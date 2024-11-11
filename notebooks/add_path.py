@@ -1,5 +1,6 @@
 from pathlib import Path
-import sysdef find_path():
+import sys
+def find_path():
     current_path = Path.cwd()
     # Navigate to the parent directory until reaching 'Multifirefly-Project'
     if 'Multifirefly-Project' in current_path.parts:
