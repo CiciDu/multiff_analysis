@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from visualization import plot_behaviors_utils
+import sysfrom visualization import plot_behaviors_utils
 from pattern_discovery import ff_dataframe_utils
 from data_wrangling import basic_func
 

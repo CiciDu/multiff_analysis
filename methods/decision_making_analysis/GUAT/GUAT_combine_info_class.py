@@ -1,7 +1,4 @@
 import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-
 from decision_making_analysis import free_selection, trajectory_info
 from decision_making_analysis.cluster_replacement import cluster_replacement_utils
 from decision_making_analysis.GUAT import GUAT_helper_class, GUAT_collect_info_class

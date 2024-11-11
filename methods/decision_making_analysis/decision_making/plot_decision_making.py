@@ -1,8 +1,5 @@
 
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from decision_making_analysis import trajectory_info
+import sysfrom decision_making_analysis import trajectory_info
 from visualization import plot_behaviors_utils, monkey_heading_functions
 from null_behaviors import show_null_trajectory
 

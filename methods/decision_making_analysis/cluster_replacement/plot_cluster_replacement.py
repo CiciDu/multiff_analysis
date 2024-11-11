@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from decision_making_analysis.decision_making import plot_decision_making
+import sysfrom decision_making_analysis.decision_making import plot_decision_making
 
 import os
 import numpy as np

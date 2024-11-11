@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from pattern_discovery import pattern_by_trials, pattern_by_trials
+import sysfrom pattern_discovery import pattern_by_trials, pattern_by_trials
 from non_behavioral_analysis import eye_positions
 
 import os

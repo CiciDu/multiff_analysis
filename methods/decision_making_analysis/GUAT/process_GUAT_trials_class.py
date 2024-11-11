@@ -1,7 +1,4 @@
 import sys
-
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
 from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_utils
 from pattern_discovery import cluster_analysis
 from visualization import plot_trials

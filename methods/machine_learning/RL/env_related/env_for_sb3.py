@@ -1,7 +1,4 @@
 import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-
 from machine_learning.RL.env_related import env_utils, base_env, more_envs
 
 import os

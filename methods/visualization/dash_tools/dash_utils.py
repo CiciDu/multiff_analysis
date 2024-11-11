@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from visualization.plotly_tools import plotly_for_monkey, plotly_for_scatterplot, plotly_for_correlation
+import sysfrom visualization.plotly_tools import plotly_for_monkey, plotly_for_scatterplot, plotly_for_correlation
 from null_behaviors import curv_of_traj_utils
 from non_behavioral_analysis import eye_positions
 

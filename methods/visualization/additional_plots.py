@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from visualization import plot_trials, plot_behaviors_utils
+import sysfrom visualization import plot_trials, plot_behaviors_utils
 
 import os
 import seaborn as sns

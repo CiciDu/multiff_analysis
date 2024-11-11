@@ -1,7 +1,6 @@
 import sys
 from tkinter import font
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
+
 from visualization import animation_utils, plot_behaviors_utils
 from null_behaviors import show_null_trajectory, find_best_arc
 

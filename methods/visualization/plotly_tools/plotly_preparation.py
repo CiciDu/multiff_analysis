@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
+import sysfrom decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
 from decision_making_analysis import free_selection, replacement, trajectory_info
 from data_wrangling import basic_func
 from pattern_discovery import cluster_analysis

@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from planning_analysis.show_planning import alt_ff_utils, show_planning_class, show_planning_utils
+import sysfrom planning_analysis.show_planning import alt_ff_utils, show_planning_class, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class, stops_near_ff_based_on_ref_class
 from planning_analysis.only_stop_ff import only_stop_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils

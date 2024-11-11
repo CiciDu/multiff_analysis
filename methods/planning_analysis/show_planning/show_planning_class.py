@@ -1,11 +1,8 @@
 
-import sys
-
-from planning_analysis.show_planning import show_planning_utils
+import sysfrom planning_analysis.show_planning import show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_utils, stops_near_ff_based_on_ref_class
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
+
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from data_wrangling import combine_info_utils, base_processing_class
 

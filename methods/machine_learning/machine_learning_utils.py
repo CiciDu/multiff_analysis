@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from planning_analysis import ml_methods_class
+import sysfrom planning_analysis import ml_methods_class
 import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go

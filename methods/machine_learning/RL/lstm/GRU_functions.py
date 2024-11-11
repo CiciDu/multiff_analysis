@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from machine_learning.RL.lstm import LSTM_functions
+import sysfrom machine_learning.RL.lstm import LSTM_functions
 import torch
 import numpy as np
 import torch.nn.functional as F

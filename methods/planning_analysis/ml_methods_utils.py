@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from planning_analysis.plan_factors import plan_factors_utils, plan_factors_class, test_vs_control_utils
+import sysfrom planning_analysis.plan_factors import plan_factors_utils, plan_factors_class, test_vs_control_utils
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.only_stop_ff import features_to_keep_utils, only_stop_ff_utils
 from planning_analysis import ml_methods_utils

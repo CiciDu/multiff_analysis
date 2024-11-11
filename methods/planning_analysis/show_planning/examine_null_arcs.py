@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from data_wrangling import basic_func
+import sysfrom data_wrangling import basic_func
 from null_behaviors import show_null_trajectory
 
 import os

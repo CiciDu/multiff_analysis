@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from data_wrangling import basic_func, process_raw_data, base_processing_class, further_processing_class, monkey_data_classes
+import sysfrom data_wrangling import basic_func, process_raw_data, base_processing_class, further_processing_class, monkey_data_classes
 from pattern_discovery import pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features
 
 

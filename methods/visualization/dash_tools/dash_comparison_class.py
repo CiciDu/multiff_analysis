@@ -1,8 +1,5 @@
 
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from visualization.dash_tools.dash_main_class_methods import dash_main_class
+import sysfrom visualization.dash_tools.dash_main_class_methods import dash_main_class
 from visualization.plotly_tools import plotly_for_correlation
 from visualization.dash_tools import dash_utils, dash_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils

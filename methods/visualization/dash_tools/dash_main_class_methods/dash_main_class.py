@@ -1,8 +1,5 @@
 
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from visualization.dash_tools import dash_utils, dash_utils
+import sysfrom visualization.dash_tools import dash_utils, dash_utils
 from visualization.dash_tools.dash_main_class_methods import dash_main_helper_class
 
 

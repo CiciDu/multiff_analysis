@@ -1,8 +1,7 @@
 import select
 import sys
 from turtle import fillcolor
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
+
 from data_wrangling import basic_func
 from visualization import plot_behaviors_utils, monkey_heading_functions
 from null_behaviors import show_null_trajectory

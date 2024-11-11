@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from planning_analysis.test_params_for_planning import params_utils, params_test_combos_class
+import sysfrom planning_analysis.test_params_for_planning import params_utils, params_test_combos_class
 from visualization.dash_tools import dash_utils
 from dash import Dash, html, Input, Output, ctx, dcc
 from dash.exceptions import PreventUpdate

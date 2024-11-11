@@ -1,7 +1,4 @@
 import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-
 
 from numpy import linalg as LA
 import numpy as np

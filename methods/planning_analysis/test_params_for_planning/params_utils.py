@@ -1,8 +1,5 @@
 
 import sys
-
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from dash import html, dcc
 import pandas as pd

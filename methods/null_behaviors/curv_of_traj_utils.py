@@ -1,8 +1,5 @@
 from re import search
 import sys
-
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
 from decision_making_analysis import trajectory_info
 from null_behaviors import find_best_arc, curvature_utils, curvature_utils
 from visualization.plotly_tools import plotly_preparation

@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from machine_learning.RL.env_related import env_utils, base_env, env_for_sb3, more_envs
+import sysfrom machine_learning.RL.env_related import env_utils, base_env, env_for_sb3, more_envs
 
 import os
 import torch

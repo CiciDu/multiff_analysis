@@ -1,7 +1,4 @@
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from data_wrangling import combine_info_utils, base_processing_class, basic_func
+import sysfrom data_wrangling import combine_info_utils, base_processing_class, basic_func
 from planning_analysis import ml_methods_class, ml_methods_utils
 from planning_analysis.only_stop_ff import only_stop_ff_class
 from planning_analysis.show_planning import alt_ff_utils

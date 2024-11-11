@@ -1,8 +1,5 @@
 
-import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-from data_wrangling import basic_func
+import sysfrom data_wrangling import basic_func
 from visualization import animation_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils

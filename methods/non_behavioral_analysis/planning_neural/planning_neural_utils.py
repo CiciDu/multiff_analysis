@@ -1,7 +1,4 @@
 import sys
-if not '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods' in sys.path:
-    sys.path.append('/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/methods')
-
 
 def add_curv_info_to_info_to_add(info_to_add, curv_df, which_ff_info):
     curv_df = curv_df.copy()
