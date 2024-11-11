@@ -1,4 +1,5 @@
-import sysfrom data_wrangling import basic_func
+import sys
+from data_wrangling import basic_func
 from visualization import plot_behaviors_utils
 from null_behaviors import show_null_trajectory, find_best_arc
 from non_behavioral_analysis import eye_positions

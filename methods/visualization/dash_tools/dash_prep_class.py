@@ -1,5 +1,6 @@
 
-import sysfrom visualization.plotly_tools import plotly_preparation, plotly_for_scatterplot, plotly_for_null_arcs, plotly_for_correlation
+import sys
+from visualization.plotly_tools import plotly_preparation, plotly_for_scatterplot, plotly_for_null_arcs, plotly_for_correlation
 from visualization.dash_tools import dash_utils, dash_utils
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class

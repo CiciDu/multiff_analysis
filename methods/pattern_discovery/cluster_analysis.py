@@ -1,4 +1,5 @@
-import sysfrom visualization import plot_behaviors_utils
+import sys
+from visualization import plot_behaviors_utils
 from pattern_discovery import ff_dataframe_utils
 from data_wrangling import basic_func
 

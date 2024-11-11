@@ -1,4 +1,5 @@
-import sysfrom decision_making_analysis.decision_making import decision_making_utils
+import sys
+from decision_making_analysis.decision_making import decision_making_utils
 
 from data_wrangling import basic_func
 from pattern_discovery import cluster_analysis, pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils

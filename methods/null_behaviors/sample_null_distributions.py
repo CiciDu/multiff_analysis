@@ -1,4 +1,5 @@
-import sysfrom null_behaviors import show_null_trajectory
+import sys
+from null_behaviors import show_null_trajectory
 
 import os
 import numpy as np

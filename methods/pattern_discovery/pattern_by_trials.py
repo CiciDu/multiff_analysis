@@ -1,4 +1,5 @@
-import sysfrom data_wrangling import basic_func
+import sys
+from data_wrangling import basic_func
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 
 import os

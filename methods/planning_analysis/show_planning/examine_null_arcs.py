@@ -1,4 +1,5 @@
-import sysfrom data_wrangling import basic_func
+import sys
+from data_wrangling import basic_func
 from null_behaviors import show_null_trajectory
 
 import os

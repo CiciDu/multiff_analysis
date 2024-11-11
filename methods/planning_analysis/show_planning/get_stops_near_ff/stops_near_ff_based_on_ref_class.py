@@ -1,4 +1,5 @@
-import sysfrom null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, optimal_arc_utils
+import sys
+from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, optimal_arc_utils
 from planning_analysis.show_planning import alt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_class
 from visualization import monkey_heading_functions

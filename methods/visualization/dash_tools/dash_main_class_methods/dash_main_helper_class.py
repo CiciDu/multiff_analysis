@@ -1,5 +1,6 @@
 
-import sysfrom visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot
+import sys
+from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot
 from visualization.dash_tools import dash_prep_class, dash_utils, dash_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_monkey_heading_helper_class
 from visualization import monkey_heading_functions

@@ -1,4 +1,5 @@
-import sysfrom visualization.plotly_tools import plotly_for_monkey, plotly_for_scatterplot, plotly_for_correlation
+import sys
+from visualization.plotly_tools import plotly_for_monkey, plotly_for_scatterplot, plotly_for_correlation
 from null_behaviors import curv_of_traj_utils
 from non_behavioral_analysis import eye_positions
 

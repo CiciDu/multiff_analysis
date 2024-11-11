@@ -1,5 +1,6 @@
 
-import sysfrom decision_making_analysis import trajectory_info
+import sys
+from decision_making_analysis import trajectory_info
 from visualization import plot_behaviors_utils, monkey_heading_functions
 from null_behaviors import show_null_trajectory
 

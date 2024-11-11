@@ -1,5 +1,6 @@
 
-import sysfrom decision_making_analysis.decision_making import decision_making_utils
+import sys
+from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from decision_making_analysis import trajectory_info

@@ -1,4 +1,5 @@
-import sysfrom data_wrangling import basic_func, base_processing_class
+import sys
+from data_wrangling import basic_func, base_processing_class
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
 from visualization import animation_func, animation_utils, plot_trials, plot_behaviors_utils
 from data_wrangling import base_processing_class

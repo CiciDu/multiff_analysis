@@ -1,4 +1,5 @@
-import sysfrom decision_making_analysis.decision_making import plot_decision_making
+import sys
+from decision_making_analysis.decision_making import plot_decision_making
 
 import os
 import numpy as np

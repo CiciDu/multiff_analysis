@@ -1,4 +1,5 @@
-import sysfrom decision_making_analysis.cluster_replacement import cluster_replacement_utils, plot_cluster_replacement
+import sys
+from decision_making_analysis.cluster_replacement import cluster_replacement_utils, plot_cluster_replacement
 from decision_making_analysis.decision_making import decision_making_class, plot_decision_making
 from decision_making_analysis import free_selection
 from null_behaviors import curvature_utils, curv_of_traj_utils

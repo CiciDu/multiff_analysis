@@ -1,5 +1,6 @@
 
-import sysfrom decision_making_analysis.decision_making import intended_targets_classes
+import sys
+from decision_making_analysis.decision_making import intended_targets_classes
 from null_behaviors import show_null_trajectory, find_best_arc, curvature_utils, curv_of_traj_utils
 
 

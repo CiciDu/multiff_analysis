@@ -1,6 +1,7 @@
 
 from multiprocessing import Value
-import sysfrom null_behaviors import curv_of_traj_utils
+import sys
+from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 import os
 import numpy as np

@@ -1,4 +1,5 @@
-import sysfrom visualization import plot_trials, plot_behaviors_utils
+import sys
+from visualization import plot_trials, plot_behaviors_utils
 
 import os
 import seaborn as sns

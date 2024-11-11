@@ -1,5 +1,6 @@
 
-import sysfrom visualization.dash_tools import dash_utils, dash_utils
+import sys
+from visualization.dash_tools import dash_utils, dash_utils
 from visualization.dash_tools.dash_main_class_methods import dash_main_helper_class
 
 

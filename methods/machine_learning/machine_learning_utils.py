@@ -1,4 +1,5 @@
-import sysfrom planning_analysis import ml_methods_class
+import sys
+from planning_analysis import ml_methods_class
 import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go

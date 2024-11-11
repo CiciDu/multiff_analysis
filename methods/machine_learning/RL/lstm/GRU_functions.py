@@ -1,4 +1,5 @@
-import sysfrom machine_learning.RL.lstm import LSTM_functions
+import sys
+from machine_learning.RL.lstm import LSTM_functions
 import torch
 import numpy as np
 import torch.nn.functional as F

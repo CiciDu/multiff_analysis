@@ -1,4 +1,5 @@
-import sysfrom decision_making_analysis.cluster_replacement import cluster_replacement_class, cluster_replacement_utils
+import sys
+from decision_making_analysis.cluster_replacement import cluster_replacement_class, cluster_replacement_utils
 from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT
 from decision_making_analysis import free_selection, trajectory_info

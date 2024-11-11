@@ -1,5 +1,6 @@
 
-import sysfrom visualization import plot_behaviors_utils, plot_trials
+import sys
+from visualization import plot_behaviors_utils, plot_trials
 from null_behaviors import show_null_trajectory
 from pattern_discovery import ff_dataframe_utils
 
