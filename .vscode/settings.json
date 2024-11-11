@@ -1,3 +1,8 @@
 {
-    "search.useReplacePreview": false
+    "search.useReplacePreview": false,
+
+    "flake8.args": [
+        "--max-line-length", "150",
+        "--extend-ignore", "E203,E302,E305,E402"
+    ],
 }
