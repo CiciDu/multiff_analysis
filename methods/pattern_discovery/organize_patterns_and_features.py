@@ -111,10 +111,6 @@ def make_all_trial_patterns(caught_ff_num, n_ff_in_a_row, visible_before_last_on
 		return all_trial_patterns
 
 
-
-
-
-
 def make_pattern_frequencies(all_trial_patterns, ff_caught_T_sorted, monkey_information, data_folder_name=None):
     pattern_frequencies = pd.DataFrame([], columns=['Item', 'Frequency', 'N_total', 'Rate', 'Group'])
     n_trial_counted = len(all_trial_patterns)-1

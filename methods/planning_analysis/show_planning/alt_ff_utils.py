@@ -124,7 +124,7 @@ def add_distance_between_stop_and_ff_center(all_closest_point_to_capture_df, mon
     df[['monkey_x', 'monkey_y']] = monkey_information.loc[df['stop_point_index'].values, ['monkey_x', 'monkey_y']].values
 
     df['caught_time_point_index'] = np.searchsorted(monkey_information['monkey_t'].values,
-                                                                                df['caught_time'].values)
+                                                   df['caught_time'].values)
 
 
     df[['caught_time_monkey_x', 'caught_time_monkey_y']] = monkey_information.loc[df['caught_time_point_index'].values, ['monkey_x', 'monkey_y']].values

@@ -114,9 +114,10 @@ def find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center, reward_boun
     rotation_matrix = np.array(((c, -s), (s, c)))
 
     mxy_rotated = np.matmul(rotation_matrix, np.stack((monkey_x, monkey_y)))
+    ff_center_rotated = np.matmul(rotation_matrix, ff_center)
 
-    x0 = mxy_rotated[0, 0]
-    y0 = mxy_rotated[1, 0]
+    x0 = ff_center_rotated[0]
+    y0 = ff_center_rotated[1]
 
     return mxy_rotated, x0, y0
 
@@ -156,20 +157,20 @@ def plot_null_arc_landings_in_ff(null_arc_info,
 
 def _make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=25, set_xy_limit=True):
     # plot a circle with radius reward_boundary_radius that centers at (0, reward_boundary_radius)
-    circle = plt.Circle((0, reward_boundary_radius), reward_boundary_radius, color='b', fill=False)
+    circle = plt.Circle((0, 0), reward_boundary_radius, color='b', fill=False)
     ax.add_artist(circle)
     ax.set_aspect('equal')
     
     if set_xy_limit:
         ax.set_xlim(-reward_boundary_radius, reward_boundary_radius)
-        ax.set_ylim(0, reward_boundary_radius * 2)
+        ax.set_ylim(-reward_boundary_radius, reward_boundary_radius)
     return ax
 
 
 def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
                                monkey_information,
                                ff_real_position_sorted,
-                                starting_trial=1,
+                                starting_trial=0,
                                 max_trials=100,
                                 reward_boundary_radius=25):
 
@@ -187,6 +188,8 @@ def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
         if len(monkey_sub) == 0:
             print(f"no monkey_sub for ff_index {row.stop_ff_index} at time {row.time}")
             continue
+
+        monkey_sub.sort_values('time', inplace=True)
         mxy_rotated, x0, y0 = find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center=ff_real_position_sorted[int(row.stop_ff_index)], reward_boundary_radius=reward_boundary_radius)
         
         ax = show_xy_overlapped(ax, mxy_rotated, x0, y0)
@@ -195,6 +198,8 @@ def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
             break
         trial_counter += 1
 
+    # plot the ff center
+    ax.plot(0, 0, 'r*', markersize=10)
     ax = _make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=True)
 
     plt.show()
@@ -202,21 +207,21 @@ def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
 
 
 
-def show_xy_overlapped(ax, mxy_rotated, x0, y0, reward_boundary_radius=25):
+def show_xy_overlapped(ax, mxy_rotated, x0, y0):
     # plot mxy_rotated
     ax.plot(mxy_rotated[0]-x0, mxy_rotated[1]-y0, alpha=0.5)
     # plot the ending point of the monkey's trajectory
     ax.plot(mxy_rotated[0, -1]-x0, mxy_rotated[1, -1]-y0, 'ro', markersize=3, alpha=0.3)
-    # plot the ff center
-    ax.plot(0, reward_boundary_radius, 'r*', markersize=10)
     return ax
 
 
-def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted):
-    reward_boundary_radius = 25
-
+def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted,
+                                                          reward_boundary_radius=25):
+    
     list_of_distance = []
     list_of_angle = []
+    list_of_rel_stop_x = []
+    list_of_rel_stop_y = []
     for index, row in all_closest_point_to_capture_df.iterrows():
 
         monkey_sub = iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, int(row.stop_ff_index), row.time, initial_duration_before_stop=2, 
@@ -224,17 +229,22 @@ def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_c
         if len(monkey_sub) == 0:
             print(f"no monkey_sub for ff_index {row.stop_ff_index} at time {row.time}")
             continue
+
+        monkey_sub.sort_values('time', inplace=True)
         
         mxy_rotated, x0, y0 = find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center=ff_real_position_sorted[int(row.stop_ff_index)])
         stop_x = mxy_rotated[0, -1]-x0
         stop_y = mxy_rotated[1, -1]-y0
         ff_x = 0
-        ff_y = reward_boundary_radius
-        distance = 25 - np.sqrt((stop_x - ff_x)**2 + (stop_y - ff_y)**2)
+        ff_y = 0
+        distance = np.sqrt((stop_x - ff_x)**2 + (stop_y - ff_y)**2)
         # calculate the angle from the ff center to the monkey's stop point ("monkey_angle" will be just to the north)
         angle = basic_func.calculate_angles_to_ff_centers(ff_x=stop_x, ff_y=stop_y, mx=ff_x, my=ff_y, m_angle=math.pi/2)
         list_of_distance.append(distance)
         list_of_angle.append(angle)
-    df = pd.DataFrame({'distance': list_of_distance, 'angle': list_of_angle})
+        list_of_rel_stop_x.append(stop_x)
+        list_of_rel_stop_y.append(stop_y)
+    df = pd.DataFrame({'distance': list_of_distance, 'angle': list_of_angle,
+                        'rel_stop_x': list_of_rel_stop_x, 'rel_stop_y': list_of_rel_stop_y})
     df['angle_in_degrees'] = np.degrees(df['angle'])
     return df
