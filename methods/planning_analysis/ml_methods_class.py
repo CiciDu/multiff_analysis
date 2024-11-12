@@ -392,7 +392,7 @@ class MlMethods():
                                                     use_combd_features_for_cluster_only=use_combd_features_for_cluster_only)
 
         if (self.data_source.x_var_df.shape[0] == 0) or (self.data_source.x_var_df.shape[1] == 0):
-            return
+            return {}
         self.use_train_test_split(self.data_source.x_var_df, self.data_source.y_var_df, y_var_column=y_var_column, remove_outliers=True)
 
         param_info_to_record = {'y_var_column': [y_var_column],
