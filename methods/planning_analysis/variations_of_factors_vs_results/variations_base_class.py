@@ -127,7 +127,8 @@ class _VariationsBase():
                                                  save_data=True, 
                                                  combd_heading_df_x_sessions_exists_ok=True, 
                                                 stops_near_ff_df_exists_ok=True, 
-                                                heading_info_df_exists_ok=True,):
+                                                heading_info_df_exists_ok=True,
+                                                process_info_for_plotting=True):
         df_path = os.path.join(self.combd_planning_info_folder_path, 'stop_and_alt/data_comparison', file_name)
         if exists_ok & exists(df_path):
             self.overall_all_median_info = pd.read_csv(df_path).drop(columns=['Unnamed: 0'])
@@ -149,10 +150,19 @@ class _VariationsBase():
                                                                                             },
                                                                         path_to_save=df_path,
                                                                         )
+            
+        self.overall_all_median_info['monkey_name'] = self.monkey_name
+        self.overall_all_median_info['optimal_arc_type'] = self.optimal_arc_type
+        self.overall_all_median_info['curv_traj_window_before_stop'] = str(self.curv_traj_window_before_stop)
+
+        if process_info_for_plotting:
+            self.process_overall_all_median_info_to_plot_heading_and_curv()
+
         return self.overall_all_median_info
+    
 
     def make_or_retrieve_all_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                       ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True):
+                                       ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True, process_info_for_plotting=True):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
         
@@ -167,7 +177,26 @@ class _VariationsBase():
             if save_data:
                 self.all_perc_info.to_csv(self.all_perc_info_path)
             print('Stored new all_perc_info in ', self.all_perc_info_path)
+
+        self.all_perc_info['monkey_name'] = self.monkey_name
+        self.all_perc_info['optimal_arc_type'] = self.optimal_arc_type
+        self.all_perc_info['curv_traj_window_before_stop'] = str(self.curv_traj_window_before_stop)
+
+        if process_info_for_plotting:
+            self.process_all_perc_info_to_plot_direction()
+
         return self.all_perc_info
+
+
+    def process_overall_all_median_info_to_plot_heading_and_curv(self):
+        self.all_median_info_heading  = process_variations_utils.make_new_df_for_plotly_comparison(self.overall_all_median_info)
+        self.all_median_info_curv = self.all_median_info_heading.copy()
+        self.all_median_info_curv['sample_size'] = self.all_median_info_curv['sample_size_for_curv']
+
+
+    def process_all_perc_info_to_plot_direction(self):
+        self.all_perc_info_new = process_variations_utils.make_new_df_for_plotly_comparison(self.all_perc_info, 
+                                                                 match_rows_based_on_ref_columns_only=False)
 
 
     def make_or_retrieve_all_stop_and_alt_lr_df(self, ref_point_params_based_on_mode=None, exists_ok=True):   
@@ -188,6 +217,7 @@ class _VariationsBase():
                                                                     )
         return self.all_stop_and_alt_lr_df
     
+
     def make_or_retrieve_all_stop_and_alt_lr_pred_ff_df(self, ref_point_params_based_on_mode=None, exists_ok=True):
         df_path = self.stop_and_alt_lr_pred_ff_df_path
         if exists_ok:

@@ -4,7 +4,7 @@ from planning_analysis.show_planning import alt_ff_utils, show_planning_class, s
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class, stops_near_ff_based_on_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, test_vs_control_utils, plan_factors_class
 from planning_analysis.agent_analysis import agent_plan_factors_class
-from planning_analysis.variations_of_factors_vs_results import variations_base_class
+from planning_analysis.variations_of_factors_vs_results import variations_base_class, plot_variations_class
 from planning_analysis import ml_methods_utils, ml_methods_class
 from data_wrangling import basic_func, combine_info_utils, base_processing_class
 import os
@@ -26,7 +26,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class PlanAcrossSessions(variations_base_class._VariationsBase):
+class PlanAcrossSessions(plot_variations_class.PlotVariations):
 
     dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
 
@@ -172,3 +172,14 @@ class PlanAcrossSessions(variations_base_class._VariationsBase):
         self.combd_plan_x_both = pd.concat([self.combd_plan_x_both, self.pf.plan_x_both], axis=0)
         self.sessions_df_for_one_monkey.loc[self.sessions_df_for_one_monkey['data_name'] == data_name, 'finished'] = True
 
+
+    def combine_overall_all_median_info_across_monkeys_and_optimal_arc_types(self):
+        self.overall_all_median_info = make_variations_utils.combine_overall_all_median_info_across_monkeys_and_optimal_arc_types()
+        self.process_overall_all_median_info_to_plot_heading_and_curv()
+        return self.overall_all_median_info
+        
+
+    def combine_all_perc_info_across_monkeys(self):
+        self.all_perc_info = make_variations_utils.combine_all_perc_info_across_monkeys()
+        self.process_all_perc_info_to_plot_direction()
+        return self.all_perc_info

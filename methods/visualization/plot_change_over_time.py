@@ -79,6 +79,15 @@ def get_title_str(one_pattern_df, x, y):
     return title_str  
 
 
+def prepare_for_subplots(num_items):
+    num_cols = 2
+    num_rows = (num_items + num_cols - 1) // num_cols
+
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows))
+    axes = axes.flatten()
+    return fig, axes
+
+
 def plot_the_changes_over_time_for_two_monkeys(merged_df, x="Data", y="Rate", title_column="Label", category_order=None):
     """
     Compare datasets using scatterplots with fitted linear regression lines.
@@ -98,13 +107,7 @@ def plot_the_changes_over_time_for_two_monkeys(merged_df, x="Data", y="Rate", ti
     if category_order is None:
         category_order = merged_df[title_column].unique()
 
-    num_items = len(category_order)
-    num_cols = 2
-    num_rows = (num_items + num_cols - 1) // num_cols
-
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows))
-    axes = axes.flatten()
-
+    fig, axes = prepare_for_subplots(len(category_order))
 
     for i, item in enumerate(category_order):
         one_pattern_df = merged_df[merged_df['Item'] == item]
@@ -132,7 +135,7 @@ def plot_the_changes_over_time_for_two_monkeys(merged_df, x="Data", y="Rate", ti
 
 
 
-def plot_the_changes_over_time(merged_df, x="Data", y="Rate", title_column="Label", monkey_name='', category_order=None):
+def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_column="Label", monkey_name='', category_order=None):
     """
     Compare datasets using scatterplots with fitted linear regression lines.
 
@@ -152,12 +155,7 @@ def plot_the_changes_over_time(merged_df, x="Data", y="Rate", title_column="Labe
     if category_order is None:
         category_order = merged_df[title_column].unique()
 
-    num_items = len(category_order)
-    num_cols = 2
-    num_rows = (num_items + num_cols - 1) // num_cols
-
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows))
-    axes = axes.flatten()
+    fig, axes = prepare_for_subplots(len(category_order))
 
     for i, item in enumerate(category_order):
         one_pattern_df = merged_df[merged_df['Item'] == item]
@@ -175,3 +173,38 @@ def plot_the_changes_over_time(merged_df, x="Data", y="Rate", title_column="Labe
     plt.tight_layout()
     plt.show()
 
+
+
+def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], monkey_name=''):
+    """
+    Compare datasets using scatterplots with fitted linear regression lines.
+
+    Parameters:
+    merged_df (pd.DataFrame): Merged DataFrame containing the data.
+    x (str): Column name for the x-axis.
+    y (str): Column name for the y-axis.
+    title_column (str): Column name for the title.
+    monkey_name (str): Name of the monkey.
+    category_order (list): Order of categories to plot.
+
+    Returns:
+    None
+    """
+    sns.set_style("darkgrid")
+
+    fig, axes = prepare_for_subplots(len(y_columns))
+
+    for i, y in enumerate(y_columns):
+        ax = axes[i]
+
+        plot_regression(ax, x, y, merged_df)
+
+        title_str = get_title_str(merged_df, x, y)
+        ax.set_title(f"{monkey_name}: {y}\n" + title_str, fontsize=12)
+        customize_axes(ax, x)
+
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    plt.tight_layout()
+    plt.show()

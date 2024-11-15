@@ -36,9 +36,6 @@ def _find_first_and_second_dim(original_df, changeable_variables, combinations):
     if len(changeable_variables) == 0:
         first_dim = 0
         second_dim = 0
-    elif len(changeable_variables) == 1:
-        first_dim = math.ceil(original_df[changeable_variables[0]].nunique()/2)
-        second_dim = 2
     elif len(changeable_variables) == 2:
         first_dim = original_df[changeable_variables[0]].nunique()
         second_dim = original_df[changeable_variables[1]].nunique()
@@ -138,7 +135,7 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                 fig.show()
 
     if use_subplots_based_on_changeable_variables:
-        fig.update_layout(height=450 * first_dim, width=450 * second_dim)
+        fig.update_layout(height=400 * first_dim, width=450 * second_dim)
         fig.show()
 
 
@@ -310,22 +307,55 @@ def label_smallest_y_sample_size(fig, sub_df, y_var_column,
                 mode='text',
                 text=[text],
                 textposition='bottom center',
-                showlegend=False
+                showlegend=False,
+                hoverinfo='skip'
             ), row=row_number, col=col_number)
             
     return fig
 
 
+def _make_hovertemplate(df, y_var_column, customdata_columns):
+    """
+    Create a hover template for Plotly plots.
 
-def _make_hovertemplate(y_var_column, customdata_columns):
+    Parameters:
+    y_var_column (str): The column name for the y-axis variable.
+    customdata_columns (list): A list of column names to include in the hover template.
+
+    Returns:
+    tuple: A tuple containing the hover template string and the updated customdata_columns list.
+    """
     if 'sample_size' not in customdata_columns:
         customdata_columns = ['sample_size'] + customdata_columns
+    df['sample_size'] = df['sample_size'].astype(int)
     customdata_columns = ['var_to_split_value'] + customdata_columns
+
     hovertemplate_parts = [f"%{{customdata[{0}]}} <br>" + 
                            f"{y_var_column}: %{{y}}<br>"]
-    hovertemplate_parts += [f"{col}: %{{customdata[{i}]:.2f}}<br>" for i, col in enumerate(customdata_columns) if (i > 0)]
+
+    for i, col in enumerate(customdata_columns):
+        if i > 0:  # Skip the first element as it's already added
+            dtype = df[col].dtype
+            if (dtype == 'str') | (dtype == 'O'):
+                hovertemplate_parts.append(f"{col}: %{{customdata[{i}]}}<br>")
+            elif dtype == 'int':
+                hovertemplate_parts.append(f"{col}: %{{customdata[{i}]:d}}<br>")
+            else:  # Assume numerical
+                hovertemplate_parts.append(f"{col}: %{{customdata[{i}]:.2f}}<br>")
+
     hovertemplate = "".join(hovertemplate_parts) + "<extra></extra>"
     return hovertemplate, customdata_columns
+
+
+# def _make_hovertemplate(y_var_column, customdata_columns):
+#     if 'sample_size' not in customdata_columns:
+#         customdata_columns = ['sample_size'] + customdata_columns
+#     customdata_columns = ['var_to_split_value'] + customdata_columns
+#     hovertemplate_parts = [f"%{{customdata[{0}]}} <br>" + 
+#                            f"{y_var_column}: %{{y}}<br>"]
+#     hovertemplate_parts += [f"{col}: %{{customdata[{i}]:.2f}}<br>" for i, col in enumerate(customdata_columns) if (i > 0)]
+#     hovertemplate = "".join(hovertemplate_parts) + "<extra></extra>"
+#     return hovertemplate, customdata_columns
     
 
 marker_partial_kwargs = dict(mode='markers',
@@ -353,11 +383,12 @@ def plot_markers_for_data_comparison(fig,
 
     # drop na in sub_df
     sub_df = sub_df.dropna(subset=[y_var_column])
-    hovertemplate, customdata_columns = _make_hovertemplate(y_var_column, customdata_columns)
+    hovertemplate, customdata_columns = _make_hovertemplate(sub_df, y_var_column, customdata_columns)
 
     showlegend=True
-    if (row_number != 1) | (col_number != 1):
-        showlegend = False
+    if (row_number is not None) & (col_number is not None):
+        if (row_number != 1) | (col_number != 1):
+            showlegend = False
 
     for line_color in sub_df['line_color'].unique():
         sub_df2 = sub_df[sub_df['line_color'] == line_color].copy()
@@ -387,6 +418,7 @@ def plot_markers_for_data_comparison(fig,
                                         line=dict(width=1.5,
                                                 color=line_color),
                                         showlegend=False,
+                                        hoverinfo='skip',
                                     ),
                                 row=row_number, col=col_number
                                 )
@@ -398,7 +430,7 @@ def connect_every_pair(fig, sub_df, y_var_column, customdata_columns, show_combo
                         col_number=None,                       
                        ):
 
-    hovertemplate, customdata_columns = _make_hovertemplate(y_var_column, customdata_columns)
+    hovertemplate, customdata_columns = _make_hovertemplate(sub_df, y_var_column, customdata_columns)
     for pair_id in sub_df['pair_id'].unique():
 
         # Find the index of the rows corresponding to the current x value
@@ -436,8 +468,9 @@ def _add_color_legends(fig, sub_df,
                        ):
     
     showlegend=True
-    if (row_number != 1) | (col_number != 1):
-        showlegend = False
+    if (row_number is not None) & (col_number is not None):
+        if (row_number != 1) | (col_number != 1):
+            showlegend = False
 
     color_to_show_legend = sub_df[['color', 'unique_combination']].drop_duplicates()
     if len(color_to_show_legend) > 1:
@@ -460,8 +493,9 @@ def _add_line_type_legends(fig, sub_df,
                             col_number=None,                            
                            ):
     showlegend=True
-    if (row_number != 1) | (col_number != 1):
-        showlegend = False
+    if (row_number is not None) & (col_number is not None):
+        if (row_number != 1) | (col_number != 1):
+            showlegend = False
 
     line_type_to_show_legend = sub_df[['line_type', 'unique_combination_for_line']].drop_duplicates()
     if len(line_type_to_show_legend) > 1:

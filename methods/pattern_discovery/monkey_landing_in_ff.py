@@ -1,0 +1,205 @@
+import sys
+from data_wrangling import basic_func
+from null_behaviors import show_null_trajectory
+from planning_analysis.show_planning import examine_null_arcs, alt_ff_utils
+
+import os
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib import rc
+from math import pi
+import os, sys
+import math
+
+plt.rcParams["animation.html"] = "html5"
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+rc('animation', html='jshtml')
+matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+matplotlib.rcParams['animation.embed_limit'] = 2**128
+pd.set_option('display.float_format', lambda x: '%.5f' % x)
+np.set_printoptions(suppress=True)
+pd.options.display.max_rows = 101
+
+
+def iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, initial_duration_before_stop=2, reward_boundary_radius=25):
+    # This function will iteratively get monkey's info before the stop until it contains at least one point before entering the reward boundary
+    duration_before_stop = initial_duration_before_stop
+    duration_counter = 1
+    monkey_sub = _get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, duration_before_stop, duration_counter=duration_counter)
+    # if all the points are within reward_boundary, then we might not have covered all points, in which case we will use a longer time
+    while monkey_sub['distance_to_ff_center'].max() < reward_boundary_radius:
+        duration_counter += 1
+        print(f"duration_counter: {duration_counter}")
+        monkey_sub = _get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, duration_before_stop, duration_counter=duration_counter)
+    monkey_sub = monkey_sub[monkey_sub['distance_to_ff_center'] <= reward_boundary_radius]
+    return monkey_sub
+
+
+def _get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, duration_before_stop, duration_counter=1):
+    # for the 2 seconds before the stop, get the monkey's trajectory and calculate the distance to the ff center
+    monkey_sub = monkey_information[monkey_information['time'].between(time-duration_before_stop * duration_counter, time)].copy()
+    monkey_sub[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_index]
+    monkey_sub['distance_to_ff_center'] = np.sqrt((monkey_sub['ff_x'] - monkey_sub['monkey_x'])**2 + (monkey_sub['ff_y'] - monkey_sub['monkey_y'])**2)
+    return monkey_sub
+
+
+def find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center, reward_boundary_radius=25):
+    # get info to plot the monkey's trajectory into the circle. We assume the entry point at the reward boundary is the origin, 
+    # and we let the ff center to toward the north
+
+    monkey_sub2 = monkey_sub[monkey_sub['distance_to_ff_center'] <= reward_boundary_radius].copy()
+    monkey_x = monkey_sub2['monkey_x'].values
+    monkey_y = monkey_sub2['monkey_y'].values
+
+    # Find the angle from the starting point to the target
+    theta = pi/2-np.arctan2(ff_center[1]-monkey_y[0], ff_center[0]-monkey_x[0])     
+    c, s = np.cos(theta), np.sin(theta)
+    # Find the rotation matrix
+    rotation_matrix = np.array(((c, -s), (s, c)))
+
+    mxy_rotated = np.matmul(rotation_matrix, np.stack((monkey_x, monkey_y)))
+    ff_center_rotated = np.matmul(rotation_matrix, ff_center)
+
+    x0 = ff_center_rotated[0]
+    y0 = ff_center_rotated[1]
+
+    return mxy_rotated, x0, y0
+
+
+def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
+                               monkey_information,
+                               ff_real_position_sorted,
+                                starting_trial=0,
+                                max_trials=100,
+                                reward_boundary_radius=25):
+
+    # for each point_index & corresponding ff_index, find the point where monkey first enters the reward boundary
+    # then make a polar plot, using that entry point as the reference, and let the ff center to be to the north
+    # then plot the monkey's trajectory into the circle
+
+    trial_counter=1
+    fig, ax = plt.subplots()
+
+    for index, row in all_closest_point_to_capture_df.iloc[starting_trial:].iterrows():
+        #point_index = int(row.point_index)
+
+        monkey_sub = iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, int(row.stop_ff_index), row.time, initial_duration_before_stop=2, reward_boundary_radius=reward_boundary_radius)
+        if len(monkey_sub) == 0:
+            #print(f"no monkey_sub for ff_index {row.stop_ff_index} at time {row.time}")
+            continue
+
+        monkey_sub.sort_values('time', inplace=True)
+        mxy_rotated, x0, y0 = find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center=ff_real_position_sorted[int(row.stop_ff_index)], reward_boundary_radius=reward_boundary_radius)
+        
+        ax = examine_null_arcs.show_xy_overlapped(ax, mxy_rotated, x0, y0)
+
+        if trial_counter > max_trials:
+            break
+        trial_counter += 1
+
+    # plot the ff center
+    ax.plot(0, 0, 'r*', markersize=10)
+    ax = examine_null_arcs._make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=True)
+
+    plt.show()
+    return
+
+
+
+def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted,
+                                                          reward_boundary_radius=25):
+    
+    list_of_distance = []
+    list_of_angle = []
+    list_of_rel_stop_x = []
+    list_of_rel_stop_y = []
+    list_of_stop_ff_index = []
+    list_of_stop_point_index = []
+    for index, row in all_closest_point_to_capture_df.iterrows():
+
+        monkey_sub = iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, int(row.stop_ff_index), row.time, initial_duration_before_stop=2, 
+                                                        reward_boundary_radius=reward_boundary_radius)
+        if len(monkey_sub) == 0:
+            #print(f"no monkey_sub for ff_index {row.stop_ff_index} at time {row.time}")
+            continue
+
+        monkey_sub.sort_values('time', inplace=True)
+        
+        mxy_rotated, x0, y0 = find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center=ff_real_position_sorted[int(row.stop_ff_index)])
+        stop_x = mxy_rotated[0, -1]-x0
+        stop_y = mxy_rotated[1, -1]-y0
+        ff_x = 0
+        ff_y = 0
+        distance = np.sqrt((stop_x - ff_x)**2 + (stop_y - ff_y)**2)
+        # calculate the angle from the ff center to the monkey's stop point ("monkey_angle" will be just to the north)
+        angle = basic_func.calculate_angles_to_ff_centers(ff_x=stop_x, ff_y=stop_y, mx=ff_x, my=ff_y, m_angle=math.pi/2)
+        list_of_distance.append(distance)
+        list_of_angle.append(angle)
+        list_of_rel_stop_x.append(stop_x)
+        list_of_rel_stop_y.append(stop_y)
+        list_of_stop_ff_index.append(row.stop_ff_index)
+        list_of_stop_point_index.append(row.stop_point_index)
+
+    df = pd.DataFrame({'stop_point_index': list_of_stop_point_index, 'stop_ff_index': list_of_stop_ff_index,
+                        'distance_from_ff_to_stop': list_of_distance, 'angle_from_ff_to_stop': list_of_angle,
+                        'stop_x_rel_to_ff': list_of_rel_stop_x, 'stop_y_rel_to_ff': list_of_rel_stop_y})
+    
+    df['angle_in_degrees_from_ff_to_stop'] = np.degrees(df['angle_from_ff_to_stop'])
+
+    return df
+
+
+def add_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted,
+                                                          reward_boundary_radius=25):
+    
+    df = find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted, reward_boundary_radius=reward_boundary_radius)
+    all_closest_point_to_capture_df = all_closest_point_to_capture_df.merge(df, on=['stop_point_index', 'stop_ff_index'], how='left')
+    return all_closest_point_to_capture_df
+
+
+def get_valid_subset_to_construct_scatter_df(ff_caught_T_sorted, monkey_information, ff_real_position_sorted):
+    all_closest_point_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)))
+    all_closest_point_to_capture_df2 = add_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted)
+    valid_subset = all_closest_point_to_capture_df2[all_closest_point_to_capture_df2['distance_from_ff_to_stop'] <= 25].copy()
+    total_len = len(all_closest_point_to_capture_df)
+    invalid_len = total_len - len(valid_subset)
+    print(f'{invalid_len} out of {total_len} are not within 25 cm of ff center, which is {invalid_len/total_len*100:.2f}%. These are excluded')
+    return valid_subset
+
+
+def make_scatter_df(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, make_plot=True):
+    valid_subset = get_valid_subset_to_construct_scatter_df(ff_caught_T_sorted, monkey_information, ff_real_position_sorted)
+
+    if make_plot:
+        plot_monkey_landings_in_ff(valid_subset, monkey_information, ff_real_position_sorted)
+
+    # get the mean, std, 25%, 50%, 75% of distance, angle, and abs_angle
+    scatter_df = valid_subset[['distance_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
+    scatter_df['iqr'] = scatter_df['75%'] - scatter_df['25%']
+    scatter_df.columns = ['distance_' + i for i in scatter_df.columns]
+    scatter_df.reset_index(inplace=True, drop=True)
+
+    scatter_df_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
+    scatter_df_angle['iqr'] = scatter_df_angle['75%'] - scatter_df_angle['25%']
+    scatter_df_angle.columns = ['angle_' + i for i in scatter_df_angle.columns]
+    scatter_df_angle.reset_index(inplace=True, drop=True)
+    scatter_df = pd.concat([scatter_df, scatter_df_angle], axis=1)
+
+    scatter_df_abs_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].abs().describe().T[['mean', 'std', '25%', '50%', '75%']]
+    scatter_df_abs_angle['iqr'] = scatter_df_abs_angle['75%'] - scatter_df_abs_angle['25%']
+    scatter_df_abs_angle.columns = ['abs_angle_' + i for i in scatter_df_abs_angle.columns]
+    scatter_df_abs_angle.reset_index(inplace=True, drop=True)
+    scatter_df = pd.concat([scatter_df, scatter_df_abs_angle], axis=1)
+
+    # get the percentage of points in each quadrant
+    quadrants = {1: [-90, 0], 2: [0, 90], 3: [90, 180], 4: [-180, -90]}
+    for quad in range(1, 5):
+        valid_subset2 = valid_subset[(valid_subset['angle_in_degrees_from_ff_to_stop'] >= quadrants[quad][0]) & (valid_subset['angle_in_degrees_from_ff_to_stop'] < quadrants[quad][1])].copy()
+        col_name = f'Q{quad}_perc'
+        perc = len(valid_subset2)/len(valid_subset) * 100
+        scatter_df[col_name] = perc
+    return scatter_df
+

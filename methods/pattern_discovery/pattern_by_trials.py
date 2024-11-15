@@ -275,6 +275,8 @@ def ignore_sudden_flash_func(ff_dataframe, ff_real_position_sorted, max_point_in
 
 
   """
+  ff_dataframe = ff_dataframe.sort_values(by=['ff_index', 'point_index'])
+  
   # These are the indices in ff_dataframe where a ff changes from being invisible to become visible
   start_index1 = np.where(np.ediff1d(np.array(ff_dataframe['visible'])) == 1)[0]+1
   # These are the indices in ff_dataframe where the ff_index has changed, meaning that an invisible firefly has become visible

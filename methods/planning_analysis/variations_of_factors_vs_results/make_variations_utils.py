@@ -2,6 +2,7 @@
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.plan_factors import plan_factors_utils
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
+from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
 from data_wrangling import basic_func
 import seaborn as sns
 import pandas as pd
@@ -14,6 +15,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from math import pi
+import contextlib
+import plotly.express as px
+import plotly.graph_objects as go
+
 
 
 
@@ -321,11 +326,12 @@ def make_variations_df_across_ref_point_values(variation_func,
                             **variation_func_kwargs)
         all_variations_df = pd.concat([all_variations_df, df], axis=0)
         all_variations_df.reset_index(drop=True, inplace=True)
-        if path_to_save is not None:
-            # make sure that the directory exists
-            os.makedirs(os.path.dirname(path_to_save), exist_ok=True)
-            all_variations_df.to_csv(path_to_save, index=False)
-            print('Variations saved at:', path_to_save)
+
+    if path_to_save is not None:
+        # make sure that the directory exists
+        os.makedirs(os.path.dirname(path_to_save), exist_ok=True)
+        all_variations_df.to_csv(path_to_save, index=False)
+        print('Variations saved at:', path_to_save)
         
     return all_variations_df
 
@@ -333,3 +339,41 @@ def make_variations_df_across_ref_point_values(variation_func,
 def make_combd_stop_and_alt_folder_path(monkey_name):
     combd_stop_and_alt_folder_path = f'all_monkey_data/raw_monkey_data/individual_monkey_data/{monkey_name}/combd_planning_info/stop_and_alt'
     return combd_stop_and_alt_folder_path
+
+
+def combine_overall_all_median_info_across_monkeys_and_optimal_arc_types(overall_all_median_info_exists_ok=True,
+                                                                all_median_info_exists_ok=True):
+    overall_all_median_info = pd.DataFrame([])
+    for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
+        for optimal_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
+            # for curv_traj_window_before_stop in [[-25, 0], [-50, 0], [-50, -5], [-75, -0], [-100, 0]]: 
+            for curv_traj_window_before_stop in [[-50, 0]]:
+                #suppress printed output
+                with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+                    ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name, 
+                                                                            optimal_arc_type=optimal_arc_type,
+                                                                            curv_traj_window_before_stop=curv_traj_window_before_stop)
+                    temp_overall_all_median_info = ps.make_or_retrieve_overall_all_median_info(exists_ok=overall_all_median_info_exists_ok, 
+                                                                                            all_median_info_exists_ok=all_median_info_exists_ok,
+                                                                                            process_info_for_plotting=False
+                                                                                            )
+                    overall_all_median_info = pd.concat([overall_all_median_info, temp_overall_all_median_info], axis=0)
+    overall_all_median_info.reset_index(drop=True, inplace=True)                
+    return overall_all_median_info
+
+
+def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):
+    all_perc_info = pd.DataFrame([])
+    curv_traj_window_before_stop = [-50, 0]
+    optimal_arc_type = 'norm_opt_arc'
+    for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
+        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+            ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name, 
+                                                                    optimal_arc_type=optimal_arc_type,
+                                                                    curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                    )
+            temp_all_perc_info = ps.make_or_retrieve_all_perc_info(exists_ok=all_perc_info_exists_ok,
+                                                                    process_info_for_plotting=False)
+            all_perc_info = pd.concat([all_perc_info, temp_all_perc_info], axis=0)
+    all_perc_info.reset_index(drop=True, inplace=True)
+    return all_perc_info

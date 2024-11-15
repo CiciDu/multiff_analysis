@@ -246,7 +246,7 @@ def find_ff_cluster_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_c
 
         if len(ff_dataframe_subset) > 0:
             row_indices.append(cluster_identifiers[i])
-            nearby_alive_ff_indices.append(ff_indices_in_a_cluster.tolist())
+            nearby_alive_ff_indices.append(ff_indices_in_a_cluster)
             latest_visible_ff = ff_dataframe_subset.loc[ff_dataframe_subset['time'].idxmax()]
             latest_visible_ff_indices.append(latest_visible_ff['ff_index'])
             ff_cluster_last_visible_time.append(time_of_evaluation - latest_visible_ff['time'])

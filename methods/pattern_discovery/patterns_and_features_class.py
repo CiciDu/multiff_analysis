@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import basic_func, base_processing_class, combine_info_utils, monkey_data_classes
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
+from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import animation_func, animation_utils, plot_trials, plot_behaviors_utils, plot_statistics, plot_change_over_time
 from data_wrangling import base_processing_class
 
@@ -41,6 +41,35 @@ class PatternsAndFeatures():
     def __init__(self, monkey_name='monkey_Bruno'):
         self.monkey_name = monkey_name
         self.combd_patterns_and_features_folder_path = "all_monkey_data/patterns_and_features/combined_data"
+
+
+    def make_combd_scatter_df(self, exists_ok=True, save_data=True):
+        df_path = os.path.join(self.combd_patterns_and_features_folder_path, 'combd_scatter_df.csv')
+        if exists_ok & exists(df_path):
+            self.combd_scatter_df = pd.read_csvdf_path().drop(columns='Unnamed: 0')
+            return
+
+        self.combd_scatter_df = pd.DataFrame()
+        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
+        for index, row in self.sessions_df_for_one_monkey.iterrows():
+            if row['finished'] is True:
+                continue
+            data_name = row['data_name']
+            print('Processing data: ', data_name)
+            raw_data_folder_path = os.path.join(self.dir_name, row['monkey_name'], data_name)
+            self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=raw_data_folder_path)
+            self.data_item.retrieve_or_make_monkey_data(exists_ok=True)
+            self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
+            self.scatter_df = monkey_landing_in_ff.make_scatter_df(self.data_item.monkey_information, self.data_item.ff_caught_T_sorted, self.data_item.ff_real_position_sorted)
+            self.scatter_df['data_name'] = data_name
+            self.combd_scatter_df = pd.concat([self.combd_scatter_df, self.scatter_df], axis=0).reset_index(drop=True)
+
+        self.combd_scatter_df = organize_patterns_and_features.add_dates_and_sessions(self.combd_scatter_df)
+        if save_data:
+            os.makedirs(self.combd_patterns_and_features_folder_path, exist_ok=True)
+            self.combd_scatter_df.to_csv(df_path)
+        return
+
 
     def combine_patterns_and_features(self, exists_ok=True, save_data=True, verbose=True):
 
@@ -105,6 +134,7 @@ class PatternsAndFeatures():
         self.agg_pattern_frequencies = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_pattern_frequencies.csv')).drop(columns='Unnamed: 0')
         self.agg_feature_statistics = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_feature_statistics.csv')).drop(columns='Unnamed: 0')
         return
+    
 
 
     def _make_agg_pattern_frequency(self):
@@ -127,13 +157,26 @@ class PatternsAndFeatures():
 
 
     def plot_the_changes_in_pattern_frequencies_over_time(self):
-        plot_change_over_time.plot_the_changes_over_time(self.concat_pattern_frequencies, x="Session", y="Rate", 
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.concat_pattern_frequencies, x="Session", y="Rate", 
                                                 monkey_name='monkey_Bruno',
                                                 category_order=self.pattern_order)
         
 
     def plot_the_changes_in_feature_statistics_over_time(self):
-        plot_change_over_time.plot_the_changes_over_time(self.concat_feature_statistics, x="Session", y="Median", title_column="Label for median", 
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.concat_feature_statistics, x="Session", y="Median", title_column="Label for median", 
                                                                           monkey_name=self.monkey_name, category_order=self.feature_order)
-        plot_change_over_time.plot_the_changes_over_time(self.concat_feature_statistics, x="Session", y="Mean", title_column="Label for mean", 
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.concat_feature_statistics, x="Session", y="Mean", title_column="Label for mean", 
                                                                           monkey_name=self.monkey_name, category_order=self.feature_order)
+
+
+    def plot_the_changes_in_scatter_df_over_time(self, y_columns=None):
+        if y_columns is None:
+            y_columns = ['distance_mean', 'distance_std', 'distance_25%', 'distance_50%',
+                        'distance_75%', 'distance_iqr', 'angle_mean', 'angle_std', 'angle_25%',
+                        'angle_50%', 'angle_75%', 'angle_iqr', 'abs_angle_mean',
+                        'abs_angle_std', 'abs_angle_25%', 'abs_angle_50%', 'abs_angle_75%',
+                        'abs_angle_iqr', 'Q1_perc', 'Q2_perc', 'Q3_perc', 'Q4_perc']
+        plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_df, x="Session", 
+                                                                y_columns=y_columns,
+                                                                monkey_name=self.monkey_name, 
+                                                                )

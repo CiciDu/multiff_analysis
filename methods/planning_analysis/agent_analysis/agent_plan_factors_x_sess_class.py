@@ -5,7 +5,7 @@ from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import plan_factors_class, monkey_plan_factors_x_sess_class
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, variations_base_class
+from planning_analysis.variations_of_factors_vs_results import make_variations_utils, variations_base_class, plot_variations_class
 from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_utils, rl_for_multiff_class
 
 from data_wrangling import basic_func, combine_info_utils
@@ -19,7 +19,7 @@ from os.path import exists
 import os
 
 # This class collects data from many agents and compares them
-class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
+class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
 
     def __init__(self,
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
@@ -276,3 +276,12 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.test_combd_heading_df_x_sessions = pd.concat([self.test_combd_heading_df_x_sessions, self.test_heading_info_df], axis=0)
         self.ctrl_combd_heading_df_x_sessions = pd.concat([self.ctrl_combd_heading_df_x_sessions, self.ctrl_heading_info_df], axis=0)
 
+    def make_or_retrieve_overall_all_median_info(self, **kwargs):
+        self.overall_all_median_info = super().make_or_retrieve_overall_all_median_info(**kwargs)
+        self.overall_all_median_info['monkey_name'] = 'agent'
+        return self.overall_all_median_info
+
+    def make_or_retrieve_all_perc_info(self, **kwargs):
+        self.all_perc_info = super().make_or_retrieve_all_perc_info(**kwargs)
+        self.all_perc_info['monkey_name'] = 'agent'
+        return self.all_perc_info

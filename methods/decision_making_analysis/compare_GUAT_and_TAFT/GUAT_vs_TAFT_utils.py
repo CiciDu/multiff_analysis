@@ -51,6 +51,22 @@ def add_stop_point_index(trials_df, monkey_information, ff_real_position_sorted)
     trials_df['stop_time'] = monkey_information.loc[trials_df['stop_point_index'], 'time'].values
     return trials_df
     
+def deal_with_duplicated_stop_point_index(GUAT_w_ff_df):
+    df = GUAT_w_ff_df[GUAT_w_ff_df[['stop_point_index', 'latest_visible_ff']].duplicated(keep=False)].copy()
+    # drop those stop_point_index from GUAT_w_ff_df
+    GUAT_w_ff_df = GUAT_w_ff_df[~GUAT_w_ff_df['stop_point_index'].isin(df['stop_point_index'])].copy()
+
+    # For each duplicated stop_point_index, find the row with the smallest distance between the first or last stop_point_index and the duplicated stop_point_index
+    df['delta_point_index_from_first_stop_to_stop_point_index'] = np.abs(df['first_stop_point_index'] - df['stop_point_index'])
+    df['delta_point_index_from_last_stop_to_stop_point_index'] = np.abs(df['last_stop_point_index'] - df['stop_point_index'])
+    df['min_delta_point_index'] = df[['delta_point_index_from_first_stop_to_stop_point_index', 'delta_point_index_from_last_stop_to_stop_point_index']].min(axis=1)
+    df.sort_values(by=['stop_point_index', 'min_delta_point_index'], ascending=True)
+    df = df.groupby('stop_point_index').first().reset_index(drop=False)
+
+    # add rows back to GUAT_w_ff_df (only keep the columns in GUAT_w_ff_df)
+    GUAT_w_ff_df = pd.concat([GUAT_w_ff_df, df[GUAT_w_ff_df.columns]], axis=0)
+    GUAT_w_ff_df.sort_values(by='stop_point_index', inplace=True)
+    return GUAT_w_ff_df
 
 def process_trials_df(trials_df, monkey_information, ff_dataframe_visible, stop_period_duration):
 

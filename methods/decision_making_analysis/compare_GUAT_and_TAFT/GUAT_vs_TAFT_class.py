@@ -187,7 +187,7 @@ class CompareGUATandTAFTclass():
             self.GUAT_w_ff_df.sort_values(by=['trial', 'first_stop_time'], inplace=True)
             self.GUAT_w_ff_df['ff_index'] = self.GUAT_w_ff_df['latest_visible_ff']
             self.GUAT_w_ff_df = GUAT_vs_TAFT_utils.add_stop_point_index(self.GUAT_w_ff_df, self.monkey_information, self.ff_real_position_sorted)
-
+            self.GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(self.GUAT_w_ff_df)
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1]
 
 

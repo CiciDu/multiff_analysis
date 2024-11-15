@@ -22,6 +22,7 @@ import gc
 def make_sessions_df_for_one_monkey(dir_name, monkey_name):
     sessions_df = basic_func.initialize_monkey_sessions_df(dir_name=dir_name)
     sessions_df_for_one_monkey = sessions_df[sessions_df['monkey_name']==monkey_name].copy()
+    sessions_df_for_one_monkey.sort_values(by='data_name', inplace=True)
     return sessions_df_for_one_monkey
 
 

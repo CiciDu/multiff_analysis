@@ -22,7 +22,9 @@ import os
 from sklearn.linear_model import LinearRegression
 
 
-def examine_and_compare_columns_between_two_df(df1, df2, verbose=True):
+def examine_and_compare_columns_between_two_df(df1, df2, verbose=True,
+                                               columns_to_exclude_from_comparison=['monkey_name'],
+                                               ):
 
     columns_differed = []
     shared_varients = {}
@@ -30,6 +32,7 @@ def examine_and_compare_columns_between_two_df(df1, df2, verbose=True):
     varied_columns_1 = process_variations_utils.examine_columns(df1, verbose=False)
     varied_columns_2 = process_variations_utils.examine_columns(df2, verbose=False)
     all_varied_columns = list(set(varied_columns_1 + varied_columns_2))
+    all_varied_columns = [col for col in all_varied_columns if col not in columns_to_exclude_from_comparison]
 
     if verbose:
         print('Columns that have different variations between the two DataFrames:')
@@ -80,6 +83,11 @@ def make_both_players_df(monkey_df, agent_df,
     monkey_df_sub['monkey_or_agent'] = 'monkey'
     agent_df_sub['monkey_or_agent'] = 'agent'
     both_players_df = pd.concat([monkey_df_sub, agent_df_sub], axis=0).reset_index(drop=True)
+
+    # check to see if there are any columns that are not in both players
+    columns_not_in_both_players = [col for col in monkey_df.columns if col not in both_players_df.columns]
+    if len(columns_not_in_both_players) > 0:
+        print('Columns that are not in both players:', columns_not_in_both_players)
 
     return both_players_df
 

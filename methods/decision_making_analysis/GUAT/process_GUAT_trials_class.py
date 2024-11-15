@@ -52,8 +52,6 @@ class ProcessGUATtrials:
         self.give_up_after_trying_info_bundle = give_up_after_trying_info_bundle
         self.give_up_after_trying_trials, self.GUAT_point_indices_for_anim, self.GUAT_indices_df, self.GUAT_trials_df = give_up_after_trying_info_bundle
         self.give_up_after_trying_indices = self.GUAT_indices_df['point_index'].values
-        self.GUAT_indices_df['trial'].values = self.GUAT_indices_df['trial'].values
-        self.GUAT_indices_df['cluster_index'].values = self.GUAT_indices_df['cluster_index'].values
         self.GUAT_cluster_index = np.unique(self.GUAT_indices_df['cluster_index'].values)
         
         self.PlotTrials_args = PlotTrials_args
@@ -200,13 +198,13 @@ class ProcessGUATtrials:
         ff_indices_of_each_cluster = self.GUAT_w_ff_df['nearby_alive_ff_indices'].values
         GUAT_last_stop_time = self.GUAT_w_ff_df['last_stop_time'].values
 
-        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_df(ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=None)
+        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_df(ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=self.GUAT_w_ff_df['cluster_index'].values)
 
+        self.GUAT_cluster_df.rename(columns={'cluster_identifier': 'cluster_index'}, inplace=True)
+        
         self.GUAT_cluster_df = self.GUAT_cluster_df.merge(self.GUAT_w_ff_df[['cluster_index', 'first_stop_time', 'second_stop_time', 'last_stop_time', 'first_stop_point_index',
-                                                                                    'second_stop_point_index', 'last_stop_point_index', 'target', 'num_stops']],
+                                                                                    'second_stop_point_index', 'last_stop_point_index', 'target_index', 'num_stops']],
                                                           on='cluster_index', how='left')
-
-        self.GUAT_cluster_df.drop(columns=['cluster_identifier'], inplace=True)
 
         # to prepare for free selection 
         self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = cluster_analysis.find_last_visible_time_of_a_cluster_before_a_time(ff_indices_of_each_cluster, GUAT_last_stop_time, self.ff_dataframe)
