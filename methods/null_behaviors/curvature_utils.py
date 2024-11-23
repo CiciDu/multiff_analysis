@@ -63,7 +63,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_optimal_arc
     curvature_df = supply_with_ff_curvature_info(curvature_df, ff_radius_for_optimal_arc=ff_radius_for_optimal_arc, invalid_curvature_ok=invalid_curvature_ok,
                                                  include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature,
                                                  optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary, ignore_error=ignore_error)
-    curvature_df = add_d_heading_info(curvature_df, include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature)
+    add_d_heading_info(curvature_df, include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature)
 
     if include_optimal_curvature:
         curvature_df.loc[:,'curv_diff'] = curvature_df['optimal_curvature'].values - curvature_df['curvature_of_traj'].values
@@ -71,7 +71,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_optimal_arc
         curvature_df = curvature_df.sort_values(by=['point_index', 'abs_curv_diff', 'ff_distance'], ascending=[True, True, True])
         
     if clean:
-        curvature_df = clean_curvature_info(curvature_df, include_optimal_curvature=include_optimal_curvature)
+        clean_curvature_info(curvature_df, include_optimal_curvature=include_optimal_curvature)
 
     return curvature_df
 
@@ -118,7 +118,6 @@ def add_d_heading_info(curvature_df, include_curv_to_ff_center=True, include_opt
         curvature_df['d_heading_to_center'] = curvature_df['arc_measure_to_center'] * np.sign(curvature_df['ff_angle'].values)
     if include_optimal_curvature:
         curvature_df['optimal_arc_d_heading'] = curvature_df['optimal_arc_measure'] * curvature_df['optimal_arc_end_direction'].values
-    return curvature_df
 
 
 def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df, ff_caught_T_sorted=None, clean=False):
@@ -320,7 +319,6 @@ def clean_curvature_info(curvature_df, include_optimal_curvature=True):
             curvature_df['curv_diff'] = curvature_df['curv_diff'].clip(lower=-0.6, upper=0.6)
         if 'abs_curv_diff' in curvature_df.columns:
             curvature_df['abs_curv_diff'] = np.abs(curvature_df['curv_diff'].values)
-    return curvature_df
 
 
 def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_sorted=None, curv_of_traj_df=None):
@@ -408,7 +406,6 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
     df['curv_diff'] = df['optimal_curvature'].values - df['curvature_of_traj'].values
     df['abs_curv_diff'] = np.abs(df['curv_diff'].values)
         
-    return df
 
 
 def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['optimal_curvature', 'curv_diff']):
@@ -418,11 +415,11 @@ def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['optimal_curvature', '
     arc_info_df = pd.merge(df[['ff_index', 'point_index']], curvature_df_sub, on=['ff_index', 'point_index'], how='left')
     # for the NAs (when ff_index is -10)
     df[arc_info_to_add] = arc_info_df[arc_info_to_add]
-    df = fill_up_NAs_in_columns_related_to_curvature(df)
-    return df
+    fill_up_NAs_in_columns_related_to_curvature(df)
 
 
 def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monkey_information):
+    curvature_df = curvature_df.copy()
     pass_by_within_next_n_seconds = 2.5
     pass_by_within_n_cm = 50
     curvature_df['monkey_passed_by'] = False
@@ -480,6 +477,7 @@ def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monk
             
     index_to_include_df['monkey_passed_by'] = True
     if 'monkey_passed_by' in curvature_df.columns:
-        curvature_df = curvature_df.drop(columns=['monkey_passed_by'])
-    curvature_df = pd.merge(curvature_df, index_to_include_df, on=['ff_index', 'point_index'], how='left').fillna(False)
+        curvature_df.drop(columns=['monkey_passed_by'], inplace=True)
+    curvature_df = curvature_df.merge(index_to_include_df, on=['ff_index', 'point_index'], how='left')
+    curvature_df.fillna(False, inplace=True)
     return curvature_df

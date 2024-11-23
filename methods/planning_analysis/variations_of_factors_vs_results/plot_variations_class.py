@@ -29,7 +29,7 @@ class PlotVariations(variations_base_class._VariationsBase):
                         curv_traj_window_before_stop=curv_traj_window_before_stop)
         
 
-    def plot_heading_in_overall_all_median_info(self,
+    def plot_heading_in_overall_median_info(self,
                                                 x_var_column_list = ['ref_point_value'],
                                                 fixed_variable_values_to_use = {'if_test_alt_ff_group_appear_after_stop': 'flexible',
                                                                                 'key_for_split': 'ff_seen'},
@@ -55,7 +55,7 @@ class PlotVariations(variations_base_class._VariationsBase):
                                                                     use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
 
 
-    def plot_curv_in_overall_all_median_info(self,
+    def plot_curv_in_overall_median_info(self,
                                             x_var_column_list = ['ref_point_value'],
                                             fixed_variable_values_to_use = {'if_test_alt_ff_group_appear_after_stop': 'flexible',
                                                                             'key_for_split': 'ff_seen'},
@@ -81,7 +81,7 @@ class PlotVariations(variations_base_class._VariationsBase):
 
 
 
-    def plot_heading_in_overall_all_median_info_across_monkeys_and_arc_types(self,
+    def plot_heading_in_overall_median_info_across_monkeys_and_arc_types(self,
                                                                             x_var_column_list = ['optimal_arc_type'],
                                                                             fixed_variable_values_to_use = {'if_test_alt_ff_group_appear_after_stop': 'flexible',
                                                                                                             'key_for_split': 'ff_seen',
@@ -93,7 +93,7 @@ class PlotVariations(variations_base_class._VariationsBase):
                                                                             columns_to_find_unique_combinations_for_line = [],
                                                                             ):    
                                                                    
-        self.plot_heading_in_overall_all_median_info(x_var_column_list=x_var_column_list,
+        self.plot_heading_in_overall_median_info(x_var_column_list=x_var_column_list,
                                                     fixed_variable_values_to_use=fixed_variable_values_to_use,
                                                     changeable_variables=changeable_variables,
                                                     columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
@@ -102,7 +102,7 @@ class PlotVariations(variations_base_class._VariationsBase):
                                                     use_subplots_based_on_changeable_variables=True)
 
 
-    def plot_curv_in_overall_all_median_info_across_monkeys_and_arc_types(self, 
+    def plot_curv_in_overall_median_info_across_monkeys_and_arc_types(self, 
                                                                         x_var_column_list = ['optimal_arc_type'],
                                                                         fixed_variable_values_to_use = {'if_test_alt_ff_group_appear_after_stop': 'flexible',
                                                                                                         'key_for_split': 'ff_seen',
@@ -114,7 +114,7 @@ class PlotVariations(variations_base_class._VariationsBase):
                                                                         columns_to_find_unique_combinations_for_line = [],
                                                                         ):
                                                                     
-        self.plot_curv_in_overall_all_median_info(x_var_column_list=x_var_column_list,
+        self.plot_curv_in_overall_median_info(x_var_column_list=x_var_column_list,
                                                 fixed_variable_values_to_use=fixed_variable_values_to_use,
                                                 changeable_variables=changeable_variables,
                                                 columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,

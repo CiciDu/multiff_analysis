@@ -99,7 +99,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
 
         if 'd_monkey_angle_since_stop_ff_first_seen' not in self.plan_y_both.columns:
             self.plan_y_both['d_monkey_angle_since_stop_ff_first_seen'] = self.plan_y_both['d_monkey_angle']
-        self.plan_y_both = plan_factors_utils.add_dir_from_stop_ff_same_side(self.plan_y_both)
+        plan_factors_utils.add_dir_from_stop_ff_same_side(self.plan_y_both)
 
 
     def _prepare_plan_data(self, plan_type, test_or_control, exists_ok, df_name_func, make_plan_func, save_data):
@@ -353,7 +353,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
                     curv_df = pd.concat([ff_df_modified.drop(columns='point_index').reset_index(drop=True), curv_df.reset_index(drop=True)], axis=1)
                     # for duplicated columns in curv_df, preserve only one
                     curv_df = curv_df.loc[:, ~curv_df.columns.duplicated()]
-                    self.both_ff_when_seen_df = planning_neural_utils.add_to_both_ff_when_seen_df(self.both_ff_when_seen_df, which_ff_info, when_which_ff, first_or_last, curv_df, ff_df)
+                    planning_neural_utils.add_to_both_ff_when_seen_df(self.both_ff_when_seen_df, which_ff_info, when_which_ff, first_or_last, curv_df, ff_df)
         self.both_ff_when_seen_df.reset_index(drop=False, inplace=True)
         return self.both_ff_when_seen_df
     

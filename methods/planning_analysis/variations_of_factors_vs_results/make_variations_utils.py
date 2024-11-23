@@ -247,6 +247,9 @@ def get_bootstrap_median_std(array, bootstrap_sample_size=5000):
 
 def add_boostrap_median_std_to_df(test_heading_info_df, ctrl_heading_info_df, 
                                   row_from_test, row_from_ctrl, columns):
+    row_from_test = row_from_test.copy()
+    row_from_ctrl = row_from_ctrl.copy()
+    
     for column in columns:
         series = test_heading_info_df[column]
         boot_med_std = get_bootstrap_median_std(series[~series.isna()].values)
@@ -341,9 +344,9 @@ def make_combd_stop_and_alt_folder_path(monkey_name):
     return combd_stop_and_alt_folder_path
 
 
-def combine_overall_all_median_info_across_monkeys_and_optimal_arc_types(overall_all_median_info_exists_ok=True,
+def combine_overall_median_info_across_monkeys_and_optimal_arc_types(overall_median_info_exists_ok=True,
                                                                 all_median_info_exists_ok=True):
-    overall_all_median_info = pd.DataFrame([])
+    overall_median_info = pd.DataFrame([])
     for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
         for optimal_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
             # for curv_traj_window_before_stop in [[-25, 0], [-50, 0], [-50, -5], [-75, -0], [-100, 0]]: 
@@ -353,13 +356,13 @@ def combine_overall_all_median_info_across_monkeys_and_optimal_arc_types(overall
                     ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name, 
                                                                             optimal_arc_type=optimal_arc_type,
                                                                             curv_traj_window_before_stop=curv_traj_window_before_stop)
-                    temp_overall_all_median_info = ps.make_or_retrieve_overall_all_median_info(exists_ok=overall_all_median_info_exists_ok, 
+                    temp_overall_median_info = ps.make_or_retrieve_overall_median_info(exists_ok=overall_median_info_exists_ok, 
                                                                                             all_median_info_exists_ok=all_median_info_exists_ok,
                                                                                             process_info_for_plotting=False
                                                                                             )
-                    overall_all_median_info = pd.concat([overall_all_median_info, temp_overall_all_median_info], axis=0)
-    overall_all_median_info.reset_index(drop=True, inplace=True)                
-    return overall_all_median_info
+                    overall_median_info = pd.concat([overall_median_info, temp_overall_median_info], axis=0)
+    overall_median_info.reset_index(drop=True, inplace=True)                
+    return overall_median_info
 
 
 def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):

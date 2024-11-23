@@ -159,7 +159,7 @@ def find_GUAT_alt_ff_info(GUAT_current_ff_info, ff_dataframe, ff_real_position_s
         GUAT_alt_ff_info = pd.concat([GUAT_alt_ff_info, ff_info], axis=0).reset_index(drop=True)
         
         # calculate the distance to the stop
-        GUAT_alt_ff_info = add_distance_to_stop(GUAT_alt_ff_info, monkey_information, ff_real_position_sorted)
+        add_distance_to_stop(GUAT_alt_ff_info, monkey_information, ff_real_position_sorted)
         GUAT_alt_ff_info = GUAT_alt_ff_info[GUAT_alt_ff_info['distance_to_stop'] < max_distance_to_stop].copy()
 
         # use merge to add 'total_stop_time' to GUAT_alt_ff_info
@@ -175,7 +175,6 @@ def add_distance_to_stop(df, monkey_information, ff_real_position_sorted):
     stop_monkey_x, stop_monkey_y = monkey_information.loc[df['point_index'].values, ['monkey_x', 'monkey_y']].values.T
     ff_x, ff_y = ff_real_position_sorted[df['ff_index'].values].T
     df['distance_to_stop'] = np.sqrt((stop_monkey_x - ff_x)**2 + (stop_monkey_y - ff_y)**2)
-    return df
 
 
 def retain_useful_current_and_alt_info(GUAT_current_ff_info, GUAT_alt_ff_info, eliminate_cases_with_close_alt_ff=True,
@@ -268,7 +267,6 @@ def _add_num_ff_in_cluster(df):
 
 def add_curv_diff_and_ff_number_to_GUAT_current_ff_info_and_GUAT_alt_ff_info(GUAT_current_ff_info, GUAT_alt_ff_info, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, curv_of_traj_df=None,
                                                                              ff_priority_criterion='abs_curv_diff'):
-    
     
     # Note: in order not to feed the input with additional data, we will let curv_of_traj_df = curv_of_traj_df 
     GUAT_current_ff_info = decision_making_utils.add_curv_diff_to_df(GUAT_current_ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted)

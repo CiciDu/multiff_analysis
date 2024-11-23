@@ -207,7 +207,7 @@ class ProcessGUATtrials:
                                                           on='cluster_index', how='left')
 
         # to prepare for free selection 
-        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = cluster_analysis.find_last_visible_time_of_a_cluster_before_a_time(ff_indices_of_each_cluster, GUAT_last_stop_time, self.ff_dataframe)
+        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = self.GUAT_cluster_df['last_stop_time'] - self.GUAT_cluster_df['time_since_last_visible']
 
         # sort by last_stop_time (note that the order in GUAT_cluster_df will henceforward be different from other variables)
         self.GUAT_cluster_df.sort_values(by='last_stop_time', inplace=True)

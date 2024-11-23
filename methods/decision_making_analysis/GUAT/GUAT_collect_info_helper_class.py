@@ -140,21 +140,20 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 self.get_monkey_data(include_GUAT_data=True)
             self.GUAT_w_ff_df, self.GUAT_expanded_trials_df = GUAT_utils.get_GUAT_w_ff_df(self.data_item.GUAT_indices_df,
                                                                                 self.data_item.GUAT_trials_df,
-                                                                                self.data_item.ff_dataframe)
-
-            if add_one_stop_info:
-                self._add_one_stop_info_to_GUAT_w_ff_df()
-                # one_stop_df is used as a comparison to GUAT where there are at least 2 stops beside a missed ff. One_stop_df, on the other hand,
-                # contains instances where there is one missed stop beside a missed ff.
-
-            self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'last_stop_point_index'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'first_stop_point_index']
-            self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'last_stop_time'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'first_stop_time']
-            self.GUAT_w_ff_df['total_stop_time'] = self.GUAT_w_ff_df['last_stop_time'] - self.GUAT_w_ff_df['first_stop_time']
-                            
+                                                                                self.data_item.ff_dataframe)   
 
             self.GUAT_w_ff_df.to_csv(filepath, sep='\t', index=False)
             print('Made and saved GUAT_w_ff_df')
 
+        if add_one_stop_info:
+            self._add_one_stop_info_to_GUAT_w_ff_df()
+            # one_stop_df is used as a comparison to GUAT where there are at least 2 stops beside a missed ff. One_stop_df, on the other hand,
+            # contains instances where there is one missed stop beside a missed ff.
+
+        self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'last_stop_point_index'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'first_stop_point_index']
+        self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'last_stop_time'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'first_stop_time']
+        self.GUAT_w_ff_df['total_stop_time'] = self.GUAT_w_ff_df['last_stop_time'] - self.GUAT_w_ff_df['first_stop_time']
+                     
     
     def _add_one_stop_info_to_GUAT_w_ff_df(self):
         one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_sorted)
@@ -168,8 +167,10 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         one_stop_w_ff_df = self.one_stop_w_ff_df[~self.one_stop_w_ff_df['first_stop_point_index'].isin(common_point_index)].copy()
 
         # print differences in columns between the two dataframes
-        print('Columns in one_stop_w_ff_df but not in GUAT_w_ff_df:', one_stop_w_ff_df.columns.difference(self.GUAT_w_ff_df.columns))
-        print('Columns in GUAT_w_ff_df but not in one_stop_w_ff_df:', self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns))
+        if len(one_stop_w_ff_df.columns.difference(self.GUAT_w_ff_df.columns)) > 0:
+            print('Columns in one_stop_w_ff_df but not in GUAT_w_ff_df:', one_stop_w_ff_df.columns.difference(self.GUAT_w_ff_df.columns))
+        if len(self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns)) > 0:
+            print('Columns in GUAT_w_ff_df but not in one_stop_w_ff_df:', self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns))
 
         self.GUAT_w_ff_df = pd.concat([self.GUAT_w_ff_df, one_stop_w_ff_df], axis=0).reset_index(drop=True)
         
@@ -437,7 +438,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.GUAT_current_ff_info = pd.merge(self.GUAT_current_ff_info, curvature_df_sub, on=['ff_index', 'point_index'], how='left')
         self.GUAT_alt_ff_info = pd.merge(self.GUAT_alt_ff_info, curvature_df_sub, on=['ff_index', 'point_index'], how='left')
         self.more_ff_df = pd.merge(self.more_ff_df, curvature_df_sub, on=['ff_index', 'point_index'], how='left')
-        self.GUAT_current_ff_info = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_current_ff_info, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
-        self.GUAT_alt_ff_info = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_alt_ff_info, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
-        self.more_ff_df = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.more_ff_df, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_current_ff_info, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_alt_ff_info, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.more_ff_df, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
  

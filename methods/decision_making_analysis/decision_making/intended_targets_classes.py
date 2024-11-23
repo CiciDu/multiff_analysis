@@ -50,7 +50,7 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
 
         # recalculate time and target_index based on starting_point_index
         self.manual_anno_long['time'] = self.monkey_information['monkey_t'].iloc[self.manual_anno_long.starting_point_index.values].values
-        self.manual_anno_long['target_index'] = np.digitize(self.manual_anno_long['time'].values, self.ff_caught_T_sorted)        
+        self.manual_anno_long['target_index'] = np.searchsorted(self.ff_caught_T_sorted, self.manual_anno_long['time'].values)        
 
         # change data type
         self.manual_anno_long['original_starting_point_index'] = self.manual_anno_long['original_starting_point_index'].astype('int')

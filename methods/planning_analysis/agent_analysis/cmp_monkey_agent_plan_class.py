@@ -26,12 +26,12 @@ class CompareMonkeyAgentPlan(plot_variations_class.PlotVariations):
         self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(model_folder_name=self.model_folder_name)
 
 
-    def get_monkey_and_agent_overall_all_median_info(self):
-        self.monkey_overall_all_median_info = make_variations_utils.combine_overall_all_median_info_across_monkeys_and_optimal_arc_types()
-        self.agent_overall_all_median_info = self.pfas.make_or_retrieve_overall_all_median_info(process_info_for_plotting=False)
+    def get_monkey_and_agent_overall_median_info(self):
+        self.monkey_overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_optimal_arc_types()
+        self.agent_overall_median_info = self.pfas.make_or_retrieve_overall_median_info(process_info_for_plotting=False)
 
-        self.overall_all_median_info = compare_monkey_and_agent_utils.make_both_players_df(self.monkey_overall_all_median_info, self.agent_overall_all_median_info)
-        self.process_overall_all_median_info_to_plot_heading_and_curv()
+        self.overall_median_info = compare_monkey_and_agent_utils.make_both_players_df(self.monkey_overall_median_info, self.agent_overall_median_info)
+        self.process_overall_median_info_to_plot_heading_and_curv()
 
 
     def get_monkey_and_agent_all_perc_info(self):

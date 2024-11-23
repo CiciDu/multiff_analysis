@@ -95,14 +95,13 @@ def add_arc_info_to_old_and_new_ff_info(old_ff_info, new_ff_info, curvature_df, 
         temp_df = both_temp_df[label]
         arc_info_df = pd.merge(curvature_df_sub, temp_df, on=['ff_index', 'point_index'], how='right')
         # for the NAs (when ff_index is -10)
-        arc_info_df = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(arc_info_df, monkey_information, ff_caught_T_sorted, curv_of_traj_df=curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(arc_info_df, monkey_information, ff_caught_T_sorted, curv_of_traj_df=curv_of_traj_df)
         # combine arc_info_df and result_df
         column_names = arc_info_to_add
         if label == 'old':
             old_ff_info[['old_' + name for name in column_names]] = arc_info_df[column_names].copy().values
         else:
             new_ff_info[column_names] = arc_info_df[column_names].copy().values
-    return old_ff_info, new_ff_info
 
 
 
@@ -174,7 +173,7 @@ def combine_old_and_new_ff_info(new_ff_info, old_ff_info, point_index_array, mon
         curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_sorted, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
 
     if add_arc_info:
-        old_ff_info, new_ff_info = add_arc_info_to_old_and_new_ff_info(old_ff_info, new_ff_info, curvature_df, monkey_information, ff_caught_T_sorted, curv_of_traj_df, arc_info_to_add=arc_info_to_add)
+        add_arc_info_to_old_and_new_ff_info(old_ff_info, new_ff_info, curvature_df, monkey_information, ff_caught_T_sorted, curv_of_traj_df, arc_info_to_add=arc_info_to_add)
 
     new_ff_info = new_ff_info.drop(columns=['point_index', 'ff_index'])
     old_ff_info = old_ff_info.drop(columns=['point_index', 'ff_index'])

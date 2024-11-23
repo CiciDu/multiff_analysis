@@ -60,7 +60,6 @@ def make_target_df(data_item):
 
 
 
-
 def _create_target_df(monkey_information, ff_caught_T_sorted, ff_real_position_sorted):
     """
     Create a DataFrame with target information.
@@ -68,7 +67,7 @@ def _create_target_df(monkey_information, ff_caught_T_sorted, ff_real_position_s
     target_df = monkey_information[['bin', 'monkey_t', 'monkey_x', 'monkey_y', 'monkey_angles']].copy()
     target_df.rename(columns={'monkey_angles': 'monkey_angle', 'monkey_t': 'time'}, inplace=True)
     target_df['point_index'] = target_df.index
-    target_df['target_index'] = np.digitize(target_df['time'], ff_caught_T_sorted)
+    target_df['target_index'] = np.searchsorted(ff_caught_T_sorted, target_df['time'])
     target_df['target_x'] = ff_real_position_sorted[target_df['target_index'].values, 0]
     target_df['target_y'] = ff_real_position_sorted[target_df['target_index'].values, 1]
     return target_df

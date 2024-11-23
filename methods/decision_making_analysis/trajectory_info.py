@@ -324,7 +324,6 @@ def add_stops_info_to_monkey_information(traj_time, monkey_information):
     stopping_info = monkey_sub['monkey_speeddummy'].values   # 0 means there has been stops in the bin
     stopping_info = -(stopping_info-1) # reverting 0 and 1 so 1 means there has been stops in the bin
     monkey_information.loc[:,'monkey_stops_based_on_bins'] = stopping_info
-    return monkey_information
 
 
 def combine_trajectory_and_stop_info_and_curvature_info(traj_points_df, traj_stops_df, relevant_curv_of_traj_df, use_more_as_prefix=False):

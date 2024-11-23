@@ -27,14 +27,14 @@ def extract_key_info_from_data_item_for_stops_near_ff_class(data_item):
 
 def find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_caught_T_sorted, ff_real_position_sorted, stop_period_duration=2, max_diff_between_caught_time_and_stop_time=0.2):
     
-    all_closest_point_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)),
-                                                                                             ff_real_position_sorted=ff_real_position_sorted, drop_rows_where_stop_is_not_inside_reward_boundary=True)
+    closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)),
+                                                                                             drop_rows_where_stop_is_not_inside_reward_boundary=True)
     print('finding captured_ff_info...')
-    captured_ff_info = alt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(all_closest_point_to_capture_df, stop_period_duration,
+    captured_ff_info = alt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(closest_stop_to_capture_df, stop_period_duration,
                                                                                             ff_dataframe_visible, monkey_information, drop_na=True)
 
     # drop rows in captured_ff_info where the stop_time and capture_time are more than n seconds apart.
-    captured_ff_info = drop_rows_in_where_stop_time_and_capture_time_is_too_far_apart(captured_ff_info, all_closest_point_to_capture_df, max_diff_between_caught_time_and_stop_time=max_diff_between_caught_time_and_stop_time)
+    captured_ff_info = drop_rows_in_where_stop_time_and_capture_time_is_too_far_apart(captured_ff_info, closest_stop_to_capture_df, max_diff_between_caught_time_and_stop_time=max_diff_between_caught_time_and_stop_time)
 
     # eliminate boundary cases
     selected_point_index = captured_ff_info.stop_point_index.values
@@ -53,17 +53,17 @@ def find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dat
     return captured_ff_info
 
 
-def drop_rows_in_where_stop_time_and_capture_time_is_too_far_apart(captured_ff_info, all_closest_point_to_capture_df, max_diff_between_caught_time_and_stop_time=0.2):
-    all_closest_point_to_capture_df = all_closest_point_to_capture_df.rename(columns={'stop_ff_index': 'ff_index'})
-    captured_ff_info = captured_ff_info.merge(all_closest_point_to_capture_df[['ff_index', 'caught_time', 'diff_from_caught_time']], on='ff_index', how='left')
+def drop_rows_in_where_stop_time_and_capture_time_is_too_far_apart(captured_ff_info, closest_stop_to_capture_df, max_diff_between_caught_time_and_stop_time=0.2):
+    closest_stop_to_capture_df = closest_stop_to_capture_df.rename(columns={'stop_ff_index': 'ff_index'})
+    captured_ff_info = captured_ff_info.merge(closest_stop_to_capture_df[['ff_index', 'caught_time', 'diff_from_caught_time']], on='ff_index', how='left')
     # if there's any NA, raise error
     if len(captured_ff_info[captured_ff_info['diff_from_caught_time'].isna()]) > 0:
         raise ValueError('There are NA values in diff_from_caught_time. This should not happen.')
     if captured_ff_info['diff_from_caught_time'].abs().max() >= max_diff_between_caught_time_and_stop_time:
         max_diff = captured_ff_info['diff_from_caught_time'].abs().max()
         num_rows_exceeding = len(captured_ff_info[captured_ff_info['diff_from_caught_time'].abs() >= max_diff_between_caught_time_and_stop_time])
-        # calculate the percentege of rows where all_closest_point_to_capture_df['diff_from_caught_time'] is positive
-        percentage_of_rows_where_diff_is_positive = len(all_closest_point_to_capture_df[all_closest_point_to_capture_df['diff_from_caught_time'] > 0]) / len(all_closest_point_to_capture_df)
+        # calculate the percentege of rows where closest_stop_to_capture_df['diff_from_caught_time'] is positive
+        percentage_of_rows_where_diff_is_positive = len(closest_stop_to_capture_df[closest_stop_to_capture_df['diff_from_caught_time'] > 0]) / len(closest_stop_to_capture_df)
         warning_message = f'There is a problem with the closest point to capture time in that the difference between the time and the caught time is greater than {max_diff_between_caught_time_and_stop_time} seconds.' + \
                             f'The maximum difference is {max_diff} seconds. Additionally, there are {num_rows_exceeding} rows that exceed this limit. ' + \
                             f'Furthermore, the percentage of rows where the difference is positive is {percentage_of_rows_where_diff_is_positive * 100} %'
@@ -123,7 +123,7 @@ def make_shared_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_re
     
     shared_stops_near_ff_df = shared_stops_near_ff_df.sort_values(by='stop_point_index')
 
-    shared_stops_near_ff_df = add_stop_ff_cluster_50_size(shared_stops_near_ff_df, ff_real_position_sorted, ff_life_sorted)
+    add_stop_ff_cluster_50_size(shared_stops_near_ff_df, ff_real_position_sorted, ff_life_sorted)
 
     len_before = len(shared_stops_near_ff_df)
     shared_stops_near_ff_df = shared_stops_near_ff_df[shared_stops_near_ff_df['stop_time'] - shared_stops_near_ff_df['STOP_time_ff_first_seen_bbas'] >= min_time_between_stop_ff_first_seen_time_and_stop].copy().reset_index(drop=True)
@@ -160,7 +160,6 @@ def add_stop_ff_cluster_50_size(shared_stops_near_ff_df, ff_real_position_sorted
                                                                     array_of_end_time_of_evaluation, ff_life_sorted, max_distance=50, empty_cluster_ok=empty_cluster_ok)
     all_cluster_size = np.array([len(array) for array in ff_indices_of_each_cluster])
     shared_stops_near_ff_df['stop_ff_cluster_50_size'] = all_cluster_size   
-    return shared_stops_near_ff_df
 
 
 def check_for_different_ref_points_to_remove_rows_with_big_stop_or_alt_ff_angle_boundary(shared_stops_near_ff_df, monkey_information, ff_real_position_sorted):

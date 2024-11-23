@@ -73,7 +73,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def get_try_a_few_times_info(self):
 
-        self.try_a_few_times_trials, self.TAFT_indices_df, self.TAFT_trials_df, self.try_a_few_times_indices_for_anim = find_GUAT_or_TAFT_trials.try_a_few_times_func(self.monkey_information, self.ff_caught_T_sorted, self.ff_real_position_sorted, max_point_index=self.max_point_index)
+        self.try_a_few_times_trials, self.TAFT_indices_df, self.TAFT_trials_df, self.try_a_few_times_indices_for_anim = find_GUAT_or_TAFT_trials.try_a_few_times_func(self.monkey_information, self.ff_caught_T_sorted, self.closest_stop_to_capture_df, self.ff_real_position_sorted, max_point_index=self.max_point_index)
 
 
     def get_give_up_after_trying_info(self):
@@ -115,7 +115,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if self.all_trial_features is None:   
             if getattr(self, 'cluster_around_target_indices', None) is None:
                 self.prepare_to_find_patterns_and_features()             
-            self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_sorted, self.cluster_around_target_indices,\
+            self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_sorted, self.ff_closest_stop_time_sorted, self.cluster_around_target_indices,\
                                                               self.ff_real_position_sorted, self.ff_believed_position_sorted, data_folder_name = self.patterns_and_features_data_folder_path)
             print("made all_trial_features")
 

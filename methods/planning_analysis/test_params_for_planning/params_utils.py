@@ -260,7 +260,6 @@ def process_tested_combo_df(tested_combo_df):
 
     tested_combo_df['window_size'] = tested_combo_df['curv_of_traj_upper_end'] - tested_combo_df['curv_of_traj_lower_end']
     tested_combo_df['window_size'] = np.round(tested_combo_df['window_size'], 2)
-    return tested_combo_df
 
 
 

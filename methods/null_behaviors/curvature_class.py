@@ -53,7 +53,7 @@ class CurvatureOfPath():
 
 
     def add_column_monkey_passed_by_to_best_arc_df(self):
-        self.best_arc_df = find_best_arc.add_column_monkey_passed_by_to_best_arc_df(self.best_arc_df, self.ff_dataframe)   
+        find_best_arc.add_column_monkey_passed_by_to_best_arc_df(self.best_arc_df, self.ff_dataframe)   
 
 
     def get_elements_for_plotting(self, optimal_arc_stop_at_visible_boundary=False, ignore_error=False):

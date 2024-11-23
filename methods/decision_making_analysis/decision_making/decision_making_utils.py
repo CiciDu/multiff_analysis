@@ -78,7 +78,7 @@ def add_time_when_last_visible_period_began_when_calculating_time_since_last_vis
     ff_visible_df2.rename(columns={'time': 'time_when_last_visible_period_began'}, inplace=True)
     ff_visible_df2 = ff_visible_df2[['ff_index', 'current_time', 'time_when_last_visible_period_began']].copy()
 
-    ff_visible_df = pd.merge(ff_visible_df, ff_visible_df2, how='left', on=['ff_index', 'current_time'])
+    ff_visible_df = ff_visible_df.merge(ff_visible_df2, how='left', on=['ff_index', 'current_time'])
     return ff_visible_df
 
 
@@ -162,8 +162,6 @@ def fill_new_columns_with_placeholder_values(df, columns=['ff_distance', 'ff_ang
 
 
 def add_attributes_last_seen_or_next_seen_for_each_ff_in_df(df, ff_dataframe, attributes=['ff_distance', 'ff_angle', 'curv_diff'], use_last_seen=True, additional_placeholder_mapping=None):
-    
-
     
     df = df.copy()
     ff_info = find_attributes_of_ff_when_last_visible_OR_next_visible(df.ff_index.values, df.time.values, ff_dataframe, use_last_seen=use_last_seen, attributes=attributes,
@@ -531,7 +529,7 @@ def make_pseudo_manual_anno(best_arc_df, monkey_information, ff_caught_T_sorted)
     pseudo_manual_anno_long.rename(columns={'point_index': 'starting_point_index'}, inplace=True)
 
     pseudo_manual_anno_long['time'] = monkey_information['monkey_t'].iloc[pseudo_manual_anno_long.starting_point_index.values].values
-    pseudo_manual_anno_long['target_index'] = np.digitize(pseudo_manual_anno_long['time'].values, ff_caught_T_sorted).astype(int)        
+    pseudo_manual_anno_long['target_index'] = np.searchsorted(ff_caught_T_sorted, pseudo_manual_anno_long['time'].values).astype(int)        
     pseudo_manual_anno_long['ff_index'] = pseudo_manual_anno_long['ff_index'].astype(int)  
     pseudo_manual_anno_long['starting_point_index'] = pseudo_manual_anno_long['starting_point_index'].astype(int)  
 

@@ -180,13 +180,13 @@ class CompareGUATandTAFTclass():
             self.TAFT_trials_df['ff_index'] = self.TAFT_trials_df['trial']
             # because we need to have alt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_sorted - 2)
             self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(self.ff_caught_T_sorted) - 2]
-            self.TAFT_trials_df = GUAT_vs_TAFT_utils.add_stop_point_index(self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
+            GUAT_vs_TAFT_utils.add_stop_point_index(self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
         elif self.TAFT_or_GUAT == 'GUAT':
             self.gcc.make_or_retrieve_GUAT_w_ff_df(exists_ok=GUAT_w_ff_df_exists_ok)
             self.GUAT_w_ff_df = self.gcc.GUAT_w_ff_df.copy()
             self.GUAT_w_ff_df.sort_values(by=['trial', 'first_stop_time'], inplace=True)
             self.GUAT_w_ff_df['ff_index'] = self.GUAT_w_ff_df['latest_visible_ff']
-            self.GUAT_w_ff_df = GUAT_vs_TAFT_utils.add_stop_point_index(self.GUAT_w_ff_df, self.monkey_information, self.ff_real_position_sorted)
+            GUAT_vs_TAFT_utils.add_stop_point_index(self.GUAT_w_ff_df, self.monkey_information, self.ff_real_position_sorted)
             self.GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(self.GUAT_w_ff_df)
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1]
 
@@ -253,7 +253,7 @@ class CompareGUATandTAFTclass():
         self._add_alt_ff_index()
         self.stops_near_ff_df['alt_ff_caught_time'] = self.ff_caught_T_sorted[self.stops_near_ff_df['alt_ff_index'].values]
 
-        all_closest_point_to_alt_ff = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.stops_near_ff_df['alt_ff_caught_time'].values, self.monkey_information,
+        all_closest_point_to_alt_ff = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.stops_near_ff_df['alt_ff_caught_time'].values, self.monkey_information, self.ff_real_position_sorted,
                                                                                              )
         self.stops_near_ff_df[['next_stop_point_index', 'next_stop_time']] = all_closest_point_to_alt_ff[['point_index', 'time']].values
         self.stops_near_ff_df['next_stop_cum_distance'] = self.monkey_information.loc[self.stops_near_ff_df['next_stop_point_index'], 'cum_distance'].values
@@ -269,7 +269,7 @@ class CompareGUATandTAFTclass():
         self.stops_near_ff_df = alt_ff_utils.add_if_alt_ff_and_alt_ff_cluster_flash_bsans(self.stops_near_ff_df, self.ff_real_position_sorted, 
                                                                                         self.ff_flash_sorted, self.ff_life_sorted)
 
-        self.stops_near_ff_df = find_stops_near_ff_utils.add_stop_ff_cluster_50_size(self.stops_near_ff_df, self.ff_real_position_sorted, self.ff_life_sorted,
+        find_stops_near_ff_utils.add_stop_ff_cluster_50_size(self.stops_near_ff_df, self.ff_real_position_sorted, self.ff_life_sorted,
                                                                                      empty_cluster_ok=True)
 
         self.stops_near_ff_df = alt_ff_utils._add_stop_or_alt_ff_first_seen_and_last_seen_info_bbas(self.stops_near_ff_df, self.ff_dataframe_visible, self.monkey_information, stop_or_alt='stop')
@@ -284,6 +284,7 @@ class CompareGUATandTAFTclass():
         self.stops_near_ff_df['d_from_stop_ff_to_alt_ff'] = np.linalg.norm(self.ff_real_position_sorted[self.stops_near_ff_df['stop_ff_index'].values] - 
                                                                            self.ff_real_position_sorted[self.stops_near_ff_df['alt_ff_index'].values], axis=1)
         self.stops_near_ff_df['data_category_by_vis'] = 'test'
+        
 
 
     def make_ff_info_at_start_df(self):
@@ -321,7 +322,7 @@ class CompareGUATandTAFTclass():
 
     def make_only_stop_ff_df(self):
         # df = self.TAFT_df2 if (self.TAFT_or_GUAT == 'TAFT') else self.GUAT_df2
-        # self.all_closest_point_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(df['stop_time'].values, self.monkey_information, 
+        # self.closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(df['stop_time'].values, self.monkey_information, self.ff_real_position_sorted,
         #                                                                                               stop_ff_index_array=df['ff_index'].values,
         #                                                                                               stop_point_index_array=df['stop_point_index'].values)
         

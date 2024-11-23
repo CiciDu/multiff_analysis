@@ -189,23 +189,29 @@ class log_extractor(object):
             monkey_information = monkey_information.rename(columns={'MonkeyX': 'monkey_x', 'MonkeyY': 'monkey_y', 'AngularV': 'monkey_dw'})
             monkey_information['monkey_dw'] = monkey_information['monkey_dw'] * pi/180
             #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
-        
 
-        monkey_information = process_monkey_information_after_retrieval(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle, interocular_dist=interocular_dist)
 
         ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
                 ff_flash_end_sorted = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path = self.folder_path)
 
+
+        monkey_information = process_monkey_information_after_retrieval(monkey_information, ff_caught_T_sorted, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
+
         return monkey_information, ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
 
 
-def process_monkey_information_after_retrieval(monkey_information, min_distance_to_calculate_angle=5, interocular_dist=4):
+def process_monkey_information_after_retrieval(monkey_information, ff_caught_T_sorted, min_distance_to_calculate_angle=5):
     monkey_information = take_out_erroneous_information_from_monkey_information(monkey_information)
     monkey_information = add_columns_to_monkey_information(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
     monkey_information = monkey_information.reset_index(drop=True)
     monkey_information = get_derivative_of_a_column(monkey_information, column_name='monkey_dw', derivative_name='monkey_ddw')
     monkey_information = get_derivative_of_a_column(monkey_information, column_name='monkey_speed', derivative_name='monkey_ddv')
-    monkey_information = add_more_columns_to_monkey_information(monkey_information)
+    add_more_columns_to_monkey_information(monkey_information)
+
+    # assign "stop_id" to each stop, with each whether_new_distinct_stop==True marking a new stop id
+    monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum() - 1
+    monkey_information.loc[monkey_information['monkey_speeddummy'] == 1, 'stop_id'] = np.nan
+
     return monkey_information
 
 
@@ -215,7 +221,7 @@ def add_more_columns_to_monkey_information(monkey_information):
     monkey_information['point_index'] = monkey_information.index.values.astype(int)
     monkey_information['dt'] = monkey_information['time'].shift(-1) - monkey_information['time']
     monkey_information['dt'] = monkey_information['dt'].ffill()
-    monkey_information = add_delta_distance_and_cum_distance_to_monkey_information(monkey_information)
+    add_delta_distance_and_cum_distance_to_monkey_information(monkey_information)
     return monkey_information
 
 
@@ -227,7 +233,6 @@ def add_delta_distance_and_cum_distance_to_monkey_information(monkey_information
     monkey_information['delta_distance'] = monkey_information['delta_distance'].fillna(0)
 
     monkey_information['cum_distance'] = np.cumsum(monkey_information['delta_distance'])
-    return monkey_information
 
 
 
@@ -370,172 +375,6 @@ def calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=
     monkey_information['num_points_past'] = np.array(list_of_num_points_past)
     monkey_information['num_points_future'] = np.array(list_of_num_points_future)
     monkey_information['delta_position'] = np.array(list_of_delta_positions)
-    return monkey_information
-
-
-
-# def calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=5):
-#     # Add angle of the monkey
-#     monkey_angles = [pi/2]  # The monkey is at 90 degree angle at the beginning
-#     list_of_num_points = [0]
-#     list_of_num_points_past = [0]
-#     list_of_num_points_future = [0]
-#     list_of_delta_positions = [0]
-#     current_angle = pi/2 # This keeps track of the current angle during the iterations
-
-#     delta_x = np.diff(monkey_information['monkey_x'])
-#     delta_y = np.diff(monkey_information['monkey_y'])
-#     delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
-
-#     # Find the time in the data that is closest (right before) the time where we wan to know the monkey's angular position.
-#     total_points = len(monkey_information['monkey_t'])
-#     num_points = 1
-#     delta_position_full_length = np.append(0, delta_position)
-#     for i in range(1, total_points):
-#         if i == 1630:
-#             print(1630)
-#         if i+num_points >= total_points:
-#             monkey_angles.extend([current_angle] * (total_points-i))
-#             list_of_num_points.extend([0] * (total_points-i))
-#             list_of_num_points_past.extend([0] * (total_points-i))
-#             list_of_num_points_future.extend([0] * (total_points-i))
-#             list_of_delta_positions.extend([0] * (total_points-i))
-#             break
-#         # if i%10000 == 0:
-#         #     print(i, "out of,", total_points, "for calculating monkey_angles")
-
-#         # first, let's see the distance between the current point and the previous point. If it's greater than 50,
-#         # then it's 
-#         current_delta_position = delta_position_full_length[i]
-
-#         if current_delta_position > min_distance_to_calculate_angle:
-#             num_points = 1
-#             num_points_past = int(np.floor(num_points/2))
-#             num_points_future = num_points - num_points_past
-#             delta_x, delta_y, current_delta_position = calculate_delta_xy_and_current_delta_position(monkey_information, i, num_points_future, num_points_past)
-#         else:
-#             if num_points >= 3:
-#                 num_points -= 2 # compared to i-1, i might need at least num_points-1 points into the future to accumulate enough distance; since there's num_points+=1 in while loop, here we shall minus 2
-#             else: 
-#                 num_points = 1
-#         while (current_delta_position <= min_distance_to_calculate_angle) and (i+num_points < total_points):
-#             # num_points should be 2 or above to be meaningful
-#             num_points += 1 
-#             # now distribute the num_points to the past and future
-#             num_points_past = int(np.floor(num_points/2))
-#             num_points_future = num_points - num_points_past
-#             delta_x, delta_y, current_delta_position = calculate_delta_xy_and_current_delta_position(monkey_information, i, num_points_future, num_points_past)
-#         if current_delta_position < 50:
-#             # calculate the angle defined by two points
-#             delta_x, delta_y, current_delta_position = calculate_delta_xy_and_current_delta_position(monkey_information, i, num_points_future, num_points_past)
-#             # calculate the angle defined by two points
-#             current_angle = math.atan2(delta_y, delta_x)
-#         # Otherwise, most likely the monkey has crossed the boundary and come out at another place; we shall keep the current angle, and not update it
-#         monkey_angles.append(current_angle)
-#         list_of_num_points.append(num_points)
-#         list_of_num_points_past.append(num_points_past)
-#         list_of_num_points_future.append(num_points_future)
-#         list_of_delta_positions.append(current_delta_position)
-#     monkey_information['monkey_angles'] = np.array(monkey_angles)
-#     monkey_information['num_points'] = np.array(list_of_num_points)
-#     monkey_information['num_points_past'] = np.array(list_of_num_points_past)
-#     monkey_information['num_points_future'] = np.array(list_of_num_points_future)
-#     monkey_information['delta_position'] = np.array(list_of_delta_positions)
-#     return monkey_information
-
-
-
-# def calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=5):
-#     # Add angle of the monkey
-#     monkey_angles = [pi/2]  # The monkey is at 90 degree angle at the beginning
-#     current_angle = pi/2 # This keeps track of the current angle during the iterations
-
-#     delta_x = np.diff(monkey_information['monkey_x'])
-#     delta_y = np.diff(monkey_information['monkey_y'])
-#     delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
-
-#     # Find the time in the data that is closest (right before) the time where we wan to know the monkey's angular position.
-#     total_points = len(monkey_information['monkey_t'])
-#     num_points = 1
-#     delta_position_full_length = np.append(0, delta_position)
-#     for i in range(1, total_points):
-#         if i+num_points >= total_points:
-#             monkey_angles.extend([current_angle] * (total_points-i))
-#             break
-#         # if i%10000 == 0:
-#         #     print(i, "out of,", total_points, "for calculating monkey_angles")
-#         current_delta_position = delta_position_full_length[i]
-#         if current_delta_position > min_distance_to_calculate_angle:
-#             num_points = 1
-#         else:
-#             if num_points >= 3:
-#                 num_points -= 2 # compared to i-1, i might need at least num_points-1 points into the future to accumulate enough distance; since there's num_points+=1 in while loop, here we shall minus 2
-#             else:
-#                 num_points = 1
-#             while (current_delta_position <= min_distance_to_calculate_angle) and (i+num_points < total_points):
-#                 # num_points should be 2 or above to be meaningful
-#                 num_points += 1 
-#                 # now distribute the num_points to the past and future
-#                 num_points_past = int(np.floor(num_points/2))
-#                 num_points_future = num_points - num_points_past
-#                 delta_x = monkey_information['monkey_x'].iloc[i+num_points_future-1] - monkey_information['monkey_x'].iloc[i-num_points_past-1]
-#                 delta_y = monkey_information['monkey_y'].iloc[i+num_points_future-1] - monkey_information['monkey_y'].iloc[i-num_points_past-1]
-#                 current_delta_position = np.sqrt(np.square(delta_x)+np.square(delta_y))
-#         if current_delta_position < 50:
-#             # calculate the angle defined by two points
-#             current_angle = math.atan2(monkey_information['monkey_y'].iloc[i+num_points-1]-monkey_information['monkey_y'].iloc[i-1], 
-#                                     monkey_information['monkey_x'].iloc[i+num_points-1]-monkey_information['monkey_x'].iloc[i-1])
-#         # Otherwise, most likely the monkey has crossed the boundary and come out at another place; we shall keep the current angle, and not update it
-#         monkey_angles.append(current_angle)
-#     monkey_information['monkey_angles'] = np.array(monkey_angles)
-#     return monkey_information
-
-
-
-
-# def calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=5):
-#     # Add angle of the monkey
-#     monkey_angles = [pi/2]  # The monkey is at 90 degree angle at the beginning
-#     current_angle = pi/2 # This keeps track of the current angle during the iterations
-
-#     delta_x = np.diff(monkey_information['monkey_x'])
-#     delta_y = np.diff(monkey_information['monkey_y'])
-#     delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
-
-#     # Find the time in the data that is closest (right before) the time where we wan to know the monkey's angular position.
-#     total_points = len(monkey_information['monkey_t'])
-#     num_points = 1
-#     delta_position_full_length = np.append(0, delta_position)
-#     for i in range(1, total_points):
-#         if i+num_points >= total_points:
-#             monkey_angles.extend([current_angle] * (total_points-i))
-#             break
-#         # if i%10000 == 0:
-#         #     print(i, "out of,", total_points, "for calculating monkey_angles")
-#         current_delta_position = delta_position_full_length[i]
-#         if current_delta_position > min_distance_to_calculate_angle:
-#             num_points = 1
-#         else:
-#             if num_points >= 3:
-#                 num_points -= 2 # compared to i-1, i might need at least num_points-1 points into the future to accumulate enough distance; since there's num_points+=1 in while loop, here we shall minus 2
-#             else:
-#                 num_points = 1
-#             while (current_delta_position <= min_distance_to_calculate_angle) and (i+num_points < total_points):
-#                 # num_points should be 2 or above to be meaningful
-#                 num_points += 1 
-#                 delta_x = monkey_information['monkey_x'].iloc[i+num_points-1] - monkey_information['monkey_x'].iloc[i-1]
-#                 delta_y = monkey_information['monkey_y'].iloc[i+num_points-1] - monkey_information['monkey_y'].iloc[i-1]
-#                 current_delta_position = np.sqrt(np.square(delta_x)+np.square(delta_y))
-#         if current_delta_position < 50:
-#             # calculate the angle defined by two points
-#             current_angle = math.atan2(monkey_information['monkey_y'].iloc[i+num_points-1]-monkey_information['monkey_y'].iloc[i-1], 
-#                                     monkey_information['monkey_x'].iloc[i+num_points-1]-monkey_information['monkey_x'].iloc[i-1])
-#         # Otherwise, most likely the monkey has crossed the boundary and come out at another place; we shall keep the current angle, and not update it
-#         monkey_angles.append(current_angle)
-#     monkey_information['monkey_angles'] = np.array(monkey_angles)
-#     return monkey_information
-
-
 
 
 
@@ -555,7 +394,7 @@ def add_columns_to_monkey_information(monkey_information, min_distance_to_calcul
         containing more information of the monkey
 
     """
-
+    monkey_information = monkey_information.copy()
     
     delta_time = np.diff(monkey_information['monkey_t'])
     delta_x = np.diff(monkey_information['monkey_x'])
@@ -592,7 +431,7 @@ def add_columns_to_monkey_information(monkey_information, min_distance_to_calcul
 
 
     if 'monkey_angles' not in monkey_information.columns:
-        monkey_information = calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
+        calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         # The Gaussian filter shouldn't be used because there will be a problem when monkey_angle changes from 3.14 to -3.14
         #monkey_information['monkey_angles'] = gaussian_filter1d(monkey_information['monkey_angles'], 1)
 
@@ -627,12 +466,12 @@ def add_columns_to_monkey_information(monkey_information, min_distance_to_calcul
         monkey_information['whether_new_distinct_stop'] = False
         monkey_information.loc[monkey_information['point_index'].isin(monkey_df['point_index']), 'whether_new_distinct_stop'] = True
 
-
     return monkey_information   
 
 
 
 def add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path, variables = ['LDy', 'LDz', 'RDy', 'RDz']):
+    monkey_information = monkey_information.copy()
     accurate_start_time, accurate_end_time, signal_df = find_start_and_accurate_end_time(raw_data_folder_path, exists_ok=True, return_signal_df=True)
     signal_t = np.array(signal_df.Time)
     monkey_t = monkey_information['monkey_t'].values
@@ -648,9 +487,9 @@ def add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_
     condensed_signal_df = condensed_signal_df.groupby('time_box').mean().reset_index(drop=False)
 
     # Put these info into monkey_information
-    monkey_information = monkey_information.merge(condensed_signal_df, how='left', on='time_box')  
-
+    monkey_information = monkey_information.merge(condensed_signal_df, how='left', on='time_box')
     return monkey_information
+
 
 
 
@@ -892,7 +731,7 @@ def turn_array_into_df(self, array, corresponding_t):
     info_num = [int(num) for num in array]
     info_dict = {'t': corresponding_t.tolist(), 'num': info_num}
     info_dataframe = pd.DataFrame(info_dict)
-    info_dataframe['trial']=np.digitize(corresponding_t, ff_caught_T_sorted)
+    info_dataframe['trial']=np.searchsorted(ff_caught_T_sorted, corresponding_t)
     return info_dataframe
 
 

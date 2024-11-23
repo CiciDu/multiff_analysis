@@ -81,7 +81,7 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
 
         print(' ')
         print('Making overall all median info ......')
-        self.make_or_retrieve_overall_all_median_info(ref_point_params_based_on_mode={'time after stop ff visible': [0.1, 0],
+        self.make_or_retrieve_overall_median_info(ref_point_params_based_on_mode={'time after stop ff visible': [0.1, 0],
                                                                         'distance': [-150, -100, -50]},
                                                     save_data=save_data,
                                                     exists_ok=final_products_exist_ok, 
@@ -89,7 +89,7 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
                                                     combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok, 
                                                     stops_near_ff_df_exists_ok=intermediate_products_exist_ok, 
                                                     heading_info_df_exists_ok=intermediate_products_exist_ok)
-        self.agent_overall_all_median_info = self.overall_all_median_info.copy()
+        self.agent_overall_median_info = self.overall_median_info.copy()
         print(' ')
         print('Making all perc info ......')
         self.make_or_retrieve_all_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
@@ -276,10 +276,10 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
         self.test_combd_heading_df_x_sessions = pd.concat([self.test_combd_heading_df_x_sessions, self.test_heading_info_df], axis=0)
         self.ctrl_combd_heading_df_x_sessions = pd.concat([self.ctrl_combd_heading_df_x_sessions, self.ctrl_heading_info_df], axis=0)
 
-    def make_or_retrieve_overall_all_median_info(self, **kwargs):
-        self.overall_all_median_info = super().make_or_retrieve_overall_all_median_info(**kwargs)
-        self.overall_all_median_info['monkey_name'] = 'agent'
-        return self.overall_all_median_info
+    def make_or_retrieve_overall_median_info(self, **kwargs):
+        self.overall_median_info = super().make_or_retrieve_overall_median_info(**kwargs)
+        self.overall_median_info['monkey_name'] = 'agent'
+        return self.overall_median_info
 
     def make_or_retrieve_all_perc_info(self, **kwargs):
         self.all_perc_info = super().make_or_retrieve_all_perc_info(**kwargs)

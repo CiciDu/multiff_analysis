@@ -174,7 +174,7 @@ def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_sorte
 	corresponding_t = monkey_information['monkey_t'].values[np.array(temp_dataframe3['point_index'])]
 	temp_dataframe3['time'] = corresponding_t
 	# From the time of each point, find the target index that corresponds to that point
-	temp_dataframe3['target_index'] = np.digitize(corresponding_t, ff_caught_T_sorted)
+	temp_dataframe3['target_index'] = np.searchsorted(ff_caught_T_sorted, corresponding_t)
 	# Only keep the part of the data up to the capture of the last firefly
 	temp_dataframe3 = temp_dataframe3[temp_dataframe3['target_index'] < len(ff_caught_T_sorted)]
 	# Thus we have the information of the clusters for each time point that has at least one cluster
@@ -232,6 +232,7 @@ def find_ff_cluster_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_c
         cluster_identifiers = list(range(len(time_of_evaluation_for_each_cluster)))
     row_indices = []
     nearby_alive_ff_indices = []
+    ff_cluster_last_visible_point_index = []
     ff_cluster_last_visible_time = []
     ff_cluster_last_visible_distances = []
     ff_cluster_last_visible_angles = []
@@ -249,6 +250,7 @@ def find_ff_cluster_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_c
             nearby_alive_ff_indices.append(ff_indices_in_a_cluster)
             latest_visible_ff = ff_dataframe_subset.loc[ff_dataframe_subset['time'].idxmax()]
             latest_visible_ff_indices.append(latest_visible_ff['ff_index'])
+            ff_cluster_last_visible_point_index.append(latest_visible_ff['point_index'])
             ff_cluster_last_visible_time.append(time_of_evaluation - latest_visible_ff['time'])
             ff_cluster_last_visible_distances.append(latest_visible_ff['ff_distance'])
             ff_cluster_last_visible_angles.append(latest_visible_ff['ff_angle'])
@@ -262,6 +264,7 @@ def find_ff_cluster_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_c
     ff_cluster_df = pd.DataFrame({'cluster_identifier': row_indices, 
                                 'latest_visible_ff_indices': latest_visible_ff_indices,
                                 'nearby_alive_ff_indices': nearby_alive_ff_indices, 
+                                'last_visible_point_index': ff_cluster_last_visible_point_index,
                                 'time_since_last_visible': ff_cluster_last_visible_time,
                                 'last_visible_distances': ff_cluster_last_visible_distances,
                                 'last_visible_angles': ff_cluster_last_visible_angles,

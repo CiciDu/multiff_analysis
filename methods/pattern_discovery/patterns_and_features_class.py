@@ -64,7 +64,7 @@ class PatternsAndFeatures():
             self.scatter_df['data_name'] = data_name
             self.combd_scatter_df = pd.concat([self.combd_scatter_df, self.scatter_df], axis=0).reset_index(drop=True)
 
-        self.combd_scatter_df = organize_patterns_and_features.add_dates_and_sessions(self.combd_scatter_df)
+        organize_patterns_and_features.add_dates_and_sessions(self.combd_scatter_df)
         if save_data:
             os.makedirs(self.combd_patterns_and_features_folder_path, exist_ok=True)
             self.combd_scatter_df.to_csv(df_path)
@@ -87,9 +87,9 @@ class PatternsAndFeatures():
 
         self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
 
-        self.concat_pattern_frequencies = pd.DataFrame()
-        self.concat_feature_statistics = pd.DataFrame()
-        self.concat_all_trial_features = pd.DataFrame()
+        self.combd_pattern_frequencies = pd.DataFrame()
+        self.combd_feature_statistics = pd.DataFrame()
+        self.combd_all_trial_features = pd.DataFrame()
         for index, row in self.sessions_df_for_one_monkey.iterrows():
             if row['finished'] is True:
                 continue
@@ -104,22 +104,22 @@ class PatternsAndFeatures():
             self.data_item.feature_statistics['data_name'] = data_name
             self.data_item.all_trial_features['data_name'] = data_name
 
-            self.concat_pattern_frequencies = pd.concat([self.concat_pattern_frequencies, self.data_item.pattern_frequencies], axis=0).reset_index(drop=True)
-            self.concat_feature_statistics = pd.concat([self.concat_feature_statistics, self.data_item.feature_statistics], axis=0).reset_index(drop=True)
-            self.concat_all_trial_features = pd.concat([self.concat_all_trial_features, self.data_item.all_trial_features], axis=0).reset_index(drop=True)
+            self.combd_pattern_frequencies = pd.concat([self.combd_pattern_frequencies, self.data_item.pattern_frequencies], axis=0).reset_index(drop=True)
+            self.combd_feature_statistics = pd.concat([self.combd_feature_statistics, self.data_item.feature_statistics], axis=0).reset_index(drop=True)
+            self.combd_all_trial_features = pd.concat([self.combd_all_trial_features, self.data_item.all_trial_features], axis=0).reset_index(drop=True)
 
-        self.concat_pattern_frequencies = organize_patterns_and_features.add_dates_and_sessions(self.concat_pattern_frequencies)
-        self.concat_feature_statistics = organize_patterns_and_features.add_dates_and_sessions(self.concat_feature_statistics)
-        self.concat_all_trial_features = organize_patterns_and_features.add_dates_and_sessions(self.concat_all_trial_features)
+        organize_patterns_and_features.add_dates_and_sessions(self.combd_pattern_frequencies)
+        organize_patterns_and_features.add_dates_and_sessions(self.combd_feature_statistics)
+        organize_patterns_and_features.add_dates_and_sessions(self.combd_all_trial_features)
 
         self.agg_pattern_frequencies = self._make_agg_pattern_frequency()
-        self.agg_feature_statistics = organize_patterns_and_features.make_feature_statistics(self.concat_all_trial_features.drop(columns='data_name'), data_folder_name = None)
+        self.agg_feature_statistics = organize_patterns_and_features.make_feature_statistics(self.combd_all_trial_features.drop(columns='data_name'), data_folder_name = None)
 
         if save_data:
             os.makedirs(self.combd_patterns_and_features_folder_path, exist_ok=True)
-            self.concat_pattern_frequencies.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'concat_pattern_frequencies.csv'))
-            self.concat_feature_statistics.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'concat_feature_statistics.csv'))
-            self.concat_all_trial_features.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'concat_all_trial_features.csv'))
+            self.combd_pattern_frequencies.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_pattern_frequencies.csv'))
+            self.combd_feature_statistics.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_feature_statistics.csv'))
+            self.combd_all_trial_features.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_all_trial_features.csv'))
             self.agg_pattern_frequencies.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_pattern_frequencies.csv'))
             self.agg_feature_statistics.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_feature_statistics.csv'))
 
@@ -128,9 +128,9 @@ class PatternsAndFeatures():
         return
     
     def _retrieve_combined_patterns_and_features(self):
-        self.concat_pattern_frequencies = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'concat_pattern_frequencies.csv')).drop(columns='Unnamed: 0')
-        self.concat_feature_statistics = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'concat_feature_statistics.csv')).drop(columns='Unnamed: 0')
-        self.concat_all_trial_features = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'concat_all_trial_features.csv')).drop(columns='Unnamed: 0')
+        self.combd_pattern_frequencies = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_pattern_frequencies.csv')).drop(columns='Unnamed: 0')
+        self.combd_feature_statistics = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_feature_statistics.csv')).drop(columns='Unnamed: 0')
+        self.combd_all_trial_features = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_all_trial_features.csv')).drop(columns='Unnamed: 0')
         self.agg_pattern_frequencies = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_pattern_frequencies.csv')).drop(columns='Unnamed: 0')
         self.agg_feature_statistics = pd.read_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_feature_statistics.csv')).drop(columns='Unnamed: 0')
         return
@@ -138,7 +138,7 @@ class PatternsAndFeatures():
 
 
     def _make_agg_pattern_frequency(self):
-        self.agg_pattern_frequencies = self.concat_pattern_frequencies.drop(columns='data_name').groupby(['Item', 'Group', 'Label']).sum().reset_index()
+        self.agg_pattern_frequencies = self.combd_pattern_frequencies.drop(columns='data_name').groupby(['Item', 'Group', 'Label']).sum().reset_index()
         self.agg_pattern_frequencies['Rate'] = self.agg_pattern_frequencies['Frequency']/self.agg_pattern_frequencies['N_total']
         self.agg_pattern_frequencies['Percentage'] = self.agg_pattern_frequencies['Rate']*100
         return self.agg_pattern_frequencies
@@ -146,26 +146,26 @@ class PatternsAndFeatures():
 
     def plot_feature_statistics(self, hue=None):
         plot_statistics.plot_feature_statistics(self.agg_feature_statistics, monkey_name=self.monkey_name, hue=hue)
-        plot_statistics.plot_feature_statistics(self.concat_feature_statistics, monkey_name=self.monkey_name, hue=hue)
+        plot_statistics.plot_feature_statistics(self.combd_feature_statistics, monkey_name=self.monkey_name, hue=hue)
 
 
     def plot_pattern_frequencies(self, hue=None):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
         ax1 = plot_statistics.plot_pattern_frequencies(self.agg_pattern_frequencies, monkey_name=self.monkey_name, ax=ax1, return_ax=True, hue=hue)
-        ax2 = plot_statistics.plot_pattern_frequencies(self.concat_pattern_frequencies, monkey_name=self.monkey_name, ax=ax2, return_ax=True, hue=hue)
+        ax2 = plot_statistics.plot_pattern_frequencies(self.combd_pattern_frequencies, monkey_name=self.monkey_name, ax=ax2, return_ax=True, hue=hue)
         plt.show()
 
 
     def plot_the_changes_in_pattern_frequencies_over_time(self):
-        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.concat_pattern_frequencies, x="Session", y="Rate", 
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_pattern_frequencies, x="Session", y="Rate", 
                                                 monkey_name='monkey_Bruno',
                                                 category_order=self.pattern_order)
         
 
     def plot_the_changes_in_feature_statistics_over_time(self):
-        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.concat_feature_statistics, x="Session", y="Median", title_column="Label for median", 
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_feature_statistics, x="Session", y="Median", title_column="Label for median", 
                                                                           monkey_name=self.monkey_name, category_order=self.feature_order)
-        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.concat_feature_statistics, x="Session", y="Mean", title_column="Label for mean", 
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_feature_statistics, x="Session", y="Mean", title_column="Label for mean", 
                                                                           monkey_name=self.monkey_name, category_order=self.feature_order)
 
 

@@ -130,7 +130,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sort
       os.makedirs(data_folder_name, exist_ok = True)
       ff_dataframe.to_csv(filepath)
 
-    ff_dataframe = add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_sorted, ff_real_position_sorted, ff_radius, reward_boundary_radius)
+    add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_sorted, ff_real_position_sorted, ff_radius, reward_boundary_radius)
     
     if to_furnish_ff_dataframe:
         ff_dataframe = furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted)
@@ -142,8 +142,6 @@ def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_c
     ff_dataframe[['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']]  \
         = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']].values
     ff_dataframe[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
-    ff_dataframe['target_index'] = np.digitize(ff_dataframe['time'], ff_caught_T_sorted).tolist()
-    ff_dataframe[['target_x', 'target_y']] = ff_real_position_sorted[np.array(ff_dataframe['target_index'])]
     ff_dataframe['ff_distance'] = LA.norm(np.array(ff_dataframe[['monkey_x', 'monkey_y']])-np.array(ff_dataframe[['ff_x', 'ff_y']]), axis=1)
     ff_dataframe['ff_angle'] = basic_func.calculate_angles_to_ff_centers(ff_x=ff_dataframe['ff_x'], ff_y=ff_dataframe['ff_y'], mx=ff_dataframe['monkey_x'], 
                                                                          my=ff_dataframe['monkey_y'], m_angle=ff_dataframe['monkey_angle'])
@@ -152,8 +150,6 @@ def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_c
     ff_dataframe['abs_ff_angle_boundary'] = np.abs(ff_dataframe['ff_angle_boundary'])
     ff_dataframe['left_right'] = (np.array(ff_dataframe['ff_angle']) > 0).astype(int)
     ff_dataframe['angles_to_reward_boundaries'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_dataframe.ff_angle, distances_to_ff=ff_dataframe.ff_distance, ff_radius=reward_boundary_radius)
-
-    return ff_dataframe
 
 
 def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_visible):
@@ -191,7 +187,7 @@ def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_sort
     dw_same_sign_as_ffangle_boundary = np.sign(np.multiply(np.array(ff_dataframe["monkey_dw"]), np.array(ff_dataframe["ff_angle_boundary"])))
     ff_dataframe["dw_same_sign_as_ffangle_boundary"] = dw_same_sign_as_ffangle_boundary
 
-    ff_dataframe = ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe, ff_caught_T_sorted, ff_life_sorted)
+    ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe, ff_caught_T_sorted, ff_life_sorted)
 
     return ff_dataframe
 
@@ -286,7 +282,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, 
         ff_index = ff_index + [i] * len(valid_distance_indices)
         point_index = point_index + cum_iloc_indices[valid_distance_indices].tolist()
         time = time + cum_t[valid_distance_indices].tolist()
-        target_index = target_index + np.digitize(cum_t[valid_distance_indices], ff_caught_T_sorted).tolist()
+        target_index = target_index + np.searchsorted(ff_caught_T_sorted, cum_t[valid_distance_indices]).tolist()
         ff_x = ff_x + [ff_real_position_sorted[i, 0]]*len(valid_distance_indices)
         ff_y = ff_y + [ff_real_position_sorted[i, 1]]*len(valid_distance_indices)
         monkey_x = monkey_x + cum_mx[valid_distance_indices].tolist()
@@ -320,7 +316,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, 
     # Also to show whether each ff has been caught;
     # Since when using the agent, ff_caught_T_sorted does not contain information for all fireflies, we need to fill out the information for the ff not included,
     # To do so, we use the latest time in the environment plus 100s.
-    ff_dataframe_v2 = ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe_v2, ff_caught_T_sorted, ff_life_sorted)
+    ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe_v2, ff_caught_T_sorted, ff_life_sorted)
 
 
 

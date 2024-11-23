@@ -59,7 +59,7 @@ class ClusterReplacement(decision_making_class.DecisionMaking):
         self.joined_new_ff_cluster_df['order'] = self.joined_new_ff_cluster_df['order'] + num_old_ff_per_row
         self.joined_cluster_df = pd.concat([self.joined_old_ff_cluster_df, self.joined_new_ff_cluster_df], axis=0)
         if add_arc_info:
-            self.joined_cluster_df = curvature_utils.add_arc_info_to_df(self.joined_cluster_df, curvature_df, arc_info_to_add=arc_info_to_add)
+            curvature_utils.add_arc_info_to_df(self.joined_cluster_df, curvature_df, arc_info_to_add=arc_info_to_add)
             ff_attributes = list(set(ff_attributes) | set(arc_info_to_add))      
         self.free_selection_inputs_df, self.free_selection_inputs_df_for_plotting, self.sequence_of_obs_ff_indices, self.point_index_array, self.pred_var = free_selection.find_free_selection_inputs_from_info_of_n_ff_per_point(self.joined_cluster_df, self.monkey_information, ff_attributes=ff_attributes, 
                                                                                     num_ff_per_row=num_old_ff_per_row + num_new_ff_per_row, add_current_curvature_of_traj=add_current_curvature_of_traj, ff_caught_T_sorted=self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)        

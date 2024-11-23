@@ -396,7 +396,6 @@ def add_box_name_column_to_rel_angle_slope_df(rel_angle_slope_df):
 
     rows_to_add_abs_and_q13 = (rel_angle_slope_df['use_abs_values']==True) & (rel_angle_slope_df['q13_only']==True)
     rel_angle_slope_df.loc[rows_to_add_abs_and_q13, 'box_name'] = 'Abs, Q1,3: ' + rel_angle_slope_df.loc[rows_to_add_abs_and_q13, 'box_name']
-    return rel_angle_slope_df
 
 
 def make_diff_and_ratio_stat_df(test_df, ctrl_df):

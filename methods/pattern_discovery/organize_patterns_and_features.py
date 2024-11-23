@@ -142,7 +142,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_sorted, monkey_info
     pattern_frequencies = pd.concat([pattern_frequencies, new_row])
 
 
-    num_stops_array = _get_num_stops_array(monkey_information, ff_caught_T_sorted)
+    num_stops_array = get_num_stops_array(monkey_information, ff_caught_T_sorted)
 
     total_number_of_stops = sum(num_stops_array)
     stop_success_rate = n_ff_counted/total_number_of_stops
@@ -170,32 +170,47 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_sorted, monkey_info
     pattern_frequencies.loc[pattern_frequencies['Item'] == 'multiple_in_a_row_all', 'Label'] = 'Multiple in a row including 1st one'
     pattern_frequencies.loc[pattern_frequencies['Item'] == 'cluster_around_target', 'Label'] = 'Cluster exists around last target'
 
-
     if data_folder_name:
         basic_func.save_df_to_csv(pattern_frequencies, 'pattern_frequencies', data_folder_name)
 
     return pattern_frequencies
 
 
-def _get_num_stops_array(monkey_information, ff_caught_T_sorted):
+def get_num_stops_array(monkey_information, ff_caught_T_sorted):
     monkey_information = monkey_information[monkey_information['whether_new_distinct_stop'] == True].copy()
-    monkey_information['trial'] = np.searchsorted(ff_caught_T_sorted, monkey_information['time'].values)
     monkey_sub = monkey_information[['trial', 'point_index']].groupby('trial').count().reset_index().rename(columns={'point_index': 'num_stops'})
     monkey_sub = monkey_sub.merge(pd.DataFrame({'trial': np.arange(len(ff_caught_T_sorted))}), on='trial', how='right')
     num_stops_array = monkey_sub['num_stops'].fillna(0).values.astype(int)
     return num_stops_array
 
+
 def _calculate_trial_durations(ff_caught_T_sorted):
+    """
+    Calculate the durations of trials based on the sorted capture times.
+
+    Parameters:
+    ff_caught_T_sorted (list or array-like): Sorted capture times.
+
+    Returns:
+    tuple: A tuple containing the trial array and the duration array.
+    """
     caught_ff_num = len(ff_caught_T_sorted)
-    trial_array = [i for i in range(1, caught_ff_num)]
-    t_array = ff_caught_T_sorted[1:caught_ff_num] - ff_caught_T_sorted[:caught_ff_num-1]
-    return trial_array, t_array.tolist()
+    trial_array = list(range(caught_ff_num))
+    
+    # Calculate the differences between consecutive capture times
+    t_array = (ff_caught_T_sorted[1:caught_ff_num] - ff_caught_T_sorted[:caught_ff_num-1]).tolist()
+    
+    # Add the first capture time to the beginning of the duration array
+    t_array.insert(0, ff_caught_T_sorted[0])
+    
+    return trial_array, t_array
+
 
 def _calculate_last_visible_metrics(visible_ff, ff_caught_T_sorted, caught_ff_num):
     t_last_visible = []
     d_last_visible = []
     abs_angle_last_visible = []
-    for i in range(1, caught_ff_num):
+    for i in range(caught_ff_num):
         info_of_nearby_ff = ((visible_ff['target_index']==i) & (visible_ff['ffdistance2target'] < 25))
         info_of_target = (visible_ff['ff_index']==i)
         relevant_df = visible_ff[ info_of_nearby_ff | info_of_target]
@@ -209,27 +224,22 @@ def _calculate_last_visible_metrics(visible_ff, ff_caught_T_sorted, caught_ff_nu
             abs_angle_last_visible.append(9999)
     return t_last_visible, d_last_visible, abs_angle_last_visible
 
-def _calculate_hitting_arena_edge(monkey_information, ff_caught_T_sorted, caught_ff_num):
-    hitting_arena_edge = []
-    for i in range(1, caught_ff_num):
-        duration = [ff_caught_T_sorted[i-1], ff_caught_T_sorted[i]]
-        cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-        if len(cum_iloc_indices) > 1:
-            cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices])
-            if np.any(cum_mx[1:]-cum_mx[:-1] > 55) or np.any(cum_my[1:]-cum_my[:-1] > 55):
-                hitting_arena_edge.append(1)
-            else:
-                hitting_arena_edge.append(0)
-        else:
-            hitting_arena_edge.append(0)
+def _calculate_hitting_arena_edge(monkey_information, ff_caught_T_sorted):
+    # Group by 'trial' and get the maximum 'crossing_boundary' value for each trial
+    cb_df = monkey_information[['trial', 'crossing_boundary']].groupby('trial').max().reset_index()
+    # Create a DataFrame with 'trial' values ranging from 0 to the length of 'ff_caught_T_sorted'
+    trial_df = pd.DataFrame({'trial': np.arange(len(ff_caught_T_sorted))})
+    # Merge the DataFrames and fill missing values with 0
+    merged_df = cb_df.merge(trial_df, on='trial', how='right').fillna(0)
+    hitting_arena_edge = merged_df['crossing_boundary'].values.astype(int)
     return hitting_arena_edge
 
 
-def _calculate_num_stops_since_last_visible(ff_caught_T_sorted, monkey_information, player, caught_ff_num, t_last_visible):
+def _calculate_num_stops_since_last_visible(monkey_information, caught_ff_num, t_last_visible):
     # note that t_last_visible starts with trial = 1
     t_last_visible = np.array(t_last_visible)
-    monkey_sub = find_GUAT_or_TAFT_trials._take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance)
-    monkey_sub = monkey_sub[monkey_sub['trial'] >= 1]
+    monkey_sub = monkey_information[monkey_information['whether_new_distinct_stop']==True]
+    monkey_sub = monkey_sub[monkey_sub['trial'] >= 1].copy()
     monkey_sub['t_last_visible'] = t_last_visible[monkey_sub['trial'].values - 1]
     monkey_sub = monkey_sub[monkey_sub['time'] >= monkey_sub['t_last_visible']]
     num_stops_since_last_visible = _use_merge_to_get_num_stops_for_each_trial(monkey_sub, caught_ff_num)
@@ -237,31 +247,32 @@ def _calculate_num_stops_since_last_visible(ff_caught_T_sorted, monkey_informati
     return num_stops_since_last_visible
 
 
-def _calculate_num_stops_near_target(ff_caught_T_sorted, monkey_information, player, caught_ff_num, ff_real_position_sorted, max_cluster_distance):
-    monkey_sub = find_GUAT_or_TAFT_trials._take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance)
+def _calculate_num_stops_near_target(monkey_information, ff_caught_T_sorted, ff_closest_stop_time_sorted, caught_ff_num, ff_real_position_sorted, max_cluster_distance):
+    monkey_sub = find_GUAT_or_TAFT_trials._take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, ff_closest_stop_time_sorted, ff_real_position_sorted, max_cluster_distance)
     num_stops_near_target = _use_merge_to_get_num_stops_for_each_trial(monkey_sub, caught_ff_num)
     return num_stops_near_target
 
 
 def _use_merge_to_get_num_stops_for_each_trial(monkey_sub, caught_ff_num):
     monkey_sub = monkey_sub[['trial', 'point_index']].groupby('trial').count()
-    monkey_sub = monkey_sub.merge(pd.DataFrame({'trial': np.arange(1, caught_ff_num)}), how='right', on='trial')
+    monkey_sub = monkey_sub.merge(pd.DataFrame({'trial': np.arange(caught_ff_num)}), how='right', on='trial')
     monkey_sub = monkey_sub.fillna(0)
     num_stops_near_target = monkey_sub['point_index'].values
     return num_stops_near_target
 
 
-def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_sorted, cluster_around_target_indices, ff_real_position_sorted, ff_believed_position_sorted, player = "monkey", max_cluster_distance = 50, data_folder_name = None):
+def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_sorted, ff_closest_stop_time_sorted, cluster_around_target_indices, ff_real_position_sorted, ff_believed_position_sorted, max_cluster_distance = 75, data_folder_name = None):
+    # Note that we start from trial = 1
     caught_ff_num = len(ff_caught_T_sorted)
     visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
     trial_array, t_array = _calculate_trial_durations(ff_caught_T_sorted)
     t_last_visible, d_last_visible, abs_angle_last_visible = _calculate_last_visible_metrics(visible_ff, ff_caught_T_sorted, caught_ff_num)
-    hitting_arena_edge = _calculate_hitting_arena_edge(monkey_information, ff_caught_T_sorted, caught_ff_num)
-    num_stops_array = _get_num_stops_array(monkey_information, ff_caught_T_sorted)
-    num_stops_since_last_visible = _calculate_num_stops_since_last_visible(ff_caught_T_sorted, monkey_information, player, caught_ff_num, t_last_visible)
-    num_stops_near_target = _calculate_num_stops_near_target(ff_caught_T_sorted, monkey_information, player, caught_ff_num, ff_real_position_sorted, max_cluster_distance)
-    n_ff_in_a_row = pattern_by_trials.n_ff_in_a_row_func(ff_believed_position_sorted[1:caught_ff_num], distance_between_ff = 50)
-    num_ff_around_target = np.array([len(unit) for unit in cluster_around_target_indices[1:caught_ff_num]])
+    hitting_arena_edge = _calculate_hitting_arena_edge(monkey_information, ff_caught_T_sorted)
+    num_stops_array = get_num_stops_array(monkey_information, ff_caught_T_sorted)
+    num_stops_since_last_visible = _calculate_num_stops_since_last_visible(monkey_information, caught_ff_num, t_last_visible)
+    num_stops_near_target = _calculate_num_stops_near_target(monkey_information, ff_caught_T_sorted, ff_closest_stop_time_sorted, caught_ff_num, ff_real_position_sorted, max_cluster_distance)
+    n_ff_in_a_row = pattern_by_trials.n_ff_in_a_row_func(ff_believed_position_sorted, distance_between_ff = 50)
+    num_ff_around_target = np.array([len(unit) for unit in cluster_around_target_indices])
 
     trials_dict = {'trial': trial_array, 
                    't': t_array,  
@@ -276,6 +287,9 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_sorted
                    'n_ff_in_a_row': n_ff_in_a_row[:len(trial_array)].tolist()                            
                           }
     all_trial_features = pd.DataFrame(trials_dict)
+
+    # drop trial=0
+    all_trial_features = all_trial_features[all_trial_features['trial'] > 0].reset_index(drop=True)
     
     if data_folder_name:
         basic_func.save_df_to_csv(all_trial_features, 'all_trial_features', data_folder_name)
@@ -373,13 +387,13 @@ def _add_dates_based_on_data_names(df):
     all_dates = [int(date[-4:]) for date in df['data'].tolist()]
     all_dates = [datetime.strptime(str(date/100), '%m.%d').date() for date in all_dates]
     df['Date'] = all_dates
-    df = df.sort_values(by='Date')
-    return df
+    df.sort_values(by='Date', inplace=True)
+
 
 
 def add_dates_and_sessions(df):
-    # concat_feature_statistics = organize_patterns_and_features._add_dates_based_on_data_names(concat_feature_statistics)
-    df = _add_dates_based_on_data_names(df)
+    # organize_patterns_and_features._add_dates_based_on_data_names(combd_feature_statistics)
+    _add_dates_based_on_data_names(df)
 
     # Create a mapping of unique data_name to unique sessions
     unique_sessions = {name: i for i, name in enumerate(df['Date'].unique())}
@@ -389,8 +403,6 @@ def add_dates_and_sessions(df):
 
     # Sort the DataFrame by data_name
     df.sort_values(by='Session', inplace=True)
-
-    return df
 
 
 
@@ -404,7 +416,7 @@ def add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive
     DEFAULT_LAST_SEEN_ANGLE = 0
 
     # Initialize columns
-    target_df = _initialize_target_df(target_df, DEFAULT_LAST_SEEN_TIME, DEFAULT_LAST_SEEN_DISTANCE, DEFAULT_LAST_SEEN_ANGLE, include_frozen_info)
+    _initialize_target_df(target_df, DEFAULT_LAST_SEEN_TIME, DEFAULT_LAST_SEEN_DISTANCE, DEFAULT_LAST_SEEN_ANGLE, include_frozen_info)
 
     if use_target_cluster:
         print("Adding target-cluster-last-seen info to target_df...")
@@ -414,7 +426,7 @@ def add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive
     # Process each target index
     for target_index in np.sort(ff_dataframe['target_index'].unique()):
         print('target_index = %d' % target_index, end='\r')
-        target_df = _process_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info)
+        _process_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info)
 
     return target_df
 
@@ -428,8 +440,6 @@ def _initialize_target_df(target_df, last_seen_time, last_seen_distance, last_se
         frozen_columns = ['target_last_seen_distance_frozen', 'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen']
         target_df[frozen_columns] = [last_seen_distance, last_seen_angle, last_seen_angle]
         target_df[frozen_columns] = target_df[frozen_columns].astype(float)
-
-    return target_df
 
 def _process_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info):
     # Get target_info and target_df_sub
@@ -446,7 +456,6 @@ def _process_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff
 			# Update target_df
             target_df = _update_target_df(target_df, target_df_sub, unique_points, target_df_idx)
 
-    return target_df
 
 def _get_target_info_and_df_sub(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster):
     # get target_info which is about the current target_index

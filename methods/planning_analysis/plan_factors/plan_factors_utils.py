@@ -218,7 +218,7 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
     if curv_of_traj_df_w_one_sided_window is not None:
         plan_y_df = _add_column_curvature_of_traj_before_stop(plan_y_df, curv_of_traj_df_w_one_sided_window)
 
-    plan_y_df = add_dir_from_stop_ff_same_side(plan_y_df)
+    add_dir_from_stop_ff_same_side(plan_y_df)
 
     plan_y_df = plan_y_df.sort_values(by='stop_point_index').reset_index(drop=True)
             
@@ -308,15 +308,14 @@ def get_alt_ff_last_seen_info_before_next_stop(alt_ff_df2, ff_dataframe_visible,
 
 
 def add_d_monkey_angle(plan_y_df, stop_ff_df2, stops_near_ff_df):
+    plan_y_df = plan_y_df.merge(stops_near_ff_df[['stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left')
     plan_y_df['monkey_angle_when_stop_ff_first_seen'] = stop_ff_df2['monkey_angle'].values * 180 / math.pi
-    plan_y_df = plan_y_df.merge(stops_near_ff_df[['stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left').copy()
     plan_y_df['stop_monkey_angle'] = plan_y_df['stop_monkey_angle'] * 180/math.pi
     plan_y_df['monkey_angle_before_stop'] = plan_y_df['monkey_angle_before_stop'] * 180/math.pi
     plan_y_df['d_monkey_angle_since_stop_ff_first_seen'] = plan_y_df['stop_monkey_angle'] - plan_y_df['monkey_angle_when_stop_ff_first_seen']
     plan_y_df['d_monkey_angle2'] = plan_y_df['monkey_angle_before_stop'] - plan_y_df['monkey_angle_when_stop_ff_first_seen']
     plan_y_df['d_monkey_angle_since_stop_ff_first_seen'] = find_stops_near_ff_utils.confine_angle_to_within_180(plan_y_df['d_monkey_angle_since_stop_ff_first_seen'].values)
     plan_y_df['d_monkey_angle2'] = find_stops_near_ff_utils.confine_angle_to_within_180(plan_y_df['d_monkey_angle2'].values)
-    # plan_y_df = plan_y_df.merge(stop_ff_final_df[['stop_point_index', 'd_heading_of_traj']], how='left')
     return plan_y_df
 
 
@@ -324,7 +323,6 @@ def add_dir_from_stop_ff_same_side(plan_y_df):
     plan_y_df['dir_from_stop_ff_to_stop'] = np.sign(plan_y_df['angle_from_stop_ff_to_stop'])
     plan_y_df['dir_from_stop_ff_to_alt_ff'] = np.sign(plan_y_df['angle_from_stop_ff_to_alt_ff'])
     plan_y_df['dir_from_stop_ff_same_side'] = plan_y_df['dir_from_stop_ff_to_stop'] == plan_y_df['dir_from_stop_ff_to_alt_ff']
-    return plan_y_df
 
 
 def get_eye_data_etc(stops_near_ff_df, monkey_information, ff_real_position_sorted, max_degrees=5,

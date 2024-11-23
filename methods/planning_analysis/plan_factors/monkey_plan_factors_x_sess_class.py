@@ -173,10 +173,10 @@ class PlanAcrossSessions(plot_variations_class.PlotVariations):
         self.sessions_df_for_one_monkey.loc[self.sessions_df_for_one_monkey['data_name'] == data_name, 'finished'] = True
 
 
-    def combine_overall_all_median_info_across_monkeys_and_optimal_arc_types(self):
-        self.overall_all_median_info = make_variations_utils.combine_overall_all_median_info_across_monkeys_and_optimal_arc_types()
-        self.process_overall_all_median_info_to_plot_heading_and_curv()
-        return self.overall_all_median_info
+    def combine_overall_median_info_across_monkeys_and_optimal_arc_types(self):
+        self.overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_optimal_arc_types()
+        self.process_overall_median_info_to_plot_heading_and_curv()
+        return self.overall_median_info
         
 
     def combine_all_perc_info_across_monkeys(self):

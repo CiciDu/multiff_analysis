@@ -18,7 +18,7 @@ def add_curv_info_to_info_to_add(info_to_add, curv_df, which_ff_info):
 
 
 def add_to_both_ff_when_seen_df(both_ff_when_seen_df, which_ff_info, when_which_ff, first_or_last, curv_df, ff_df):
-    curv_df.set_index('stop_point_index', inplace=True)
+    curv_df = curv_df.set_index('stop_point_index')
     both_ff_when_seen_df[f'{which_ff_info}ff_angle_{when_which_ff}_{first_or_last}_seen'] = curv_df['ff_angle']
     both_ff_when_seen_df[f'{which_ff_info}ff_distance_{when_which_ff}_{first_or_last}_seen'] = curv_df['ff_distance']
     # both_ff_when_seen_df[f'{which_ff_info}arc_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_to_ff_center']
@@ -26,4 +26,3 @@ def add_to_both_ff_when_seen_df(both_ff_when_seen_df, which_ff_info, when_which_
     # both_ff_when_seen_df[f'{which_ff_info}opt_arc_dheading_{when_which_ff}_{first_or_last}_seen'] = curv_df['optimal_arc_d_heading']
     both_ff_when_seen_df[f'time_{when_which_ff}_{first_or_last}_seen_rel_to_stop'] = ff_df[f'time_ff_{first_or_last}_seen'].values - ff_df['stop_time'].values
     both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curvature_of_traj']
-    return both_ff_when_seen_df

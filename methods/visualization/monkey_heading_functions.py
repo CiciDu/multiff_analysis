@@ -100,7 +100,6 @@ def add_monkey_heading_info_to_curv_of_traj_df(curv_of_traj_df, monkey_informati
     mheading_in_xy = find_mheading_in_xy(traj_point_index_2d, monkey_information)
     for key in mheading_in_xy.keys():
         curv_of_traj_df[[key + '_0', key + '_1']] = mheading_in_xy[key]
-    return curv_of_traj_df    
 
 
 

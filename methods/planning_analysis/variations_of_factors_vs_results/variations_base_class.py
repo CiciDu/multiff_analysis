@@ -102,7 +102,7 @@ class _VariationsBase():
         self.stop_and_alt_data_comparison_path = os.path.join(self.combd_stop_and_alt_folder_path, 'data_comparison')
         self.all_perc_info_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/all_perc_info.csv')
         self.all_median_info_folder_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/all_median_info')
-        self.overall_all_median_info_folder_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/overall_all_median_info')
+        self.overall_median_info_folder_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/overall_median_info')
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
 
         self.stop_and_alt_lr_df_path = os.path.join(self.combd_stop_and_alt_folder_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_stop_and_alt_lr_df.csv')
@@ -119,11 +119,11 @@ class _VariationsBase():
                                                                             show_printed_output=True, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data)
         
-    def make_or_retrieve_overall_all_median_info(self, 
+    def make_or_retrieve_overall_median_info(self, 
                                                  exists_ok=True, 
                                                  all_median_info_exists_ok=True, 
                                                  ref_point_params_based_on_mode=None, 
-                                                 file_name='overall_all_median_info.csv', 
+                                                 file_name='overall_median_info.csv', 
                                                  save_data=True, 
                                                  combd_heading_df_x_sessions_exists_ok=True, 
                                                 stops_near_ff_df_exists_ok=True, 
@@ -131,15 +131,15 @@ class _VariationsBase():
                                                 process_info_for_plotting=True):
         df_path = os.path.join(self.combd_planning_info_folder_path, 'stop_and_alt/data_comparison', file_name)
         if exists_ok & exists(df_path):
-            self.overall_all_median_info = pd.read_csv(df_path).drop(columns=['Unnamed: 0'])
-            print('Successfully retrieved overall_all_median_info from ', df_path)
+            self.overall_median_info = pd.read_csv(df_path).drop(columns=['Unnamed: 0'])
+            print('Successfully retrieved overall_median_info from ', df_path)
         else:
             if ref_point_params_based_on_mode is None:
                 ref_point_params_based_on_mode = self.default_ref_point_params_based_on_mode
             
             df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(None, None, self.curv_traj_window_before_stop)
-            df_path = os.path.join(self.overall_all_median_info_folder_path, df_name)
-            self.overall_all_median_info = make_variations_utils.make_variations_df_across_ref_point_values(self.make_all_median_info,
+            df_path = os.path.join(self.overall_median_info_folder_path, df_name)
+            self.overall_median_info = make_variations_utils.make_variations_df_across_ref_point_values(self.make_all_median_info,
                                                                         ref_point_params_based_on_mode=ref_point_params_based_on_mode,
                                                                         monkey_name=self.monkey_name,
                                                                         variation_func_kwargs={'all_median_info_exists_ok': all_median_info_exists_ok,
@@ -151,14 +151,14 @@ class _VariationsBase():
                                                                         path_to_save=df_path,
                                                                         )
             
-        self.overall_all_median_info['monkey_name'] = self.monkey_name
-        self.overall_all_median_info['optimal_arc_type'] = self.optimal_arc_type
-        self.overall_all_median_info['curv_traj_window_before_stop'] = str(self.curv_traj_window_before_stop)
+        self.overall_median_info['monkey_name'] = self.monkey_name
+        self.overall_median_info['optimal_arc_type'] = self.optimal_arc_type
+        self.overall_median_info['curv_traj_window_before_stop'] = str(self.curv_traj_window_before_stop)
 
         if process_info_for_plotting:
-            self.process_overall_all_median_info_to_plot_heading_and_curv()
+            self.process_overall_median_info_to_plot_heading_and_curv()
 
-        return self.overall_all_median_info
+        return self.overall_median_info
     
 
     def make_or_retrieve_all_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
@@ -188,8 +188,8 @@ class _VariationsBase():
         return self.all_perc_info
 
 
-    def process_overall_all_median_info_to_plot_heading_and_curv(self):
-        self.all_median_info_heading  = process_variations_utils.make_new_df_for_plotly_comparison(self.overall_all_median_info)
+    def process_overall_median_info_to_plot_heading_and_curv(self):
+        self.all_median_info_heading  = process_variations_utils.make_new_df_for_plotly_comparison(self.overall_median_info)
         self.all_median_info_curv = self.all_median_info_heading.copy()
         self.all_median_info_curv['sample_size'] = self.all_median_info_curv['sample_size_for_curv']
 
@@ -483,7 +483,7 @@ class _VariationsBase():
         self.test_heading_info_df, self.ctrl_heading_info_df = test_vs_control_utils.filter_both_df(self.test_heading_info_df, self.ctrl_heading_info_df, **kwargs)
 
     def process_combd_plan_x_both_and_plan_y_both(self):
-        self.combd_plan_x_both, self.combd_plan_y_both = test_vs_control_utils.process_combd_plan_x_and_y_combd(self.combd_plan_x_both, self.combd_plan_y_both, curv_columns=self.curv_columns)
+        test_vs_control_utils.process_combd_plan_x_and_y_combd(self.combd_plan_x_both, self.combd_plan_y_both, curv_columns=self.curv_columns)
         self.ref_columns = [column for column in self.combd_plan_x_both.columns if ('ref' in column) & ('stop_ff' in column)]
         # note that it will include ref_d_heading_of_traj
 

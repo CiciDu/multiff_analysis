@@ -158,7 +158,7 @@ def _prepare_bin_midlines(time_bins, ff_caught_T_sorted, all_trial_patterns):
     bin_midlines = bin_midlines[bin_midlines['bin_midline'] < ff_caught_T_sorted[-1]]
 
     # Add trial info to bin_midlines
-    bin_midlines['trial'] = np.digitize(bin_midlines['bin_midline'], ff_caught_T_sorted)
+    bin_midlines['trial'] = np.searchsorted(ff_caught_T_sorted, bin_midlines['bin_midline'])
     all_trial_patterns['trial'] = all_trial_patterns.index
     bin_midlines = bin_midlines.merge(all_trial_patterns, on='trial', how='left')
     bin_midlines['bin'] = bin_midlines.index

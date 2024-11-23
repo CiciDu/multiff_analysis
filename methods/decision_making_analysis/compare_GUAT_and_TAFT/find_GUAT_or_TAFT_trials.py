@@ -25,12 +25,12 @@ def give_up_after_trying_func(monkey_information, ff_caught_T_sorted, ff_real_po
     return give_up_after_trying_trials, GUAT_indices_df, GUAT_trials_df, GUAT_point_indices_for_anim
 
 
-def try_a_few_times_func(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
+def try_a_few_times_func(monkey_information, ff_caught_T_sorted, closest_stop_to_capture_df, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
     """
     Find the trials where the monkey has stopped more than one times to catch a target
     """
 
-    TAFT_trials_df = make_TAFT_trials_df(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance=max_cluster_distance)
+    TAFT_trials_df = make_TAFT_trials_df(monkey_information, ff_caught_T_sorted, closest_stop_to_capture_df, ff_real_position_sorted, max_cluster_distance=max_cluster_distance)
     try_a_few_times_trials = TAFT_trials_df['trial'].unique()
     TAFT_indices_df, try_a_few_times_indices_for_anim = _get_more_or_TAFT_info(TAFT_trials_df, monkey_information, max_point_index=max_point_index)
     return try_a_few_times_trials, TAFT_indices_df, TAFT_trials_df, try_a_few_times_indices_for_anim
@@ -88,14 +88,11 @@ def make_GUAT_trials_df(monkey_information, ff_caught_T_sorted, ff_real_position
     return GUAT_trials_df
 
 
-def make_TAFT_trials_df(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance=75):
+def make_TAFT_trials_df(monkey_information, ff_caught_T_sorted, closest_stop_to_capture_df, ff_real_position_sorted, max_cluster_distance=75):
 
     # Extract a subset of monkey information that is relevant for GUAT analysis
-    monkey_sub = _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance)
-    
-    # make all the stops belonging to the same stop cluster id to be in the same trial (using the trial number of the first stop in the cluster)
-    monkey_sub['trial'] = monkey_sub.groupby('stop_cluster_id')['trial'].transform('first')
-    
+    monkey_sub = _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, closest_stop_to_capture_df, ff_real_position_sorted, max_cluster_distance)
+
     TAFT_trials_df = _make_trials_df(monkey_sub)
 
     return TAFT_trials_df
@@ -107,6 +104,10 @@ def _make_trials_df(monkey_sub):
 
     # Calculate the number of stops for each cluster
     trials_df['num_stops'] = monkey_sub.groupby(['stop_cluster_id', 'trial']).size().values
+
+    # only keep the trials with more than one stop
+    trials_df = trials_df[trials_df['num_stops'] > 1].copy()
+    monkey_sub = monkey_sub.merge(trials_df[['stop_cluster_id', 'trial']], on=['stop_cluster_id', 'trial'], how='inner')
 
     # Get stop indices for each cluster
     trials_df['stop_indices'] = monkey_sub.groupby(['stop_cluster_id', 'trial'])['point_index'].apply(list).values
@@ -152,10 +153,10 @@ def _take_out_monkey_subset_for_GUAT(monkey_information, ff_caught_T_sorted, ff_
     monkey_sub['distance_to_last_target'] = np.sqrt((monkey_sub['monkey_x'] - monkey_sub['last_target_x'])**2 + (monkey_sub['monkey_y'] - monkey_sub['last_target_y'])**2)
 
     # Filter out clusters too close to the targets
-    too_close_clusters = monkey_sub[(monkey_sub['distance_to_target'] < max_cluster_distance) | 
-                                    (monkey_sub['distance_to_last_target'] < max_cluster_distance)]['stop_cluster_id'].unique()
-    print(f'{len(too_close_clusters)} clusters out of {len(monkey_sub["stop_cluster_id"].unique())} are too close to the target or the last target')
-    monkey_sub = monkey_sub[~monkey_sub['stop_cluster_id'].isin(too_close_clusters)].copy()
+    close_to_target_clusters = monkey_sub[(monkey_sub['distance_to_target'] < max_cluster_distance) | 
+                                          (monkey_sub['distance_to_last_target'] < max_cluster_distance)]['stop_cluster_id'].unique()
+    print(f'{len(close_to_target_clusters)} clusters out of {len(monkey_sub["stop_cluster_id"].unique())} are too close to the target or the last target')
+    monkey_sub = monkey_sub[~monkey_sub['stop_cluster_id'].isin(close_to_target_clusters)].copy()
 
     # Also filter out clusters that span multiple trials
     monkey_sub2 = monkey_sub[['stop_cluster_id', 'trial']].drop_duplicates()
@@ -170,16 +171,26 @@ def _take_out_monkey_subset_for_GUAT(monkey_information, ff_caught_T_sorted, ff_
     return monkey_sub
 
 
-def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance=75):
+def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, closest_stop_to_capture_df, ff_real_position_sorted, max_cluster_distance=75):
 
-    monkey_information = add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_capture_time_to_separate_clusters=True, 
-                                                        ff_caught_T_sorted=ff_caught_T_sorted)
+    monkey_information = add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=True, 
+                                                        closest_stop_to_capture_df=closest_stop_to_capture_df)
 
     monkey_sub = _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance=max_cluster_distance)
 
     # Keep clusters that are close to the targets
-    too_close_clusters = monkey_sub[(monkey_sub['distance_to_target'] < max_cluster_distance)]['stop_cluster_id'].unique()
-    monkey_sub = monkey_sub[monkey_sub['stop_cluster_id'].isin(too_close_clusters)].copy()
+    close_to_target_clusters = monkey_sub[(monkey_sub['distance_to_target'] < max_cluster_distance)]['stop_cluster_id'].unique()
+    monkey_sub = monkey_sub[monkey_sub['stop_cluster_id'].isin(close_to_target_clusters)].copy()
+
+    # For each trial, keep the latest stop cluster
+    monkey_sub.sort_values(by=['trial', 'stop_cluster_id'], inplace=True)
+    unique_combo_to_keep = monkey_sub[['trial', 'stop_cluster_id']].groupby('trial').tail(1)
+    monkey_sub = monkey_sub.merge(unique_combo_to_keep, on=['trial', 'stop_cluster_id'], how='inner')
+
+    # if two trials share the same stop cluster, then keep the trial with the smaller trial number
+    monkey_sub.sort_values(by=['stop_cluster_id', 'trial'], inplace=True)
+    unique_combo_to_keep = monkey_sub.groupby('stop_cluster_id')['trial'].first().reset_index(drop=False)
+    monkey_sub = monkey_sub.merge(unique_combo_to_keep, on=['stop_cluster_id', 'trial'], how='inner')
 
     # Sort and reset index
     monkey_sub.sort_values(by='point_index', inplace=True)
@@ -189,9 +200,10 @@ def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_sorted, ff_
 
 
 def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_sorted, ff_real_position_sorted, max_cluster_distance=75):
+    
 
     # Filter for new distinct stops within the time range
-    monkey_sub = monkey_information[monkey_information['whether_new_distinct_stop']].copy()
+    monkey_sub = monkey_information[monkey_information['whether_new_distinct_stop']==True].copy()
     monkey_sub = monkey_sub[monkey_sub['time'].between(ff_caught_T_sorted[0], ff_caught_T_sorted[-1])]
 
     # Find clusters with more than one stop
@@ -200,7 +212,6 @@ def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_sor
     monkey_sub = monkey_sub[monkey_sub['stop_cluster_id'].isin(valid_clusters)]
 
     # Assign trial numbers and target positions
-    monkey_sub['trial'] = np.searchsorted(ff_caught_T_sorted, monkey_sub['time'].values)
     monkey_sub[['target_x', 'target_y']] = ff_real_position_sorted[monkey_sub['trial'].values]
 
     # Calculate distances to targets
@@ -209,10 +220,10 @@ def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_sor
     return monkey_sub
 
 
-def add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_capture_time_to_separate_clusters=False, 
-                        ff_caught_T_sorted=None):
+def add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=False, 
+                        closest_stop_to_capture_df=None):
     # note, in addition to stop_cluster_id, we also add stop_cluster_start_point and stop_cluster_end_point
-
+    monkey_information = monkey_information.copy()
     stop_points_df = monkey_information[monkey_information['whether_new_distinct_stop']].copy()
 
     # take out stops that are not too close to previous stop points
@@ -225,11 +236,10 @@ def add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_capture
     stop_points_df['cluster_start'] = stop_points_df['cum_distance_from_last_stop_point'] > max_cluster_distance
     stop_points_df['cluster_end'] = stop_points_df['cum_distance_from_next_stop_point'] > max_cluster_distance
 
-    if use_ff_capture_time_to_separate_clusters:
-        if ff_caught_T_sorted is None:
-            raise ValueError('If use_ff_capture_time_to_separate_clusters is True, ff_caught_T_sorted needs to be provided')
-        stop_points_df = further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df, ff_caught_T_sorted)
-
+    if use_ff_caught_time_new_to_separate_clusters:
+        if closest_stop_to_capture_df is None:
+            raise ValueError('If use_ff_caught_time_new_to_separate_clusters is True, ff_caught_T_sorted needs to be provided')
+        stop_points_df = further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df, closest_stop_to_capture_df)
 
     stop_points_df_sub = stop_points_df.copy()
 
@@ -254,23 +264,31 @@ def add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_capture
     monkey_information.loc[~monkey_information['point_index'].between(monkey_information['stop_cluster_start_point'], monkey_information['stop_cluster_end_point']), 
                         'stop_cluster_id'] = np.nan
     
+    # assign the same stop_cluster_id to all points with the same stop_id
+    sub_w_stop_cluster_id = monkey_information[['stop_id', 'stop_cluster_id']].drop_duplicates().dropna()
+    monkey_information.drop(columns='stop_cluster_id', inplace=True)
+    monkey_information = monkey_information.merge(sub_w_stop_cluster_id, on='stop_id', how='left')
     return monkey_information
 
 
-def further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df, ff_caught_T_sorted):
+def further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df, closest_stop_to_capture_df):
+    ff_caught_T_new = closest_stop_to_capture_df['ff_caught_T_new'].values
     # Mark the stops that are near the capture time of a firefly
-    all_closest_point_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, stop_points_df, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)))
-    all_closest_point_to_capture_df['near_capture'] = 1
-    stop_points_df = stop_points_df.merge(all_closest_point_to_capture_df, on='point_index', how='left')
-    stop_points_df['near_capture'] = stop_points_df['near_capture'].fillna(0)
-    if stop_points_df['near_capture'].sum() != len(all_closest_point_to_capture_df):
-        raise ValueError('The number of near capture points is not the same as the number of capture points')
+    # closest_stop_to_capture_df['point_index'] = closest_stop_to_capture_df['ff_caught_T_new_point_index'].astype(int)
+    # closest_stop_to_capture_df['near_capture'] = 1
+    # stop_points_df = stop_points_df.merge(closest_stop_to_capture_df[['point_index', 'near_capture']], on='point_index', how='left')
+    # stop_points_df['near_capture'] = stop_points_df['near_capture'].fillna(0)
+    # if stop_points_df['near_capture'].sum() != len(closest_stop_to_capture_df):
+    #     raise ValueError('The number of near capture points is not the same as the number of capture points')
+
+
+    #stop_points_df['trial'] = 
 
     # Mark those points as cluster_start, and the points after as cluster_end
     stop_points_df.reset_index(drop=True, inplace=True)
-    index_to_mark_as_stop = stop_points_df[stop_points_df['near_capture']==1].index.values
-    stop_points_df.loc[index_to_mark_as_stop, 'cluster_end'] = True
-    index_to_mark_as_start = index_to_mark_as_stop + 1
+    index_to_mark_as_end = stop_points_df[stop_points_df['near_capture']==1].index.values
+    stop_points_df.loc[index_to_mark_as_end, 'cluster_end'] = True
+    index_to_mark_as_start = index_to_mark_as_end + 1
     index_to_mark_as_start = index_to_mark_as_start[index_to_mark_as_start < len(stop_points_df)]
     stop_points_df.loc[index_to_mark_as_start, 'cluster_start'] = True
 
@@ -280,3 +298,28 @@ def further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_
         raise ValueError('The number of cluster start and end points are not the same')
 
     return stop_points_df
+
+
+# def further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df, closest_stop_to_capture_df):
+#     # Mark the stops that are near the capture time of a firefly
+#     closest_stop_to_capture_df['point_index'] = closest_stop_to_capture_df['ff_caught_T_new_point_index'].astype(int)
+#     closest_stop_to_capture_df['near_capture'] = 1
+#     stop_points_df = stop_points_df.merge(closest_stop_to_capture_df[['point_index', 'near_capture']], on='point_index', how='left')
+#     stop_points_df['near_capture'] = stop_points_df['near_capture'].fillna(0)
+#     if stop_points_df['near_capture'].sum() != len(closest_stop_to_capture_df):
+#         raise ValueError('The number of near capture points is not the same as the number of capture points')
+
+#     # Mark those points as cluster_start, and the points after as cluster_end
+#     stop_points_df.reset_index(drop=True, inplace=True)
+#     index_to_mark_as_end = stop_points_df[stop_points_df['near_capture']==1].index.values
+#     stop_points_df.loc[index_to_mark_as_end, 'cluster_end'] = True
+#     index_to_mark_as_start = index_to_mark_as_end + 1
+#     index_to_mark_as_start = index_to_mark_as_start[index_to_mark_as_start < len(stop_points_df)]
+#     stop_points_df.loc[index_to_mark_as_start, 'cluster_start'] = True
+
+#     # check correctness
+#     if (stop_points_df['cluster_start'].sum() - stop_points_df['cluster_end'].sum() > 1) | \
+#         (stop_points_df['cluster_start'].sum() - stop_points_df['cluster_end'].sum() < 0):
+#         raise ValueError('The number of cluster start and end points are not the same')
+
+#     return stop_points_df

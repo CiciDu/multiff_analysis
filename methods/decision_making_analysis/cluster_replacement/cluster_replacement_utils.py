@@ -333,7 +333,6 @@ def turn_more_ff_df_into_free_selection_inputs_df_for_plotting(more_ff_df, point
 def add_time_till_next_visible(df, ff_dataframe_visible, monkey_information):
     all_current_time = monkey_information.loc[df['point_index'].values, 'monkey_t'].values
     df['time_till_next_visible'] = decision_making_utils.find_time_since_last_visible_OR_time_till_next_visible(df.ff_index.values, all_current_time, ff_dataframe_visible, time_since_last_visible=False)
-    return df
 
 
 

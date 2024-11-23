@@ -195,7 +195,6 @@ def add_column_monkey_passed_by_to_best_arc_df(best_arc_df, ff_dataframe):
         if len(ff_dataframe_sub) > 0:
             #print("ff_index", ff_index, "has been stopped by monkey within", pass_by_within_next_n_seconds, "seconds")
             best_arc_df.loc[best_arc_df['intended_target_id']==id, 'monkey_passed_by'] = True
-    return best_arc_df
 
 
 def find_point_on_ff_boundary_with_smallest_angle_to_monkey(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ff_radius=10):

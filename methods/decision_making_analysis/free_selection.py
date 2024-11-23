@@ -54,7 +54,7 @@ def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_positio
     #     ff_dataframe_sub = ff_dataframe_sub.merge(curv_of_traj_df[['point_index', 'curvature_of_traj']], on='point_index', how='left')
 
     if add_arc_info:
-        ff_dataframe_sub = curvature_utils.add_arc_info_to_df(ff_dataframe_sub, curvature_df, arc_info_to_add=arc_info_to_add)
+        curvature_utils.add_arc_info_to_df(ff_dataframe_sub, curvature_df, arc_info_to_add=arc_info_to_add)
 
     all_point_index = np.unique(free_selection_df.starting_point_index.values.astype(int))
     ff_dataframe_sub = guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=num_ff_per_row, only_select_n_ff_case=only_select_n_ff_case, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff,

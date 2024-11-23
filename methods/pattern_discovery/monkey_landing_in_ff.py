@@ -69,7 +69,7 @@ def find_mxy_rotated_w_ff_center_to_the_north(monkey_sub, ff_center, reward_boun
     return mxy_rotated, x0, y0
 
 
-def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
+def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
                                monkey_information,
                                ff_real_position_sorted,
                                 starting_trial=0,
@@ -83,7 +83,7 @@ def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
     trial_counter=1
     fig, ax = plt.subplots()
 
-    for index, row in all_closest_point_to_capture_df.iloc[starting_trial:].iterrows():
+    for index, row in closest_stop_to_capture_df.iloc[starting_trial:].iterrows():
         #point_index = int(row.point_index)
 
         monkey_sub = iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, int(row.stop_ff_index), row.time, initial_duration_before_stop=2, reward_boundary_radius=reward_boundary_radius)
@@ -108,17 +108,32 @@ def plot_monkey_landings_in_ff(all_closest_point_to_capture_df,
     return
 
 
+def add_distance_from_ff_to_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted):
+    df = closest_stop_to_capture_df.copy()
+    df[['stop_ff_x', 'stop_ff_y']] = ff_real_position_sorted[df['stop_ff_index'].values]
 
-def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted,
+    df[['monkey_x', 'monkey_y']] = monkey_information.loc[df['stop_point_index'].values, ['monkey_x', 'monkey_y']].values
+
+    df['caught_time_point_index'] = np.searchsorted(monkey_information['monkey_t'].values,
+                                                   df['caught_time'].values)
+
+
+    df[['caught_time_monkey_x', 'caught_time_monkey_y']] = monkey_information.loc[df['caught_time_point_index'].values, ['monkey_x', 'monkey_y']].values
+
+    closest_stop_to_capture_df['distance_from_ff_to_stop'] = np.sqrt((df['stop_ff_x'] - df['monkey_x'])**2 + (df['stop_ff_y'] - df['monkey_y'])**2)
+
+    return closest_stop_to_capture_df
+
+
+def find_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted,
                                                           reward_boundary_radius=25):
     
-    list_of_distance = []
     list_of_angle = []
     list_of_rel_stop_x = []
     list_of_rel_stop_y = []
     list_of_stop_ff_index = []
     list_of_stop_point_index = []
-    for index, row in all_closest_point_to_capture_df.iterrows():
+    for index, row in closest_stop_to_capture_df.iterrows():
 
         monkey_sub = iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, int(row.stop_ff_index), row.time, initial_duration_before_stop=2, 
                                                         reward_boundary_radius=reward_boundary_radius)
@@ -133,10 +148,8 @@ def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_c
         stop_y = mxy_rotated[1, -1]-y0
         ff_x = 0
         ff_y = 0
-        distance = np.sqrt((stop_x - ff_x)**2 + (stop_y - ff_y)**2)
         # calculate the angle from the ff center to the monkey's stop point ("monkey_angle" will be just to the north)
         angle = basic_func.calculate_angles_to_ff_centers(ff_x=stop_x, ff_y=stop_y, mx=ff_x, my=ff_y, m_angle=math.pi/2)
-        list_of_distance.append(distance)
         list_of_angle.append(angle)
         list_of_rel_stop_x.append(stop_x)
         list_of_rel_stop_y.append(stop_y)
@@ -144,7 +157,7 @@ def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_c
         list_of_stop_point_index.append(row.stop_point_index)
 
     df = pd.DataFrame({'stop_point_index': list_of_stop_point_index, 'stop_ff_index': list_of_stop_ff_index,
-                        'distance_from_ff_to_stop': list_of_distance, 'angle_from_ff_to_stop': list_of_angle,
+                        'angle_from_ff_to_stop': list_of_angle,
                         'stop_x_rel_to_ff': list_of_rel_stop_x, 'stop_y_rel_to_ff': list_of_rel_stop_y})
     
     df['angle_in_degrees_from_ff_to_stop'] = np.degrees(df['angle_from_ff_to_stop'])
@@ -152,19 +165,20 @@ def find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_c
     return df
 
 
-def add_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted,
+def add_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted,
                                                           reward_boundary_radius=25):
     
-    df = find_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted, reward_boundary_radius=reward_boundary_radius)
-    all_closest_point_to_capture_df = all_closest_point_to_capture_df.merge(df, on=['stop_point_index', 'stop_ff_index'], how='left')
-    return all_closest_point_to_capture_df
+    df = find_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted, reward_boundary_radius=reward_boundary_radius)
+    # in case the distance is already calculated, we will drop it
+    closest_stop_to_capture_df2 = closest_stop_to_capture_df.merge(df, on=['stop_point_index', 'stop_ff_index'], how='left')
+    return closest_stop_to_capture_df2
 
 
 def get_valid_subset_to_construct_scatter_df(ff_caught_T_sorted, monkey_information, ff_real_position_sorted):
-    all_closest_point_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)))
-    all_closest_point_to_capture_df2 = add_distance_and_angle_from_ff_center_to_monkey_stop(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted)
-    valid_subset = all_closest_point_to_capture_df2[all_closest_point_to_capture_df2['distance_from_ff_to_stop'] <= 25].copy()
-    total_len = len(all_closest_point_to_capture_df)
+    closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)))
+    closest_stop_to_capture_df2 = add_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
+    valid_subset = closest_stop_to_capture_df2[closest_stop_to_capture_df2['distance_from_ff_to_stop'] <= 25].copy()
+    total_len = len(closest_stop_to_capture_df)
     invalid_len = total_len - len(valid_subset)
     print(f'{invalid_len} out of {total_len} are not within 25 cm of ff center, which is {invalid_len/total_len*100:.2f}%. These are excluded')
     return valid_subset

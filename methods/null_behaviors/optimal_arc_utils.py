@@ -90,7 +90,6 @@ def add_optimal_arc_measure_and_length(curvature_df, optimal_arc_stop_at_visible
     if np.any(arc_end_distance_to_ff_center > 25):
         raise ValueError("At least one arc end is outside the reward boundary. This is invalid. Please check the input.")
     
-    return curvature_df
 
 def find_cartesian_arc_center_and_angle_for_optimal_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction, whether_ff_behind=None,
                                                                     ignore_error=False):
@@ -191,7 +190,7 @@ def _supply_curvature_df_with_optimal_arc_info(curvature_df, ff_radius_for_optim
     curvature_df['optimal_arc_radius'] = find_arc_radius_based_on_curvature(curvature_df['optimal_curvature'])
     
     # find arc ending xy for optimal curvature (curv to disk edge)
-    curvature_df = add_optimal_arc_measure_and_length(curvature_df, optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary,
+    add_optimal_arc_measure_and_length(curvature_df, optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary,
                                                       ignore_error=ignore_error)
 
     return curvature_df

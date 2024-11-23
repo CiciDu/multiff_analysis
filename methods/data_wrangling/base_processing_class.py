@@ -5,6 +5,9 @@ from visualization import animation_func, animation_utils, plot_trials, plot_beh
 from non_behavioral_analysis import eye_positions
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.test_params_for_planning import params_utils
+from planning_analysis.show_planning import alt_ff_utils
+from pattern_discovery import pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features
+
 
 import os
 import os.path
@@ -113,8 +116,6 @@ class BaseProcessing:
         os.makedirs(self.decision_making_folder_name, exist_ok=True)
 
 
-
-
     def try_retrieving_df(self, df_name, exists_ok=True, data_folder_name_for_retrieval=None):
         if data_folder_name_for_retrieval is None:
             raise Exception("data_folder_name_for_retrieval is None")
@@ -140,7 +141,7 @@ class BaseProcessing:
             h5_file_pathway = os.path.join(os.path.join(self.processed_data_folder_path, h5_file_name))
             self.ff_dataframe = pd.read_hdf(h5_file_pathway, 'ff_dataframe')
             print("Retrieved ff_dataframe from ", h5_file_pathway) 
-            self.ff_dataframe = make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_caught_T_sorted, self.ff_real_position_sorted, 10, 25)
+            make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_caught_T_sorted, self.ff_real_position_sorted, 10, 25)
         # otherwise, recreate the dataframe
         except Exception as e:
             print("Failed to retrieve ff_dataframe. Will make new ff_dataframe. Error: ", e)
@@ -178,7 +179,7 @@ class BaseProcessing:
         if to_furnish_ff_dataframe:
             self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
                                                     self.ff_caught_T_sorted, self.ff_life_sorted)
-        
+
 
     def retrieve_monkey_data(self, min_distance_to_calculate_angle=5):
         self.npz_file_pathway = os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz')
@@ -187,12 +188,8 @@ class BaseProcessing:
         self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
             self.ff_flash_end_sorted = self.retrieve_ff_info_from_npz()
         self.monkey_information = pd.read_csv(self.monkey_information_path).drop(["Unnamed: 0"], axis=1)
-        
-        try: # monkey has interocular_dist, but agent doesn't
-            interocular_dist = self.interocular_dist
-        except AttributeError:
-            interocular_dist = None
-        self.monkey_information = process_raw_data.process_monkey_information_after_retrieval(self.monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle, interocular_dist=interocular_dist)
+
+        self.monkey_information = process_raw_data.process_monkey_information_after_retrieval(self.monkey_information, self.ff_caught_T_sorted, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         
         # if the eye data is present but the converted data is missing
         if ('LDz' in self.monkey_information.columns) & ('gaze_world_x' not in self.monkey_information.columns):
@@ -202,9 +199,63 @@ class BaseProcessing:
             self.monkey_information.to_csv(self.monkey_information_path)                
             
         print("Retrieved monkey data from ", self.monkey_information_path, " and ff data from ", self.npz_file_pathway)
+
+        self.make_or_retrieve_closest_stop_to_capture_df()
+        self.make_ff_caught_T_new()
+
         return 
+    
+    def make_or_retrieve_closest_stop_to_capture_df(self, exists_ok=True):
+        path = os.path.join(self.processed_data_folder_path, 'closest_stop_to_capture_df.csv')
+        if exists_ok & exists(path):
+            self.closest_stop_to_capture_df = pd.read_csv(path).drop(["Unnamed: 0"], axis=1)
+        else:
+            self.closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted, 
+                                                                                                    stop_ff_index_array=np.arange(len(self.ff_caught_T_sorted)),
+                                                                                                    drop_rows_where_stop_is_not_inside_reward_boundary=False)
+            self.closest_stop_to_capture_df.to_csv(path)
+        return
 
+    def make_ff_caught_T_new(self, max_time_apart=0.3):
+        self.ff_closest_stop_time_sorted = self.closest_stop_to_capture_df['time'].values
+        self.ff_caught_T_new = self.ff_closest_stop_time_sorted.copy()
 
+        # if the time difference between the closest stop time and the capture time is too large, then we should use the original capture time
+        time_too_far_apart_points = np.where(np.abs(self.ff_closest_stop_time_sorted - self.ff_caught_T_sorted) > max_time_apart)[0]
+        if len(time_too_far_apart_points) > 0:
+            print(f"Warning: ff_closest_stop_time_sorted has {len(time_too_far_apart_points)} points out of {len(self.ff_caught_T_sorted)} points that are significantly larger than ff_caught_T_sorted, "
+                f"which is {len(time_too_far_apart_points)/len(self.ff_caught_T_sorted)*100:.2f}% of the points. "
+                f"Max value of closest_time - capture time is {abs(self.ff_closest_stop_time_sorted - self.ff_caught_T_sorted).max()}. "
+                f"They are replaced with the original ff_caught_T in ff_caught_T_new.")
+            self.ff_caught_T_new[time_too_far_apart_points] = self.ff_caught_T_sorted[time_too_far_apart_points]
+            
+        # also, if the new stop position is outside of the reward boundary, then we should use the original capture time
+        outside_boundary_points = np.where(self.closest_stop_to_capture_df['whether_stop_inside_boundary'].values == 0)[0]
+        if len(outside_boundary_points) > 0:
+            print(f"Warning: ff_closest_stop_time_sorted has {len(outside_boundary_points)} points out of {len(self.ff_caught_T_sorted)} points that are outside of the reward boundary, "
+                f"which is {len(outside_boundary_points)/len(self.ff_caught_T_sorted)*100:.2f}% of the points. "
+                f"They are replaced with the original ff_caught_T in ff_caught_T_new.")
+            self.ff_caught_T_new[outside_boundary_points] = self.ff_caught_T_sorted[outside_boundary_points]
+
+        self.closest_stop_to_capture_df['ff_caught_T_new'] = self.ff_caught_T_new
+        self.closest_stop_to_capture_df['ff_caught_T_new_point_index'] = np.searchsorted(self.monkey_information['time'].values, self.ff_caught_T_new)
+
+        self.ff_caught_T_sorted = self.ff_caught_T_new
+        print('Note: ff_caught_T_sorted is replaced with ff_caught_T_new')
+
+        self.monkey_information['trial'] = np.searchsorted(self.ff_caught_T_sorted, self.monkey_information['monkey_t'])
+        self.ff_dataframe['trial'] = np.searchsorted(self.ff_caught_T_sorted, self.ff_dataframe['time'].values)
+        print('Note: monkey_information and ff_dataframe are updated with the new trial numbers')
+
+    def make_or_retrieve_target_cluster_df(self, exists_ok=True, max_distance=50):
+        path = os.path.join(self.processed_data_folder_path, 'target_cluster_df.csv')
+        if exists_ok & exists(path):
+            self.target_cluster_df = pd.read_csv(path).drop(["Unnamed: 0"], axis=1)
+        else:
+            self.target_cluster_df = cluster_analysis.find_target_cluster_df(self.ff_real_position_sorted, self.ff_caught_T_sorted, self.ff_life_sorted, self.ff_dataframe, max_distance=max_distance)
+            self.target_cluster_df.to_csv(path)
+        return
+    
     def save_monkey_information(self):
         columns_to_keep = ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_speed', 'monkey_speeddummy',
                            'monkey_angles', 'monkey_dw', 'LDy', 'LDz', 'RDy', 'RDz']

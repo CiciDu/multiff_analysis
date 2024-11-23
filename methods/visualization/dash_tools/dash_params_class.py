@@ -58,7 +58,7 @@ class ParamsDash(params_test_combos_class.ParamsTestCombos):
         self.hyperparameter_dict['ref_point_value'] = self.ref_point_info[ref_point_mode]['values'][0]
 
         self.tested_combo_df = tested_combo_df.copy()
-        self.tested_combo_df = params_utils.process_tested_combo_df(self.tested_combo_df)
+        params_utils.process_tested_combo_df(self.tested_combo_df)
         self.make_combo_df_long()
 
         self.sub_df = params_utils.get_subset_of_combo_df(self.combo_df_long, self.hyperparameter_dict)

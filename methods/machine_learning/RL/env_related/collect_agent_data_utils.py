@@ -272,7 +272,7 @@ def pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_d
 
     monkey_information = pd.DataFrame(monkey_information)
 
-    monkey_information = process_raw_data.add_more_columns_to_monkey_information(monkey_information)
+    process_raw_data.add_more_columns_to_monkey_information(monkey_information)
 
     return monkey_information
 

@@ -234,8 +234,6 @@ def add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe, ff_caught_T
     ff_caught_T_sorted_extended = np.append(ff_caught_T_sorted, np.repeat(env_end_time, num_ff_to_be_added))
     ff_dataframe['caught_time'] = ff_caught_T_sorted_extended[np.array(ff_dataframe['ff_index'])]
     ff_dataframe['whether_caught'] = (np.abs(ff_dataframe['caught_time'] - ff_dataframe['time']) < 0.016+0.01).astype('int')
-    return ff_dataframe
-
 
 
 def keep_only_ff_that_monkey_has_passed_by_closely(ff_dataframe, duration=None, max_distance_to_ff=100):

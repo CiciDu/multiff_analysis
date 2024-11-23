@@ -191,8 +191,6 @@ def find_all_curv_of_traj_df(monkey_information, ff_caught_T_sorted,
     return all_curv_of_traj_df
 
 
-
-
 def calculate_difference_in_curvature_of_traj(new_curv_df):
     # calculate curvature_of_traj_diff and curvature_of_traj_diff_over_dt
     new_curv_df['curvature_of_traj_diff'] = new_curv_df['curvature_of_traj_deg_over_cm'].diff()
@@ -201,9 +199,6 @@ def calculate_difference_in_curvature_of_traj(new_curv_df):
     new_curv_df['curvature_of_traj_diff_over_dt'] = new_curv_df['curvature_of_traj_diff_over_dt'].fillna(0)
     new_curv_df['curvature_of_traj_diff_over_distance'] = new_curv_df['curvature_of_traj_deg_over_cm'].diff() / (new_curv_df['delta_distance']*100).diff()
     new_curv_df['curvature_of_traj_diff_over_distance'] = new_curv_df['curvature_of_traj_diff_over_distance'].fillna(0)
-    return new_curv_df
-
-
 
 
 def find_curv_of_traj_df_based_on_from_current_point_to_right_before_stop(stops_near_ff_df, monkey_information):
@@ -227,8 +222,8 @@ def find_curv_of_traj_df_based_on_from_current_point_to_right_before_stop(stops_
     new_curv_of_traj_df = add_basic_monkey_information(new_curv_of_traj_df, monkey_information)
     new_curv_of_traj_df = find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(new_curv_of_traj_df, monkey_information)
     # also add monkey direction info
-    new_curv_of_traj_df = monkey_heading_functions.add_monkey_heading_info_to_curv_of_traj_df(new_curv_of_traj_df, monkey_information)
-    new_curv_of_traj_df = calculate_difference_in_curvature_of_traj(new_curv_of_traj_df)
+    monkey_heading_functions.add_monkey_heading_info_to_curv_of_traj_df(new_curv_of_traj_df, monkey_information)
+    calculate_difference_in_curvature_of_traj(new_curv_of_traj_df)
 
     return new_curv_of_traj_df
 
@@ -251,7 +246,7 @@ def find_curv_of_traj_df_based_on_from_current_point_to_right_before_stop_in_dur
     new_curv_df = find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(new_curv_df, monkey_information)
 
     # add some other variables
-    new_curv_df = calculate_difference_in_curvature_of_traj(new_curv_df)
+    calculate_difference_in_curvature_of_traj(new_curv_df)
     new_curv_df['rel_time'] = np.round(new_curv_df['time_before_stop'] - new_curv_df['time'], 2)
 
     return new_curv_df
@@ -298,8 +293,8 @@ def find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, mon
         else:
             raise ValueError('lower_end of the window_for_curv_of_traj_df cannot be smaller than the upper_end')
         
-    curv_of_traj_df = monkey_heading_functions.add_monkey_heading_info_to_curv_of_traj_df(curv_of_traj_df, monkey_information)
-    curv_of_traj_df = calculate_difference_in_curvature_of_traj(curv_of_traj_df)
+    monkey_heading_functions.add_monkey_heading_info_to_curv_of_traj_df(curv_of_traj_df, monkey_information)
+    calculate_difference_in_curvature_of_traj(curv_of_traj_df)
 
     return curv_of_traj_df, traj_curv_descr
 

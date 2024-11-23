@@ -336,7 +336,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         self.ctrl_rel_angle_slope_df['test_or_control'] = 'control'
         self.combd_rel_angle_slope_df = pd.concat([self.test_rel_angle_slope_df, self.ctrl_rel_angle_slope_df], axis=0)
         self.combd_rel_angle_slope_df.reset_index(drop=True, inplace=True)
-        self.combd_rel_angle_slope_df = show_planning_utils.add_box_name_column_to_rel_angle_slope_df(self.combd_rel_angle_slope_df)
+        show_planning_utils.add_box_name_column_to_rel_angle_slope_df(self.combd_rel_angle_slope_df)
 
 
     def make_side_by_side_boxplots(self, show_all_figures=False):

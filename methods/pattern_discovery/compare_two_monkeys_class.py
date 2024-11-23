@@ -42,7 +42,7 @@ class CompareTwoMonkeys():
         self.combine_df()
 
 
-    def combine_df(self, df_names=['agg_pattern_frequencies', 'agg_feature_statistics', 'concat_pattern_frequencies', 'concat_feature_statistics', 'concat_all_trial_features']):
+    def combine_df(self, df_names=['agg_pattern_frequencies', 'agg_feature_statistics', 'combd_pattern_frequencies', 'combd_feature_statistics', 'combd_all_trial_features']):
         for df_name in df_names:
             bruno_df = getattr(self.bruno, df_name)
             schro_df = getattr(self.schro, df_name)
@@ -60,12 +60,12 @@ class CompareTwoMonkeys():
 
 
     def plot_the_changes_in_pattern_frequencies_over_time(self):
-        plot_change_over_time.plot_the_changes_over_time_for_two_monkeys(self.concat_pattern_frequencies, x="Session", y="Rate", 
+        plot_change_over_time.plot_the_changes_over_time_for_two_monkeys(self.combd_pattern_frequencies, x="Session", y="Rate", 
                                                 category_order=patterns_and_features_class.PatternsAndFeatures.pattern_order)    
 
     def plot_the_changes_in_feature_statistics_over_time(self):
-        plot_change_over_time.plot_the_changes_over_time_for_two_monkeys(self.concat_feature_statistics, x="Session", y="Mean", title_column="Label for mean", 
+        plot_change_over_time.plot_the_changes_over_time_for_two_monkeys(self.combd_feature_statistics, x="Session", y="Mean", title_column="Label for mean", 
                                                 category_order=patterns_and_features_class.PatternsAndFeatures.feature_order)   
-        plot_change_over_time.plot_the_changes_over_time_for_two_monkeys(self.concat_feature_statistics, x="Session", y="Median", title_column="Label for median", 
+        plot_change_over_time.plot_the_changes_over_time_for_two_monkeys(self.combd_feature_statistics, x="Session", y="Median", title_column="Label for median", 
                                                 category_order=patterns_and_features_class.PatternsAndFeatures.feature_order)                                                    
         

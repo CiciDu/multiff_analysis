@@ -18,7 +18,7 @@ import math
 
 
 # try replacing ff_dataframe_visible with ff_info_at_start_df
-def get_only_stop_ff_df(all_closest_point_to_capture_df, ff_real_position_sorted, ff_caught_T_sorted, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
+def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_sorted, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
                          ref_point_mode='distance', ref_point_value=-150,
                          optimal_arc_type='norm_opt_arc'):
 
@@ -26,7 +26,7 @@ def get_only_stop_ff_df(all_closest_point_to_capture_df, ff_real_position_sorted
         drop_na = True
     else:
         drop_na = False
-    ff_info = alt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(all_closest_point_to_capture_df, stop_period_duration, ff_dataframe_visible, monkey_information, 
+    ff_info = alt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(closest_stop_to_capture_df, stop_period_duration, ff_dataframe_visible, monkey_information, 
                                                                                 drop_na=drop_na)
     ff_info['stop_time'] = monkey_information.loc[ff_info['stop_point_index'].values, 'time'].values
     ff_info['time_since_ff_last_seen'] = ff_info['stop_time'].values - ff_info['time_ff_last_seen'].values
@@ -310,10 +310,10 @@ def get_cluster_and_agg_df(ff_info_at_start_df, all_cluster_names,
 
     cluster_factors_df['group'] = cluster_factors_df['group'] + '_' + cluster_factors_df['ff'].str.upper()
     cluster_factors_df = cluster_factors_df.sort_values(by=['group', 'stop_point_index']).reset_index(drop=True).drop(columns=['ff'])
-    cluster_factors_df = slice_and_concat_a_df(cluster_factors_df)
+    cluster_factors_df = slice_and_combd_a_df(cluster_factors_df)
 
     cluster_agg_df = _get_cluster_agg_df(ff_info_at_start_df_melted, flash_or_vis=flash_or_vis)
-    cluster_agg_df = slice_and_concat_a_df(cluster_agg_df)
+    cluster_agg_df = slice_and_combd_a_df(cluster_agg_df)
 
     cluster_factors_df.reset_index(drop=True, inplace=True)
     cluster_agg_df.reset_index(drop=True, inplace=True)
@@ -414,7 +414,7 @@ def get_ranks_of_columns_to_include_within_each_stop_period(ff_info_at_start_df,
     ff_info_at_start_df = pd.concat([ff_info_at_start_df, ranked_columns], axis=1)
     return ff_info_at_start_df
 
-def slice_and_concat_a_df(df):
+def slice_and_combd_a_df(df):
     total_rows = len(df)
     chunk_size = len(df['stop_point_index'].unique())
 
@@ -511,19 +511,19 @@ def _supply_zero_size_cluster_with_stop_ff_info(ff_info_at_start_df, stop_ff_inf
     return ff_info_at_start_df
 
 
-def make_monkey_info_in_all_stop_periods(all_closest_point_to_capture_df, monkey_information, stop_period_duration=2,
+def make_monkey_info_in_all_stop_periods(closest_stop_to_capture_df, monkey_information, stop_period_duration=2,
                                          all_end_time=None, all_start_time=None):
     if all_end_time is None:
-        all_end_time = all_closest_point_to_capture_df['time'].values 
+        all_end_time = closest_stop_to_capture_df['time'].values 
     if all_start_time is None:
-        all_start_time = all_closest_point_to_capture_df['time'].values - stop_period_duration
-    all_group_id = all_closest_point_to_capture_df['stop_point_index'].values
+        all_start_time = closest_stop_to_capture_df['time'].values - stop_period_duration
+    all_group_id = closest_stop_to_capture_df['stop_point_index'].values
     monkey_info_in_all_stop_periods = find_monkey_info_in_all_stop_periods(all_start_time, all_end_time, all_group_id, monkey_information)
-    if 'stop_time' not in all_closest_point_to_capture_df.columns:
-        all_closest_point_to_capture_df['stop_time'] = all_closest_point_to_capture_df['time']
-    if 'beginning_time' not in all_closest_point_to_capture_df.columns:
-        all_closest_point_to_capture_df['beginning_time'] = all_closest_point_to_capture_df['time'] - stop_period_duration
-    monkey_info_in_all_stop_periods = monkey_info_in_all_stop_periods.merge(all_closest_point_to_capture_df[['stop_point_index', 'beginning_time', 'stop_time']], on='stop_point_index', how='left')
+    if 'stop_time' not in closest_stop_to_capture_df.columns:
+        closest_stop_to_capture_df['stop_time'] = closest_stop_to_capture_df['time']
+    if 'beginning_time' not in closest_stop_to_capture_df.columns:
+        closest_stop_to_capture_df['beginning_time'] = closest_stop_to_capture_df['time'] - stop_period_duration
+    monkey_info_in_all_stop_periods = monkey_info_in_all_stop_periods.merge(closest_stop_to_capture_df[['stop_point_index', 'beginning_time', 'stop_time']], on='stop_point_index', how='left')
 
     return monkey_info_in_all_stop_periods
 

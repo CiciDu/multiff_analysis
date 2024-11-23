@@ -73,7 +73,7 @@ class DecisionMaking():
         
         # get manually annotated data
         self.manual_anno['time'] = self.monkey_information['monkey_t'].iloc[self.manual_anno.starting_point_index.values].values
-        self.manual_anno['target_index'] = np.digitize(self.manual_anno['time'].values, self.ff_caught_T_sorted)
+        self.manual_anno['target_index'] = np.searchsorted(self.ff_caught_T_sorted, self.manual_anno['time'].values)
         self.manual_anno['ff_index'] = self.manual_anno['ff_index'].astype(int)
         self.manual_anno['target_index'] = self.manual_anno['target_index'].astype(int)
 

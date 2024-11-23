@@ -1,7 +1,7 @@
 
 from data_wrangling import basic_func
 from pattern_discovery import cluster_analysis
-
+from pattern_discovery import monkey_landing_in_ff
 
 import pandas as pd
 import numpy as np
@@ -25,7 +25,7 @@ def get_all_alt_ff_df_from_ff_dataframe(stops_near_ff_df, ff_dataframe_visible, 
     all_alt_ff_df['alt_ff_caught_time'] = ff_caught_T_sorted[all_alt_ff_df['alt_ff_index'].values]
 
     # get next_stop_time and next_stop_point_index
-    all_closest_point_to_alt_ff = get_closest_stop_time_to_all_capture_time(all_alt_ff_df['alt_ff_caught_time'].values, monkey_information)
+    all_closest_point_to_alt_ff = get_closest_stop_time_to_all_capture_time(all_alt_ff_df['alt_ff_caught_time'].values, monkey_information, ff_real_position_sorted)
 
     all_alt_ff_df['next_stop_point_index'] = all_closest_point_to_alt_ff['point_index'].values
     all_alt_ff_df['next_stop_time'] = monkey_information.loc[all_alt_ff_df['next_stop_point_index'].values, 'time'].values
@@ -78,6 +78,7 @@ def get_all_alt_ff_df_from_ff_dataframe(stops_near_ff_df, ff_dataframe_visible, 
 
 
 def add_alt_ff_first_and_last_seen_info(all_alt_ff_df, ff_dataframe_visible, monkey_information, ff_real_position_sorted, ff_life_sorted):
+    all_alt_ff_df = all_alt_ff_df.copy()
     all_alt_ff_df = add_alt_ff_first_seen_and_last_seen_info_bbas(all_alt_ff_df, ff_dataframe_visible, monkey_information)
     all_alt_ff_df = add_alt_ff_first_seen_and_last_seen_info_bsans(all_alt_ff_df, ff_dataframe_visible, monkey_information)
     
@@ -86,69 +87,55 @@ def add_alt_ff_first_and_last_seen_info(all_alt_ff_df, ff_dataframe_visible, mon
     return all_alt_ff_df
 
 
-def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted=None, stop_ff_index_array=None, stop_point_index_array=None,
+def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, stop_ff_index_array=None, stop_point_index_array=None,
                                               drop_rows_where_stop_is_not_inside_reward_boundary=False):
     stop_sub = monkey_information.loc[monkey_information['monkey_speeddummy']==0, ['time', 'point_index']].copy()
-    all_closest_point_to_capture_df = pd.DataFrame()
+    closest_stop_to_capture_df = pd.DataFrame()
     for i in range(len(ff_caught_T_sorted)):
         caught_time = ff_caught_T_sorted[i]
         monkey_t = stop_sub['time'].values
         iloc_of_closest_time = np.argmin(np.abs(monkey_t - caught_time))
         closest_point_row = stop_sub.iloc[[iloc_of_closest_time]].copy()
         closest_point_row['caught_time'] = caught_time
-        all_closest_point_to_capture_df = pd.concat([all_closest_point_to_capture_df, closest_point_row], axis=0)
-    all_closest_point_to_capture_df['diff_from_caught_time'] = all_closest_point_to_capture_df['time'] - all_closest_point_to_capture_df['caught_time']
+        closest_stop_to_capture_df = pd.concat([closest_stop_to_capture_df, closest_point_row], axis=0)
+    closest_stop_to_capture_df['diff_from_caught_time'] = closest_stop_to_capture_df['time'] - closest_stop_to_capture_df['caught_time']
     if stop_ff_index_array is not None:
-        all_closest_point_to_capture_df['stop_ff_index'] = stop_ff_index_array
+        closest_stop_to_capture_df['stop_ff_index'] = stop_ff_index_array
     if stop_point_index_array is not None:
-        all_closest_point_to_capture_df['stop_point_index'] = stop_point_index_array
+        closest_stop_to_capture_df['stop_point_index'] = stop_point_index_array
     else:
-        all_closest_point_to_capture_df['stop_point_index'] = all_closest_point_to_capture_df['point_index']
+        closest_stop_to_capture_df['stop_point_index'] = closest_stop_to_capture_df['point_index']
 
+    closest_stop_to_capture_df = monkey_landing_in_ff.add_distance_from_ff_to_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
+    closest_stop_to_capture_df['whether_stop_inside_boundary'] = closest_stop_to_capture_df['distance_from_ff_to_stop'] <= 25
     if drop_rows_where_stop_is_not_inside_reward_boundary:
-        if ff_real_position_sorted is None:
-            raise ValueError('ff_real_position_sorted must be provided if drop_rows_where_stop_is_not_inside_reward_boundary is True')
-        all_closest_point_to_capture_df = add_distance_between_stop_and_ff_center(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted)
-        original_length = len(all_closest_point_to_capture_df)
-        all_closest_point_to_capture_df = all_closest_point_to_capture_df[all_closest_point_to_capture_df['distance_between_stop_and_ff_center'] <= 25].copy()
-        print(f'{original_length - len(all_closest_point_to_capture_df)} rows out of {original_length} rows were removed from all_closest_point_to_capture_df because the distance between stop and ff center is larger than 25cm')
-
-    return all_closest_point_to_capture_df
-
-
-
-def add_distance_between_stop_and_ff_center(all_closest_point_to_capture_df, monkey_information, ff_real_position_sorted):
-    df = all_closest_point_to_capture_df.copy()
-    df[['stop_ff_x', 'stop_ff_y']] = ff_real_position_sorted[df['stop_ff_index'].values]
-
-    df[['monkey_x', 'monkey_y']] = monkey_information.loc[df['stop_point_index'].values, ['monkey_x', 'monkey_y']].values
-
-    df['caught_time_point_index'] = np.searchsorted(monkey_information['monkey_t'].values,
-                                                   df['caught_time'].values)
+        original_length = len(closest_stop_to_capture_df)
+        outlier_sub_df = closest_stop_to_capture_df[closest_stop_to_capture_df['distance_from_ff_to_stop'] > 25].sort_values(by='distance_from_ff_to_stop', ascending=False)
+        closest_stop_to_capture_df = closest_stop_to_capture_df[closest_stop_to_capture_df['distance_from_ff_to_stop'] <= 25].copy()
+        
+        print(f'{original_length - len(closest_stop_to_capture_df)} rows out of {original_length} rows were removed from closest_stop_to_capture_df because the distance between stop and ff center is larger than 25cm, '\
+            #   + f'\n which is {round((original_length - len(closest_stop_to_capture_df))/original_length*100, 2)}% of the rows, '\
+            #   + f'and the sorted distances from those are {outlier_sub_df["distance_from_ff_to_stop"].values}'
+              )
+    closest_stop_to_capture_df.sort_values(by='stop_ff_index', inplace=True)
+    return closest_stop_to_capture_df
 
 
-    df[['caught_time_monkey_x', 'caught_time_monkey_y']] = monkey_information.loc[df['caught_time_point_index'].values, ['monkey_x', 'monkey_y']].values
-
-    all_closest_point_to_capture_df['distance_between_stop_and_ff_center'] = np.sqrt((df['stop_ff_x'] - df['monkey_x'])**2 + (df['stop_ff_y'] - df['monkey_y'])**2)
-
-    return all_closest_point_to_capture_df
-
-
-def get_all_captured_ff_first_seen_and_last_seen_info(all_closest_point_to_capture_df, stop_period_duration, ff_dataframe_visible, monkey_information, drop_na=False):
-    if 'stop_ff_index' in all_closest_point_to_capture_df.columns:
-        all_ff_index = all_closest_point_to_capture_df['stop_ff_index'].values
+def get_all_captured_ff_first_seen_and_last_seen_info(closest_stop_to_capture_df, stop_period_duration, ff_dataframe_visible, monkey_information, drop_na=False):
+    if 'stop_ff_index' in closest_stop_to_capture_df.columns:
+        all_ff_index = closest_stop_to_capture_df['stop_ff_index'].values
     else:
-        all_ff_index = all_closest_point_to_capture_df['ff_index'].values
+        all_ff_index = closest_stop_to_capture_df['ff_index'].values
 
-    if 'stop_point_index' in all_closest_point_to_capture_df.columns:
-        all_stop_point_index = all_closest_point_to_capture_df['stop_point_index'].values
+    if 'stop_point_index' in closest_stop_to_capture_df.columns:
+        all_stop_point_index = closest_stop_to_capture_df['stop_point_index'].values
     else:
-        all_stop_point_index = all_closest_point_to_capture_df['point_index'].values
+        all_stop_point_index = closest_stop_to_capture_df['point_index'].values
 
-    if 'stop_time' in all_closest_point_to_capture_df.columns:
-        all_end_time = all_closest_point_to_capture_df['stop_time'].values
+    if 'stop_time' in closest_stop_to_capture_df.columns:
+        all_end_time = closest_stop_to_capture_df['stop_time'].values
     else:
-        all_end_time = all_closest_point_to_capture_df['time'].values
+        all_end_time = closest_stop_to_capture_df['time'].values
 
     all_start_time = all_end_time - stop_period_duration
     
@@ -192,6 +179,7 @@ def _add_stop_or_alt_ff_first_seen_and_last_seen_info_bbas(df, ff_dataframe_visi
     return df
 
 
+
 def add_alt_ff_first_seen_and_last_seen_info_bsans(all_alt_ff_df, ff_dataframe_visible, monkey_information):
 
     alt_ff_first_and_last_seen_info = get_first_seen_and_last_seen_info_for_ff_in_time_windows(all_alt_ff_df['alt_ff_index'].values, all_alt_ff_df['stop_point_index'].values, all_alt_ff_df['stop_time'].values, 
@@ -205,7 +193,6 @@ def add_alt_ff_first_seen_and_last_seen_info_bsans(all_alt_ff_df, ff_dataframe_v
     alt_ff_first_and_last_seen_info.rename(columns=columns_to_be_renamed_dict, inplace=True)
     all_alt_ff_df = all_alt_ff_df.merge(alt_ff_first_and_last_seen_info, on='stop_point_index', how='left')
     return all_alt_ff_df
-
 
 def get_alt_ff_last_seen_rel_time(all_alt_ff_df, ff_dataframe, stop_period_duration=2):
     # See if alt ff was visible before stop; if they are not, they will be assigned control rather than test

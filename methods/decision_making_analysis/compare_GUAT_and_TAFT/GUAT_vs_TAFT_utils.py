@@ -43,13 +43,13 @@ def add_closest_point_on_trajectory_to_stop_ff(trials_df, monkey_information, ff
         closest_point_index = monkey_sub.loc[monkey_sub['distance_to_ff'].idxmin(), 'point_index']
         list_of_closest_points.append(closest_point_index)
     trials_df['closest_point_index_to_stop_ff'] = list_of_closest_points
-    return trials_df
+
 
 def add_stop_point_index(trials_df, monkey_information, ff_real_position_sorted):
     trials_df = add_closest_point_on_trajectory_to_stop_ff(trials_df, monkey_information, ff_real_position_sorted)
     trials_df['stop_point_index'] = trials_df['closest_point_index_to_stop_ff']
     trials_df['stop_time'] = monkey_information.loc[trials_df['stop_point_index'], 'time'].values
-    return trials_df
+
     
 def deal_with_duplicated_stop_point_index(GUAT_w_ff_df):
     df = GUAT_w_ff_df[GUAT_w_ff_df[['stop_point_index', 'latest_visible_ff']].duplicated(keep=False)].copy()

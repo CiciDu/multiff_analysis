@@ -231,7 +231,7 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         self.target_df = self.monkey_information[['bin', 'monkey_t', 'monkey_x', 'monkey_y', 'monkey_angles']].copy()
         self.target_df.rename(columns={'monkey_angles': 'monkey_angle', 'monkey_t': 'time'}, inplace=True)
         self.target_df['point_index'] = self.target_df.index
-        self.target_df['target_index'] = np.digitize(self.target_df['time'], self.ff_caught_T_sorted)
+        self.target_df['target_index'] = np.searchsorted(self.ff_caught_T_sorted, self.target_df['time'])
         self.target_df['target_x'] = self.ff_real_position_sorted[self.target_df['target_index'].values, 0]
         self.target_df['target_y'] = self.ff_real_position_sorted[self.target_df['target_index'].values, 1]
         # find nearby_alive_ff_indices (a.k.a target cluster)
@@ -412,7 +412,7 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         bin_midlines = (self.time_bins[:-1] + self.time_bins[1:])/2
         bin_midlines = bin_midlines[bin_midlines < self.ff_caught_T_sorted[-1]]
         bin_midlines = pd.DataFrame(bin_midlines, columns=['bin_midline'])
-        bin_midlines['trial'] = np.digitize(bin_midlines['bin_midline'], self.ff_caught_T_sorted)
+        bin_midlines['trial'] = np.searchsorted(self.ff_caught_T_sorted, bin_midlines['bin_midline'])
         self.all_trial_patterns['trial'] = self.all_trial_patterns.index
         bin_midlines = bin_midlines.merge(self.all_trial_patterns, on='trial', how='left')
         bin_midlines['bin'] = bin_midlines.index

@@ -283,8 +283,6 @@ def make_the_distributions_of_angle_more_similar_in_df(test_df, ctrl_df, verbose
         print(f'Number of rows dropped out of total rows in test_df after making the distributions of alt_ff_angle_at_ref more similar: {test_length - len(test_df)} out of {test_length}')
         print(f'Number of rows dropped out of total rows in ctrl_df after making the distributions of alt_ff_angle_at_ref more similar: {ctrl_length - len(ctrl_df)} out of {ctrl_length}')
    
-
-
     return test_df, ctrl_df
 
 def process_combd_plan_x_and_y_combd(combd_plan_x_both, combd_plan_y_both, curv_columns=['curv_min', 'curv_max', 'curv_range']):
@@ -294,4 +292,3 @@ def process_combd_plan_x_and_y_combd(combd_plan_x_both, combd_plan_y_both, curv_
     combd_plan_y_both['dir_from_stop_ff_same_side'] = ((combd_plan_y_both['dir_from_stop_ff_same_side'] + 1)/2).astype(int)
     combd_plan_x_both['dir_from_stop_ff_to_alt_ff'] = ((combd_plan_y_both['dir_from_stop_ff_to_alt_ff'] + 1)/2).astype(int)
     combd_plan_x_both[curv_columns] = combd_plan_y_both[curv_columns].values
-    return combd_plan_x_both, combd_plan_y_both

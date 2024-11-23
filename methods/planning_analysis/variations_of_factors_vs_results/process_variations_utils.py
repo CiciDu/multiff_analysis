@@ -328,8 +328,8 @@ def melt_df_by_test_and_control(df, test_column='test_perc', control_column='ctr
 
 
 
-def plot_heading_in_overall_all_median_info(overall_all_median_info, title_prefix=None):
-    new_overall_all_median_info = make_new_df_for_plotly_comparison(overall_all_median_info)
+def plot_heading_in_overall_median_info(overall_median_info, title_prefix=None):
+    new_overall_median_info = make_new_df_for_plotly_comparison(overall_median_info)
 
 
     x_var_column_list = ['ref_point_value']
@@ -351,7 +351,7 @@ def plot_heading_in_overall_all_median_info(overall_all_median_info, title_prefi
     columns_to_find_unique_combinations_for_line = []
 
 
-    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_overall_all_median_info, 
+    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_overall_median_info, 
                                                                 fixed_variable_values_to_use,
                                                                 changeable_variables,
                                                                 x_var_column_list,
@@ -365,10 +365,10 @@ def plot_heading_in_overall_all_median_info(overall_all_median_info, title_prefi
     
 
 
-def plot_curv_in_overall_all_median_info(overall_all_median_info, title_prefix=None):
+def plot_curv_in_overall_median_info(overall_median_info, title_prefix=None):
 
-    new_overall_all_median_info = make_new_df_for_plotly_comparison(overall_all_median_info)
-    new_overall_all_median_info['sample_size'] = new_overall_all_median_info['sample_size_for_curv']
+    new_overall_median_info = make_new_df_for_plotly_comparison(overall_median_info)
+    new_overall_median_info['sample_size'] = new_overall_median_info['sample_size_for_curv']
 
 
     x_var_column_list = ['ref_point_value']
@@ -389,7 +389,7 @@ def plot_curv_in_overall_all_median_info(overall_all_median_info, title_prefix=N
     columns_to_find_unique_combinations_for_line = []
 
 
-    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_overall_all_median_info, 
+    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_overall_median_info, 
                                                                 fixed_variable_values_to_use,
                                                                 changeable_variables,
                                                                 x_var_column_list,
