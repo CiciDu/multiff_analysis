@@ -80,10 +80,10 @@ def find_df_related_to_cluster_replacement(replacement_df, prior_to_replacement_
 
     # find information of clusters of these ff
     max_cluster_distance = 50
-    old_ff_cluster = cluster_analysis.find_ff_clusters(old_ff_positions, ff_real_position_sorted, all_time_1-10, all_time_1+10, ff_life_sorted, max_distance=max_cluster_distance)
-    new_ff_cluster = cluster_analysis.find_ff_clusters(new_ff_positions, ff_real_position_sorted, all_time_1-10, all_time_1+10, ff_life_sorted, max_distance=max_cluster_distance)
-    parallel_old_ff_cluster = cluster_analysis.find_ff_clusters(parallel_old_ff_positions, ff_real_position_sorted, all_time_2-10, all_time_2+10, ff_life_sorted, max_distance=max_cluster_distance)
-    non_chosen_ff_cluster = cluster_analysis.find_ff_clusters(non_chosen_ff_positions, ff_real_position_sorted, all_time_2-10, all_time_2+10, ff_life_sorted, max_distance=max_cluster_distance)
+    old_ff_cluster = cluster_analysis.find_alive_ff_clusters(old_ff_positions, ff_real_position_sorted, all_time_1-10, all_time_1+10, ff_life_sorted, max_distance=max_cluster_distance)
+    new_ff_cluster = cluster_analysis.find_alive_ff_clusters(new_ff_positions, ff_real_position_sorted, all_time_1-10, all_time_1+10, ff_life_sorted, max_distance=max_cluster_distance)
+    parallel_old_ff_cluster = cluster_analysis.find_alive_ff_clusters(parallel_old_ff_positions, ff_real_position_sorted, all_time_2-10, all_time_2+10, ff_life_sorted, max_distance=max_cluster_distance)
+    non_chosen_ff_cluster = cluster_analysis.find_alive_ff_clusters(non_chosen_ff_positions, ff_real_position_sorted, all_time_2-10, all_time_2+10, ff_life_sorted, max_distance=max_cluster_distance)
 
 
     # turn them into df and find corresponding information
@@ -100,9 +100,9 @@ def find_df_related_to_cluster_replacement(replacement_df, prior_to_replacement_
     non_chosen_ff_cluster_df = decision_making_utils.find_many_ff_info_anew(non_chosen_ff_cluster_df['ff_index'].values, non_chosen_ff_cluster_df['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
     
     
-    # eliminate ff whose time_since_last_visible is too large
-    old_ff_cluster_df, new_ff_cluster_df = eliminate_rows_with_large_value_in_shared_column_between_df('time_since_last_visible', 3, old_ff_cluster_df, new_ff_cluster_df)
-    parallel_old_ff_cluster_df, non_chosen_ff_cluster_df = eliminate_rows_with_large_value_in_shared_column_between_df('time_since_last_visible', 3, parallel_old_ff_cluster_df, non_chosen_ff_cluster_df)
+    # eliminate ff whose time_since_last_vis is too large
+    old_ff_cluster_df, new_ff_cluster_df = eliminate_rows_with_large_value_in_shared_column_between_df('time_since_last_vis', 3, old_ff_cluster_df, new_ff_cluster_df)
+    parallel_old_ff_cluster_df, non_chosen_ff_cluster_df = eliminate_rows_with_large_value_in_shared_column_between_df('time_since_last_vis', 3, parallel_old_ff_cluster_df, non_chosen_ff_cluster_df)
 
     # mark the current intended_target in old_ff_cluster_df and the next intended target in new_ff_cluster_df
     old_ff_cluster_df = mark_intended_target_in_df(old_ff_cluster_df, old_ff_info)
@@ -122,7 +122,7 @@ def find_df_related_to_cluster_replacement(replacement_df, prior_to_replacement_
 
 
 
-def further_process_df_related_to_cluster_replacement(joined_old_ff_cluster_df, joined_new_ff_cluster_df, num_old_ff_per_row=3, num_new_ff_per_row=3, selection_criterion_if_too_many_ff='time_since_last_visible', sorting_criterion=None):
+def further_process_df_related_to_cluster_replacement(joined_old_ff_cluster_df, joined_new_ff_cluster_df, num_old_ff_per_row=3, num_new_ff_per_row=3, selection_criterion_if_too_many_ff='time_since_last_vis', sorting_criterion=None):
     '''
     Further process the dataframes related to cluster replacement, including:
     1. Guarantee that there are num_old_ff_per_row or num_new_ff_per_row of ff for each point_index
@@ -246,9 +246,9 @@ def find_non_chosen_ff_info_and_parallel_old_ff_info_with_no_close_by_pairs(non_
     non_chosen_df['group'] = non_chosen_df['time'].apply(lambda x: int(x/0.35))
 
     # preserve only one row per group, sort by the selection criterion
-    non_chosen_df = non_chosen_df.sort_values(['abs_curv_diff', 'time_since_last_visible'], ascending=[True, True])
+    non_chosen_df = non_chosen_df.sort_values(['abs_curv_diff', 'time_since_last_vis'], ascending=[True, True])
     non_chosen_df = non_chosen_df.groupby(['group']).first().reset_index()
-    non_chosen_ff_info = non_chosen_df[['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_visible', 'point_index', 'ff_index']].copy()
+    non_chosen_ff_info = non_chosen_df[['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis', 'point_index', 'ff_index']].copy()
 
     # get the parallel_old_ff_info
     all_point_index = non_chosen_df['point_index'].values
@@ -269,7 +269,7 @@ def find_non_chosen_ff_info_and_parallel_old_ff_info_with_no_close_by_pairs(non_
 
 
 def find_more_ff_inputs_for_plotting(point_index_all, sequence_of_obs_ff_indices, ff_dataframe, ff_real_position_sorted, monkey_information, all_available_ff_in_near_future=None,
-                                    attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_visible'], return_all_attributes=False):
+                                    attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis'], return_all_attributes=False):
     more_ff_df = find_more_ff_df(point_index_all, ff_dataframe, ff_real_position_sorted, monkey_information, all_available_ff_in_near_future=all_available_ff_in_near_future, attributes_for_plotting=attributes_for_plotting)
     more_ff_df = eliminate_part_of_more_ff_inputs_already_in_observation(more_ff_df, sequence_of_obs_ff_indices, point_index_all)
     more_ff_inputs_df_for_plotting = turn_more_ff_df_into_free_selection_inputs_df_for_plotting(more_ff_df, point_index_all, return_all_attributes=return_all_attributes, attributes_for_plotting=attributes_for_plotting)
@@ -279,7 +279,7 @@ def find_more_ff_inputs_for_plotting(point_index_all, sequence_of_obs_ff_indices
 
 
 
-def find_more_ff_df(point_index_all, ff_dataframe, ff_real_position_sorted, monkey_information, all_available_ff_in_near_future=None, attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_visible']):
+def find_more_ff_df(point_index_all, ff_dataframe, ff_real_position_sorted, monkey_information, all_available_ff_in_near_future=None, attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis']):
     more_ff_df = ff_dataframe[ff_dataframe['point_index'].isin(point_index_all)].sort_values(by='point_index').copy()
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible']==1].copy()
     all_possible_ff = more_ff_df[['ff_index', 'point_index']].copy()
@@ -289,10 +289,10 @@ def find_more_ff_df(point_index_all, ff_dataframe, ff_real_position_sorted, monk
     if 'time_till_next_visible' in attributes_for_plotting:
         more_ff_df = decision_making_utils.find_many_ff_info_anew(all_possible_ff.ff_index.values, all_possible_ff.point_index.values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
         more_ff_df['time_till_next_visible'] = more_ff_df['time_till_next_visible'].clip(upper=10)
-        more_ff_df = more_ff_df[(more_ff_df['time_since_last_visible'] <= 2.5) | (more_ff_df['time_till_next_visible'] <= 2)].copy()
+        more_ff_df = more_ff_df[(more_ff_df['time_since_last_vis'] <= 2.5) | (more_ff_df['time_till_next_visible'] <= 2)].copy()
     else:
         more_ff_df = decision_making_utils.find_many_ff_info_anew(all_possible_ff.ff_index.values, all_possible_ff.point_index.values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=False)
-        more_ff_df = more_ff_df[more_ff_df['time_since_last_visible'] <= 2.5].copy()   
+        more_ff_df = more_ff_df[more_ff_df['time_since_last_vis'] <= 2.5].copy()   
 
     more_ff_df.sort_values(by='point_index', inplace=True)
     more_ff_df.drop_duplicates(subset=['ff_index', 'point_index'], inplace=True)
@@ -313,7 +313,7 @@ def eliminate_part_of_more_ff_inputs_already_in_observation(more_ff_inputs, sequ
     return more_ff_inputs
 
 
-def turn_more_ff_df_into_free_selection_inputs_df_for_plotting(more_ff_df, point_index_all, return_all_attributes=False, attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_visible']):
+def turn_more_ff_df_into_free_selection_inputs_df_for_plotting(more_ff_df, point_index_all, return_all_attributes=False, attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis']):
     # turn more_ff_df into a format that can be used to produce free_selection_inputs
     max_num_ff = more_ff_df.groupby('point_index').count().max().iloc[0]
     num_ff_per_row = max_num_ff
@@ -332,11 +332,11 @@ def turn_more_ff_df_into_free_selection_inputs_df_for_plotting(more_ff_df, point
 
 def add_time_till_next_visible(df, ff_dataframe_visible, monkey_information):
     all_current_time = monkey_information.loc[df['point_index'].values, 'monkey_t'].values
-    df['time_till_next_visible'] = decision_making_utils.find_time_since_last_visible_OR_time_till_next_visible(df.ff_index.values, all_current_time, ff_dataframe_visible, time_since_last_visible=False)
+    df['time_till_next_visible'] = decision_making_utils.find_time_since_last_vis_OR_time_till_next_visible(df.ff_index.values, all_current_time, ff_dataframe_visible, time_since_last_vis=False)
 
 
 
-def supply_info_of_ff_last_seen_and_next_seen_to_df(df, ff_dataframe, monkey_information, ff_real_position_sorted, ff_caught_T_sorted, curv_of_traj_df=None,
+def supply_info_of_ff_last_seen_and_next_seen_to_df(df, ff_dataframe, monkey_information, ff_real_position_sorted, ff_caught_T_new, curv_of_traj_df=None,
                                            attributes_to_add = ['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
     if curv_of_traj_df is None:
         raise ValueError('curv_of_traj_df cannot be None')
@@ -353,8 +353,8 @@ def supply_info_of_ff_last_seen_and_next_seen_to_df(df, ff_dataframe, monkey_inf
     
     df = trajectory_info.add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, ff_dataframe, monkey_information)
     df = trajectory_info.add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, ff_dataframe, monkey_information, use_last_seen=False)
-    df = trajectory_info.add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_sorted, curv_of_traj_df=curv_of_traj_df)
-    df = trajectory_info.add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_sorted, curv_of_traj_df=curv_of_traj_df, use_last_seen=False)
+    df = trajectory_info.add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)
+    df = trajectory_info.add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_new, curv_of_traj_df=curv_of_traj_df, use_last_seen=False)
 
     return df
 

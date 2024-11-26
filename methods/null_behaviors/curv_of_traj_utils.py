@@ -22,12 +22,12 @@ def initialize_curv_of_traj_df(all_point_index, monkey_information):
     return curv_of_traj_df
 
 
-def find_curv_of_traj_df_based_on_shifts(all_point_index, monkey_information, ff_caught_T_sorted, shifts, reindex=True, truncate_curv_of_traj_by_time_of_capture=False):
+def find_curv_of_traj_df_based_on_shifts(all_point_index, monkey_information, ff_caught_T_new, shifts, reindex=True, truncate_curv_of_traj_by_time_of_capture=False):
     if reindex:
         monkey_information = reindex_monkey_information_based_on_all_point_index_and_shifts(all_point_index, monkey_information, shifts)  
     
     monkey_information = monkey_information.loc[:max(all_point_index) + max(shifts) + 100].copy()
-    curv_of_traj_df = find_curv_of_traj_df_based_on_point_index_window(all_point_index, shifts[0], shifts[-1], monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+    curv_of_traj_df = find_curv_of_traj_df_based_on_point_index_window(all_point_index, shifts[0], shifts[-1], monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
 
     return curv_of_traj_df
 
@@ -43,7 +43,7 @@ def reindex_monkey_information_based_on_all_point_index_and_shifts(all_point_ind
     return monkey_information 
 
 
-def find_curv_of_traj_df_based_on_point_index_window(all_point_index, lower_end, upper_end, monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=False):   
+def find_curv_of_traj_df_based_on_point_index_window(all_point_index, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=False):   
     if lower_end > 0:
         warnings.warn('lower_end is greater than 0. This is not recommended.')
     
@@ -52,14 +52,14 @@ def find_curv_of_traj_df_based_on_point_index_window(all_point_index, lower_end,
     curv_of_traj_df['point_index_upper_end'] = curv_of_traj_df['point_index'] + upper_end
 
     if truncate_curv_of_traj_by_time_of_capture:
-        curv_of_traj_df = truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_sorted)
+        curv_of_traj_df = truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_new)
     curv_of_traj_df = find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_traj_df, monkey_information)
 
     return curv_of_traj_df
 
 
 
-def find_curv_of_traj_df_based_on_time_window(all_point_index, lower_end, upper_end, monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=False): 
+def find_curv_of_traj_df_based_on_time_window(all_point_index, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=False): 
     if lower_end > 0:
         warnings.warn('lower_end is greater than 0. This is not recommended.')
       
@@ -70,13 +70,13 @@ def find_curv_of_traj_df_based_on_time_window(all_point_index, lower_end, upper_
     curv_of_traj_df['point_index_upper_end'] = np.searchsorted(monkey_information['time'].values, curv_of_traj_df['time_upper_end'].values, side='right')
     curv_of_traj_df.drop(columns=['time_lower_end', 'time_upper_end'], inplace=True)
     if truncate_curv_of_traj_by_time_of_capture:
-        curv_of_traj_df = truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_sorted)    
+        curv_of_traj_df = truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_new)    
     curv_of_traj_df = find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_traj_df, monkey_information)
 
     return curv_of_traj_df
 
 
-def find_curv_of_traj_df_based_on_distance_window(all_point_index, lower_end, upper_end, monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=False):   
+def find_curv_of_traj_df_based_on_distance_window(all_point_index, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=False):   
     if lower_end > 0:
         warnings.warn('lower_end is greater than 0. This is not recommended.')
 
@@ -91,7 +91,7 @@ def find_curv_of_traj_df_based_on_distance_window(all_point_index, lower_end, up
     curv_of_traj_df['point_index_upper_end'] = np.searchsorted(monkey_information['cum_distance'].values, curv_of_traj_df['cum_distance_upper_end'].values, side='right')
     curv_of_traj_df.drop(columns=['cum_distance_lower_end', 'cum_distance_upper_end'], inplace=True)
     if truncate_curv_of_traj_by_time_of_capture:
-        curv_of_traj_df = truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_sorted)    
+        curv_of_traj_df = truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_new)    
     curv_of_traj_df = find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_traj_df, monkey_information)
 
     return curv_of_traj_df
@@ -139,9 +139,9 @@ def find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_tr
 
 
 
-def truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_sorted):
+def truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_information, ff_caught_T_new):
     # curv_of_traj_df must contain point_index, point_index_lower_end, point_index_upper_end
-    searchsorted_result = np.searchsorted(monkey_information['monkey_t'].values, ff_caught_T_sorted, side='right')
+    searchsorted_result = np.searchsorted(monkey_information['monkey_t'].values, ff_caught_T_new, side='right')
     searchsorted_result[searchsorted_result > len(monkey_information)-1] = len(monkey_information)-1
     ff_caught_point_index = monkey_information['point_index'].values[searchsorted_result]
     point_index_values = curv_of_traj_df[['point_index_lower_end', 'point_index', 'point_index_upper_end']].values
@@ -175,7 +175,7 @@ def find_curv_of_traj_df_in_duration(curv_of_traj_df, duration_to_plot):
     return curv_of_traj_df_in_duration
 
 
-def find_all_curv_of_traj_df(monkey_information, ff_caught_T_sorted, 
+def find_all_curv_of_traj_df(monkey_information, ff_caught_T_new, 
                              all_time_windows=[x*2 for x in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]],
                              truncate_curv_of_traj_by_time_of_capture=False):
     all_point_index = monkey_information.index.values
@@ -183,7 +183,7 @@ def find_all_curv_of_traj_df(monkey_information, ff_caught_T_sorted,
     for time_window in all_time_windows:
         half_time_window = time_window/2
         print('time_window:', time_window)
-        temp_curv_of_traj_df = find_curv_of_traj_df_based_on_time_window(all_point_index, -half_time_window, half_time_window, monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+        temp_curv_of_traj_df = find_curv_of_traj_df_based_on_time_window(all_point_index, -half_time_window, half_time_window, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         temp_curv_of_traj_df['time_window'] = time_window
         all_curv_of_traj_df = pd.concat([all_curv_of_traj_df, temp_curv_of_traj_df], axis=0)
     all_curv_of_traj_df['time'] = monkey_information.loc[all_curv_of_traj_df.point_index.values, 'monkey_t']
@@ -270,7 +270,7 @@ def find_traj_curv_descr(curv_of_traj_mode, lower_end, upper_end):
     return traj_curv_descr
 
 
-def find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_sorted, stops_near_ff_df=None, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=False):
+def find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, stops_near_ff_df=None, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=False):
     if curv_of_traj_mode == 'now to stop':
         if stops_near_ff_df is None:
             raise ValueError('stops_near_ff_df must be specified if curv_of_traj_mode is from current point to right before stop')
@@ -284,10 +284,10 @@ def find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, mon
         if lower_end < upper_end:
             point_index_for_curv_of_traj_df = monkey_information.index.values
             if curv_of_traj_mode == 'time':
-                curv_of_traj_df = find_curv_of_traj_df_based_on_time_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_sorted, 
+                curv_of_traj_df = find_curv_of_traj_df_based_on_time_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, 
                                                                                                     truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
             elif curv_of_traj_mode == 'distance':
-                curv_of_traj_df = find_curv_of_traj_df_based_on_distance_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_sorted, 
+                curv_of_traj_df = find_curv_of_traj_df_based_on_distance_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, 
                                                                                                         truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
             traj_curv_descr = find_traj_curv_descr(curv_of_traj_mode, lower_end, upper_end)
         else:

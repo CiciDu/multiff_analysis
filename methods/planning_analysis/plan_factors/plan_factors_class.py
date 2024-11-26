@@ -201,7 +201,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
 
     def _make_curv_of_traj_df_w_one_sided_window_if_not_already_made(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance'):
         if self.curv_of_traj_df_w_one_sided_window is None:
-            self.curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_sorted, 
+            self.curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, 
                     curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False)
 
 
@@ -345,7 +345,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
 
                     curv_df = curvature_utils.make_curvature_df(ff_df_modified, self.curv_of_traj_df, clean=False,
                                                                         monkey_information=self.monkey_information,
-                                                                        ff_caught_T_sorted=self.ff_caught_T_sorted,
+                                                                        ff_caught_T_new=self.ff_caught_T_new,
                                                                         remove_invalid_rows=False, 
                                                                         optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary)
                     if len(curv_df) != len(ff_df_modified):

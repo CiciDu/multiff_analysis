@@ -53,7 +53,7 @@ def make_one_polar_plot(max_time_before_next_visible_to_annotate=2.5, **current_
         A 2D array of shape (r, 2) representing additional points on the trajectory.
     current_more_traj_stops : numpy.ndarray, optional
         A 2D array of shape (s, 2) representing additional stops.
-    max_time_since_last_visible : float, optional
+    max_time_since_last_vis : float, optional
         The maximum time since last visible for a firefly to be plotted.
     show_reward_boundary : bool, optional
         Whether to show the reward boundary.
@@ -84,7 +84,7 @@ def make_one_polar_plot(max_time_before_next_visible_to_annotate=2.5, **current_
     current_more_ff_inputs = current_polar_plot_kargs['current_more_ff_inputs']
     current_more_traj_points = current_polar_plot_kargs['current_more_traj_points']
     current_more_traj_stops = current_polar_plot_kargs['current_more_traj_stops']
-    max_time_since_last_visible = current_polar_plot_kargs['max_time_since_last_visible']
+    max_time_since_last_vis = current_polar_plot_kargs['max_time_since_last_vis']
     show_reward_boundary = current_polar_plot_kargs['show_reward_boundary']
     show_null_arcs_from_best_arc_df = current_polar_plot_kargs['show_null_arcs_from_best_arc_df']
     null_arc_info_for_plotting = current_polar_plot_kargs['null_arc_info_for_plotting']
@@ -101,13 +101,13 @@ def make_one_polar_plot(max_time_before_next_visible_to_annotate=2.5, **current_
     ax = plot_behaviors_utils.set_polar_background_for_plotting(ax, 400, color_visible_area_in_background=True)
     
     # Plot fireflies
-    ax, markers, marker_labels = plot_fireflies_from_input(ff_input, ax, markers, marker_labels, ff_colormap=ff_colormap, max_time=max_time_since_last_visible)
+    ax, markers, marker_labels = plot_fireflies_from_input(ff_input, ax, markers, marker_labels, ff_colormap=ff_colormap, max_time=max_time_since_last_vis)
     if current_more_ff_inputs is not None:
         ax, markers, marker_labels = plot_fireflies_from_input(current_more_ff_inputs, ax, markers, marker_labels, ff_colormap=ff_colormap, 
-                                                               max_time=max_time_since_last_visible, add_to_legend=False)
+                                                               max_time=max_time_since_last_vis, add_to_legend=False)
 
     # Plot a colorbar
-    fig = plot_a_colorbar_for_time_since_last_visible(fig, ff_colormap=ff_colormap, max_time=max_time_since_last_visible)
+    fig = plot_a_colorbar_for_time_since_last_vis(fig, ff_colormap=ff_colormap, max_time=max_time_since_last_vis)
 
     if show_reward_boundary:
         circle_center_x = np.cos(ff_input[:,1])*ff_input[:,0]
@@ -118,7 +118,7 @@ def make_one_polar_plot(max_time_before_next_visible_to_annotate=2.5, **current_
 
     # Annotate the time since last visible
     for j in range(ff_input.shape[0]):
-        if ff_input[j,2] < max_time_since_last_visible:
+        if ff_input[j,2] < max_time_since_last_vis:
             ax.annotate(str(round(ff_input[j,2], 2)), xy=(ff_input[j,1], ff_input[j,0]), xytext=(ff_input[j,1], ff_input[j,0]+15), color='black', fontsize=11)
     if current_more_ff_inputs is not None:
         for j in range(current_more_ff_inputs.shape[0]):
@@ -288,7 +288,7 @@ def plot_fireflies_from_input(input, ax, markers, marker_labels, ff_colormap='Gr
 
 
 
-def plot_a_colorbar_for_time_since_last_visible(fig, ff_colormap='Greens', max_time=3):
+def plot_a_colorbar_for_time_since_last_vis(fig, ff_colormap='Greens', max_time=3):
     title = 'Time Since FF Visible (s)'
     norm = matplotlib.colors.Normalize(vmin=0, vmax=max_time)
     cax = fig.add_axes([0.95, 0.05, 0.05, 0.4]) #[left, bottom, width, height] 
@@ -355,7 +355,7 @@ def plot_a_circle_in_polar_coordinates(ax, circle_center_x, circle_center_y, cir
 
 
 
-def get_current_polar_plot_kargs(i, max_time_since_last_visible=2.5, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None, 
+def get_current_polar_plot_kargs(i, max_time_since_last_vis=2.5, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None, 
                                  **polar_plots_kwargs):
 
     ff_inputs = polar_plots_kwargs['ff_inputs']
@@ -447,7 +447,7 @@ def get_current_polar_plot_kargs(i, max_time_since_last_visible=2.5, show_reward
                                 'show_null_arcs_from_best_arc_df': show_null_arcs_from_best_arc_df,
                                 'show_direction_of_monkey_on_trajectory': show_direction_of_monkey_on_trajectory,
                                 'null_arc_info_for_plotting': null_arc_info_for_plotting,
-                                'max_time_since_last_visible': max_time_since_last_visible,
+                                'max_time_since_last_vis': max_time_since_last_vis,
                                 'show_reward_boundary': show_reward_boundary,
                                 'ff_colormap': ff_colormap,
                                 'num_ff_per_row': num_ff_per_row,

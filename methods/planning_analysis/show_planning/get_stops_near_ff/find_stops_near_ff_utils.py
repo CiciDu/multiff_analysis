@@ -16,7 +16,7 @@ import warnings
 def extract_key_info_from_data_item_for_stops_near_ff_class(data_item):
     data_item_info = {'monkey_information': data_item.monkey_information,
                         'ff_dataframe': data_item.ff_dataframe,
-                        'ff_caught_T_sorted': data_item.ff_caught_T_sorted,
+                        'ff_caught_T_new': data_item.ff_caught_T_new,
                         'ff_real_position_sorted': data_item.ff_real_position_sorted,
                         'ff_life_sorted': data_item.ff_life_sorted,
                         'PlotTrials_args': data_item.PlotTrials_args,
@@ -25,10 +25,9 @@ def extract_key_info_from_data_item_for_stops_near_ff_class(data_item):
     return data_item_info
 
 
-def find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_caught_T_sorted, ff_real_position_sorted, stop_period_duration=2, max_diff_between_caught_time_and_stop_time=0.2):
-    
-    closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, stop_ff_index_array=np.arange(len(ff_caught_T_sorted)),
-                                                                                             drop_rows_where_stop_is_not_inside_reward_boundary=True)
+def find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dataframe_visible, closest_stop_to_capture_df, stop_period_duration=2, max_diff_between_caught_time_and_stop_time=0.2):
+
+    closest_stop_to_capture_df = alt_ff_utils.drop_rows_where_stop_is_not_inside_reward_boundary(closest_stop_to_capture_df)
     print('finding captured_ff_info...')
     captured_ff_info = alt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(closest_stop_to_capture_df, stop_period_duration,
                                                                                             ff_dataframe_visible, monkey_information, drop_na=True)
@@ -73,7 +72,9 @@ def drop_rows_in_where_stop_time_and_capture_time_is_too_far_apart(captured_ff_i
     return captured_ff_info
 
 
-def make_shared_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_real_position_sorted, ff_caught_T_sorted,
+def make_shared_stops_near_ff_df(monkey_information, ff_dataframe_visible, 
+                                 closest_stop_to_capture_df,
+                                 ff_real_position_sorted, ff_caught_T_new,
                                  ff_flash_sorted, ff_life_sorted,
                                  remove_cases_where_monkey_too_close_to_edge=False, 
                                  stop_period_duration=2,
@@ -84,7 +85,7 @@ def make_shared_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_re
                                  ):
     print('Making shared_stops_near_ff_df...')
 
-    shared_stops_near_ff_df = find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_caught_T_sorted, ff_real_position_sorted, stop_period_duration=stop_period_duration)
+    shared_stops_near_ff_df = find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dataframe_visible, closest_stop_to_capture_df, stop_period_duration=stop_period_duration)
 
     shared_stops_near_ff_df[['stop_x', 'stop_y', 'monkey_angle', 'stop_time', 'stop_cum_distance']] = monkey_information.loc[shared_stops_near_ff_df['stop_point_index'], ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_t', 'cum_distance']].values
 
@@ -93,10 +94,10 @@ def make_shared_stops_near_ff_df(monkey_information, ff_dataframe_visible, ff_re
     shared_stops_near_ff_df.rename(columns={'ff_index': 'stop_ff_index',
                                             'monkey_angle': 'stop_monkey_angle',
                                             }, inplace=True)
-    shared_stops_near_ff_df['stop_ff_capture_time'] = ff_caught_T_sorted[shared_stops_near_ff_df['stop_ff_index'].values]
+    shared_stops_near_ff_df['stop_ff_capture_time'] = ff_caught_T_new[shared_stops_near_ff_df['stop_ff_index'].values]
     
     # add alt ff info
-    all_alt_ff_df = alt_ff_utils.get_all_alt_ff_df_from_ff_dataframe(shared_stops_near_ff_df, ff_dataframe_visible, ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted, monkey_information,
+    all_alt_ff_df = alt_ff_utils.get_all_alt_ff_df_from_ff_dataframe(shared_stops_near_ff_df, ff_dataframe_visible, closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, monkey_information,
                                                         min_time_between_stop_and_alt_ff_caught_time=min_time_between_stop_and_alt_ff_caught_time,
                                                         min_distance_between_stop_and_alt_ff=min_distance_between_stop_and_alt_ff,
                                                         max_distance_between_stop_and_alt_ff=max_distance_between_stop_and_alt_ff)
@@ -156,7 +157,7 @@ def add_stop_ff_cluster_50_size(shared_stops_near_ff_df, ff_real_position_sorted
         array_of_end_time_of_evaluation = shared_stops_near_ff_df['stop_ff_capture_time'].values
     else:
         array_of_end_time_of_evaluation = shared_stops_near_ff_df['stop_time'].values
-    ff_indices_of_each_cluster = cluster_analysis.find_ff_clusters(ff_positions, ff_real_position_sorted, shared_stops_near_ff_df['beginning_time'].values,
+    ff_indices_of_each_cluster = cluster_analysis.find_alive_ff_clusters(ff_positions, ff_real_position_sorted, shared_stops_near_ff_df['beginning_time'].values,
                                                                     array_of_end_time_of_evaluation, ff_life_sorted, max_distance=50, empty_cluster_ok=empty_cluster_ok)
     all_cluster_size = np.array([len(array) for array in ff_indices_of_each_cluster])
     shared_stops_near_ff_df['stop_ff_cluster_50_size'] = all_cluster_size   

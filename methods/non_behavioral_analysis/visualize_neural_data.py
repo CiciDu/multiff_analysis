@@ -59,12 +59,12 @@ def make_individual_spike_plots(time_to_sample_from, spike_df, unique_clusters, 
 def make_individual_spike_plot_from_target_cluster_VBLO(target_cluster_VBLO, spike_df, unique_clusters=1, starting_row=100, max_plots=2):
     subset = target_cluster_VBLO.iloc[starting_row:starting_row+max_plots]
     for i, (_, row) in enumerate(subset.iterrows(), start=1):
-        duration = [row.last_visible_time - 1, row.caught_time + 1] 
+        duration = [row.last_vis_time - 1, row.caught_time + 1] 
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax = plot_spike_times(ax, spike_df, duration, unique_clusters, x_values_for_vline=[row.last_visible_time-duration[0], row.caught_time-duration[0]])
+        ax = plot_spike_times(ax, spike_df, duration, unique_clusters, x_values_for_vline=[row.last_vis_time-duration[0], row.caught_time-duration[0]])
 
-        # annotate at row.last_visible_time-duration[0] as "last visible time"
-        ax.annotate('last visible time', xy=(row.last_visible_time-duration[0], 0), xytext=(row.last_visible_time-duration[0]+0.1, 0.5),
+        # annotate at row.last_vis_time-duration[0] as "last visible time"
+        ax.annotate('last visible time', xy=(row.last_vis_time-duration[0], 0), xytext=(row.last_vis_time-duration[0]+0.1, 0.5),
                     )
         # annotate at row.caught_time-duration[0] as "caught time"
         ax.annotate('caught time', xy=(row.caught_time-duration[0], 0), xytext=(row.caught_time-duration[0]+0.1, 0.5),

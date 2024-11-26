@@ -161,7 +161,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def make_diff_in_curv_df(self, curv_traj_window_before_stop=[-50, 0]):
         self.alt_ff_info_for_null_arc = show_planning_utils.make_alt_ff_info_for_null_arc(self.alt_ff_df_modified, self.stop_ff_final_df, self.heading_info_df)
         self.alt_ff_info_for_monkey = show_planning_utils.make_alt_ff_info_for_monkey(self.alt_ff_df_modified, self.heading_info_df, self.monkey_information, 
-                                                                                      self.ff_real_position_sorted, self.ff_caught_T_sorted,
+                                                                                      self.ff_real_position_sorted, self.ff_caught_T_new,
                                                                                       curv_traj_window_before_stop=curv_traj_window_before_stop)
         self.diff_in_curv_df = show_planning_utils.make_diff_in_curv_df(self.alt_ff_info_for_monkey, self.alt_ff_info_for_null_arc)
         self.diff_in_curv_df = show_planning_utils.furnish_diff_in_curv_df(self.diff_in_curv_df)
@@ -397,7 +397,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
 
     def _make_curv_of_traj_df_if_not_already_made(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         if self.curv_of_traj_df is None:
-            self.curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_sorted, 
+            self.curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, 
                                                              curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
 
 
@@ -408,10 +408,10 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         optimal_arc_stop_at_visible_boundary = True if (self.optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
 
         self.alt_curv_df = curvature_utils.make_curvature_df(self.alt_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information, 
-                                                             ff_caught_T_sorted=self.ff_caught_T_sorted, remove_invalid_rows=False,
+                                                             ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
                                                              invalid_curvature_ok=True, optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary)
         self.stop_curv_df = curvature_utils.make_curvature_df(self.stop_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information, 
-                                                              ff_caught_T_sorted=self.ff_caught_T_sorted, remove_invalid_rows=False,
+                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
                                                               invalid_curvature_ok=False, optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary)
 
         if self.optimal_arc_type == 'opt_arc_stop_closest':

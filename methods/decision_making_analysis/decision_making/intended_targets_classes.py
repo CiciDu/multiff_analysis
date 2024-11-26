@@ -14,9 +14,9 @@ import seaborn as sns
 
 
 class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
-    def __init__(self, ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
+    def __init__(self, ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
                  time_range_of_trajectory=[-1,1], num_time_points_for_trajectory=10):
-        super().__init__(ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
+        super().__init__(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
         
         self.ff_flash_sorted = ff_flash_sorted
         self.ff_life_sorted = ff_life_sorted
@@ -50,7 +50,7 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
 
         # recalculate time and target_index based on starting_point_index
         self.manual_anno_long['time'] = self.monkey_information['monkey_t'].iloc[self.manual_anno_long.starting_point_index.values].values
-        self.manual_anno_long['target_index'] = np.searchsorted(self.ff_caught_T_sorted, self.manual_anno_long['time'].values)        
+        self.manual_anno_long['target_index'] = np.searchsorted(self.ff_caught_T_new, self.manual_anno_long['time'].values)        
 
         # change data type
         self.manual_anno_long['original_starting_point_index'] = self.manual_anno_long['original_starting_point_index'].astype('int')
@@ -80,8 +80,8 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
         # take out all the points where the ff_index is a ff that has just been captured, and change the ff_index = -9
         
         self.manual_anno_long['ff_capture_time'] = 99999
-        valid_caught_ff_indices = self.manual_anno_long[(self.manual_anno_long['ff_index'] >= 0) & (self.manual_anno_long['ff_index'] < len(self.ff_caught_T_sorted))].index.values
-        self.manual_anno_long.loc[valid_caught_ff_indices, 'ff_capture_time'] = self.ff_caught_T_sorted[self.manual_anno_long.loc[valid_caught_ff_indices, 'ff_index'].values.astype(int)]
+        valid_caught_ff_indices = self.manual_anno_long[(self.manual_anno_long['ff_index'] >= 0) & (self.manual_anno_long['ff_index'] < len(self.ff_caught_T_new))].index.values
+        self.manual_anno_long.loc[valid_caught_ff_indices, 'ff_capture_time'] = self.ff_caught_T_new[self.manual_anno_long.loc[valid_caught_ff_indices, 'ff_index'].values.astype(int)]
         self.manual_anno_long.loc[self.manual_anno_long['time'] > self.manual_anno_long['ff_capture_time'], 'ff_index'] = -9
 
 
@@ -155,9 +155,9 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
 
 
 class ModelOfMultipleIntendedTargets(ModelOfIntendedTargets):
-    def __init__(self, ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
+    def __init__(self, ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
                  time_range_of_trajectory=[-1,1], num_time_points_for_trajectory=10):
-        super().__init__(ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
+        super().__init__(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
                          time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
         
 
@@ -209,17 +209,17 @@ class ModelOfMultipleIntendedTargets(ModelOfIntendedTargets):
 
 
 
-def test_moit_hyperparameters(ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, pseudo_manual_anno, pseudo_manual_anno_long,
+def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, pseudo_manual_anno, pseudo_manual_anno_long,
                               num_ff_per_row=5, keeping_1_out_of_n_rows=10, add_arc_info=True, arc_info_to_add=['optimal_curvature', 'curv_diff'], 
                               add_current_curvature_of_traj=True, furnish_with_trajectory_data=True, keep_whole_chunks=False,
-                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible'], trajectory_data_kind=['position'], curvature_df=None, curv_of_traj_df=None,
+                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None, curv_of_traj_df=None,
                               time_range_of_trajectory=[-0.8, 0], n_seconds_before_crossing_boundary=0, n_seconds_after_crossing_boundary=0.8,):
 
     ff_dataframe_temp=ff_dataframe.copy()
     ff_dataframe_temp=ff_dataframe_temp[abs(ff_dataframe_temp['ff_angle']) <=math.pi/4]
-    ff_dataframe_truncated=ff_dataframe_temp[ff_dataframe_temp['time_since_last_visible'] <=2.5]
+    ff_dataframe_truncated=ff_dataframe_temp[ff_dataframe_temp['time_since_last_vis'] <=2.5]
 
-    moit=ModelOfIntendedTargets(ff_dataframe_truncated, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, time_range_of_trajectory=time_range_of_trajectory)
+    moit=ModelOfIntendedTargets(ff_dataframe_truncated, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, time_range_of_trajectory=time_range_of_trajectory)
     moit.manual_anno=pseudo_manual_anno
     moit.manual_anno_long=pseudo_manual_anno_long
     moit.eliminate_crossing_boundary_cases(n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary, n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary)

@@ -182,12 +182,12 @@ def put_down_correlation_plot(fig_corr, id='correlation_plot', width='60%'):
 
 
 
-def find_new_curv_of_traj_counted(point_index_for_curv_of_traj_df, monkey_information, ff_caught_T_sorted, curv_of_traj_mode, lower_end, upper_end, truncate_curv_of_traj_by_time_of_capture=False):
+def find_new_curv_of_traj_counted(point_index_for_curv_of_traj_df, monkey_information, ff_caught_T_new, curv_of_traj_mode, lower_end, upper_end, truncate_curv_of_traj_by_time_of_capture=False):
     if (lower_end is not None) & (upper_end is not None):
         if curv_of_traj_mode == 'time':
-            new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_time_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+            new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_time_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         elif curv_of_traj_mode == 'distance':
-            new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_distance_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_sorted, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+            new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_distance_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         else:
             raise PreventUpdate
         new_curv_of_traj_counted = new_curv_of_traj_df['curvature_of_traj'].values

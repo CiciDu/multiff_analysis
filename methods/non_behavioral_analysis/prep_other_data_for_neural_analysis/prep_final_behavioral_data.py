@@ -38,10 +38,10 @@ def make_final_behavioral_data(rebinned_monkey_info_essential, binned_features):
 
 
 
-def make_binned_features(ff_dataframe_unique_ff, num_bins, ff_caught_T_sorted, time_bins, feature_dataframes_to_merge):
+def make_binned_features(ff_dataframe_unique_ff, num_bins, ff_caught_T_new, time_bins, feature_dataframes_to_merge):
     binned_features = _prepare_binned_features(ff_dataframe_unique_ff, num_bins)
     binned_features = _merge_features(binned_features, feature_dataframes_to_merge)
-    binned_features = _add_catching_ff(binned_features, ff_caught_T_sorted, time_bins)
+    binned_features = _add_catching_ff(binned_features, ff_caught_T_new, time_bins)
     binned_features = _fill_na(binned_features)
     return binned_features
 
@@ -67,12 +67,12 @@ def _merge_features(binned_features, feature_dataframes_to_merge):
     return binned_features
 
 
-def _add_catching_ff(binned_features, ff_caught_T_sorted, time_bins):
+def _add_catching_ff(binned_features, ff_caught_T_new, time_bins):
     """
     Add a column 'catching_ff' to binned_features indicating bins where ff is caught.
     """
     binned_features['catching_ff'] = 0
-    catching_target_bins = np.digitize(ff_caught_T_sorted, time_bins)-1
+    catching_target_bins = np.digitize(ff_caught_T_new, time_bins)-1
     binned_features.loc[binned_features['bin'].isin(catching_target_bins), 'catching_ff'] = 1
     return binned_features
 

@@ -10,7 +10,7 @@ import numpy as np
 
 
 class CurvatureOfPath():
-    def __init__(self, ff_dataframe, monkey_information, ff_caught_T_sorted, ff_real_position_sorted, seed=None):
+    def __init__(self, ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, seed=None):
 
         if seed is not None:
             np.random.seed(seed)
@@ -18,7 +18,7 @@ class CurvatureOfPath():
 
         self.ff_dataframe = ff_dataframe[ff_dataframe.ff_angle_boundary.between(-45*math.pi/180, 45*math.pi/180)]
         self.monkey_information = monkey_information
-        self.ff_caught_T_sorted = ff_caught_T_sorted
+        self.ff_caught_T_new = ff_caught_T_new
         self.ff_real_position_sorted = ff_real_position_sorted
         self.seed = seed
 
@@ -27,7 +27,7 @@ class CurvatureOfPath():
                           optimal_arc_stop_at_visible_boundary=False,
                           ignore_error=False):
         ff_dataframe = self.ff_dataframe.copy()
-        self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+        self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         self.curvature_df = curvature_utils.make_curvature_df(ff_dataframe, self.curv_of_traj_df, ff_radius_for_optimal_arc=ff_radius_for_optimal_arc, clean=clean,
                                                               include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature,
                                                               optimal_arc_stop_at_visible_boundary=optimal_arc_stop_at_visible_boundary, ignore_error=ignore_error)

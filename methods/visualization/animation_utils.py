@@ -16,7 +16,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 
-def prepare_for_animation(ff_dataframe, ff_caught_T_sorted, ff_life_sorted, ff_believed_position_sorted, ff_real_position_sorted, 
+def prepare_for_animation(ff_dataframe, ff_caught_T_new, ff_life_sorted, ff_believed_position_sorted, ff_real_position_sorted, 
                           ff_flash_sorted, monkey_information, duration=None, currentTrial=None, num_trials=None, k=1, rotated=True,
                           max_duration=30, min_duration=1):
     """
@@ -26,10 +26,10 @@ def prepare_for_animation(ff_dataframe, ff_caught_T_sorted, ff_life_sorted, ff_b
     if duration is None:
         if num_trials > currentTrial:
             raise ValueError("num_trials must be smaller than currentTrial")
-        if currentTrial >= len(ff_caught_T_sorted):
-            currentTrial = len(ff_caught_T_sorted)-1
-            num_trials = min(2, len(ff_caught_T_sorted))
-        duration = [ff_caught_T_sorted[currentTrial-num_trials], ff_caught_T_sorted[currentTrial]]
+        if currentTrial >= len(ff_caught_T_new):
+            currentTrial = len(ff_caught_T_new)-1
+            num_trials = min(2, len(ff_caught_T_new))
+        duration = [ff_caught_T_new[currentTrial-num_trials], ff_caught_T_new[currentTrial]]
         
     # If the duration is too long
     if max_duration is not None:
@@ -45,12 +45,12 @@ def prepare_for_animation(ff_dataframe, ff_caught_T_sorted, ff_life_sorted, ff_b
 
     if currentTrial is None:
         try:
-            earlier_trials = np.where(ff_caught_T_sorted <= duration[1])[0]
+            earlier_trials = np.where(ff_caught_T_new <= duration[1])[0]
             if len(earlier_trials) > 0:
                 currentTrial = earlier_trials[-1]
             else:
                 currentTrial = 1
-            num_trials = currentTrial-np.where(ff_caught_T_sorted > duration[0])[0][0]
+            num_trials = currentTrial-np.where(ff_caught_T_new > duration[0])[0][0]
         except Exception as e:
             print(f'CurrentTrial and num_trials are set to be None because of the following error: {e}')
             currentTrial = None
@@ -82,13 +82,13 @@ def prepare_for_animation(ff_dataframe, ff_caught_T_sorted, ff_life_sorted, ff_b
     flash_on_ff_dict = match_points_to_flash_on_ff_positions(anim_monkey_info['anim_t'], anim_monkey_info['anim_indices'], duration, ff_flash_sorted, 
                                                                 ff_life_sorted, ff_real_position_sorted, rotation_matrix=R, x0=x0, y0=y0)
     
-    alive_ff_dict = match_points_to_alive_ff_positions(anim_monkey_info['anim_t'], anim_monkey_info['anim_indices'], ff_caught_T_sorted, ff_life_sorted, ff_real_position_sorted,
+    alive_ff_dict = match_points_to_alive_ff_positions(anim_monkey_info['anim_t'], anim_monkey_info['anim_indices'], ff_caught_T_new, ff_life_sorted, ff_real_position_sorted,
                                                         rotation_matrix=R, x0=x0, y0=y0)
     
     # believed_ff_dict = None
     # if (currentTrial is not None) & (num_trials is not None):
     believed_ff_dict = match_points_to_believed_ff_positions(anim_monkey_info['anim_t'], anim_monkey_info['anim_indices'], currentTrial, num_trials, ff_believed_position_sorted, 
-                                                            ff_caught_T_sorted, rotation_matrix=R, x0=x0, y0=y0)
+                                                            ff_caught_T_new, rotation_matrix=R, x0=x0, y0=y0)
     
     num_frames = anim_monkey_info['anim_t'].size
 
@@ -220,7 +220,7 @@ def match_points_to_flash_on_ff_positions(anim_t, anim_indices, duration, ff_fla
     ff_life_sorted: np.array
         containing the time that each firefly comes into being and gets captured 
         (if the firefly is never captured, then capture time is replaced by the last point of time in data)
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
 
 
@@ -259,9 +259,9 @@ def match_points_to_flash_on_ff_positions(anim_t, anim_indices, duration, ff_fla
 
 
 
-def match_points_to_alive_ff_positions(anim_t, anim_indices, ff_caught_T_sorted, ff_life_sorted, ff_real_position_sorted, 
+def match_points_to_alive_ff_positions(anim_t, anim_indices, ff_caught_T_new, ff_life_sorted, ff_real_position_sorted, 
                                        rotation_matrix=None, x0=0, y0=0):
-    array_of_trial_nums = np.digitize(anim_t, ff_caught_T_sorted).tolist()
+    array_of_trial_nums = np.digitize(anim_t, ff_caught_T_new).tolist()
     alive_ff_dict = {}
     for i in range(len(anim_indices)):
         index = anim_indices[i]
@@ -287,7 +287,7 @@ def match_points_to_alive_ff_positions(anim_t, anim_indices, ff_caught_T_sorted,
 
 # Create a dictionary of {time: [[believed_ff_position], [believed_ff_position2], ...], ...}
 def match_points_to_believed_ff_positions(anim_t, anim_indices, currentTrial, num_trials, ff_believed_position_sorted, 
-                                          ff_caught_T_sorted, rotation_matrix=None, x0=0, y0=0):
+                                          ff_caught_T_new, rotation_matrix=None, x0=0, y0=0):
     """
     Match the believed positions of the fireflies to the time when they are captured (for animation)
 
@@ -301,7 +301,7 @@ def match_points_to_believed_ff_positions(anim_t, anim_indices, currentTrial, nu
         number of trials to span across when using this function
     ff_believed_position_sorted: np.array
         containing the locations of the monkey (or agent) when each captured firefly was captured 
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
 
 
@@ -314,23 +314,23 @@ def match_points_to_believed_ff_positions(anim_t, anim_indices, currentTrial, nu
 
     Examples
     -------
-        believed_ff_dict = match_points_to_believed_ff_positions(anim_t, anim_indices, currentTrial, num_trials, ff_believed_position_sorted, ff_caught_T_sorted, ff_real_position_sorted)
+        believed_ff_dict = match_points_to_believed_ff_positions(anim_t, anim_indices, currentTrial, num_trials, ff_believed_position_sorted, ff_caught_T_new, ff_real_position_sorted)
 
     """
 
-    if ff_caught_T_sorted is None:
-        ff_caught_T_sorted = []
+    if ff_caught_T_new is None:
+        ff_caught_T_new = []
 
 
     believed_ff_dict = {}
     # For each time point:
     if (currentTrial is not None) & (num_trials is not None):
-        relevant_catching_ff_time = ff_caught_T_sorted[currentTrial-num_trials+1:currentTrial+1]
+        relevant_catching_ff_time = ff_caught_T_new[currentTrial-num_trials+1:currentTrial+1]
         relevant_caught_ff_positions = ff_believed_position_sorted[currentTrial-num_trials+1:currentTrial+1]
     else:
         try:
-            relevant_catching_ff_time = ff_caught_T_sorted[ff_caught_T_sorted >= [anim_t[0]]]
-            relevant_caught_ff_positions = ff_believed_position_sorted[ff_caught_T_sorted >= [anim_t[0]]]
+            relevant_catching_ff_time = ff_caught_T_new[ff_caught_T_new >= [anim_t[0]]]
+            relevant_caught_ff_positions = ff_believed_position_sorted[ff_caught_T_new >= [anim_t[0]]]
         except IndexError:
             relevant_catching_ff_time = np.array([])
             relevant_caught_ff_positions = np.array([])

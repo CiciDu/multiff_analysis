@@ -53,7 +53,7 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
         containing the information such as the speed, angle, and location of the monkey at various points of time
     ff_flash_sorted: list
         containing the flashing-on durations of each firefly 
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     ff_believed_position_sorted: np.array
         containing the locations of the monkey (or agent) when each captured firefly was captured 
@@ -143,7 +143,7 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
         if done:
             break
 
-    ff_time_since_last_visible = (1 - np.array(ff_memory)/env.full_memory) * env.max_in_memory_time
+    ff_time_since_last_vis = (1 - np.array(ff_memory)/env.full_memory) * env.max_in_memory_time
 
     temp_obs_in_ff_df = pd.DataFrame({'index_in_ff_flash': indexes_in_ff_flash,
                                'time': corresponding_time,
@@ -151,10 +151,10 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
                                'ff_x_noisy': ff_x_noisy,
                                'ff_y_noisy': ff_y_noisy,
                                'memory': ff_memory,
-                               'time_since_last_visible': ff_time_since_last_visible})
+                               'time_since_last_vis': ff_time_since_last_vis})
     if LSTM:
         temp_obs_in_ff_df['memory'] = 1
-        temp_obs_in_ff_df['time_since_last_visible'] = 0 
+        temp_obs_in_ff_df['time_since_last_vis'] = 0 
     ff_information_temp = env.ff_information.copy()
     ff_information_temp['index_in_ff_information'] = range(len(ff_information_temp))
     ff_information_temp.loc[ff_information_temp['time_captured'] < 0, 'time_captured'] = env.time + 10
@@ -173,8 +173,8 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
     
 
     # get information about fireflies from env.ff_information and env.ff_lash
-    ff_caught_T_sorted, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
-    caught_ff_num = len(ff_caught_T_sorted)
+    ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
+    caught_ff_num = len(ff_caught_T_new)
     total_ff_num = len(ff_life_sorted)
 
     # Find the indices of ffs in obs for each time point, keeping the indices that will be used by ff_dataframe
@@ -182,11 +182,11 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
     temp_obs_in_ff_df['index_in_ff_dataframe'] = reversed_sorting[temp_obs_in_ff_df['index_in_ff_information'].values]
     temp_obs_in_ff_df = temp_obs_in_ff_df.astype({'index_in_ff_information':'int', 'index_in_ff_dataframe':'int',  'point_index':'int'})
     num_decimals_of_dt = find_decimals(env.dt)
-    temp_obs_in_ff_df['time_since_last_visible'] = np.round(temp_obs_in_ff_df['time_since_last_visible'], num_decimals_of_dt)
+    temp_obs_in_ff_df['time_since_last_vis'] = np.round(temp_obs_in_ff_df['time_since_last_vis'], num_decimals_of_dt)
     temp_obs_in_ff_df.reset_index(drop = True, inplace = True)
 
     ff_in_obs_df = temp_obs_in_ff_df[['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index', 'ff_x_noisy', 'ff_y_noisy', 
-                                        'memory', 'time_since_last_visible']].copy()
+                                        'memory', 'time_since_last_vis']].copy()
     ff_in_obs_df.rename(columns = {'index_in_ff_dataframe': 'ff_index'}, inplace = True)
 
 
@@ -199,11 +199,11 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
 
 
     # find and print ff capture rate
-    ff_capture_rate = len(set(ff_caught_T_sorted))/monkey_information['monkey_t'].max()
+    ff_capture_rate = len(set(ff_caught_T_new))/monkey_information['monkey_t'].max()
     print('Firefly capture rate: ', ff_capture_rate)
 
 
-    return monkey_information, ff_flash_sorted, ff_caught_T_sorted, ff_believed_position_sorted, \
+    return monkey_information, ff_flash_sorted, ff_caught_T_new, ff_believed_position_sorted, \
            ff_real_position_sorted, ff_life_sorted, ff_flash_end_sorted, caught_ff_num, total_ff_num, \
            obs_ff_indices_in_ff_dataframe, sorted_indices_all, ff_in_obs_df
 
@@ -478,7 +478,7 @@ def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
 
     Returns
     -------
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     ff_believed_position_sorted: np.array
         containing the locations of the monkey (or agent) when each captured firefly was captured 
@@ -507,7 +507,7 @@ def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
     ff_flash_sorted = make_ff_flash_sorted(env_ff_flash, ff_information, sorted_indices_all, env_end_time)
 
     # Note that the following two arrays will be shorter than the other arrays
-    ff_caught_T_sorted = np.array(ff_time_captured_all[sorted_indices_captured])  
+    ff_caught_T_new = np.array(ff_time_captured_all[sorted_indices_captured])  
     ff_believed_position_sorted = np.array(ff_information.iloc[sorted_indices_captured, 5:7])
 
     ff_real_position_sorted = np.array(ff_information.iloc[sorted_indices_all, 1:3])
@@ -517,7 +517,7 @@ def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
     ff_flash_end_sorted = [flash[-1, 1] if len(flash) > 0 else env_end_time for flash in ff_flash_sorted]
     ff_flash_end_sorted = np.array(ff_flash_end_sorted)
 
-    return ff_caught_T_sorted, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all
+    return ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all
 
 
 def reverse_value_and_position(sorted_indices_all):
@@ -584,10 +584,10 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     """      
 
     # Set a duration that the plot will encompass; first find the start time
-    start_time = min(info_of_monkey['ff_caught_T_sorted'][currentTrial-3], info_of_monkey['ff_caught_T_sorted'][currentTrial]-num_trials)
-    plot_whole_duration = [start_time, info_of_monkey['ff_caught_T_sorted'][currentTrial]]
+    start_time = min(info_of_monkey['ff_caught_T_new'][currentTrial-3], info_of_monkey['ff_caught_T_new'][currentTrial]-num_trials)
+    plot_whole_duration = [start_time, info_of_monkey['ff_caught_T_new'][currentTrial]]
     # We take out a part at the beginning of the plot_whole_duration, where the agent will replicate the monkey's action
-    monkey_acting_duration = [start_time, info_of_monkey['ff_caught_T_sorted'][currentTrial]-1.5]
+    monkey_acting_duration = [start_time, info_of_monkey['ff_caught_T_new'][currentTrial]-1.5]
     
 
     # Find the indices of alive fireflies
@@ -722,15 +722,15 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
     #======================================= Organize Collected Data ==========================================
     monkey_information = pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
-    ff_caught_T_sorted, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
-    caught_ff_num = len(ff_caught_T_sorted)
+    ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
+    caught_ff_num = len(ff_caught_T_new)
 
     # Find the indices of ffs in obs for each time point, keeping the indices that will be used by ff_dataframe
     reversed_sorting = reverse_value_and_position(sorted_indices_all)
     obs_ff_indices_in_ff_dataframe = [reversed_sorting[indices] for indices in obs_ff_unique_identifiers]
 
     # Make ff_dataframe
-    ff_dataframe_args = (monkey_information, ff_caught_T_sorted, ff_flash_sorted,  ff_real_position_sorted, ff_life_sorted)
+    ff_dataframe_args = (monkey_information, ff_caught_T_new, ff_flash_sorted,  ff_real_position_sorted, ff_life_sorted)
     ff_dataframe_kargs = {"max_distance": 400, "data_folder_name": None, "num_missed_index": 0}
     ff_dataframe = make_ff_dataframe.make_ff_dataframe_func(*ff_dataframe_args, **ff_dataframe_kargs, player = "agent", \
                                     obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe)
@@ -738,7 +738,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     if len(ff_dataframe) > 0:
         ff_dataframe = ff_dataframe[ff_dataframe['time'] <= plot_whole_duration[1]-plot_whole_duration[0]]
         # Select trials, indices, and positions where there is a cluster of fireflies around the target
-        cluster_around_target_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_sorted, ff_real_position_sorted, max_time_apart = 1.25)
+        cluster_around_target_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted, max_time_apart = 1.25)
     else:
         cluster_around_target_indices = []
 
@@ -749,7 +749,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     info_of_agent = {
       "monkey_information": monkey_information,
       "ff_dataframe": ff_dataframe,
-      "ff_caught_T_sorted": ff_caught_T_sorted,
+      "ff_caught_T_new": ff_caught_T_new,
       "ff_real_position_sorted": ff_real_position_sorted,
       "ff_believed_position_sorted": ff_believed_position_sorted,
       "ff_life_sorted": ff_life_sorted,

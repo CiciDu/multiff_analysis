@@ -69,7 +69,7 @@ class PlanFactorsOfAgent():
     def _load_agent_data_onto_pf(self):
         for attr in ['ff_dataframe', 
                      'monkey_information', 
-                     'ff_caught_T_sorted', 
+                     'ff_caught_T_new', 
                      'ff_real_position_sorted', 
                      'ff_believed_position_sorted',
                      'ff_life_sorted',

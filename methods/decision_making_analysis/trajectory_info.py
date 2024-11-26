@@ -29,20 +29,20 @@ np.set_printoptions(suppress=True)
 
 
 
-def find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_sorted=None, monkey_information=None, curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1], truncate_curv_of_traj_by_time_of_capture=False):
+def find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=None, monkey_information=None, curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1], truncate_curv_of_traj_by_time_of_capture=False):
     # curvature_df has duplicate point_index
     curv_of_traj_df_temp = curv_of_traj_df.groupby('point_index').first().reset_index().set_index('point_index')
     try:
         curvature_of_traj = curv_of_traj_df_temp.loc[point_index_array, 'curvature_of_traj'].values
     except KeyError:
-        if ff_caught_T_sorted is None:
-            raise ValueError('Since add_current_curvature_of_traj is True and the current information is insufficient, ff_caught_T_sorted cannot be None')
+        if ff_caught_T_new is None:
+            raise ValueError('Since add_current_curvature_of_traj is True and the current information is insufficient, ff_caught_T_new cannot be None')
         # see which point_index is in point_index_array but not in curv_of_traj_df_temp
         missing_point_index = np.setdiff1d(point_index_array, curv_of_traj_df_temp.index.values)
         print('missing_point_index', missing_point_index)
 
         print('Since add_current_curvature_of_traj is True and the information in curv_of_traj_df is insufficient, we will calculate the curvature_of_traj now')
-        curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_sorted, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+        curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         curvature_of_traj = curv_of_traj_df.loc[point_index_array, 'curvature_of_traj'].values
     except:
         print('Other errors?')
@@ -441,7 +441,7 @@ def add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(
     all_current_time = monkey_information.loc[all_current_point_indices, 'monkey_t'].values
 
     additional_placeholder_mapping = {'ff_x': [9999, False], 'ff_y': [9999, False]}
-    ff_info = decision_making_utils.find_attributes_of_ff_when_last_visible_OR_next_visible(all_ff_index, all_current_time, ff_dataframe, use_last_seen=use_last_seen, 
+    ff_info = decision_making_utils.find_attributes_of_ff_when_last_vis_OR_next_visible(all_ff_index, all_current_time, ff_dataframe, use_last_seen=use_last_seen, 
                                                                       attributes=['ff_x', 'ff_y'], additional_placeholder_mapping=additional_placeholder_mapping)
 
     ff_xy_when_ff_last_seen_or_next_seen = ff_info[['ff_x', 'ff_y']].values
@@ -457,7 +457,7 @@ def add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(
 
 
 
-def add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_sorted, use_last_seen=True, curv_of_traj_df=None):
+def add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_new, use_last_seen=True, curv_of_traj_df=None):
     df = df.copy()
     suffix = '_last_seen' if use_last_seen else '_next_seen'
     df, temp_curvature_df = GUAT_and_TAFT.find_curv_diff_for_ff_info(df, monkey_information, ff_real_position_sorted, curv_of_traj_df=curv_of_traj_df)

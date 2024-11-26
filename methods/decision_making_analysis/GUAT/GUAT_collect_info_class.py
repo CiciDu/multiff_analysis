@@ -95,8 +95,8 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                                                          max_cluster_distance=50,
                                                          max_distance_to_stop=400,
                                                          max_distance_to_stop_for_GUAT_target=50,
-                                                         max_time_since_last_visible = 2.5,
-                                                         columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_visible'],
+                                                         max_time_since_last_vis = 2.5,
+                                                         columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_vis'],
                                                          curv_of_traj_mode='time',
                                                          window_for_curv_of_traj=[-1, 1], 
                                                          truncate_curv_of_traj_by_time_of_capture=False,
@@ -130,7 +130,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.trajectory_features = trajectory_features
         self.max_distance_to_stop_for_GUAT_target = max_distance_to_stop_for_GUAT_target
 
-        self.get_current_ff_info_and_alt_ff_info_for_info_collection(max_cluster_distance=max_cluster_distance, max_time_since_last_visible=max_time_since_last_visible, include_ff_in_near_future=include_ff_in_near_future, \
+        self.get_current_ff_info_and_alt_ff_info_for_info_collection(max_cluster_distance=max_cluster_distance, max_time_since_last_vis=max_time_since_last_vis, include_ff_in_near_future=include_ff_in_near_future, \
                                                                      duration_into_future=duration_into_future, columns_to_sort_alt_ff_by=columns_to_sort_alt_ff_by, last_seen_and_next_seen_attributes_to_add=last_seen_and_next_seen_attributes_to_add,
                                                                      max_distance_to_stop=max_distance_to_stop)
         
@@ -141,7 +141,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         if include_ff_in_near_future:
             self.update_curvature_df_with_additional_curvature_df()
 
-        relevant_curvature_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_sorted=self.ff_caught_T_sorted, monkey_information=self.monkey_information)
+        relevant_curvature_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new, monkey_information=self.monkey_information)
         self.relevant_curv_of_traj_df = pd.DataFrame({'point_index': self.point_index_all, 'curvature_of_traj': relevant_curvature_of_traj})
 
         # combine the trajectory data
@@ -172,7 +172,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.get_trajectory_and_stop_info_for_machine_learning()
         self.get_more_trajectory_info_for_plotting(time_range_of_trajectory_to_plot=self.gc_kwargs['time_range_of_trajectory_to_plot'], num_time_points_for_trajectory_to_plot=self.gc_kwargs['num_time_points_for_trajectory_to_plot'])
 
-        relevant_curvature_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_sorted=self.ff_caught_T_sorted, monkey_information=self.monkey_information)
+        relevant_curvature_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new, monkey_information=self.monkey_information)
         self.relevant_curv_of_traj_df = pd.DataFrame({'point_index': self.point_index_all, 'curvature_of_traj': relevant_curvature_of_traj})
 
         # combine the trajectory data

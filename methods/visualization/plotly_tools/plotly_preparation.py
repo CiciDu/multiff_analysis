@@ -65,7 +65,7 @@ def prepare_to_plot_a_planning_instance_in_plotly(row,
         duration_to_plot = show_null_trajectory.eliminate_irrelevant_points_before_or_after_crossing_boundary(duration_to_plot, relevant_point_indices, monkey_information, verbose=False)
     print('duration_to_plot:', duration_to_plot)
 
-    monkey_information, ff_dataframe, ff_life_sorted, ff_real_position_sorted, _, _, ff_caught_T_sorted = PlotTrials_args
+    monkey_information, ff_dataframe, ff_life_sorted, ff_real_position_sorted, _, _, ff_caught_T_new = PlotTrials_args
     trajectory_df, R = make_trajectory_df(PlotTrials_args, row=row, duration_to_plot=duration_to_plot, rotation_matrix=rotation_matrix)
 
     # then find ff to be plotted
@@ -205,20 +205,20 @@ def find_traj_portion_for_traj_curv(trajectory_df, curv_of_traj_current_row):
 
 
 
-def find_alt_ff_curv_df(current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_sorted=None):
-    alt_ff_curv_df = find_ff_curv_df(current_plotly_plot_key_comp['row'].alt_ff_index, current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_sorted=ff_caught_T_sorted)
+def find_alt_ff_curv_df(current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=None):
+    alt_ff_curv_df = find_ff_curv_df(current_plotly_plot_key_comp['row'].alt_ff_index, current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new)
     return alt_ff_curv_df
             
 
-def find_stop_ff_curv_df(current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_sorted=None):  
-    stop_ff_curv_df = find_ff_curv_df(current_plotly_plot_key_comp['row'].stop_ff_index, current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_sorted=ff_caught_T_sorted)
+def find_stop_ff_curv_df(current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=None):  
+    stop_ff_curv_df = find_ff_curv_df(current_plotly_plot_key_comp['row'].stop_ff_index, current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new)
     return stop_ff_curv_df
 
 
-def find_ff_curv_df(ff_index, current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_sorted=None):
+def find_ff_curv_df(ff_index, current_plotly_plot_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=None):
     duration_to_plot = current_plotly_plot_key_comp['duration_to_plot']
     row = current_plotly_plot_key_comp['row']
-    ff_curv_df = curvature_utils.find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df,  ff_caught_T_sorted=ff_caught_T_sorted, clean=False)
+    ff_curv_df = curvature_utils.find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df,  ff_caught_T_new=ff_caught_T_new, clean=False)
     ff_curv_df['rel_time'] = ff_curv_df['time'] - row.stop_time
     ff_curv_df = ff_curv_df.merge(monkey_information[['point_index', 'cum_distance']], on='point_index', how='left')
     ff_curv_df['rel_distance'] = np.round(ff_curv_df['cum_distance'] - row.stop_cum_distance, 2)

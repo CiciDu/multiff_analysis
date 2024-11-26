@@ -21,7 +21,7 @@ def PlotPoints(point,
                duration_of_trajectory, 
                monkey_information, 
                ff_dataframe, 
-               ff_caught_T_sorted,
+               ff_caught_T_new,
                ff_life_sorted, 
                ff_real_position_sorted, 
                ff_believed_position_sorted, 
@@ -57,7 +57,7 @@ def PlotPoints(point,
         containing various information about all visible or "in-memory" fireflies at each time point
     monkey_information: df
         containing the speed, angle, and location of the monkey at various points of time
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     ff_life_sorted: np.array
         containing the time that each firefly comes into being and gets captured 
@@ -154,7 +154,7 @@ def PlotPoints(point,
         axes.scatter(in_memory_ffs['ff_x'], in_memory_ffs['ff_y'], color="green", s=40)
 
     if show_target:
-        trial_num = np.digitize(time, ff_caught_T_sorted)
+        trial_num = np.digitize(time, ff_caught_T_new)
         if trial_num is None:
             raise ValueError("If show_target, then trial_num cannot be None")
         target_position = ff_real_position_sorted[trial_num]
@@ -293,7 +293,7 @@ def PlotSidebySide(plot_whole_duration,
             info_of_monkey['ff_real_position_sorted'], 
             info_of_monkey['ff_believed_position_sorted'], 
             info_of_monkey['cluster_around_target_indices'], 
-            info_of_monkey['ff_caught_T_sorted'], 
+            info_of_monkey['ff_caught_T_new'], 
             currentTrial = currentTrial,
             num_trials = num_trials,
             fig = fig, 
@@ -320,7 +320,7 @@ def PlotSidebySide(plot_whole_duration,
               info_of_agent['ff_real_position_sorted'], 
               info_of_agent['ff_believed_position_sorted'], 
               info_of_agent['cluster_around_target_indices'], 
-              info_of_agent['ff_caught_T_sorted'], 
+              info_of_agent['ff_caught_T_new'], 
               currentTrial = None,
               num_trials = None,
               fig = fig, 

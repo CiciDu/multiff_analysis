@@ -47,7 +47,7 @@ class ProcessGUATtrials:
 
         
 
-    def __init__(self, give_up_after_trying_info_bundle, PlotTrials_args, max_distance_to_stop_for_GUAT_target=50, max_allowed_time_since_last_visible=2.5) -> None:
+    def __init__(self, give_up_after_trying_info_bundle, PlotTrials_args, max_distance_to_stop_for_GUAT_target=50, max_allowed_time_since_last_vis=2.5) -> None:
         
         self.give_up_after_trying_info_bundle = give_up_after_trying_info_bundle
         self.give_up_after_trying_trials, self.GUAT_point_indices_for_anim, self.GUAT_indices_df, self.GUAT_trials_df = give_up_after_trying_info_bundle
@@ -56,10 +56,10 @@ class ProcessGUATtrials:
         
         self.PlotTrials_args = PlotTrials_args
         self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, \
-                self.cluster_around_target_indices, self.ff_caught_T_sorted = self.PlotTrials_args
+                self.cluster_around_target_indices, self.ff_caught_T_new = self.PlotTrials_args
 
         self.max_distance_to_stop_for_GUAT_target = max_distance_to_stop_for_GUAT_target 
-        self.max_allowed_time_since_last_visible = max_allowed_time_since_last_visible
+        self.max_allowed_time_since_last_vis = max_allowed_time_since_last_vis
 
 
     def find_GUAT_ff_aimed_at_from_manual_anno(self, manual_anno):
@@ -81,7 +81,7 @@ class ProcessGUATtrials:
                                                                             self.GUAT_trials_df,
                                                                             self.ff_dataframe,
                                                                             max_distance_to_stop_for_GUAT_target=self.max_distance_to_stop_for_GUAT_target,
-                                                                            max_allowed_time_since_last_visible=self.max_allowed_time_since_last_visible)
+                                                                            max_allowed_time_since_last_vis=self.max_allowed_time_since_last_vis)
 
 
     def make_GUAT_plot(self, trial, ff_near_stops, relevant_indices, additional_kwargs=None):
@@ -100,7 +100,7 @@ class ProcessGUATtrials:
             for key, value in additional_kwargs.items():
                 plotting_kwargs_temp[key] = value
 
-        duration = [self.ff_caught_T_sorted[trial-num_trials], self.ff_caught_T_sorted[trial]]
+        duration = [self.ff_caught_T_new[trial-num_trials], self.ff_caught_T_new[trial]]
         returned_info = plot_trials.PlotTrials(duration, 
                     *self.PlotTrials_args,
                     **plotting_kwargs_temp,
@@ -198,7 +198,7 @@ class ProcessGUATtrials:
         ff_indices_of_each_cluster = self.GUAT_w_ff_df['nearby_alive_ff_indices'].values
         GUAT_last_stop_time = self.GUAT_w_ff_df['last_stop_time'].values
 
-        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_df(ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=self.GUAT_w_ff_df['cluster_index'].values)
+        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_last_vis_df(ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=self.GUAT_w_ff_df['cluster_index'].values)
 
         self.GUAT_cluster_df.rename(columns={'cluster_identifier': 'cluster_index'}, inplace=True)
         
@@ -207,7 +207,7 @@ class ProcessGUATtrials:
                                                           on='cluster_index', how='left')
 
         # to prepare for free selection 
-        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = self.GUAT_cluster_df['last_stop_time'] - self.GUAT_cluster_df['time_since_last_visible']
+        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = self.GUAT_cluster_df['last_stop_time'] - self.GUAT_cluster_df['time_since_last_vis']
 
         # sort by last_stop_time (note that the order in GUAT_cluster_df will henceforward be different from other variables)
         self.GUAT_cluster_df.sort_values(by='last_stop_time', inplace=True)

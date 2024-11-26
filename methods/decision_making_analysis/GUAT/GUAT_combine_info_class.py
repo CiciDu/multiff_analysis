@@ -196,7 +196,7 @@ class GUATProcessCombinedInfo(GUATCombineInfoAcrossSessions):
     def find_input_and_output(self,
                               add_arc_info=False,
                               add_current_curvature_of_traj=False,
-                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible', 'time_till_next_visible'],
+                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis', 'time_till_next_visible'],
                               add_num_ff_in_cluster=False,
                               arc_info_to_add=['curv_diff', 'abs_curv_diff'],
                               ):
@@ -212,7 +212,7 @@ class GUATProcessCombinedInfo(GUATCombineInfoAcrossSessions):
 
         self.GUAT_joined_ff_info = pd.concat([self.GUAT_current_ff_info, self.GUAT_alt_ff_info], axis=0)
         self.ff_attributes = ff_attributes.copy()
-        self.attributes_for_plotting = ['ff_distance', 'ff_angle', 'time_since_last_visible']
+        self.attributes_for_plotting = ['ff_distance', 'ff_angle', 'time_since_last_vis']
         if 'time_till_next_visible' in self.ff_attributes:
             self.attributes_for_plotting.append('time_till_next_visible')
 
@@ -241,7 +241,7 @@ class GUATProcessCombinedInfo(GUATCombineInfoAcrossSessions):
 
 
     def prepare_data_for_machine_learning(self, furnish_with_trajectory_data=True,
-                                          traj_ff_attributes_to_add=['time_since_last_visible', 'ff_distance', 'ff_angle', 'curv_diff'],):
+                                          traj_ff_attributes_to_add=['time_since_last_vis', 'ff_distance', 'ff_angle', 'curv_diff'],):
         '''
         X_all: the input data for machine learning
         input_features: the names of the input features

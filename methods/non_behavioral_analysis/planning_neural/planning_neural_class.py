@@ -92,7 +92,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
         self.curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
                                                          remove_invalid_rows=True,
                                                         monkey_information=self.monkey_information,
-                                                        ff_caught_T_sorted=self.ff_caught_T_sorted)
+                                                        ff_caught_T_new=self.ff_caught_T_new)
         self.curv_df.set_index('point_index', inplace=True)
         #self.curv_df['point_index'] = self.curv_df.index
         info_to_add, columns_added = planning_neural_utils.add_curv_info_to_info_to_add(info_to_add, self.curv_df, which_ff_info)

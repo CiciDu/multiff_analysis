@@ -244,7 +244,7 @@ def calculate_change_in_abs_ff_angle(current_ff_index, angles_to_ff, angles_to_b
 
     
 
-def distance_traveled(currentTrial, ff_caught_T_sorted, monkey_information):
+def get_cum_distance_traveled(currentTrial, ff_caught_T_new, monkey_information):
     """
     Find the length of the trajectory run by the monkey in the current trial
 
@@ -252,7 +252,7 @@ def distance_traveled(currentTrial, ff_caught_T_sorted, monkey_information):
     ----------
     currentTrial: numeric
         the number of current trial 
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     monkey_information: df
         containing the speed, angle, and location of the monkey at various points of time
@@ -264,7 +264,7 @@ def distance_traveled(currentTrial, ff_caught_T_sorted, monkey_information):
         the length of the trajectory run by the monkey in the current trial
 
     """
-    duration = [ff_caught_T_sorted[currentTrial-1], ff_caught_T_sorted[currentTrial]]
+    duration = [ff_caught_T_new[currentTrial-1], ff_caught_T_new[currentTrial]]
     cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
     distance = 0
     if len(cum_iloc_indices) > 1:
@@ -276,7 +276,7 @@ def distance_traveled(currentTrial, ff_caught_T_sorted, monkey_information):
 
 
 
-def abs_displacement(currentTrial, ff_caught_T_sorted, monkey_information, ff_believed_position_sorted):
+def get_distance_between_two_points(currentTrial, ff_caught_T_new, monkey_information, ff_believed_position_sorted):
     """
     Find the absolute displacement between the target for the currentTrial and the target for currentTrial.
     Return 9999 if the monkey has hit the border at one point.
@@ -285,7 +285,7 @@ def abs_displacement(currentTrial, ff_caught_T_sorted, monkey_information, ff_be
     ----------
     currentTrial: numeric
         the number of current trial 
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     monkey_information: df
         containing the speed, angle, and location of the monkey at various points of time
@@ -300,7 +300,7 @@ def abs_displacement(currentTrial, ff_caught_T_sorted, monkey_information, ff_be
         returns 9999 if the monkey has hit the border at any point during the trial
 
     """
-    duration = [ff_caught_T_sorted[currentTrial-1], ff_caught_T_sorted[currentTrial]]
+    duration = [ff_caught_T_new[currentTrial-1], ff_caught_T_new[currentTrial]]
     cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
     displacement = 0
     if len(cum_iloc_indices) > 1:
@@ -409,25 +409,25 @@ def save_df_to_csv(df, df_name, data_folder_name, exists_ok=False):
             print("new", df_name, "is stored in ", filepath)
 
 
-def find_currentTrial_or_num_trials_or_duration(ff_caught_T_sorted, currentTrial=None, num_trials=None, duration=None):
+def find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial=None, num_trials=None, duration=None):
     # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
     if duration is None:
-        duration = [ff_caught_T_sorted[currentTrial-num_trials], ff_caught_T_sorted[currentTrial]]
-    # elif duration[1] > ff_caught_T_sorted[-1]:
-    #    raise ValueError("The second element of duration must be smaller than the last element of ff_caught_T_sorted")
+        duration = [ff_caught_T_new[currentTrial-num_trials], ff_caught_T_new[currentTrial]]
+    # elif duration[1] > ff_caught_T_new[-1]:
+    #    raise ValueError("The second element of duration must be smaller than the last element of ff_caught_T_new")
            
     if currentTrial is None:   
         try:
-            if len(ff_caught_T_sorted) > 0:
+            if len(ff_caught_T_new) > 0:
                 # Take the max of the results from two similar methods
                 # Method 1:
-                earlier_trials = np.where(ff_caught_T_sorted <= duration[1])[0]
+                earlier_trials = np.where(ff_caught_T_new <= duration[1])[0]
                 if len(earlier_trials) > 0:
                     currentTrial = earlier_trials[-1]
                 else:
                     currentTrial = 1
                 # Method 2:
-                later_trials = np.where(ff_caught_T_sorted >= duration[0])[0]
+                later_trials = np.where(ff_caught_T_new >= duration[0])[0]
                 if len(later_trials) > 0:
                     currentTrial_2 = later_trials[0]
                 else:
@@ -438,8 +438,8 @@ def find_currentTrial_or_num_trials_or_duration(ff_caught_T_sorted, currentTrial
             currentTrial = None
     if num_trials is None: 
         try:
-            if len(ff_caught_T_sorted) > 0:
-                trials_after_first_capture = np.where(ff_caught_T_sorted <= duration[0])[0]
+            if len(ff_caught_T_new) > 0:
+                trials_after_first_capture = np.where(ff_caught_T_new <= duration[0])[0]
                 if len(trials_after_first_capture) > 0:
                     num_trials = max(1, currentTrial-trials_after_first_capture[-1])
                 else:

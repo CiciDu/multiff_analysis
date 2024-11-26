@@ -42,15 +42,15 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def find_patterns(self):
         self.n_ff_in_a_row = pattern_by_trials.n_ff_in_a_row_func(self.ff_believed_position_sorted, distance_between_ff = 50)
         self.two_in_a_row = np.where(self.n_ff_in_a_row==2)[0]
-        self.two_in_a_row_simul, self.two_in_a_row_non_simul = pattern_by_trials.whether_current_and_last_targets_are_captured_simultaneously(self.two_in_a_row, self.ff_caught_T_sorted)
+        self.two_in_a_row_simul, self.two_in_a_row_non_simul = pattern_by_trials.whether_current_and_last_targets_are_captured_simultaneously(self.two_in_a_row, self.ff_caught_T_new)
         self.three_in_a_row= np.where(self.n_ff_in_a_row==3)[0]
         self.four_in_a_row= np.where(self.n_ff_in_a_row==4)[0]
-        self.on_before_last_one_trials = pattern_by_trials.on_before_last_one_func(self.ff_flash_end_sorted, self.ff_caught_T_sorted, self.caught_ff_num)
-        self.on_before_last_one_simul, self.on_before_last_one_non_simul = pattern_by_trials.whether_current_and_last_targets_are_captured_simultaneously(self.on_before_last_one_trials, self.ff_caught_T_sorted)
+        self.on_before_last_one_trials = pattern_by_trials.on_before_last_one_func(self.ff_flash_end_sorted, self.ff_caught_T_new, self.caught_ff_num)
+        self.on_before_last_one_simul, self.on_before_last_one_non_simul = pattern_by_trials.whether_current_and_last_targets_are_captured_simultaneously(self.on_before_last_one_trials, self.ff_caught_T_new)
         self.visible_before_last_one_trials = pattern_by_trials.visible_before_last_one_func(self.ff_dataframe)
         self.used_cluster = np.intersect1d(self.two_in_a_row_non_simul, self.visible_before_last_one_trials)
         self.disappear_latest_trials = pattern_by_trials.disappear_latest_func(self.ff_dataframe)
-        self.cluster_around_target_trials, self.cluster_around_target_indices, self.cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(self.ff_dataframe, self.caught_ff_num, self.ff_caught_T_sorted, self.ff_real_position_sorted, max_time_apart = 1.25)
+        self.cluster_around_target_trials, self.cluster_around_target_indices, self.cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(self.ff_dataframe, self.caught_ff_num, self.ff_caught_T_new, self.ff_real_position_sorted, max_time_apart = 1.25)
         self.waste_cluster_around_target_trials = np.intersect1d(self.cluster_around_target_trials+1, np.where(self.n_ff_in_a_row == 1)[0])
         self.ignore_sudden_flash_trials, self.ignore_sudden_flash_indices, self.ignore_sudden_flash_indices_for_anim, self.ignored_ff_target_pairs = pattern_by_trials.ignore_sudden_flash_func(self.ff_dataframe, self.ff_real_position_sorted, self.max_point_index, max_ff_distance_from_monkey = 50)
         self.ignore_sudden_flash_time = self.monkey_information['monkey_t'][self.ignore_sudden_flash_indices]
@@ -73,12 +73,12 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def get_try_a_few_times_info(self):
 
-        self.try_a_few_times_trials, self.TAFT_indices_df, self.TAFT_trials_df, self.try_a_few_times_indices_for_anim = find_GUAT_or_TAFT_trials.try_a_few_times_func(self.monkey_information, self.ff_caught_T_sorted, self.closest_stop_to_capture_df, self.ff_real_position_sorted, max_point_index=self.max_point_index)
+        self.try_a_few_times_trials, self.TAFT_indices_df, self.TAFT_trials_df, self.try_a_few_times_indices_for_anim = find_GUAT_or_TAFT_trials.try_a_few_times_func(self.monkey_information, self.ff_caught_T_new,  self.ff_real_position_sorted, max_point_index=self.max_point_index)
 
 
     def get_give_up_after_trying_info(self):
 
-        self.give_up_after_trying_trials, self.GUAT_indices_df, self.GUAT_trials_df, self.GUAT_point_indices_for_anim = find_GUAT_or_TAFT_trials.give_up_after_trying_func(self.monkey_information, self.ff_caught_T_sorted, self.ff_real_position_sorted, max_point_index=self.max_point_index)
+        self.give_up_after_trying_trials, self.GUAT_indices_df, self.GUAT_trials_df, self.GUAT_point_indices_for_anim = find_GUAT_or_TAFT_trials.give_up_after_trying_func(self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, max_point_index=self.max_point_index)
         self.give_up_after_trying_indices = self.GUAT_indices_df['point_index'].values
         self.give_up_after_trying_info_bundle = (self.give_up_after_trying_trials, self.GUAT_point_indices_for_anim, self.GUAT_indices_df, self.GUAT_trials_df)                                                                                                                                                                                                                                           
 
@@ -104,7 +104,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if self.pattern_frequencies is None:
             if getattr(self, 'monkey_information', None) is None:
                 self.retrieve_or_make_monkey_data(already_made_ok=True)
-            self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_sorted, self.monkey_information, data_folder_name = self.patterns_and_features_data_folder_path)
+            self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_new, self.monkey_information, data_folder_name = self.patterns_and_features_data_folder_path)
             print("made pattern_frequencies")
 
 
@@ -115,7 +115,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if self.all_trial_features is None:   
             if getattr(self, 'cluster_around_target_indices', None) is None:
                 self.prepare_to_find_patterns_and_features()             
-            self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_sorted, self.ff_closest_stop_time_sorted, self.cluster_around_target_indices,\
+            self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.cluster_around_target_indices,\
                                                               self.ff_real_position_sorted, self.ff_believed_position_sorted, data_folder_name = self.patterns_and_features_data_folder_path)
             print("made all_trial_features")
 
@@ -134,7 +134,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def make_info_of_monkey(self):
         self.info_of_monkey = {"monkey_information": self.monkey_information,
                                 "ff_dataframe": self.ff_dataframe,
-                                "ff_caught_T_sorted": self.ff_caught_T_sorted,
+                                "ff_caught_T_new": self.ff_caught_T_new,
                                 "ff_real_position_sorted": self.ff_real_position_sorted,
                                 "ff_believed_position_sorted": self.ff_believed_position_sorted,
                                 "ff_life_sorted": self.ff_life_sorted,
@@ -164,18 +164,18 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def plot_trials_from_a_category(self, category_name, max_trial_to_plot, trials=None, additional_kwargs=None, images_dir=None, using_subplots=False, figsize=(10, 10)):
         category = self.all_categories[category_name]
         plot_behaviors_utils.plot_trials_from_a_category(category, category_name, max_trial_to_plot, self.PlotTrials_args, self.all_category_kwargs, 
-                                    self.ff_caught_T_sorted, trials=trials, additional_kwargs=additional_kwargs, images_dir=images_dir, using_subplots=using_subplots, figsize=figsize)
+                                    self.ff_caught_T_new, trials=trials, additional_kwargs=additional_kwargs, images_dir=images_dir, using_subplots=using_subplots, figsize=figsize)
 
 
 
     def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left = False, max_num_frames=150, max_duration=30, min_duration=1, rotated=True): 
         # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
-        currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(self.ff_caught_T_sorted, currentTrial, num_trials, duration)
+        currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(self.ff_caught_T_new, currentTrial, num_trials, duration)
         
         # if the duration is too short, then increase the number of trials
         while duration[1] - duration[0] < 0.1:
             num_trials = num_trials+1
-            duration = [self.ff_caught_T_sorted[currentTrial-num_trials], self.ff_caught_T_sorted[currentTrial]]
+            duration = [self.ff_caught_T_new[currentTrial-num_trials], self.ff_caught_T_new[currentTrial]]
         
         if static_plot_on_the_left:
             self.fig, self.ax = self._make_static_plot_on_the_left(currentTrial=currentTrial, num_trials=num_trials, duration=duration, animation_plot_kwargs=animation_plot_kwargs)
@@ -195,7 +195,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                                          max_duration=30, min_duration=1, rotated=True):
         self.num_frames, self.anim_monkey_info, self.flash_on_ff_dict, self.alive_ff_dict, self.believed_ff_dict, self.new_num_trials, self.ff_dataframe_anim \
                 = animation_utils.prepare_for_animation(
-                self.ff_dataframe, self.ff_caught_T_sorted, self.ff_life_sorted, self.ff_believed_position_sorted, 
+                self.ff_dataframe, self.ff_caught_T_new, self.ff_life_sorted, self.ff_believed_position_sorted, 
                 self.ff_real_position_sorted, self.ff_flash_sorted, self.monkey_information, k=k, currentTrial=currentTrial, num_trials=num_trials, duration=duration,
                 max_duration=max_duration, min_duration=min_duration, rotated=rotated)
         print("Number of frames is:", self.num_frames)
@@ -205,7 +205,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             while self.num_frames > 150:
                 self.k = self.k + 1
                 self.num_frames, self.anim_monkey_info, self.flash_on_ff_dict, self.alive_ff_dict, self.believed_ff_dict, self.new_num_trials, self.ff_dataframe_anim \
-                        = animation_utils.prepare_for_animation(self.ff_dataframe, self.ff_caught_T_sorted, self.ff_life_sorted, self.ff_believed_position_sorted, 
+                        = animation_utils.prepare_for_animation(self.ff_dataframe, self.ff_caught_T_new, self.ff_life_sorted, self.ff_believed_position_sorted, 
                         self.ff_real_position_sorted, self.ff_flash_sorted, self.monkey_information, k = self.k, currentTrial=currentTrial, num_trials=num_trials, 
                         duration=duration)
         print("Number of frames for the animation is:", self.num_frames)
@@ -213,7 +213,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def _make_static_plot_on_the_left(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None):
         self.fig = plt.figure(figsize=(14.5, 7))
-        PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_sorted)
+        PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
 
         if animation_plot_kwargs is None:
             animation_plot_kwargs = self.animation_plot_kwargs
@@ -250,7 +250,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.annotation_info = animation_utils.make_annotation_info(self.caught_ff_num+1, self.max_point_index, self.n_ff_in_a_row, self.visible_before_last_one_trials, self.disappear_latest_trials, \
                                                                        self.ignore_sudden_flash_indices, self.GUAT_indices_df['point_index'].values, self.try_a_few_times_indices)
             animate_func = partial(animation_func.animate_annotated, ax=self.ax, anim_monkey_info=self.anim_monkey_info, ff_dataframe_anim=self.ff_dataframe_anim, \
-                                   flash_on_ff_dict=self.flash_on_ff_dict, alive_ff_dict=self.alive_ff_dict, believed_ff_dict=self.believed_ff_dict, ff_caught_T_sorted=self.ff_caught_T_sorted, annotation_info=self.annotation_info,
+                                   flash_on_ff_dict=self.flash_on_ff_dict, alive_ff_dict=self.alive_ff_dict, believed_ff_dict=self.believed_ff_dict, ff_caught_T_new=self.ff_caught_T_new, annotation_info=self.annotation_info,
                                    plot_time_index=plot_time_index, **animate_kwargs)
         else:
             animate_func = partial(animation_func.animate, ax=self.ax, anim_monkey_info=self.anim_monkey_info, ff_dataframe_anim=self.ff_dataframe_anim,\

@@ -100,7 +100,7 @@ def animate(frame, ax, anim_monkey_info, margin, ff_dataframe_anim, flash_on_ff_
 
 
     # #Plot target
-    # trial_num = np.where(ff_caught_T_sorted > anim_t[frame])[0][0]
+    # trial_num = np.where(ff_caught_T_new > anim_t[frame])[0][0]
     # ax.scatter(ff_real_position_sorted[trial_num][0], ff_real_position_sorted[trial_num][1], marker='*', c='blue', s = 130, alpha = 0.5)
 
     # Plot the reward boundaries of visible fireflies (if ff_x_noisy is included in the columns of visible_ffs, then plot the noisy reward boundaries as well)
@@ -185,7 +185,7 @@ def animate(frame, ax, anim_monkey_info, margin, ff_dataframe_anim, flash_on_ff_
 
 
 def animate_annotated(frame, ax, anim_monkey_info, margin, ff_dataframe_anim, \
-                      flash_on_ff_dict, alive_ff_dict, believed_ff_dict, ff_caught_T_sorted, annotation_info,
+                      flash_on_ff_dict, alive_ff_dict, believed_ff_dict, ff_caught_T_new, annotation_info,
                       **animate_kwargs):
     
     """
@@ -211,7 +211,7 @@ def animate_annotated(frame, ax, anim_monkey_info, margin, ff_dataframe_anim, \
     believed_ff_dict: dictionary
         contains the locations of the captured fireflies that have been captured during a trial up to each time point;
         the indices are cummulative
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     annotation_info: dictionary
         containing the information needed for the annotation of animation 
@@ -226,7 +226,7 @@ def animate_annotated(frame, ax, anim_monkey_info, margin, ff_dataframe_anim, \
     animate(frame, ax, anim_monkey_info, margin, ff_dataframe_anim, flash_on_ff_dict, alive_ff_dict, believed_ff_dict, **animate_kwargs)
     index = anim_monkey_info['anim_indices'][frame]
     time = anim_monkey_info['anim_t'][frame]
-    trial_num = np.where(ff_caught_T_sorted > time)[0][0]
+    trial_num = np.where(ff_caught_T_new > time)[0][0]
     annotation = ""
     # If the monkey has captured more than one 1 ff in a cluster
     if annotation_info['n_ff_in_a_row'][trial_num] > 1:

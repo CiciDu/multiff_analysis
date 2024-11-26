@@ -164,7 +164,7 @@ class log_extractor(object):
 
         # get monkey data
         self.processed_data_folder_path = self.folder_path.replace('raw_monkey_data', 'processed_data')
-        monkey_information_path = os.path.join(self.folder_path, 'monkey_information.csv')
+        monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
         if exists(monkey_information_path) & monkey_information_exists_OK:
             print("Retrieved monkey_information")
             monkey_information = pd.read_csv(monkey_information_path).drop(["Unnamed: 0"], axis=1)
@@ -191,16 +191,16 @@ class log_extractor(object):
             #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
 
 
-        ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
+        ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
                 ff_flash_end_sorted = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path = self.folder_path)
 
 
-        monkey_information = process_monkey_information_after_retrieval(monkey_information, ff_caught_T_sorted, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
+        monkey_information = process_monkey_information_after_retrieval(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
 
-        return monkey_information, ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
+        return monkey_information, ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
 
 
-def process_monkey_information_after_retrieval(monkey_information, ff_caught_T_sorted, min_distance_to_calculate_angle=5):
+def process_monkey_information_after_retrieval(monkey_information, min_distance_to_calculate_angle=5):
     monkey_information = take_out_erroneous_information_from_monkey_information(monkey_information)
     monkey_information = add_columns_to_monkey_information(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
     monkey_information = monkey_information.reset_index(drop=True)
@@ -594,7 +594,7 @@ def unpack_ff_information_of_monkey(ff_information, accurate_end_time = None, ra
 
     Returns
     -------
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     ff_index_sorted: np.array
         containing the sorted indices of the fireflies
@@ -637,18 +637,18 @@ def unpack_ff_information_of_monkey(ff_information, accurate_end_time = None, ra
         ff_flash.append(ff_flash_currrent_ff)
         ff_flash_end.append(item['ff_flash_T'][-1][-1])
     sort_index = np.argsort(ff_caught_T)
-    ff_caught_T_sorted = ff_caught_T[sort_index]
-    # Use accurate juice timestamps, ff_caught_T_sorted for smr1 (so that the time frame is correct)
+    ff_caught_T_new = ff_caught_T[sort_index]
+    # Use accurate juice timestamps, ff_caught_T_new for smr1 (so that the time frame is correct)
  
-    captured_ffs = np.where((ff_caught_T_sorted <= min(accurate_end_time, 99999)))
-    ff_caught_T_sorted = ff_caught_T_sorted[captured_ffs]
+    captured_ffs = np.where((ff_caught_T_new <= min(accurate_end_time, 99999)))
+    ff_caught_T_new = ff_caught_T_new[captured_ffs]
     ff_index_sorted = ff_index[sort_index]
     ff_real_position_sorted = np.array(ff_real_position)[sort_index]
     ff_believed_position_sorted = np.array(ff_believed_position)[sort_index][captured_ffs]
     ff_life_sorted = np.array(ff_life)[sort_index]
     ff_flash_sorted = np.array(ff_flash, dtype=object)[sort_index].tolist()
     ff_flash_end_sorted = np.array(ff_flash_end)[sort_index]
-    return ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
+    return ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
 
 
 
@@ -698,16 +698,16 @@ def find_monkey_angles_for_signal_df(signal_df, monkey_information):
 
 def make_info_of_monkey(monkey_information, ff_information, ff_dataframe,  accurate_end_time = None, raw_data_folder_path = None):
     accurate_start_time, accurate_end_time = find_start_and_accurate_end_time(raw_data_folder_path)
-    ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted\
+    ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted\
         = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path=raw_data_folder_path)
     monkey_information = add_columns_to_monkey_information(monkey_information)
-    caught_ff_num = len(ff_caught_T_sorted)
-    cluster_around_target_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_sorted, ff_real_position_sorted, max_time_apart = 1.25)
+    caught_ff_num = len(ff_caught_T_new)
+    cluster_around_target_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted, max_time_apart = 1.25)
 
     info_of_monkey = {
             "monkey_information": monkey_information,
             "ff_dataframe": ff_dataframe,
-            "ff_caught_T_sorted": ff_caught_T_sorted,
+            "ff_caught_T_new": ff_caught_T_new,
             "ff_real_position_sorted": ff_real_position_sorted,
             "ff_believed_position_sorted": ff_believed_position_sorted,
             "ff_life_sorted": ff_life_sorted,
@@ -731,7 +731,7 @@ def turn_array_into_df(self, array, corresponding_t):
     info_num = [int(num) for num in array]
     info_dict = {'t': corresponding_t.tolist(), 'num': info_num}
     info_dataframe = pd.DataFrame(info_dict)
-    info_dataframe['trial']=np.searchsorted(ff_caught_T_sorted, corresponding_t)
+    info_dataframe['trial']=np.searchsorted(ff_caught_T_new, corresponding_t)
     return info_dataframe
 
 

@@ -2,7 +2,7 @@ import sys
 from visualization import plot_behaviors_utils
 from pattern_discovery import ff_dataframe_utils
 from data_wrangling import basic_func
-
+from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
 
 import os
 import numpy as np
@@ -138,7 +138,7 @@ def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey = 500, max_c
 
 
 
-def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_sorted):
+def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_new):
 	"""
   Find clusters of fireflies that appear during a trial based on point_vs_cluster
 
@@ -149,7 +149,7 @@ def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_sorte
   	structure: [[point_index, ff_index, cluster_label], [point_index, ff_index, cluster_label], ...]
   monkey_information: df
     containing the speed, angle, and location of the monkey at various points of time
-  ff_caught_T_sorted: np.array
+  ff_caught_T_new: np.array
     containing the time when each captured firefly gets captured
 
   Returns
@@ -174,9 +174,9 @@ def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_sorte
 	corresponding_t = monkey_information['monkey_t'].values[np.array(temp_dataframe3['point_index'])]
 	temp_dataframe3['time'] = corresponding_t
 	# From the time of each point, find the target index that corresponds to that point
-	temp_dataframe3['target_index'] = np.searchsorted(ff_caught_T_sorted, corresponding_t)
+	temp_dataframe3['target_index'] = np.searchsorted(ff_caught_T_new, corresponding_t)
 	# Only keep the part of the data up to the capture of the last firefly
-	temp_dataframe3 = temp_dataframe3[temp_dataframe3['target_index'] < len(ff_caught_T_sorted)]
+	temp_dataframe3 = temp_dataframe3[temp_dataframe3['target_index'] < len(ff_caught_T_new)]
 	# Thus we have the information of the clusters for each time point that has at least one cluster
 	cluster_dataframe_point = temp_dataframe3
 	# By grouping the information into trials, we can have the information of the clusters for each trial that has at least one cluster;
@@ -189,7 +189,7 @@ def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_sorte
 	return cluster_exist_trials, cluster_dataframe_point, cluster_dataframe_trial
 
 
-def find_ff_clusters(ff_positions, ff_real_position_sorted, array_of_start_time_of_evaluation, array_of_end_time_of_evaluation, ff_life_sorted, max_distance=50,
+def find_alive_ff_clusters(ff_positions, ff_real_position_sorted, array_of_start_time_of_evaluation, array_of_end_time_of_evaluation, ff_life_sorted, max_distance=50,
                      empty_cluster_ok=False):
     ff_indices_of_each_cluster = []
     ff_num = len(array_of_start_time_of_evaluation)
@@ -217,69 +217,64 @@ def turn_list_of_ff_clusters_info_into_dataframe(ff_clusters, all_point_index):
     return ff_cluster_df
 
 
-def find_target_clusters(ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted, max_distance=50):
-    ff_indices_of_each_cluster = find_ff_clusters(ff_real_position_sorted, ff_real_position_sorted, ff_caught_T_sorted-10, ff_caught_T_sorted+10, ff_life_sorted, max_distance=max_distance)
-    return ff_indices_of_each_cluster
-
-
-
-
-def find_ff_cluster_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_cluster, ff_dataframe, cluster_identifiers=None):
+def find_ff_cluster_last_vis_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_cluster, ff_dataframe, 
+                                duration_of_evaluation=5,
+                                cluster_identifiers=None):
     # ff_indices_of_each_cluster: a list; each item in ff_indices_of_each_cluster should contain at least one ff index
     
     print("Finding information of clusters ...")   
     if cluster_identifiers is None:
         cluster_identifiers = list(range(len(time_of_evaluation_for_each_cluster)))
-    row_indices = []
+    list_of_cluster_identifier = []
     nearby_alive_ff_indices = []
-    ff_cluster_last_visible_point_index = []
-    ff_cluster_last_visible_time = []
-    ff_cluster_last_visible_distances = []
-    ff_cluster_last_visible_angles = []
-    ff_cluster_last_visible_angles_to_boundary = []
-    latest_visible_ff_indices = []
+    last_vis_point_index = []
+    last_vis_ff_index = []
+    time_since_last_vis = []
+    last_vis_dist = []
+    last_vis_ang = []
+    last_vis_ang_to_bndry = []
     ff_dataframe = ff_dataframe[ff_dataframe['visible']==1].copy()
     for i in range(len(time_of_evaluation_for_each_cluster)):
         time_of_evaluation = time_of_evaluation_for_each_cluster[i]
         ff_indices_in_a_cluster = ff_indices_of_each_cluster[i]
-        ff_dataframe_subset = ff_dataframe[(ff_dataframe['time'] <= time_of_evaluation)].copy()
+        ff_dataframe_subset = ff_dataframe[(ff_dataframe['time'].between(time_of_evaluation-duration_of_evaluation, time_of_evaluation))].copy()
         ff_dataframe_subset = ff_dataframe_subset[ff_dataframe_subset['ff_index'].isin(ff_indices_in_a_cluster)]
 
         if len(ff_dataframe_subset) > 0:
-            row_indices.append(cluster_identifiers[i])
+            list_of_cluster_identifier.append(cluster_identifiers[i])
             nearby_alive_ff_indices.append(ff_indices_in_a_cluster)
             latest_visible_ff = ff_dataframe_subset.loc[ff_dataframe_subset['time'].idxmax()]
-            latest_visible_ff_indices.append(latest_visible_ff['ff_index'])
-            ff_cluster_last_visible_point_index.append(latest_visible_ff['point_index'])
-            ff_cluster_last_visible_time.append(time_of_evaluation - latest_visible_ff['time'])
-            ff_cluster_last_visible_distances.append(latest_visible_ff['ff_distance'])
-            ff_cluster_last_visible_angles.append(latest_visible_ff['ff_angle'])
-            ff_cluster_last_visible_angles_to_boundary.append(latest_visible_ff['ff_angle_boundary'])
+            last_vis_ff_index.append(latest_visible_ff['ff_index'])
+            last_vis_point_index.append(latest_visible_ff['point_index'])
+            time_since_last_vis.append(time_of_evaluation - latest_visible_ff['time'])
+            last_vis_dist.append(latest_visible_ff['ff_distance'])
+            last_vis_ang.append(latest_visible_ff['ff_angle'])
+            last_vis_ang_to_bndry.append(latest_visible_ff['ff_angle_boundary'])
 
         if i%100==0:
             print(i, 'out of', len(time_of_evaluation_for_each_cluster))
 
 
     # make the lists above into a dataframe
-    ff_cluster_df = pd.DataFrame({'cluster_identifier': row_indices, 
-                                'latest_visible_ff_indices': latest_visible_ff_indices,
+    ff_cluster_df = pd.DataFrame({'cluster_identifier': list_of_cluster_identifier, 
+                                'last_vis_ff_index': last_vis_ff_index,
                                 'nearby_alive_ff_indices': nearby_alive_ff_indices, 
-                                'last_visible_point_index': ff_cluster_last_visible_point_index,
-                                'time_since_last_visible': ff_cluster_last_visible_time,
-                                'last_visible_distances': ff_cluster_last_visible_distances,
-                                'last_visible_angles': ff_cluster_last_visible_angles,
-                                'last_visible_angles_to_boundary': ff_cluster_last_visible_angles_to_boundary})
+                                'last_vis_point_index': last_vis_point_index,
+                                'time_since_last_vis': time_since_last_vis,
+                                'last_vis_dist': last_vis_dist,
+                                'last_vis_ang': last_vis_ang,
+                                'last_vis_ang_to_bndry': last_vis_ang_to_bndry})
 
-    ff_cluster_df['abs_last_visible_angles'] = np.abs(ff_cluster_df['last_visible_angles'])
-    ff_cluster_df['abs_last_visible_angles_to_boundary'] = np.abs(ff_cluster_df['last_visible_angles_to_boundary'])    
+    ff_cluster_df['abs_last_vis_ang'] = np.abs(ff_cluster_df['last_vis_ang'])
+    ff_cluster_df['abs_last_vis_ang_to_bndry'] = np.abs(ff_cluster_df['last_vis_ang_to_bndry'])    
         
     return ff_cluster_df
 
 
 # The function below is similar as the function above
-def find_last_visible_time_of_a_cluster_before_a_time(list_of_ff_clusters, list_of_time, ff_dataframe):
+def find_last_vis_time_of_a_cluster_before_a_time(list_of_ff_clusters, list_of_time, ff_dataframe):
     # relevant_indices indicate
-    list_of_last_visible_time = []
+    list_of_last_vis_time = []
     for i in range(len(list_of_time)):
         indices_of_ff = list_of_ff_clusters[i]
         latest_time = list_of_time[i]
@@ -287,18 +282,182 @@ def find_last_visible_time_of_a_cluster_before_a_time(list_of_ff_clusters, list_
         ff_info = ff_dataframe.loc[ff_dataframe['time'] <= latest_time]
         ff_info = ff_info[ff_info['ff_index'].isin(indices_of_ff)]
         ff_info = ff_info[ff_info['visible']==1]
-        last_visible_time = ff_info.time.max()
-        list_of_last_visible_time.append(last_visible_time)
-    list_of_last_visible_time = np.array(list_of_last_visible_time)
-    return list_of_last_visible_time
+        last_vis_time = ff_info.time.max()
+        list_of_last_vis_time.append(last_vis_time)
+    list_of_last_vis_time = np.array(list_of_last_vis_time)
+    return list_of_last_vis_time
 
 
+def find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=50):
+    ff_indices_of_each_cluster = find_alive_ff_clusters(ff_real_position_sorted, ff_real_position_sorted, ff_caught_T_new-10, ff_caught_T_new+10, ff_life_sorted, max_distance=max_distance)
+    return ff_indices_of_each_cluster
 
-def find_target_cluster_df(ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted, ff_dataframe, max_distance=50):
-    
-    ff_indices_of_each_cluster = find_target_clusters(ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted, max_distance=max_distance)
-    target_cluster_df = find_ff_cluster_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_cluster=ff_caught_T_sorted, ff_dataframe=ff_dataframe, cluster_identifiers=None)
-    target_cluster_df['target_index'] = target_cluster_df['cluster_identifier']
-    target_cluster_df.drop(columns=['cluster_identifier'], inplace=True)
-    
+
+def find_target_cluster_df(monkey_information, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, max_distance=50,
+                           keep_all_rows=False):
+    ff_indices_of_each_cluster = find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=max_distance)
+    target_clust_last_vis_df = get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted)
+    target_clust_last_vis_df['nearby_alive_ff_indices'] = ff_indices_of_each_cluster
+    if not keep_all_rows:
+      # drop the rows whose last_vis_dist is 9999
+      target_cluster_df = target_clust_last_vis_df[target_clust_last_vis_df['last_vis_dist']!=9999].copy()
+      # also drop target_index = 0
+      target_cluster_df = target_cluster_df[target_cluster_df['target_index']!=0].copy()
+    else:
+      target_cluster_df = target_clust_last_vis_df
     return target_cluster_df
+
+def get_target_clust_last_vis_df(ff_dataframe, 
+                                monkey_information,
+                                ff_caught_T_new, 
+                                ff_real_position_sorted,
+                                duration_of_evaluation=3,
+                                max_distance_to_target_in_cluster=50):
+    """
+    Calculate metrics for the last visible target or target cluster.
+
+    Returns:
+    DataFrame: DataFrame containing the last visible metrics.
+    """
+
+    nearby_vis_ff_indices = []
+    last_vis_point_index = []  # Point index when target cluster was last visible
+    last_vis_ff_index = []  # Firefly index of the last visible firefly in the target cluster
+    time_since_last_vis = []  # Time since the  target cluster was last visible
+    last_vis_cum_dist = []  # Cumulative distance to the capture point when the target cluster was last visible
+    last_vis_dist = []  # Distance to the last visible firefly in the target cluster when it was last visible
+    last_vis_ang = []  # Angle to the last visible firefly in the target cluster when it was last visible
+    last_vis_ang_to_bndry = []  # Angle to the boundary of the last visible firefly in the target cluster when it was last visible
+    last_vis_target_dist = []  # Distance to the target when the last visible firefly in the target cluster was last visible
+    last_vis_target_ang = []  # Angle to the target when the last visible firefly in the target cluster was last visible
+    last_vis_target_ang_to_bndry = []  # Angle to the boundary of the target when the last visible firefly in the target cluster was last visible
+
+    ff_capture_rows = monkey_information.iloc[np.searchsorted(monkey_information['time'].values, ff_caught_T_new)]
+    visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
+
+    for i in range(len(ff_caught_T_new)):
+        # Subset of visible fireflies within the evaluation window
+        ff_info_sub = visible_ff[visible_ff['time'].between(ff_caught_T_new[i] - duration_of_evaluation, ff_caught_T_new[i])].copy()
+        ff_info_sub['ff_distance_to_target'] = LA.norm(ff_info_sub[['ff_x', 'ff_y']].values - ff_real_position_sorted[i], axis=1)
+        relevant_df = ff_info_sub[ff_info_sub['ff_distance_to_target'] < max_distance_to_target_in_cluster].copy()
+    
+        if not relevant_df.empty:
+            # Choose the row with the latest time and the closest distance to the target
+            relevant_df.sort_values(by=['point_index', 'ff_distance_to_target'], ascending=[True, False], inplace=True)
+            relevant_row = relevant_df.iloc[-1]
+            
+            last_vis_point_index.append(relevant_row['point_index'])
+            last_vis_ff_index.append(relevant_row['ff_index'])
+            time_since_last_vis.append(ff_caught_T_new[i] - relevant_row['time'])
+            last_vis_cum_dist.append(ff_capture_rows.iloc[i]['cum_distance'] - relevant_row['cum_distance'])
+            nearby_vis_ff_indices.append(relevant_df['ff_index'].unique().tolist())
+
+            last_vis_dist.append(relevant_row['ff_distance'])
+            last_vis_ang.append(relevant_row['ff_angle'])
+            last_vis_ang_to_bndry.append(relevant_row['ff_angle_boundary'])
+            last_vis_target_dist.append(LA.norm(relevant_row[['ff_x', 'ff_y']].values - ff_real_position_sorted[i]))
+            last_vis_target_ang.append(basic_func.calculate_angles_to_ff_centers(
+                ff_x=ff_real_position_sorted[i][0],
+                ff_y=ff_real_position_sorted[i][1],
+                mx=relevant_row['monkey_x'],
+                my=relevant_row['monkey_y'],
+                m_angle=relevant_row['monkey_angle']
+            ))
+            last_vis_target_ang_to_bndry.append(basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=last_vis_target_ang[-1],
+                                                                                    distances_to_ff=last_vis_target_dist[-1]
+                                                                                    ))
+        else:
+            last_vis_point_index.append(9999)
+            last_vis_ff_index.append(9999)
+            time_since_last_vis.append(9999)
+            last_vis_cum_dist.append(9999)
+            last_vis_dist.append(9999)
+            last_vis_ang.append(9999)
+            last_vis_ang_to_bndry.append(9999)
+            last_vis_target_dist.append(9999)
+            last_vis_target_ang.append(9999)
+            last_vis_target_ang_to_bndry.append(9999)
+            nearby_vis_ff_indices.append([])
+
+    target_clust_last_vis_df = pd.DataFrame({
+        'target_index': np.arange(len(ff_caught_T_new)),
+        'last_vis_point_index': last_vis_point_index,
+        'last_vis_ff_index': last_vis_ff_index,
+        'nearby_vis_ff_indices': nearby_vis_ff_indices,
+        'time_since_last_vis': time_since_last_vis,
+        'last_vis_cum_dist': last_vis_cum_dist,
+        'last_vis_dist': last_vis_dist,
+        'last_vis_ang': last_vis_ang,
+        'last_vis_ang_to_bndry': last_vis_ang_to_bndry,
+        'last_vis_target_dist': last_vis_target_dist,
+        'last_vis_target_ang': last_vis_target_ang,
+        'last_vis_target_ang_to_bndry': last_vis_target_ang_to_bndry
+    })
+    
+    target_clust_last_vis_df['abs_last_vis_ang'] = np.abs(target_clust_last_vis_df['last_vis_ang'])
+    target_clust_last_vis_df['abs_last_vis_ang_to_bndry'] = np.abs(target_clust_last_vis_df['last_vis_ang_to_bndry'])
+    target_clust_last_vis_df['abs_last_vis_target_ang'] = np.abs(target_clust_last_vis_df['last_vis_target_ang'])
+    target_clust_last_vis_df['abs_last_vis_target_ang_to_bndry'] = np.abs(target_clust_last_vis_df['last_vis_target_ang_to_bndry'])
+        
+    return target_clust_last_vis_df
+
+
+def get_target_last_vis_df(ff_dataframe, 
+                           monkey_information,
+                            ff_caught_T_new, 
+                            ff_real_position_sorted,
+                            duration_of_evaluation=3):
+    """
+    Calculate metrics for the last visible target or target cluster.
+    """
+
+    last_vis_point_index = []  # Point index when target was last visible
+    time_since_last_vis = []  # Time since the target was last visible
+    last_vis_cum_dist = []  # Cumulative distance to the capture point when the target was last visible
+    last_vis_dist = []  # Distance to the target when the target was last visible
+    last_vis_ang = []  # Angle to the target when the target was last visible
+    last_vis_ang_to_bndry = []  # Angle to the boundary of the target when the target was last visible
+
+    visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
+    ff_capture_rows = monkey_information.iloc[np.searchsorted(monkey_information['time'].values, ff_caught_T_new)]
+
+
+    for i in range(len(ff_caught_T_new)):
+        # Subset of visible fireflies within the evaluation window
+        ff_info_sub = visible_ff[visible_ff['time'].between(ff_caught_T_new[i] - duration_of_evaluation, ff_caught_T_new[i])].copy()
+        ff_info_sub['ff_distance_to_target'] = LA.norm(ff_info_sub[['ff_x', 'ff_y']].values - ff_real_position_sorted[i], axis=1)
+        relevant_df = ff_info_sub[ff_info_sub['ff_index'] == i].copy()
+
+        if not relevant_df.empty:
+            # Choose the row with the latest time and the closest distance to the target
+            relevant_df.sort_values(by=['point_index', 'ff_distance_to_target'], ascending=[True, False], inplace=True)
+            relevant_row = relevant_df.iloc[-1]
+            last_vis_point_index.append(relevant_row['point_index'])
+            time_since_last_vis.append(ff_caught_T_new[i] - relevant_row['time'])
+            last_vis_cum_dist.append(ff_capture_rows.iloc[i]['cum_distance'] - relevant_row['cum_distance'])
+            last_vis_dist.append(relevant_row['ff_distance'])
+            last_vis_ang.append(relevant_row['ff_angle'])
+            last_vis_ang_to_bndry.append(relevant_row['ff_angle_boundary'])
+        else:
+            last_vis_point_index.append(9999)
+            time_since_last_vis.append(9999)
+            last_vis_cum_dist.append(9999)
+            last_vis_dist.append(9999)
+            last_vis_ang.append(9999)
+            last_vis_ang_to_bndry.append(9999)
+
+    target_last_vis_df = pd.DataFrame({
+        'target_index': np.arange(len(ff_caught_T_new)),
+        'last_vis_point_index': last_vis_point_index,
+        'time_since_last_vis': time_since_last_vis,
+        'last_vis_cum_dist': last_vis_cum_dist,
+        'last_vis_dist': last_vis_dist,
+        'last_vis_ang': last_vis_ang,
+        'last_vis_ang_to_bndry': last_vis_ang_to_bndry
+    })
+
+    target_last_vis_df['abs_last_vis_ang'] = np.abs(target_last_vis_df['last_vis_ang'])
+    target_last_vis_df['abs_last_vis_ang_to_bndry'] = np.abs(target_last_vis_df['last_vis_ang_to_bndry'])
+
+    return target_last_vis_df
+

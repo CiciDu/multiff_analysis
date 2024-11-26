@@ -166,13 +166,13 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
     def _show_alt_ff_curv_in_scatterplot_func(self, y_column_name = 'curv_to_ff_center'):    
         if self.curv_of_traj_df is None:
             raise ValueError('curv_of_traj_df is None, so cannot show alt_ff_curv')
-        self.alt_ff_curv_df = plotly_preparation.find_alt_ff_curv_df(self.current_plotly_plot_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_sorted=self.ff_caught_T_sorted)
+        self.alt_ff_curv_df = plotly_preparation.find_alt_ff_curv_df(self.current_plotly_plot_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
         self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(self.fig_scatter_s, self.alt_ff_curv_df, name='Alt FF Curv to Center', color=self.alt_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-down')
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(self.fig_scatter_cm, self.alt_ff_curv_df, name='Alt FF Curv to Center', color=self.alt_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-down')
 
 
     def _show_stop_ff_curv_in_scatterplot_func(self, y_column_name = 'curv_to_ff_center'):
-        self.stop_ff_curv_df = plotly_preparation.find_stop_ff_curv_df(self.current_plotly_plot_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_sorted=self.ff_caught_T_sorted)
+        self.stop_ff_curv_df = plotly_preparation.find_stop_ff_curv_df(self.current_plotly_plot_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
         self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(self.fig_scatter_s, self.stop_ff_curv_df, name='Stop FF Curv to Center', color=self.stop_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-up')
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(self.fig_scatter_cm, self.stop_ff_curv_df, name='Stop FF Curv to Center', color=self.stop_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-up')
 

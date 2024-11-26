@@ -29,33 +29,33 @@ np.set_printoptions(suppress=True)
 class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
 
-    def get_current_ff_info_and_alt_ff_info_for_info_collection(self, max_cluster_distance=50, max_time_since_last_visible = 2.5, include_ff_in_near_future=True, duration_into_future=0.5, max_distance_to_stop=400,
-                                                                columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_visible'], last_seen_and_next_seen_attributes_to_add = ['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
+    def get_current_ff_info_and_alt_ff_info_for_info_collection(self, max_cluster_distance=50, max_time_since_last_vis = 2.5, include_ff_in_near_future=True, duration_into_future=0.5, max_distance_to_stop=400,
+                                                                columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_vis'], last_seen_and_next_seen_attributes_to_add = ['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
         
-        self.find_current_and_alternative_ff_info(columns_to_sort_alt_ff_by=columns_to_sort_alt_ff_by, max_cluster_distance=max_cluster_distance, max_time_since_last_visible=max_time_since_last_visible, 
+        self.find_current_and_alternative_ff_info(columns_to_sort_alt_ff_by=columns_to_sort_alt_ff_by, max_cluster_distance=max_cluster_distance, max_time_since_last_vis=max_time_since_last_vis, 
                                                   include_ff_in_near_future=include_ff_in_near_future, duration_into_future=duration_into_future, max_distance_to_stop=max_distance_to_stop)
         
 
         
         self.GUAT_current_ff_info, self.GUAT_alt_ff_info = GUAT_and_TAFT.add_curv_diff_and_ff_number_to_GUAT_current_ff_info_and_GUAT_alt_ff_info(self.GUAT_current_ff_info, self.GUAT_alt_ff_info, 
-                self.ff_caught_T_sorted, self.ff_real_position_sorted, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df
+                self.ff_caught_T_new, self.ff_real_position_sorted, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df
                 )
 
         # add time to self.GUAT_current_ff_info and self.GUAT_alt_ff_info
         self.GUAT_current_ff_info['time'] = self.monkey_information.loc[self.GUAT_current_ff_info['point_index'].values, 'monkey_t'].values
         self.GUAT_alt_ff_info['time'] = self.monkey_information.loc[self.GUAT_alt_ff_info['point_index'].values, 'monkey_t'].values
 
-        self.GUAT_current_ff_info = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.GUAT_current_ff_info, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_sorted, attributes_to_add=last_seen_and_next_seen_attributes_to_add, curv_of_traj_df=self.curv_of_traj_df)
-        self.GUAT_alt_ff_info = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.GUAT_alt_ff_info, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_sorted, attributes_to_add=last_seen_and_next_seen_attributes_to_add, curv_of_traj_df=self.curv_of_traj_df)
+        self.GUAT_current_ff_info = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.GUAT_current_ff_info, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new, attributes_to_add=last_seen_and_next_seen_attributes_to_add, curv_of_traj_df=self.curv_of_traj_df)
+        self.GUAT_alt_ff_info = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.GUAT_alt_ff_info, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new, attributes_to_add=last_seen_and_next_seen_attributes_to_add, curv_of_traj_df=self.curv_of_traj_df)
         self.last_seen_and_next_seen_attributes_to_add = last_seen_and_next_seen_attributes_to_add
 
         os.makedirs(self.GUAT_folder_path, exist_ok=True)
 
 
     def find_current_and_alternative_ff_info(self, 
-                                             columns_to_sort_alt_ff_by = ['abs_curv_diff', 'time_since_last_visible'], 
+                                             columns_to_sort_alt_ff_by = ['abs_curv_diff', 'time_since_last_vis'], 
                                              max_cluster_distance = 75, 
-                                             max_time_since_last_visible=2.5, 
+                                             max_time_since_last_vis=2.5, 
                                              max_distance_to_stop=400,
                                              include_ff_in_near_future=True, 
                                              duration_into_future=0.5):
@@ -63,11 +63,11 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
         print('Note, the current value for max_cluster_distance is', max_cluster_distance, '. Please make sure that this is the same value used to make the GUAT_w_ff_df.')
         GUAT_current_ff_info = GUAT_and_TAFT.find_GUAT_current_ff_info(self.GUAT_w_ff_df, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information, 
-                                                                       include_ff_in_near_future=include_ff_in_near_future, max_time_since_last_visible=max_time_since_last_visible, 
+                                                                       include_ff_in_near_future=include_ff_in_near_future, max_time_since_last_vis=max_time_since_last_vis, 
                                                                        max_cluster_distance=max_cluster_distance, duration_into_future=duration_into_future,
                                                                        max_distance_to_stop=max_distance_to_stop)
         GUAT_alt_ff_info = GUAT_and_TAFT.find_GUAT_alt_ff_info(GUAT_current_ff_info, self.ff_dataframe, self.ff_real_position_sorted, self.monkey_information, include_ff_in_near_future=include_ff_in_near_future,
-                                                               max_time_since_last_visible=max_time_since_last_visible, duration_into_future=duration_into_future,
+                                                               max_time_since_last_vis=max_time_since_last_vis, duration_into_future=duration_into_future,
                                                                max_distance_to_stop=max_distance_to_stop)
 
         GUAT_current_ff_info, GUAT_alt_ff_info = GUAT_and_TAFT.retain_useful_current_and_alt_info(GUAT_current_ff_info, GUAT_alt_ff_info)
@@ -86,7 +86,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.GUAT_current_ff_info = GUAT_and_TAFT.polish_GUAT_current_ff_info(GUAT_current_ff_info)
         self.GUAT_alt_ff_info = GUAT_and_TAFT.polish_GUAT_alt_ff_info(GUAT_alt_ff_info, GUAT_current_ff_info, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information, max_cluster_distance=max_cluster_distance, 
                                                                       columns_to_sort_alt_ff_by=columns_to_sort_alt_ff_by,
-                                                                      max_time_since_last_visible=max_time_since_last_visible, duration_into_future=duration_into_future)
+                                                                      max_time_since_last_vis=max_time_since_last_vis, duration_into_future=duration_into_future)
         
         self.GUAT_current_ff_info, self.GUAT_alt_ff_info = GUAT_and_TAFT.make_sure_GUAT_alt_ff_info_and_GUAT_current_ff_info_have_the_same_point_indices(self.GUAT_current_ff_info, self.GUAT_alt_ff_info)
 
@@ -156,7 +156,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                      
     
     def _add_one_stop_info_to_GUAT_w_ff_df(self):
-        one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_sorted)
+        one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(one_stop_df)
         self.one_stop_w_ff_df['cluster_index'] = np.arange(self.GUAT_w_ff_df['cluster_index'].max()+1, 
                                                       self.GUAT_w_ff_df['cluster_index'].max()+1+len(self.one_stop_w_ff_df))
@@ -189,7 +189,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             self.ff_life_sorted = self.data_item.ff_life_sorted
             self.ff_real_position_sorted = self.data_item.ff_real_position_sorted
             self.ff_believed_position_sorted = self.data_item.ff_believed_position_sorted
-            self.ff_caught_T_sorted = self.data_item.ff_caught_T_sorted
+            self.ff_caught_T_new = self.data_item.ff_caught_T_new
 
         if include_ff_dataframe:
             if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
@@ -227,7 +227,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
         if include_ff_dataframe:
             self.cluster_around_target_indices = None
-            self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_sorted)
+            self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
         
 
     def retrieve_or_make_GUAT_trials_df(self, exists_ok=True):
@@ -276,7 +276,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             self.curv_of_traj_df = self.curv_of_traj_df[['point_index', 'curvature_of_traj']]
             print('Retrieved curv_of_traj_df')
         else:
-            self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+            self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
             self.curv_of_traj_df = self.curv_of_traj_df[['point_index', 'curvature_of_traj']]
             self.curv_of_traj_df.to_csv(filepath)
             print(f'Made and saved curv_of_traj_df at {filepath}')
@@ -292,8 +292,8 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             raise ValueError('The point_index_all and the point_index in self.more_ff_df are not the same set.')
 
         # self.more_ff_df = cluster_replacement_utils.find_more_ff_df(self.point_index_all, self.ff_dataframe, self.ff_real_position_sorted, self.monkey_information, all_available_ff_in_near_future=self.all_available_ff_in_near_future, 
-        #                                                                   attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_visible', 'time_till_next_visible'])
-        # self.more_ff_df = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.more_ff_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_sorted,
+        #                                                                   attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis', 'time_till_next_visible'])
+        # self.more_ff_df = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.more_ff_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new,
         #                                                                                                   curv_of_traj_df=self.curv_of_traj_df, attributes_to_add=self.last_seen_and_next_seen_attributes_to_add)
         return self.more_ff_df
 
@@ -398,8 +398,8 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
 
         ff_info = decision_making_utils.find_many_ff_info_anew(new_traj_df.ff_index.values, new_traj_df.traj_point_index.values, self.ff_real_position_sorted, self.ff_dataframe_visible, self.monkey_information, add_time_till_next_visible=True, add_curv_diff=True,
-                                        ff_caught_T_sorted=self.curv_of_traj_df, truncate_curv_of_traj_by_time_of_capture=True, ff_radius=10, curv_of_traj_df=self.curv_of_traj_df)
-        ff_info = ff_info[['ff_index', 'point_index', 'time_since_last_visible', 'curv_diff', 'ff_distance', 'ff_angle']].copy()
+                                        ff_caught_T_new=self.curv_of_traj_df, truncate_curv_of_traj_by_time_of_capture=True, ff_radius=10, curv_of_traj_df=self.curv_of_traj_df)
+        ff_info = ff_info[['ff_index', 'point_index', 'time_since_last_vis', 'curv_diff', 'ff_distance', 'ff_angle']].copy()
         ff_info['traj_point_index'] = ff_info['point_index'].values.copy()
         try:
             ff_info['traj_relative_index'] = new_traj_df['traj_relative_index'].values.copy()
@@ -438,7 +438,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.GUAT_current_ff_info = pd.merge(self.GUAT_current_ff_info, curvature_df_sub, on=['ff_index', 'point_index'], how='left')
         self.GUAT_alt_ff_info = pd.merge(self.GUAT_alt_ff_info, curvature_df_sub, on=['ff_index', 'point_index'], how='left')
         self.more_ff_df = pd.merge(self.more_ff_df, curvature_df_sub, on=['ff_index', 'point_index'], how='left')
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_current_ff_info, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_alt_ff_info, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.more_ff_df, self.monkey_information, self.ff_caught_T_sorted, curv_of_traj_df=self.curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_current_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.GUAT_alt_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
+        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(self.more_ff_df, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
  

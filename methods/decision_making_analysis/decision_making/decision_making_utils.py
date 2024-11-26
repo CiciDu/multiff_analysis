@@ -26,7 +26,7 @@ np.set_printoptions(suppress=True)
 
 
 
-def find_time_since_last_visible_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe, time_since_last_visible=True, return_duration_of_last_visible_period=False):
+def find_time_since_last_vis_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe, time_since_last_vis=True, return_duration_of_last_vis_period=False):
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1]
     current_time_df = pd.DataFrame({'unique_id': np.arange(len(ff_indices)), 'ff_index': ff_indices, 'current_time': all_current_time})
@@ -35,29 +35,29 @@ def find_time_since_last_visible_OR_time_till_next_visible(ff_indices, all_curre
     ff_visible_df = ff_visible_df[['ff_index', 'time', 'point_index']].copy()
     # make sure that for each ff, the time in dataframe doesn't exceed the max time for that ff    
     ff_visible_df = pd.merge(ff_visible_df, current_time_df, how='left', on='ff_index')
-    if time_since_last_visible:
+    if time_since_last_vis:
         ff_visible_df = ff_visible_df[ff_visible_df['time'] <= ff_visible_df['current_time']]
     else:
         ff_visible_df = ff_visible_df[ff_visible_df['time'] > ff_visible_df['current_time']]
     # for each ff, get the last visible time before max time
-    whether_time_should_be_ascending = (time_since_last_visible==False)
+    whether_time_should_be_ascending = (time_since_last_vis==False)
     ff_visible_df.sort_values(['ff_index', 'time'], ascending=[True, whether_time_should_be_ascending], inplace=True)
-    ff_visible_df = add_time_when_last_visible_period_began_when_calculating_time_since_last_visible(ff_visible_df)
+    ff_visible_df = add_time_when_last_vis_period_began_when_calculating_time_since_last_vis(ff_visible_df)
     
     
     
     ff_visible_df = ff_visible_df.groupby(['ff_index', 'current_time']).first().reset_index(drop=False)
     # now, make sure we have info of all the ff's
     ff_visible_df = ff_visible_df.drop(columns=['ff_index', 'current_time'])
-    if time_since_last_visible:
+    if time_since_last_vis:
         ff_visible_df = pd.merge(ff_visible_df, current_time_df, how='right', on='unique_id').fillna(0)
-        ff_visible_df['time_since_last_visible'] = ff_visible_df['current_time'].values - ff_visible_df['time'].values
-        if return_duration_of_last_visible_period:
-            moment_when_ff_last_visible = ff_visible_df['current_time'] - ff_visible_df['time_since_last_visible']
-            ff_visible_df['duration_of_last_visible_period'] = moment_when_ff_last_visible - ff_visible_df['time_when_last_visible_period_began']
-            return ff_visible_df['time_since_last_visible'].values, ff_visible_df['duration_of_last_visible_period'].values
+        ff_visible_df['time_since_last_vis'] = ff_visible_df['current_time'].values - ff_visible_df['time'].values
+        if return_duration_of_last_vis_period:
+            moment_when_ff_last_vis = ff_visible_df['current_time'] - ff_visible_df['time_since_last_vis']
+            ff_visible_df['duration_of_last_vis_period'] = moment_when_ff_last_vis - ff_visible_df['time_when_last_vis_period_began']
+            return ff_visible_df['time_since_last_vis'].values, ff_visible_df['duration_of_last_vis_period'].values
         else:
-            return ff_visible_df['time_since_last_visible'].values
+            return ff_visible_df['time_since_last_vis'].values
     else:
         ff_visible_df = pd.merge(ff_visible_df, current_time_df, how='right', on='unique_id')
         ff_visible_df['time_till_next_visible'] = ff_visible_df['time'].values - ff_visible_df['current_time'].values
@@ -67,7 +67,7 @@ def find_time_since_last_visible_OR_time_till_next_visible(ff_indices, all_curre
 
 
 
-def add_time_when_last_visible_period_began_when_calculating_time_since_last_visible(ff_visible_df):
+def add_time_when_last_vis_period_began_when_calculating_time_since_last_vis(ff_visible_df):
     # oh shoot...i only want df within ff_index though
     ff_visible_df2 = ff_visible_df.copy()
     ff_visible_df2.sort_values(['ff_index', 'current_time', 'time'], ascending=[True, True, True], inplace=True)
@@ -75,15 +75,15 @@ def add_time_when_last_visible_period_began_when_calculating_time_since_last_vis
     # only keep the rows that mark the beginning of a new visible period
     ff_visible_df2 = ff_visible_df2[ff_visible_df2['point_index_diff'] > 1]
     ff_visible_df2 = ff_visible_df2.groupby(['ff_index', 'current_time']).last().reset_index(drop=False)
-    ff_visible_df2.rename(columns={'time': 'time_when_last_visible_period_began'}, inplace=True)
-    ff_visible_df2 = ff_visible_df2[['ff_index', 'current_time', 'time_when_last_visible_period_began']].copy()
+    ff_visible_df2.rename(columns={'time': 'time_when_last_vis_period_began'}, inplace=True)
+    ff_visible_df2 = ff_visible_df2[['ff_index', 'current_time', 'time_when_last_vis_period_began']].copy()
 
     ff_visible_df = ff_visible_df.merge(ff_visible_df2, how='left', on=['ff_index', 'current_time'])
     return ff_visible_df
 
 
 
-def find_attributes_of_ff_when_last_visible_OR_next_visible(ff_indices, all_current_time, ff_dataframe, use_last_seen=True, attributes=['ff_distance', 'ff_angle', 'curv_diff'],
+def find_attributes_of_ff_when_last_vis_OR_next_visible(ff_indices, all_current_time, ff_dataframe, use_last_seen=True, attributes=['ff_distance', 'ff_angle', 'curv_diff'],
                                                             additional_placeholder_mapping=None):
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1]
@@ -164,7 +164,7 @@ def fill_new_columns_with_placeholder_values(df, columns=['ff_distance', 'ff_ang
 def add_attributes_last_seen_or_next_seen_for_each_ff_in_df(df, ff_dataframe, attributes=['ff_distance', 'ff_angle', 'curv_diff'], use_last_seen=True, additional_placeholder_mapping=None):
     
     df = df.copy()
-    ff_info = find_attributes_of_ff_when_last_visible_OR_next_visible(df.ff_index.values, df.time.values, ff_dataframe, use_last_seen=use_last_seen, attributes=attributes,
+    ff_info = find_attributes_of_ff_when_last_vis_OR_next_visible(df.ff_index.values, df.time.values, ff_dataframe, use_last_seen=use_last_seen, attributes=attributes,
                                                                     additional_placeholder_mapping=additional_placeholder_mapping)
 
     ff_info = ff_info[attributes].copy()
@@ -202,8 +202,8 @@ def add_curv_diff_to_df(df, monkey_information, curv_of_traj_df, ff_real_positio
 
 
 def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=False, add_curv_diff=False,
-                           ff_caught_T_sorted=None, curv_of_traj_mode='time', window_for_curv_of_traj=None, truncate_curv_of_traj_by_time_of_capture=False, 
-                           ff_radius=10, curv_of_traj_df=None, add_duration_of_last_visible_period=True):
+                           ff_caught_T_new=None, curv_of_traj_mode='time', window_for_curv_of_traj=None, truncate_curv_of_traj_by_time_of_capture=False, 
+                           ff_radius=10, curv_of_traj_df=None, add_duration_of_last_vis_period=True):
     """
     Computes various information about multiple fireflies and their relationship to a monkey, given their indices and positions.
 
@@ -243,8 +243,8 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
     ff_angle = basic_func.calculate_angles_to_ff_centers(ff_x=ff_xy[:,0], ff_y=ff_xy[:,1], mx=monkey_xy[:,0], my=monkey_xy[:,1], m_angle=monkey_angle)
     ff_angle_boundary = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
     # find time since last visible
-    time_since_last_visible, duration_of_last_visible_period = find_time_since_last_visible_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe_visible, return_duration_of_last_visible_period=True)
-    #ff_info = pd.DataFrame([ff_distance, ff_angle, ff_angle_boundary, time_since_last_visible], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_visible'])
+    time_since_last_vis, duration_of_last_vis_period = find_time_since_last_vis_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe_visible, return_duration_of_last_vis_period=True)
+    #ff_info = pd.DataFrame([ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis'])
     ff_info = pd.DataFrame({'ff_index': ff_indices.astype(int),
                             'point_index': point_index.astype(int),
                             'time': all_current_time, 
@@ -253,21 +253,21 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
                             'ff_angle_boundary': ff_angle_boundary,
                             'abs_ff_angle': np.abs(ff_angle),
                             'abs_ff_angle_boundary': np.abs(ff_angle_boundary),
-                            'time_since_last_visible': time_since_last_visible,
+                            'time_since_last_vis': time_since_last_vis,
                             })
     if add_time_till_next_visible:
-        time_till_next_visible = find_time_since_last_visible_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe_visible, time_since_last_visible=False)
+        time_till_next_visible = find_time_since_last_vis_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe_visible, time_since_last_vis=False)
         ff_info['time_till_next_visible'] = time_till_next_visible
 
     if add_curv_diff:
         if curv_of_traj_df is None:
-            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_sorted, curv_of_traj_mode=curv_of_traj_mode, 
+            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, 
                                                                                                                   truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-        if (ff_caught_T_sorted is None):
-            raise ValueError('ff_caught_T_sortedshould be provided if add_curv_diff is True')
+        if (ff_caught_T_new is None):
+            raise ValueError('ff_caught_T_newshould be provided if add_curv_diff is True')
         ff_info = add_curv_diff_to_df(ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted, ff_radius_for_optimal_arc=ff_radius)
-    if add_duration_of_last_visible_period:
-        ff_info['duration_of_last_visible_period'] = duration_of_last_visible_period
+    if add_duration_of_last_vis_period:
+        ff_info['duration_of_last_vis_period'] = duration_of_last_vis_period
     return ff_info
 
 
@@ -290,11 +290,11 @@ def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_datafra
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible']==1]
     ff_visible_df = ff_dataframe_visible[(ff_dataframe_visible['ff_index']==ff_index) & (ff_dataframe_visible['time'] <= time)]
     if len(ff_visible_df) > 0:
-        ff_last_visible = ff_visible_df.time.max()
+        ff_last_vis = ff_visible_df.time.max()
     else:
-        ff_last_visible = 0   
+        ff_last_vis = 0   
    
-    time_since_last_visible = time-ff_last_visible
+    time_since_last_vis = time-ff_last_vis
 
     # we want to make sure that we're just using float or int, and there's no array
     if (isinstance(ff_angle, float) is False) & (isinstance(ff_angle, int) is False):
@@ -302,7 +302,7 @@ def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_datafra
     if (isinstance(ff_angle_boundary, float) is False) & (isinstance(ff_angle_boundary, int) is False):
         ff_angle_boundary = ff_angle_boundary[0]
 
-    return ff_distance, ff_angle, ff_angle_boundary, time_since_last_visible
+    return ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis
 
 
 
@@ -316,23 +316,23 @@ def find_ff_info_at_some_time(ff_index, point_index, ff_real_position_sorted, ff
 
     # if there's no corresponding info, then calculate it now.
     if len(raw_ff_info) == 0:
-        ff_distance, ff_angle, ff_angle_boundary, time_since_last_visible = find_ff_info_anew(int(ff_index), point_index, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
-        #ff_info = pd.DataFrame([[ff_distance, ff_angle, ff_angle_boundary, time_since_last_visible]], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_visible'])
+        ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis = find_ff_info_anew(int(ff_index), point_index, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
+        #ff_info = pd.DataFrame([[ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis]], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis'])
     else:
-        '''# the following chunk is no longer needed since time_since_last_visible is already calculated in ff_dataframe
+        '''# the following chunk is no longer needed since time_since_last_vis is already calculated in ff_dataframe
         # since "memory" is based on points, not time, I shall recalculate the time since the ff last visible
         if raw_ff_info['visible'].item() == 1:
-            raw_ff_info['time_since_last_visible'] = 0
+            raw_ff_info['time_since_last_vis'] = 0
         else:
             ff_visible_df = ff_dataframe_visible[(ff_dataframe_visible['ff_index']==ff_index) & (ff_dataframe_visible['point_index'] <= point_index)]
             if len(ff_visible_df) > 0:
-               ff_last_visible = ff_visible_df.time.max()
+               ff_last_vis = ff_visible_df.time.max()
             else:
-                ff_last_visible = 0
+                ff_last_vis = 0
             time = monkey_information.loc[monkey_information.index==point_index]['monkey_t'].item()
-            raw_ff_info['time_since_last_visible'] = time-ff_last_visible
+            raw_ff_info['time_since_last_vis'] = time-ff_last_vis
         '''
-        ff_info = raw_ff_info[['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_visible']]
+        ff_info = raw_ff_info[['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis']]
     return ff_info
 
 
@@ -522,14 +522,14 @@ def make_anno_and_pred_ff_indices_dict(moit2, y_pred_all=None, add_negative_labe
 
 
 
-def make_pseudo_manual_anno(best_arc_df, monkey_information, ff_caught_T_sorted):
+def make_pseudo_manual_anno(best_arc_df, monkey_information, ff_caught_T_new):
 
     # organize best_arc_df_sub into manual_anno format to apply machine learning
     pseudo_manual_anno_long = best_arc_df.copy()
     pseudo_manual_anno_long.rename(columns={'point_index': 'starting_point_index'}, inplace=True)
 
     pseudo_manual_anno_long['time'] = monkey_information['monkey_t'].iloc[pseudo_manual_anno_long.starting_point_index.values].values
-    pseudo_manual_anno_long['target_index'] = np.searchsorted(ff_caught_T_sorted, pseudo_manual_anno_long['time'].values).astype(int)        
+    pseudo_manual_anno_long['target_index'] = np.searchsorted(ff_caught_T_new, pseudo_manual_anno_long['time'].values).astype(int)        
     pseudo_manual_anno_long['ff_index'] = pseudo_manual_anno_long['ff_index'].astype(int)  
     pseudo_manual_anno_long['starting_point_index'] = pseudo_manual_anno_long['starting_point_index'].astype(int)  
 

@@ -46,12 +46,12 @@ def retrieve_or_make_and_target_df_into_h5(data_item, h5_file_name='target_df.h5
 
 
 def make_target_df(data_item):
-    target_df = _create_target_df(data_item.monkey_information, data_item.ff_caught_T_sorted, data_item.ff_real_position_sorted)
+    target_df = _create_target_df(data_item.monkey_information, data_item.ff_caught_T_new, data_item.ff_real_position_sorted)
     target_df = _calculate_target_distance_and_angle(target_df)
-    target_df, nearby_alive_ff_indices = _add_target_last_seen_info(target_df, data_item.ff_real_position_sorted, data_item.ff_caught_T_sorted, data_item.ff_life_sorted, data_item.ff_dataframe)
-    target_df = _add_disappeared_for_last_time_dummy(target_df, data_item.ff_caught_T_sorted, data_item.ff_dataframe, nearby_alive_ff_indices)
+    target_df, nearby_alive_ff_indices = _add_target_last_seen_info(target_df, data_item.ff_real_position_sorted, data_item.ff_caught_T_new, data_item.ff_life_sorted, data_item.ff_dataframe)
+    target_df = _add_disappeared_for_last_time_dummy(target_df, data_item.ff_caught_T_new, data_item.ff_dataframe, nearby_alive_ff_indices)
     target_df = _add_visible_dummy(target_df)
-    target_df = _find_time_since_last_capture(target_df, data_item.ff_caught_T_sorted)
+    target_df = _find_time_since_last_capture(target_df, data_item.ff_caught_T_new)
     target_df = _add_last_seeing_target_cluster(target_df)
     target_average_info = _calculate_average_info(target_df)
     target_min_info = _calculate_min_info(target_df)
@@ -60,14 +60,14 @@ def make_target_df(data_item):
 
 
 
-def _create_target_df(monkey_information, ff_caught_T_sorted, ff_real_position_sorted):
+def _create_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted):
     """
     Create a DataFrame with target information.
     """
     target_df = monkey_information[['bin', 'monkey_t', 'monkey_x', 'monkey_y', 'monkey_angles']].copy()
     target_df.rename(columns={'monkey_angles': 'monkey_angle', 'monkey_t': 'time'}, inplace=True)
     target_df['point_index'] = target_df.index
-    target_df['target_index'] = np.searchsorted(ff_caught_T_sorted, target_df['time'])
+    target_df['target_index'] = np.searchsorted(ff_caught_T_new, target_df['time'])
     target_df['target_x'] = ff_real_position_sorted[target_df['target_index'].values, 0]
     target_df['target_y'] = ff_real_position_sorted[target_df['target_index'].values, 1]
     return target_df
@@ -86,12 +86,12 @@ def _calculate_target_distance_and_angle(target_df):
 
 
 
-def _add_target_last_seen_info(target_df, ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted, ff_dataframe):
+def _add_target_last_seen_info(target_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe):
     """
     Add some target last seen info to target_df
     """
     if 'target_cluster_last_seen_time' not in target_df.columns:
-        nearby_alive_ff_indices = cluster_analysis.find_target_clusters(ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted, max_distance=50)
+        nearby_alive_ff_indices = cluster_analysis.find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=50)
         target_df = organize_patterns_and_features.add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=True)
         target_df = target_df.rename(columns={'target_last_seen_time': 'target_cluster_last_seen_time', 
                                                 'target_last_seen_distance': 'target_cluster_last_seen_distance', 
@@ -106,21 +106,21 @@ def _add_target_last_seen_info(target_df, ff_real_position_sorted, ff_caught_T_s
 
 
 
-def _add_disappeared_for_last_time_dummy(target_df, ff_caught_T_sorted, ff_dataframe, nearby_alive_ff_indices):
+def _add_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_dataframe, nearby_alive_ff_indices):
     """
     Add target_has_disappeared_for_last_time_dummy to target_df
     """
     target_df['target_has_disappeared_for_last_time_dummy'] = 0
-    for target in range(len(ff_caught_T_sorted)):
+    for target in range(len(ff_caught_T_new)):
         target_info = ff_dataframe[(ff_dataframe['ff_index']==target) & (ff_dataframe['visible']==1)]
-        target_last_visible_time = target_info['time'].max()
-        target_df.loc[(target_df['target_index']==target) & (target_df['time'] > target_last_visible_time), 'target_has_disappeared_for_last_time_dummy'] = 1
+        target_last_vis_time = target_info['time'].max()
+        target_df.loc[(target_df['target_index']==target) & (target_df['time'] > target_last_vis_time), 'target_has_disappeared_for_last_time_dummy'] = 1
     target_df['target_cluster_has_disappeared_for_last_time_dummy'] = 0
-    for target in range(len(ff_caught_T_sorted)):
+    for target in range(len(ff_caught_T_new)):
         target_cluster_indices = nearby_alive_ff_indices[target] 
         target_info = ff_dataframe[(ff_dataframe['ff_index'].isin(target_cluster_indices)) & (ff_dataframe['visible']==1)]
-        target_last_visible_time = target_info['time'].max()
-        target_df.loc[(target_df['target_index']==target) & (target_df['time'] > target_last_visible_time), 'target_cluster_has_disappeared_for_last_time_dummy'] = 1
+        target_last_vis_time = target_info['time'].max()
+        target_df.loc[(target_df['target_index']==target) & (target_df['time'] > target_last_vis_time), 'target_cluster_has_disappeared_for_last_time_dummy'] = 1
     return target_df
 
 def _add_visible_dummy(target_df):
@@ -133,17 +133,17 @@ def _add_visible_dummy(target_df):
     target_df.loc[target_df['target_cluster_last_seen_time'] > 0, 'target_cluster_visible_dummy'] = 0
     return target_df
 
-def _find_time_since_last_capture(target_df, ff_caught_T_sorted):
+def _find_time_since_last_capture(target_df, ff_caught_T_new):
     """
     Find time_since_last_capture
     """
-    if target_df.target_index.unique().max() >= len(ff_caught_T_sorted)-1:
-        num_exceeding_target = target_df.target_index.unique().max() - (len(ff_caught_T_sorted)-1)
-        ff_caught_T_sorted_temp = np.concatenate((ff_caught_T_sorted, np.repeat(target_df.time.max(), num_exceeding_target)))
+    if target_df.target_index.unique().max() >= len(ff_caught_T_new)-1:
+        num_exceeding_target = target_df.target_index.unique().max() - (len(ff_caught_T_new)-1)
+        ff_caught_T_new_temp = np.concatenate((ff_caught_T_new, np.repeat(target_df.time.max(), num_exceeding_target)))
     else:
-        ff_caught_T_sorted_temp = ff_caught_T_sorted.copy()
-    target_df['current_target_caught_time'] = ff_caught_T_sorted_temp[target_df['target_index']]
-    target_df['last_target_caught_time'] = ff_caught_T_sorted_temp[target_df['target_index']-1]
+        ff_caught_T_new_temp = ff_caught_T_new.copy()
+    target_df['current_target_caught_time'] = ff_caught_T_new_temp[target_df['target_index']]
+    target_df['last_target_caught_time'] = ff_caught_T_new_temp[target_df['target_index']-1]
     target_df.loc[target_df['target_index']==0, 'last_target_caught_time'] = 0
     target_df['time_since_last_capture'] = target_df['time'] - target_df['last_target_caught_time']
     return target_df

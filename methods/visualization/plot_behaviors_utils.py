@@ -18,7 +18,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 
 
-def plot_a_trial(currentTrial, num_trials, ff_caught_T_sorted, PlotTrials_args, additional_kwargs=None, images_dir=None):
+def plot_a_trial(currentTrial, num_trials, ff_caught_T_new, PlotTrials_args, additional_kwargs=None, images_dir=None):
     
     plot_kwargs = {'player': 'monkey',
     'show_stops': True,
@@ -38,7 +38,7 @@ def plot_a_trial(currentTrial, num_trials, ff_caught_T_sorted, PlotTrials_args, 
         for key, value in additional_kwargs.items():
             plot_kwargs[key] = value
     
-    duration = [ff_caught_T_sorted[currentTrial-num_trials], ff_caught_T_sorted[currentTrial]]
+    duration = [ff_caught_T_new[currentTrial-num_trials], ff_caught_T_new[currentTrial]]
     returned_info = plot_trials.PlotTrials(duration, 
                 *PlotTrials_args,
                 **plot_kwargs,
@@ -53,14 +53,14 @@ def plot_a_trial(currentTrial, num_trials, ff_caught_T_sorted, PlotTrials_args, 
 
 
 
-def plot_a_trial_from_a_category(category_name, currentTrial, num_trials, ff_caught_T_sorted, PlotTrials_args, all_category_kwargs, additional_kwargs=None, images_dir=None):
+def plot_a_trial_from_a_category(category_name, currentTrial, num_trials, ff_caught_T_new, PlotTrials_args, all_category_kwargs, additional_kwargs=None, images_dir=None):
     PlotTrials_kargs = all_category_kwargs[category_name]
     PlotTrials_kargs['images_dir'] = images_dir
     if additional_kwargs is not None:
         for key, value in additional_kwargs.items():
             PlotTrials_kargs[key] = value
     
-    duration = [ff_caught_T_sorted[currentTrial-num_trials], ff_caught_T_sorted[currentTrial]]
+    duration = [ff_caught_T_new[currentTrial-num_trials], ff_caught_T_new[currentTrial]]
     returned_info = plot_trials.PlotTrials(duration, 
                 *PlotTrials_args,
                 **PlotTrials_kargs,
@@ -73,7 +73,7 @@ def plot_a_trial_from_a_category(category_name, currentTrial, num_trials, ff_cau
 
 
 def plot_trials_from_a_category(category, category_name, max_trial_to_plot, PlotTrials_args, all_category_kwargs, 
-                                ff_caught_T_sorted, trials=None, additional_kwargs=None, images_dir=None, using_subplots=False,
+                                ff_caught_T_new, trials=None, additional_kwargs=None, images_dir=None, using_subplots=False,
                                 figsize=(10, 10)):
     # category is an array of trial indices belonging to a category
     # trials is an optional array of trial indices to be plotted; if trials is None, then trials in the category will be plotted based on max_trial_to_plot
@@ -99,7 +99,7 @@ def plot_trials_from_a_category(category, category_name, max_trial_to_plot, Plot
                 if using_subplots:
                     axes = fig.add_subplot(2,2,k)
                     additional_kwargs = {'fig': fig, 'axes': axes, 'subplots': True}
-                returned_info = plot_a_trial_from_a_category(category_name, currentTrial, num_trials, ff_caught_T_sorted, PlotTrials_args, 
+                returned_info = plot_a_trial_from_a_category(category_name, currentTrial, num_trials, ff_caught_T_new, PlotTrials_args, 
                                                         all_category_kwargs, additional_kwargs=additional_kwargs, images_dir=images_dir)
                 if returned_info['whether_plotted'] is True:
                     if using_subplots:
@@ -118,7 +118,7 @@ def plot_trials_from_a_category(category, category_name, max_trial_to_plot, Plot
 
 
 def plot_behaviors_in_clusters(points_w_more_than_2_ff, chunk_numbers, monkey_information, ff_dataframe,
-                                ff_life_sorted, ff_real_position_sorted, ff_caught_T_sorted, ff_flash_sorted):
+                                ff_life_sorted, ff_real_position_sorted, ff_caught_T_new, ff_flash_sorted):
     # for each chunk, finds indices of points where ddw > 0.15
     for chunk in chunk_numbers:
         chunk_df = points_w_more_than_2_ff[points_w_more_than_2_ff['chunk'] == chunk]
@@ -142,7 +142,7 @@ def plot_behaviors_in_clusters(points_w_more_than_2_ff, chunk_numbers, monkey_in
                         ff_dataframe_sub, 
                         ff_life_sorted,
                         ff_real_position_sorted,
-                        ff_caught_T_sorted,
+                        ff_caught_T_new,
                         ff_flash_sorted,
                         rmax = 400,
                         currentTrial = None,
@@ -710,12 +710,12 @@ def save_image(filename, images_dir):
 
 
 
-def plot_ff_distribution_in_arena(ff_real_position_sorted, ff_life_sorted, ff_caught_T_sorted, images_dir=None):
+def plot_ff_distribution_in_arena(ff_real_position_sorted, ff_life_sorted, ff_caught_T_new, images_dir=None):
     # divide total time length (or valid point_index) into 9 parts
     # since some fireflies might not be flashing at the beginnin or end of the period, their "life" information at the beginning
     # and end are not complete. Thus, we chop off the beginning and the end of the period by 50s.
-    max_time = ff_caught_T_sorted[-1] - 50
-    min_time = ff_caught_T_sorted[0] + 50
+    max_time = ff_caught_T_new[-1] - 50
+    min_time = ff_caught_T_new[0] + 50
     time_intervals = np.linspace(min_time, max_time, 9)
     num_ff_for_each_plot = []
 

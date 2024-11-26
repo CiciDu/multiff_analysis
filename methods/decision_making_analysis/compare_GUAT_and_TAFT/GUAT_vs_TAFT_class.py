@@ -43,7 +43,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'max_cluster_distance': 100, # max distance from other ff to the current ff to be considered as in the same cluster
              'max_distance_to_stop': 400,
              'max_distance_to_stop_for_GUAT_target': 50,
-             'columns_to_sort_alt_ff_by': ['distance_to_monkey'], # originally using ['abs_curv_diff', 'time_since_last_visible'],        
+             'columns_to_sort_alt_ff_by': ['distance_to_monkey'], # originally using ['abs_curv_diff', 'time_since_last_vis'],        
              'selection_criterion_if_too_many_ff': 'distance_to_monkey',
 
              'num_old_ff_per_row': 2, # originally it was 2
@@ -62,7 +62,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'trajectory_features': ['monkey_distance', 'monkey_angle_to_origin', 'monkey_t', 'curvature_of_traj'],
 
              'include_ff_in_near_future': True,
-             'max_time_since_last_visible': 2.5,
+             'max_time_since_last_vis': 2.5,
              'duration_into_future': 0.5, 
  }
 
@@ -172,14 +172,14 @@ class CompareGUATandTAFTclass():
         self.gcc.get_monkey_data(already_retrieved_ok=already_retrieved_ok, include_TAFT_data=include_TAFT_data)
         
         for df in ['monkey_information', 'ff_dataframe', 'ff_flash_sorted', 'ff_real_position_sorted', 'ff_life_sorted',
-                   'ff_believed_position_sorted', 'ff_caught_T_sorted']:
+                   'ff_believed_position_sorted', 'ff_caught_T_new']:
             setattr(self, df, getattr(self.gcc.data_item, df).copy())
         if self.TAFT_or_GUAT == 'TAFT':
             self.TAFT_trials_df = self.gcc.data_item.TAFT_trials_df.copy()
             self.TAFT_trials_df['first_stop_time'] = self.monkey_information.loc[self.TAFT_trials_df['first_stop_point_index'], 'time'].values
             self.TAFT_trials_df['ff_index'] = self.TAFT_trials_df['trial']
-            # because we need to have alt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_sorted - 2)
-            self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(self.ff_caught_T_sorted) - 2]
+            # because we need to have alt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
+            self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(self.ff_caught_T_new) - 2]
             GUAT_vs_TAFT_utils.add_stop_point_index(self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
         elif self.TAFT_or_GUAT == 'GUAT':
             self.gcc.make_or_retrieve_GUAT_w_ff_df(exists_ok=GUAT_w_ff_df_exists_ok)
@@ -206,7 +206,7 @@ class CompareGUATandTAFTclass():
 
     def get_TAFT_df(self):
         self.TAFT_df = GUAT_vs_TAFT_utils.process_trials_df(self.TAFT_trials_df, self.monkey_information, self.ff_dataframe_visible, self.stop_period_duration)
-        self.TAFT_df['stop_ff_capture_time'] = self.ff_caught_T_sorted[self.TAFT_df['ff_index'].values]
+        self.TAFT_df['stop_ff_capture_time'] = self.ff_caught_T_new[self.TAFT_df['ff_index'].values]
 
     def get_GUAT_df(self):
         self.GUAT_df = GUAT_vs_TAFT_utils.process_trials_df(self.GUAT_w_ff_df, self.monkey_information, self.ff_dataframe_visible, self.stop_period_duration)
@@ -224,10 +224,10 @@ class CompareGUATandTAFTclass():
         if self.TAFT_or_GUAT == 'TAFT':
             self.stops_near_ff_df['alt_ff_index'] = self.stops_near_ff_df['stop_ff_index'] + 1
         else:
-            self.stops_near_ff_df['alt_ff_index'] = np.searchsorted(self.ff_caught_T_sorted, self.stops_near_ff_df['stop_time'].values)
+            self.stops_near_ff_df['alt_ff_index'] = np.searchsorted(self.ff_caught_T_new, self.stops_near_ff_df['stop_time'].values)
             
             # check if the alt_ff_index is correct (can delete the lines below later)
-            self.stops_near_ff_df['alt_ff_caught_time'] = self.ff_caught_T_sorted[self.stops_near_ff_df['alt_ff_index'].values]
+            self.stops_near_ff_df['alt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['alt_ff_index'].values]
             # see if any element of self.stops_near_ff_df['alt_ff_caught_time'] - self.stops_near_ff_df['stop_time'] is smaller than 0
             # if there is, then the alt_ff_index is not correct
             if np.any(self.stops_near_ff_df['alt_ff_caught_time'] - self.stops_near_ff_df['stop_time'] < 0):
@@ -251,10 +251,17 @@ class CompareGUATandTAFTclass():
 
         # note that this only works for TAFT, but doesn't work for GUAT
         self._add_alt_ff_index()
-        self.stops_near_ff_df['alt_ff_caught_time'] = self.ff_caught_T_sorted[self.stops_near_ff_df['alt_ff_index'].values]
+        self.stops_near_ff_df['alt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['alt_ff_index'].values]
 
-        all_closest_point_to_alt_ff = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.stops_near_ff_df['alt_ff_caught_time'].values, self.monkey_information, self.ff_real_position_sorted,
-                                                                                             )
+        closest_stop_to_capture_df2 = self.closest_stop_to_capture_df[['stop_ff_index', 'stop_point_index', 'stop_time']].copy()
+        closest_stop_to_capture_df2.rename(columns={'stop_ff_index': 'alt_ff_index',
+                                                    'stop_time': 'next_stop_time',
+                                                    'stop_point_index': 'next_stop_point_index'}, inplace=True)
+        all_closest_point_to_alt_ff = self.closest_stop_to_capture_df.merge(closest_stop_to_capture_df2, on='alt_ff_index', how='left')
+
+
+        # self.stops_near_ff_df['next_stop_time'] = self.ff_caught_T_new[self.stops_near_ff_df['alt_ff_index'].values]
+        # self.stops_near_ff_df['next_stop_point_index'] = np.searchsorted(self.monkey_information['time'].values, self.stops_near_ff_df['next_stop_time'].values)
         self.stops_near_ff_df[['next_stop_point_index', 'next_stop_time']] = all_closest_point_to_alt_ff[['point_index', 'time']].values
         self.stops_near_ff_df['next_stop_cum_distance'] = self.monkey_information.loc[self.stops_near_ff_df['next_stop_point_index'], 'cum_distance'].values
 
@@ -321,12 +328,7 @@ class CompareGUATandTAFTclass():
 
 
     def make_only_stop_ff_df(self):
-        # df = self.TAFT_df2 if (self.TAFT_or_GUAT == 'TAFT') else self.GUAT_df2
-        # self.closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(df['stop_time'].values, self.monkey_information, self.ff_real_position_sorted,
-        #                                                                                               stop_ff_index_array=df['ff_index'].values,
-        #                                                                                               stop_point_index_array=df['stop_point_index'].values)
-        
-        self.only_stop_ff_df = only_stop_ff_utils.get_only_stop_ff_df(self.stops_near_ff_df, self.ff_real_position_sorted, self.ff_caught_T_sorted, self.monkey_information, 
+        self.only_stop_ff_df = only_stop_ff_utils.get_only_stop_ff_df(self.stops_near_ff_df, self.ff_real_position_sorted, self.ff_caught_T_new, self.monkey_information, 
                                                                         self.curv_of_traj_df, self.ff_dataframe_visible, stop_period_duration=self.stop_period_duration,
                                                                         ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
 
@@ -407,7 +409,7 @@ class CompareGUATandTAFTclass():
 
     def _add_curv_of_traj_stat_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
         if self.curv_of_traj_df is None:
-            self.curv_of_traj_df, self.traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_sorted, 
+            self.curv_of_traj_df, self.traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, 
                                                                                                                         curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False)
         self.curv_of_traj_stat_df, self.stops_near_ff_df = plan_factors_utils.find_curv_of_traj_stat_df(self.stops_near_ff_df, self.curv_of_traj_df)      
 
@@ -511,7 +513,7 @@ class CompareGUATandTAFTclass():
                         'show_connect_path_ff': False,
                         'show_visible_fireflies': True}
 
-        self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, None, self.ff_caught_T_sorted)
+        self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, None, self.ff_caught_T_new)
         self.max_distance_to_stop_for_GUAT_target = 50
         
         return sub

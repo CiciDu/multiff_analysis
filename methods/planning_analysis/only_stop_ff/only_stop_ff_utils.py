@@ -18,7 +18,7 @@ import math
 
 
 # try replacing ff_dataframe_visible with ff_info_at_start_df
-def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_sorted, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
+def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_new, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
                          ref_point_mode='distance', ref_point_value=-150,
                          optimal_arc_type='norm_opt_arc'):
 
@@ -76,7 +76,7 @@ def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_
                                                                                         m_angle=only_stop_ff_df['monkey_angle_before_stop'])
     only_stop_ff_df['dir_from_stop_ff_to_stop'] = np.sign(only_stop_ff_df['angle_from_stop_ff_to_stop'])
     
-    curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode([-25, 0], monkey_information, ff_caught_T_sorted, 
+    curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode([-25, 0], monkey_information, ff_caught_T_new, 
                                                                                                                 curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
     only_stop_ff_df = plan_factors_utils._add_column_curvature_of_traj_before_stop(only_stop_ff_df, curv_of_traj_df_w_one_sided_window)
 
@@ -169,7 +169,7 @@ def find_monkey_info_in_all_stop_periods(all_start_time, all_end_time, all_group
     return monkey_info_in_all_stop_periods
 
 
-def find_ff_flash_df_within_all_stop_periods(monkey_info_in_all_stop_periods, ff_caught_T_sorted, ff_real_position_sorted, ff_flash_sorted, ff_radius=10):
+def find_ff_flash_df_within_all_stop_periods(monkey_info_in_all_stop_periods, ff_caught_T_new, ff_real_position_sorted, ff_flash_sorted, ff_radius=10):
     ff_flash_df = pd.DataFrame()
     for i in range(len(ff_real_position_sorted)):
         if i % 100 == 0:

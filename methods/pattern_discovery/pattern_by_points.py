@@ -11,7 +11,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
 
-def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_sorted, n=2, n_max=None):
+def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_new, n=2, n_max=None):
     # Pull out all the segments where we can see aligned ff vs non-aligned ff
     # Find segments involving the flashing on of >= 3 firefly (preferably 2ff vs 2ff on each side) and until 1.6s after.
     point_vs_num_ff = ff_dataframe[['point_index', 'ff_index']].groupby('point_index').nunique()
@@ -21,7 +21,7 @@ def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_s
     if n_max is not None:
         points_w_more_than_n_ff = points_w_more_than_n_ff[points_w_more_than_n_ff['num_alive_ff'] <= n_max].copy()
     # Eliminate the points before the capture of the 1st firefly
-    valid_earliest_point = np.where(monkey_information['monkey_t'] > ff_caught_T_sorted[0])[0][0]
+    valid_earliest_point = np.where(monkey_information['monkey_t'] > ff_caught_T_new[0])[0][0]
     points_w_more_than_n_ff = points_w_more_than_n_ff[points_w_more_than_n_ff['point_index'] >= valid_earliest_point].copy()
     diff = np.diff(points_w_more_than_n_ff['point_index'])
     points_w_more_than_n_ff['diff'] = np.append(0, diff) # in the array, numbers not equal to 1 are starts of a chunk
@@ -35,14 +35,14 @@ def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_s
 
 
 
-def find_points_w_more_than_n_ff(chunk_df, monkey_information, ff_caught_T_sorted, chunk_interval=10, minimum_time_before_capturing=0.5):
+def find_points_w_more_than_n_ff(chunk_df, monkey_information, ff_caught_T_new, chunk_interval=10, minimum_time_before_capturing=0.5):
     first_point = chunk_df['point_index'].min()
     duration = [monkey_information['monkey_t'][first_point], monkey_information['monkey_t'][first_point]+chunk_interval]
     cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0] 
 
     # Take out the part right before catching a ff
     # First find ff caught in the interval and a little beyond the interval
-    relevant_ff_caught_T = ff_caught_T_sorted[(ff_caught_T_sorted >= duration[0]) & (ff_caught_T_sorted <= duration[1]+minimum_time_before_capturing)]
+    relevant_ff_caught_T = ff_caught_T_new[(ff_caught_T_new >= duration[0]) & (ff_caught_T_new <= duration[1]+minimum_time_before_capturing)]
     for time in relevant_ff_caught_T:
         duration_to_take_out = [time-minimum_time_before_capturing, time]        
         # Take out corresponding indices from cum_iloc_indices
@@ -92,11 +92,11 @@ def decrease_overlaps_between_chunks(points_w_more_than_n_ff, monkey_information
 
 
 
-def find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(prev_trials, ff_caught_T_sorted, ff_dataframe):
+def find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(prev_trials, ff_caught_T_new, ff_dataframe):
     list_of_num_visible_ff = []
     list_of_num_in_memory_ff = []
     for trial in prev_trials:
-        duration = [ff_caught_T_sorted[trial]-0.1, ff_caught_T_sorted[trial]+0.1]
+        duration = [ff_caught_T_new[trial]-0.1, ff_caught_T_new[trial]+0.1]
         ff_dataframe_sub = ff_dataframe[ff_dataframe['time'].between(*duration)]
         ff_dataframe_sub = ff_dataframe_sub.groupby(['ff_index']).max()
         visible_ff = ff_dataframe_sub[ff_dataframe_sub['memory'] == 100]

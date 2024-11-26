@@ -326,7 +326,7 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
         
         self.stop_point_index = stop_point_index
         self.stops_near_ff_row = self.stops_near_ff_df_counted[self.stops_near_ff_df_counted['stop_point_index']==self.stop_point_index].copy()
-        self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_sorted)
+        self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
         
         self.current_plotly_plot_key_comp = plotly_preparation.prepare_to_plot_a_planning_instance_in_plotly(self.stops_near_ff_row, self.PlotTrials_args, self.monkey_plot_params)
         # self.trajectory_ref_row = plotly_for_monkey.find_trajectory_ref_row(self.current_plotly_plot_key_comp['trajectory_df'], self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'])

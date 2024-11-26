@@ -19,7 +19,7 @@ def PlotPolar(duration,
               ff_dataframe, 
               ff_life_sorted,
               ff_real_position_sorted,
-              ff_caught_T_sorted,
+              ff_caught_T_new,
               ff_flash_sorted,
               rmax = 400,
               currentTrial = None, # Can be None; then it means all trials in the duration will be plotted
@@ -59,7 +59,7 @@ def PlotPolar(duration,
         the duration to be plotted, with a starting time and an ending time; 
     ff_dataframe: pd.dataframe
         containing various information about all visible or "in-memory" fireflies at each time point
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     rmax: num
         the radius of the polar plot
@@ -87,7 +87,7 @@ def PlotPolar(duration,
         whether to show the color bars
     """  
 
-    currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_sorted, currentTrial, num_trials, duration)
+    currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
     target_indices = np.arange(currentTrial-num_trials+1, currentTrial+1)
     sns.set_style(style="white")
     if duration[1]-duration[0] == 0:
@@ -111,7 +111,7 @@ def PlotPolar(duration,
     ff_dataframe = ff_dataframe[(ff_dataframe['time'] >= duration[0]) & (ff_dataframe['time'] <= duration[1])]
     if show_all_positions_of_all_fireflies:
         # Make a new ff_dataframe using the new function make_ff_dataframe.make_ff_dataframe_v2_func
-        ff_dataframe_v2 = make_ff_dataframe.make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, ff_flash_sorted,  
+        ff_dataframe_v2 = make_ff_dataframe.make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_flash_sorted,  
                         ff_real_position_sorted, ff_life_sorted, max_distance = 400, 
                         data_folder_name = None, print_progress = False) 
         # add the information about memory from ff_dataframe to ff_dataframe_v2 by merging the two dataframes
@@ -160,7 +160,7 @@ def PlotPolar(duration,
 
 
     if show_alive_ff & (not show_all_positions_of_all_fireflies):
-        ff_dataframe_v2 = make_ff_dataframe.make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, ff_flash_sorted,  
+        ff_dataframe_v2 = make_ff_dataframe.make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_flash_sorted,  
                                 ff_real_position_sorted, ff_life_sorted, max_distance = 400, 
                                 data_folder_name = None, print_progress = False) 
         ax.scatter(ff_dataframe_v2['ff_angle'], ff_dataframe_v2['ff_distance'], c='grey', s=5, alpha=0.2, zorder=1, marker='o')   

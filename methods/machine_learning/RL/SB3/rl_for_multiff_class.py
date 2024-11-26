@@ -210,7 +210,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
 
         self.n_steps = n_steps
 
-        self.monkey_information, self.ff_flash_sorted, self.ff_caught_T_sorted, self.ff_believed_position_sorted, \
+        self.monkey_information, self.ff_flash_sorted, self.ff_caught_T_new, self.ff_believed_position_sorted, \
         self.ff_real_position_sorted, self.ff_life_sorted, self.ff_flash_end_sorted, self.caught_ff_num, self.total_ff_num, \
         self.obs_ff_indices_in_ff_dataframe, self.sorted_indices_all, self.ff_in_obs_df \
                 = collect_agent_data_utils.collect_agent_data_func(self.env_for_data_collection, self.sac_model, n_steps=self.n_steps, LSTM=LSTM)
@@ -251,8 +251,8 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
         self.ff_dataframe = self.ff_in_obs_df.copy()
         self.ff_dataframe['visible'] = 1
 
-        make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_caught_T_sorted, self.ff_real_position_sorted)
-        self.ff_dataframe = make_ff_dataframe.process_ff_dataframe(self.ff_dataframe, max_distance=None, max_time_since_last_visible=3)
+        make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted)
+        self.ff_dataframe = make_ff_dataframe.process_ff_dataframe(self.ff_dataframe, max_distance=None, max_time_since_last_vis=3)
 
 
     def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=False, load_replay_buffer=False, **env_kwargs):
@@ -288,7 +288,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None):
         self.collect_data(n_steps=n_steps)
-        #if len(self.ff_caught_T_sorted) >= currentTrial_for_animation:
+        #if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation, 
                             duration=duration, file_name=file_name, video_dir=video_dir)
 
@@ -381,14 +381,14 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
         
         self.collect_data(n_steps=n_steps)
         
-        if len(self.ff_caught_T_sorted) < 1:
+        if len(self.ff_caught_T_new) < 1:
             print("No firefly was caught by the agent during testing. Re-train agent.") 
             self.train_agent(use_curriculum_training=use_curriculum_training)
             if not self.successful_training:
                 print("The set of parameters has failed to produce a well-trained agent in the past. \
                         Skip to the next set of parameters")
                 raise ValueError("The set of parameters has failed to produce a well-trained agent in the past. Skip to the next set of parameters") 
-            if len(self.ff_caught_T_sorted) < 1:
+            if len(self.ff_caught_T_new) < 1:
                 print("No firefly was caught by the agent during testing again. Abort: ") 
                 raise ValueError("Still no firefly was caught by the agent during testing after retraining. Abort: ")
         
@@ -400,9 +400,9 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
 
 
     def _make_plots_for_the_model(self, currentTrial_for_animation, num_trials_for_animation, duration=None):
-        if currentTrial_for_animation >= len(self.ff_caught_T_sorted):
-            currentTrial_for_animation = len(self.ff_caught_T_sorted)-1
-            num_trials_for_animation = min(len(self.ff_caught_T_sorted)-1, 5)
+        if currentTrial_for_animation >= len(self.ff_caught_T_new):
+            currentTrial_for_animation = len(self.ff_caught_T_new)-1
+            num_trials_for_animation = min(len(self.ff_caught_T_new)-1, 5)
         
         self.annotation_info = animation_utils.make_annotation_info(self.caught_ff_num+1, self.max_point_index, self.n_ff_in_a_row, self.visible_before_last_one_trials, self.disappear_latest_trials, \
                                                 self.ignore_sudden_flash_indices, self.GUAT_indices_df['point_index'].values, self.try_a_few_times_indices)        
@@ -560,7 +560,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
     def import_monkey_data(self, info_of_monkey, all_trial_features_m, pattern_frequencies_m, feature_statistics_m):
         self.info_of_monkey = info_of_monkey
         self.all_trial_features_m = all_trial_features_m
-        self.all_trial_features_valid_m = self.all_trial_features_m[(self.all_trial_features_m['t_last_visible']<50) & (self.all_trial_features_m['hitting_arena_edge']==False)].reset_index()    
+        self.all_trial_features_valid_m = self.all_trial_features_m[(self.all_trial_features_m['t_last_vis']<50) & (self.all_trial_features_m['hitting_arena_edge']==False)].reset_index()    
         self.pattern_frequencies_m = pattern_frequencies_m
         self.feature_statistics_m = feature_statistics_m
 
@@ -568,7 +568,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
 
     def calculate_pattern_frequencies_and_feature_statistics(self):
         self.make_or_retrieve_all_trial_features()
-        self.all_trial_features_valid = self.all_trial_features[(self.all_trial_features['t_last_visible']<50) & (self.all_trial_features['hitting_arena_edge']==False)].reset_index()    
+        self.all_trial_features_valid = self.all_trial_features[(self.all_trial_features['t_last_vis']<50) & (self.all_trial_features['hitting_arena_edge']==False)].reset_index()    
         self.make_or_retrieve_all_trial_patterns()
         self.make_or_retrieve_pattern_frequencies()
         self.make_or_retrieve_feature_statistics()

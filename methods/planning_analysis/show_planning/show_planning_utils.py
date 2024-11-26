@@ -460,12 +460,12 @@ def make_alt_ff_info_for_null_arc(alt_ff_df_modified, stop_ff_final_df, heading_
     return alt_ff_info_for_null_arc
 
 
-def make_alt_ff_info_for_monkey(alt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_sorted,
+def make_alt_ff_info_for_monkey(alt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                 curv_traj_window_before_stop=[-50, 0]):
     alt_ff_info_for_monkey = find_stops_near_ff_utils.find_ff_info(alt_ff_df_modified.ff_index.values, heading_info_df.point_index_before_stop.values, monkey_information, ff_real_position_sorted)
     alt_ff_info_for_monkey['stop_point_index'] = heading_info_df['stop_point_index'].values
 
-    curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(curv_traj_window_before_stop, monkey_information, ff_caught_T_sorted, 
+    curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(curv_traj_window_before_stop, monkey_information, ff_caught_T_new, 
                                                                 curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
     curv_of_traj_df.set_index('point_index', inplace=True)
     monkey_curv_before_stop = curv_of_traj_df.loc[heading_info_df['point_index_before_stop'].values, 'curvature_of_traj'].values

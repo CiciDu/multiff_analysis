@@ -27,7 +27,7 @@ np.set_printoptions(suppress=True)
 
 
 
-def make_rebinned_monkey_info_essential(monkey_information, time_bins, ff_caught_T_sorted, convolve_pattern, window_width):
+def make_rebinned_monkey_info_essential(monkey_information, time_bins, ff_caught_T_new, convolve_pattern, window_width):
     """Prepare behavioral data."""
     monkey_information = monkey_information.copy()
     monkey_t = monkey_information['monkey_t'].values
@@ -36,7 +36,7 @@ def make_rebinned_monkey_info_essential(monkey_information, time_bins, ff_caught
     monkey_information.loc[:, 'bin'] = np.digitize(monkey_t, time_bins)-1
 
     rebinned_monkey_info = _rebin_monkey_info(monkey_information)
-    rebinned_monkey_info = _add_num_caught_ff(rebinned_monkey_info, ff_caught_T_sorted, time_bins)
+    rebinned_monkey_info = _add_num_caught_ff(rebinned_monkey_info, ff_caught_T_new, time_bins)
     rebinned_monkey_info = _make_bin_continuous(rebinned_monkey_info)
     rebinned_monkey_info = _clip_columns(rebinned_monkey_info)
 
@@ -82,7 +82,7 @@ def prepare_pattern_df(data_item, time_bins):
     cols_to_condense = ['bin', *dummy_cols_indices.keys()]
     pattern_df_condensed = pattern_df[cols_to_condense].groupby('bin').max().reset_index()
 
-    bin_midlines = _prepare_bin_midlines(time_bins, data_item.ff_caught_T_sorted, data_item.all_trial_patterns)
+    bin_midlines = _prepare_bin_midlines(time_bins, data_item.ff_caught_T_new, data_item.all_trial_patterns)
 
     cols_to_merge = ['bin', 'two_in_a_row', 'visible_before_last_one', 'disappear_latest', 'ignore_sudden_flash', 'try_a_few_times', 'give_up_after_trying', 'cluster_around_target', 'waste_cluster_around_target']
     pattern_df_condensed = pattern_df_condensed.merge(bin_midlines[cols_to_merge], on='bin', how='left')
@@ -106,9 +106,9 @@ def _rebin_monkey_info(monkey_information):
     rebinned_monkey_info['num_stops'] = monkey_information.groupby('bin').sum()['monkey_speeddummy']
     return rebinned_monkey_info
 
-def _add_num_caught_ff(rebinned_monkey_info, ff_caught_T_sorted, time_bins):
+def _add_num_caught_ff(rebinned_monkey_info, ff_caught_T_new, time_bins):
     """Add num_caught_ff to rebinned_monkey_info."""
-    catching_target_bins = np.digitize(ff_caught_T_sorted, time_bins)-1
+    catching_target_bins = np.digitize(ff_caught_T_new, time_bins)-1
     catching_target_bins_unique, counts = np.unique(catching_target_bins, return_counts=True)
     catching_target_bins_unique = catching_target_bins_unique[catching_target_bins_unique < len(time_bins)-1]
     counts = counts[:len(catching_target_bins_unique)]
@@ -146,19 +146,19 @@ def _add_stop_rate_and_success_rate(rebinned_monkey_info_essential, convolve_pat
 
 
 
-def _prepare_bin_midlines(time_bins, ff_caught_T_sorted, all_trial_patterns):
+def _prepare_bin_midlines(time_bins, ff_caught_T_new, all_trial_patterns):
     """
     Prepare the bin_midlines dataframe by finding the centers of time_bins and adding trial info.
     """
 
     # Add the category info based on trials
-    all_trial_patterns['trial_end_time'] = ff_caught_T_sorted[:len(all_trial_patterns)]
+    all_trial_patterns['trial_end_time'] = ff_caught_T_new[:len(all_trial_patterns)]
     all_trial_patterns['trial_start_time'] = all_trial_patterns['trial_end_time'].shift(1).fillna(0)
     bin_midlines = pd.DataFrame((time_bins[:-1] + time_bins[1:])/2, columns=['bin_midline'])
-    bin_midlines = bin_midlines[bin_midlines['bin_midline'] < ff_caught_T_sorted[-1]]
+    bin_midlines = bin_midlines[bin_midlines['bin_midline'] < ff_caught_T_new[-1]]
 
     # Add trial info to bin_midlines
-    bin_midlines['trial'] = np.searchsorted(ff_caught_T_sorted, bin_midlines['bin_midline'])
+    bin_midlines['trial'] = np.searchsorted(ff_caught_T_new, bin_midlines['bin_midline'])
     all_trial_patterns['trial'] = all_trial_patterns.index
     bin_midlines = bin_midlines.merge(all_trial_patterns, on='trial', how='left')
     bin_midlines['bin'] = bin_midlines.index

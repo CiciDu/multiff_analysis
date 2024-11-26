@@ -26,8 +26,8 @@ np.set_printoptions(suppress=True)
 
 def make_one_plotly_polar_plot(ff_df=None, current_traj_df=None, current_more_traj_df=None, real_label=None, predicted_label=None,
                                add_trajectory=True, add_colorbar=True, add_legend=True, add_real_and_predicted_labels=True, show_more_ff=True,
-                               columns_for_annotation=['subgroup', 'ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'curv_diff', 'time_since_last_visible', 'duration_of_last_visible_period', 'time_till_next_visible'],
-                               additional_customdata_columns=[], color='time_since_last_visible', range_color=[0, 3], symbol='group', size='time_since_last_visible', size_max=15,
+                               columns_for_annotation=['subgroup', 'ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'curv_diff', 'time_since_last_vis', 'duration_of_last_vis_period', 'time_till_next_visible'],
+                               additional_customdata_columns=[], color='time_since_last_vis', range_color=[0, 3], symbol='group', size='time_since_last_vis', size_max=15,
                                symbol_map={}, monkey_info_for_ff_in_past_or_future=None):
     
     ff_df = ff_df.sort_values(by='group', ascending=False).copy()
@@ -35,8 +35,8 @@ def make_one_plotly_polar_plot(ff_df=None, current_traj_df=None, current_more_tr
     current_more_traj_df = current_more_traj_df.sort_values(by='whether_stopped').copy()
     # Note: the order of 'subgroup' and 'ff_number' matter here
 
-    if size == 'time_since_last_visible':
-        size = np.maximum(8, 18-ff_df['time_since_last_visible'].values*5)
+    if size == 'time_since_last_vis':
+        size = np.maximum(8, 18-ff_df['time_since_last_vis'].values*5)
     if size is None:
         size = np.ones(ff_df.shape[0]) * size_max
     fig, customdata_columns = plotly_for_ff_polar.plot_fireflies(None, ff_df, columns_for_annotation=columns_for_annotation,
@@ -140,7 +140,7 @@ def annotate_real_and_predicted_labels_in_numbers(fig, real_label, predicted_lab
 def prepare_to_make_one_plotly_polar_plot(i, polar_plots_kwargs, point_index_array, GUAT_joined_ff_info, all_traj_feature_names, more_ff_df=None, trajectory_features=['monkey_distance', 'monkey_angle_to_origin'],
                                           add_monkey_info_for_ff_in_past_or_future=True):
 
-    current_polar_plot_kargs = plot_decision_making.get_current_polar_plot_kargs(i, max_time_since_last_visible=2.5, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None, **polar_plots_kwargs)
+    current_polar_plot_kargs = plot_decision_making.get_current_polar_plot_kargs(i, max_time_since_last_vis=2.5, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None, **polar_plots_kwargs)
     
     real_label = current_polar_plot_kargs['real_label']
     predicted_label = current_polar_plot_kargs['predicted_label']

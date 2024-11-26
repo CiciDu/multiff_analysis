@@ -60,7 +60,7 @@ def take_optimal_row_per_group_based_on_columns(df, columns, groupby_column='poi
 def supply_info_of_cluster_to_df(df, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=50):
 
     ff_time = monkey_information.loc[df['point_index'].values, 'monkey_t'].values
-    ff_cluster = cluster_analysis.find_ff_clusters(ff_real_position_sorted[df['ff_index'].values], ff_real_position_sorted, ff_time-10, ff_time+10, 
+    ff_cluster = cluster_analysis.find_alive_ff_clusters(ff_real_position_sorted[df['ff_index'].values], ff_real_position_sorted, ff_time-10, ff_time+10, 
                                                    ff_life_sorted, max_distance=max_cluster_distance)
     ff_cluster_df = cluster_analysis.turn_list_of_ff_clusters_info_into_dataframe(ff_cluster, df['point_index'].values)
     #new_df = decision_making_utils.find_many_ff_info_anew(ff_cluster_df['ff_index'].values, ff_cluster_df['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
@@ -68,7 +68,7 @@ def supply_info_of_cluster_to_df(df, ff_real_position_sorted, ff_life_sorted, mo
 
 
 def find_GUAT_current_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information, include_ff_in_near_future=False, 
-                              max_time_since_last_visible=2.5, 
+                              max_time_since_last_vis=2.5, 
                               duration_into_future=0.5,
                               max_cluster_distance=50,
                               max_distance_to_stop=400,):
@@ -101,7 +101,7 @@ def find_GUAT_current_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sor
     
     GUAT_current_ff_info = decision_making_utils.find_many_ff_info_anew(GUAT_current_ff['ff_index'].values, GUAT_current_ff['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
     GUAT_current_ff_info = GUAT_current_ff_info.drop_duplicates(subset=['point_index', 'ff_index'], keep='first').reset_index(drop=True)
-    GUAT_current_ff_info = GUAT_current_ff_info[GUAT_current_ff_info['time_since_last_visible'] <= max_time_since_last_visible]
+    GUAT_current_ff_info = GUAT_current_ff_info[GUAT_current_ff_info['time_since_last_vis'] <= max_time_since_last_vis]
 
     if include_ff_in_near_future:
         GUAT_current_ff_info = supply_info_of_cluster_to_df(GUAT_current_ff_info, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=max_cluster_distance)
@@ -112,13 +112,13 @@ def find_GUAT_current_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sor
         GUAT_current_ff_info = pd.merge(GUAT_current_ff_info, columns_to_add_back, on=['point_index'], how='left')
 
         # either the ff has appeared lately, or will appear shortly
-        GUAT_current_ff_info = GUAT_current_ff_info[(GUAT_current_ff_info['time_since_last_visible'] <= max_time_since_last_visible) | 
+        GUAT_current_ff_info = GUAT_current_ff_info[(GUAT_current_ff_info['time_since_last_vis'] <= max_time_since_last_vis) | 
                                                     (GUAT_current_ff_info['time_till_next_visible'] <= GUAT_current_ff_info['total_stop_time'] + duration_into_future)] 
 
     # if min_time_till_next_visible is not None:
     #     # This is to eliminate the point_index that has a targeted_ff whose time_till_next_visible is too small; in other words, we only want ff that will not re-appear soon.
     #     GUAT_current_ff_info['time'] = monkey_information.loc[GUAT_current_ff_info['point_index'].values, 'monkey_t'].values
-    #     GUAT_current_ff_info['time_till_next_visible'] = decision_making_utils.find_time_since_last_visible_OR_time_till_next_visible(GUAT_current_ff_info['ff_index'].values, GUAT_current_ff_info['time'].values, ff_dataframe_visible, time_since_last_visible=False)
+    #     GUAT_current_ff_info['time_till_next_visible'] = decision_making_utils.find_time_since_last_vis_OR_time_till_next_visible(GUAT_current_ff_info['ff_index'].values, GUAT_current_ff_info['time'].values, ff_dataframe_visible, time_since_last_vis=False)
     #     GUAT_current_ff_info.loc[GUAT_current_ff_info['ff_index'] < 0, 'time_till_next_visible'] = np.nan
     #     point_index_to_eliminate = GUAT_current_ff_info[GUAT_current_ff_info['time_till_next_visible'] < min_time_till_next_visible]['point_index'].values
     #     print('The number of point indices eliminated because of time_till_next_visible is', len(point_index_to_eliminate), 'which is', round(len(point_index_to_eliminate)/len(GUAT_current_ff_info)*100, 2), '% of the total number of point indices.')
@@ -138,15 +138,15 @@ def find_GUAT_current_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sor
 
 
 def find_GUAT_alt_ff_info(GUAT_current_ff_info, ff_dataframe, ff_real_position_sorted, monkey_information, 
-                          max_time_since_last_visible=2.5, 
+                          max_time_since_last_vis=2.5, 
                           max_distance_to_stop=400,
                           duration_into_future=0.5, 
                           include_ff_in_near_future=True):
 
     # find the info of the alternative ff that's not within the same cluster as the current ff
     GUAT_alt_ff_info = ff_dataframe[ff_dataframe['point_index'].isin(GUAT_current_ff_info['point_index'].values)].copy()
-    GUAT_alt_ff_info = GUAT_alt_ff_info[GUAT_alt_ff_info['time_since_last_visible'] <= max_time_since_last_visible]
-    GUAT_alt_ff_info = GUAT_alt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_visible', 'point_index', 'ff_index','abs_curv_diff']]
+    GUAT_alt_ff_info = GUAT_alt_ff_info[GUAT_alt_ff_info['time_since_last_vis'] <= max_time_since_last_vis]
+    GUAT_alt_ff_info = GUAT_alt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis', 'point_index', 'ff_index','abs_curv_diff']]
     GUAT_alt_ff_info['distance_to_monkey'] = GUAT_alt_ff_info['ff_distance']
     GUAT_alt_ff_info['distance_to_stop'] = GUAT_alt_ff_info['ff_distance']
     GUAT_alt_ff_info = GUAT_alt_ff_info[GUAT_alt_ff_info['distance_to_stop'] < max_distance_to_stop].copy()
@@ -202,11 +202,11 @@ def make_sure_GUAT_alt_ff_info_and_GUAT_current_ff_info_have_the_same_point_indi
 
 def polish_GUAT_current_ff_info(GUAT_current_ff_info):
     GUAT_current_ff_info = GUAT_current_ff_info.sort_values(by=['point_index']).reset_index(drop=True)
-    GUAT_current_ff_info = GUAT_current_ff_info[['num_stops', 'ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_visible', 
-                                                 'time_till_next_visible', 'duration_of_last_visible_period', 'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']].copy()
+    GUAT_current_ff_info = GUAT_current_ff_info[['num_stops', 'ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis', 
+                                                 'time_till_next_visible', 'duration_of_last_vis_period', 'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']].copy()
     GUAT_current_ff_info.sort_values(by=['point_index'], inplace=True)
 
-    GUAT_current_ff_info = _clip_time_since_last_visible_and_time_till_next_visible(GUAT_current_ff_info)
+    GUAT_current_ff_info = _clip_time_since_last_vis_and_time_till_next_visible(GUAT_current_ff_info)
 
     GUAT_current_ff_info = _add_num_ff_in_cluster(GUAT_current_ff_info)
 
@@ -215,8 +215,8 @@ def polish_GUAT_current_ff_info(GUAT_current_ff_info):
 
 
 def polish_GUAT_alt_ff_info(GUAT_alt_ff_info, GUAT_current_ff_info, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information, 
-                            columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_visible'], max_cluster_distance=50,
-                            max_time_since_last_visible=2.5, duration_into_future=0.5,
+                            columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_vis'], max_cluster_distance=50,
+                            max_time_since_last_vis=2.5, duration_into_future=0.5,
                             take_one_row_for_each_point_and_find_cluster=False):
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == True].copy()
@@ -233,10 +233,10 @@ def polish_GUAT_alt_ff_info(GUAT_alt_ff_info, GUAT_current_ff_info, ff_real_posi
     # find the info of additional columnsfor GUAT_alt_ff_info
     GUAT_alt_ff_info = decision_making_utils.find_many_ff_info_anew(GUAT_alt_ff_info['ff_index'].values, GUAT_alt_ff_info['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
     
-    GUAT_alt_ff_info = GUAT_alt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_visible', 'time_till_next_visible', 'duration_of_last_visible_period', 'point_index', 'ff_index']].copy()
+    GUAT_alt_ff_info = GUAT_alt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis', 'time_till_next_visible', 'duration_of_last_vis_period', 'point_index', 'ff_index']].copy()
     GUAT_alt_ff_info = GUAT_alt_ff_info.merge(GUAT_alt_ff_info_old[['point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']], on=['point_index', 'ff_index'], how='left')
 
-    GUAT_alt_ff_info = GUAT_alt_ff_info[(GUAT_alt_ff_info['time_since_last_visible'] <= max_time_since_last_visible) | 
+    GUAT_alt_ff_info = GUAT_alt_ff_info[(GUAT_alt_ff_info['time_since_last_vis'] <= max_time_since_last_vis) | 
                                         (GUAT_alt_ff_info['time_till_next_visible'] <= GUAT_alt_ff_info['total_stop_time']  + duration_into_future)] # either the ff has appeared lately, or will appear shortly
     
     # # since we just added cluster ff, once again we need to eliminate the info of the ff in GUAT_alt_ff_info that's also in GUAT_current_ff_info at the same point indices
@@ -244,15 +244,15 @@ def polish_GUAT_alt_ff_info(GUAT_alt_ff_info, GUAT_current_ff_info, ff_real_posi
 
     GUAT_alt_ff_info.sort_values(by=['point_index'], inplace=True)
 
-    GUAT_alt_ff_info = _clip_time_since_last_visible_and_time_till_next_visible(GUAT_alt_ff_info)
+    GUAT_alt_ff_info = _clip_time_since_last_vis_and_time_till_next_visible(GUAT_alt_ff_info)
 
     GUAT_alt_ff_info = _add_num_ff_in_cluster(GUAT_alt_ff_info)
 
     return GUAT_alt_ff_info
 
 
-def _clip_time_since_last_visible_and_time_till_next_visible(df, max_time_since_last_visible=5, max_time_till_next_visible=5):
-    df.loc[df['time_since_last_visible'] > max_time_since_last_visible, 'time_since_last_visible'] = max_time_since_last_visible
+def _clip_time_since_last_vis_and_time_till_next_visible(df, max_time_since_last_vis=5, max_time_till_next_visible=5):
+    df.loc[df['time_since_last_vis'] > max_time_since_last_vis, 'time_since_last_vis'] = max_time_since_last_vis
     df.loc[df['time_till_next_visible'] > max_time_till_next_visible, 'time_till_next_visible'] = max_time_till_next_visible
     return df
 
@@ -265,7 +265,7 @@ def _add_num_ff_in_cluster(df):
     return df
 
 
-def add_curv_diff_and_ff_number_to_GUAT_current_ff_info_and_GUAT_alt_ff_info(GUAT_current_ff_info, GUAT_alt_ff_info, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, curv_of_traj_df=None,
+def add_curv_diff_and_ff_number_to_GUAT_current_ff_info_and_GUAT_alt_ff_info(GUAT_current_ff_info, GUAT_alt_ff_info, ff_caught_T_new, ff_real_position_sorted, monkey_information, curv_of_traj_df=None,
                                                                              ff_priority_criterion='abs_curv_diff'):
     
     # Note: in order not to feed the input with additional data, we will let curv_of_traj_df = curv_of_traj_df 
@@ -293,7 +293,7 @@ def find_additional_ff_info_for_near_future(unique_point_index_and_time_df, ff_d
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == True].copy()
     ff_info = decision_making_utils.find_many_ff_info_anew(all_available_ff_in_near_future.ff_index.values, all_available_ff_in_near_future.point_index.values, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
     ff_info = ff_info[ff_info.ff_angle_boundary.between(-90*math.pi/180, 90*math.pi/180)]
-    ff_info = ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_visible', 'point_index', 'ff_index']]
+    ff_info = ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis', 'point_index', 'ff_index']]
 
     if add_distance_to_monkey:
         ff_info = ff_info.merge(original_all_available_ff_in_near_future[['point_index', 'ff_index', 'distance_to_monkey']], on=['point_index', 'ff_index'], how='left')
@@ -302,7 +302,7 @@ def find_additional_ff_info_for_near_future(unique_point_index_and_time_df, ff_d
 
 def find_available_ff_in_near_future(unique_point_index_and_time_df, ff_dataframe, duration_into_future=0.5):
     ff_dataframe = ff_dataframe.copy()
-    ff_dataframe['ff_starting_visible_time'] = ff_dataframe['time'] + ff_dataframe['time_since_last_visible']
+    ff_dataframe['ff_starting_visible_time'] = ff_dataframe['time'] + ff_dataframe['time_since_last_vis']
     all_available_ff_in_near_future = pd.DataFrame([], columns=['ff_index', 'point_index'])
     for index, row in unique_point_index_and_time_df.iterrows():
         # find a duration of N seconds starting from the point_index and take out the subset from ff_dataframe_visible
@@ -379,10 +379,10 @@ def update_point_index_of_important_df_in_important_info_func(important_info, ne
 
 
 def find_possible_objects_of_pursuit(all_relevant_indices, ff_dataframe, max_distance_to_stop_for_GUAT_target=50,
-                                     max_allowed_time_since_last_visible=2.5):
+                                     max_allowed_time_since_last_vis=2.5):
     # find corresponding info in ff_dataframe at time (in-memory ff and visible ff)
     ff_info = ff_dataframe.loc[ff_dataframe['point_index'].isin(all_relevant_indices)].copy()
-    ff_info = ff_info[ff_info['time_since_last_visible'] <= max_allowed_time_since_last_visible]
+    ff_info = ff_info[ff_info['time_since_last_vis'] <= max_allowed_time_since_last_vis]
 
     # among them, find ff close to monkey's position (within max_distance_to_stop_for_GUAT_target to the center of the ff), all of them can be possible targets
     ff_info = ff_info[ff_info['ff_distance'] < max_distance_to_stop_for_GUAT_target].copy()

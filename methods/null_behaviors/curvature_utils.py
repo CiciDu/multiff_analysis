@@ -15,7 +15,7 @@ from scipy import stats
 
 
 def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_optimal_arc=15, clean=True, 
-                      monkey_information=None, ff_caught_T_sorted=None,
+                      monkey_information=None, ff_caught_T_new=None,
                       remove_invalid_rows=True, invalid_curvature_ok=False,
                       include_curv_to_ff_center=True, include_optimal_curvature=True,
                       optimal_arc_stop_at_visible_boundary=False,
@@ -35,7 +35,7 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_optimal_a
     if optimal_arc_stop_at_visible_boundary & (len(ff_dataframe_sub) > 100000):
         print('Warning: The number of ff is larger than 100000, and optimal_arc_stop_at_visible_boundary is set to True. This might take a long time to calculate the optimal arc.')
 
-    curv_of_traj = trajectory_info.find_trajectory_arc_info(ff_dataframe_sub['point_index'].values, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_sorted=ff_caught_T_sorted)
+    curv_of_traj = trajectory_info.find_trajectory_arc_info(ff_dataframe_sub['point_index'].values, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_new=ff_caught_T_new)
 
     curvature_df = _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_optimal_arc=ff_radius_for_optimal_arc, clean=clean, invalid_curvature_ok=invalid_curvature_ok,
                                       include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature,
@@ -120,7 +120,7 @@ def add_d_heading_info(curvature_df, include_curv_to_ff_center=True, include_opt
         curvature_df['optimal_arc_d_heading'] = curvature_df['optimal_arc_measure'] * curvature_df['optimal_arc_end_direction'].values
 
 
-def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df, ff_caught_T_sorted=None, clean=False):
+def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df, ff_caught_T_new=None, clean=False):
     if curv_of_traj_df is None:
         raise ValueError("Please provide curv_of_traj_df, since it's needed to calculate the curvature of the trajectory.")
     ff_dataframe_sub = ff_dataframe[(ff_dataframe['time'].between(duration_to_plot[0], duration_to_plot[1])) & 
@@ -129,7 +129,7 @@ def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plo
     # eliminate ff whose angle is outside (-45 deg, 45 deg)
     ff_dataframe_sub = ff_dataframe_sub[ff_dataframe_sub.ff_angle.between(-45*math.pi/180, 45*math.pi/180)]
 
-    curvature_df_in_duration = make_curvature_df(ff_dataframe_sub, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_sorted=ff_caught_T_sorted, clean=clean)
+    curvature_df_in_duration = make_curvature_df(ff_dataframe_sub, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_new=ff_caught_T_new, clean=clean)
     curvature_df_in_duration['time'] = monkey_information.loc[curvature_df_in_duration['point_index'].values, 'monkey_t'].values
     return curvature_df_in_duration
 
@@ -321,7 +321,7 @@ def clean_curvature_info(curvature_df, include_optimal_curvature=True):
             curvature_df['abs_curv_diff'] = np.abs(curvature_df['curv_diff'].values)
 
 
-def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_sorted=None, curv_of_traj_df=None):
+def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_new=None, curv_of_traj_df=None):
     if 'optimal_curvature' in df.columns:
         # need to fill NA of columns associated with curvature. At this point, NA should only occur when ff_index = -10 (placeholders). Thus, we fill NA with 0, instead of using the function 'fill_up_NAs_in_columns_related_to_curvature'
         df['optimal_curvature'] = df[['optimal_curvature']].fillna(0)
@@ -337,22 +337,22 @@ def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_info
     
     if 'curvature_of_traj' in df.columns:
         if len(point_index_array) > 0:
-            curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_sorted=ff_caught_T_sorted, monkey_information=monkey_information)
+            curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
             df.loc[df.curvature_of_traj.isna(), 'curvature_of_traj'] = curvature_of_traj    
     return df
 
 
-def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_sorted=None, curv_of_traj_df=None):
+def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_new=None, curv_of_traj_df=None):
     # assume that none of the ff is a placeholder ff, but just ff that doesn't have valid arc information
 
     # if there's any NA in curvature_of_traj, then we recalculate them
     if 'curvature_of_traj' in df.columns:
         curv_traj_na_index = df['curvature_of_traj'].isna()
         if curv_traj_na_index.any():
-            if (ff_caught_T_sorted is None) or (curv_of_traj_df is None):
-                raise ValueError("Please provide ff_caught_T_sorted and curv_of_traj_df, since it's needed to calculate curvature_of_traj.")
+            if (ff_caught_T_new is None) or (curv_of_traj_df is None):
+                raise ValueError("Please provide ff_caught_T_new and curv_of_traj_df, since it's needed to calculate curvature_of_traj.")
             point_index_array = df.loc[curv_traj_na_index, 'point_index'].values
-            curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_sorted=ff_caught_T_sorted, monkey_information=monkey_information)
+            curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
             df.loc[curv_traj_na_index, 'curvature_of_traj'] = curvature_of_traj
             df['curvature_of_traj'] = df['curvature_of_traj'].clip(lower=-0.5, upper=0.5)
 

@@ -65,7 +65,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     counter = 0
 
 
-    variable_of_interest = "t_last_visible"
+    variable_of_interest = "t_last_vis"
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     sns.histplot(data = all_trial_features_valid_agent[variable_of_interest], kde = False, alpha = 0.4, color = "green", binwidth = 0.1, stat="probability")
@@ -95,7 +95,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     axes.set_xlabel("Number of Fireflies", fontsize=11)
 
 
-    variable_of_interest = "abs_angle_last_visible"
+    variable_of_interest = "abs_angle_last_vis"
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     sns.histplot(data = all_trial_features_valid_agent[variable_of_interest], kde = False, binwidth=0.02, alpha = 0.3, color = "green", stat="probability", edgecolor='grey')
@@ -126,7 +126,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     axes.set_title("Number of Stops During Trials", fontsize=11)
 
 
-    variable_of_interest = "d_last_visible"
+    variable_of_interest = "d_last_vis"
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     sns.histplot(data = all_trial_features_valid_agent[variable_of_interest]/100, kde = False, alpha = 0.3,  color = "green", binwidth=2, stat="probability",  edgecolor='grey')
@@ -268,7 +268,7 @@ def plot_feature_statistics(feature_statistics, compare_monkey_and_agent=False, 
                                    x="Player", y="Mean", percentage=False, subplots=True)
     
     else:        
-        subset = feature_statistics[feature_statistics['Item'].isin(['t', 't_last_visible', 'abs_angle_last_visible', 'num_stops', 'num_stops_near_target'])]
+        subset = feature_statistics[feature_statistics['Item'].isin(['t', 't_last_vis', 'abs_angle_last_vis', 'num_stops', 'num_stops_near_target'])]
 
         # Create a 1x2 subplot
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
@@ -491,8 +491,8 @@ def fit_and_plot_linear_regression(x_array, y_array, show_regression=True, show_
     matplotlib.rcParams.update({'font.size': 15})
     model = LinearRegression()
     model.fit(x_array.reshape((-1, 1)), y_array)
-    r_squared = model.score(x_array.reshape((-1, 1)), y_array)
-    r = math.sqrt(r_squared)
+    slope, intercept, r_value, p_value, std_err = stats.linregress(x_array, y_array)
+    r_squared = r_value**2
     p1 = sns.scatterplot(x=x_array, y=y_array, hue=hue, ax=ax, s=50)
     if print_r_squared:
         print('coefficient of determination:', r_squared)
@@ -501,7 +501,7 @@ def fit_and_plot_linear_regression(x_array, y_array, show_regression=True, show_
     if show_r:
         text_x_position=min(x_array) + 0.1*(max(x_array)-min(x_array))
         text_y_position=min(y_array) + 0.8*(max(y_array)-min(y_array))
-        plt.text(text_x_position, text_y_position, f'$r = {round(r, 2)}$')
+        plt.text(text_x_position, text_y_position, f'r = {round(r_value, 2)}; p = {round(p_value, 2)}', fontsize=15)
 
 
 def plot_correlations_in_record(df, parameter_columns = ['action_noise_std', 'ffxy_noise_std', 'num_obs_ff', 'max_in_memory_time'], 

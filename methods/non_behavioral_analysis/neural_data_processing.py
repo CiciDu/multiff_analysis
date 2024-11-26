@@ -30,7 +30,7 @@ def make_spike_df(raw_data_folder_path="all_monkey_data/raw_monkey_data/individu
     
     neural_data_folder_path = os.path.join(raw_data_folder_path, "neural_data/Sorted")
 
-    accurate_start_time, accurate_end_time = process_raw_data.find_start_and_accurate_end_time(raw_data_folder_path, exists_ok=True, return_signal_df=False)
+    accurate_start_time, accurate_end_time = process_raw_data.find_start_and_accurate_end_time(raw_data_folder_path)
     align_neural_data_df = pd.read_csv(os.path.join(raw_data_folder_path, 'neural_data_alignment.txt'))
 
     spike_times = load_spike_times(neural_data_folder_path)

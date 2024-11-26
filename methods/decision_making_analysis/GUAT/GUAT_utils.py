@@ -23,11 +23,11 @@ np.set_printoptions(suppress=True)
 
 
 
-def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_sorted, min_distance_between_distinct_stops=15, min_distance_from_other_stops=100, 
+def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_new, min_distance_between_distinct_stops=15, min_distance_from_other_stops=100, 
                                    min_cum_distance_to_ff_capture=100, min_distance_to_ff=25, max_distance_to_ff=50):
     distinct_stops_df = get_distinct_stops_df(monkey_information, min_distance_between_distinct_stops)
     filtered_stops_df = get_filtered_stops_df(distinct_stops_df, min_distance_from_other_stops)
-    filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(filtered_stops_df, monkey_information, ff_caught_T_sorted, min_cum_distance_to_ff_capture)
+    filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture)
     one_stop_df = get_one_stop_df(filtered_stops_df, ff_dataframe, min_distance_to_ff, max_distance_to_ff)
 
     return one_stop_df
@@ -36,7 +36,7 @@ def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T
 def make_one_stop_w_ff_df(one_stop_df):
 
     # group one_stop_df by 'point_index' and make a list out of all ff_indices for each point_index
-    one_stop_df.sort_values(by=['point_index', 'time_since_last_visible'], ascending=[True, True], inplace=True)
+    one_stop_df.sort_values(by=['point_index', 'time_since_last_vis'], ascending=[True, True], inplace=True)
     ff_around_stop_df = one_stop_df[['point_index', 'ff_index']].groupby('point_index')['ff_index'].apply(list).reset_index(drop=False)
     ff_around_stop_df['latest_visible_ff'] = one_stop_df.groupby('point_index')['ff_index'].first().values
     one_stop_w_ff_df = ff_around_stop_df.merge(one_stop_df[['target_index', 'time', 'point_index']].drop_duplicates(), on='point_index', how='left')
@@ -83,11 +83,11 @@ def get_filtered_stops_df(distinct_stops_df, min_distance_from_other_stops=100):
     return filtered_stops_df
 
 
-def filter_stops_based_on_distance_to_ff_capture(filtered_stops_df, monkey_information, ff_caught_T_sorted, min_cum_distance_to_ff_capture=100):
+def filter_stops_based_on_distance_to_ff_capture(filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture=100):
     # eliminate the stops that are too close to a ff capture (within min_cum_distance_to_ff_capture)
 
-    # first find the corresponding point index of each time point in ff_caught_T_sorted
-    ff_caught_points_sorted = np.searchsorted(monkey_information['time'].values, ff_caught_T_sorted)
+    # first find the corresponding point index of each time point in ff_caught_T_new
+    ff_caught_points_sorted = np.searchsorted(monkey_information['time'].values, ff_caught_T_new)
     ff_caught_points_df = monkey_information[monkey_information['point_index'].isin(ff_caught_points_sorted)].copy()
 
     # for each value in filtered_stops_df's cum_distance column, find the closest cum_distance in ff_caught_points
@@ -124,12 +124,12 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
                     GUAT_trials_df, 
                     ff_dataframe, 
                     max_distance_to_stop_for_GUAT_target=50, 
-                    max_allowed_time_since_last_visible=2.5):
+                    max_allowed_time_since_last_vis=2.5):
 
     GUAT_df = GUAT_indices_df[['point_index', 'cluster_index']].copy()
 
     GUAT_ff_info = GUAT_df.merge(ff_dataframe, on='point_index', how='left')
-    GUAT_ff_info = GUAT_ff_info[GUAT_ff_info['time_since_last_visible'] <= max_allowed_time_since_last_visible]
+    GUAT_ff_info = GUAT_ff_info[GUAT_ff_info['time_since_last_vis'] <= max_allowed_time_since_last_vis]
     # among them, find ff close to monkey's position (within max_distance_to_stop_for_GUAT_target to the center of the ff), all of them can be possible targets
     GUAT_ff_info = GUAT_ff_info[GUAT_ff_info['ff_distance'] < max_distance_to_stop_for_GUAT_target].copy()
 
@@ -138,7 +138,7 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     GUAT_ff_info2.rename(columns={'ff_index': 'nearby_alive_ff_indices'}, inplace=True)
     
     # also get latest visible ff
-    GUAT_ff_info.sort_values(by=['cluster_index', 'time_since_last_visible'], ascending=[True, True], inplace=True)    
+    GUAT_ff_info.sort_values(by=['cluster_index', 'time_since_last_vis'], ascending=[True, True], inplace=True)    
     GUAT_ff_info2['latest_visible_ff'] = GUAT_ff_info.groupby('cluster_index')['ff_index'].first().values
 
     GUAT_expanded_trials_df = GUAT_trials_df.merge(GUAT_ff_info2, on='cluster_index', how='left')

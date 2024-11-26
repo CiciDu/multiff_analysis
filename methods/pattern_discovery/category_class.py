@@ -49,7 +49,7 @@ class ProcessCategoryData:
         self.ff_flash_sorted = ff_flash_sorted
         self.PlotTrials_args = PlotTrials_args
         (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, 
-                                  self.cluster_around_target_indices, self.ff_caught_T_sorted) = PlotTrials_args
+                                  self.cluster_around_target_indices, self.ff_caught_T_new) = PlotTrials_args
 
         self.sort_1_name = sort_1_name
         self.sort_2_name = sort_2_name
@@ -84,20 +84,20 @@ class ProcessCategoryData:
 
         self.sort_1_trials_ending_time  = sort_1_trials_ending_time
         if self.sort_1_trials_ending_time is None:
-            self.sort_1_trials_ending_time = self.ff_caught_T_sorted[self.sort_1_trials]
+            self.sort_1_trials_ending_time = self.ff_caught_T_new[self.sort_1_trials]
 
         self.sort_2_trials_ending_time  = sort_2_trials_ending_time
         if self.sort_2_trials_ending_time is None:
-            self.sort_2_trials_ending_time = self.ff_caught_T_sorted[self.sort_2_trials]
+            self.sort_2_trials_ending_time = self.ff_caught_T_new[self.sort_2_trials]
 
 
         self.sort_1_time_for_predicting_ff = sort_1_time_for_predicting_ff
         if self.sort_1_time_for_predicting_ff is None:
-            self.sort_1_time_for_predicting_ff = self.ff_caught_T_sorted[self.sort_1_trials-1]
+            self.sort_1_time_for_predicting_ff = self.ff_caught_T_new[self.sort_1_trials-1]
 
         self.sort_2_time_for_predicting_ff = sort_2_time_for_predicting_ff
         if self.sort_2_time_for_predicting_ff is None:
-            self.sort_2_time_for_predicting_ff = self.ff_caught_T_sorted[self.sort_2_trials-1]
+            self.sort_2_time_for_predicting_ff = self.ff_caught_T_new[self.sort_2_trials-1]
 
 
 
@@ -155,7 +155,7 @@ class ProcessCategoryData:
     def clean_out_trials_where_target_cluster_was_not_seen_for_a_long_time_before_capture(self, max_not_seen_time=3):
         # Eliminate the cases where during the max_not_seen_time up to catching the target, the monkey has not been visible to the monkey
         original_length = len(self.sort_1_df)
-        new_indices = np.where(self.sort_1_df['time_since_last_visible'] < max_not_seen_time)[0]
+        new_indices = np.where(self.sort_1_df['time_since_last_vis'] < max_not_seen_time)[0]
         new_length = len(self.sort_1_df)
         self.sort_1_df = self.sort_1_df.iloc[new_indices]
         self.sort_1_trials = self.sort_1_trials[new_indices]
@@ -167,7 +167,7 @@ class ProcessCategoryData:
 
 
         original_length = len(self.sort_2_df)
-        new_indices = np.where(self.sort_2_df['time_since_last_visible'] < max_not_seen_time)[0]
+        new_indices = np.where(self.sort_2_df['time_since_last_vis'] < max_not_seen_time)[0]
         new_length = len(self.sort_2_df)
         self.sort_2_df = self.sort_2_df.iloc[new_indices]
         self.sort_2_trials = self.sort_2_trials[new_indices]
@@ -188,9 +188,9 @@ class ProcessCategoryData:
         fig = plt.figure(figsize=(8, 8))
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], polar=True)
         ax = plot_behaviors_utils.set_polar_background_for_plotting(ax, 400, color_visible_area_in_background=True)
-        ax.scatter(self.sort_1_df_sample['last_visible_angles'], self.sort_1_df_sample['last_visible_distances'], c="green", alpha=0.7, zorder=2, s=5, marker='o') # originally it was s=15
+        ax.scatter(self.sort_1_df_sample['last_vis_ang'], self.sort_1_df_sample['last_vis_dist'], c="green", alpha=0.7, zorder=2, s=5, marker='o') # originally it was s=15
         # sample from it so the size is the same as target_cluster_info
-        ax.scatter(self.sort_2_df_sample['last_visible_angles'], self.sort_2_df_sample['last_visible_distances'], c="red", alpha=0.4, zorder=2, s=5, marker='o') # originally it was s=15
+        ax.scatter(self.sort_2_df_sample['last_vis_ang'], self.sort_2_df_sample['last_vis_dist'], c="red", alpha=0.4, zorder=2, s=5, marker='o') # originally it was s=15
         plt.title("Firefly Last Seen Positions", fontsize=17)
         plt.legend(labels=[self.sort_1_name, self.sort_2_name], fontsize=13, loc="upper right")
         plt.show()
@@ -202,7 +202,7 @@ class ProcessCategoryData:
         sns.set_style(style="darkgrid")
 
 
-        variable_of_interest = "time_since_last_visible"
+        variable_of_interest = "time_since_last_vis"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
             fig, axes = plt.subplots()
             sns.histplot(data = self.sort_1_df[variable_of_interest], kde = False, alpha = 0.4, color = "green", binwidth = 0.1, stat="probability")
@@ -214,7 +214,7 @@ class ProcessCategoryData:
             plt.show()
             
 
-        variable_of_interest = "abs_last_visible_angles"
+        variable_of_interest = "abs_last_vis_ang"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
             fig, axes = plt.subplots()
             sns.histplot(data = self.sort_1_df[variable_of_interest], kde = False, binwidth=0.02, alpha = 0.3, color = "green", stat="probability", edgecolor='grey')
@@ -229,7 +229,7 @@ class ProcessCategoryData:
             plt.show()
             
 
-        variable_of_interest = "abs_last_visible_angles_to_boundary"
+        variable_of_interest = "abs_last_vis_ang_to_bndry"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
             fig, axes = plt.subplots()
             sns.histplot(data = self.sort_1_df[variable_of_interest], kde = False, binwidth=0.02, alpha = 0.3, color = "green", stat="probability", edgecolor='grey')
@@ -245,7 +245,7 @@ class ProcessCategoryData:
             
 
 
-        variable_of_interest = "last_visible_distances"
+        variable_of_interest = "last_vis_dist"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
             fig, axes = plt.subplots()
             sns.histplot(data = self.sort_1_df[variable_of_interest], kde = False, alpha = 0.3,  color = "green", binwidth=10, stat="probability",  edgecolor='grey')
@@ -305,11 +305,11 @@ class ProcessCategoryData:
         ax = plot_behaviors_utils.set_polar_background_for_plotting(ax, 400, color_visible_area_in_background=True)
 
 
-        prev_target_caught_T = self.ff_caught_T_sorted[self.sort_1_trials-1][self.sort_1_sample_indices]
+        prev_target_caught_T = self.ff_caught_T_new[self.sort_1_trials-1][self.sort_1_sample_indices]
         target_distances, target_angles = decision_making_utils.get_distance_and_angle_from_previous_target(self.sort_1_ff_positions[self.sort_1_sample_indices], prev_target_caught_T, self.monkey_information)
         ax.scatter(target_angles, target_distances, c="green", alpha=0.7, zorder=2, s=5, marker='o') # originally it was s=15
 
-        prev_target_caught_T = self.ff_caught_T_sorted[self.sort_2_trials-1][self.sort_2_sample_indices]
+        prev_target_caught_T = self.ff_caught_T_new[self.sort_2_trials-1][self.sort_2_sample_indices]
         target_distances, target_angles = decision_making_utils.get_distance_and_angle_from_previous_target(self.sort_2_ff_positions[self.sort_2_sample_indices], prev_target_caught_T, self.monkey_information)
         ax.scatter(target_angles, target_distances, c="red", alpha=0.7, zorder=2, s=5, marker='o') # originally it was s=15
         plt.legend(labels=[self.sort_1_name, self.sort_2_name], fontsize=11, loc="upper right")
@@ -334,10 +334,10 @@ class ProcessCategoryData:
         # plot the chunks
         for trial in trials:
             with basic_func.initiate_plot(7, 7, 100):
-                duration = [self.ff_caught_T_sorted[trial-1]-2, self.ff_caught_T_sorted[trial]+0.01]
+                duration = [self.ff_caught_T_new[trial-1]-2, self.ff_caught_T_new[trial]+0.01]
                 print("duration", duration)
 
-                temp_plotting_kwargs['null_agent_starting_time'] = self.ff_caught_T_sorted[trial-1]
+                temp_plotting_kwargs['null_agent_starting_time'] = self.ff_caught_T_new[trial-1]
                 for i in range(1):
                     fig = plt.figure()
                     returned_info = plot_trials.PlotTrials(duration,
@@ -358,8 +358,8 @@ class ProcessCategoryData:
         # Compare box plots (or violin plots) of two cases:
         # After catching previous ff, how many ff are visible? How many are in memory?
 
-        num_visible_ff, num_in_memory_ff = pattern_by_points.find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(self.sort_1_trials-1, self.ff_caught_T_sorted, self.ff_dataframe)
-        num_visible_ff_else, num_in_memory_ff_else = pattern_by_points.find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(self.sort_2_trials-1, self.ff_caught_T_sorted, self.ff_dataframe)
+        num_visible_ff, num_in_memory_ff = pattern_by_points.find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(self.sort_1_trials-1, self.ff_caught_T_new, self.ff_dataframe)
+        num_visible_ff_else, num_in_memory_ff_else = pattern_by_points.find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(self.sort_2_trials-1, self.ff_caught_T_new, self.ff_dataframe)
 
 
         fig = plt.figure(figsize=(8, 6))
@@ -398,7 +398,7 @@ class ProcessCategoryData:
         if use_sort_1:
             print("Predictions on free selection trials using the trained model: ", self.sort_1_name)
             self.sort_1_inputs, self.sort_1_labels, self.sort_1_y_pred = free_selection.make_free_selection_predictions_using_trained_model(trained_model, self.sort_1_ff_indices, self.sort_1_trials, self.ff_dataframe, 
-                                                                                                                                            self.ff_real_position_sorted, self.ff_caught_T_sorted, self.monkey_information, time_of_evaluation=self.sort_1_time_for_predicting_ff)
+                                                                                                                                            self.ff_real_position_sorted, self.ff_caught_T_new, self.monkey_information, time_of_evaluation=self.sort_1_time_for_predicting_ff)
              
             if sort_1_select_trials is not None:
             # find corresponding indices of select_trials in trials
@@ -415,7 +415,7 @@ class ProcessCategoryData:
         if use_sort_2:
             print("Predictions on free selection trials using the trained model: ", self.sort_2_name)
             self.sort_2_inputs, self.sort_2_labels, self.sort_2_y_pred = free_selection.make_free_selection_predictions_using_trained_model(trained_model, self.sort_2_ff_indices, self.sort_2_trials, self.ff_dataframe, self.ff_real_position_sorted, 
-                                                                                         self.ff_caught_T_sorted, self.monkey_information, time_of_evaluation=self.sort_2_time_for_predicting_ff)
+                                                                                         self.ff_caught_T_new, self.monkey_information, time_of_evaluation=self.sort_2_time_for_predicting_ff)
 
             if sort_2_select_trials is not None:
                 selected_cases = np.where(np.isin(self.sort_2_trials, sort_2_select_trials))[0]
@@ -457,7 +457,7 @@ class ProcessCategoryData:
 
 
                 with basic_func.initiate_plot(7, 7, 100):
-                    duration = [self.ff_caught_T_sorted[trial]-3, self.ff_caught_T_sorted[trial]+0.01]
+                    duration = [self.ff_caught_T_new[trial]-3, self.ff_caught_T_new[trial]+0.01]
                     print("duration", duration)
 
                     for i in range(1):
@@ -465,7 +465,7 @@ class ProcessCategoryData:
                         returned_info = plot_trials.PlotTrials(duration,
                                 *self.PlotTrials_args,
                                 **self.temp_plotting_kwargs,
-                                null_agent_starting_time = self.ff_caught_T_sorted[trial-1],
+                                null_agent_starting_time = self.ff_caught_T_new[trial-1],
                                 show_points_when_ff_stop_being_visible = False,
                                 show_path_when_target_visible=True,
                                 truncate_part_before_crossing_arena_edge=False,

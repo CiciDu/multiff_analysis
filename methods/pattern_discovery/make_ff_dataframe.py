@@ -14,11 +14,11 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
 
-def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sorted,  
+def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,  
                             ff_real_position_sorted, ff_life_sorted, player = "monkey", 
                             max_distance = 500, ff_radius = 10, reward_boundary_radius = 25, 
                             data_folder_name = None, num_missed_index = None, print_progress = True, 
-                            obs_ff_indices_in_ff_dataframe = None, max_time_since_last_visible = 3,
+                            obs_ff_indices_in_ff_dataframe = None, max_time_since_last_vis = 3,
                             ff_in_obs_df = None, to_furnish_ff_dataframe=True,
                             truncate_info_beyond_capture = True):
 
@@ -30,7 +30,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sort
     ----------
     monkey_information: df
         containing the speed, angle, and location of the monkey at various points of time
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
         containing the time when each captured firefly gets captured
     ff_flash_sorted: list
         containing the time that each firefly flashes on and off
@@ -66,38 +66,38 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sort
     """
 
     dt = (monkey_information['monkey_t'].iloc[-1] - monkey_information['monkey_t'].iloc[0])/(len(monkey_information)-1)
-    if max_time_since_last_visible is None:
+    if max_time_since_last_vis is None:
       max_memory = 200
     else:
-      max_memory = int((max_time_since_last_visible/dt)*1.2) # we use 1.2 here to make sure that the time range covers the max_time_since_last_visible
+      max_memory = int((max_time_since_last_vis/dt)*1.2) # we use 1.2 here to make sure that the time range covers the max_time_since_last_vis
     # max_memory: the numeric value of the variable "memory" for a firefly when it's fully visible
 
     if player == 'monkey':
-      if len(ff_caught_T_sorted) < 1:
+      if len(ff_caught_T_new) < 1:
           return ff_dataframe_utils.make_empty_ff_dataframe()
       # Let's use data from monkey_information. But we shall cut off portion that is before the time of capturing the first target and the after capturing the last target
-      valid_index, num_missed_index = ff_dataframe_utils.find_valid_indices(monkey_information, ff_caught_T_sorted, player=player, num_missed_index=num_missed_index)
+      valid_index, num_missed_index = ff_dataframe_utils.find_valid_indices(monkey_information, ff_caught_T_new, player=player, num_missed_index=num_missed_index)
       if len(valid_index) == 0:
           return ff_dataframe_utils.make_empty_ff_dataframe()
     else:
       valid_index = np.arange(len(monkey_information))
       num_missed_index = 0
-      if len(ff_caught_T_sorted) == 0:
-         ff_caught_T_sorted = [monkey_information['monkey_t'].max() + 10]
+      if len(ff_caught_T_new) == 0:
+         ff_caught_T_new = [monkey_information['monkey_t'].max() + 10]
         
     ff_index = []
     point_index = []
     visible = []
     memory = []
-    time_since_last_visible = []
+    time_since_last_vis = []
     total_ff_num = len(ff_life_sorted)
 
     starting_ff = {"monkey": 1, "agent": 0}
     for i in range(starting_ff[player], total_ff_num):
       current_ff_index = i
 
-      visible_indices, memory_array, in_memory_indices, time_since_last_visible_array = ff_dataframe_utils.find_visible_indices_AND_memory_array_AND_time_since_last_visible(current_ff_index, monkey_information, valid_index, obs_ff_indices_in_ff_dataframe, ff_flash_sorted, \
-                                                                                              ff_real_position_sorted, ff_caught_T_sorted, max_distance, player, max_memory, truncate_info_beyond_capture=truncate_info_beyond_capture)
+      visible_indices, memory_array, in_memory_indices, time_since_last_vis_array = ff_dataframe_utils.find_visible_indices_AND_memory_array_AND_time_since_last_vis(current_ff_index, monkey_information, valid_index, obs_ff_indices_in_ff_dataframe, ff_flash_sorted, \
+                                                                                              ff_real_position_sorted, ff_caught_T_new, max_distance, player, max_memory, truncate_info_beyond_capture=truncate_info_beyond_capture)
       if len(visible_indices) > 0:
         num_points_in_memory = len(memory_array)
 
@@ -106,7 +106,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sort
         point_index = point_index + [point + num_missed_index for point in in_memory_indices.tolist()]
         visible = visible + [1 if point == max_memory else 0 for point in memory_array.tolist()]
         memory = memory + memory_array.tolist()
-        time_since_last_visible = time_since_last_visible + time_since_last_visible_array.tolist()
+        time_since_last_vis = time_since_last_vis + time_since_last_vis_array.tolist()
         # In the following, "relevant" means in memory
         
       if i % 100 == 0:
@@ -114,7 +114,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sort
           print("Making ff_dataframe: ", i, " out of ", total_ff_num, " total number of fireflies ")
 
     ff_dict = {'ff_index': ff_index, 'point_index': point_index, 
-                'visible': visible, 'memory': memory, 'time_since_last_visible': time_since_last_visible}
+                'visible': visible, 'memory': memory, 'time_since_last_vis': time_since_last_vis}
     
     ff_dataframe = pd.DataFrame(ff_dict).reset_index(drop=True)
 
@@ -130,15 +130,15 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_sorted, ff_flash_sort
       os.makedirs(data_folder_name, exist_ok = True)
       ff_dataframe.to_csv(filepath)
 
-    add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_sorted, ff_real_position_sorted, ff_radius, reward_boundary_radius)
+    add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_radius, reward_boundary_radius)
     
     if to_furnish_ff_dataframe:
-        ff_dataframe = furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted)
+        ff_dataframe = furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted)
 
     return ff_dataframe
 
 
-def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_sorted, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
+def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
     ff_dataframe[['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']]  \
         = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']].values
     ff_dataframe[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
@@ -152,23 +152,25 @@ def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_c
     ff_dataframe['angles_to_reward_boundaries'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_dataframe.ff_angle, distances_to_ff=ff_dataframe.ff_distance, ff_radius=reward_boundary_radius)
 
 
-def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_visible):
+def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_vis):
     # set ff_index, point_index, target_index, visible, memory, left_right all to be int
     ff_dataframe[['ff_index', 'point_index', 'visible', 'memory']] = ff_dataframe[['ff_index', 'point_index', 'visible', 'memory']].astype('int')
     if max_distance is not None:
       ff_dataframe = ff_dataframe[ff_dataframe['ff_distance'] < max_distance + 100]
-    if max_time_since_last_visible is not None:
-      ff_dataframe = ff_dataframe[ff_dataframe['time_since_last_visible'] <= max_time_since_last_visible]
+    if max_time_since_last_vis is not None:
+      ff_dataframe = ff_dataframe[ff_dataframe['time_since_last_vis'] <= max_time_since_last_vis]
     return ff_dataframe
 
 
-def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_sorted, ff_life_sorted):
+def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted):
     
     ff_dataframe['abs_delta_ff_angle'], ff_dataframe['abs_delta_ff_angle_boundary'] = basic_func.calculate_change_in_abs_ff_angle(current_ff_index=ff_dataframe['ff_index'].values, angles_to_ff=ff_dataframe['ff_angle'].values, 
             angles_to_boundaries=ff_dataframe['ff_angle_boundary'].values, ff_real_position_sorted=ff_real_position_sorted, monkey_x_array=ff_dataframe['monkey_x'].values, monkey_y_array=ff_dataframe['monkey_y'].values, 
             monkey_angles_array=ff_dataframe['monkey_angle'].values, in_memory_indices=ff_dataframe['point_index'].values)
     
     # Add some columns (they shall not be saved in csv for the sake of saving space)
+    ff_dataframe['target_index'] = np.searchsorted(ff_caught_T_new, ff_dataframe['time'])
+    ff_dataframe[['target_x', 'target_y']] = ff_real_position_sorted[ff_dataframe['target_index'].values]
     ff_dataframe['ffdistance2target'] = LA.norm(np.array(ff_dataframe[['ff_x', 'ff_y']])-np.array(ff_dataframe[['target_x', 'target_y']]), axis=1)
 
     # Analyze whether ffangle is decreasing as the monkey moves
@@ -187,12 +189,12 @@ def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_sort
     dw_same_sign_as_ffangle_boundary = np.sign(np.multiply(np.array(ff_dataframe["monkey_dw"]), np.array(ff_dataframe["ff_angle_boundary"])))
     ff_dataframe["dw_same_sign_as_ffangle_boundary"] = dw_same_sign_as_ffangle_boundary
 
-    ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe, ff_caught_T_sorted, ff_life_sorted)
+    ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe, ff_caught_T_new, ff_life_sorted)
 
     return ff_dataframe
 
 
-def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, ff_flash_sorted,  
+def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_flash_sorted,  
                     ff_real_position_sorted, ff_life_sorted, max_distance = 500, ff_radius = 10, 
                     data_folder_name = None, print_progress = True):
 
@@ -214,7 +216,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, 
       containing a starting time and and an ending time; only the time points within the duration will be evaluated
     monkey_information: df
       containing the speed, angle, and location of the monkey at various points of time
-    ff_caught_T_sorted: np.array
+    ff_caught_T_new: np.array
       containing the time when each captured firefly gets captured
     ff_flash_sorted: list
       containing the time that each firefly flashes on and off
@@ -282,7 +284,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, 
         ff_index = ff_index + [i] * len(valid_distance_indices)
         point_index = point_index + cum_iloc_indices[valid_distance_indices].tolist()
         time = time + cum_t[valid_distance_indices].tolist()
-        target_index = target_index + np.searchsorted(ff_caught_T_sorted, cum_t[valid_distance_indices]).tolist()
+        target_index = target_index + np.searchsorted(ff_caught_T_new, cum_t[valid_distance_indices]).tolist()
         ff_x = ff_x + [ff_real_position_sorted[i, 0]]*len(valid_distance_indices)
         ff_y = ff_y + [ff_real_position_sorted[i, 1]]*len(valid_distance_indices)
         monkey_x = monkey_x + cum_mx[valid_distance_indices].tolist()
@@ -314,9 +316,9 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_sorted, 
     ff_dataframe_v2['being_target'] = (ff_dataframe_v2['ff_index'] == ff_dataframe_v2['target_index']).astype('int')
 
     # Also to show whether each ff has been caught;
-    # Since when using the agent, ff_caught_T_sorted does not contain information for all fireflies, we need to fill out the information for the ff not included,
+    # Since when using the agent, ff_caught_T_new does not contain information for all fireflies, we need to fill out the information for the ff not included,
     # To do so, we use the latest time in the environment plus 100s.
-    ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe_v2, ff_caught_T_sorted, ff_life_sorted)
+    ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe_v2, ff_caught_T_new, ff_life_sorted)
 
 
 

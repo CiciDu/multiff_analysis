@@ -37,10 +37,10 @@ np.set_printoptions(suppress=True)
 
 class DecisionMaking():
 
-    def __init__(self, ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, raw_data_folder_path=None,
+    def __init__(self, ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, raw_data_folder_path=None,
                  time_range_of_trajectory=[-2.5, 0], num_time_points_for_trajectory=5):
         self.ff_dataframe = ff_dataframe
-        self.ff_caught_T_sorted = ff_caught_T_sorted
+        self.ff_caught_T_new = ff_caught_T_new
         self.monkey_information = monkey_information
         self.ff_real_position_sorted = ff_real_position_sorted
         self.time_range_of_trajectory = time_range_of_trajectory
@@ -73,7 +73,7 @@ class DecisionMaking():
         
         # get manually annotated data
         self.manual_anno['time'] = self.monkey_information['monkey_t'].iloc[self.manual_anno.starting_point_index.values].values
-        self.manual_anno['target_index'] = np.searchsorted(self.ff_caught_T_sorted, self.manual_anno['time'].values)
+        self.manual_anno['target_index'] = np.searchsorted(self.ff_caught_T_new, self.manual_anno['time'].values)
         self.manual_anno['ff_index'] = self.manual_anno['ff_index'].astype(int)
         self.manual_anno['target_index'] = self.manual_anno['target_index'].astype(int)
 
@@ -175,8 +175,8 @@ class DecisionMaking():
 
 
     def get_replacement_data(self, add_arc_info=False, add_current_curvature_of_traj=False, curvature_df=None, curv_of_traj_df=None, replacement_inputs_format = 'old_plus_diff_between_old_and_new', 
-                             ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible'], arc_info_to_add=['optimal_curvature', 'curv_diff'], 
-                             non_chosen_ff_selection_criterion='ff_angle_boundary', ff_caught_T_sorted=None):
+                             ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], arc_info_to_add=['optimal_curvature', 'curv_diff'], 
+                             non_chosen_ff_selection_criterion='ff_angle_boundary', ff_caught_T_new=None):
         '''
         changing_pursued_ff_data: df, containing the input features for both original and alternative ff
         changing_pursued_ff_data_diff: df, containing the difference between the input features for both original and alternative ff
@@ -198,7 +198,7 @@ class DecisionMaking():
             add_old_values_to_diff_df = False
 
         self.changing_pursued_ff_data, self.changing_pursued_ff_data_diff, self.replacement_inputs_addition_info, self.replacement_inputs_for_plotting = replacement.organize_replacement_data(self.replacement_df, self.prior_to_replacement_df, self.non_chosen_df, self.manual_anno, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, equal_sample_from_two_cases=True,
-                                                                                                                                                        add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curvature_of_traj=add_current_curvature_of_traj, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, add_old_values_to_diff_df=add_old_values_to_diff_df, ff_attributes=ff_attributes, ff_caught_T_sorted=ff_caught_T_sorted, 
+                                                                                                                                                        add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curvature_of_traj=add_current_curvature_of_traj, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, add_old_values_to_diff_df=add_old_values_to_diff_df, ff_attributes=ff_attributes, ff_caught_T_new=ff_caught_T_new, 
                                                                                                                                                         non_chosen_ff_selection_criterion=non_chosen_ff_selection_criterion)
         self.replacement_time = self.replacement_inputs_addition_info['time'].values
         self.replacement_point_index = self.replacement_inputs_addition_info['point_index'].values.astype(int)
@@ -484,7 +484,7 @@ class DecisionMaking():
 
 
 
-    def add_additional_info_to_plot(self, time_range_of_trajectory, num_time_points_for_trajectory, ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible']):
+    def add_additional_info_to_plot(self, time_range_of_trajectory, num_time_points_for_trajectory, ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis']):
         '''
         more_ff_df: df, containing the input features for additional ff for each point_index in point_index_all, with each point_index corresponds to >= 1 row
         more_ff_inputs_df_for_plotting: df, containing the input features for additional ff for each point_index in point_index_all, for plotting, in free_selection format, 
@@ -629,13 +629,13 @@ class DecisionMaking():
                                                
 
 
-def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information, pseudo_manual_anno,
+def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, pseudo_manual_anno,
                               add_arc_info=True, arc_info_to_add=['optimal_curvature', 'curv_diff'], add_current_curvature_of_traj=True, furnish_with_trajectory_data=True, num_time_points_for_trajectory=20,
-                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible'], trajectory_data_kind=['position'], curvature_df=None,
+                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None,
                               time_range_of_trajectory=[-0.8, 0.8], n_seconds_before_crossing_boundary=0.8, n_seconds_after_crossing_boundary=0.8,
                               replacement_inputs_format = 'diff_between_old_and_new'):
 
-    dm = DecisionMaking(ff_dataframe, ff_caught_T_sorted, ff_real_position_sorted, monkey_information,
+    dm = DecisionMaking(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information,
                                             time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
     dm.manual_anno = pseudo_manual_anno
     dm.separate_manual_anno()

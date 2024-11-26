@@ -63,8 +63,8 @@ class _FindStopsNearFF(base_processing_class.BaseProcessing):
                 self.get_more_monkey_data()
 
             self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible']==1].copy()
-            self.shared_stops_near_ff_df, self.all_alt_ff_df = find_stops_near_ff_utils.make_shared_stops_near_ff_df(self.monkey_information, self.ff_dataframe_visible, self.ff_real_position_sorted,
-                                                                                        self.ff_caught_T_sorted, self.ff_flash_sorted, self.ff_life_sorted, min_distance_between_stop_and_alt_ff=min_distance_between_stop_and_alt_ff,
+            self.shared_stops_near_ff_df, self.all_alt_ff_df = find_stops_near_ff_utils.make_shared_stops_near_ff_df(self.monkey_information, self.ff_dataframe_visible, self.closest_stop_to_capture_df, self.ff_real_position_sorted,
+                                                                                        self.ff_caught_T_new, self.ff_flash_sorted, self.ff_life_sorted, min_distance_between_stop_and_alt_ff=min_distance_between_stop_and_alt_ff,
                                                                                         max_distance_between_stop_and_alt_ff=max_distance_between_stop_and_alt_ff, stop_period_duration=stop_period_duration,
                                                                                         remove_cases_where_monkey_too_close_to_edge=remove_cases_where_monkey_too_close_to_edge
                                                                                         )

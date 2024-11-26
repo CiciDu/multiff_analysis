@@ -91,9 +91,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
         self.get_more_monkey_data()
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible']==1].copy()
-        self.closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted, stop_ff_index_array=np.arange(len(self.ff_caught_T_sorted)),
-                                                                                                      )
-        self.only_stop_ff_df = only_stop_ff_utils.get_only_stop_ff_df(self.closest_stop_to_capture_df, self.ff_real_position_sorted, self.ff_caught_T_sorted, self.monkey_information, 
+        self.only_stop_ff_df = only_stop_ff_utils.get_only_stop_ff_df(self.closest_stop_to_capture_df, self.ff_real_position_sorted, self.ff_caught_T_new, self.monkey_information, 
                                                                         self.curv_of_traj_df, self.ff_dataframe_visible, stop_period_duration=stop_period_duration,
                                                                         ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                         optimal_arc_type=self.optimal_arc_type)
@@ -102,8 +100,6 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
 
     def _make_ff_info_at_start_df(self, stop_period_duration=2):
-        self.closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted, stop_ff_index_array=np.arange(len(self.ff_caught_T_sorted)),
-                                                                                                      )
         self.monkey_info_in_all_stop_periods = only_stop_ff_utils.make_monkey_info_in_all_stop_periods(self.closest_stop_to_capture_df, self.monkey_information, stop_period_duration=stop_period_duration)
         self.ff_info_at_start_df, self.stop_ff_info_at_start_df = only_stop_ff_utils.find_ff_info_and_stop_ff_info_at_start_df(self.only_stop_ff_df, self.monkey_info_in_all_stop_periods, self.ff_flash_sorted, 
                                                                                                         self.ff_real_position_sorted, self.ff_life_sorted, ff_radius=10, dropna=True,

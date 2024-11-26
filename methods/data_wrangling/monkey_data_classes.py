@@ -141,7 +141,7 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
 
 
         # add num_caught_ff to rebinned_monkey_info
-        catching_target_bins = np.digitize(self.ff_caught_T_sorted, self.time_bins)-1
+        catching_target_bins = np.digitize(self.ff_caught_T_new, self.time_bins)-1
         catching_target_bins_unique, counts = np.unique(catching_target_bins, return_counts=True)
         rebinned_monkey_info['num_caught_ff'] = 0
         rebinned_monkey_info.loc[catching_target_bins_unique, 'num_caught_ff'] = counts
@@ -213,7 +213,7 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
 
         # mark bins where ff is caught
         self.binned_features['catching_ff'] = 0
-        catching_target_bins = np.digitize(self.ff_caught_T_sorted, self.time_bins)-1
+        catching_target_bins = np.digitize(self.ff_caught_T_new, self.time_bins)-1
         self.binned_features.loc[self.binned_features['bin'].isin(catching_target_bins), 'catching_ff'] = 1
 
 
@@ -231,11 +231,11 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         self.target_df = self.monkey_information[['bin', 'monkey_t', 'monkey_x', 'monkey_y', 'monkey_angles']].copy()
         self.target_df.rename(columns={'monkey_angles': 'monkey_angle', 'monkey_t': 'time'}, inplace=True)
         self.target_df['point_index'] = self.target_df.index
-        self.target_df['target_index'] = np.searchsorted(self.ff_caught_T_sorted, self.target_df['time'])
+        self.target_df['target_index'] = np.searchsorted(self.ff_caught_T_new, self.target_df['time'])
         self.target_df['target_x'] = self.ff_real_position_sorted[self.target_df['target_index'].values, 0]
         self.target_df['target_y'] = self.ff_real_position_sorted[self.target_df['target_index'].values, 1]
         # find nearby_alive_ff_indices (a.k.a target cluster)
-        self.nearby_alive_ff_indices = cluster_analysis.find_target_clusters(self.ff_real_position_sorted, self.ff_caught_T_sorted, \
+        self.nearby_alive_ff_indices = cluster_analysis.find_alive_target_clusters(self.ff_real_position_sorted, self.ff_caught_T_new, \
                                                                                         self.ff_life_sorted, max_distance=50)
 
     def add_target_last_seen_info(self):
@@ -254,12 +254,12 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         # Add target_has_disappeared_for_last_time_dummy
         self.target_df['target_has_disappeared_for_last_time_dummy'] = 0
         # for each target
-        for target in range(len(self.ff_caught_T_sorted)):
+        for target in range(len(self.ff_caught_T_new)):
         # fine the time it disappears for the last time
             target_info = self.ff_dataframe[(self.ff_dataframe['ff_index']==target) & (self.ff_dataframe['visible']==1)]
-            target_last_visible_time = target_info['time'].max()
+            target_last_vis_time = target_info['time'].max()
             # then mark the period between that time and the capture time as 1
-            self.target_df.loc[(self.target_df['target_index']==target) & (self.target_df['time'] > target_last_visible_time), 'target_has_disappeared_for_last_time_dummy'] = 1
+            self.target_df.loc[(self.target_df['target_index']==target) & (self.target_df['time'] > target_last_vis_time), 'target_has_disappeared_for_last_time_dummy'] = 1
         
         target_min_info = self.target_df[['bin', 'target_has_disappeared_for_last_time_dummy']].groupby('bin').min().reset_index(drop=False)                                   
         target_min_info.rename(columns={'target_has_disappeared_for_last_time_dummy': 'min_target_has_disappeared_for_last_time_dummy'}, inplace=True)   
@@ -288,12 +288,12 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         self.binned_features = self.binned_features.merge(target_average_info, how='left', on='bin')
 
         self.target_df['target_cluster_has_disappeared_for_last_time_dummy'] = 0
-        for target in range(len(self.ff_caught_T_sorted)):
+        for target in range(len(self.ff_caught_T_new)):
             target_cluster_indices = self.nearby_alive_ff_indices[target] 
             target_info = self.ff_dataframe[(self.ff_dataframe['ff_index'].isin(target_cluster_indices)) & (self.ff_dataframe['visible']==1)]
-            target_last_visible_time = target_info['time'].max()
+            target_last_vis_time = target_info['time'].max()
             # then mark the period between that time and the capture time as 1
-            self.target_df.loc[(self.target_df['target_index']==target) & (self.target_df['time'] > target_last_visible_time), 'target_cluster_has_disappeared_for_last_time_dummy'] = 1
+            self.target_df.loc[(self.target_df['target_index']==target) & (self.target_df['time'] > target_last_vis_time), 'target_cluster_has_disappeared_for_last_time_dummy'] = 1
 
         target_min_info = self.target_df[['bin', 'target_cluster_has_disappeared_for_last_time_dummy']].groupby('bin').min().reset_index(drop=False)                                   
         target_min_info.rename(columns={'target_cluster_has_disappeared_for_last_time_dummy': 'min_target_cluster_has_disappeared_for_last_time_dummy'}, inplace=True)   
@@ -309,13 +309,13 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         self.target_df['target_angle'] = target_angle
         self.target_df['target_angle_to_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
 
-        # find time_since_last_capture; since self.target_df contains more time than self.ff_caught_T_sorted, we need to add a value to the end of self.ff_caught_T_sorted
-        if self.target_df.target_index.unique().max() >= len(self.ff_caught_T_sorted)-1:
-            num_exceeding_target = self.target_df.target_index.unique().max() - (len(self.ff_caught_T_sorted)-1)
-            self.ff_caught_T_sorted_temp = np.concatenate((self.ff_caught_T_sorted, np.repeat(self.target_df.time.max(), num_exceeding_target)))
+        # find time_since_last_capture; since self.target_df contains more time than self.ff_caught_T_new, we need to add a value to the end of self.ff_caught_T_new
+        if self.target_df.target_index.unique().max() >= len(self.ff_caught_T_new)-1:
+            num_exceeding_target = self.target_df.target_index.unique().max() - (len(self.ff_caught_T_new)-1)
+            self.ff_caught_T_new_temp = np.concatenate((self.ff_caught_T_new, np.repeat(self.target_df.time.max(), num_exceeding_target)))
         else:
-            self.ff_caught_T_sorted_temp = self.ff_caught_T_sorted.copy()
-        last_target_caught_time = self.ff_caught_T_sorted_temp[self.target_df['target_index']-1]
+            self.ff_caught_T_new_temp = self.ff_caught_T_new.copy()
+        last_target_caught_time = self.ff_caught_T_new_temp[self.target_df['target_index']-1]
         last_target_caught_time[0] = 0
         self.target_df['time_since_last_capture'] = self.target_df['time'] - last_target_caught_time
 
@@ -404,15 +404,15 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
 
     def add_pattern_info_based_on_trials(self):
         # add the category info based on trials
-        self.all_trial_patterns['trial_end_time'] = self.ff_caught_T_sorted[:len(self.all_trial_patterns)]
+        self.all_trial_patterns['trial_end_time'] = self.ff_caught_T_new[:len(self.all_trial_patterns)]
         self.all_trial_patterns['trial_start_time'] = self.all_trial_patterns['trial_end_time'].shift(1)
         self.all_trial_patterns.loc[0, 'trial_start_time'] = 0
 
         # find the centers of time_bins, which is the average of every two points
         bin_midlines = (self.time_bins[:-1] + self.time_bins[1:])/2
-        bin_midlines = bin_midlines[bin_midlines < self.ff_caught_T_sorted[-1]]
+        bin_midlines = bin_midlines[bin_midlines < self.ff_caught_T_new[-1]]
         bin_midlines = pd.DataFrame(bin_midlines, columns=['bin_midline'])
-        bin_midlines['trial'] = np.searchsorted(self.ff_caught_T_sorted, bin_midlines['bin_midline'])
+        bin_midlines['trial'] = np.searchsorted(self.ff_caught_T_new, bin_midlines['bin_midline'])
         self.all_trial_patterns['trial'] = self.all_trial_patterns.index
         bin_midlines = bin_midlines.merge(self.all_trial_patterns, on='trial', how='left')
         bin_midlines['bin'] = bin_midlines.index

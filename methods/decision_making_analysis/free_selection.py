@@ -28,7 +28,7 @@ np.set_printoptions(suppress=True)
 
 
 def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, num_ff_per_row=3, guarantee_including_target_info=True, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
-                                placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=0, placeholder_ff_angle_boundary=0, placeholder_time_since_last_visible=3, curv_of_traj_df=None,
+                                placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=0, placeholder_ff_angle_boundary=0, placeholder_time_since_last_vis=3, curv_of_traj_df=None,
                                 add_arc_info=False, curvature_df=None, arc_info_to_add=['optimal_curvature', 'curv_diff']):
     if only_select_n_ff_case is not None:
         # if only_select_n_ff_case is not an integer
@@ -39,7 +39,7 @@ def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_positio
             print("only_select_n_ff_case is not None, so num_ff_per_row is set to only_select_n_ff_case: ", num_ff_per_row)
 
     ff_dataframe_sub = ff_dataframe[ff_dataframe['point_index'].isin(free_selection_df.starting_point_index.values.astype(int))].copy()
-    ff_dataframe_sub = ff_dataframe_sub[['point_index', 'ff_index', 'ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_visible']].copy()
+    ff_dataframe_sub = ff_dataframe_sub[['point_index', 'ff_index', 'ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis']].copy()
     ff_dataframe_sub.loc[:, 'selection_criterion'] = ff_dataframe_sub.loc[:, selection_criterion_if_too_many_ff]
 
     if guarantee_including_target_info:
@@ -59,7 +59,7 @@ def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_positio
     all_point_index = np.unique(free_selection_df.starting_point_index.values.astype(int))
     ff_dataframe_sub = guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=num_ff_per_row, only_select_n_ff_case=only_select_n_ff_case, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff,
                                                                       placeholder_ff_index=placeholder_ff_index, placeholder_ff_distance=placeholder_ff_distance, placeholder_ff_angle=placeholder_ff_angle, placeholder_ff_angle_boundary=placeholder_ff_angle_boundary, 
-                                                                      placeholder_time_since_last_visible=placeholder_time_since_last_visible, curv_of_traj_df=curv_of_traj_df)
+                                                                      placeholder_time_since_last_vis=placeholder_time_since_last_vis, curv_of_traj_df=curv_of_traj_df)
 
     # then, we sort the remaining ff by ff_angle
     info_of_n_ff_per_point = ff_dataframe_sub.sort_values(['point_index', 'ff_angle'], ascending=True).drop(columns=['selection_criterion'])
@@ -87,11 +87,11 @@ def find_label_of_ff_in_obs_ff(sequence_of_obs_ff_indices, ff_index_to_label, na
 
 def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_point, 
                                                            monkey_information=None, 
-                                                           ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible'], 
-                                                           attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_visible'],
+                                                           ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], 
+                                                           attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis'],
                                                            add_current_curvature_of_traj=False, 
                                                            num_ff_per_row=5, 
-                                                           ff_caught_T_sorted=None, 
+                                                           ff_caught_T_new=None, 
                                                            curv_of_traj_df=None,
                                                            curv_of_traj_mode='time',
                                                            window_for_curv_of_traj=[-1, 1],
@@ -112,7 +112,7 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
         info_to_add = current_info[ff_attributes].copy()
         column_names = [x+'_'+str(i) for x in ff_attributes]
         column_for_plotting_names = [x+'_for_plotting_'+str(i) for x in attributes_for_plotting]
-        #column_names = ['ff_distance_'+str(i), angle_var+'_'+str(i), 'time_since_last_visible_'+str(i)]
+        #column_names = ['ff_distance_'+str(i), angle_var+'_'+str(i), 'time_since_last_vis_'+str(i)]
         pred_var.extend(column_names)
         free_selection_inputs[column_names] = info_to_add.values
         free_selection_inputs_df_for_plotting[column_for_plotting_names] = current_info[attributes_for_plotting].copy().values
@@ -122,8 +122,8 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
         if monkey_information is None:
             raise ValueError('monkey_information is None, but add_current_curvature_of_traj is True')
         if curv_of_traj_df is None:
-            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_sorted, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-        curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_sorted=ff_caught_T_sorted, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
+            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+        curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
         free_selection_inputs['curvature_of_traj'] = curvature_of_traj
         # since curvature_of_traj depends completely on the point index, we just have to include this variable once.
         pred_var.append('curvature_of_traj')
@@ -139,10 +139,10 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
 
 
 def organize_free_selection_data(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, only_select_n_ff_case=None, num_ff_per_row=5, 
-                                 guarantee_including_target_info=True, add_current_curvature_of_traj=False, ff_caught_T_sorted=None, 
+                                 guarantee_including_target_info=True, add_current_curvature_of_traj=False, ff_caught_T_new=None, 
                                  curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1],
-                                  curvature_df=None, curv_of_traj_df=None, selection_criterion_if_too_many_ff='time_since_last_visible',
-                                 ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_visible'], 
+                                  curvature_df=None, curv_of_traj_df=None, selection_criterion_if_too_many_ff='time_since_last_vis',
+                                 ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], 
                                  add_arc_info = False,
                                  arc_info_to_add=['optimal_curvature', 'curv_diff'], # or []
                                  info_of_n_ff_per_point=None):
@@ -161,7 +161,7 @@ def organize_free_selection_data(free_selection_df, ff_dataframe, ff_real_positi
         print('Note: info_of_n_ff_per_point is not None, so the following parameters will be ignored: free_selection_df, num_ff_per_row, guarantee_including_target_info, only_select_n_ff_case, selection_criterion_if_too_many_ff')
 
     free_selection_inputs_df, free_selection_inputs_df_for_plotting, sequence_of_obs_ff_indices, point_index_array, pred_var = find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_point, monkey_information, ff_attributes=ff_attributes, num_ff_per_row=num_ff_per_row, \
-                                                                                                                                                       add_current_curvature_of_traj=add_current_curvature_of_traj, ff_caught_T_sorted=ff_caught_T_sorted, curv_of_traj_df=curv_of_traj_df,
+                                                                                                                                                       add_current_curvature_of_traj=add_current_curvature_of_traj, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df,
                                                                                                                                                        curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
     free_selection_labels = find_label_of_ff_in_obs_ff(sequence_of_obs_ff_indices, free_selection_df['ff_index'].values, na_filler=num_ff_per_row)
 
@@ -187,11 +187,11 @@ def organize_free_selection_data(free_selection_df, ff_dataframe, ff_real_positi
 
 
 
-def make_free_selection_predictions_using_trained_model(trained_model, ff_indices, target_indices, ff_dataframe, ff_real_position_sorted, ff_caught_T_sorted, monkey_information, time_of_evaluation=None):
+def make_free_selection_predictions_using_trained_model(trained_model, ff_indices, target_indices, ff_dataframe, ff_real_position_sorted, ff_caught_T_new, monkey_information, time_of_evaluation=None):
     # if time_of_evaluation is None, then it will be set to the beginning of the trial
 
     if time_of_evaluation is None:
-        time_of_evaluation = ff_caught_T_sorted[target_indices-1] # here it denotes the beginning of a trial
+        time_of_evaluation = ff_caught_T_new[target_indices-1] # here it denotes the beginning of a trial
     starting_point_index = np.searchsorted(monkey_information['monkey_t'], time_of_evaluation)
     time_of_evaluation = monkey_information['monkey_t'][starting_point_index] 
 
@@ -242,7 +242,7 @@ def guarantee_ff_dataframe_include_target_info(target_info, ff_dataframe_sub, ff
     ff_dataframe_w_targets.loc[ff_dataframe_w_targets['ff_distance'].isna(), 'ff_distance'] = ff_info['ff_distance'].values
     ff_dataframe_w_targets.loc[ff_dataframe_w_targets['ff_angle'].isna(), 'ff_angle'] = ff_info['ff_angle'].values
     ff_dataframe_w_targets.loc[ff_dataframe_w_targets['ff_angle_boundary'].isna(), 'ff_angle_boundary'] = ff_info['ff_angle_boundary'].values
-    ff_dataframe_w_targets.loc[ff_dataframe_w_targets['time_since_last_visible'].isna(), 'time_since_last_visible'] = ff_info['time_since_last_visible'].values
+    ff_dataframe_w_targets.loc[ff_dataframe_w_targets['time_since_last_vis'].isna(), 'time_since_last_vis'] = ff_info['time_since_last_vis'].values
     ff_dataframe_w_targets['abs_ff_angle'] = np.abs(ff_dataframe_w_targets['ff_angle'])
     ff_dataframe_w_targets['abs_ff_angle_boundary'] = np.abs(ff_dataframe_w_targets['ff_angle_boundary'])
     ff_dataframe_sub = ff_dataframe_w_targets.copy()  
@@ -251,7 +251,7 @@ def guarantee_ff_dataframe_include_target_info(target_info, ff_dataframe_sub, ff
 
 
 def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=3, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
-                                                   placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=math.pi/4, placeholder_ff_angle_boundary=math.pi/4, placeholder_time_since_last_visible=3, 
+                                                   placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=math.pi/4, placeholder_ff_angle_boundary=math.pi/4, placeholder_time_since_last_vis=3, 
                                                    placeholder_time_till_next_visible=10, placeholder_curv_diff=0.6, curv_of_traj_df=None):
     
     count_of_ff = ff_dataframe_sub.groupby('point_index').count().reset_index(drop=False)
@@ -272,7 +272,7 @@ def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_i
         added_point_index = np.repeat(not_enough_ff.point_index.values, not_enough_ff['num_missing'].values)
         df_to_add = pd.DataFrame({'point_index': added_point_index, 
                                 'ff_index': np.repeat(placeholder_ff_index, len(added_point_index)), 
-                                'time_since_last_visible': np.repeat(placeholder_time_since_last_visible, len(added_point_index)),
+                                'time_since_last_vis': np.repeat(placeholder_time_since_last_vis, len(added_point_index)),
                                 'ff_distance': np.repeat(placeholder_ff_distance, len(added_point_index)),
                                 # 'ff_angle': np.repeat(placeholder_ff_angle, len(added_point_index)),
                                 # 'ff_angle_boundary': np.repeat(placeholder_ff_angle_boundary, len(added_point_index)),
@@ -308,13 +308,13 @@ def fill_up_additional_attributes_for_placeholders(placeholder_df,
                                                    placeholder_ff_angle=math.pi/4, 
                                                    placeholder_ff_angle_boundary=math.pi/4, 
                                                    placeholder_time_till_next_visible=10, 
-                                                   placeholder_duration_of_last_visible_period=0,
+                                                   placeholder_duration_of_last_vis_period=0,
                                                    placeholder_optimal_curvature=0.1):
     attributes = []
     additional_placeholder_mapping = {}
 
     for column in ['ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 
-                   'time_till_next_visible', 'duration_of_last_visible_period', 'curv_diff', 'abs_curv_diff', 
+                   'time_till_next_visible', 'duration_of_last_vis_period', 'curv_diff', 'abs_curv_diff', 
                    'next_seen_ff_distance', 'next_seen_ff_angle', 'next_seen_ff_angle_boundary', 'next_seen_curv_diff', 'next_seen_abs_curv_diff', 
                    'distance_from_monkey_now_to_monkey_when_ff_next_seen', 'angle_from_monkey_now_to_monkey_when_ff_next_seen',
                     'last_seen_ff_distance', 'last_seen_ff_angle', 'last_seen_ff_angle_boundary', 'last_seen_curv_diff', 'last_seen_abs_curv_diff',
@@ -330,7 +330,7 @@ def fill_up_additional_attributes_for_placeholders(placeholder_df,
                                         'ff_angle_boundary': [placeholder_ff_angle_boundary, True],
                                         'abs_ff_angle_boundary': [placeholder_ff_angle_boundary, False],
                                         'time_till_next_visible': [placeholder_time_till_next_visible, False],
-                                        'duration_of_last_visible_period': [placeholder_duration_of_last_visible_period, False],
+                                        'duration_of_last_vis_period': [placeholder_duration_of_last_vis_period, False],
                                         'curv_diff': [placeholder_curv_diff, True],
                                         'abs_curv_diff': [placeholder_curv_diff, False],
                                         'next_seen_ff_distance': [placeholder_ff_distance, False],

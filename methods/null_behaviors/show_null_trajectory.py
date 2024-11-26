@@ -228,7 +228,7 @@ def find_most_recent_monkey_information(monkey_information, current_moment):
     point_index = cum_iloc_indices[-1]
     return monkey_xy, monkey_angle, point_index
 
-def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_information, ff_dataframe, ff_caught_T_sorted,
+def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_information, ff_dataframe, ff_caught_T_new,
                                     axes, legend_markers, legend_names, R, assumed_memory_duration_of_agent, show_null_agent_trajectory_2nd_time=False,
                                     show_ff_to_be_considered_by_first_null_trajectory=True, show_starting_point_of_show_null_trajectory=True, show_landing_point_of_show_null_trajectory=True,
                                     reaching_boundary_ok=True, type='most_aligned', null_arc_info_for_plotting=None):
@@ -254,7 +254,7 @@ def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_i
         axes, whether_plotted = plot_null_arcs_from_best_arc_df(axes, point_index, null_arc_info_for_plotting, x0=0, y0=0, rotation_matrix=R, polar=False, zorder=6, alpha=0.8, color='lime', marker_size=1)
     elif type == 'shortest':
         axes, min_arc_ff_xy, min_arc_ff_center_xy, min_arc_ff_angle, min_arc_length, center_x, center_y, ff_xy_to_be_considered \
-            = plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe, ff_caught_T_sorted, monkey_xy, monkey_angle, rotation_matrix=R, assumed_memory_duration=assumed_memory_duration_of_agent,
+            = plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe, ff_caught_T_new, monkey_xy, monkey_angle, rotation_matrix=R, assumed_memory_duration=assumed_memory_duration_of_agent,
                                             arc_color="lime", reaching_boundary_ok=reaching_boundary_ok)    
         min_arc_ff_xy_rotated = np.matmul(R, min_arc_ff_xy.reshape(2,1)) 
     line = Line2D([0], [0], linestyle="-", alpha=0.7, linewidth=2, color="lime")
@@ -291,7 +291,7 @@ def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_i
                 ff_dataframe_sub = ff_dataframe.copy()
 
                 axes, min_arc_ff_xy, min_arc_ff_center_xy, min_arc_ff_angle, min_arc_length, center_x, center_y, ff_xy_to_be_considered_2nd \
-                    = plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe_sub, ff_caught_T_sorted, monkey_xy, monkey_angle, rotation_matrix=R, assumed_memory_duration=2, \
+                    = plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe_sub, ff_caught_T_new, monkey_xy, monkey_angle, rotation_matrix=R, assumed_memory_duration=2, \
                                                     arc_color="navy", reaching_boundary_ok=reaching_boundary_ok, zorder=4)
                 line = Line2D([0], [0], linestyle="-", alpha=0.7, linewidth=2, color="navy")
                 legend_markers.append(line)
@@ -311,7 +311,7 @@ def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_i
     return axes, legend_markers, legend_names
 
 
-def plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe, ff_caught_T_sorted, monkey_xy, monkey_angle, rotation_matrix=None, assumed_memory_duration=2, arc_color='black',
+def plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe, ff_caught_T_new, monkey_xy, monkey_angle, rotation_matrix=None, assumed_memory_duration=2, arc_color='black',
                                  reaching_boundary_ok=False):
     R = rotation_matrix
     duration = [current_moment-assumed_memory_duration, current_moment]
@@ -330,7 +330,7 @@ def plot_shortest_arc_from_null_condition(axes, current_moment, ff_dataframe, ff
         return axes, None, None, None, None, None, None, None
 
     # eliminate the information of ff in ff_dataframe that have already been caught prior to current_moment
-    current_trial_number = np.where(ff_caught_T_sorted > current_moment)[0][0]
+    current_trial_number = np.where(ff_caught_T_new > current_moment)[0][0]
     ff_dataframe_temp = ff_dataframe_temp[ff_dataframe_temp['ff_index'] >= current_trial_number]
 
     ff_xy_and_angle = ff_dataframe_temp[['ff_x', 'ff_y', 'ff_angle', 'ff_distance']].drop_duplicates().values

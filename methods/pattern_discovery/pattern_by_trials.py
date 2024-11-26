@@ -55,7 +55,7 @@ def n_ff_in_a_row_func(ff_believed_position_sorted, distance_between_ff = 50):
 
 
 
-def on_before_last_one_func(ff_flash_end_sorted, ff_caught_T_sorted, caught_ff_num):
+def on_before_last_one_func(ff_flash_end_sorted, ff_caught_T_new, caught_ff_num):
 	"""
   Find the trials where the current target has only flashed on before the capture of the previous target;
   In other words, the target hasn’t flashed on during the trial
@@ -64,7 +64,7 @@ def on_before_last_one_func(ff_flash_end_sorted, ff_caught_T_sorted, caught_ff_n
   ----------
   ff_flash_end_sorted: np.array
       containing the last moment that each firefly flashes on
-  ff_caught_T_sorted: np.array
+  ff_caught_T_new: np.array
       containing the time when each captured firefly gets captured
   caught_ff_num: numeric
       total number of caught firefies
@@ -79,9 +79,9 @@ def on_before_last_one_func(ff_flash_end_sorted, ff_caught_T_sorted, caught_ff_n
 	on_before_last_one_trials = [] 
 	for i in range(1, caught_ff_num):
 	  # Evaluate whether the last flash of the current ff finishes before the capture of the previous ff
-	  if ff_flash_end_sorted[i] < ff_caught_T_sorted[i-1]:
+	  if ff_flash_end_sorted[i] < ff_caught_T_new[i-1]:
 	    # If the monkey captures 2 fireflies at the same time, then the trial does not count as "on_before_last_one"
-	    if ff_caught_T_sorted[i] == ff_caught_T_sorted[i-1]:
+	    if ff_caught_T_new[i] == ff_caught_T_new[i-1]:
 	       continue
 	    # Otherwise, append the trial number into the list
 	    on_before_last_one_trials.append(i)
@@ -120,25 +120,25 @@ def visible_before_last_one_func(ff_dataframe):
 
 
 
-def find_target_cluster_visible_before_last_one(target_cluster_df, ff_caught_T_sorted):
-    target_cluster_df['caught_time'] = ff_caught_T_sorted[target_cluster_df.target_index]
-    target_cluster_df['prev_caught_time'] = ff_caught_T_sorted[target_cluster_df.target_index-1]
+def find_target_cluster_visible_before_last_one(target_cluster_df, ff_caught_T_new):
+    target_cluster_df['caught_time'] = ff_caught_T_new[target_cluster_df.target_index]
+    target_cluster_df['prev_caught_time'] = ff_caught_T_new[target_cluster_df.target_index-1]
     target_cluster_df.loc[0, 'prev_caught_time'] = 0
-    target_cluster_df['last_visible_time'] = target_cluster_df['caught_time'] - target_cluster_df['time_since_last_visible']
+    target_cluster_df['last_vis_time'] = target_cluster_df['caught_time'] - target_cluster_df['time_since_last_vis']
     target_cluster_df['trial_duration'] = target_cluster_df['caught_time'] - target_cluster_df['prev_caught_time']
 
-    target_cluster_VBLO = target_cluster_df[target_cluster_df['last_visible_time'] < target_cluster_df['prev_caught_time']-0.1]
+    target_cluster_VBLO = target_cluster_df[target_cluster_df['last_vis_time'] < target_cluster_df['prev_caught_time']-0.1]
     target_cluster_VBLO = target_cluster_VBLO[target_cluster_VBLO['caught_time'] != target_cluster_VBLO['prev_caught_time']]
     target_cluster_VBLO = target_cluster_VBLO[target_cluster_VBLO['trial_duration'] < 25]
 
-    #target_cluster_VBLO[['target_index', 'time_since_last_visible', 'last_visible_time', 'caught_time', 'prev_caught_time']]
+    #target_cluster_VBLO[['target_index', 'time_since_last_vis', 'last_vis_time', 'caught_time', 'prev_caught_time']]
     return target_cluster_VBLO
 
 
     
 
 
-def cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_sorted, ff_real_position_sorted, 
+def cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted, 
             max_time_apart = 1.25, max_ff_distance_from_monkey = 250, max_ff_distance_from_target = 50):
   """
   Find the trials where the target is within a cluster, as well as the locations of the fireflies in the cluster
@@ -150,7 +150,7 @@ def cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_sorted, 
     containing various information about all visible or "in-memory" fireflies at each time point
   caught_ff_num: numeric
     total number of caught firefies
-  ff_caught_T_sorted: np.array
+  ff_caught_T_new: np.array
     containing the time when each captured firefly gets captured
   ff_real_position_sorted: np.array
     containing the real locations of the fireflies
@@ -181,7 +181,7 @@ def cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_sorted, 
   # For each trial
   for i in range(caught_ff_num):
     # Take out the time of that the target is captured
-    time = ff_caught_T_sorted[i]
+    time = ff_caught_T_new[i]
     # Set the duration such that only fireflies visible in this duration will be included in the consideration of 
     # whether it belongs to the same cluster as the target
     duration = [time-max_time_apart, time+max_time_apart]
@@ -238,11 +238,11 @@ def disappear_latest_func(ff_dataframe):
   """
 	ff_dataframe_visible = ff_dataframe[(ff_dataframe['visible'] == 1)]
 	# For each trial, find out the point index where the monkey last sees a ff
-	last_visible_index = ff_dataframe_visible[['point_index', 'target_index']].groupby('target_index').max()
+	last_vis_index = ff_dataframe_visible[['point_index', 'target_index']].groupby('target_index').max()
 	# Take out all the rows corresponding to these points
-	last_visible_ffs = pd.merge(last_visible_index, ff_dataframe_visible, how="left")
+	last_vis_ffs = pd.merge(last_vis_index, ff_dataframe_visible, how="left")
 	# Select trials where the target disappears the latest
-	disappear_latest_trials = np.array(last_visible_ffs[last_visible_ffs['target_index']==last_visible_ffs['ff_index']]['target_index'])
+	disappear_latest_trials = np.array(last_vis_ffs[last_vis_ffs['target_index']==last_vis_ffs['ff_index']]['target_index'])
 	return disappear_latest_trials
 
 
@@ -342,9 +342,9 @@ def ignore_sudden_flash_func(ff_dataframe, ff_real_position_sorted, max_point_in
 
 
 
-def whether_current_and_last_targets_are_captured_simultaneously(trial_number_arrays, ff_caught_T_sorted):
+def whether_current_and_last_targets_are_captured_simultaneously(trial_number_arrays, ff_caught_T_new):
     if len(trial_number_arrays) > 0:
-        dif_time = ff_caught_T_sorted[trial_number_arrays] - ff_caught_T_sorted[trial_number_arrays-1]
+        dif_time = ff_caught_T_new[trial_number_arrays] - ff_caught_T_new[trial_number_arrays-1]
         trial_number_arrays_simul = trial_number_arrays[np.where(dif_time <= 0.1)[0]]
         trial_number_arrays_non_simul = trial_number_arrays[np.where(dif_time > 0.1)[0]]
     else:

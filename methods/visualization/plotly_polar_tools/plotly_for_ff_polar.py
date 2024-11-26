@@ -24,8 +24,8 @@ np.set_printoptions(suppress=True)
 
 
 
-def plot_fireflies(fig, ff_df, columns_for_annotation=['ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'time_since_last_visible', 'duration_of_last_visible_period'],
-                   color='time_since_last_visible', range_color=[0, 3], symbol='group', size='time_since_last_visible', size_max=15,
+def plot_fireflies(fig, ff_df, columns_for_annotation=['ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'time_since_last_vis', 'duration_of_last_vis_period'],
+                   color='time_since_last_vis', range_color=[0, 3], symbol='group', size='time_since_last_vis', size_max=15,
                    symbol_map={}, additional_customdata_columns=[]):
 
     default_symbol_map = {'Original': 'circle-dot', 'Alternative': 'star-dot', 'More': 'diamond-open-dot',
@@ -73,17 +73,17 @@ def plot_fireflies(fig, ff_df, columns_for_annotation=['ff_distance_to_monkey_th
 
 
 def update_firefly_hovertemplate_based_on_group(fig, ff_df, num_added_traces, additional_update_kwargs={}, color='group', symbol='group',
-                                        columns_for_annotation=['ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'time_since_last_visible'],
+                                        columns_for_annotation=['ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'time_since_last_vis'],
                                         additional_customdata_columns=[]):
     
     annotation_names = {'ff_distance': 'ff distance (cm)',
                         'ff_angle': 'ff angle (deg)',
                         'ff_distance_to_monkey_then': 'ff distance to monkey then (cm)',
                         'ff_angle_to_monkey_then': 'ff angle to monkey then (deg)',
-                        'time_since_last_visible': 'time since last visible (s)',
+                        'time_since_last_vis': 'time since last visible (s)',
                         'time_till_next_visible': 'time till next visible (s)',
                         'time_from_now': 'time from now (s)',
-                        'duration_of_last_visible_period': 'duration of last visible period (s)',
+                        'duration_of_last_vis_period': 'duration of last visible period (s)',
                         'curv_diff': 'curvature difference (deg/cm)',
                         'abs_curv_diff': 'abs curvature difference (deg/cm)',
                         'time': 'time (s)',
@@ -169,7 +169,7 @@ def update_firefly_hovertemplate_based_on_group(fig, ff_df, num_added_traces, ad
 
 
 
-def separate_ff_info_from_past_present_and_future(i, original_ff_df, point_index_array, time_since_last_visible_cap=3, time_till_next_visible_cap=3):
+def separate_ff_info_from_past_present_and_future(i, original_ff_df, point_index_array, time_since_last_vis_cap=3, time_till_next_visible_cap=3):
     corr_point_index = point_index_array[i]
     current_ff_df = original_ff_df[original_ff_df['point_index']==corr_point_index].copy()
     current_ff_df['time_label'] = 'Present'
@@ -180,10 +180,10 @@ def separate_ff_info_from_past_present_and_future(i, original_ff_df, point_index
     current_ff_df['ff_distance_to_monkey_then'] = current_ff_df['ff_distance'].values
     current_ff_df['ff_angle_to_monkey_then'] = current_ff_df['ff_angle'].values
 
-    last_seen_ff_df = current_ff_df[['point_index', 'group', 'ff_number', 'last_seen_ff_distance', 'last_seen_ff_angle', 'last_seen_curv_diff', 'time_since_last_visible', 'time_till_next_visible', 'duration_of_last_visible_period',
+    last_seen_ff_df = current_ff_df[['point_index', 'group', 'ff_number', 'last_seen_ff_distance', 'last_seen_ff_angle', 'last_seen_curv_diff', 'time_since_last_vis', 'time_till_next_visible', 'duration_of_last_vis_period',
                                      'distance_from_monkey_now_to_ff_when_ff_last_seen', 'angle_from_monkey_now_to_ff_when_ff_last_seen', 'curv_diff_from_monkey_now_to_ff_when_ff_last_seen']].copy()
     last_seen_ff_df['time_label'] = 'Past'
-    last_seen_ff_df = last_seen_ff_df[last_seen_ff_df['time_since_last_visible'] < time_since_last_visible_cap].copy()
+    last_seen_ff_df = last_seen_ff_df[last_seen_ff_df['time_since_last_vis'] < time_since_last_vis_cap].copy()
     last_seen_ff_df.rename(columns={'distance_from_monkey_now_to_ff_when_ff_last_seen': 'ff_distance',
                                     'angle_from_monkey_now_to_ff_when_ff_last_seen': 'ff_angle',
                                     'curv_diff_from_monkey_now_to_ff_when_ff_last_seen': 'curv_diff',
@@ -191,7 +191,7 @@ def separate_ff_info_from_past_present_and_future(i, original_ff_df, point_index
                                     'last_seen_ff_angle': 'ff_angle_to_monkey_then'}, inplace=True)
         
 
-    next_seen_ff_df = current_ff_df[['point_index', 'group', 'ff_number', 'next_seen_ff_distance', 'next_seen_ff_angle', 'next_seen_curv_diff', 'time_since_last_visible', 'time_till_next_visible', 'duration_of_last_visible_period',
+    next_seen_ff_df = current_ff_df[['point_index', 'group', 'ff_number', 'next_seen_ff_distance', 'next_seen_ff_angle', 'next_seen_curv_diff', 'time_since_last_vis', 'time_till_next_visible', 'duration_of_last_vis_period',
                                      'distance_from_monkey_now_to_ff_when_ff_next_seen', 'angle_from_monkey_now_to_ff_when_ff_next_seen', 'curv_diff_from_monkey_now_to_ff_when_ff_next_seen']].copy()
     next_seen_ff_df['time_label'] = 'Future'
     next_seen_ff_df = next_seen_ff_df[next_seen_ff_df['time_till_next_visible'] < time_till_next_visible_cap].copy()
@@ -202,13 +202,13 @@ def separate_ff_info_from_past_present_and_future(i, original_ff_df, point_index
                                     'next_seen_ff_angle': 'ff_angle_to_monkey_then'}, inplace=True)
     
 
-    essential_columns = ['point_index', 'group', 'ff_number', 'time_label', 'ff_distance', 'ff_angle', 'ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'curv_diff', 'time_since_last_visible', 'time_till_next_visible', 'duration_of_last_visible_period']
+    essential_columns = ['point_index', 'group', 'ff_number', 'time_label', 'ff_distance', 'ff_angle', 'ff_distance_to_monkey_then', 'ff_angle_to_monkey_then', 'curv_diff', 'time_since_last_vis', 'time_till_next_visible', 'duration_of_last_vis_period']
     main_ff_df = pd.concat([current_ff_df[essential_columns], last_seen_ff_df[essential_columns], next_seen_ff_df[essential_columns]], axis=0).reset_index(drop=True)
     main_ff_df['abs_curv_diff'] = np.abs(main_ff_df['curv_diff'])
     main_ff_df['subgroup'] = main_ff_df['group'] + '-' + main_ff_df['time_label']
     main_ff_df.sort_values(by='group', ascending=False, inplace=True)
 
-    main_ff_df['time_since_last_visible'] = main_ff_df['time_since_last_visible'].clip(upper=time_since_last_visible_cap)
+    main_ff_df['time_since_last_vis'] = main_ff_df['time_since_last_vis'].clip(upper=time_since_last_vis_cap)
     main_ff_df['time_till_next_visible'] = main_ff_df['time_till_next_visible'].clip(upper=time_till_next_visible_cap)
     main_ff_df['ff_angle'] = main_ff_df['ff_angle'] * 180 / math.pi
     main_ff_df['ff_angle_to_monkey_then'] = main_ff_df['ff_angle_to_monkey_then'] * 180 / math.pi
@@ -224,11 +224,11 @@ def separate_ff_info_from_past_present_and_future(i, original_ff_df, point_index
 
 
 
-def make_all_ff_dict_from_GUAT_joined_ff_df_and_more_ff_df(i, GUAT_joined_ff_df, more_ff_df, point_index_array, time_since_last_visible_cap=3, time_till_next_visible_cap=3):
-    main_ff_df, monkey_info_for_ff_in_past_or_future = separate_ff_info_from_past_present_and_future(i, GUAT_joined_ff_df, point_index_array, time_since_last_visible_cap=time_since_last_visible_cap, time_till_next_visible_cap=time_till_next_visible_cap)
+def make_all_ff_dict_from_GUAT_joined_ff_df_and_more_ff_df(i, GUAT_joined_ff_df, more_ff_df, point_index_array, time_since_last_vis_cap=3, time_till_next_visible_cap=3):
+    main_ff_df, monkey_info_for_ff_in_past_or_future = separate_ff_info_from_past_present_and_future(i, GUAT_joined_ff_df, point_index_array, time_since_last_vis_cap=time_since_last_vis_cap, time_till_next_visible_cap=time_till_next_visible_cap)
     more_ff_df = more_ff_df.copy()
     more_ff_df['group'] = 'More'
-    current_more_ff_df, more_monkey_info_for_ff_in_past_or_future = separate_ff_info_from_past_present_and_future(i, more_ff_df, point_index_array, time_since_last_visible_cap=time_since_last_visible_cap, time_till_next_visible_cap=time_till_next_visible_cap)
+    current_more_ff_df, more_monkey_info_for_ff_in_past_or_future = separate_ff_info_from_past_present_and_future(i, more_ff_df, point_index_array, time_since_last_vis_cap=time_since_last_vis_cap, time_till_next_visible_cap=time_till_next_visible_cap)
     current_more_ff_df['ff_number'] = current_more_ff_df['ff_number'] + 200 # so that the ff_number of more ff does not overlap with the ff_number of main ff
 
     combined_ff_df = pd.concat([main_ff_df, current_more_ff_df], axis=0).reset_index(drop=True)

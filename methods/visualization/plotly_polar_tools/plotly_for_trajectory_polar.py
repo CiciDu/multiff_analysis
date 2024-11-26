@@ -138,13 +138,13 @@ def make_current_traj_df(current_traj_points, current_stops, trajectory_features
 
 def find_monkey_info_when_ff_last_seen(current_ff_df, last_seen_ff_numbers):
     current_ff_df = current_ff_df[current_ff_df['ff_number'].isin(last_seen_ff_numbers)].copy()
-    monkey_info_when_ff_last_seen = current_ff_df[['point_index', 'group', 'ff_number', 'last_seen_monkey_x', 'last_seen_monkey_y', 'time_since_last_visible',
+    monkey_info_when_ff_last_seen = current_ff_df[['point_index', 'group', 'ff_number', 'last_seen_monkey_x', 'last_seen_monkey_y', 'time_since_last_vis',
                                                    'distance_from_monkey_now_to_monkey_when_ff_last_seen', 'angle_from_monkey_now_to_monkey_when_ff_last_seen',
                                                    'distance_from_monkey_now_to_ff_when_ff_last_seen', 'angle_from_monkey_now_to_ff_when_ff_last_seen']].copy()
     
     monkey_info_when_ff_last_seen.rename(columns={'last_seen_monkey_x': 'monkey_x', 
                                                 'last_seen_monkey_y': 'monkey_y', 
-                                                'time_since_last_visible': 'time_from_now',
+                                                'time_since_last_vis': 'time_from_now',
                                                 'last_seen_ff_distance': 'distance_from_monkey_then_to_ff_then', 
                                                 'last_seen_ff_angle': 'angle_from_monkey_then_to_ff_then', 
                                                 'last_seen_curv_diff': 'curv_diff_from_monkey_then_to_ff_then',

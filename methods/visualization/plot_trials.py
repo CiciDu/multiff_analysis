@@ -22,7 +22,7 @@ def PlotTrials(duration,
                ff_real_position_sorted, 
                ff_believed_position_sorted, 
                cluster_around_target_indices, 
-               ff_caught_T_sorted,
+               ff_caught_T_new,
                currentTrial = None, # Can be None; then it means all trials in the duration will be plotted
                num_trials = None,
                fig = None, 
@@ -215,7 +215,7 @@ def PlotTrials(duration,
 
 
     # If currentTrial is not given, then it will be calculated based on the duration
-    currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_sorted, currentTrial, num_trials, duration)
+    currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
     print('currentTrial:', currentTrial, 'num_trials:', num_trials)
     cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
 
@@ -242,7 +242,7 @@ def PlotTrials(duration,
                 # need to find the new currentTrial and num_trials and related information
                 currentTrial = None
                 num_trials = None
-                currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_sorted, currentTrial, num_trials, duration)
+                currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
                 cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
             else:
                 print("The monkey crossed the arena edge at {} but the duration is long enough (more than 2/3 of the original duration) to include the crossing".format(cross_boundary_time))
@@ -258,7 +258,7 @@ def PlotTrials(duration,
     #         duration[0] = null_agent_starting_time - assumed_memory_duration_of_agent
     #         print("duration[0] is changed to %s to ensure that the duration is sufficient for assumed_memory_duration_of_agent" % duration[0])
     #         # recalculate currentTrial and num_trials accordingly
-    #         currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_sorted, currentTrial, num_trials, duration)
+    #         currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
 
     target_indices = np.arange(currentTrial-num_trials+1, currentTrial+1)
 
@@ -599,7 +599,7 @@ def PlotTrials(duration,
 
 
     if show_null_agent_trajectory:
-        axes, legend_markers, legend_names = show_null_trajectory.show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_information, ff_dataframe, ff_caught_T_sorted, \
+        axes, legend_markers, legend_names = show_null_trajectory.show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_information, ff_dataframe, ff_caught_T_new, \
                                                axes, legend_markers, legend_names, R, assumed_memory_duration_of_agent, show_null_agent_trajectory_2nd_time, show_ff_to_be_considered_by_first_null_trajectory,
                                                reaching_boundary_ok=show_null_trajectory_reaching_boundary_ok, null_arc_info_for_plotting=null_arc_info_for_plotting, type=show_null_agent_trajectory_type)
 
