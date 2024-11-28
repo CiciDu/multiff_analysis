@@ -282,7 +282,6 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, c
     return all_trial_features
 
 
-
 def make_feature_statistics(all_trial_features, data_folder_name=None):
 	feature_statistics = pd.DataFrame([], columns=['Item', 'Median', 'Mean', 'N_trial'])
 	all_trial_features_valid = all_trial_features[(all_trial_features['t_last_vis'] < 50) & (all_trial_features['hitting_arena_edge']==False)].reset_index()
@@ -520,3 +519,17 @@ def _update_target_df(target_df, target_df_sub, unique_points, target_df_idx):
     target_df.iloc[target_df_idx, target_df.columns.get_indexer(target_df_sub_new.columns)] = target_df_sub_new.values
 
     return target_df
+
+
+def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num_stops, num_stops_near_target, num_stops_since_last_vis):
+    all_trial_df = pd.DataFrame({'target_index': np.arange(len(ff_caught_T_new))})
+    target_last_vis_df = target_last_vis_df.merge(all_trial_df, on='target_index', how='right')
+
+    target_last_vis_df.sort_values(by='target_index', inplace=True)
+    target_last_vis_df['num_stops'] = num_stops
+    target_last_vis_df['num_stops_near_target'] = num_stops_near_target
+    target_last_vis_df['num_stops_since_last_vis'] = num_stops_since_last_vis
+    target_last_vis_df.dropna(inplace=True)
+    target_last_vis_df = target_last_vis_df[target_last_vis_df['last_vis_dist'] != 9999]
+    return target_last_vis_df
+

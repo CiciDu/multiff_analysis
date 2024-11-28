@@ -154,21 +154,24 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'last_stop_time'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'first_stop_time']
         self.GUAT_w_ff_df['total_stop_time'] = self.GUAT_w_ff_df['last_stop_time'] - self.GUAT_w_ff_df['first_stop_time']
                      
-    
+
+    def make_one_stop_w_ff_df(self):                
+        self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
+        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)
+
     def _add_one_stop_info_to_GUAT_w_ff_df(self):
-        one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
-        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(one_stop_df)
+        self.make_one_stop_w_ff_df()
         self.one_stop_w_ff_df['cluster_index'] = np.arange(self.GUAT_w_ff_df['cluster_index'].max()+1, 
-                                                      self.GUAT_w_ff_df['cluster_index'].max()+1+len(self.one_stop_w_ff_df))
+                                                            self.GUAT_w_ff_df['cluster_index'].max()+1+len(self.one_stop_w_ff_df))
         
         # find point_index in self.one_stop_w_ff_df that are also in self.GUAT_w_ff_df
         common_point_index = np.intersect1d(self.GUAT_w_ff_df['first_stop_point_index'].values, self.one_stop_w_ff_df['first_stop_point_index'].values)
         print(f'Out of {len(self.one_stop_w_ff_df)} rows in one_stop_w_ff_df, {len(common_point_index)} rows have first_stop_point_index that are also in GUAT_w_ff_df. These rows are removed from one_stop_ff_df.')
         one_stop_w_ff_df = self.one_stop_w_ff_df[~self.one_stop_w_ff_df['first_stop_point_index'].isin(common_point_index)].copy()
-
-        # print differences in columns between the two dataframes
-        if len(one_stop_w_ff_df.columns.difference(self.GUAT_w_ff_df.columns)) > 0:
-            print('Columns in one_stop_w_ff_df but not in GUAT_w_ff_df:', one_stop_w_ff_df.columns.difference(self.GUAT_w_ff_df.columns))
+        # only keep columns in one_stop_w_ff_df that are also in GUAT_w_ff_df
+        columns_of_one_stop_to_keep = [col for col in one_stop_w_ff_df.columns if col in self.GUAT_w_ff_df.columns]
+        one_stop_w_ff_df = one_stop_w_ff_df[columns_of_one_stop_to_keep].copy()
+        # print columns in one_stop_w_ff_df but not in GUAT_w_ff_df
         if len(self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns)) > 0:
             print('Columns in GUAT_w_ff_df but not in one_stop_w_ff_df:', self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns))
 

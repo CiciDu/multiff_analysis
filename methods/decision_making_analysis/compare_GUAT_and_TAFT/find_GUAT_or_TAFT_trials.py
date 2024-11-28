@@ -85,6 +85,8 @@ def make_GUAT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_so
 
     GUAT_trials_df = _make_trials_df(monkey_sub)
 
+    GUAT_trials_df.reset_index(drop=True, inplace=True)
+
     return GUAT_trials_df
 
 
@@ -94,6 +96,8 @@ def make_TAFT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_so
     monkey_sub = _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance)
 
     TAFT_trials_df = _make_trials_df(monkey_sub)
+
+    TAFT_trials_df.reset_index(drop=True, inplace=True)
 
     return TAFT_trials_df
 
@@ -155,7 +159,8 @@ def _take_out_monkey_subset_for_GUAT(monkey_information, ff_caught_T_new, ff_rea
     # Filter out clusters too close to the targets
     close_to_target_clusters = monkey_sub[(monkey_sub['distance_to_target'] < max_cluster_distance) | 
                                           (monkey_sub['distance_to_last_target'] < max_cluster_distance)]['stop_cluster_id'].unique()
-    print(f'{len(close_to_target_clusters)} clusters out of {len(monkey_sub["stop_cluster_id"].unique())} are too close to the target or the last target')
+    print(f'When take out monkey subset for GUAT, {len(close_to_target_clusters)} clusters out of {len(monkey_sub["stop_cluster_id"].unique())} are'
+          ' too close to the target or the last target. Those clusters are filtered out.')
     monkey_sub = monkey_sub[~monkey_sub['stop_cluster_id'].isin(close_to_target_clusters)].copy()
 
     # Also filter out clusters that span multiple trials
