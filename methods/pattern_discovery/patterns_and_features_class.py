@@ -90,6 +90,8 @@ class PatternsAndFeatures():
         self.combd_pattern_frequencies = pd.DataFrame()
         self.combd_feature_statistics = pd.DataFrame()
         self.combd_all_trial_features = pd.DataFrame()
+        self.combd_scatter_around_target_center_df = pd.DataFrame()
+        
         for index, row in self.sessions_df_for_one_monkey.iterrows():
             if row['finished'] is True:
                 continue
@@ -103,14 +105,17 @@ class PatternsAndFeatures():
             self.data_item.pattern_frequencies['data_name'] = data_name
             self.data_item.feature_statistics['data_name'] = data_name
             self.data_item.all_trial_features['data_name'] = data_name
+            self.data_item.scatter_around_target_center_df['data_name'] = data_name
 
             self.combd_pattern_frequencies = pd.concat([self.combd_pattern_frequencies, self.data_item.pattern_frequencies], axis=0).reset_index(drop=True)
             self.combd_feature_statistics = pd.concat([self.combd_feature_statistics, self.data_item.feature_statistics], axis=0).reset_index(drop=True)
             self.combd_all_trial_features = pd.concat([self.combd_all_trial_features, self.data_item.all_trial_features], axis=0).reset_index(drop=True)
+            self.combd_scatter_around_target_center_df = pd.concat([self.combd_scatter_around_target_center_df, self.data_item.scatter_around_target_center_df], axis=0).reset_index(drop=True)
 
         organize_patterns_and_features.add_dates_and_sessions(self.combd_pattern_frequencies)
         organize_patterns_and_features.add_dates_and_sessions(self.combd_feature_statistics)
         organize_patterns_and_features.add_dates_and_sessions(self.combd_all_trial_features)
+        organize_patterns_and_features.add_dates_and_sessions(self.combd_scatter_around_target_center_df)
 
         self.agg_pattern_frequencies = self._make_agg_pattern_frequency()
         self.agg_feature_statistics = organize_patterns_and_features.make_feature_statistics(self.combd_all_trial_features.drop(columns='data_name'), data_folder_name = None)
@@ -122,6 +127,9 @@ class PatternsAndFeatures():
             self.combd_all_trial_features.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_all_trial_features.csv'))
             self.agg_pattern_frequencies.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_pattern_frequencies.csv'))
             self.agg_feature_statistics.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'agg_feature_statistics.csv'))
+            self.combd_scatter_around_target_center_df.to_csv(os.path.join(self.combd_patterns_and_features_folder_path, 'combd_scatter_around_target_center_df.csv'))
+
+        self.make_combd_scatter_around_target_center_df(exists_ok=exists_ok)
 
         sys.stdout = original_stdout
 

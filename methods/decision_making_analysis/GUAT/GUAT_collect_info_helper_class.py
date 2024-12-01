@@ -1,10 +1,10 @@
-import sys
-from decision_making_analysis.cluster_replacement import cluster_replacement_class, cluster_replacement_utils
+from decision_making_analysis.cluster_replacement import cluster_replacement_utils
 from decision_making_analysis.decision_making import decision_making_utils
-from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_helper_class, process_GUAT_trials_class, GUAT_utils
-from decision_making_analysis import free_selection, trajectory_info
+from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_helper_class, GUAT_utils
+from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from data_wrangling import monkey_data_classes
+from data_wrangling import further_processing_class
 
 import os
 import numpy as np
@@ -13,7 +13,6 @@ from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
 from os.path import exists
-import json
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -129,35 +128,9 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         print("GUAT_w_ff_df:", len(self.time_of_eval), "out of", original_length, "rows remains")
 
 
-    def make_or_retrieve_GUAT_w_ff_df(self, exists_ok=True, add_one_stop_info=False):
+    def make_one_stop_w_ff_df(self):    
+        further_processing_class.FurtherProcessing.make_one_stop_w_ff_df(self)            
 
-        filepath = os.path.join(self.GUAT_folder_path, 'GUAT_w_ff_df.csv')
-        if exists(filepath) & exists_ok:
-            self.GUAT_w_ff_df = pd.read_csv(filepath, sep='\t', converters={'nearby_alive_ff_indices': pd.eval})
-            print('Retrieved GUAT_w_ff_df')
-        else:
-            if getattr(self, 'GUAT_indices_df', None) is None:
-                self.get_monkey_data(include_GUAT_data=True)
-            self.GUAT_w_ff_df, self.GUAT_expanded_trials_df = GUAT_utils.get_GUAT_w_ff_df(self.data_item.GUAT_indices_df,
-                                                                                self.data_item.GUAT_trials_df,
-                                                                                self.data_item.ff_dataframe)   
-
-            self.GUAT_w_ff_df.to_csv(filepath, sep='\t', index=False)
-            print('Made and saved GUAT_w_ff_df')
-
-        if add_one_stop_info:
-            self._add_one_stop_info_to_GUAT_w_ff_df()
-            # one_stop_df is used as a comparison to GUAT where there are at least 2 stops beside a missed ff. One_stop_df, on the other hand,
-            # contains instances where there is one missed stop beside a missed ff.
-
-        self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'last_stop_point_index'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'first_stop_point_index']
-        self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'last_stop_time'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'first_stop_time']
-        self.GUAT_w_ff_df['total_stop_time'] = self.GUAT_w_ff_df['last_stop_time'] - self.GUAT_w_ff_df['first_stop_time']
-                     
-
-    def make_one_stop_w_ff_df(self):                
-        self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
-        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)
 
     def _add_one_stop_info_to_GUAT_w_ff_df(self):
         self.make_one_stop_w_ff_df()
@@ -181,6 +154,11 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             if '_index' in col:
                 if self.GUAT_w_ff_df[col].isna().sum() == 0:
                     self.GUAT_w_ff_df[col] = self.GUAT_w_ff_df[col].astype('int64')
+
+        self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'last_stop_point_index'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_point_index'].isna(), 'first_stop_point_index']
+        self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'last_stop_time'] = self.GUAT_w_ff_df.loc[self.GUAT_w_ff_df['last_stop_time'].isna(), 'first_stop_time']
+        self.GUAT_w_ff_df['total_stop_time'] = self.GUAT_w_ff_df['last_stop_time'] - self.GUAT_w_ff_df['first_stop_time']
+                     
 
 
     def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,

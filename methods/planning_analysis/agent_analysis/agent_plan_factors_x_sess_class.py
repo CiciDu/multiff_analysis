@@ -35,8 +35,8 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
         self.num_steps_per_dataset = num_steps_per_dataset
         rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(self, self.model_folder_name)
         self.monkey_name = None
-        self.combd_planning_info_folder_path = os.path.join(os.path.dirname(os.path.dirname(self.planning_data_folder_path)), 'combined_data/combd_planning_info')
-        self.combd_stop_and_alt_folder_path = os.path.join(os.path.dirname(os.path.dirname(self.planning_data_folder_path)), 'combined_data/stop_and_alt')
+        self.combd_planning_info_folder_path = os.path.join(os.path.dirname(os.path.dirname(self.planning_data_folder_path)), 'combined_data')
+        self.combd_stop_and_alt_folder_path = os.path.join(self.combd_planning_info_folder_path, 'stop_and_alt')
         # note that we used dir_name for the above because those data folder path includes "individual_data_sessions/data_0" and so on at the end.
         self.make_key_paths()
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode

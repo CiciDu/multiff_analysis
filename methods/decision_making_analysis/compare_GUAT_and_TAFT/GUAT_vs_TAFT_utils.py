@@ -68,6 +68,7 @@ def deal_with_duplicated_stop_point_index(GUAT_w_ff_df):
     GUAT_w_ff_df.sort_values(by='stop_point_index', inplace=True)
     return GUAT_w_ff_df
 
+
 def process_trials_df(trials_df, monkey_information, ff_dataframe_visible, stop_period_duration):
 
     processed_df = trials_df[['stop_point_index', 'ff_index']].copy()

@@ -4,6 +4,7 @@ from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT
 from decision_making_analysis import free_selection, trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
+from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils
 
 import os
 import numpy as np
@@ -125,6 +126,8 @@ def get_one_stop_df(filtered_stops_df, ff_dataframe, min_distance_to_ff=25, max_
 def get_GUAT_w_ff_df(GUAT_indices_df, 
                     GUAT_trials_df, 
                     ff_dataframe, 
+                    monkey_information,
+                    ff_real_position_sorted,
                     max_distance_to_stop_for_GUAT_target=50, 
                     max_allowed_time_since_last_vis=2.5):
 
@@ -151,5 +154,9 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     GUAT_w_ff_df['target_index'] = GUAT_w_ff_df['trial']
     GUAT_w_ff_df['latest_visible_ff'] = GUAT_w_ff_df['latest_visible_ff'].astype('int64')
 
+    GUAT_w_ff_df.sort_values(by=['trial', 'first_stop_time'], inplace=True)
+    GUAT_w_ff_df['ff_index'] = GUAT_w_ff_df['latest_visible_ff']
+    GUAT_vs_TAFT_utils.add_stop_point_index(GUAT_w_ff_df, monkey_information, ff_real_position_sorted)
+    GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(GUAT_w_ff_df)
 
     return GUAT_w_ff_df, GUAT_expanded_trials_df

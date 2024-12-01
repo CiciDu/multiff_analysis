@@ -60,7 +60,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         except Exception as e:
             print('Abort retrieving all GUAT info from one session:', e, 'Proceed to collect all GUAT info from one session.')
             self.get_monkey_data(already_retrieved_ok=monkey_data_already_retrieved_ok)
-            self.make_or_retrieve_GUAT_w_ff_df(exists_ok=GUAT_w_ff_df_exists_ok, add_one_stop_info=True)
+            self._add_one_stop_info_to_GUAT_w_ff_df()
             self._generate_important_df_to_combine_across_sessions(self.GUAT_w_ff_df, curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, **self.gc_kwargs)
             if save_data:
                 self._save_important_info()  

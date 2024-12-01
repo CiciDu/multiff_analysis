@@ -702,7 +702,7 @@ def make_info_of_monkey(monkey_information, ff_information, ff_dataframe,  accur
         = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path=raw_data_folder_path)
     monkey_information = add_columns_to_monkey_information(monkey_information)
     caught_ff_num = len(ff_caught_T_new)
-    cluster_around_target_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted, max_time_apart = 1.25)
+    cluster_around_target_trials, used_cluster_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted)
 
     info_of_monkey = {
             "monkey_information": monkey_information,

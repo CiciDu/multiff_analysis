@@ -63,7 +63,10 @@ class OnlyStopFFAcrossSessions():
     def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
         self.optimal_arc_type = optimal_arc_type
 
-        self.top_combd_only_stop_ff_path = f'all_monkey_data/raw_monkey_data/individual_monkey_data/{self.monkey_name}/combd_planning_info/only_stop_ff'
+        self.only_stop_ff_folder_path = os.path.join(self.planning_data_folder_path, f'only_stop_ff/only_stop_ff_df/{self.optimal_arc_type}')
+
+
+        self.top_combd_only_stop_ff_path = f'all_monkey_data/planning/individual_monkey_data/{self.monkey_name}/combd_planning_info/only_stop_ff'
         self.combd_only_stop_ff_df_folder_path = os.path.join(self.top_combd_only_stop_ff_path, f'data/combd_only_stop_ff_df/{self.optimal_arc_type}')
         self.combd_x_features_folder_path = os.path.join(self.top_combd_only_stop_ff_path, f'data/combd_x_features_df/{self.optimal_arc_type}')
         os.makedirs(self.combd_only_stop_ff_df_folder_path, exist_ok=True)

@@ -738,7 +738,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     if len(ff_dataframe) > 0:
         ff_dataframe = ff_dataframe[ff_dataframe['time'] <= plot_whole_duration[1]-plot_whole_duration[0]]
         # Select trials, indices, and positions where there is a cluster of fireflies around the target
-        cluster_around_target_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted, max_time_apart = 1.25)
+        cluster_around_target_trials, used_cluster_trials, cluster_around_target_indices, cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted)
     else:
         cluster_around_target_indices = []
 

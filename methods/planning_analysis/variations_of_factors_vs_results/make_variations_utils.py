@@ -340,7 +340,7 @@ def make_variations_df_across_ref_point_values(variation_func,
 
 
 def make_combd_stop_and_alt_folder_path(monkey_name):
-    combd_stop_and_alt_folder_path = f'all_monkey_data/raw_monkey_data/individual_monkey_data/{monkey_name}/combd_planning_info/stop_and_alt'
+    combd_stop_and_alt_folder_path = f'all_monkey_data/planning/individual_monkey_data/{monkey_name}/combd_planning_info/stop_and_alt'
     return combd_stop_and_alt_folder_path
 
 

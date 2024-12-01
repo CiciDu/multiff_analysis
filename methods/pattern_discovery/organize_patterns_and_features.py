@@ -16,164 +16,91 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
 
-
-def make_all_trial_patterns(caught_ff_num, n_ff_in_a_row, visible_before_last_one_trials, disappear_latest_trials, ignore_sudden_flash_trials,
-                            try_a_few_times_trials, give_up_after_trying_trials, cluster_around_target_trials,
-                            waste_cluster_around_target_trials, data_folder_name=None):
-    
-
-		zero_array = np.zeros(caught_ff_num+1, dtype=int)
-
-		multiple_in_a_row = np.where(n_ff_in_a_row >= 2)[0]
-		# multiple_in_a_row_all means it also includes the first ff that's caught in a cluster
-		multiple_in_a_row_all = np.union1d(multiple_in_a_row, multiple_in_a_row-1)
-		multiple_in_a_row2 = zero_array.copy()
-		multiple_in_a_row_all2 = zero_array.copy()
-		multiple_in_a_row2[multiple_in_a_row] = 1
-		multiple_in_a_row_all2[multiple_in_a_row_all] = 1
-
-
-		two_in_a_row = np.where(n_ff_in_a_row == 2)[0]
-		three_in_a_row = np.where(n_ff_in_a_row == 3)[0]
-		four_in_a_row = np.where(n_ff_in_a_row == 4)[0]
-
-
-		two_in_a_row2 = zero_array.copy()
-		if len(two_in_a_row) > 0:
-			two_in_a_row2[two_in_a_row] = 1 
-
-		three_in_a_row2 = zero_array.copy()
-		if len(three_in_a_row) > 0:
-			three_in_a_row2[three_in_a_row] = 1
-
-		four_in_a_row2 = zero_array.copy()
-		if len(four_in_a_row) > 0:
-			four_in_a_row2[four_in_a_row] = 1
-
-		one_in_a_row = np.where(n_ff_in_a_row < 2)[0]
-		one_in_a_row2 = zero_array.copy()
-		if len(one_in_a_row) > 0:
-			one_in_a_row2[one_in_a_row] = 1
-
-		visible_before_last_one2 = zero_array.copy()
-		if len(visible_before_last_one_trials) > 0:
-			visible_before_last_one2[visible_before_last_one_trials] = 1
-
-		disappear_latest2 = zero_array.copy()
-		if len(disappear_latest_trials) > 0:
-			disappear_latest2[disappear_latest_trials] = 1 
-
-		ignore_sudden_flash2 = zero_array.copy()
-		if len(ignore_sudden_flash_trials) > 0:
-			ignore_sudden_flash2[ignore_sudden_flash_trials] = 1
-
-		try_a_few_times2 = zero_array.copy()
-		if len(try_a_few_times_trials) > 0:
-			try_a_few_times2[try_a_few_times_trials] = 1
-
-		give_up_after_trying2 = zero_array.copy()
-		if len(give_up_after_trying_trials) > 0:
-			give_up_after_trying2[give_up_after_trying_trials] = 1
-
-		cluster_around_target2 = zero_array.copy()
-		if len(cluster_around_target_trials) > 0:
-			cluster_around_target2[cluster_around_target_trials] = 1 
-
-		waste_cluster_around_target2 = zero_array.copy()
-		if len(waste_cluster_around_target_trials) > 0:
-			waste_cluster_around_target2[waste_cluster_around_target_trials] = 1
-
-
-		all_trial_patterns_dict = {
-		# bool
-		'two_in_a_row': two_in_a_row2,
-		'three_in_a_row': three_in_a_row2,
-		'four_in_a_row': four_in_a_row2,
-		'one_in_a_row': one_in_a_row2,
-		'multiple_in_a_row': multiple_in_a_row2,
-		'multiple_in_a_row_all': multiple_in_a_row_all2,
-		'visible_before_last_one': visible_before_last_one2,
-		'disappear_latest': disappear_latest2,
-		'ignore_sudden_flash': ignore_sudden_flash2,
-		'try_a_few_times': try_a_few_times2,
-		'give_up_after_trying': give_up_after_trying2,
-		'cluster_around_target': cluster_around_target2,
-		'waste_cluster_around_target': waste_cluster_around_target2}
-
-		for key, value in all_trial_patterns_dict.items():
-			all_trial_patterns_dict[key] = value[:-1]
-
-		                                  
-		all_trial_patterns = pd.DataFrame(all_trial_patterns_dict) 
-
-		if data_folder_name:
-			basic_func.save_df_to_csv(all_trial_patterns, 'all_trial_patterns', data_folder_name)
-
-
-		return all_trial_patterns
-
-
-def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_information, data_folder_name=None):
+def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_information, 
+                             GUAT_w_ff_frequency, one_stop_w_ff_frequency,
+                             data_folder_name=None):
     pattern_frequencies = pd.DataFrame([], columns=['Item', 'Frequency', 'N_total', 'Rate', 'Group'])
-    n_trial_counted = len(all_trial_patterns)-1
-    caught_ff_num = len(ff_caught_T_new)
     n_ff_counted = len(ff_caught_T_new) - 1
 
-    group = 1
     for item in all_trial_patterns.columns:
         frequency = all_trial_patterns[item].sum()
-        if item == 'three_in_a_row':
-            n_trial = n_trial_counted-1
-        elif item == 'four_in_a_row':
-            n_trial = n_trial_counted-2
-        elif item == 'cluster_around_target': # cause for this category, we actually didn't count the 1st ff (when time = ff_caught_T_new[0])
-            n_trial = n_trial_counted+1
-        else:
-            n_trial = n_trial_counted
-                
-        new_row = pd.DataFrame({'Item': item, 'Frequency': frequency,
-                                'N_total': n_trial, 'Rate': frequency/n_trial, 'Group': group}, index=[0])
+        new_row = pd.DataFrame({'Item': item,
+                                'Frequency': frequency}, index=[0])
         pattern_frequencies = pd.concat([pattern_frequencies, new_row])
 
-    
+    # Customize n_trials for each pattern
+    pattern_frequencies['N_total'] = len(all_trial_patterns) - 1
 
+    # Specific customizations
+    pattern_frequencies.loc[pattern_frequencies['Item'].isin(['cluster_around_target', 'disappear_latest', 'ignore_sudden_flash']), 'N_total'] = len(all_trial_patterns)
+    pattern_frequencies.loc[pattern_frequencies['Item'] == 'three_in_a_row', 'N_total'] = len(all_trial_patterns) - 2
+    pattern_frequencies.loc[pattern_frequencies['Item'] == 'four_in_a_row', 'N_total'] = len(all_trial_patterns) - 3
+    pattern_frequencies.loc[pattern_frequencies['Item'].isin(['waste_cluster_around_target', 'use_cluster']), 'N_total'] = all_trial_patterns['cluster_around_target'].sum()
+    pattern_frequencies.loc[pattern_frequencies['Item'] == 'ignore_sudden_flash', 'N_total'] = all_trial_patterns['sudden_flash'].sum()
+
+    # Adjust GUAT and TAFT
+    n_total = GUAT_w_ff_frequency + one_stop_w_ff_frequency + all_trial_patterns['try_a_few_times'].sum()
+    pattern_frequencies.loc[pattern_frequencies['Item'] == 'give_up_after_trying', 'Frequency'] = GUAT_w_ff_frequency
+    pattern_frequencies.loc[pattern_frequencies['Item'].isin(['give_up_after_trying', 'try_a_few_times']), 'N_total'] = n_total
+
+    # Calculate Rate
+    pattern_frequencies['Rate'] = pattern_frequencies['Frequency'] / pattern_frequencies['N_total']
+    pattern_frequencies['Group'] = 1
+
+    # Calculate Firefly capture rate
     total_duration = (ff_caught_T_new[-1]-ff_caught_T_new[0]) # we don't consider the duration before the first ff was caught
     ff_capture_rate = n_ff_counted/total_duration
     new_row = pd.DataFrame({'Item': 'ff_capture_rate', 'Frequency': n_ff_counted, 'N_total': total_duration, 
-                                                    'Rate': ff_capture_rate, 'Group': 2}, index=[0])
+                             'Rate': ff_capture_rate, 'Group': 2}, index=[0])
     pattern_frequencies = pd.concat([pattern_frequencies, new_row])
 
-
-    num_stops_array = get_num_stops_array(monkey_information, np.arange(len(ff_caught_T_new)))
-
-    total_number_of_stops = sum(num_stops_array)
+    # Calculate Stop success rate
+    monkey_sub = monkey_information = monkey_information[monkey_information['whether_new_distinct_stop'] == True]
+    monkey_sub = monkey_sub[monkey_sub['time'].between(ff_caught_T_new[0], ff_caught_T_new[-1])]
+    total_number_of_stops = len(monkey_sub)
     stop_success_rate = n_ff_counted/total_number_of_stops
     new_row = pd.DataFrame({'Item': 'stop_success_rate', 'Frequency': n_ff_counted, 'N_total': total_number_of_stops, 
-                                                    'Rate': stop_success_rate, 'Group': 2}, index=[0])
+                            'Rate': stop_success_rate, 'Group': 2}, index=[0])
     pattern_frequencies = pd.concat([pattern_frequencies, new_row]).reset_index(drop=True)
-    pattern_frequencies = pattern_frequencies.reset_index(drop=True)
+
+    # Calculate GUAT/TAFT rate
+    GUAT_over_TAFT = GUAT_w_ff_frequency / all_trial_patterns['try_a_few_times'].sum()
+    new_row = pd.DataFrame({'Item': 'GUAT_over_TAFT', 'Frequency': GUAT_w_ff_frequency, 'N_total': all_trial_patterns['try_a_few_times'].sum(), 
+                             'Rate': GUAT_over_TAFT, 'Group': 2}, index=[0])
+    pattern_frequencies = pd.concat([pattern_frequencies, new_row]).reset_index(drop=True)
 
 
-    pattern_frequencies['Label'] = 'Missing'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'two_in_a_row', 'Label'] = 'Two in a row'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'visible_before_last_one', 'Label'] = 'Visible before last capture'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'disappear_latest', 'Label'] = 'Target disappears latest'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'waste_cluster_around_target', 'Label'] = 'Waste cluster around last target'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'ignore_sudden_flash', 'Label'] = 'Ignore sudden flash'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'give_up_after_trying', 'Label'] = 'Give up after trying'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'try_a_few_times', 'Label'] = 'Try a few times'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'ff_capture_rate', 'Label'] = 'Firefly capture rate (per s)'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'stop_success_rate', 'Label'] = 'Stop success rate'
-    
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'three_in_a_row', 'Label'] = 'Three in a row'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'four_in_a_row', 'Label'] = 'Four in a row'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'one_in_a_row', 'Label'] = 'One in a row'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'multiple_in_a_row', 'Label'] = 'Multiple in a row'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'multiple_in_a_row_all', 'Label'] = 'Multiple in a row including 1st one'
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'cluster_around_target', 'Label'] = 'Cluster exists around last target'
+    # Define the mapping of Item to Label
+    item_to_label = {
+        'two_in_a_row': 'Two in a row',
+        'visible_before_last_one': 'Visible before last capture',
+        'disappear_latest': 'Target disappears latest',
+        'use_cluster': 'Use cluster near target',
+        'waste_cluster_around_target': 'Waste cluster around target',
+        'ignore_sudden_flash': 'Ignore sudden flash',
+        'sudden_flash': 'Sudden flash',
+        'give_up_after_trying': 'Give up after trying',
+        'try_a_few_times': 'Try a few times',
+        'ff_capture_rate': 'Firefly capture rate (per s)',
+        'stop_success_rate': 'Stop success rate',
+        'three_in_a_row': 'Three in a row',
+        'four_in_a_row': 'Four in a row',
+        'one_in_a_row': 'One in a row',
+        'multiple_in_a_row': 'Multiple in a row',
+        'multiple_in_a_row_all': 'Multiple in a row including 1st one',
+        'cluster_around_target': 'Cluster exists around target',
+        'GUAT_over_TAFT': 'GUAT over TAFT'
+    }
+
+    # Apply the mapping to the Label column
+    pattern_frequencies['Label'] = pattern_frequencies['Item'].map(item_to_label).fillna('Missing')
+
+    pattern_frequencies['N_total'] = pattern_frequencies['N_total'].astype(int)
+
 
     if data_folder_name:
         basic_func.save_df_to_csv(pattern_frequencies, 'pattern_frequencies', data_folder_name)
+
 
     return pattern_frequencies
 

@@ -1,7 +1,6 @@
-import sys
-from data_wrangling import basic_func, process_raw_data, base_processing_class, further_processing_class, monkey_data_classes
-from pattern_discovery import pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features
-
+from data_wrangling import basic_func, process_raw_data, further_processing_class
+from pattern_discovery import pattern_by_points, cluster_analysis, organize_patterns_and_features
+from pattern_discovery import organize_patterns_and_features, monkey_landing_in_ff
 
 import os
 import os.path
@@ -62,6 +61,9 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         self.make_or_retrieve_all_trial_features(exists_ok=exists_ok)
         
         self.make_or_retrieve_feature_statistics(exists_ok=exists_ok)
+
+        self.scatter_around_target_center_df = monkey_landing_in_ff.make_scatter_around_target_center_df(self.monkey_information, 
+                                                                                                         self.closest_stop_to_capture_df, self.ff_real_position_sorted)
 
 
     def make_or_retrieve_target_closest(self, exists_ok=False): # these may need to be run again if they're to be used

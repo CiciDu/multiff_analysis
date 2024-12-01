@@ -80,6 +80,8 @@ class ProcessGUATtrials:
         self.GUAT_w_ff_df, self.GUAT_expanded_trials_df = GUAT_utils.get_GUAT_w_ff_df(self.GUAT_indices_df,
                                                                             self.GUAT_trials_df,
                                                                             self.ff_dataframe,
+                                                                            self.monkey_information,
+                                                                            self.ff_real_position_sorted,                                                                            
                                                                             max_distance_to_stop_for_GUAT_target=self.max_distance_to_stop_for_GUAT_target,
                                                                             max_allowed_time_since_last_vis=self.max_allowed_time_since_last_vis)
 

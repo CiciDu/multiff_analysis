@@ -138,7 +138,6 @@ class CompareGUATandTAFTclass():
         self.x_var_df = self.x_var_df.drop(columns=columns_with_na)
 
 
-
     def try_retrieving_x_df(self):
         if self.TAFT_or_GUAT == 'TAFT':
             if (os.path.exists(os.path.join(self.GUAT_vs_TAFT_folder_path, 'TAFT_x_df.csv'))):
@@ -182,12 +181,7 @@ class CompareGUATandTAFTclass():
             self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(self.ff_caught_T_new) - 2]
             GUAT_vs_TAFT_utils.add_stop_point_index(self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
         elif self.TAFT_or_GUAT == 'GUAT':
-            self.gcc.make_or_retrieve_GUAT_w_ff_df(exists_ok=GUAT_w_ff_df_exists_ok)
-            self.GUAT_w_ff_df = self.gcc.GUAT_w_ff_df.copy()
-            self.GUAT_w_ff_df.sort_values(by=['trial', 'first_stop_time'], inplace=True)
-            self.GUAT_w_ff_df['ff_index'] = self.GUAT_w_ff_df['latest_visible_ff']
-            GUAT_vs_TAFT_utils.add_stop_point_index(self.GUAT_w_ff_df, self.monkey_information, self.ff_real_position_sorted)
-            self.GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(self.GUAT_w_ff_df)
+            self.GUAT_w_ff_df = self.gcc.data_item.GUAT_w_ff_df.copy()
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1]
 
 

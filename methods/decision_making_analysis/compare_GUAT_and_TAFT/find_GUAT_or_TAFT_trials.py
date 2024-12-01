@@ -1,6 +1,7 @@
 import sys
 from data_wrangling import basic_func
 from planning_analysis.show_planning import alt_ff_utils
+from decision_making_analysis.GUAT import process_GUAT_trials_class, GUAT_and_TAFT, GUAT_collect_info_helper_class, GUAT_collect_info_class, GUAT_utils
 
 import os
 import numpy as np
@@ -13,16 +14,28 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
 
-def give_up_after_trying_func(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
+def give_up_after_trying_func(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
     """
     Find the trials where the monkey has stopped more than once to catch a firefly but failed to succeed, and the monkey gave up.
     """
 
     GUAT_trials_df = make_GUAT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance)
-    give_up_after_trying_trials = GUAT_trials_df['trial'].unique()
-    GUAT_indices_df, GUAT_point_indices_for_anim = _get_more_or_TAFT_info(GUAT_trials_df, monkey_information, max_point_index=max_point_index)
+    GUAT_indices_df, GUAT_point_indices_for_anim = _get_more_or_GUAT_or_TAFT_info(GUAT_trials_df, monkey_information, max_point_index=max_point_index)
 
-    return give_up_after_trying_trials, GUAT_indices_df, GUAT_trials_df, GUAT_point_indices_for_anim
+    GUAT_w_ff_df, GUAT_expanded_trials_df = GUAT_utils.get_GUAT_w_ff_df(GUAT_indices_df,
+                                                                        GUAT_trials_df,
+                                                                        ff_dataframe,
+                                                                        monkey_information,
+                                                                        ff_real_position_sorted,
+                                                                        )   
+    give_up_after_trying_trials = GUAT_expanded_trials_df['trial'].values
+
+    # only keep the GUAT_indices_df in GUAT_w_ff_df
+    GUAT_trials_df = GUAT_trials_df[GUAT_trials_df['cluster_index'].isin(GUAT_w_ff_df['cluster_index'].unique())]
+    GUAT_indices_df = GUAT_indices_df[GUAT_indices_df['cluster_index'].isin(GUAT_w_ff_df['cluster_index'].unique())]
+    GUAT_point_indices_for_anim = only_get_point_indices_for_anim(GUAT_trials_df, monkey_information, max_point_index=None)
+    
+    return give_up_after_trying_trials, GUAT_indices_df, GUAT_trials_df, GUAT_point_indices_for_anim, GUAT_w_ff_df
 
 
 def try_a_few_times_func(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
@@ -32,11 +45,11 @@ def try_a_few_times_func(monkey_information, ff_caught_T_new, ff_real_position_s
 
     TAFT_trials_df = make_TAFT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=max_cluster_distance)
     try_a_few_times_trials = TAFT_trials_df['trial'].unique()
-    TAFT_indices_df, try_a_few_times_indices_for_anim = _get_more_or_TAFT_info(TAFT_trials_df, monkey_information, max_point_index=max_point_index)
+    TAFT_indices_df, try_a_few_times_indices_for_anim = _get_more_or_GUAT_or_TAFT_info(TAFT_trials_df, monkey_information, max_point_index=max_point_index)
     return try_a_few_times_trials, TAFT_indices_df, TAFT_trials_df, try_a_few_times_indices_for_anim
 
 
-def _get_more_or_TAFT_info(trials_df, monkey_information, max_point_index=None):
+def _get_more_or_GUAT_or_TAFT_info(trials_df, monkey_information, max_point_index=None):
 
     # Initialize lists to store indices
     point_indices = []
@@ -62,7 +75,7 @@ def _get_more_or_TAFT_info(trials_df, monkey_information, max_point_index=None):
     point_indices = np.array(point_indices)
     indices_corr_trials = np.array(indices_corr_trials)
     indices_corr_clusters = np.array(indices_corr_clusters)
-    point_indices_for_anim = np.array(point_indices_for_anim)
+    point_indices_for_anim = np.unique(np.array(point_indices_for_anim))
 
     # Filter indices based on max_point_index
     indices_to_keep = point_indices < max_point_index
@@ -77,6 +90,19 @@ def _get_more_or_TAFT_info(trials_df, monkey_information, max_point_index=None):
 
 
 
+def only_get_point_indices_for_anim(trials_df, monkey_information, max_point_index=None):
+    point_indices_for_anim = []
+    for _, row in trials_df.iterrows():
+        first_stop_point_index = row['first_stop_point_index']
+        last_stop_point_index = row['last_stop_point_index']
+        point_indices_for_anim.extend(range(first_stop_point_index - 20, last_stop_point_index + 21))
+
+    if max_point_index is None:
+        max_point_index = monkey_information['point_index'].max()
+
+    point_indices_for_anim = np.unique(np.array(point_indices_for_anim))
+    point_indices_for_anim = point_indices_for_anim[point_indices_for_anim < max_point_index]
+    return point_indices_for_anim
     
 def make_GUAT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=75):
 

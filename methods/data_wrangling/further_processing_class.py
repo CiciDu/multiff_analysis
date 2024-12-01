@@ -1,9 +1,9 @@
-import sys
 from data_wrangling import basic_func, base_processing_class
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
+from pattern_discovery import pattern_by_trials, organize_patterns_and_features
 from visualization import animation_func, animation_utils, plot_trials, plot_behaviors_utils
 from data_wrangling import base_processing_class
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.GUAT import GUAT_utils
 
 import os
 import os.path
@@ -50,9 +50,10 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.visible_before_last_one_trials = pattern_by_trials.visible_before_last_one_func(self.ff_dataframe)
         self.used_cluster = np.intersect1d(self.two_in_a_row_non_simul, self.visible_before_last_one_trials)
         self.disappear_latest_trials = pattern_by_trials.disappear_latest_func(self.ff_dataframe)
-        self.cluster_around_target_trials, self.cluster_around_target_indices, self.cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(self.ff_dataframe, self.caught_ff_num, self.ff_caught_T_new, self.ff_real_position_sorted, max_time_apart = 1.25)
-        self.waste_cluster_around_target_trials = np.intersect1d(self.cluster_around_target_trials+1, np.where(self.n_ff_in_a_row == 1)[0])
-        self.ignore_sudden_flash_trials, self.ignore_sudden_flash_indices, self.ignore_sudden_flash_indices_for_anim, self.ignored_ff_target_pairs = pattern_by_trials.ignore_sudden_flash_func(self.ff_dataframe, self.ff_real_position_sorted, self.max_point_index, max_ff_distance_from_monkey = 50)
+        self.cluster_around_target_trials, self.used_cluster_trials, self.cluster_around_target_indices, self.cluster_around_target_positions = pattern_by_trials.cluster_around_target_func(self.ff_dataframe, self.caught_ff_num, self.ff_caught_T_new, self.ff_real_position_sorted)
+        # take out trials in cluster_around_target_trials but not in used_cluster_trials
+        self.waste_cluster_around_target_trials = np.setdiff1d(self.cluster_around_target_trials, self.used_cluster_trials)
+        self.ignore_sudden_flash_trials, self.sudden_flash_trials, self.ignore_sudden_flash_indices, self.ignore_sudden_flash_indices_for_anim, self.ignored_ff_target_pairs = pattern_by_trials.ignore_sudden_flash_func(self.ff_dataframe, self.max_point_index, max_ff_distance_from_monkey = 50)
         self.ignore_sudden_flash_time = self.monkey_information['monkey_t'][self.ignore_sudden_flash_indices]
         self.get_give_up_after_trying_info()
         self.get_try_a_few_times_info()
@@ -78,7 +79,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def get_give_up_after_trying_info(self):
 
-        self.give_up_after_trying_trials, self.GUAT_indices_df, self.GUAT_trials_df, self.GUAT_point_indices_for_anim = find_GUAT_or_TAFT_trials.give_up_after_trying_func(self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, max_point_index=self.max_point_index)
+        self.give_up_after_trying_trials, self.GUAT_indices_df, self.GUAT_trials_df, self.GUAT_point_indices_for_anim, self.GUAT_w_ff_df = find_GUAT_or_TAFT_trials.give_up_after_trying_func(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, max_point_index=self.max_point_index)
         self.give_up_after_trying_indices = self.GUAT_indices_df['point_index'].values
         self.give_up_after_trying_info_bundle = (self.give_up_after_trying_trials, self.GUAT_point_indices_for_anim, self.GUAT_indices_df, self.GUAT_trials_df)                                                                                                                                                                                                                                           
 
@@ -89,22 +90,22 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if self.all_trial_patterns is None:       
             if getattr(self, 'n_ff_in_a_row', None) is None:
                 self.prepare_to_find_patterns_and_features()
-            self.all_trial_patterns = organize_patterns_and_features.make_all_trial_patterns(self.caught_ff_num, self.n_ff_in_a_row, self.visible_before_last_one_trials, 
-                                                          self.disappear_latest_trials, self.ignore_sudden_flash_trials,
-                                                          self.try_a_few_times_trials, self.give_up_after_trying_trials, 
-                                                          self.cluster_around_target_trials,
-                                                          self.waste_cluster_around_target_trials, 
-                                                          data_folder_name = self.patterns_and_features_data_folder_path)
+            self.all_trial_patterns = self.make_all_trial_patterns()
             print("made all_trial_patterns")
 
 
     def make_or_retrieve_pattern_frequencies(self, exists_ok=True):
         self.pattern_frequencies = self.try_retrieving_df(df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
+        self.make_one_stop_w_ff_df()
+        self.GUAT_w_ff_frequency = len(self.GUAT_w_ff_df)
+        self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
 
         if self.pattern_frequencies is None:
             if getattr(self, 'monkey_information', None) is None:
                 self.retrieve_or_make_monkey_data(already_made_ok=True)
-            self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_new, self.monkey_information, data_folder_name = self.patterns_and_features_data_folder_path)
+            self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_new, self.monkey_information, 
+                                                                                               self.GUAT_w_ff_frequency, self.one_stop_w_ff_frequency,
+                                                                                               data_folder_name = self.patterns_and_features_data_folder_path)
             print("made pattern_frequencies")
 
 
@@ -391,3 +392,104 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                 self.make_animation(duration=duration, animation_plot_kwargs=animation_plot_kwargs, save_video=save_video, file_name=file_name, dt=dt, max_duration=max_duration, min_duration=min_duration,
                                     video_dir=self.video_dir, static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, **animate_kwargs)
 
+
+    def make_all_trial_patterns(self):
+        zero_array = np.zeros(self.caught_ff_num + 1, dtype=int)
+
+        multiple_in_a_row = np.where(self.n_ff_in_a_row >= 2)[0]
+        # multiple_in_a_row_all means it also includes the first ff that's caught in a cluster
+        multiple_in_a_row_all = np.union1d(multiple_in_a_row, multiple_in_a_row - 1)
+        multiple_in_a_row2 = zero_array.copy()
+        multiple_in_a_row_all2 = zero_array.copy()
+        multiple_in_a_row2[multiple_in_a_row] = 1
+        multiple_in_a_row_all2[multiple_in_a_row_all] = 1
+
+        two_in_a_row = np.where(self.n_ff_in_a_row == 2)[0]
+        three_in_a_row = np.where(self.n_ff_in_a_row == 3)[0]
+        four_in_a_row = np.where(self.n_ff_in_a_row == 4)[0]
+
+        two_in_a_row2 = zero_array.copy()
+        if len(two_in_a_row) > 0:
+            two_in_a_row2[two_in_a_row] = 1
+
+        three_in_a_row2 = zero_array.copy()
+        if len(three_in_a_row) > 0:
+            three_in_a_row2[three_in_a_row] = 1
+
+        four_in_a_row2 = zero_array.copy()
+        if len(four_in_a_row) > 0:
+            four_in_a_row2[four_in_a_row] = 1
+
+        one_in_a_row = np.where(self.n_ff_in_a_row < 2)[0]
+        one_in_a_row2 = zero_array.copy()
+        if len(one_in_a_row) > 0:
+            one_in_a_row2[one_in_a_row] = 1
+
+        visible_before_last_one2 = zero_array.copy()
+        if len(self.visible_before_last_one_trials) > 0:
+            visible_before_last_one2[self.visible_before_last_one_trials] = 1
+
+        disappear_latest2 = zero_array.copy()
+        if len(self.disappear_latest_trials) > 0:
+            disappear_latest2[self.disappear_latest_trials] = 1
+
+        sudden_flash_trials2 = zero_array.copy()
+        if len(self.sudden_flash_trials) > 0:
+            sudden_flash_trials2[self.sudden_flash_trials] = 1
+
+        ignore_sudden_flash2 = zero_array.copy()
+        if len(self.ignore_sudden_flash_trials) > 0:
+            ignore_sudden_flash2[self.ignore_sudden_flash_trials] = 1
+
+        try_a_few_times2 = zero_array.copy()
+        if len(self.try_a_few_times_trials) > 0:
+            try_a_few_times2[self.try_a_few_times_trials] = 1
+
+        give_up_after_trying2 = zero_array.copy()
+        if len(self.give_up_after_trying_trials) > 0:
+            give_up_after_trying2[self.give_up_after_trying_trials] = 1
+
+        cluster_around_target2 = zero_array.copy()
+        if len(self.cluster_around_target_trials) > 0:
+            cluster_around_target2[self.cluster_around_target_trials] = 1
+
+        use_cluster2 = zero_array.copy()
+        if len(self.used_cluster_trials) > 0:
+            use_cluster2[self.used_cluster_trials] = 1
+
+        waste_cluster_around_target2 = zero_array.copy()
+        if len(self.waste_cluster_around_target_trials) > 0:
+            waste_cluster_around_target2[self.waste_cluster_around_target_trials] = 1
+
+        all_trial_patterns_dict = {
+            # bool
+            'two_in_a_row': two_in_a_row2,
+            'three_in_a_row': three_in_a_row2,
+            'four_in_a_row': four_in_a_row2,
+            'one_in_a_row': one_in_a_row2,
+            'multiple_in_a_row': multiple_in_a_row2,
+            'multiple_in_a_row_all': multiple_in_a_row_all2,
+            'visible_before_last_one': visible_before_last_one2,
+            'disappear_latest': disappear_latest2,
+            'sudden_flash': sudden_flash_trials2,
+            'ignore_sudden_flash': ignore_sudden_flash2,
+            'try_a_few_times': try_a_few_times2,
+            'give_up_after_trying': give_up_after_trying2,
+            'cluster_around_target': cluster_around_target2,
+            'use_cluster': use_cluster2,
+            'waste_cluster_around_target': waste_cluster_around_target2
+        }
+
+        for key, value in all_trial_patterns_dict.items():
+            all_trial_patterns_dict[key] = value[:-1]
+
+        self.all_trial_patterns = pd.DataFrame(all_trial_patterns_dict)
+
+        if self.patterns_and_features_data_folder_path:
+            basic_func.save_df_to_csv(self.all_trial_patterns, 'all_trial_patterns', self.patterns_and_features_data_folder_path)
+
+        return self.all_trial_patterns
+
+    def make_one_stop_w_ff_df(self):                
+        self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
+        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)
