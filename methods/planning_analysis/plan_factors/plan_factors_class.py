@@ -1,18 +1,14 @@
-import sys
 from planning_analysis import ml_methods_class, ml_methods_utils
 from null_behaviors import curv_of_traj_utils
-from planning_analysis.show_planning import alt_ff_utils, show_planning_class, show_planning_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, test_vs_control_utils
 from null_behaviors import curvature_utils
 from non_behavioral_analysis.planning_neural import planning_neural_utils
 from data_wrangling import base_processing_class
 import pandas as pd
 import os
-import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
 import numpy as np
 
 

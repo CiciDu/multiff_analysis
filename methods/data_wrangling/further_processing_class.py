@@ -33,10 +33,33 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         super().__init__()
 
 
-    def prepare_to_find_patterns_and_features(self):
+    def prepare_to_find_patterns_and_features(self, find_patterns=True):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
         self.make_or_retrieve_ff_dataframe(already_made_ok=True, exists_ok=True)
-        self.find_patterns()
+        if find_patterns:
+            self.find_patterns()
+
+    def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,
+                        include_TAFT_data=False):
+        if (already_retrieved_ok is False) | (not hasattr(self, 'monkey_information')):
+            self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
+            self.data_item.retrieve_or_make_monkey_data()
+            self.monkey_information = self.data_item.monkey_information
+            self.ff_life_sorted = self.data_item.ff_life_sorted
+            self.ff_real_position_sorted = self.data_item.ff_real_position_sorted
+            self.ff_believed_position_sorted = self.data_item.ff_believed_position_sorted
+            self.ff_caught_T_new = self.data_item.ff_caught_T_new
+
+        if include_ff_dataframe:
+            if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
+                # if self.data_item is not called yet
+                if not hasattr(self, 'data_item'):
+                    self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
+                    self.data_item.retrieve_or_make_monkey_data()
+                if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
+                    self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
+                    self.ff_dataframe = self.data_item.ff_dataframe
+                    self.ff_dataframe_visible = self.ff_dataframe.loc[self.ff_dataframe['visible']==1].copy()
 
 
     def find_patterns(self):
@@ -97,8 +120,11 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def make_or_retrieve_pattern_frequencies(self, exists_ok=True):
         self.pattern_frequencies = self.try_retrieving_df(df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
         self.make_one_stop_w_ff_df()
-        self.GUAT_w_ff_frequency = len(self.GUAT_w_ff_df)
         self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
+        if getattr(self, 'GUAT_w_ff_df', None) is None:
+            self.get_give_up_after_trying_info()
+        self.GUAT_w_ff_frequency = len(self.GUAT_w_ff_df)
+        
 
         if self.pattern_frequencies is None:
             if getattr(self, 'monkey_information', None) is None:
@@ -490,6 +516,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         return self.all_trial_patterns
 
-    def make_one_stop_w_ff_df(self):                
+    def make_one_stop_w_ff_df(self):   
+        self.prepare_to_find_patterns_and_features(find_patterns=False)
+
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)

@@ -1,12 +1,10 @@
-import sys
 from data_wrangling import basic_func, process_raw_data
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
-from visualization import animation_func, animation_utils, plot_trials, plot_behaviors_utils
+from pattern_discovery import make_ff_dataframe
 from non_behavioral_analysis import eye_positions
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.test_params_for_planning import params_utils
 from planning_analysis.show_planning import alt_ff_utils
-from pattern_discovery import pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features
+from pattern_discovery import cluster_analysis
 
 
 import os
@@ -14,12 +12,10 @@ import os.path
 import pandas as pd
 import numpy as np
 import matplotlib
-from functools import partial
-from matplotlib import rc, animation
+from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
 from os.path import exists
-from functools import partial
 
 
 

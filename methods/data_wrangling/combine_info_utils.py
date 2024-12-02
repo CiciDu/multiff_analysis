@@ -1,20 +1,9 @@
-import sys
-from decision_making_analysis.cluster_replacement import cluster_replacement_utils
-from decision_making_analysis.GUAT import process_GUAT_trials_class, GUAT_and_TAFT, GUAT_helper_class, GUAT_collect_info_class
-from decision_making_analysis import trajectory_info
-from null_behaviors import curvature_utils, curvature_class
-from data_wrangling import monkey_data_classes, basic_func
+from decision_making_analysis.GUAT import GUAT_and_TAFT
+from data_wrangling import basic_func
 
 import os
-import copy
-import numpy as np
-import math
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
 from os.path import exists
 import pandas as pd
-import pickle
 import gc
 
 

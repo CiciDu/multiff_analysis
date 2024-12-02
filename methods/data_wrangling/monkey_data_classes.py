@@ -54,6 +54,7 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         
 
     def make_df_related_to_patterns_and_features(self, exists_ok=True):
+
         self.make_or_retrieve_all_trial_patterns(exists_ok=exists_ok)
         
         self.make_or_retrieve_pattern_frequencies(exists_ok=exists_ok)

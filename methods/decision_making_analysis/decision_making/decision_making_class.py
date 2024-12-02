@@ -475,9 +475,9 @@ class DecisionMaking():
 
             self.pred_results_df = pd.DataFrame({'time': self.time_to_plot,
                                         'y_real': self.y_test,
-                                        'self.y_pred': self.y_pred, 
+                                        'y_pred': self.y_pred, 
                                         'probability': self.y_pred_prob})
-            self.pred_results_df['matched'] = self.pred_results_df['y_real'] == self.pred_results_df['self.y_pred']                       
+            self.pred_results_df['matched'] = self.pred_results_df['y_real'] == self.pred_results_df['y_pred']                       
             self.wrong_predictions_df = self.pred_results_df[self.pred_results_df['matched']==False]
             self.wrong_predictions = self.wrong_predictions_df.index.to_numpy()         
 

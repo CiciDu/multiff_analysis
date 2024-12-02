@@ -1,23 +1,10 @@
-import sys
-from planning_analysis.show_planning import alt_ff_utils, show_planning_class, show_planning_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class, stops_near_ff_based_on_ref_class
-from planning_analysis.only_stop_ff import only_stop_ff_utils
-from planning_analysis.plan_factors import test_vs_control_utils
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, process_variations_utils
-from data_wrangling import basic_func
-from sklearn.preprocessing import StandardScaler
+from planning_analysis.variations_of_factors_vs_results import process_variations_utils
 import numpy as np
-import pandas as pd
 import math
-import statsmodels.api as sm
-from math import pi
-import itertools
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.linear_model import LinearRegression
 import copy
 
 

@@ -29,6 +29,11 @@ def change_control_data_to_conform_to_test_data(plan_x_ctrl, plan_y_ctrl, plan_x
 
 
 def make_the_distributions_of_a_column_more_similar_between_two_df(df_1, df_2, column_name='alt_ff_angle_at_ref', bins=np.arange(-pi, pi, 0.025)):
+
+    # if bins are not integers, round them
+    if bins.dtype != 'int64':
+        bins = np.round(bins, 3)
+
     df1_length = len(df_1)
     df2_length = len(df_2)
     if (df1_length == 0) | (df2_length == 0):
@@ -255,7 +260,7 @@ def make_the_distributions_of_distance_more_similar_in_df(test_df, ctrl_df, verb
     test_length = len(test_df)
     ctrl_length = len(ctrl_df)
     test_df, ctrl_df = make_the_distributions_of_a_column_more_similar_between_two_df(test_df, ctrl_df, 
-                                                                                                            column_name='stop_ff_distance_at_ref', bins=np.arange(0, 500, 5))
+                                                                                     column_name='stop_ff_distance_at_ref', bins=np.arange(0, 500, 5))
     if verbose:
         print(f'Number of rows dropped out of total rows in test_df after making the distributions of stop_ff_distance_at_ref more similar: {test_length - len(test_df)} out of {test_length}')
         print(f'Number of rows dropped out of total rows in ctrl_df after making the distributions of stop_ff_distance_at_ref more similar: {ctrl_length - len(ctrl_df)} out of {ctrl_length}')
@@ -269,7 +274,7 @@ def make_the_distributions_of_angle_more_similar_in_df(test_df, ctrl_df, verbose
         print('No data in test_df or ctrl_df. The function make_the_distributions_of_angle_more_similar_in_df is not used.')
         return test_df, ctrl_df
     ctrl_df, test_df = make_the_distributions_of_a_column_more_similar_between_two_df(ctrl_df, test_df,
-                                                                                                            column_name='stop_ff_angle_at_ref', bins=np.arange(-pi, pi, 0.05))
+                                                                                      column_name='stop_ff_angle_at_ref', bins=np.arange(-pi, pi, 0.05))
     if verbose:
         print(f'Number of rows dropped out of total rows in test_df after making the distributions of stop_ff_angle_at_ref more similar: {test_length - len(test_df)} out of {test_length}')
         print(f'Number of rows dropped out of total rows in ctrl_df after making the distributions of stop_ff_angle_at_ref more similar: {ctrl_length - len(ctrl_df)} out of {ctrl_length}')
@@ -278,7 +283,7 @@ def make_the_distributions_of_angle_more_similar_in_df(test_df, ctrl_df, verbose
     test_length = len(test_df)
     ctrl_length = len(ctrl_df)
     test_df, ctrl_df = make_the_distributions_of_a_column_more_similar_between_two_df(test_df, ctrl_df,
-                                                                                                            column_name='alt_ff_angle_at_ref', bins=np.arange(-pi, pi, 0.05))
+                                                                                      column_name='alt_ff_angle_at_ref', bins=np.arange(-pi, pi, 0.05))
     if verbose:
         print(f'Number of rows dropped out of total rows in test_df after making the distributions of alt_ff_angle_at_ref more similar: {test_length - len(test_df)} out of {test_length}')
         print(f'Number of rows dropped out of total rows in ctrl_df after making the distributions of alt_ff_angle_at_ref more similar: {ctrl_length - len(ctrl_df)} out of {ctrl_length}')

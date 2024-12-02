@@ -1,14 +1,12 @@
-import sys
 from data_wrangling import basic_func
 from pattern_discovery import pattern_by_trials
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
-from pattern_discovery import pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features
+from pattern_discovery import pattern_by_trials, cluster_analysis
 
 
 import os
 import numpy as np
 import pandas as pd
-from numpy import linalg as LA
 from datetime import datetime
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 np.set_printoptions(suppress=True)
@@ -210,20 +208,22 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, c
 
 
 def make_feature_statistics(all_trial_features, data_folder_name=None):
-	feature_statistics = pd.DataFrame([], columns=['Item', 'Median', 'Mean', 'N_trial'])
+	
 	all_trial_features_valid = all_trial_features[(all_trial_features['t_last_vis'] < 50) & (all_trial_features['hitting_arena_edge']==False)].reset_index()
 	all_trial_features_valid = all_trial_features_valid.drop(columns={'index', 'trial'})
 	median_values = all_trial_features_valid.median(axis=0)
 	mean_values = all_trial_features_valid.mean(axis=0)
 	n_trial = len(all_trial_features_valid)
-	for item in median_values.index:
+	for i, item in enumerate(median_values.index):
 		median = median_values[item]
 		mean = mean_values[item]
 		new_row = pd.DataFrame({'Item': item, 'Median': median, 'Mean': mean, 'N_trial': n_trial}, index=[0])
-		feature_statistics = pd.concat([feature_statistics, new_row])
+		if i == 0:
+			feature_statistics = new_row
+		else:
+			feature_statistics = pd.concat([feature_statistics, new_row])
 
 	feature_statistics = feature_statistics.reset_index(drop=True)
-
 
 	feature_statistics['Label'] = 'Missing'
 	feature_statistics.loc[feature_statistics['Item'] == 't', 'Label'] = 'time'

@@ -1,13 +1,5 @@
-import sys
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.plan_factors import test_vs_control_utils, monkey_plan_factors_x_sess_class
-from planning_analysis.variations_of_factors_vs_results import variations_base_class, make_variations_utils
-from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_utils, rl_for_multiff_class
-import pandas as pd
-import os
-from os.path import exists
-import warnings
+from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_class
 
 
 
@@ -73,7 +65,9 @@ class PlanFactorsOfAgent():
                      'ff_real_position_sorted', 
                      'ff_believed_position_sorted',
                      'ff_life_sorted',
-                     'ff_flash_sorted']:
+                     'ff_flash_sorted',
+                     'closest_stop_to_capture_df'
+                     ]:
             setattr(self.pf, attr, getattr(self.rl_ff, attr))
 
 

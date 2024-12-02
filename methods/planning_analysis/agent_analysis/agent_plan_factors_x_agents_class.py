@@ -29,10 +29,10 @@ class PlanFactorsAcrossAgents():
 
     def make_overall_median_info_across_agents_AND_all_perc_info_across_agents(self, exists_ok=True, intermediate_products_exist_ok=True, agent_data_exists_ok=True):
 
-        self.overall_variations_df_path = self.overall_folder_name + '/overall_variations_df'
-        os.makedirs(self.overall_variations_df_path, exist_ok=True)
-        overall_median_info_across_agents_path = os.path.join(self.overall_variations_df_path, 'self.overall_median_info_across_agents.csv')
-        all_perc_info_across_agents_path = os.path.join(self.overall_variations_df_path, 'self.all_perc_info_across_agents.csv')
+        self.combined_data_x_agents = self.overall_folder_name + '/overall_variations_df'
+        os.makedirs(self.combined_data_x_agents, exist_ok=True)
+        overall_median_info_across_agents_path = os.path.join(self.combined_data_x_agents, 'self.overall_median_info_across_agents.csv')
+        all_perc_info_across_agents_path = os.path.join(self.combined_data_x_agents, 'self.all_perc_info_across_agents.csv')
 
 
         if exists_ok & os.path.exists(overall_median_info_across_agents_path) & os.path.exists(all_perc_info_across_agents_path):

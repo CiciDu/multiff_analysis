@@ -1,21 +1,16 @@
-import sys
-from decision_making_analysis.cluster_replacement import cluster_replacement_utils
-from decision_making_analysis.GUAT import process_GUAT_trials_class, GUAT_and_TAFT, GUAT_collect_info_helper_class, GUAT_utils
+from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_collect_info_helper_class
 from decision_making_analysis import trajectory_info
-from decision_making_analysis.decision_making import decision_making_utils
-from null_behaviors import curvature_utils, curvature_class, curv_of_traj_utils
-from data_wrangling import monkey_data_classes, basic_func, base_processing_class
+from null_behaviors import curvature_utils
+from data_wrangling import base_processing_class
 
 import os
 import copy
 import numpy as np
-import math
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 from os.path import exists
 import pandas as pd
-import json
 
 
 plt.rcParams["animation.html"] = "html5"

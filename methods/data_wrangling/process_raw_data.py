@@ -1,6 +1,5 @@
 import sys
 from pattern_discovery import pattern_by_trials, pattern_by_trials
-from non_behavioral_analysis import eye_positions
 
 import os
 import math

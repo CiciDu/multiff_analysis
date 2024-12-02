@@ -1,9 +1,5 @@
-import sys
-from decision_making_analysis import trajectory_info
-from null_behaviors import find_best_arc, curv_of_traj_utils
 from planning_analysis.show_planning import show_planning_utils
-from null_behaviors import show_null_trajectory, find_best_arc
-from scipy.stats import rankdata
+from null_behaviors import show_null_trajectory
 
 import os
 import warnings
@@ -12,7 +8,6 @@ from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import pandas as pd
 import math
-from scipy import stats
 
 
 def update_curvature_df_to_let_optimal_arc_stop_at_closest_point_to_monkey_stop(curvature_df, stop_ff_df, stops_near_ff_df, 

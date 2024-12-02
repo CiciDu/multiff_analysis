@@ -1,20 +1,7 @@
-import sys
-from planning_analysis.show_planning.get_stops_near_ff import stops_near_ff_based_on_ref_class, find_stops_near_ff_utils
-from planning_analysis.show_planning import show_planning_class
-from planning_analysis.plan_factors import plan_factors_class, monkey_plan_factors_x_sess_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
-from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_class, agent_plan_factors_x_sess_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, variations_base_class, plot_variations_class
-from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_utils, rl_for_multiff_class
+from planning_analysis.variations_of_factors_vs_results import make_variations_utils
+from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
+from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_class
 
-from data_wrangling import basic_func, combine_info_utils
-from data_wrangling import basic_func
-import pandas as pd
-import os
-import matplotlib.pyplot as plt
-import warnings
-import gc
-from os.path import exists
 import os
 
 # This class collects data from many agents and compares them

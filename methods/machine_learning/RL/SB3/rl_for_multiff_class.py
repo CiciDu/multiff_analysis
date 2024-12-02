@@ -168,6 +168,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
         if exists_ok:
             try:
                 base_processing_class.BaseProcessing.retrieve_monkey_data(self)
+                self.ff_caught_T_new = self.ff_caught_T_sorted
                 self.make_or_retrieve_ff_dataframe_for_agent(exists_ok=exists_ok, save_data=save_data)
     
             except Exception as e:
@@ -176,6 +177,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
         else:
             self.run_agent_to_collect_data(n_steps=n_steps, save_data=save_data)
 
+        self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=exists_ok)
         # self.calculate_pattern_frequencies_and_feature_statistics()
         # self.find_patterns()
 
@@ -210,12 +212,14 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
 
         self.n_steps = n_steps
 
-        self.monkey_information, self.ff_flash_sorted, self.ff_caught_T_new, self.ff_believed_position_sorted, \
+        self.monkey_information, self.ff_flash_sorted, self.ff_caught_T_sorted, self.ff_believed_position_sorted, \
         self.ff_real_position_sorted, self.ff_life_sorted, self.ff_flash_end_sorted, self.caught_ff_num, self.total_ff_num, \
         self.obs_ff_indices_in_ff_dataframe, self.sorted_indices_all, self.ff_in_obs_df \
                 = collect_agent_data_utils.collect_agent_data_func(self.env_for_data_collection, self.sac_model, n_steps=self.n_steps, LSTM=LSTM)
         self.ff_index_sorted = np.arange(len(self.ff_life_sorted))
         self.eval_ff_capture_rate = len(self.ff_flash_end_sorted)/self.monkey_information['time'].max()
+
+        self.ff_caught_T_new = self.ff_caught_T_sorted
 
         if save_data:
             base_processing_class.BaseProcessing.save_ff_info_into_npz(self)
