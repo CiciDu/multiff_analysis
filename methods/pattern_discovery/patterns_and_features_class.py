@@ -29,7 +29,7 @@ np.set_printoptions(suppress=True)
 
 class PatternsAndFeatures():
 
-    dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
 
     pattern_order = ['ff_capture_rate', 'stop_success_rate',
                         'two_in_a_row', 'waste_cluster_around_target', 'visible_before_last_one', 'disappear_latest', 
@@ -40,7 +40,7 @@ class PatternsAndFeatures():
 
     def __init__(self, monkey_name='monkey_Bruno'):
         self.monkey_name = monkey_name
-        self.combd_patterns_and_features_folder_path = "all_monkey_data/patterns_and_features/combined_data"
+        self.combd_patterns_and_features_folder_path = f"all_monkey_data/patterns_and_features/{self.monkey_name}/combined_data"
 
 
     def make_combd_scatter_around_target_center_df(self, exists_ok=True, save_data=True):
@@ -50,13 +50,13 @@ class PatternsAndFeatures():
             return
 
         self.combd_scatter_around_target_center_df = pd.DataFrame()
-        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
+        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.raw_data_dir_name, self.monkey_name)
         for index, row in self.sessions_df_for_one_monkey.iterrows():
             if row['finished'] is True:
                 continue
             data_name = row['data_name']
             print('Processing data: ', data_name)
-            raw_data_folder_path = os.path.join(self.dir_name, row['monkey_name'], data_name)
+            raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], data_name)
             self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=raw_data_folder_path)
             self.data_item.retrieve_or_make_monkey_data(exists_ok=True)
             self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
@@ -85,7 +85,7 @@ class PatternsAndFeatures():
         if not verbose:
             sys.stdout = open(os.devnull, 'w')
 
-        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
+        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.raw_data_dir_name, self.monkey_name)
 
         self.combd_pattern_frequencies = pd.DataFrame()
         self.combd_feature_statistics = pd.DataFrame()
@@ -97,7 +97,7 @@ class PatternsAndFeatures():
                 continue
         
             data_name = row['data_name']
-            raw_data_folder_path = os.path.join(self.dir_name, row['monkey_name'], data_name)
+            raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], data_name)
             print(raw_data_folder_path)
             self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=raw_data_folder_path)
             self.data_item.make_df_related_to_patterns_and_features(exists_ok=exists_ok)

@@ -18,10 +18,8 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
     def __init__(self, raw_data_folder_path=None, curv_of_traj_mode='distance', 
                  window_for_curv_of_traj=[-25, 25],
                 optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                curv_traj_window_before_stop=[-50, 0],
                 ):
         super().__init__(optimal_arc_type=optimal_arc_type,
-                         curv_traj_window_before_stop=curv_traj_window_before_stop,
                          raw_data_folder_path=None)
 
         self.test_or_control = None
@@ -35,6 +33,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         self.plan_y_ctrl = None
         self.ref_point_mode = None
         self.ref_point_value = None
+        self.curv_traj_window_before_stop = None
         self.ff_dataframe = None
         self.curv_of_traj_params = {'curv_of_traj_mode': curv_of_traj_mode, 'window_for_curv_of_traj': window_for_curv_of_traj}
         
@@ -47,12 +46,14 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         self.ml_inst = ml_methods_class.MlMethods()
 
 
-    def make_plan_x_and_y_for_both_test_and_ctrl(self, already_made_ok=True, plan_x_exists_ok=True, plan_y_exists_ok=True, ref_point_mode='time after stop ff visible', 
-                                                ref_point_value=0.0,
+    def make_plan_x_and_y_for_both_test_and_ctrl(self, already_made_ok=True, plan_x_exists_ok=True, plan_y_exists_ok=True, 
+                                                 ref_point_mode='time after stop ff visible', 
+                                                ref_point_value=0.0, curv_traj_window_before_stop=[-50, 0],
                                                 use_curvature_to_ff_center=False, heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                 use_eye_data=True, save_data=True):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         self.use_curvature_to_ff_center = use_curvature_to_ff_center
 
         for test_or_control in ['test', 'control']:
@@ -98,10 +99,11 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         plan_factors_utils.add_dir_from_stop_ff_same_side(self.plan_y_both)
 
 
-    def _prepare_plan_data(self, plan_type, test_or_control, exists_ok, df_name_func, make_plan_func, save_data):
+    def _prepare_plan_data(self, plan_type, test_or_control, exists_ok, make_plan_func, save_data):
         test_or_ctrl = 'test' if test_or_control == 'test' else 'ctrl'
 
-        df_name = df_name_func(self.monkey_name, self.ref_point_mode, self.ref_point_value)
+        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, 
+                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop)
 
         if plan_type == 'plan_x':
             folder_name = os.path.join(self.planning_data_folder_path, self.plan_x_partial_path, test_or_control)
@@ -133,8 +135,9 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         for plan_type in ['plan_x', 'plan_y']:
             for test_or_ctrl in ['test', 'ctrl']:
                 test_or_control = 'test' if test_or_ctrl == 'test' else 'control'
-                df_name = find_stops_near_ff_utils.find_df_name(self.monkey_name, self.ref_point_mode, self.ref_point_value)
-        
+                df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, 
+                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+                
                 if plan_type == 'plan_x':
                     folder_name = os.path.join(self.planning_data_folder_path, self.plan_x_partial_path, test_or_control)
                 elif plan_type == 'plan_y':
@@ -155,7 +158,6 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
             plan_type='plan_x',
             test_or_control=test_or_control,
             exists_ok=exists_ok,
-            df_name_func=find_stops_near_ff_utils.find_df_name,
             make_plan_func=make_plan_x,
             save_data=save_data
         )
@@ -166,6 +168,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         def make_plan_y():
             self.make_heading_info_df_without_long_process(
                 test_or_control=test_or_control, ref_point_mode=self.ref_point_mode, 
+                curv_traj_window_before_stop=self.curv_traj_window_before_stop,
                 ref_point_value=self.ref_point_value, use_curvature_to_ff_center=self.use_curvature_to_ff_center,
                 heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                 save_data=save_data
@@ -189,7 +192,6 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
             plan_type='plan_y',
             test_or_control=test_or_control,
             exists_ok=exists_ok,
-            df_name_func=find_stops_near_ff_utils.find_df_name,
             make_plan_func=make_plan_y,
             save_data=save_data
         )
@@ -369,7 +371,8 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
             self.get_more_monkey_data()  
 
         if not hasattr(self, 'heading_info_df'):
-            self.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, use_curvature_to_ff_center=self.use_curvature_to_ff_center)
+            self.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, 
+                                                           curv_traj_window_before_stop=self.curv_traj_window_before_stop, use_curvature_to_ff_center=self.use_curvature_to_ff_center)
 
         self.plan_x_df = plan_factors_utils.make_plan_x_df(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
                                                         stop_period_duration=stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,

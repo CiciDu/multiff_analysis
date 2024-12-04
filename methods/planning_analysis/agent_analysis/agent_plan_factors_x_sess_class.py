@@ -18,18 +18,17 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
     def __init__(self,
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 curv_traj_window_before_stop=[-50, 0],
                  num_steps_per_dataset=100000,
                  ):
 
-        super().__init__(optimal_arc_type=optimal_arc_type, curv_traj_window_before_stop=curv_traj_window_before_stop)
+        super().__init__(optimal_arc_type=optimal_arc_type)
         self.model_folder_name = model_folder_name
         self.optimal_arc_type = optimal_arc_type
-        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         self.num_steps_per_dataset = num_steps_per_dataset
         rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(self, self.model_folder_name)
         self.monkey_name = None
-        self.combd_planning_info_folder_path = os.path.join(os.path.dirname(os.path.dirname(self.planning_data_folder_path)), 'combined_data')
+
+        self.combd_planning_info_folder_path = os.path.join(model_folder_name.replace('all_agents', 'all_collected_data/planning'), 'combined_data')
         self.combd_stop_and_alt_folder_path = os.path.join(self.combd_planning_info_folder_path, 'stop_and_alt')
         # note that we used dir_name for the above because those data folder path includes "individual_data_sessions/data_0" and so on at the end.
         self.make_key_paths()
@@ -60,7 +59,6 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
             self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=model_folder_name,
                                                                     data_name=data_name,
                                                                     optimal_arc_type=self.optimal_arc_type,
-                                                                    curv_traj_window_before_stop=self.curv_traj_window_before_stop,
                                                                     )
             
             # check to see if data exists:
@@ -71,18 +69,18 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
             env_kwargs['print_ff_capture_incidents'] = False
             self.pfa.get_agent_data(**env_kwargs, exists_ok=agent_data_exists_ok, save_data=save_data, n_steps=self.num_steps_per_dataset)
             
-
-
         print(' ')
         print('Making overall all median info ......')
         self.make_or_retrieve_overall_median_info(ref_point_params_based_on_mode={'time after stop ff visible': [0.1, 0],
-                                                                        'distance': [-150, -100, -50]},
+                                                                                  'distance': [-150, -100, -50]},
+                                                    list_of_curv_traj_window_before_stop=[[-50, 0]],
                                                     save_data=save_data,
                                                     exists_ok=final_products_exist_ok, 
                                                     all_median_info_exists_ok=intermediate_products_exist_ok, 
                                                     combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok, 
                                                     stops_near_ff_df_exists_ok=intermediate_products_exist_ok, 
                                                     heading_info_df_exists_ok=intermediate_products_exist_ok)
+        
         self.agent_overall_median_info = self.overall_median_info.copy()
         print(' ')
         print('Making all perc info ......')
@@ -98,6 +96,7 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
     def get_plan_x_and_plan_y_across_sessions(self, 
                                               num_datasets_to_collect=1,
                                             ref_point_mode='distance', ref_point_value=-150,
+                                            curv_traj_window_before_stop=[-50, 0],
                                             exists_ok=True, 
                                             plan_x_exists_ok=True,
                                             plan_y_exists_ok=True,
@@ -110,13 +109,12 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
                                             ):
         
         df_name = find_stops_near_ff_utils.find_df_name('monkey_agent', ref_point_mode, ref_point_value)
-        dir = self.combd_planning_info_folder_path
-        os.makedirs(dir, exist_ok=True)
+        os.makedirs(self.combd_planning_info_folder_path, exist_ok=True)
 
         if exists_ok:
             try:
-                self.combd_plan_y_both = pd.read_csv(os.path.join(dir, f'combd_plan_y_both_{df_name}.csv'))
-                self.combd_plan_x_both = pd.read_csv(os.path.join(dir, f'combd_plan_x_both_{df_name}.csv'))
+                self.combd_plan_y_both = pd.read_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_y_both_{df_name}.csv'))
+                self.combd_plan_x_both = pd.read_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_x_both_{df_name}.csv'))
                 print('Successfully retrieved combd_plan_y_both_{df_name} and combd_plan_x_both_{df_name}.')
                 return 
             except FileNotFoundError:
@@ -135,13 +133,13 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
                 print('data_name:', data_name)
                 self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=self.model_folder_name,
                                                                         data_name=data_name,
-                                                                        optimal_arc_type=self.optimal_arc_type,
-                                                                        curv_traj_window_before_stop=self.curv_traj_window_before_stop,                                                                        
+                                                                        optimal_arc_type=self.optimal_arc_type,                                                                      
                                                                         )
                 print(' ')
                 print('Getting plan x and plan y data ......')
                 self.pfa.get_plan_x_and_plan_y_for_one_session(ref_point_mode=ref_point_mode, 
                                         ref_point_value=ref_point_value,
+                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
                                         plan_x_exists_ok=plan_x_exists_ok, 
                                         plan_y_exists_ok=plan_y_exists_ok, 
                                         heading_info_df_exists_ok=heading_info_df_exists_ok,
@@ -156,23 +154,26 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
                 self._add_plan_xy_to_combd_plan_xy(data_name)
 
         if save_data:
-            self.combd_plan_y_both.to_csv(os.path.join(dir, f'combd_plan_y_both_{df_name}.csv'))
-            self.combd_plan_x_both.to_csv(os.path.join(dir, f'combd_plan_x_both_{df_name}.csv'))
+            self.combd_plan_y_both.to_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_y_both_{df_name}.csv'))
+            self.combd_plan_x_both.to_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_x_both_{df_name}.csv'))
 
 
 
-    def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-150):
+    def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-150,
+                                             curv_traj_window_before_stop=[-50, 0]):
         df_name_dict = {'control': 'ctrl_heading_info_df', 
                         'test': 'test_heading_info_df'}               
         for test_or_control in ['control', 'test']:
             combd_heading_df_x_sessions = show_planning_class.ShowPlanning.retrieve_combd_heading_df_x_sessions(self, ref_point_mode=ref_point_mode, 
                                                                                                         ref_point_value=ref_point_value,
+                                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                                         test_or_control=test_or_control)
             setattr(self, df_name_dict[test_or_control], combd_heading_df_x_sessions)
 
 
     def make_combd_heading_df_x_sessions(self, num_datasets_to_collect=1,
                                     ref_point_mode='distance', ref_point_value=-150,
+                                    curv_traj_window_before_stop=[-50, 0],
                                     heading_info_df_exists_ok=True, 
                                     stops_near_ff_df_exists_ok=True,
                                     curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
@@ -189,13 +190,13 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
             print('data_name:', data_name)
             self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=self.model_folder_name,
                                                                     data_name=data_name,
-                                                                    optimal_arc_type=self.optimal_arc_type,
-                                                                    curv_traj_window_before_stop=self.curv_traj_window_before_stop,                                                                    
+                                                                    optimal_arc_type=self.optimal_arc_type,                                                          
                                                                     )
             print(' ')
             print('Getting test heading info control heading info ......')
             self.pfa.get_test_and_ctrl_heading_info_df_for_one_session(ref_point_mode=ref_point_mode, 
                                     ref_point_value=ref_point_value,
+                                    curv_traj_window_before_stop=curv_traj_window_before_stop,
                                     heading_info_df_exists_ok=heading_info_df_exists_ok,
                                     stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, 
                                     curv_of_traj_mode=curv_of_traj_mode, 
@@ -223,6 +224,7 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
     def get_test_and_ctrl_heading_info_df_across_sessions(self,
                                                         num_datasets_to_collect=1,
                                                         ref_point_mode='distance', ref_point_value=-150,
+                                                        curv_traj_window_before_stop=[-50, 0],
                                                         heading_info_df_exists_ok=True, 
                                                         combd_heading_df_x_sessions_exists_ok=True,
                                                         stops_near_ff_df_exists_ok=True,
@@ -233,7 +235,8 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
                                                         ):                                                       
         try:
             if combd_heading_df_x_sessions_exists_ok:
-                self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
+                self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                          curv_traj_window_before_stop=curv_traj_window_before_stop)
                 if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
                     raise Exception('Empty combd_heading_df_x_sessions.')
             else:
@@ -243,6 +246,7 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
             print(f'Will make new combd_heading_df_x_sessions for the agent because {e}.')
             self.make_combd_heading_df_x_sessions(num_steps_per_dataset=self.num_steps_per_dataset, num_datasets_to_collect=num_datasets_to_collect,
                                             ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                            curv_traj_window_before_stop=curv_traj_window_before_stop,
                                             heading_info_df_exists_ok=heading_info_df_exists_ok, 
                                             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                             curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,

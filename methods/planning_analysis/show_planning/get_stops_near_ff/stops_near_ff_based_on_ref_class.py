@@ -14,7 +14,6 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def __init__(self, 
                  raw_data_folder_path=None,
                  optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                 curv_traj_window_before_stop=[-50, 0],
                 ):
         super().__init__()
 
@@ -28,8 +27,6 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         default_monkey_plot_params = copy.deepcopy(self.default_monkey_plot_params)
         default_monkey_plot_params.update(self.monkey_plot_params)
         self.monkey_plot_params = default_monkey_plot_params
-
-        self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
         self.stop_ff_color = 'brown'
         self.alt_ff_color = 'green'
@@ -48,6 +45,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
 
     def streamline_organizing_info(self, 
                                    ref_point_mode='distance', ref_point_value=-150, # ref_point_mode can be 'time', 'distance', or 'time after stop ff visible'
+                                   curv_traj_window_before_stop=[-50, 0],
                                    curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25], truncate_curv_of_traj_by_time_of_capture=False, 
                                    eliminate_outliers=False, use_curvature_to_ff_center=False, deal_with_rows_with_big_ff_angles=True, 
                                    remove_i_o_modify_rows_with_big_ff_angles=True,
@@ -70,6 +68,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         self.ref_point_params['ref_point_value'] = ref_point_value
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
         self.overall_params['remove_i_o_modify_rows_with_big_ff_angles'] = remove_i_o_modify_rows_with_big_ff_angles
         self.overall_params['use_curvature_to_ff_center']=use_curvature_to_ff_center 
@@ -96,13 +95,15 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             self.stops_near_ff_df = self.stops_near_ff_df.merge(self.heading_info_df[['stop_point_index', 'rank_by_angle_to_alt_ff']], on='stop_point_index', how='left')
 
 
-    def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after stop ff visible', ref_point_value=0.0, 
+    def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after stop ff visible', ref_point_value=0.0,
+                                                  curv_traj_window_before_stop=[-50, 0], 
                                                    use_curvature_to_ff_center=False, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                                    save_data=True, merge_diff_in_curv_df_to_heading_info=True):
         
         self.ref_point_params = {'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value}
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         self.overall_params['use_curvature_to_ff_center'] = use_curvature_to_ff_center
 
 
@@ -321,9 +322,12 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         return self.alt_and_stop_ff_df
     
 
-    def _retrieve_heading_info_df(self, ref_point_mode, ref_point_value, test_or_control, merge_diff_in_curv_df_to_heading_info=True):
+    def _retrieve_heading_info_df(self, ref_point_mode, ref_point_value, test_or_control,
+                                  curv_traj_window_before_stop=[-50, 0],
+                                  merge_diff_in_curv_df_to_heading_info=True):
+        
         self.diff_in_curv_df = self.make_or_retrieve_diff_in_curv_df(ref_point_mode, ref_point_value, test_or_control,
-                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop, 
+                                                                     curv_traj_window_before_stop=curv_traj_window_before_stop, 
                                                                      exists_ok=True, merge_diff_in_curv_df_to_heading_info=False,
                                                                      only_try_retrieving=True)
         
@@ -343,6 +347,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                 print('Will make new heading_info_df because heading_info_df_exists_ok is False')
                 raise Exception
             self.heading_info_df, self.diff_in_curv_df = self._retrieve_heading_info_df(self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'], test_or_control,
+                                                                                        curv_traj_window_before_stop=self.curv_traj_window_before_stop,
                                                                                         merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
         except Exception as e:
             if heading_info_df_exists_ok:

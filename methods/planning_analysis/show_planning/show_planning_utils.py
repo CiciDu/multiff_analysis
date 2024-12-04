@@ -362,42 +362,6 @@ def try_different_variations_to_conduct_linear_regression(alt_traj, alt_stop):
     return rel_angle_slope_subset
 
 
-def add_to_rel_angle_slope_df(heading_info_df, rel_angle_slope_df, row):
-    alt_traj, alt_stop, heading_info_df_no_na = get_alt_traj_and_alt_stop(heading_info_df.copy())
-    rel_angle_slope_subset = try_different_variations_to_conduct_linear_regression(alt_traj, alt_stop)
-    rel_angle_slope_subset['monkey_name'] = row['monkey_name']
-    rel_angle_slope_subset['data_name'] = row['data_name']
-    rel_angle_slope_subset['original_sample_size'] = len(heading_info_df)
-    rel_angle_slope_subset['valid_sample_size'] = len(alt_traj)
-
-    rel_angle_slope_df = pd.concat([rel_angle_slope_df, rel_angle_slope_subset], axis=0)
-    return rel_angle_slope_df
-
-
-
-def add_box_name_column_to_rel_angle_slope_df(rel_angle_slope_df):
-    rel_angle_slope_df['boxplot_name'] = None
-
-    conditions = [(False, True, 'Normal'), 
-                  (False, False, 'No intercept'), 
-                  (True, True, 'No outliers'), 
-                  (True, False, 'No intercept, No outliers')]
-
-    # Create traces
-    for condition in conditions:
-        omit_outliers, fit_intercept, name = condition
-        rel_angle_slope_df.loc[(rel_angle_slope_df['omit_outliers']==omit_outliers) & (rel_angle_slope_df['fit_intercept']==fit_intercept), 'box_name'] = name
-    
-    rows_to_add_abs = (rel_angle_slope_df['use_abs_values']==True) & (rel_angle_slope_df['q13_only']==False)
-    rel_angle_slope_df.loc[rows_to_add_abs, 'box_name'] = 'Abs: ' + rel_angle_slope_df.loc[rows_to_add_abs, 'box_name']
-
-    rows_to_add_q13 = (rel_angle_slope_df['use_abs_values']==False) & (rel_angle_slope_df['q13_only']==True)
-    rel_angle_slope_df.loc[rows_to_add_q13, 'box_name'] = 'Q1,3: ' + rel_angle_slope_df.loc[rows_to_add_q13, 'box_name']
-
-    rows_to_add_abs_and_q13 = (rel_angle_slope_df['use_abs_values']==True) & (rel_angle_slope_df['q13_only']==True)
-    rel_angle_slope_df.loc[rows_to_add_abs_and_q13, 'box_name'] = 'Abs, Q1,3: ' + rel_angle_slope_df.loc[rows_to_add_abs_and_q13, 'box_name']
-
-
 def make_diff_and_ratio_stat_df(test_df, ctrl_df):
 
     test_stat = test_df[['diff', 'ratio', 'diff_in_abs',

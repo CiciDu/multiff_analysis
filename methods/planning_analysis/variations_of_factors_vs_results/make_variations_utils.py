@@ -313,7 +313,7 @@ def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df):
 def make_variations_df_across_ref_point_values(variation_func,
                                                 variation_func_kwargs={},
                                                 ref_point_params_based_on_mode = {'time after stop ff visible': [0.1, 0],
-                                                                                    'distance': [-150, -100, -50]},
+                                                                                    'distance': [-150, -100, -50]},                                  
                                                 monkey_name = None,
                                                 path_to_save = None,
                                                 ):
@@ -339,28 +339,35 @@ def make_variations_df_across_ref_point_values(variation_func,
     return all_variations_df
 
 
+def make_combd_planning_info_folder_path(monkey_name):
+    combd_planning_info_folder_path = f"all_monkey_data/planning/individual_monkey_data/{monkey_name}/combined_data"
+    return combd_planning_info_folder_path
+
+
 def make_combd_stop_and_alt_folder_path(monkey_name):
-    combd_stop_and_alt_folder_path = f'all_monkey_data/planning/individual_monkey_data/{monkey_name}/combd_planning_info/stop_and_alt'
+    combd_planning_info_folder_path = make_combd_planning_info_folder_path(monkey_name)
+    combd_stop_and_alt_folder_path = os.path.join(combd_planning_info_folder_path, 'stop_and_alt')
     return combd_stop_and_alt_folder_path
 
+def make_combd_only_stop_ff_path(monkey_name):
+    combd_planning_info_folder_path = make_combd_planning_info_folder_path(monkey_name)
+    combd_only_stop_ff_path = os.path.join(combd_planning_info_folder_path, 'only_stop_ff')
+    return combd_only_stop_ff_path
 
 def combine_overall_median_info_across_monkeys_and_optimal_arc_types(overall_median_info_exists_ok=True,
                                                                 all_median_info_exists_ok=True):
     overall_median_info = pd.DataFrame([])
     for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
         for optimal_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
-            # for curv_traj_window_before_stop in [[-25, 0], [-50, 0], [-50, -5], [-75, -0], [-100, 0]]: 
-            for curv_traj_window_before_stop in [[-50, 0]]:
-                #suppress printed output
-                with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-                    ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name, 
-                                                                            optimal_arc_type=optimal_arc_type,
-                                                                            curv_traj_window_before_stop=curv_traj_window_before_stop)
-                    temp_overall_median_info = ps.make_or_retrieve_overall_median_info(exists_ok=overall_median_info_exists_ok, 
-                                                                                            all_median_info_exists_ok=all_median_info_exists_ok,
-                                                                                            process_info_for_plotting=False
-                                                                                            )
-                    overall_median_info = pd.concat([overall_median_info, temp_overall_median_info], axis=0)
+            #suppress printed output
+            with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+                ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name, 
+                                                                        optimal_arc_type=optimal_arc_type)
+                temp_overall_median_info = ps.make_or_retrieve_overall_median_info(exists_ok=overall_median_info_exists_ok, 
+                                                                                        all_median_info_exists_ok=all_median_info_exists_ok,
+                                                                                        process_info_for_plotting=False
+                                                                                        )
+                overall_median_info = pd.concat([overall_median_info, temp_overall_median_info], axis=0)
     overall_median_info.reset_index(drop=True, inplace=True)                
     return overall_median_info
 
@@ -372,8 +379,7 @@ def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
         with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
             ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name, 
-                                                                    optimal_arc_type=optimal_arc_type,
-                                                                    curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                    optimal_arc_type=optimal_arc_type
                                                                     )
             temp_all_perc_info = ps.make_or_retrieve_all_perc_info(exists_ok=all_perc_info_exists_ok,
                                                                     process_info_for_plotting=False)

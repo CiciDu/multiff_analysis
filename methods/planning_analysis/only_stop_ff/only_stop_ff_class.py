@@ -21,7 +21,7 @@ import math
 
 class OnlyStopFF(base_processing_class.BaseProcessing):
     
-    dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
 
     ref_point_params_based_on_mode = {'distance': [-50, -100, -150],
                                      'time after stop ff visible': [0.1, 0, -0.2],

@@ -9,10 +9,9 @@ class PlotVariations(variations_base_class._VariationsBase):
 
     def __init__(self,
                  optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 curv_traj_window_before_stop=[-50, 0]): 
+                ): 
         
-        super().__init__(optimal_arc_type=optimal_arc_type,
-                        curv_traj_window_before_stop=curv_traj_window_before_stop)
+        super().__init__(optimal_arc_type=optimal_arc_type)
         
 
     def plot_heading_in_overall_median_info(self,

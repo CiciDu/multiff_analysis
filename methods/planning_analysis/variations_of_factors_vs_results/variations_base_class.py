@@ -89,10 +89,9 @@ class _VariationsBase():
     
     def __init__(self,
                  optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 curv_traj_window_before_stop=[-50, 0]): 
+                 ): 
 
         self.optimal_arc_type = optimal_arc_type
-        self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
     def make_key_paths(self):
         if not hasattr(self, 'combd_stop_and_alt_folder_path'):
@@ -100,7 +99,7 @@ class _VariationsBase():
         self.stop_and_alt_data_comparison_path = os.path.join(self.combd_stop_and_alt_folder_path, 'data_comparison')
         self.all_perc_info_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/all_perc_info.csv')
         self.all_median_info_folder_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/all_median_info')
-        self.overall_median_info_folder_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/overall_median_info')
+        self.overall_median_info_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/overall_median_info.csv')
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
 
         self.stop_and_alt_lr_df_path = os.path.join(self.combd_stop_and_alt_folder_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_stop_and_alt_lr_df.csv')
@@ -110,10 +109,14 @@ class _VariationsBase():
 
 
     # note that the method below is only used for monkey; for agent, the method is defined in the agent class
-    def get_test_and_ctrl_heading_info_df_across_sessions(self, ref_point_mode='distance', ref_point_value=-150, heading_info_df_exists_ok=True, combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, save_data=True):
-        self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name, curv_traj_window_before_stop=self.curv_traj_window_before_stop,
+    def get_test_and_ctrl_heading_info_df_across_sessions(self, ref_point_mode='distance', ref_point_value=-150, 
+                                                          curv_traj_window_before_stop=[-50, 0],
+                                                          heading_info_df_exists_ok=True, combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, save_data=True):
+        self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name,
                                                    optimal_arc_type=self.optimal_arc_type)
-        self.test_heading_info_df, self.ctrl_heading_info_df = self.sp.make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
+        self.test_heading_info_df, self.ctrl_heading_info_df = self.sp.make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(ref_point_mode, ref_point_value,
+                                                                            curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                            combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
                                                                             show_printed_output=True, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data)
         
@@ -121,13 +124,13 @@ class _VariationsBase():
                                             exists_ok=True, 
                                             all_median_info_exists_ok=True, 
                                             ref_point_params_based_on_mode=None, 
-                                            file_name='overall_median_info.csv', 
+                                            list_of_curv_traj_window_before_stop=[[-50, 0]],
                                             save_data=True, 
                                             combd_heading_df_x_sessions_exists_ok=True, 
                                             stops_near_ff_df_exists_ok=True, 
                                             heading_info_df_exists_ok=True,
                                             process_info_for_plotting=True):
-        df_path = os.path.join(self.combd_planning_info_folder_path, 'stop_and_alt/data_comparison', file_name)
+        df_path = self.overall_median_info_path
         if exists_ok & exists(df_path):
             self.overall_median_info = pd.read_csv(df_path).drop(columns=['Unnamed: 0'])
             print('Successfully retrieved overall_median_info from ', df_path)
@@ -135,24 +138,26 @@ class _VariationsBase():
             if ref_point_params_based_on_mode is None:
                 ref_point_params_based_on_mode = self.default_ref_point_params_based_on_mode
             
-            df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(None, None, self.curv_traj_window_before_stop)
-            df_path = os.path.join(self.overall_median_info_folder_path, df_name)
-            self.overall_median_info = make_variations_utils.make_variations_df_across_ref_point_values(self.make_all_median_info,
-                                                                        ref_point_params_based_on_mode=ref_point_params_based_on_mode,
-                                                                        monkey_name=self.monkey_name,
-                                                                        variation_func_kwargs={'all_median_info_exists_ok': all_median_info_exists_ok,
-                                                                                            'save_data': save_data,
-                                                                                            'combd_heading_df_x_sessions_exists_ok': combd_heading_df_x_sessions_exists_ok,
-                                                                                            'stops_near_ff_df_exists_ok': stops_near_ff_df_exists_ok,
-                                                                                            'heading_info_df_exists_ok': heading_info_df_exists_ok,
-                                                                                            },
-                                                                        path_to_save=df_path,
-                                                                        )
-            
+            self.overall_median_info = pd.DataFrame([])
+            for curv_traj_window_before_stop in list_of_curv_traj_window_before_stop:
+                temp_overall_median_info = make_variations_utils.make_variations_df_across_ref_point_values(self.make_all_median_info,
+                                                                            ref_point_params_based_on_mode=ref_point_params_based_on_mode,
+                                                                            monkey_name=self.monkey_name,
+                                                                            variation_func_kwargs={'all_median_info_exists_ok': all_median_info_exists_ok,
+                                                                                                   'curv_traj_window_before_stop': curv_traj_window_before_stop,
+                                                                                                'save_data': save_data,
+                                                                                                'combd_heading_df_x_sessions_exists_ok': combd_heading_df_x_sessions_exists_ok,
+                                                                                                'stops_near_ff_df_exists_ok': stops_near_ff_df_exists_ok,
+                                                                                                'heading_info_df_exists_ok': heading_info_df_exists_ok,
+                                                                                                },
+                                                                            path_to_save=df_path,
+                                                                            )
+                temp_overall_median_info['curv_traj_window_before_stop'] = str(curv_traj_window_before_stop)
+                self.overall_median_info = pd.concat([self.overall_median_info, temp_overall_median_info], axis=0)
+
+        self.overall_median_info.reset_index(drop=True, inplace=True)    
         self.overall_median_info['monkey_name'] = self.monkey_name
         self.overall_median_info['optimal_arc_type'] = self.optimal_arc_type
-        self.overall_median_info['curv_traj_window_before_stop'] = str(self.curv_traj_window_before_stop)
-
         if process_info_for_plotting:
             self.process_overall_median_info_to_plot_heading_and_curv()
 
@@ -178,7 +183,6 @@ class _VariationsBase():
 
         self.all_perc_info['monkey_name'] = self.monkey_name
         self.all_perc_info['optimal_arc_type'] = self.optimal_arc_type
-        self.all_perc_info['curv_traj_window_before_stop'] = str(self.curv_traj_window_before_stop)
 
         if process_info_for_plotting:
             self.process_all_perc_info_to_plot_direction()
@@ -256,20 +260,21 @@ class _VariationsBase():
 
     def make_all_median_info(self, ref_point_mode='time after stop ff visible', 
                              ref_point_value=0.1, 
+                             curv_traj_window_before_stop=[-50, 0],
                              all_median_info_exists_ok=True, 
                              combd_heading_df_x_sessions_exists_ok=True, 
                              stops_near_ff_df_exists_ok=True, 
                              heading_info_df_exists_ok=True, 
-                            
                              verbose=False, save_data=True):
 
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode, ref_point_value, self.curv_traj_window_before_stop)
+        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         df_path = os.path.join(self.all_median_info_folder_path, df_name)
         if all_median_info_exists_ok & exists(df_path):
             self.all_median_info = pd.read_csv(df_path)
             print('Successfully retrieved all_median_info from ', df_path)
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
+                                                                   curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                     heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                     stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data,
                                                     combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok)

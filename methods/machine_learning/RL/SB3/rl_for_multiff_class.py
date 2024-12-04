@@ -84,13 +84,13 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
         self.processed_data_folder_path = os.path.join(model_folder_name.replace('all_agents', 'all_collected_data/processed_data'), f'individual_data_sessions/{data_name}')
         self.planning_data_folder_path = os.path.join(model_folder_name.replace('all_agents', 'all_collected_data/planning'), f'individual_data_sessions/{data_name}')
         self.patterns_and_features_data_folder_path = os.path.join(model_folder_name.replace('all_agents', 'all_collected_data/patterns_and_features'), f'individual_data_sessions/{data_name}')
-        self.decision_making_folder_name = os.path.join(model_folder_name.replace('all_agents', 'all_collected_data/decision_making'), f'individual_data_sessions/{data_name}')
+        self.decision_making_folder_path = os.path.join(model_folder_name.replace('all_agents', 'all_collected_data/decision_making'), f'individual_data_sessions/{data_name}')
 
         os.makedirs(self.model_folder_name, exist_ok=True)
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
         os.makedirs(self.planning_data_folder_path, exist_ok=True)
         os.makedirs(self.patterns_and_features_data_folder_path, exist_ok=True)
-        os.makedirs(self.decision_making_folder_name, exist_ok=True)
+        os.makedirs(self.decision_making_folder_path, exist_ok=True)
 
 
     def get_current_info_condition(self, df):

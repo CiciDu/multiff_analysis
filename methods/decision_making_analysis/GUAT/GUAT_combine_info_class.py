@@ -17,15 +17,16 @@ import pickle
 class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
 
     df_names = ['GUAT_alt_ff_info', 'GUAT_current_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']
-    dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
-    combd_GUAT_info_folder_path = "all_monkey_data/decision_making/combined_data/GUAT_info"
-
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    
 
 
     def __init__(self, monkey_name='monkey_Bruno'):
         self.monkey_information = None
         self.polar_plots_kwargs = None
         self.monkey_name = monkey_name
+        self.combd_GUAT_info_folder_path = f"all_monkey_data/decision_making/{self.monkey_name}/combined_data/GUAT_info"
+
 
 
 
@@ -59,11 +60,11 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
             traj_df_exist_in_GUAT_store_ok = False
             print('Warning: ff_df_exist_in_GUAT_store_ok False, so traj_df_exist_in_GUAT_store_ok is forced to be False as well.')
         
-        sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
+        sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.raw_data_dir_name, self.monkey_name)
         sessions_df_for_one_monkey = combine_info_utils.check_which_df_exists_for_each_session(sessions_df_for_one_monkey, df_names=self.df_names)
         print('Making missing GUAT df for monkey {}'.format(self.monkey_name))
         sessions_df_for_one_monkey = self.make_missing_GUAT_df(sessions_df_for_one_monkey, gc_kwargs, GUAT_w_ff_df_exists_ok=GUAT_w_ff_df_exists_ok,
-                                                    curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, traj_df_exist_in_h5_store_ok=traj_df_exist_in_GUAT_store_ok)
+                                                    curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, traj_df_exist_ok=traj_df_exist_in_GUAT_store_ok)
         print('Collecting important info from all sessions of monkey {}'.format(self.monkey_name))
         self.all_important_info, self.all_point_index_to_new_number = combine_info_utils.collect_info_from_all_sessions(sessions_df_for_one_monkey, df_names=self.df_names)
         self.all_traj_feature_names = self.find_all_traj_feature_names(gc_kwargs, traj_point_features=gc_kwargs['trajectory_features'])
@@ -84,7 +85,7 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
     def make_missing_GUAT_df(self, sessions_df_for_one_monkey, gc_kwargs,
                                         GUAT_w_ff_df_exists_ok=True,
                                         curv_of_traj_df_exists_ok=True,
-                                        traj_df_exist_in_h5_store_ok=True):
+                                        traj_df_exist_ok=True):
         sessions_df_for_one_monkey['finished'] = False
         # if all df in df_names exist (being True in the corresponding column), then finished is True
         sessions_df_for_one_monkey.loc[sessions_df_for_one_monkey[self.df_names].all(axis=1), 'finished'] = True
@@ -92,38 +93,34 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         for index, row in sessions_df_for_one_monkey.iterrows():
             if row['finished'] == True:
                 continue 
-            raw_data_folder_path = os.path.join(self.dir_name, row['monkey_name'], row['data_name'])
-            decision_making_folder_name = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
-            GUAT_folder_path = os.path.join(decision_making_folder_name, 'GUAT_info')
+            raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], row['data_name'])
             print('raw_data_folder_path:', raw_data_folder_path)
             gcc = GUAT_collect_info_class.GUATCollectInfoForSession(raw_data_folder_path=raw_data_folder_path, gc_kwargs=gc_kwargs)
             important_info = gcc.streamline_process_to_collect_info_from_one_session(GUAT_w_ff_df_exists_ok=GUAT_w_ff_df_exists_ok, 
                                                                                      curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, 
                                                                                      update_point_index=False)
             for df in self.df_names:
-                important_info[df].to_csv(os.path.join(GUAT_folder_path, df+'.csv'))
+                important_info[df].to_csv(os.path.join(gcc.GUAT_folder_path, df+'.csv'))
             sessions_df_for_one_monkey.loc[index, 'finished'] = True
             sessions_df_for_one_monkey.loc[index, 'remade'] = True
 
-        if not traj_df_exist_in_h5_store_ok:
+        if not traj_df_exist_ok:
             for index, row in sessions_df_for_one_monkey.iterrows():
                 if row['remade']:
                     continue 
-                raw_data_folder_path = os.path.join(self.dir_name, row['monkey_name'], row['data_name'])
-                decision_making_folder_name = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
-                GUAT_folder_path = os.path.join(decision_making_folder_name, 'GUAT_info')
+                raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], row['data_name'])
+                gcc = GUAT_collect_info_class.GUATCollectInfoForSession(raw_data_folder_path=raw_data_folder_path, gc_kwargs=gc_kwargs)
                 # otherwise, we will remake traj_data_df and more_traj_data_df
                 print('We will remake traj_data_df and more_traj_data_df')
                 # get all_point_index
-                GUAT_alt_ff_info = pd.read_csv(os.path.join(GUAT_folder_path, 'GUAT_alt_ff_info.csv'))
+                GUAT_alt_ff_info = pd.read_csv(os.path.join(gcc.GUAT_folder_path, 'GUAT_alt_ff_info.csv'))
                 if 'old_point_index' in GUAT_alt_ff_info.columns:
                     all_point_index = np.unique(GUAT_alt_ff_info['old_point_index'].values)
                 else:
                     all_point_index = np.unique(GUAT_alt_ff_info['point_index'].values)
-                gcc = GUAT_collect_info_class.GUATCollectInfoForSession(raw_data_folder_path=raw_data_folder_path, gc_kwargs=gc_kwargs)
                 gcc.streamline_process_to_collect_traj_data_only(all_point_index, curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok)
-                gcc.traj_data_df.to_csv(os.path.join(GUAT_folder_path, 'traj_data_df.csv'))
-                gcc.more_traj_data_df.to_csv(os.path.join(GUAT_folder_path, 'more_traj_data_df.csv'))
+                gcc.traj_data_df.to_csv(os.path.join(gcc.GUAT_folder_path, 'traj_data_df.csv'))
+                gcc.more_traj_data_df.to_csv(os.path.join(gcc.GUAT_folder_path, 'more_traj_data_df.csv'))
         return sessions_df_for_one_monkey
 
 

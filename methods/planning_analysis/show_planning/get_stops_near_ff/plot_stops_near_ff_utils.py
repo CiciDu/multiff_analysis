@@ -169,20 +169,6 @@ def plot_alt_traj_vs_alt_stop(alt_traj, alt_stop, hue, title, slope, intercept):
 
 
 
-def make_side_by_side_boxplots(rel_angle_slope_df, title=None):
-
-    order = ['Normal', 'No intercept', 'No outliers', 'No intercept, No outliers']
-    current_df = rel_angle_slope_df[~rel_angle_slope_df['use_abs_values'] & ~rel_angle_slope_df['q13_only']].copy()
-    fig1 = _make_side_by_side_boxplots(current_df, order, title=title)
-
-    order = ['Q1,3: ' + name for name in order] + ['Abs: No intercept', 'Abs: No intercept, No outliers']                 
-    current_df = rel_angle_slope_df[((rel_angle_slope_df['use_abs_values']==False) & (rel_angle_slope_df['q13_only']==True))
-                                    | ((rel_angle_slope_df['use_abs_values']==True) & (rel_angle_slope_df['q13_only']==False) & (rel_angle_slope_df['fit_intercept']==False))]
-    fig2 = _make_side_by_side_boxplots(current_df, order, title=title)
-    
-    return fig1, fig2
-
-
 def _make_side_by_side_boxplots(current_df, order=[], title=None):
 
     # Filter DataFrame
@@ -207,52 +193,4 @@ def _make_side_by_side_boxplots(current_df, order=[], title=None):
     # draw a line at y=1 that spans the width of the whole figure
     fig.add_shape(type='line', x0=-0.5, x1=len(order)-0.5, y0=1, y1=1, line=dict(color='red', width=2, dash='dash'))
 
-    return fig
-
-
-def make_boxplots_from_rel_angle_slope_df(rel_angle_slope_df, title=None):
-    # Helper function to create box plot traces
-    def create_trace(df, omit_outliers, fit_intercept, name):
-        return go.Box(y=df[(df['omit_outliers'] == omit_outliers) & (df['fit_intercept'] == fit_intercept)]['slope'], 
-                      hoverinfo='y', name=name)
-
-    # Helper function to filter dataframe
-    def filter_df(df, use_abs_values, q13_only):
-        return df[(df['use_abs_values'] == use_abs_values) & (df['q13_only'] == q13_only)].copy()
-
-    # Create box plots
-    current_df = filter_df(rel_angle_slope_df, False, False)
-    traces_to_add = [create_trace(current_df, omit_outliers, fit_intercept, name) 
-                     for omit_outliers, fit_intercept, name in [(False, True, 'Normal'), 
-                                                                (False, False, 'No intercept'), 
-                                                                (True, True, 'No outliers'), 
-                                                                (True, False, 'No intercept, No outliers')]]
-
-    current_df = filter_df(rel_angle_slope_df, True, False)
-    traces_to_add += [create_trace(current_df, omit_outliers, fit_intercept, name) 
-                      for omit_outliers, fit_intercept, name in [(False, False, 'Abs: No intercept'), 
-                                                                 (True, False, 'Abs: No intercept, No outliers')]]
-
-    current_df = filter_df(rel_angle_slope_df, False, True)
-    traces_to_add += [create_trace(current_df, omit_outliers, fit_intercept, name) 
-                      for omit_outliers, fit_intercept, name in [(False, True, 'Q1,3: Normal'), 
-                                                                 (False, False, 'Q1,3: No intercept'), 
-                                                                 (True, True, 'Q1,3: No outliers'), 
-                                                                 (True, False, 'Q1,3: No intercept, No outliers')]]
-
-    # Create a figure and add the box plots
-    fig = go.Figure(data=traces_to_add)  
-
-    # Update layout
-    fig.update_layout(showlegend=False, yaxis_title='Slope')
-
-    # Add title if title is provided
-    if title is not None:
-        fig.update_layout(title=title, title_x=0.5)
-
-    # Draw a horizontal line at y=1 that spans the width of the whole figure
-    fig.add_shape(type='line', x0=-0.5, x1=len(traces_to_add)-0.5, y0=1, y1=1, line=dict(color='red', width=2, dash='dash'))
-
-    # Show plot
-    fig.show()
     return fig

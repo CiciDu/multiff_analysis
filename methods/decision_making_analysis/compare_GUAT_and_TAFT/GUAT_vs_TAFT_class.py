@@ -80,14 +80,13 @@ class CompareGUATandTAFTclass():
     def streamline_getting_x_df(self, TAFT_or_GUAT='TAFT',
                                     save_data=True,
                                     exists_ok=True,
-                                    GUAT_w_ff_df_exists_ok=True,
                                     ):
         self.TAFT_or_GUAT = TAFT_or_GUAT
         # delete self.stops_near_ff_df
         if hasattr(self, 'stops_near_ff_df'):
             del self.stops_near_ff_df
         
-        self.GUAT_vs_TAFT_folder_path = os.path.join(self.decision_making_folder_name, 'GUAT_vs_TAFT')
+        self.GUAT_vs_TAFT_folder_path = os.path.join(self.decision_making_folder_path, 'GUAT_vs_TAFT')
         os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
 
         if exists_ok:
@@ -97,7 +96,7 @@ class CompareGUATandTAFTclass():
             except FileNotFoundError:
                 pass
 
-        self.get_relevant_monkey_data(raw_data_folder_path=self.raw_data_folder_path, GUAT_w_ff_df_exists_ok=GUAT_w_ff_df_exists_ok)
+        self.get_relevant_monkey_data(raw_data_folder_path=self.raw_data_folder_path)
         self.process_trials_df()
 
         self.get_stops_near_ff_df(already_made_ok=True)
@@ -148,7 +147,6 @@ class CompareGUATandTAFTclass():
 
     def get_relevant_monkey_data(self,
                                  already_retrieved_ok=True,
-                                 GUAT_w_ff_df_exists_ok=True,
                                 raw_data_folder_path='all_monkey_data/raw_monkey_data/individual_monkey_data/monkey_Bruno/data_0330'
                                 ):
         self.monkey_name = os.path.basename(raw_data_folder_path)

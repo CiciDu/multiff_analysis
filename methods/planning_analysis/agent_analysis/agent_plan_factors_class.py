@@ -11,8 +11,7 @@ class PlanFactorsOfAgent():
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  data_name='data_0', 
                  use_curvature_to_ff_center=False,
-                optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                curv_traj_window_before_stop=[-50, 0],                 
+                optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,                
                  ):
 
         self.monkey_name = None
@@ -20,7 +19,6 @@ class PlanFactorsOfAgent():
         self.data_name = data_name
         self.use_curvature_to_ff_center = use_curvature_to_ff_center
         self.optimal_arc_type = optimal_arc_type
-        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(self, self.model_folder_name, data_name=data_name)
 
 
@@ -75,18 +73,18 @@ class PlanFactorsOfAgent():
         
         self.pf = plan_factors_class.PlanFactors(raw_data_folder_path=None, 
                                                 optimal_arc_type=self.optimal_arc_type,
-                                                curv_traj_window_before_stop=self.curv_traj_window_before_stop,
                                                 **kwargs)
         
         self.pf.processed_data_folder_path = self.processed_data_folder_path
         self.pf.planning_data_folder_path = self.planning_data_folder_path
         self.pf.patterns_and_features_data_folder_path = self.patterns_and_features_data_folder_path
-        self.pf.decision_making_folder_name = self.decision_making_folder_name
+        self.pf.decision_making_folder_path = self.decision_making_folder_path
         self.pf.monkey_name = 'monkey_agent'
 
     
     def get_plan_x_and_plan_y_for_one_session(self, ref_point_mode='distance', ref_point_value=-150, 
-                              monkey_data_exists_ok=True,
+                            curv_traj_window_before_stop=[-50, 0],
+                            monkey_data_exists_ok=True,
                             plan_x_exists_ok=False, 
                             plan_y_exists_ok=False,
                             heading_info_df_exists_ok=False,
@@ -105,6 +103,7 @@ class PlanFactorsOfAgent():
                         stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,                                                         
                         ref_point_mode=ref_point_mode, 
                         ref_point_value=ref_point_value,
+                        curv_traj_window_before_stop=curv_traj_window_before_stop,
                         use_curvature_to_ff_center=use_curvature_to_ff_center, 
                         use_eye_data=False,
                         already_made_ok=False,
@@ -121,6 +120,7 @@ class PlanFactorsOfAgent():
 
 
     def get_test_and_ctrl_heading_info_df_for_one_session(self, ref_point_mode='distance', ref_point_value=-150, 
+                                curv_traj_window_before_stop=[-50, 0],
                                 monkey_data_exists_ok=True,
                                 heading_info_df_exists_ok=False,
                                 stops_near_ff_df_exists_ok=False, 
@@ -136,6 +136,7 @@ class PlanFactorsOfAgent():
             try: # needs agent data
                 for test_or_control in ['test', 'control']:
                     heading_info_df, diff_in_curv_df = self.pf._retrieve_heading_info_df(ref_point_mode, ref_point_value, test_or_control,
+                                                                                         curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                          merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
                     test_or_ctrl = 'test' if test_or_control == 'test' else 'ctrl'
                     setattr(self, f'{test_or_ctrl}_heading_info_df', heading_info_df)
@@ -145,6 +146,7 @@ class PlanFactorsOfAgent():
                 self._load_agent_data_onto_pf()
                 for test_or_control in ['test', 'control']:
                     self.pf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode, 
+                                                                      curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                         ref_point_value=ref_point_value, use_curvature_to_ff_center=use_curvature_to_ff_center,
                                                                         heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                         save_data=save_data, 

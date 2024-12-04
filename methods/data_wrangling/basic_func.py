@@ -313,90 +313,6 @@ def get_distance_between_two_points(currentTrial, ff_caught_T_new, monkey_inform
     return displacement
 
 
-def retrieve_and_merge_patterns_or_features(df_name='pattern_frequencies', data_directory_list=['all_monkey_data/raw_monkey_data/individual_monkey_data']):
-    """
-    Retrieve and merge patterns or features from CSV files in specified directories.
-
-    Parameters:
-    df_name (str): Name of the DataFrame to retrieve (default is 'pattern_frequencies').
-    data_directory_list (list): List of directories to search for the CSV files.
-
-    Returns:
-    pd.DataFrame: Merged DataFrame containing the patterns or features.
-    list: List of file paths from which the data was retrieved.
-    """
-    csv_name = df_name + '.csv'
-    all_filepaths = []
-    merged_df = pd.DataFrame()
-
-    for data_directory in data_directory_list:
-        for rootdir, dirs, files in os.walk(data_directory):
-            if csv_name in files:
-                filepath = os.path.join(rootdir, csv_name)
-                df_of_interest = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
-
-                # Determine the current data name
-                data_name_path = os.path.dirname(os.path.dirname(rootdir))
-                data_name = os.path.basename(data_name_path)
-                if 'data_' not in data_name:
-                    raise ValueError("The data name must contain 'data_'")
-                df_of_interest['Data'] = data_name
-
-                # Determine the current monkey name
-                monkey_name = os.path.basename(os.path.dirname(data_name_path))
-                df_of_interest['Monkey'] = monkey_name[7:] if len(monkey_name) > 8 else monkey_name
-
-                # Merge the DataFrame
-                all_filepaths.append(filepath)
-                merged_df = pd.concat([merged_df, df_of_interest], ignore_index=True)
-
-    return merged_df, all_filepaths
-
-
-
-# def retrieve_and_merge_patterns_or_features(df_name = 'pattern_frequencies', data_directory_list = ['all_monkey_data/raw_monkey_data/individual_monkey_data']):
-#     csv_name = df_name + '.csv'
-#     all_filepaths = []
-#     merged_df = pd.DataFrame([])
-
-#     FIRST_DF = True
-#     for data_directory in data_directory_list:
-#         for rootdir, dirs, files in os.walk(data_directory):
-#             for file in files:
-#                 if file == csv_name:        
-#                     filepath = os.path.join(rootdir, csv_name)
-#                     df_of_interest = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
-
-#                     # Figure out the current data name
-#                     data_path = rootdir
-#                     data_name = os.path.split(rootdir)[1]
-#                     if data_name == 'patterns_and_features':
-#                         data_path = os.path.dirname(rootdir)
-#                         data_name = os.path.split(data_path)[1]
-#                     df_of_interest['Data'] = data_name
-                    
-
-#                     # Figure out the current monkey name
-#                     monkey_path = os.path.dirname(data_path)
-#                     monkey_name = os.path.split(monkey_path)[1]
-#                     if len(monkey_name) > 8:
-#                         df_of_interest['Monkey'] = monkey_name[7:]
-#                     else:
-#                         df_of_interest['Monkey'] = monkey_name
-                    
-
-#                     # Merge the df
-#                     all_filepaths.append(filepath)
-#                     if FIRST_DF:
-#                         merged_df = df_of_interest
-#                         FIRST_DF = False
-#                     else:
-#                         merged_df = pd.concat([merged_df, df_of_interest], ignore_index=True)
-        
-#     return merged_df, all_filepaths
-
-
-
 def save_df_to_csv(df, df_name, data_folder_name, exists_ok=False):
     if data_folder_name:
         csv_name = df_name + '.csv'
@@ -465,11 +381,11 @@ def take_out_a_sample_from_df(sampled_indices, *args):
     return sampled_args
 
 
-def initialize_monkey_sessions_df(dir_name='all_monkey_data/raw_monkey_data/individual_monkey_data'):
+def initialize_monkey_sessions_df(raw_data_dir_name='all_monkey_data/raw_monkey_data/individual_monkey_data'):
     list_of_monkey_name = []
     list_of_data_name = []
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']: # 'monkey_Quigley'
-        monkey_path = os.path.join(dir_name, monkey_name)
+        monkey_path = os.path.join(raw_data_dir_name, monkey_name)
         for data_name in os.listdir(monkey_path):
             if data_name[0] == 'd':
                 list_of_monkey_name.append(monkey_name)

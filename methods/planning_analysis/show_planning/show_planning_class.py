@@ -33,7 +33,7 @@ np.set_printoptions(suppress=True)
 
 class ShowPlanning(base_processing_class.BaseProcessing):
         
-    dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
 
     time_after_dict = {'min': 0.05,
                 'max': 0.5,
@@ -55,13 +55,12 @@ class ShowPlanning(base_processing_class.BaseProcessing):
     
     def __init__(self, monkey_name='monkey_Bruno', 
                     optimal_arc_type='norm_opt_arc', # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                    curv_traj_window_before_stop=[-50, 0],
                     test_or_control='test', 
                     raw_data_folder_path=None):
         super().__init__()
 
         self.monkey_name = monkey_name
-        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, monkey_name)
+        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.raw_data_dir_name, monkey_name)
         self.test_or_control = test_or_control
 
         if raw_data_folder_path is not None:
@@ -69,7 +68,6 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
 
         self.update_optimal_arc_type(optimal_arc_type=optimal_arc_type)
-        self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
 
     def update_optimal_arc_type(self, optimal_arc_type='norm_opt_arc'):
@@ -96,25 +94,12 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         self.combd_plan_y_both_folder_path = data_folder + f'/combd_plan_y_df/{self.optimal_arc_type}'
 
 
-    def retrieve_rel_angle_slope_df(self, ref_point_mode='distance', ref_point_value=-100, test_or_control=None):
-        self.ref_point_mode = ref_point_mode
-        self.ref_point_value = ref_point_value
-        
-        if test_or_control is None:
-            test_or_control = self.test_or_control
-        path = self.dict_of_combd_rel_angle_slope_folder_path[test_or_control]
-        df_name = find_stops_near_ff_utils.find_df_name(self.monkey_name, ref_point_mode, ref_point_value)
-        df_path = os.path.join(path, df_name)
-        if not os.path.exists(df_path):
-            raise FileNotFoundError(f'rel_angle_slope_df ({df_name}) is not in the folder: ', path)
-        else:
-            self.rel_angle_slope_df = pd.read_csv(df_path)
-        return self.rel_angle_slope_df
-
-
-    def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100, test_or_control=None):
+    def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100, 
+                                             curv_traj_window_before_stop=[-50, 0],
+                                             test_or_control=None):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value  
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         
         if test_or_control is None:
             test_or_control = self.test_or_control
@@ -128,7 +113,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             print('Successfully retrieved combd_heading_df_x_sessions from: ', df_path)
 
         self.combd_diff_in_curv_df = self.retrieve_combd_diff_in_curv_df(ref_point_mode, ref_point_value, test_or_control, 
-                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+                                                                     curv_traj_window_before_stop=curv_traj_window_before_stop)
 
         self.combd_heading_df_x_sessions = self.combd_heading_df_x_sessions.merge(self.combd_diff_in_curv_df, on='stop_point_index', how='left')
 
@@ -148,32 +133,19 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             print('Successfully retrieved combd_diff_in_curv_df from: ', df_path)
         return self.combd_diff_in_curv_df
 
-
-    def _store_new_rel_angle_slope_df(self, test_or_control=None):
-        if test_or_control is None:
-            test_or_control = self.test_or_control
-        df_name = find_stops_near_ff_utils.find_df_name(self.monkey_name, self.rel_angle_slope_df.attrs['ref_point_mode'], self.rel_angle_slope_df.attrs['ref_point_value'])
-        os.makedirs(self.dict_of_combd_rel_angle_slope_folder_path[test_or_control], exist_ok=True)
-        self.rel_angle_slope_df.to_csv(os.path.join(self.dict_of_combd_rel_angle_slope_folder_path[test_or_control], df_name))
-
     def _store_combd_heading_df_x_sessions(self, test_or_control=None):
         if test_or_control is None:
             test_or_control = self.test_or_control
-        df_name = find_stops_near_ff_utils.find_df_name(self.monkey_name, self.combd_heading_df_x_sessions.attrs['ref_point_mode'], self.combd_heading_df_x_sessions.attrs['ref_point_value'])
+        df_name = find_stops_near_ff_utils.find_df_name(self.monkey_name, self.ref_point_mode, self.ref_point_value)
         os.makedirs(self.dict_of_combd_heading_info_folder_path[test_or_control], exist_ok=True)
         self.combd_heading_df_x_sessions.to_csv(os.path.join(self.dict_of_combd_heading_info_folder_path[test_or_control], df_name))
         print(f'Stored {df_name} in the folder: ', self.dict_of_combd_heading_info_folder_path[test_or_control])
 
     def _store_combd_diff_in_curv_df(self, test_or_control=None):
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(self.combd_heading_df_x_sessions.attrs['ref_point_mode'], self.combd_heading_df_x_sessions.attrs['ref_point_value'], self.curv_traj_window_before_stop)
+        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(self.ref_point_mode, self.ref_point_value, self.curv_traj_window_before_stop)
         os.makedirs(self.dict_of_combd_diff_in_curv_folder_path[test_or_control], exist_ok=True)
         self.combd_diff_in_curv_df.to_csv(os.path.join(self.dict_of_combd_diff_in_curv_folder_path[test_or_control], df_name))
         print(f'Stored {df_name} in the folder: ', self.dict_of_combd_diff_in_curv_folder_path[test_or_control])
-
-
-    def make_boxplots(self):
-        self.fig_box = plot_stops_near_ff_utils.make_boxplots_from_rel_angle_slope_df(self.rel_angle_slope_df, )
-
 
     def plot_linear_regression_on_combd_heading_df_x_sessions(self):
         self.alt_traj, self.alt_stop, self.heading_info_df_no_na = show_planning_utils.get_alt_traj_and_alt_stop(self.combd_heading_df_x_sessions)
@@ -183,90 +155,96 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
 
     def _extract_key_monkey_info_from_monkey_name_and_data_name(self, monkey_name, data_name):
-        raw_data_folder_path = os.path.join("all_monkey_data/raw_monkey_data/individual_monkey_data/", monkey_name, data_name)
+        raw_data_folder_path = os.path.join(self.raw_data_dir_name, monkey_name, data_name)
         self.extract_info_from_raw_data_folder_path(raw_data_folder_path)
         self.retrieve_or_make_monkey_data(exists_ok=True)
 
 
 
-    def retrieve_or_make_rel_angle_slope_df_and_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100, rel_angle_slope_df_exists_ok=True, 
-                                                                        combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, show_printed_output=False,
-                                                                        test_or_control=None, sessions_df_for_one_monkey=None):
+    def retrieve_or_make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
+                                                     curv_traj_window_before_stop=[-50, 0],
+                                                    combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, show_printed_output=False,
+                                                    test_or_control=None, sessions_df_for_one_monkey=None):
         if test_or_control is None:
             test_or_control = self.test_or_control
 
         self.test_or_control = test_or_control
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         
-        if rel_angle_slope_df_exists_ok & combd_heading_df_x_sessions_exists_ok:
+        if combd_heading_df_x_sessions_exists_ok:
             try:
-                self.rel_angle_slope_df = self.retrieve_rel_angle_slope_df(ref_point_mode, ref_point_value, test_or_control=test_or_control)
-                self.combd_heading_df_x_sessions = self.retrieve_combd_heading_df_x_sessions(ref_point_mode, ref_point_value, test_or_control=test_or_control)
+                self.combd_heading_df_x_sessions = self.retrieve_combd_heading_df_x_sessions(ref_point_mode, ref_point_value, 
+                                                                                             curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                                             test_or_control=test_or_control)
                 if show_printed_output:
-                    print('The rel_angle_slope_df and combd_heading_df_x_sessions already exists in the folders: ', self.dict_of_combd_rel_angle_slope_folder_path[test_or_control], ' and ', self.dict_of_combd_heading_info_folder_path[test_or_control])
+                    print('The combd_heading_df_x_sessions already exists in the folders: ', self.dict_of_combd_heading_info_folder_path[test_or_control])
                 return
             except:
                 pass
-        self.rel_angle_slope_df, self.combd_heading_df_x_sessions, self.combd_diff_in_curv_df = self.make_rel_angle_slope_df_and_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+        self.combd_heading_df_x_sessions, self.combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
+                                                                                                             curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                                                             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                 show_printed_output=show_printed_output, test_or_control=test_or_control, sessions_df_for_one_monkey=sessions_df_for_one_monkey)
-        print('Made new rel_angle_slope_df and combd_heading_df_x_sessions and stored them in the folder: ', self.dict_of_combd_rel_angle_slope_folder_path[test_or_control], ' and ', self.dict_of_combd_heading_info_folder_path[test_or_control])
+        print('Made new and combd_heading_df_x_sessions and stored it in the folder: ', self.dict_of_combd_heading_info_folder_path[test_or_control])
         if 'Unnamed: 0' in self.combd_heading_df_x_sessions.columns:
             self.combd_heading_df_x_sessions.drop(columns=['Unnamed: 0'], inplace=True)    
 
 
-    def make_rel_angle_slope_df_and_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
-                                                            test_or_control=None, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                                            show_printed_output=False, sessions_df_for_one_monkey=None,
-                                                            use_curvature_to_ff_center=False,
-                                                            merge_diff_in_curv_df_to_heading_info=True,
-                                                            save_data=True):
+    def make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
+                                        curv_traj_window_before_stop=[-50, 0],
+                                        test_or_control=None, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
+                                        show_printed_output=False, sessions_df_for_one_monkey=None,
+                                        use_curvature_to_ff_center=False,
+                                        merge_diff_in_curv_df_to_heading_info=True,
+                                        save_data=True):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
         
         self.combd_heading_df_x_sessions = pd.DataFrame()
         self.combd_diff_in_curv_df = pd.DataFrame()
-        self.rel_angle_slope_df = pd.DataFrame()
         if test_or_control is None:
             test_or_control = self.test_or_control
 
         if show_printed_output:
-            self.combd_heading_df_x_sessions, self.rel_angle_slope_df = self._make_rel_angle_slope_df_and_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, test_or_control=test_or_control,
+            self.combd_heading_df_x_sessions = self._make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
+                                                                                      curv_traj_window_before_stop=curv_traj_window_before_stop, test_or_control=test_or_control,
                                                                                  stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, sessions_df_for_one_monkey=sessions_df_for_one_monkey, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                                  use_curvature_to_ff_center=use_curvature_to_ff_center)  
         else:
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-                self.combd_heading_df_x_sessions, self.rel_angle_slope_df = self._make_rel_angle_slope_df_and_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, test_or_control=test_or_control, 
+                self.combd_heading_df_x_sessions = self._make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
+                                                                                          curv_traj_window_before_stop=curv_traj_window_before_stop, test_or_control=test_or_control, 
                                                                                 stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, sessions_df_for_one_monkey=sessions_df_for_one_monkey, 
                                                                                 heading_info_df_exists_ok=heading_info_df_exists_ok, use_curvature_to_ff_center=use_curvature_to_ff_center)  
-        metadata = {'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value, 'monkey_name': self.monkey_name}
-        self.rel_angle_slope_df.attrs.update(metadata)
-        self.rel_angle_slope_df.reset_index(drop=True, inplace=True)
-        self.combd_heading_df_x_sessions.attrs.update(metadata)
+
         self.combd_heading_df_x_sessions.reset_index(drop=True, inplace=True)
         self.combd_diff_in_curv_df.reset_index(drop=True, inplace=True)
 
         if save_data:
-            self._store_new_rel_angle_slope_df(test_or_control=test_or_control)
             self._store_combd_heading_df_x_sessions(test_or_control=test_or_control)
             self._store_combd_diff_in_curv_df(test_or_control=test_or_control)
 
         if merge_diff_in_curv_df_to_heading_info:
             self.combd_heading_df_x_sessions = self.combd_heading_df_x_sessions.merge(self.combd_diff_in_curv_df, on='stop_point_index', how='left')
 
-        return self.rel_angle_slope_df, self.combd_heading_df_x_sessions, self.combd_diff_in_curv_df
+        return self.combd_heading_df_x_sessions, self.combd_diff_in_curv_df
 
 
-    def _make_rel_angle_slope_df_and_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100, test_or_control='test', 
-                                                        stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True, sessions_df_for_one_monkey=None,
-                                                        use_curvature_to_ff_center=False):
+    def _make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100, 
+                                          curv_traj_window_before_stop=[-50, 0], test_or_control='test', 
+                                            stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True, sessions_df_for_one_monkey=None,
+                                            use_curvature_to_ff_center=False):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
         if sessions_df_for_one_monkey is not None:
             self.sessions_df_for_one_monkey = sessions_df_for_one_monkey
         else:
-            self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
+            self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.raw_data_dir_name, self.monkey_name)
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")  
@@ -276,6 +254,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                     
                 self.heading_info_df = self._make_heading_info_df_for_a_data_session(row['monkey_name'], row['data_name'], ref_point_mode=ref_point_mode, 
                                                                             ref_point_value=ref_point_value, test_or_control=test_or_control, 
+                                                                            curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                             use_curvature_to_ff_center=use_curvature_to_ff_center,
                                                                             merge_diff_in_curv_df_to_heading_info=False,
@@ -283,21 +262,21 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                 self.heading_info_df['data_name'] = row['data_name']
                 self.combd_heading_df_x_sessions = pd.concat([self.combd_heading_df_x_sessions, self.heading_info_df], axis=0)
                 self.combd_diff_in_curv_df = pd.concat([self.combd_diff_in_curv_df, self.snf.diff_in_curv_df], axis=0)
-                if len(self.heading_info_df) > 1:
-                    self.rel_angle_slope_df = show_planning_utils.add_to_rel_angle_slope_df(self.heading_info_df, self.rel_angle_slope_df, row)
                 self.sessions_df_for_one_monkey.loc[self.sessions_df_for_one_monkey['data_name'] == row['data_name'], 'finished'] = True
-        return self.combd_heading_df_x_sessions, self.rel_angle_slope_df
+        return self.combd_heading_df_x_sessions
 
 
 
-    def _make_heading_info_df_for_a_data_session(self, monkey_name, data_name, ref_point_mode='distance', ref_point_value=-150,
+    def _make_heading_info_df_for_a_data_session(self, monkey_name, data_name, ref_point_mode='distance', ref_point_value=-150, curv_traj_window_before_stop=[-50, 0],
                                                 test_or_control='test', heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                 use_curvature_to_ff_center=False,
                                                 merge_diff_in_curv_df_to_heading_info=True):
         self.ref_point_value = ref_point_value
         self.ref_point_mode = ref_point_mode
+        self.curv_traj_window_before_stop = curv_traj_window_before_stop
+        
         # first try retrieving it
-        raw_data_folder_path = os.path.join(self.dir_name, monkey_name, data_name)
+        raw_data_folder_path = os.path.join(self.raw_data_dir_name, monkey_name, data_name)
         base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(self, raw_data_folder_path)
         self.heading_info_path = os.path.join(self.planning_data_folder_path, self.heading_info_partial_path, test_or_control)
         try:
@@ -305,68 +284,51 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             self.data_name = data_name
             if heading_info_df_exists_ok is False:
                 raise FileNotFoundError('Force the creation of heading_info_df')
-            self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(raw_data_folder_path=None, optimal_arc_type=self.optimal_arc_type,
-                                                                              curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+            self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(raw_data_folder_path=None, optimal_arc_type=self.optimal_arc_type)
             
             self.snf.extract_info_from_raw_data_folder_path(raw_data_folder_path)
             heading_info_df, diff_in_curv_df = self.snf._retrieve_heading_info_df(ref_point_mode, ref_point_value, test_or_control, 
+                                                                                  curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                   merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
         except FileNotFoundError:
             print('Making new heading_info_df ...')
-            self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(raw_data_folder_path=raw_data_folder_path, optimal_arc_type=self.optimal_arc_type,
-                                                                              curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+            self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(raw_data_folder_path=raw_data_folder_path, optimal_arc_type=self.optimal_arc_type)
             
             self.snf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode,
-                                                                ref_point_value=ref_point_value, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                                ref_point_value=ref_point_value, curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                 use_curvature_to_ff_center=use_curvature_to_ff_center, 
                                                                 heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                 merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
             heading_info_df = self.snf.heading_info_df.copy()
         return heading_info_df
 
-
-    def retrieve_rel_angle_slope_df_from_both_test_and_control(self, ref_point_mode='distance', ref_point_value=-100):
-        self.test_rel_angle_slope_df = self.retrieve_rel_angle_slope_df(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, test_or_control='test')
-        self.ctrl_rel_angle_slope_df = self.retrieve_rel_angle_slope_df(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, test_or_control='control')
-        return self.test_rel_angle_slope_df, self.ctrl_rel_angle_slope_df
-
-
-    def combine_both_rel_angle_slope_df(self):
-        self.test_rel_angle_slope_df['test_or_control'] = 'test'
-        self.ctrl_rel_angle_slope_df['test_or_control'] = 'control'
-        self.combd_rel_angle_slope_df = pd.concat([self.test_rel_angle_slope_df, self.ctrl_rel_angle_slope_df], axis=0)
-        self.combd_rel_angle_slope_df.reset_index(drop=True, inplace=True)
-        show_planning_utils.add_box_name_column_to_rel_angle_slope_df(self.combd_rel_angle_slope_df)
-
-
-    def make_side_by_side_boxplots(self, show_all_figures=False):
-        df_name = find_stops_near_ff_utils.find_df_name(self.monkey_name, self.ref_point_mode, self.ref_point_value)
-        self.fig1, self.fig2 = plot_stops_near_ff_utils.make_side_by_side_boxplots(self.combd_rel_angle_slope_df, title=df_name)
-        self.fig1.show()
-        if show_all_figures:
-            self.fig2.show()
-
-
-    def make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(self, ref_point_mode='distance', ref_point_value=-100, combd_heading_df_x_sessions_exists_ok=True, 
+    def make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(self, ref_point_mode='distance', ref_point_value=-100, 
+                                                                                curv_traj_window_before_stop=[-50, 0],
+                                                                                combd_heading_df_x_sessions_exists_ok=True, 
                                                                             heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True, 
                                                                             show_printed_output=False, use_curvature_to_ff_center=False, save_data=True):
         for test_or_control in ['control', 'test']:
             stops_near_ff_df_exists_ok = stops_near_ff_df_exists_ok if test_or_control == 'test' else stops_near_ff_df_exists_ok
             self.handle_heading_info_df(ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok, heading_info_df_exists_ok, stops_near_ff_df_exists_ok, 
-                                        show_printed_output, test_or_control, use_curvature_to_ff_center=use_curvature_to_ff_center, save_data=save_data)
+                                        show_printed_output, test_or_control, curv_traj_window_before_stop=curv_traj_window_before_stop, use_curvature_to_ff_center=use_curvature_to_ff_center, save_data=save_data)
         return self.test_heading_info_df, self.ctrl_heading_info_df
 
 
-    def handle_heading_info_df(self, ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok, heading_info_df_exists_ok, stops_near_ff_df_exists_ok, show_output, test_or_control, 
+    def handle_heading_info_df(self, ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok, heading_info_df_exists_ok, stops_near_ff_df_exists_ok, show_output, test_or_control,
+                               curv_traj_window_before_stop=[-50, 0],
                                use_curvature_to_ff_center=False, save_data=True):
         df_name = "test_heading_info_df" if test_or_control == 'test' else "ctrl_heading_info_df"
         try:
             if combd_heading_df_x_sessions_exists_ok:
-                combd_heading_df_x_sessions = self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, test_or_control=test_or_control)
+                combd_heading_df_x_sessions = self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, test_or_control=test_or_control,
+                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop)
             else:
                 raise FileNotFoundError  # Force the creation if combd_heading_df_x_sessions_exists_ok is False
         except FileNotFoundError:  # Specific exception for clarity
-            _, combd_heading_df_x_sessions, combd_diff_in_curv_df = self.make_rel_angle_slope_df_and_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, 
+            _, combd_heading_df_x_sessions, combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
+                                                                    curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                    stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, 
                                                                    show_printed_output=show_output, test_or_control=test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                    use_curvature_to_ff_center=use_curvature_to_ff_center, save_data=save_data,
                                                                    merge_diff_in_curv_df_to_heading_info=True)

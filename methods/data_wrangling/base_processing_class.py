@@ -32,7 +32,7 @@ np.set_printoptions(suppress=True)
 
 class BaseProcessing:
 
-    dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
 
 
     def __init__(self):
@@ -103,13 +103,13 @@ class BaseProcessing:
         self.processed_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_data')
         self.planning_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'planning')
         self.patterns_and_features_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'patterns_and_features')
-        self.decision_making_folder_name = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
+        self.decision_making_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
         os.makedirs(self.planning_data_folder_path, exist_ok=True)
         os.makedirs(self.patterns_and_features_data_folder_path, exist_ok=True)
-        os.makedirs(self.decision_making_folder_name, exist_ok=True)
+        os.makedirs(self.decision_making_folder_path, exist_ok=True)
 
 
     def try_retrieving_df(self, df_name, exists_ok=True, data_folder_name_for_retrieval=None):

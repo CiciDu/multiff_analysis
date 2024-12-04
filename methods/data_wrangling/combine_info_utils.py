@@ -8,8 +8,8 @@ import gc
 
 
 
-def make_sessions_df_for_one_monkey(dir_name, monkey_name):
-    sessions_df = basic_func.initialize_monkey_sessions_df(dir_name=dir_name)
+def make_sessions_df_for_one_monkey(raw_data_dir_name, monkey_name):
+    sessions_df = basic_func.initialize_monkey_sessions_df(raw_data_dir_name=raw_data_dir_name)
     sessions_df_for_one_monkey = sessions_df[sessions_df['monkey_name']==monkey_name].copy()
     sessions_df_for_one_monkey.sort_values(by='data_name', inplace=True)
     return sessions_df_for_one_monkey
@@ -98,7 +98,7 @@ def turn_all_important_info_into_combined_info(all_important_info, folder_name, 
 
 def try_to_retrieve_combined_info(folder_name, df_names=['GUAT_alt_ff_info', 'GUAT_current_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']):
     combined_info = dict()
-    # retrieve all the csv in dir_name and put into combined_info
+    # retrieve all the csv in raw_data_dir_name and put into combined_info
     collect_info_flag = False
     for df_name in df_names:
         filename = df_name + '.csv'

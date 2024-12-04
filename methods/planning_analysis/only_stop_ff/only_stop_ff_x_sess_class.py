@@ -22,7 +22,7 @@ import math
 
 class OnlyStopFFAcrossSessions():
     
-    dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
 
     ref_point_params_based_on_mode = {'distance': [-50, -100, -150],
                                      'time after stop ff visible': [0.1, 0, -0.2],
@@ -66,14 +66,14 @@ class OnlyStopFFAcrossSessions():
         self.only_stop_ff_folder_path = os.path.join(self.planning_data_folder_path, f'only_stop_ff/only_stop_ff_df/{self.optimal_arc_type}')
 
 
-        self.top_combd_only_stop_ff_path = f'all_monkey_data/planning/individual_monkey_data/{self.monkey_name}/combd_planning_info/only_stop_ff'
-        self.combd_only_stop_ff_df_folder_path = os.path.join(self.top_combd_only_stop_ff_path, f'data/combd_only_stop_ff_df/{self.optimal_arc_type}')
-        self.combd_x_features_folder_path = os.path.join(self.top_combd_only_stop_ff_path, f'data/combd_x_features_df/{self.optimal_arc_type}')
+        self.combd_only_stop_ff_path = make_variations_utils.make_combd_only_stop_ff_path(self.monkey_name)
+        self.combd_only_stop_ff_df_folder_path = os.path.join(self.combd_only_stop_ff_path, f'data/combd_only_stop_ff_df/{self.optimal_arc_type}')
+        self.combd_x_features_folder_path = os.path.join(self.combd_only_stop_ff_path, f'data/combd_x_features_df/{self.optimal_arc_type}')
         os.makedirs(self.combd_only_stop_ff_df_folder_path, exist_ok=True)
         os.makedirs(self.combd_x_features_folder_path, exist_ok=True)
 
-        self.only_stop_ff_lr_df_path = os.path.join(self.top_combd_only_stop_ff_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_only_stop_lr_df.csv')
-        self.only_stop_ff_ml_df_path = os.path.join(self.top_combd_only_stop_ff_path, f'ml_results/ml_variations/{self.optimal_arc_type}/all_only_stop_ml_df.csv')
+        self.only_stop_ff_lr_df_path = os.path.join(self.combd_only_stop_ff_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_only_stop_lr_df.csv')
+        self.only_stop_ff_ml_df_path = os.path.join(self.combd_only_stop_ff_path, f'ml_results/ml_variations/{self.optimal_arc_type}/all_only_stop_ml_df.csv')
         os.makedirs(os.path.dirname(self.only_stop_ff_lr_df_path), exist_ok=True)
         os.makedirs(os.path.dirname(self.only_stop_ff_ml_df_path), exist_ok=True)
 
@@ -96,7 +96,7 @@ class OnlyStopFFAcrossSessions():
             pass
         
         #if self.sessions_df is None:
-        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.dir_name, self.monkey_name)
+        self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(self.raw_data_dir_name, self.monkey_name)
         self.combd_only_stop_ff_df = pd.DataFrame()
         self.combd_x_features_df = pd.DataFrame()
         for index, row in self.sessions_df_for_one_monkey.iterrows():
@@ -105,7 +105,7 @@ class OnlyStopFFAcrossSessions():
         
             data_name = row['data_name']
 
-            raw_data_folder_path = os.path.join(self.dir_name, row['monkey_name'], data_name)
+            raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], data_name)
             print(raw_data_folder_path)
 
             self.osf = only_stop_ff_class.OnlyStopFF(monkey_name=self.monkey_name, raw_data_folder_path=raw_data_folder_path,

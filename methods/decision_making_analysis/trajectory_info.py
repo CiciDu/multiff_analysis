@@ -380,9 +380,9 @@ def make_all_traj_feature_names(time_range_of_trajectory, num_time_points_for_tr
     return all_traj_feature_names
 
 
-def retrieve_or_make_all_traj_feature_names(dir_name, monkey_name, exists_ok=True, save=True, time_range_of_trajectory=None, num_time_points_for_trajectory=None, time_range_of_trajectory_to_plot=None, num_time_points_for_trajectory_to_plot=None,
+def retrieve_or_make_all_traj_feature_names(raw_data_dir_name, monkey_name, exists_ok=True, save=True, time_range_of_trajectory=None, num_time_points_for_trajectory=None, time_range_of_trajectory_to_plot=None, num_time_points_for_trajectory_to_plot=None,
                                             traj_point_features=['monkey_distance', 'monkey_angle']):
-    file_path = os.path.join(dir_name, monkey_name, 'all_traj_feature_names.pkl')
+    file_path = os.path.join(raw_data_dir_name, monkey_name, 'all_traj_feature_names.pkl')
     if os.path.exists(file_path) & exists_ok:
         with open(file_path, 'rb') as f:
             all_traj_feature_names = pickle.load(f)
@@ -393,7 +393,7 @@ def retrieve_or_make_all_traj_feature_names(dir_name, monkey_name, exists_ok=Tru
         all_traj_feature_names = make_all_traj_feature_names(time_range_of_trajectory, num_time_points_for_trajectory, time_range_of_trajectory_to_plot, num_time_points_for_trajectory_to_plot,
                                                                 traj_point_features=traj_point_features)
         if save == True:
-            with open(os.path.join(dir_name, monkey_name, 'all_traj_feature_names.pkl'), 'wb') as f:
+            with open(os.path.join(raw_data_dir_name, monkey_name, 'all_traj_feature_names.pkl'), 'wb') as f:
                 pickle.dump(all_traj_feature_names, f)
 
     return all_traj_feature_names

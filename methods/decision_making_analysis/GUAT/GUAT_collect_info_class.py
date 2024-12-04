@@ -28,7 +28,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
     def __init__(self, raw_data_folder_path, gc_kwargs, new_point_index_start=0):
 
         base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(self, raw_data_folder_path)
-        self.GUAT_folder_path = os.path.join(self.decision_making_folder_name, 'GUAT_info')
+        self.GUAT_folder_path = os.path.join(self.decision_making_folder_path, 'GUAT_info')
         self.gc_kwargs = gc_kwargs
         self.trajectory_features = gc_kwargs['trajectory_features']
         self.new_point_index_start = new_point_index_start
