@@ -16,7 +16,7 @@ import pandas as pd
 from numpy import linalg as LA
 from os.path import exists
 from scipy.ndimage import gaussian_filter1d
-
+from non_behavioral_analysis import eye_positions
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -30,9 +30,9 @@ np.set_printoptions(suppress=True)
 
 class smr_extractor(object):   
     def __init__(self, raw_data_folder_path):
-        folder_path = raw_data_folder_path
-        files_names = [file for file in os.listdir(folder_path) if 'smr' in file]
-        self.full_path_file_names = [os.path.join(folder_path,files_names[i]) 
+        self.raw_data_folder_path = raw_data_folder_path
+        files_names = [file for file in os.listdir(self.raw_data_folder_path) if 'smr' in file]
+        self.full_path_file_names = [os.path.join(self.raw_data_folder_path,files_names[i]) 
                                      for i, value in enumerate(files_names)] # a list contains 2 file path in total
         
     def extract_data(self):
@@ -87,12 +87,16 @@ class smr_extractor(object):
 class log_extractor(object):
     # Modified from Ruiyi's codes
     def __init__(self, raw_data_folder_path):
-        self.folder_path = raw_data_folder_path      
-        files_names = [file for file in os.listdir(self.folder_path) if ('txt' in file) and ('s' in file)]
-        self.full_path_file_names = os.path.join(self.folder_path, files_names[0])
+        self.raw_data_folder_path = raw_data_folder_path      
+        files_names = [file for file in os.listdir(self.raw_data_folder_path) if ('txt' in file) and ('s' in file)]
+        self.full_path_file_names = os.path.join(self.raw_data_folder_path, files_names[0])
 
-        # files_names = file_name
-        # full_path_file_names = os.path.join(folder_path,files_names)        
+        if 'monkey_Bruno' in self.raw_data_folder_path:
+            self.monkey_name = 'monkey_Bruno'
+        elif 'monkey_Schro' in self.raw_data_folder_path:
+            self.monkey_name = 'monkey_Schro'
+        else:
+            raise ValueError("The monkey name is not recognized")
 
 
     def extract_data(self, monkey_information_exists_OK=True, min_distance_to_calculate_angle=5, interocular_dist=4):
@@ -159,11 +163,11 @@ class log_extractor(object):
                 ffname_index = ffname_index+1    
             # incorporate the last ff in this array of data that was not caught
 
-        accurate_start_time, accurate_end_time = find_start_and_accurate_end_time(self.folder_path)
+        accurate_start_time, accurate_end_time = find_start_and_accurate_end_time(self.raw_data_folder_path)
 
         # get monkey data
-        self.processed_data_folder_path = self.folder_path.replace('raw_monkey_data', 'processed_data')
-        monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
+        processed_data_folder_path = self.raw_data_folder_path.replace('raw_monkey_data', 'processed_data')
+        monkey_information_path = os.path.join(processed_data_folder_path, 'monkey_information.csv')
         if exists(monkey_information_path) & monkey_information_exists_OK:
             print("Retrieved monkey_information")
             monkey_information = pd.read_csv(monkey_information_path).drop(["Unnamed: 0"], axis=1)
@@ -180,7 +184,7 @@ class log_extractor(object):
             #monkey_information = {'monkey_x': np.array(Monkey_X), 'monkey_y': np.array(Monkey_Y), 'monkey_t': np.array(Monkey_Position_T)}
             monkey_information = pd.DataFrame(monkey_information)
             monkey_information = trimming_monkey_information(monkey_information, accurate_start_time, accurate_end_time)
-            monkey_information = add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path = self.folder_path,
+            monkey_information = add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path = self.raw_data_folder_path,
                                                                          variables = ['LDy', 'LDz', 'RDy', 'RDz', 'MonkeyX', 'MonkeyY', 'LateralV', 'ForwardV', 'AngularV'])
             monkey_information['monkey_speed'] = LA.norm(monkey_information[['LateralV', 'ForwardV']].values, axis=1)
             #monkey_information['monkey_speed'] = gaussian_filter1d(monkey_information['monkey_speed'], 1)
@@ -189,12 +193,16 @@ class log_extractor(object):
             monkey_information['monkey_dw'] = monkey_information['monkey_dw'] * pi/180
             #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
 
-
-        ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
-                ff_flash_end_sorted = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path = self.folder_path)
+            ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
+                    ff_flash_end_sorted = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path = self.raw_data_folder_path)
 
 
         monkey_information = process_monkey_information_after_retrieval(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
+
+        # convert the eye position data
+        interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
+        monkey_information = eye_positions.convert_eye_positions_in_monkey_information(monkey_information, add_left_and_right_eyes_info=True, interocular_dist=interocular_dist)
+
 
         return monkey_information, ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
 
@@ -209,8 +217,8 @@ def process_monkey_information_after_retrieval(monkey_information, min_distance_
 
     # assign "stop_id" to each stop, with each whether_new_distinct_stop==True marking a new stop id
     monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum() - 1
-    monkey_information.loc[monkey_information['monkey_speeddummy'] == 1, 'stop_id'] = np.nan
-
+    monkey_information.loc[monkey_information['monkey_speeddummy'] == 1, 'stop_id'] = np.nan             
+        
     return monkey_information
 
 

@@ -23,18 +23,13 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-
-
 class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
-
 
     def get_current_ff_info_and_alt_ff_info_for_info_collection(self, max_cluster_distance=50, max_time_since_last_vis = 2.5, include_ff_in_near_future=True, duration_into_future=0.5, max_distance_to_stop=400,
                                                                 columns_to_sort_alt_ff_by=['abs_curv_diff', 'time_since_last_vis'], last_seen_and_next_seen_attributes_to_add = ['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
         
         self.find_current_and_alternative_ff_info(columns_to_sort_alt_ff_by=columns_to_sort_alt_ff_by, max_cluster_distance=max_cluster_distance, max_time_since_last_vis=max_time_since_last_vis, 
                                                   include_ff_in_near_future=include_ff_in_near_future, duration_into_future=duration_into_future, max_distance_to_stop=max_distance_to_stop)
-        
-
         
         self.GUAT_current_ff_info, self.GUAT_alt_ff_info = GUAT_and_TAFT.add_curv_diff_and_ff_number_to_GUAT_current_ff_info_and_GUAT_alt_ff_info(self.GUAT_current_ff_info, self.GUAT_alt_ff_info, 
                 self.ff_caught_T_new, self.ff_real_position_sorted, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df
@@ -81,7 +76,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         #     self.additional_curvature_df, self.all_available_ff_in_near_future = None, None
         self.additional_curvature_df, self.all_available_ff_in_near_future = None, None
 
-
         self.GUAT_current_ff_info = GUAT_and_TAFT.polish_GUAT_current_ff_info(GUAT_current_ff_info)
         self.GUAT_alt_ff_info = GUAT_and_TAFT.polish_GUAT_alt_ff_info(GUAT_alt_ff_info, GUAT_current_ff_info, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information, max_cluster_distance=max_cluster_distance, 
                                                                       columns_to_sort_alt_ff_by=columns_to_sort_alt_ff_by,
@@ -103,7 +97,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             raise ValueError('Only one of the three time_with_respect_to_* can be not None.')
         if (time_with_respect_to_second_stop is not None) & (time_with_respect_to_last_stop is not None):
             raise ValueError('Only one of the three time_with_respect_to_* can be not None.')
-
 
         if time_with_respect_to_first_stop is not None:
             self.time_of_eval = self.GUAT_w_ff_df['first_stop_time'] + time_with_respect_to_first_stop
@@ -129,8 +122,11 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
 
     def make_one_stop_w_ff_df(self):    
-        further_processing_class.FurtherProcessing.make_one_stop_w_ff_df(self)            
-
+        #further_processing_class.FurtherProcessing.make_one_stop_w_ff_df(self)  
+        self.get_monkey_data(include_GUAT_data=True,
+                             include_TAFT_data=True)
+        self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
+        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)
 
     def _add_one_stop_info_to_GUAT_w_ff_df(self):
         self.make_one_stop_w_ff_df()
@@ -162,7 +158,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
 
     def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,
-                        include_TAFT_data=False):
+                        include_TAFT_data=False): 
         if (already_retrieved_ok is False) | (not hasattr(self, 'monkey_information')):
             self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
             self.data_item.retrieve_or_make_monkey_data()
@@ -171,6 +167,9 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             self.ff_real_position_sorted = self.data_item.ff_real_position_sorted
             self.ff_believed_position_sorted = self.data_item.ff_believed_position_sorted
             self.ff_caught_T_new = self.data_item.ff_caught_T_new
+
+        for df in ['monkey_information', 'ff_life_sorted', 'ff_real_position_sorted', 'ff_believed_position_sorted', 'ff_caught_T_new']:
+            setattr(self, df, getattr(self.data_item, df).copy())
 
         if include_ff_dataframe:
             if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
@@ -193,7 +192,10 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                     self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
                 self.data_item.get_give_up_after_trying_info()
                 self.give_up_after_trying_info_bundle = self.data_item.give_up_after_trying_info_bundle
+                self.GUAT_w_ff_df = self.data_item.GUAT_w_ff_df
 
+            for df in ['give_up_after_trying_trials', 'GUAT_indices_df', 'GUAT_trials_df', 'GUAT_point_indices_for_anim', 'GUAT_w_ff_df']:
+                setattr(self, df, getattr(self.data_item, df).copy())
 
         if include_TAFT_data:
             if not hasattr(self, 'TAFT_trials_df'):
@@ -204,7 +206,9 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 elif not hasattr(self, 'ff_dataframe'):
                     self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
                 self.data_item.get_try_a_few_times_info()
-            
+
+            for df in ['try_a_few_times_trials', 'TAFT_indices_df', 'TAFT_trials_df', 'try_a_few_times_indices_for_anim']:
+                setattr(self, df, getattr(self.data_item, df).copy())            
 
         if include_ff_dataframe:
             self.cluster_around_target_indices = None

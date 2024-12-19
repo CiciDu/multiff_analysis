@@ -137,14 +137,13 @@ class BaseProcessing:
             h5_file_pathway = os.path.join(os.path.join(self.processed_data_folder_path, h5_file_name))
             self.ff_dataframe = pd.read_hdf(h5_file_pathway, 'ff_dataframe')
             print("Retrieved ff_dataframe from ", h5_file_pathway) 
-            make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, 10, 25)
         # otherwise, recreate the dataframe
         except Exception as e:
             print("Failed to retrieve ff_dataframe. Will make new ff_dataframe. Error: ", e)
             ff_dataframe_args = (self.monkey_information, self.ff_caught_T_new, self.ff_flash_sorted,  self.ff_real_position_sorted, self.ff_life_sorted)
             ff_dataframe_kargs = {"max_distance": 500, 
-                                  "data_folder_name": None, 
                                   "num_missed_index": num_missed_index, 
+                                  "to_add_essential_columns": False,
                                   "to_furnish_ff_dataframe": False}
             
             for kwarg, value in kwargs.items():
@@ -172,6 +171,7 @@ class BaseProcessing:
             self.min_point_index, self.max_point_index = 0, 0
         self.caught_ff_num = len(self.ff_caught_T_new)
 
+        make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, 10, 25)
         if to_furnish_ff_dataframe:
             self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
                                                     self.ff_caught_T_new, self.ff_life_sorted)
@@ -187,13 +187,6 @@ class BaseProcessing:
 
         self.monkey_information = process_raw_data.process_monkey_information_after_retrieval(self.monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         
-        # if the eye data is present but the converted data is missing
-        if ('LDz' in self.monkey_information.columns) & ('gaze_world_x' not in self.monkey_information.columns):
-            self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
-            self.monkey_information = eye_positions.convert_eye_positions_in_monkey_information(self.monkey_information, add_left_and_right_eyes_info=True, interocular_dist=self.interocular_dist)
-            # save the csv again
-            self.monkey_information.to_csv(self.monkey_information_path)                
-            
         print("Retrieved monkey data from ", self.monkey_information_path, " and ff data from ", self.npz_file_pathway)
 
         self.make_or_retrieve_closest_stop_to_capture_df()
@@ -265,6 +258,9 @@ class BaseProcessing:
     def save_monkey_information(self):
         columns_to_keep = ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_speed', 'monkey_speeddummy',
                            'monkey_angles', 'monkey_dw', 'LDy', 'LDz', 'RDy', 'RDz']
+        more_columns_to_keep = [col for col in self.monkey_information.columns if 'gaze' in col]
+        columns_to_keep.extend(more_columns_to_keep)
+        
         columns_to_keep = [col for col in columns_to_keep if col in self.monkey_information.columns]
         monkey_information_small = self.monkey_information[columns_to_keep]
         data_dir = self.processed_data_folder_path

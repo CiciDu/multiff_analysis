@@ -17,9 +17,11 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,  
                             ff_real_position_sorted, ff_life_sorted, player = "monkey", 
                             max_distance = 500, ff_radius = 10, reward_boundary_radius = 25, 
-                            data_folder_name = None, num_missed_index = None, print_progress = True, 
+                            num_missed_index = None, print_progress = True, 
                             obs_ff_indices_in_ff_dataframe = None, max_time_since_last_vis = 3,
-                            ff_in_obs_df = None, to_furnish_ff_dataframe=True,
+                            ff_in_obs_df = None, 
+                            to_add_essential_columns=True,
+                            to_furnish_ff_dataframe=True,
                             truncate_info_beyond_capture = True):
 
     """
@@ -124,13 +126,8 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
       ff_dataframe.loc[ff_dataframe['ff_x_noisy'].isnull(), 'ff_x_noisy'] = ff_dataframe.loc[ff_dataframe['ff_x_noisy'].isnull(), 'ff_x']
       ff_dataframe.loc[ff_dataframe['ff_y_noisy'].isnull(), 'ff_y_noisy'] = ff_dataframe.loc[ff_dataframe['ff_y_noisy'].isnull(), 'ff_y']
 
-    # if a path is provided, then we will store the dataframe as a csv in the provided path
-    if data_folder_name is not None:
-      filepath = os.path.join(data_folder_name, 'ff_dataframe.csv')
-      os.makedirs(data_folder_name, exist_ok = True)
-      ff_dataframe.to_csv(filepath)
-
-    add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_radius, reward_boundary_radius)
+    if to_add_essential_columns:
+      add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_real_position_sorted, ff_radius, reward_boundary_radius)
     
     if to_furnish_ff_dataframe:
         ff_dataframe = furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted)
@@ -138,7 +135,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     return ff_dataframe
 
 
-def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
+def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
     ff_dataframe[['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']]  \
         = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']].values
     ff_dataframe[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_dataframe['ff_index'].values]

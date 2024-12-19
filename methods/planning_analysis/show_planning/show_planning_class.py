@@ -78,20 +78,16 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
 
     def get_combd_info_folder_paths(self):
-        data_folder = os.path.join(self.combd_stop_and_alt_folder_path, 'data')
 
-        self.dict_of_combd_rel_angle_slope_folder_path = {'test': data_folder + f'/combd_rel_angle_slope/{self.optimal_arc_type}/test',
-                                            'control': data_folder + f'/combd_rel_angle_slope/{self.optimal_arc_type}/control'}
-
-        self.dict_of_combd_heading_info_folder_path = {'test': data_folder + f'/combd_heading_info/{self.optimal_arc_type}/test',
-                                            'control': data_folder + f'/combd_heading_info/{self.optimal_arc_type}/control/'}
+        self.dict_of_combd_heading_info_folder_path = {'test': self.combd_stop_and_alt_folder_path + f'/data/combd_heading_info/{self.optimal_arc_type}/test',
+                                            'control': self.combd_stop_and_alt_folder_path + f'/data/combd_heading_info/{self.optimal_arc_type}/control/'}
         
-        self.dict_of_combd_diff_in_curv_folder_path = {'test': data_folder + f'/combd_diff_in_curv/{self.optimal_arc_type}/test',
-                                            'control': data_folder + f'/combd_diff_in_curv/{self.optimal_arc_type}/control'}
+        self.dict_of_combd_diff_in_curv_folder_path = {'test': self.combd_stop_and_alt_folder_path + f'/data/combd_diff_in_curv/{self.optimal_arc_type}/test',
+                                            'control': self.combd_stop_and_alt_folder_path + f'/data/combd_diff_in_curv/{self.optimal_arc_type}/control'}
 
-        self.combd_plan_x_both_folder_path = data_folder + f'/combd_plan_x_df/{self.optimal_arc_type}'
+        self.combd_plan_x_tc_folder_path = self.combd_stop_and_alt_folder_path + f'/data/combd_plan_x_tc/{self.optimal_arc_type}'
         
-        self.combd_plan_y_both_folder_path = data_folder + f'/combd_plan_y_df/{self.optimal_arc_type}'
+        self.combd_plan_y_tc_folder_path = self.combd_stop_and_alt_folder_path + f'/data/combd_plan_y_tc/{self.optimal_arc_type}'
 
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100, 
@@ -326,7 +322,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             else:
                 raise FileNotFoundError  # Force the creation if combd_heading_df_x_sessions_exists_ok is False
         except FileNotFoundError:  # Specific exception for clarity
-            _, combd_heading_df_x_sessions, combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
+            combd_heading_df_x_sessions, combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
                                                                     curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                     stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, 
                                                                    show_printed_output=show_output, test_or_control=test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok,

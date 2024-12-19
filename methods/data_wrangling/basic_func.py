@@ -438,5 +438,14 @@ def make_rotation_matrix(x0, y0, x1, y1):
     return rotation_matrix
 
 
+@contextmanager
+def suppress_stdout():
+    original_stdout = sys.stdout
+    sys.stdout = open(os.devnull, 'w')
+    try:
+        yield
+    finally:
+        sys.stdout.close()
+        sys.stdout = original_stdout
 
 

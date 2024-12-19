@@ -1,7 +1,6 @@
-from data_wrangling import basic_func, base_processing_class
-from pattern_discovery import pattern_by_trials, organize_patterns_and_features
+from data_wrangling import basic_func, base_processing_class, monkey_data_classes
+from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import animation_func, animation_utils, plot_trials, plot_behaviors_utils
-from data_wrangling import base_processing_class
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from decision_making_analysis.GUAT import GUAT_utils
 
@@ -41,6 +40,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,
                         include_TAFT_data=False):
+        
         if (already_retrieved_ok is False) | (not hasattr(self, 'monkey_information')):
             self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
             self.data_item.retrieve_or_make_monkey_data()
@@ -152,11 +152,19 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.feature_statistics = self.try_retrieving_df(df_name='feature_statistics', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
 
         if self.feature_statistics is None:                
-            self.feature_statistics = organize_patterns_and_features.make_feature_statistics(self.all_trial_features, data_folder_name = self.patterns_and_features_data_folder_path)
+            self.feature_statistics = organize_patterns_and_features.make_feature_statistics(self.all_trial_features, data_folder_name=self.patterns_and_features_data_folder_path)
             print("made feature_statistics")
 
 
+    def make_or_retrieve_scatter_around_target_df(self, exists_ok=True):
+        self.scatter_around_target_df = self.try_retrieving_df(df_name='scatter_around_target_df', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
 
+        if self.scatter_around_target_df is None:
+            self.scatter_around_target_df = monkey_landing_in_ff.make_scatter_around_target_df(self.monkey_information, 
+                                                                                                self.closest_stop_to_capture_df, 
+                                                                                                self.ff_real_position_sorted,
+                                                                                                data_folder_name=self.patterns_and_features_data_folder_path)
+            print("made scatter_around_target_df")
 
     def make_info_of_monkey(self):
         self.info_of_monkey = {"monkey_information": self.monkey_information,

@@ -133,12 +133,11 @@ class PlotVariations(variations_base_class._VariationsBase):
 
     def plot_direction_in_all_perc_info_across_monkeys(self,
                                                         x_var_column_list = ['monkey_name'],
-
                                                         fixed_variable_values_to_use = {'if_test_alt_ff_group_appear_after_stop': 'flexible',
-                                                                                        #'key_for_split': 'ff_seen',
+                                                                                        'key_for_split': 'ff_seen',
                                                                                         'whether_even_out_dist': False,
                                                         },
-                                                        changeable_variables = ['key_for_split'],
+                                                        changeable_variables = [], #'key_for_split'
                                                         columns_to_find_unique_combinations_for_color = []):
 
         self.plot_direction_in_all_perc_info(x_var_column_list=x_var_column_list,
@@ -147,3 +146,4 @@ class PlotVariations(variations_base_class._VariationsBase):
                                         columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
                                         add_error_bars=True,
                                         use_subplots_based_on_changeable_variables=True)
+

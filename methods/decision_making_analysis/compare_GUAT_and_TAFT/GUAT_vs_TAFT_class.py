@@ -154,13 +154,12 @@ class CompareGUATandTAFTclass():
             self.gcc = GUAT_collect_info_class.GUATCollectInfoForSession(raw_data_folder_path=raw_data_folder_path, 
                                                                     gc_kwargs=gc_kwargs, new_point_index_start=0)
 
-        include_TAFT_data = False
-        if self.TAFT_or_GUAT == 'TAFT':
-            include_TAFT_data = True
-        self.gcc.get_monkey_data(already_retrieved_ok=already_retrieved_ok, include_TAFT_data=include_TAFT_data)
+        include_TAFT_data = True if self.TAFT_or_GUAT == 'TAFT' else False
+        include_GUAT_data = True if self.TAFT_or_GUAT == 'GUAT' else False
+        self.gcc.get_monkey_data(already_retrieved_ok=already_retrieved_ok, include_GUAT_data=include_GUAT_data, include_TAFT_data=include_TAFT_data)
         
         for df in ['monkey_information', 'ff_dataframe', 'ff_flash_sorted', 'ff_real_position_sorted', 'ff_life_sorted',
-                   'ff_believed_position_sorted', 'ff_caught_T_new']:
+                   'ff_believed_position_sorted', 'ff_caught_T_new', 'closest_stop_to_capture_df']:
             setattr(self, df, getattr(self.gcc.data_item, df).copy())
         if self.TAFT_or_GUAT == 'TAFT':
             self.TAFT_trials_df = self.gcc.data_item.TAFT_trials_df.copy()
@@ -236,16 +235,14 @@ class CompareGUATandTAFTclass():
         self._add_alt_ff_index()
         self.stops_near_ff_df['alt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['alt_ff_index'].values]
 
+        # add the next stop time and point index
         closest_stop_to_capture_df2 = self.closest_stop_to_capture_df[['stop_ff_index', 'stop_point_index', 'stop_time']].copy()
         closest_stop_to_capture_df2.rename(columns={'stop_ff_index': 'alt_ff_index',
                                                     'stop_time': 'next_stop_time',
                                                     'stop_point_index': 'next_stop_point_index'}, inplace=True)
-        all_closest_point_to_alt_ff = self.closest_stop_to_capture_df.merge(closest_stop_to_capture_df2, on='alt_ff_index', how='left')
+        
+        self.stops_near_ff_df = self.stops_near_ff_df.merge(closest_stop_to_capture_df2, on='alt_ff_index', how='left')
 
-
-        # self.stops_near_ff_df['next_stop_time'] = self.ff_caught_T_new[self.stops_near_ff_df['alt_ff_index'].values]
-        # self.stops_near_ff_df['next_stop_point_index'] = np.searchsorted(self.monkey_information['time'].values, self.stops_near_ff_df['next_stop_time'].values)
-        self.stops_near_ff_df[['next_stop_point_index', 'next_stop_time']] = all_closest_point_to_alt_ff[['point_index', 'time']].values
         self.stops_near_ff_df['next_stop_cum_distance'] = self.monkey_information.loc[self.stops_near_ff_df['next_stop_point_index'], 'cum_distance'].values
 
         self.stops_near_ff_df[['stop_ff_x', 'stop_ff_y']] = self.ff_real_position_sorted[self.stops_near_ff_df['stop_ff_index'].values]

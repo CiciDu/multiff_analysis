@@ -174,7 +174,7 @@ def add_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_i
     return closest_stop_to_capture_df2
 
 
-def get_valid_subset_to_construct_scatter_around_target_center_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted):
+def get_valid_subset_to_construct_scatter_around_target_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted):
     closest_stop_to_capture_df2 = add_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
     valid_subset = closest_stop_to_capture_df2[closest_stop_to_capture_df2['distance_from_ff_to_stop'] <= 25].copy()
     total_len = len(closest_stop_to_capture_df)
@@ -183,29 +183,29 @@ def get_valid_subset_to_construct_scatter_around_target_center_df(closest_stop_t
     return valid_subset
 
 
-def make_scatter_around_target_center_df(monkey_information, closest_stop_to_capture_df, ff_real_position_sorted, make_plot=True):
-    valid_subset = get_valid_subset_to_construct_scatter_around_target_center_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
+def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df, ff_real_position_sorted, data_folder_name=None, make_plot=True):
+    valid_subset = get_valid_subset_to_construct_scatter_around_target_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
 
     if make_plot:
         plot_monkey_landings_in_ff(valid_subset, monkey_information, ff_real_position_sorted)
 
     # get the mean, std, 25%, 50%, 75% of distance, angle, and abs_angle
-    scatter_around_target_center_df = valid_subset[['distance_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
-    scatter_around_target_center_df['iqr'] = scatter_around_target_center_df['75%'] - scatter_around_target_center_df['25%']
-    scatter_around_target_center_df.columns = ['distance_' + i for i in scatter_around_target_center_df.columns]
-    scatter_around_target_center_df.reset_index(inplace=True, drop=True)
+    scatter_around_target_df = valid_subset[['distance_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
+    scatter_around_target_df['iqr'] = scatter_around_target_df['75%'] - scatter_around_target_df['25%']
+    scatter_around_target_df.columns = ['distance_' + i for i in scatter_around_target_df.columns]
+    scatter_around_target_df.reset_index(inplace=True, drop=True)
 
-    scatter_around_target_center_df_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
-    scatter_around_target_center_df_angle['iqr'] = scatter_around_target_center_df_angle['75%'] - scatter_around_target_center_df_angle['25%']
-    scatter_around_target_center_df_angle.columns = ['angle_' + i for i in scatter_around_target_center_df_angle.columns]
-    scatter_around_target_center_df_angle.reset_index(inplace=True, drop=True)
-    scatter_around_target_center_df = pd.concat([scatter_around_target_center_df, scatter_around_target_center_df_angle], axis=1)
+    scatter_around_target_df_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
+    scatter_around_target_df_angle['iqr'] = scatter_around_target_df_angle['75%'] - scatter_around_target_df_angle['25%']
+    scatter_around_target_df_angle.columns = ['angle_' + i for i in scatter_around_target_df_angle.columns]
+    scatter_around_target_df_angle.reset_index(inplace=True, drop=True)
+    scatter_around_target_df = pd.concat([scatter_around_target_df, scatter_around_target_df_angle], axis=1)
 
-    scatter_around_target_center_df_abs_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].abs().describe().T[['mean', 'std', '25%', '50%', '75%']]
-    scatter_around_target_center_df_abs_angle['iqr'] = scatter_around_target_center_df_abs_angle['75%'] - scatter_around_target_center_df_abs_angle['25%']
-    scatter_around_target_center_df_abs_angle.columns = ['abs_angle_' + i for i in scatter_around_target_center_df_abs_angle.columns]
-    scatter_around_target_center_df_abs_angle.reset_index(inplace=True, drop=True)
-    scatter_around_target_center_df = pd.concat([scatter_around_target_center_df, scatter_around_target_center_df_abs_angle], axis=1)
+    scatter_around_target_df_abs_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].abs().describe().T[['mean', 'std', '25%', '50%', '75%']]
+    scatter_around_target_df_abs_angle['iqr'] = scatter_around_target_df_abs_angle['75%'] - scatter_around_target_df_abs_angle['25%']
+    scatter_around_target_df_abs_angle.columns = ['abs_angle_' + i for i in scatter_around_target_df_abs_angle.columns]
+    scatter_around_target_df_abs_angle.reset_index(inplace=True, drop=True)
+    scatter_around_target_df = pd.concat([scatter_around_target_df, scatter_around_target_df_abs_angle], axis=1)
 
     # get the percentage of points in each quadrant
     quadrants = {1: [-90, 0], 2: [0, 90], 3: [90, 180], 4: [-180, -90]}
@@ -213,6 +213,10 @@ def make_scatter_around_target_center_df(monkey_information, closest_stop_to_cap
         valid_subset2 = valid_subset[(valid_subset['angle_in_degrees_from_ff_to_stop'] >= quadrants[quad][0]) & (valid_subset['angle_in_degrees_from_ff_to_stop'] < quadrants[quad][1])].copy()
         col_name = f'Q{quad}_perc'
         perc = len(valid_subset2)/len(valid_subset) * 100
-        scatter_around_target_center_df[col_name] = perc
-    return scatter_around_target_center_df
+        scatter_around_target_df[col_name] = perc
+
+    if data_folder_name is not None:
+        basic_func.save_df_to_csv(scatter_around_target_df, 'scatter_around_target_df', data_folder_name)
+
+    return scatter_around_target_df
 

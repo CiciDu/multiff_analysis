@@ -290,10 +290,10 @@ def make_the_distributions_of_angle_more_similar_in_df(test_df, ctrl_df, verbose
    
     return test_df, ctrl_df
 
-def process_combd_plan_x_and_y_combd(combd_plan_x_both, combd_plan_y_both, curv_columns=['curv_min', 'curv_max', 'curv_range']):
-    combd_plan_x_both['ref_d_heading_of_traj'] = combd_plan_y_both['ref_d_heading_of_traj'].values
-    combd_plan_x_both['stop_ff_angle_diff_boundary_at_ref'] = combd_plan_x_both['stop_ff_angle_at_ref'] - combd_plan_x_both['stop_ff_angle_boundary_at_ref']
-    combd_plan_y_both['dir_from_stop_ff_to_stop'] = ((combd_plan_y_both['dir_from_stop_ff_to_stop'] + 1)/2).astype(int)
-    combd_plan_y_both['dir_from_stop_ff_same_side'] = ((combd_plan_y_both['dir_from_stop_ff_same_side'] + 1)/2).astype(int)
-    combd_plan_x_both['dir_from_stop_ff_to_alt_ff'] = ((combd_plan_y_both['dir_from_stop_ff_to_alt_ff'] + 1)/2).astype(int)
-    combd_plan_x_both[curv_columns] = combd_plan_y_both[curv_columns].values
+def process_combd_plan_x_and_y_combd(combd_plan_x_tc, combd_plan_y_tc, curv_columns=['curv_min', 'curv_max', 'curv_range']):
+    combd_plan_x_tc['ref_d_heading_of_traj'] = combd_plan_y_tc['ref_d_heading_of_traj'].values
+    combd_plan_x_tc['stop_ff_angle_diff_boundary_at_ref'] = combd_plan_x_tc['stop_ff_angle_at_ref'] - combd_plan_x_tc['stop_ff_angle_boundary_at_ref']
+    combd_plan_y_tc['dir_from_stop_ff_to_stop'] = ((combd_plan_y_tc['dir_from_stop_ff_to_stop'] + 1)/2).astype(int)
+    combd_plan_y_tc['dir_from_stop_ff_same_side'] = ((combd_plan_y_tc['dir_from_stop_ff_same_side'] + 1)/2).astype(int)
+    combd_plan_x_tc['dir_from_stop_ff_to_alt_ff'] = ((combd_plan_y_tc['dir_from_stop_ff_to_alt_ff'] + 1)/2).astype(int)
+    combd_plan_x_tc[curv_columns] = combd_plan_y_tc[curv_columns].values

@@ -76,6 +76,8 @@ def get_title_str(one_pattern_df, x, y):
     r_squared = r_value ** 2
     num_sessions = one_pattern_df[y].unique().size
     title_str = f"Slope x T = {round(slope * num_sessions, 3)}, R² = {r_squared:.3f}, p = {p_value:.3f}"
+    if p_value < 0.05:
+        title_str += " *"
     return title_str  
 
 
@@ -120,6 +122,7 @@ def plot_the_changes_over_time_for_two_monkeys(merged_df, x="Data", y="Rate", ti
             monkey_df = one_pattern_df[one_pattern_df['Monkey'] == monkey]
             title_str = get_title_str(monkey_df, x, y)
             title += f"{monkey}: {title_str}\n"
+
 
         ax.set_xlabel(x, fontsize=10, loc='left')
         ax.set_ylabel(y, fontsize=10)
@@ -190,11 +193,19 @@ def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], mon
     Returns:
     None
     """
+    merged_df = merged_df.copy()
     sns.set_style("darkgrid")
 
     fig, axes = prepare_for_subplots(len(y_columns))
 
     for i, y in enumerate(y_columns):
+
+        # change all '_50%' to '_median' in the column name
+        if '_50%' in y:
+            y_old = y
+            y = y.replace('_50%', '_median')
+            merged_df[y] = merged_df[y_old]
+
         ax = axes[i]
 
         plot_regression(ax, x, y, merged_df)

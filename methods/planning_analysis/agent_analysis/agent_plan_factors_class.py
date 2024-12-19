@@ -41,8 +41,8 @@ class PlanFactorsOfAgent():
     def _copy_df_from_pn_to_self(self):
 
         try:
-            self.plan_y_both = self.pf.plan_y_both
-            self.plan_x_both = self.pf.plan_x_both
+            self.plan_y_tc = self.pf.plan_y_tc
+            self.plan_x_tc = self.pf.plan_x_tc
             self.plan_x_test = self.pf.plan_x_test
             self.plan_y_test = self.pf.plan_y_test
             self.plan_x_ctrl = self.pf.plan_x_ctrl

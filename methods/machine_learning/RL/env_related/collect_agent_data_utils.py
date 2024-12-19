@@ -731,7 +731,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
     # Make ff_dataframe
     ff_dataframe_args = (monkey_information, ff_caught_T_new, ff_flash_sorted,  ff_real_position_sorted, ff_life_sorted)
-    ff_dataframe_kargs = {"max_distance": 400, "data_folder_name": None, "num_missed_index": 0}
+    ff_dataframe_kargs = {"max_distance": 400, "num_missed_index": 0}
     ff_dataframe = make_ff_dataframe.make_ff_dataframe_func(*ff_dataframe_args, **ff_dataframe_kargs, player = "agent", \
                                     obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe)
     # Only keep the relevant part of ff_dataframe

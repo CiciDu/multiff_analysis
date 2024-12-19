@@ -255,7 +255,7 @@ class _RLforMultifirefly(further_processing_class.FurtherProcessing):
         self.ff_dataframe = self.ff_in_obs_df.copy()
         self.ff_dataframe['visible'] = 1
 
-        make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted)
+        make_ff_dataframe.add_essential_columns_to_ff_dataframe(self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted)
         self.ff_dataframe = make_ff_dataframe.process_ff_dataframe(self.ff_dataframe, max_distance=None, max_time_since_last_vis=3)
 
 

@@ -80,7 +80,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         self._make_plan_x_test_OR_plan_x_ctrl(test_or_control=test_or_control, exists_ok=plan_x_exists_ok, use_eye_data=use_eye_data, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data)
 
 
-    def _make_plan_x_both_OR_plan_y_both(self, x_or_y='x'):
+    def _make_plan_x_tc_OR_plan_y_tc(self, x_or_y='x'):
         plan_test = getattr(self, f'plan_{x_or_y}_test').reset_index(drop=True).copy()
         plan_ctrl = getattr(self, f'plan_{x_or_y}_ctrl').reset_index(drop=True).copy()
         plan_test['whether_test'] = 1
@@ -91,12 +91,12 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         return plan_combd
 
     def _get_plan_x_and_y_combd(self):
-        self.plan_x_both = self._make_plan_x_both_OR_plan_y_both(x_or_y='x')
-        self.plan_y_both = self._make_plan_x_both_OR_plan_y_both(x_or_y='y')
+        self.plan_x_tc = self._make_plan_x_tc_OR_plan_y_tc(x_or_y='x')
+        self.plan_y_tc = self._make_plan_x_tc_OR_plan_y_tc(x_or_y='y')
 
-        if 'd_monkey_angle_since_stop_ff_first_seen' not in self.plan_y_both.columns:
-            self.plan_y_both['d_monkey_angle_since_stop_ff_first_seen'] = self.plan_y_both['d_monkey_angle']
-        plan_factors_utils.add_dir_from_stop_ff_same_side(self.plan_y_both)
+        if 'd_monkey_angle_since_stop_ff_first_seen' not in self.plan_y_tc.columns:
+            self.plan_y_tc['d_monkey_angle_since_stop_ff_first_seen'] = self.plan_y_tc['d_monkey_angle']
+        plan_factors_utils.add_dir_from_stop_ff_same_side(self.plan_y_tc)
 
 
     def _prepare_plan_data(self, plan_type, test_or_control, exists_ok, make_plan_func, save_data):
@@ -204,10 +204,10 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
 
 
     def get_test_and_ctrl_data_from_combd_data(self):
-        self.plan_x_test = self.plan_x_both[self.plan_x_both['whether_test']==1].drop(columns='whether_test').copy()
-        self.plan_x_ctrl = self.plan_x_both[self.plan_x_both['whether_test']==0].drop(columns='whether_test').copy()
-        self.plan_y_test = self.plan_y_both[self.plan_y_both['whether_test']==1].drop(columns='whether_test').copy()
-        self.plan_y_ctrl = self.plan_y_both[self.plan_y_both['whether_test']==0].drop(columns='whether_test').copy()
+        self.plan_x_test = self.plan_x_tc[self.plan_x_tc['whether_test']==1].drop(columns='whether_test').copy()
+        self.plan_x_ctrl = self.plan_x_tc[self.plan_x_tc['whether_test']==0].drop(columns='whether_test').copy()
+        self.plan_y_test = self.plan_y_tc[self.plan_y_tc['whether_test']==1].drop(columns='whether_test').copy()
+        self.plan_y_ctrl = self.plan_y_tc[self.plan_y_tc['whether_test']==0].drop(columns='whether_test').copy()
 
 
     def get_combd_data_from_test_and_ctrl_data(self):
@@ -215,8 +215,8 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         self.plan_x_ctrl['whether_test'] = 0
         self.plan_y_test['whether_test'] = 1
         self.plan_y_ctrl['whether_test'] = 0
-        self.plan_x_both = pd.concat([self.plan_x_test, self.plan_x_ctrl], ignore_index=True)
-        self.plan_y_both = pd.concat([self.plan_y_test, self.plan_y_ctrl], ignore_index=True)
+        self.plan_x_tc = pd.concat([self.plan_x_test, self.plan_x_ctrl], ignore_index=True)
+        self.plan_y_tc = pd.concat([self.plan_y_test, self.plan_y_ctrl], ignore_index=True)
 
     def change_control_data_to_conform_to_test_data(self):
         self.plan_x_ctrl, self.plan_y_ctrl = test_vs_control_utils.change_control_data_to_conform_to_test_data(self.plan_x_ctrl, self.plan_y_ctrl, self.plan_x_test)
@@ -235,12 +235,12 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
 
 
     def limit_curv_range(self, max_curv_range=100):
-        self.plan_x_both, self.plan_y_both = test_vs_control_utils.prune_out_data_with_large_curv_range(self.plan_x_both, self.plan_y_both, max_curv_range=max_curv_range)
+        self.plan_x_tc, self.plan_y_tc = test_vs_control_utils.prune_out_data_with_large_curv_range(self.plan_x_tc, self.plan_y_tc, max_curv_range=max_curv_range)
         self.get_test_and_ctrl_data_from_combd_data()
 
 
     def limit_cum_distance_between_two_stops(self, max_cum_distance_between_two_stops=400):
-        self.plan_x_both, self.plan_y_both = test_vs_control_utils.limit_cum_distance_between_two_stops(self.plan_x_both, self.plan_y_both, max_cum_distance_between_two_stops=max_cum_distance_between_two_stops)
+        self.plan_x_tc, self.plan_y_tc = test_vs_control_utils.limit_cum_distance_between_two_stops(self.plan_x_tc, self.plan_y_tc, max_cum_distance_between_two_stops=max_cum_distance_between_two_stops)
         self.get_test_and_ctrl_data_from_combd_data()
 
 
@@ -254,8 +254,8 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
             x_df = self.plan_x_ctrl
             y_df = self.plan_y_ctrl
         else:
-            x_df = self.plan_x_both
-            y_df = self.plan_y_both
+            x_df = self.plan_x_tc
+            y_df = self.plan_y_tc
 
         for column in ['d_from_stop_ff_to_alt_ff', 'time_between_two_stops']:
             if column in x_df.columns:

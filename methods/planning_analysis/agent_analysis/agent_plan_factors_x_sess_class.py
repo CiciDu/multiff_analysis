@@ -32,11 +32,12 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
         self.combd_stop_and_alt_folder_path = os.path.join(self.combd_planning_info_folder_path, 'stop_and_alt')
         # note that we used dir_name for the above because those data folder path includes "individual_data_sessions/data_0" and so on at the end.
         self.make_key_paths()
+        show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
         
 
     def streamline_getting_y_values(self,
-                                    num_datasets_to_collect=1,
+                                    num_datasets_to_collect=5,
                                     ref_point_mode='time after stop ff visible',
                                     ref_point_value=0.1,
                                     save_data = True,
@@ -95,33 +96,50 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
 
     def get_plan_x_and_plan_y_across_sessions(self, 
                                               num_datasets_to_collect=1,
-                                            ref_point_mode='distance', ref_point_value=-150,
+                                            ref_point_mode='distance', 
+                                            ref_point_value=-150,
                                             curv_traj_window_before_stop=[-50, 0],
                                             exists_ok=True, 
                                             plan_x_exists_ok=True,
                                             plan_y_exists_ok=True,
                                             heading_info_df_exists_ok=True, 
                                             stops_near_ff_df_exists_ok=True,
-                                            curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
+                                            curv_of_traj_mode='distance', 
+                                            window_for_curv_of_traj=[-25, 25],
                                             use_curvature_to_ff_center=False,
                                             save_data=True,
                                             **env_kwargs
                                             ):
+        plan_xy_tc_kwargs = dict(num_datasets_to_collect=num_datasets_to_collect,  
+                                save_data=save_data,  
+                                **env_kwargs)   
         
-        df_name = find_stops_near_ff_utils.find_df_name('monkey_agent', ref_point_mode, ref_point_value)
-        os.makedirs(self.combd_planning_info_folder_path, exist_ok=True)
+        monkey_plan_factors_x_sess_class.PlanAcrossSessions.get_plan_x_and_plan_y_across_sessions(self,
+                                                                                                ref_point_mode=ref_point_mode,
+                                                                                                ref_point_value=ref_point_value,
+                                                                                                curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                                                exists_ok=exists_ok,
+                                                                                                plan_x_exists_ok=plan_x_exists_ok,
+                                                                                                plan_y_exists_ok=plan_y_exists_ok,
+                                                                                                heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                                                                curv_of_traj_mode=curv_of_traj_mode,
+                                                                                                window_for_curv_of_traj=window_for_curv_of_traj,
+                                                                                                use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                                                                **plan_xy_tc_kwargs)
 
-        if exists_ok:
-            try:
-                self.combd_plan_y_both = pd.read_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_y_both_{df_name}.csv'))
-                self.combd_plan_x_both = pd.read_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_x_both_{df_name}.csv'))
-                print('Successfully retrieved combd_plan_y_both_{df_name} and combd_plan_x_both_{df_name}.')
-                return 
-            except FileNotFoundError:
-                print('Retrieving combd_plan_y_both_{df_name} and combd_plan_x_both_{df_name} failed. Will recreate them.')
-
-        self.combd_plan_y_both = pd.DataFrame()
-        self.combd_plan_x_both = pd.DataFrame()
+    def make_combd_plan_xy_tc(self,
+                                plan_x_exists_ok=True, 
+                                plan_y_exists_ok=True,
+                                heading_info_df_exists_ok=True, 
+                                stops_near_ff_df_exists_ok=True,
+                                num_datasets_to_collect=1,  
+                                save_data=True,  
+                                **env_kwargs
+                                ):
+        
+        self.combd_plan_y_tc = pd.DataFrame()
+        self.combd_plan_x_tc = pd.DataFrame()
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")  
@@ -137,26 +155,21 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
                                                                         )
                 print(' ')
                 print('Getting plan x and plan y data ......')
-                self.pfa.get_plan_x_and_plan_y_for_one_session(ref_point_mode=ref_point_mode, 
-                                        ref_point_value=ref_point_value,
-                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
+                self.pfa.get_plan_x_and_plan_y_for_one_session(ref_point_mode=self.ref_point_mode, 
+                                        ref_point_value=self.ref_point_value,
+                                        curv_traj_window_before_stop=self.curv_traj_window_before_stop,
                                         plan_x_exists_ok=plan_x_exists_ok, 
                                         plan_y_exists_ok=plan_y_exists_ok, 
                                         heading_info_df_exists_ok=heading_info_df_exists_ok,
                                         stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, 
-                                        curv_of_traj_mode=curv_of_traj_mode, 
-                                        window_for_curv_of_traj=window_for_curv_of_traj,
-                                        use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                        curv_of_traj_mode=self.curv_of_traj_mode, 
+                                        window_for_curv_of_traj=self.window_for_curv_of_traj,
+                                        use_curvature_to_ff_center=self.use_curvature_to_ff_center,
                                         save_data=save_data,
                                         n_steps=self.num_steps_per_dataset,
                                         **env_kwargs)
                 
                 self._add_plan_xy_to_combd_plan_xy(data_name)
-
-        if save_data:
-            self.combd_plan_y_both.to_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_y_both_{df_name}.csv'))
-            self.combd_plan_x_both.to_csv(os.path.join(self.combd_planning_info_folder_path, f'combd_plan_x_both_{df_name}.csv'))
-
 
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-150,
@@ -256,12 +269,12 @@ class PlanFactorsAcrossAgentSessions(plot_variations_class.PlotVariations):
 
         
     def _add_plan_xy_to_combd_plan_xy(self, data_name):
-        plan_x_both = self.pfa.plan_x_both.copy()
-        plan_y_both = self.pfa.plan_y_both.copy()
-        plan_x_both['data_name'] = data_name
-        plan_y_both['data_name'] = data_name
-        self.combd_plan_x_both = pd.concat([self.combd_plan_x_both, plan_x_both], axis=0)
-        self.combd_plan_y_both = pd.concat([self.combd_plan_y_both, plan_y_both], axis=0)
+        plan_x_tc = self.pfa.plan_x_tc.copy()
+        plan_y_tc = self.pfa.plan_y_tc.copy()
+        plan_x_tc['data_name'] = data_name
+        plan_y_tc['data_name'] = data_name
+        self.combd_plan_x_tc = pd.concat([self.combd_plan_x_tc, plan_x_tc], axis=0)
+        self.combd_plan_y_tc = pd.concat([self.combd_plan_y_tc, plan_y_tc], axis=0)
         
 
     def _add_heading_info_to_combd_heading_info(self, data_name):

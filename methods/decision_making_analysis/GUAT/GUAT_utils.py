@@ -113,7 +113,6 @@ def get_one_stop_df(filtered_stops_df, ff_dataframe, min_distance_to_ff=25, max_
 
     # eliminate rows where ff is too far away from the stop (thus, some point indices will be completely eliminated, while others that have at least one row with ff_distance < max_distance_to_ff will remain)
     one_stop_df = one_stop_df[one_stop_df['ff_distance'] <= max_distance_to_ff].copy()
-    
     return one_stop_df
 
 

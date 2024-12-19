@@ -63,8 +63,7 @@ class ProcessMonkeyData(further_processing_class.FurtherProcessing):
         
         self.make_or_retrieve_feature_statistics(exists_ok=exists_ok)
 
-        self.scatter_around_target_center_df = monkey_landing_in_ff.make_scatter_around_target_center_df(self.monkey_information, 
-                                                                                                         self.closest_stop_to_capture_df, self.ff_real_position_sorted)
+        self.make_or_retrieve_scatter_around_target_df(exists_ok=exists_ok)
 
 
     def make_or_retrieve_target_closest(self, exists_ok=False): # these may need to be run again if they're to be used

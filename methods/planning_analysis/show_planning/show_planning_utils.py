@@ -340,28 +340,6 @@ def conduct_linear_regression_to_show_planning(alt_traj, alt_stop, use_abs_value
     return slope, intercept, r_value, p_value, results
 
 
-def try_different_variations_to_conduct_linear_regression(alt_traj, alt_stop):
-    # make a list of dictionaries with the different variations of the four variables: use_abs_values, q13_only, omit_outliers, fit_intercept
-    variables = ['use_abs_values', 'q13_only', 'omit_outliers', 'fit_intercept']
-
-    # Generate all combinations of True and False for the four variables
-    combinations = list(product([True, False], repeat=len(variables)))
-
-    # Convert each combination to a dictionary and store them in a list
-    variations = [dict(zip(variables, combination)) for combination in combinations]
-
-
-    for variation in variations:
-        slope, intercept, r_value, p_value, results = conduct_linear_regression_to_show_planning(alt_traj, alt_stop, show_plot=False, **variation)
-        variation['slope'] = slope
-        variation['intercept'] = intercept
-        variation['r_value'] = r_value
-        variation['p_value'] = p_value
-
-    rel_angle_slope_subset = pd.DataFrame(variations)
-    return rel_angle_slope_subset
-
-
 def make_diff_and_ratio_stat_df(test_df, ctrl_df):
 
     test_stat = test_df[['diff', 'ratio', 'diff_in_abs',

@@ -94,8 +94,6 @@ class _VariationsBase():
         self.optimal_arc_type = optimal_arc_type
 
     def make_key_paths(self):
-        if not hasattr(self, 'combd_stop_and_alt_folder_path'):
-            self.combd_stop_and_alt_folder_path = make_variations_utils.make_combd_stop_and_alt_folder_path(self.monkey_name)
         self.stop_and_alt_data_comparison_path = os.path.join(self.combd_stop_and_alt_folder_path, 'data_comparison')
         self.all_perc_info_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/all_perc_info.csv')
         self.all_median_info_folder_path = os.path.join(self.stop_and_alt_data_comparison_path, f'{self.optimal_arc_type}/all_median_info')
@@ -130,10 +128,10 @@ class _VariationsBase():
                                             stops_near_ff_df_exists_ok=True, 
                                             heading_info_df_exists_ok=True,
                                             process_info_for_plotting=True):
-        df_path = self.overall_median_info_path
-        if exists_ok & exists(df_path):
-            self.overall_median_info = pd.read_csv(df_path).drop(columns=['Unnamed: 0'])
-            print('Successfully retrieved overall_median_info from ', df_path)
+
+        if exists_ok & exists(self.overall_median_info_path):
+            self.overall_median_info = pd.read_csv(self.overall_median_info_path).drop(columns=['Unnamed: 0'])
+            print('Successfully retrieved overall_median_info from ', self.overall_median_info_path)
         else:
             if ref_point_params_based_on_mode is None:
                 ref_point_params_based_on_mode = self.default_ref_point_params_based_on_mode
@@ -150,7 +148,7 @@ class _VariationsBase():
                                                                                                 'stops_near_ff_df_exists_ok': stops_near_ff_df_exists_ok,
                                                                                                 'heading_info_df_exists_ok': heading_info_df_exists_ok,
                                                                                                 },
-                                                                            path_to_save=df_path,
+                                                                            path_to_save=None,
                                                                             )
                 temp_overall_median_info['curv_traj_window_before_stop'] = str(curv_traj_window_before_stop)
                 self.overall_median_info = pd.concat([self.overall_median_info, temp_overall_median_info], axis=0)
@@ -158,6 +156,8 @@ class _VariationsBase():
         self.overall_median_info.reset_index(drop=True, inplace=True)    
         self.overall_median_info['monkey_name'] = self.monkey_name
         self.overall_median_info['optimal_arc_type'] = self.optimal_arc_type
+        self.overall_median_info.to_csv(self.overall_median_info_path)
+        print(f'Saved overall_median_info_path to {self.overall_median_info_path}')
         if process_info_for_plotting:
             self.process_overall_median_info_to_plot_heading_and_curv()
 
@@ -359,11 +359,11 @@ class _VariationsBase():
 
     def quickly_get_plan_x_and_y_control_and_test_data(self, ref_point_mode, ref_point_value, to_predict_ff=False, keep_monkey_info=False, for_classification=False):
         self.get_plan_x_and_plan_y_across_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
-        self.process_combd_plan_x_both_and_plan_y_both()
-        self.further_process_combd_plan_x_both(to_predict_ff, for_classification=for_classification)
+        self.process_combd_plan_x_tc_and_plan_y_tc()
+        self.further_process_combd_plan_x_tc(to_predict_ff, for_classification=for_classification)
         if keep_monkey_info is False:
-            self.combd_plan_x_both = plan_factors_utils.delete_monkey_info_in_plan_x(self.combd_plan_x_both)
-        self.plan_xy_test, self.plan_xy_ctrl = plan_factors_utils.make_plan_xy_test_and_plan_xy_ctrl(self.combd_plan_x_both, self.combd_plan_y_both)
+            self.combd_plan_x_tc = plan_factors_utils.delete_monkey_info_in_plan_x(self.combd_plan_x_tc)
+        self.plan_xy_test, self.plan_xy_ctrl = plan_factors_utils.make_plan_xy_test_and_plan_xy_ctrl(self.combd_plan_x_tc, self.combd_plan_y_tc)
         return
     
     def _make_stop_and_alt_variations_df(self, ref_point_mode, ref_point_value, 
@@ -471,10 +471,10 @@ class _VariationsBase():
 
 
     def separate_plan_xy_test_and_plan_xy_ctrl(self):
-        self.plan_x_test = self.plan_xy_test[self.combd_plan_x_both.columns].copy()
-        self.plan_y_test = self.plan_xy_test[self.combd_plan_y_both.columns].copy()
-        self.plan_x_ctrl = self.plan_xy_ctrl[self.combd_plan_x_both.columns].copy()
-        self.plan_y_ctrl = self.plan_xy_ctrl[self.combd_plan_y_both.columns].copy()
+        self.plan_x_test = self.plan_xy_test[self.combd_plan_x_tc.columns].copy()
+        self.plan_y_test = self.plan_xy_test[self.combd_plan_y_tc.columns].copy()
+        self.plan_x_ctrl = self.plan_xy_ctrl[self.combd_plan_x_tc.columns].copy()
+        self.plan_y_ctrl = self.plan_xy_ctrl[self.combd_plan_y_tc.columns].copy()
     
 
     def process_both_heading_info_df(self):
@@ -485,29 +485,29 @@ class _VariationsBase():
     def filter_both_heading_info_df(self, **kwargs):
         self.test_heading_info_df, self.ctrl_heading_info_df = test_vs_control_utils.filter_both_df(self.test_heading_info_df, self.ctrl_heading_info_df, **kwargs)
 
-    def process_combd_plan_x_both_and_plan_y_both(self):
-        test_vs_control_utils.process_combd_plan_x_and_y_combd(self.combd_plan_x_both, self.combd_plan_y_both, curv_columns=self.curv_columns)
-        self.ref_columns = [column for column in self.combd_plan_x_both.columns if ('ref' in column) & ('stop_ff' in column)]
+    def process_combd_plan_x_tc_and_plan_y_tc(self):
+        test_vs_control_utils.process_combd_plan_x_and_y_combd(self.combd_plan_x_tc, self.combd_plan_y_tc, curv_columns=self.curv_columns)
+        self.ref_columns = [column for column in self.combd_plan_x_tc.columns if ('ref' in column) & ('stop_ff' in column)]
         # note that it will include ref_d_heading_of_traj
 
-        # drop columns with NA in self.combd_plan_x_both and print them
-        columns_with_null_info = self.combd_plan_x_both.isnull().sum(axis=0)[self.combd_plan_x_both.isnull().sum(axis=0) > 0]
+        # drop columns with NA in self.combd_plan_x_tc and print them
+        columns_with_null_info = self.combd_plan_x_tc.isnull().sum(axis=0)[self.combd_plan_x_tc.isnull().sum(axis=0) > 0]
         if len(columns_with_null_info) > 0:
             print('Columns with nulls are dropped:')
             print(columns_with_null_info)
-        self.combd_plan_x_both.dropna(axis=1, inplace=True)
+        self.combd_plan_x_tc.dropna(axis=1, inplace=True)
 
         # Also drop the columns that can't be put into x_var
         for column in ['data_name', 'stop_point_index']:
-            if column in self.combd_plan_x_both.columns:
-                self.combd_plan_x_both.drop(columns=[column], inplace=True)
+            if column in self.combd_plan_x_tc.columns:
+                self.combd_plan_x_tc.drop(columns=[column], inplace=True)
 
 
-    def further_process_combd_plan_x_both(self, to_predict_ff, for_classification=False):
+    def further_process_combd_plan_x_tc(self, to_predict_ff, for_classification=False):
         if to_predict_ff:
-            self.combd_plan_x_both = plan_factors_utils.process_plan_x_to_predict_ff_info(self.combd_plan_x_both, self.combd_plan_y_both)
+            self.combd_plan_x_tc = plan_factors_utils.process_plan_x_to_predict_ff_info(self.combd_plan_x_tc, self.combd_plan_y_tc)
         else:
-            self.combd_plan_x_both = plan_factors_utils.process_plan_x_to_predict_monkey_info(self.combd_plan_x_both, for_classification=for_classification)
+            self.combd_plan_x_tc = plan_factors_utils.process_plan_x_to_predict_monkey_info(self.combd_plan_x_tc, for_classification=for_classification)
 
 
     def streamline_preparing_for_ml(self, 

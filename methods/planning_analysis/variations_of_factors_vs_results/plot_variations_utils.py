@@ -21,13 +21,13 @@ def _check_order_in_changeable_variables(changeable_variables, original_df):
 
 def _find_first_and_second_dim(original_df, changeable_variables, combinations):
     if len(changeable_variables) == 0:
-        first_dim = 0
-        second_dim = 0
+        first_dim = 1
+        second_dim = 1
     elif len(changeable_variables) == 2:
         first_dim = original_df[changeable_variables[0]].nunique()
         second_dim = original_df[changeable_variables[1]].nunique()
     else:
-        first_dim = math.ceil(len(combinations)/2)
+        first_dim = max(1, math.ceil(len(combinations)/2))
         second_dim = 2
     return first_dim, second_dim
 
@@ -159,10 +159,11 @@ def _process_columns_to_find_unique_combinations_for_color(columns_to_find_uniqu
                 else:
                     columns_to_find_unique_combinations_for_color = []
     else:
-        if len(rest_of_x_for_hoverdata) > 0:
-            columns_to_find_unique_combinations_for_color = [rest_of_x_for_hoverdata[0]]
-        else:
-            columns_to_find_unique_combinations_for_color = []
+        # if len(rest_of_x_for_hoverdata) > 0:
+        #     columns_to_find_unique_combinations_for_color = [rest_of_x_for_hoverdata[0]]
+        # else:
+        #     columns_to_find_unique_combinations_for_color = []
+        columns_to_find_unique_combinations_for_color = []
     return columns_to_find_unique_combinations_for_color
 
 

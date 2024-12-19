@@ -635,9 +635,9 @@ def delete_monkey_info_in_plan_x(plan_x):
     return plan_x
 
 
-def make_plan_xy_test_and_plan_xy_ctrl(plan_x_both, plan_y_both):
-    # concat plan_x_both and plan_y_both but drop duplicated columns
-    plan_xy = pd.concat([plan_x_both, plan_y_both], axis=1)
+def make_plan_xy_test_and_plan_xy_ctrl(plan_x_tc, plan_y_tc):
+    # concat plan_x_tc and plan_y_tc but drop duplicated columns
+    plan_xy = pd.concat([plan_x_tc, plan_y_tc], axis=1)
     # drop duplicated columns
     plan_xy = plan_xy.loc[:, ~plan_xy.columns.duplicated()]
 

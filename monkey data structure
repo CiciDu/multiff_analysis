@@ -64,26 +64,21 @@
                     │   │   ├── opt_arc_stop_closest
                     │   │   └── opt_arc_stop_first_vis_bdry
                     │   ├── combd_heading_info
-                    │   ├── combd_plan_x_df
-                    │   ├── combd_plan_y_df
-                    │   └── combd_rel_angle_slope
+                    │   ├── combd_plan_x_tc
+                    │   └── combd_plan_y_tc
                     ├── data_comparison
                     │   ├── norm_opt_arc
                     │   │   ├── all_median_info
                     │   │   │   ├── dist_100_window_-100cm_0cm
                     │   │   │   ├── dist_100_window_-25cm_0cm
                     │   │   ├── all_perc_info.csv
-                    │   │   └── overall_median_info
-                    │   │       ├── window_-100cm_0cm
-                    │   │       ├── window_-25cm_0cm
+                    │   │   └── overall_median_info.csv
                     │   ├── opt_arc_stop_closest
                     │   │   ├── all_median_info
                     │   │   │   ├── dist_100_window_-100cm_0cm
                     │   │   │   ├── dist_100_window_-25cm_0cm
                     │   │   ├── all_perc_info.csv
-                    │   │   └── overall_median_info
-                    │   │       ├── window_-100cm_0cm
-                    │   │       ├── window_-25cm_0cm
+                    │   │   └── overall_median_info.csv
                     │   └── opt_arc_stop_first_vis_bdry
                     └── ml_results
                         └── lr_variations

@@ -30,25 +30,29 @@ np.set_printoptions(suppress=True)
 class CompareTwoMonkeys():
 
     def __init__(self):
-
         self.bruno = patterns_and_features_class.PatternsAndFeatures(monkey_name='monkey_Bruno')
-        self.bruno.combine_patterns_and_features(verbose=False)
-
         self.schro = patterns_and_features_class.PatternsAndFeatures(monkey_name='monkey_Schro')
-        self.schro.combine_patterns_and_features(verbose=False)
+
+
+    def compare_monkeys(self, verbose=True, exists_ok=True):
+
+        self.bruno.combine_or_retrieve_patterns_and_features(verbose=verbose, exists_ok=exists_ok)
+        self.schro.combine_or_retrieve_patterns_and_features(verbose=verbose, exists_ok=exists_ok)
 
         self.monkey_name = ''
 
         self.combine_df()
 
 
-    def combine_df(self, df_names=['agg_pattern_frequencies', 'agg_feature_statistics', 'combd_pattern_frequencies', 'combd_feature_statistics', 'combd_all_trial_features']):
+    def combine_df(self, df_names=['agg_pattern_frequencies', 'agg_feature_statistics', 'combd_pattern_frequencies', 
+                                   'combd_feature_statistics', 'combd_all_trial_features', 'combd_scatter_around_target_df']):
         for df_name in df_names:
             bruno_df = getattr(self.bruno, df_name)
             schro_df = getattr(self.schro, df_name)
             bruno_df['Monkey'] = 'Bruno'
             schro_df['Monkey'] = 'Schro'
             setattr(self, df_name, pd.concat([bruno_df, schro_df], axis=0).reset_index(drop=True))
+            print(f'Made {df_name} with shape {getattr(self, df_name).shape}')
 
 
     def plot_feature_statistics(self):
