@@ -193,8 +193,8 @@ class log_extractor(object):
             monkey_information['monkey_dw'] = monkey_information['monkey_dw'] * pi/180
             #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
 
-            ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
-                    ff_flash_end_sorted = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path = self.raw_data_folder_path)
+        ff_caught_T_new, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
+                ff_flash_end_sorted = unpack_ff_information_of_monkey(ff_information, accurate_end_time=accurate_end_time, raw_data_folder_path = self.raw_data_folder_path)
 
 
         monkey_information = process_monkey_information_after_retrieval(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)

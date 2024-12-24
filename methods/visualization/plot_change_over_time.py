@@ -37,7 +37,7 @@ def plot_regression(ax, x, y, data, hue=None, scatter_kws=None, line_kws=None):
         sns.regplot(x=x, y=y, data=data, ax=ax, ci=None, **line_kws)
 
 
-def customize_axes(ax, x):
+def customize_axes(ax, x, y, title, multiple_monkeys=False):
     """
     Customize the axes ticks and labels.
 
@@ -70,7 +70,15 @@ def customize_axes(ax, x):
         yticks = np.arange(np.floor(ymin / space_between_yticks) * space_between_yticks, np.ceil(ymax / space_between_yticks) * space_between_yticks + space_between_yticks, space_between_yticks)
         ax.yaxis.set_major_locator(FixedLocator(yticks))
         ax.set_yticklabels([f"{tick:.2f}" for tick in yticks], fontsize=10)
-    
+
+    if multiple_monkeys:
+        ax.legend(prop={'size': 6})
+
+    ax.set_xlabel(x, fontsize=10, loc='left')
+    ax.set_ylabel(y, fontsize=10)
+    ax.set_title(title, fontsize=12)
+
+
 def get_title_str(one_pattern_df, x, y):
     slope, intercept, r_value, p_value, std_err = stats.linregress(one_pattern_df[x], one_pattern_df[y])
     r_squared = r_value ** 2
@@ -90,55 +98,9 @@ def prepare_for_subplots(num_items):
     return fig, axes
 
 
-def plot_the_changes_over_time_for_two_monkeys(merged_df, x="Data", y="Rate", title_column="Label", category_order=None):
-    """
-    Compare datasets using scatterplots with fitted linear regression lines.
 
-    Parameters:
-    merged_df (pd.DataFrame): Merged DataFrame containing the data.
-    x (str): Column name for the x-axis.
-    y (str): Column name for the y-axis.
-    title_column (str): Column name for the title.
-    category_order (list): Order of categories to plot.
-
-    Returns:
-    None
-    """
-    sns.set_style("darkgrid")
-
-    if category_order is None:
-        category_order = merged_df[title_column].unique()
-
-    fig, axes = prepare_for_subplots(len(category_order))
-
-    for i, item in enumerate(category_order):
-        one_pattern_df = merged_df[merged_df['Item'] == item]
-        ax = axes[i]
-        title = f"{one_pattern_df[title_column].iloc[0]}\n"
-
-        plot_regression(ax, x, y, one_pattern_df, hue='Monkey')
-
-        for monkey in one_pattern_df['Monkey'].unique():
-            monkey_df = one_pattern_df[one_pattern_df['Monkey'] == monkey]
-            title_str = get_title_str(monkey_df, x, y)
-            title += f"{monkey}: {title_str}\n"
-
-
-        ax.set_xlabel(x, fontsize=10, loc='left')
-        ax.set_ylabel(y, fontsize=10)
-        ax.set_title(title, fontsize=12)
-        ax.legend(prop={'size': 6})
-        customize_axes(ax, x)
-
-    for j in range(i + 1, len(axes)):
-        fig.delaxes(axes[j])
-
-    plt.tight_layout()
-    plt.show()
-
-
-
-def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_column="Label", monkey_name='', category_order=None):
+def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_column="Label", monkey_name='', 
+                                          multiple_monkeys=False, category_order=None):
     """
     Compare datasets using scatterplots with fitted linear regression lines.
 
@@ -164,11 +126,11 @@ def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_c
         one_pattern_df = merged_df[merged_df['Item'] == item]
         ax = axes[i]
 
-        plot_regression(ax, x, y, one_pattern_df)
+        hue = 'Monkey' if multiple_monkeys else None
+        plot_regression(ax, x, y, one_pattern_df, hue=hue)
 
-        title_str = get_title_str(one_pattern_df, x, y)
-        ax.set_title(f"{monkey_name}: {one_pattern_df[title_column].iloc[0]}\n" + title_str, fontsize=12)
-        customize_axes(ax, x)
+        title = get_title(one_pattern_df, x, y, one_pattern_df[title_column].iloc[0], multiple_monkeys, monkey_name=monkey_name)
+        customize_axes(ax, x, y, title, multiple_monkeys)
 
     for j in range(i + 1, len(axes)):
         fig.delaxes(axes[j])
@@ -177,8 +139,8 @@ def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_c
     plt.show()
 
 
-
-def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], monkey_name=''):
+def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], monkey_name='',
+                                          multiple_monkeys=False):
     """
     Compare datasets using scatterplots with fitted linear regression lines.
 
@@ -193,12 +155,16 @@ def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], mon
     Returns:
     None
     """
+
+    sns.set_style("darkgrid")
+
     merged_df = merged_df.copy()
-    sns.set_style("darkgrid")
-
+    
     fig, axes = prepare_for_subplots(len(y_columns))
 
     for i, y in enumerate(y_columns):
+
+        ax = axes[i]
 
         # change all '_50%' to '_median' in the column name
         if '_50%' in y:
@@ -206,16 +172,30 @@ def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], mon
             y = y.replace('_50%', '_median')
             merged_df[y] = merged_df[y_old]
 
-        ax = axes[i]
+        hue = 'Monkey' if multiple_monkeys else None
+        plot_regression(ax, x, y, merged_df, hue=hue)
 
-        plot_regression(ax, x, y, merged_df)
-
-        title_str = get_title_str(merged_df, x, y)
-        ax.set_title(f"{monkey_name}: {y}\n" + title_str, fontsize=12)
-        customize_axes(ax, x)
+        title = get_title(merged_df, x, y, y, multiple_monkeys, monkey_name=monkey_name)
+        customize_axes(ax, x, y, title, multiple_monkeys)
 
     for j in range(i + 1, len(axes)):
         fig.delaxes(axes[j])
 
     plt.tight_layout()
     plt.show()
+
+
+
+
+def get_title(data_df, x, y, feature_name, multiple_monkeys, monkey_name=''):
+    if multiple_monkeys:
+        title = f"{feature_name}\n"
+        for monkey in data_df['Monkey'].unique():
+            monkey_df = data_df[data_df['Monkey'] == monkey]
+            title_str = get_title_str(monkey_df, x, y)
+            title += f"{monkey}: {title_str}\n"
+    else:
+        title_str = get_title_str(data_df, x, y)
+        title = f"{monkey_name}: {feature_name}\n" + title_str
+    return title
+

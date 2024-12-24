@@ -110,9 +110,9 @@ def plot_null_arc_landings_in_ff(null_arc_info,
     return
 
 
-def _make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=25, set_xy_limit=True):
+def _make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=25, set_xy_limit=True, color='b'):
     # plot a circle with radius reward_boundary_radius that centers at (0, reward_boundary_radius)
-    circle = plt.Circle((0, 0), reward_boundary_radius, color='b', fill=False)
+    circle = plt.Circle((0, 0), reward_boundary_radius, color=color, fill=False)
     ax.add_artist(circle)
     ax.set_aspect('equal')
     

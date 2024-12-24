@@ -31,11 +31,11 @@ def make_spike_df(raw_data_folder_path="all_monkey_data/raw_monkey_data/individu
     neural_data_folder_path = os.path.join(raw_data_folder_path, "neural_data/Sorted")
 
     accurate_start_time, accurate_end_time = process_raw_data.find_start_and_accurate_end_time(raw_data_folder_path)
-    align_neural_data_df = pd.read_csv(os.path.join(raw_data_folder_path, 'neural_data_alignment.txt'))
+    time_offset_df = pd.read_csv(os.path.join(raw_data_folder_path, 'time_offset.txt'))
 
     spike_times = load_spike_times(neural_data_folder_path)
     
-    neural_data_offset = align_neural_data_df.loc[align_neural_data_df['sv']==1, 'ts_s'].item()
+    neural_data_offset = time_offset_df.loc[time_offset_df['sv']==1, 'ts_s'].item()
 
     spike_times_in_s = spike_times/sampling_rate - neural_data_offset + accurate_start_time
 

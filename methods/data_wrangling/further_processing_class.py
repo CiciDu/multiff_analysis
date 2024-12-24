@@ -166,6 +166,9 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                                                                                                 data_folder_name=self.patterns_and_features_data_folder_path)
             print("made scatter_around_target_df")
 
+    def plot_scatter_around_target_df(self):
+        monkey_landing_in_ff.plot_scatter_around_target_df(self.closest_stop_to_capture_df, self.monkey_information, self.ff_real_position_sorted)
+
     def make_info_of_monkey(self):
         self.info_of_monkey = {"monkey_information": self.monkey_information,
                                 "ff_dataframe": self.ff_dataframe,
@@ -529,3 +532,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)
+
+
+    def make_distance_and_num_stops_df(self):
+        self.distance_df = organize_patterns_and_features.make_distance_df(self.ff_caught_T_new, self.monkey_information, self.ff_believed_position_sorted)
+        self.num_stops_df = organize_patterns_and_features.make_num_stops_df(self.distance_df, self.closest_stop_to_capture_df, self.ff_caught_T_new, self.monkey_information)

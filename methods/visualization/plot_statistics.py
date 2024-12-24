@@ -307,7 +307,7 @@ def plot_feature_statistics(feature_statistics, compare_monkey_and_agent=False, 
 
 
 def plot_num_ff_caught_in_a_row_in_barplot(pattern_frequencies, show_one_in_a_row = True):
-    plt.rcParams['figure.figsize'] = (8, 6)
+    plt.rcParams['figure.figsize'] = (6, 4)
     sns.set_style(style="darkgrid")
     if 'Item' in pattern_frequencies.columns:
         pattern_frequencies = pattern_frequencies.set_index('Item')
@@ -350,7 +350,7 @@ def plot_num_ff_caught_in_a_row_in_pie_chart(pattern_frequencies):
 
 
 def plot_categorical_variable_in_barplot(all_trial_features, var_of_interest):
-    plt.rcParams['figure.figsize'] = (8, 6)
+    plt.rcParams['figure.figsize'] = (6, 4)
     plt.rcParams.update({'font.size': 13})
     temp_df = all_trial_features[[var_of_interest]].copy()
     temp_df = temp_df[temp_df[var_of_interest]!=9999]
@@ -367,6 +367,7 @@ def plot_categorical_variable_in_barplot(all_trial_features, var_of_interest):
 
 
 def plot_num_ff_around_target_in_barplot(all_trial_features):
+    plt.rcParams['figure.figsize'] = (6, 4)
     plot_categorical_variable_in_barplot(all_trial_features, var_of_interest = 'num_ff_around_target')
     plt.title('Maximum Number of Alive Fireflies Around the Target During a Trial')
     plt.xlabel('Number of Fireflies')
@@ -384,7 +385,7 @@ def plot_num_stops_near_target_in_barplot(all_trial_features):
     
 
 def plot_num_stops_in_histogram(all_trial_features, var_of_interest):
-    plt.rcParams['figure.figsize'] = (8, 6)
+    plt.rcParams['figure.figsize'] = (6, 4)
     plt.rcParams.update({'font.size': 13})
     temp_df = all_trial_features[[var_of_interest]]
     temp_df = temp_df[temp_df[var_of_interest] != 9999]
@@ -408,7 +409,7 @@ def plot_proportion_of_target_angle_smallest(target_angle_smallest):
 
 def plot_proportion_of_time_points(list_of_values_for_points):
     plt.rcParams.update({'font.size': 13})
-    plt.rcParams['figure.figsize'] = (7, 7)
+    plt.rcParams['figure.figsize'] = (6, 6)
     prop_points = sum([1 if point > 1.9 else 0 for point in list_of_values_for_points])/len(list_of_values_for_points)
     prop_points_com = 1 - prop_points
     labels = ['Yes', 'No']
@@ -429,6 +430,8 @@ def plot_number_of_visible_ff_per_point_in_histogram(ff_dataframe):
         xaxis_title_text='Number of Visible Fireflies', # xaxis label
         yaxis_title_text='Percentage of Points', # yaxis label
         bargap=0.2, # gap between bars of adjacent location coordinates
+        width=600,  # width of the figure
+        height=400  # height of the figure
         #bargroupgap=0.1 # gap between bars of the same location coordinates
     )
     fig.show()
@@ -451,7 +454,7 @@ def plot_number_of_ff_in_memory_per_point_in_histogram(ff_dataframe):
  # First find the points where the target and at least 1 non-target is present in ff_dataframe
 def compare_target_with_non_targets(ff_dataframe, var_of_interest='ff_distance'):
     sns.set_style(style="darkgrid")
-    plt.rcParams['figure.figsize'] = (8, 6)
+    plt.rcParams['figure.figsize'] = (6, 4)
     target_present_df = ff_dataframe[ff_dataframe['ff_index'] == ff_dataframe['target_index']]
     target_present_points = np.array(target_present_df.point_index)
     non_target_present_df = ff_dataframe[ff_dataframe['ff_index'] != ff_dataframe['target_index']]

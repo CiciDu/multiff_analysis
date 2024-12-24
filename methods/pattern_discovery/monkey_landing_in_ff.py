@@ -104,6 +104,9 @@ def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
     ax.plot(0, 0, 'r*', markersize=10)
     ax = examine_null_arcs._make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=True)
 
+    # also plot the visible boundary
+    ax = examine_null_arcs._make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=10, set_xy_limit=False, color='g')
+
     plt.show()
     return
 
@@ -182,8 +185,12 @@ def get_valid_subset_to_construct_scatter_around_target_df(closest_stop_to_captu
     print(f'{invalid_len} out of {total_len} are not within 25 cm of ff center, which is {invalid_len/total_len*100:.2f}%. These are excluded')
     return valid_subset
 
+def plot_scatter_around_target_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted):
+    valid_subset = get_valid_subset_to_construct_scatter_around_target_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
+    plot_monkey_landings_in_ff(valid_subset, monkey_information, ff_real_position_sorted)
 
-def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df, ff_real_position_sorted, data_folder_name=None, make_plot=True):
+
+def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df, ff_real_position_sorted, data_folder_name=None, make_plot=False):
     valid_subset = get_valid_subset_to_construct_scatter_around_target_df(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
 
     if make_plot:

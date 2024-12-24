@@ -2,7 +2,7 @@ from data_wrangling import basic_func
 from pattern_discovery import pattern_by_trials
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from pattern_discovery import pattern_by_trials, cluster_analysis
-
+from planning_analysis.show_planning import alt_ff_utils, show_planning_utils
 
 import os
 import numpy as np
@@ -30,7 +30,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
     pattern_frequencies['N_total'] = len(all_trial_patterns) - 1
 
     # Specific customizations
-    pattern_frequencies.loc[pattern_frequencies['Item'].isin(['cluster_around_target', 'disappear_latest', 'ignore_sudden_flash']), 'N_total'] = len(all_trial_patterns)
+    pattern_frequencies.loc[pattern_frequencies['Item'].isin(['cluster_around_target', 'disappear_latest']), 'N_total'] = len(all_trial_patterns)
     pattern_frequencies.loc[pattern_frequencies['Item'] == 'three_in_a_row', 'N_total'] = len(all_trial_patterns) - 2
     pattern_frequencies.loc[pattern_frequencies['Item'] == 'four_in_a_row', 'N_total'] = len(all_trial_patterns) - 3
     pattern_frequencies.loc[pattern_frequencies['Item'].isin(['waste_cluster_around_target', 'use_cluster']), 'N_total'] = all_trial_patterns['cluster_around_target'].sum()
@@ -43,6 +43,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
 
     # Calculate Rate
     pattern_frequencies['Rate'] = pattern_frequencies['Frequency'] / pattern_frequencies['N_total']
+    pattern_frequencies['Percentage'] = pattern_frequencies['Rate']*100
     pattern_frequencies['Group'] = 1
 
     # Calculate Firefly capture rate
@@ -460,3 +461,36 @@ def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num
     target_last_vis_df = target_last_vis_df[target_last_vis_df['last_vis_dist'] != 9999]
     return target_last_vis_df
 
+
+def make_distance_df(ff_caught_T_new, monkey_information, ff_believed_position_sorted):
+    cum_distance_array = []
+    distance_array = []
+    for i in range(len(ff_caught_T_new)-1):
+        cum_distance_array.append(basic_func.get_cum_distance_traveled(i, ff_caught_T_new, monkey_information))
+        distance_array.append(basic_func.get_distance_between_two_points(i, ff_caught_T_new, monkey_information, ff_believed_position_sorted))
+    cum_distance_array = np.array(cum_distance_array)
+    distance_array = np.array(distance_array)
+    distance_df = pd.DataFrame({'cum_distance': cum_distance_array, 'distance': distance_array})
+    distance_df['trial'] = np.arange(len(distance_df))
+    return distance_df
+
+
+def make_num_stops_df(distance_df, closest_stop_to_capture_df, ff_caught_T_new, monkey_information):
+    num_stops_df = alt_ff_utils.drop_rows_where_stop_is_not_inside_reward_boundary(closest_stop_to_capture_df)
+    num_stops_df = num_stops_df.rename(columns={'time': 'stop_time',
+                                                    'stop_ff_index': 'trial'})
+    num_stops_df['num_stops'] = get_num_stops_array(monkey_information, 
+                                                                                num_stops_df['trial'].values)
+
+    num_stops_df['current_capture_time'] = ff_caught_T_new[num_stops_df['trial']]
+    num_stops_df['prev_capture_time'] = ff_caught_T_new[num_stops_df['trial'] - 1]
+
+    # Add distance information
+    num_stops_df = num_stops_df.merge(distance_df, on='trial', how='left').dropna()
+
+    # # Filter out the outliers
+    # original_length = len(num_stops_df)
+    # num_stops_df = num_stops_df[(num_stops_df['distance'] < 2000) & (num_stops_df['cum_distance'] < 2000)]
+    # print(f'Filtered out {original_length - len(num_stops_df)} outliers out of {original_length} trials, since they have distance ' + 
+    #       f'or displacement greater than 2000, which is {round(100*(original_length - len(num_stops_df))/original_length, 2)}% of the data')
+    return num_stops_df
