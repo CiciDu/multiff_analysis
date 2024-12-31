@@ -165,8 +165,8 @@ def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_new):
   # Turn point_vs_cluster from np.array into a dataframe
 	temp_dataframe1 = pd.DataFrame(point_vs_cluster, columns=['point_index', 'ff_index', 'cluster_label'])
 	# Find indices of unique points and their counts and make them into a dataframe as well
-	unique_points, counts = np.unique(point_vs_cluster[:, 0], return_counts=True)
-	temp_dataframe2 = pd.DataFrame(np.concatenate([unique_points.reshape(-1, 1), counts.reshape(-1, 1)], axis=1),
+	unique_time_points, counts = np.unique(point_vs_cluster[:, 0], return_counts=True)
+	temp_dataframe2 = pd.DataFrame(np.concatenate([unique_time_points.reshape(-1, 1), counts.reshape(-1, 1)], axis=1),
 								   columns=['point_index', 'num_ff_at_point'])
 	# Combine the information of the above 2 dataframes
 	temp_dataframe3 = temp_dataframe1.merge(temp_dataframe2, how="left", on="point_index")

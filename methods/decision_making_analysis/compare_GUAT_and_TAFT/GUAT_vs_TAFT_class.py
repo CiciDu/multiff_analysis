@@ -63,7 +63,7 @@ class CompareGUATandTAFTclass():
     
 
     def __init__(self, 
-                 raw_data_folder_path='all_monkey_data/raw_monkey_data/individual_monkey_data/monkey_Bruno/data_0330',
+                 raw_data_folder_path='all_monkey_data/raw_monkey_data/monkey_Bruno/data_0330',
                  ref_point_mode='distance', 
                  ref_point_value=-150,
                  stop_period_duration=2):
@@ -147,7 +147,7 @@ class CompareGUATandTAFTclass():
 
     def get_relevant_monkey_data(self,
                                  already_retrieved_ok=True,
-                                raw_data_folder_path='all_monkey_data/raw_monkey_data/individual_monkey_data/monkey_Bruno/data_0330'
+                                raw_data_folder_path='all_monkey_data/raw_monkey_data/monkey_Bruno/data_0330'
                                 ):
         self.monkey_name = os.path.basename(raw_data_folder_path)
         if not hasattr(self, 'gcc'):

@@ -32,7 +32,7 @@ np.set_printoptions(suppress=True)
 
 class BaseProcessing:
 
-    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
 
     def __init__(self):
@@ -87,8 +87,8 @@ class BaseProcessing:
 
     def extract_info_from_raw_data_folder_path(self, raw_data_folder_path):
         self.get_related_folder_names_from_raw_data_folder_path(raw_data_folder_path)
-        self.monkey_name = raw_data_folder_path.split('/')[3]
-        self.data_name = raw_data_folder_path.split('/')[4]
+        self.monkey_name = raw_data_folder_path.split('/')[2]
+        self.data_name = raw_data_folder_path.split('/')[3]
         self.player = 'monkey'
 
         if 'monkey_' not in self.monkey_name:
@@ -104,12 +104,16 @@ class BaseProcessing:
         self.planning_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'planning')
         self.patterns_and_features_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'patterns_and_features')
         self.decision_making_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
+        self.neural_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')
+        self.processed_neural_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_neural_data')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
         os.makedirs(self.planning_data_folder_path, exist_ok=True)
         os.makedirs(self.patterns_and_features_data_folder_path, exist_ok=True)
         os.makedirs(self.decision_making_folder_path, exist_ok=True)
+        os.makedirs(self.neural_data_folder_path, exist_ok=True)
+        os.makedirs(self.processed_neural_data_folder_path, exist_ok=True)
 
 
     def try_retrieving_df(self, df_name, exists_ok=True, data_folder_name_for_retrieval=None):

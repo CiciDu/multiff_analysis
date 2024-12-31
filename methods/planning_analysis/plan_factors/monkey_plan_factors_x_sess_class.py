@@ -25,7 +25,7 @@ np.set_printoptions(suppress=True)
 
 class PlanAcrossSessions(plot_variations_class.PlotVariations):
 
-    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
     default_ref_point_params_based_on_mode = {'time after stop ff visible': [0.1, 0], 'distance': [-150, -100, -50]}
 

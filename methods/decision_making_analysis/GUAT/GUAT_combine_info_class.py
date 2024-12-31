@@ -17,7 +17,7 @@ import pickle
 class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
 
     df_names = ['GUAT_alt_ff_info', 'GUAT_current_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']
-    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
     
 
 

@@ -3,7 +3,6 @@ from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_helper_class, GUAT_utils
 from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
-from data_wrangling import monkey_data_classes
 from data_wrangling import further_processing_class
 
 import os
@@ -122,7 +121,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
 
     def make_one_stop_w_ff_df(self):    
-        #further_processing_class.FurtherProcessing.make_one_stop_w_ff_df(self)  
         self.get_monkey_data(include_GUAT_data=True,
                              include_TAFT_data=True)
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
@@ -160,7 +158,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
     def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,
                         include_TAFT_data=False): 
         if (already_retrieved_ok is False) | (not hasattr(self, 'monkey_information')):
-            self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
+            self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
             self.data_item.retrieve_or_make_monkey_data()
             self.monkey_information = self.data_item.monkey_information
             self.ff_life_sorted = self.data_item.ff_life_sorted
@@ -175,7 +173,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
                 # if self.data_item is not called yet
                 if not hasattr(self, 'data_item'):
-                    self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
+                    self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
                     self.data_item.retrieve_or_make_monkey_data()
                 if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
                     self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
@@ -185,7 +183,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         if include_GUAT_data:
             if not hasattr(self, 'GUAT_trials_df'):
                 if not hasattr(self, 'data_item'):
-                    self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
+                    self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
                     self.data_item.retrieve_or_make_monkey_data()
                     self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
                 elif not hasattr(self, 'ff_dataframe'):
@@ -200,7 +198,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         if include_TAFT_data:
             if not hasattr(self, 'TAFT_trials_df'):
                 if not hasattr(self, 'data_item'):
-                    self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=self.raw_data_folder_path)
+                    self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
                     self.data_item.retrieve_or_make_monkey_data()
                     self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
                 elif not hasattr(self, 'ff_dataframe'):

@@ -22,9 +22,6 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-pd.set_option('future.no_silent_downcasting', True)
-
-
 def find_df_related_to_cluster_replacement(replacement_df, prior_to_replacement_df, non_chosen_df, manual_anno, ff_dataframe, monkey_information, ff_real_position_sorted, ff_life_sorted, sample_size=None, equal_sample_from_two_cases=False):
     """
     Given dataframes containing information about fireflies and their clusters, this function selects a sample of fireflies

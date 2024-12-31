@@ -10,7 +10,8 @@ def find_path():
         #%cd $current_path
         print("Changed the directory to 'Multifirefly-Project'.")
     else:
-        raise ValueError("Multifirefly-Project directory not found in the current path.")
+        print("Multifirefly-Project directory not found in the current path; try adding Multifirefly-Project to the end of the path.")
+        current_path = Path.cwd() / 'Multifirefly-Project'
 
     # add methods to the path
     path = current_path / 'multiff_analysis' / 'methods'

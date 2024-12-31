@@ -1,7 +1,7 @@
 
 import sys
 from data_wrangling import basic_func
-from visualization import animation_utils
+from visualization.animation import animation_func, animation_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT

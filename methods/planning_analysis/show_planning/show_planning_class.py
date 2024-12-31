@@ -33,7 +33,7 @@ np.set_printoptions(suppress=True)
 
 class ShowPlanning(base_processing_class.BaseProcessing):
         
-    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
     time_after_dict = {'min': 0.05,
                 'max': 0.5,

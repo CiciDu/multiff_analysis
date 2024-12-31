@@ -1,7 +1,8 @@
 
 import sys
 from data_wrangling import basic_func
-from visualization import plot_behaviors_utils, animation_utils, plot_trials
+from visualization import plot_behaviors_utils, plot_trials
+from visualization.animation import animation_func, animation_utils
 from null_behaviors import find_best_arc, curvature_utils, optimal_arc_utils
 from pattern_discovery import ff_dataframe_utils
 

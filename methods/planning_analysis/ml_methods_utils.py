@@ -3,7 +3,7 @@ from planning_analysis.plan_factors import plan_factors_utils, plan_factors_clas
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.only_stop_ff import features_to_keep_utils, only_stop_ff_utils
 from planning_analysis import ml_methods_utils
-from non_behavioral_analysis import neural_analysis
+from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import neural_data_modeling, plot_modeling_result
 from machine_learning import machine_learning_utils
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -296,21 +296,21 @@ def plot_correlation_coefficients(avg_canon_corrs):
 
 def plot_x_loadings(avg_x_loadings, avg_canon_corrs, X1):
 
-    loading_squared = pd.DataFrame(np.round(avg_x_loadings**2, 3))
-    loading_squared['feature'] = X1.columns 
-    loading_squared['feature_category'] = loading_squared['feature']
+    squared_loading = pd.DataFrame(np.round(avg_x_loadings**2, 3))
+    squared_loading['feature'] = X1.columns 
+    squared_loading['feature_category'] = squared_loading['feature']
 
     num_variates = avg_x_loadings.shape[1]
-    neural_analysis.make_a_series_of_barplots_of_ranked_loadings(loading_squared, avg_canon_corrs, num_variates, keep_one_value_for_each_feature = True, max_features_to_show_per_plot = 20)
+    plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature = True, max_features_to_show_per_plot = 20)
     return 
 
 
 def plot_y_loadings(avg_y_loadings, avg_canon_corrs, X2):
 
-    loading_squared = pd.DataFrame(np.round(avg_y_loadings**2, 3))
-    loading_squared['feature'] = X2.columns 
-    loading_squared['feature_category'] = loading_squared['feature']
+    squared_loading = pd.DataFrame(np.round(avg_y_loadings**2, 3))
+    squared_loading['feature'] = X2.columns 
+    squared_loading['feature_category'] = squared_loading['feature']
 
     num_variates = avg_y_loadings.shape[1]
-    neural_analysis.make_a_series_of_barplots_of_ranked_loadings(loading_squared, avg_canon_corrs, num_variates, keep_one_value_for_each_feature = True, max_features_to_show_per_plot = 5)
+    plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature = True, max_features_to_show_per_plot = 5)
     return 

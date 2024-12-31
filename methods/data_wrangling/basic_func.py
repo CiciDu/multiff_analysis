@@ -162,7 +162,7 @@ def calculate_angles_to_ff_centers(ff_x, ff_y, mx, my, m_angle):
     # if distance to ff is very small, make the angle 0:
     try:
         distances_to_ff = LA.norm(np.stack([ff_x-mx, ff_y-my], axis=1), axis=1)
-    except np.exceptions.AxisError:
+    except Exception as e:
         distances_to_ff = LA.norm(np.array([ff_x-mx, ff_y-my]), axis=0)
     if np.any(distances_to_ff < 0.001):
         print(f'Note: {np.sum(distances_to_ff < 0.001)} fireflies are too close to the monkey/agent. Their angles are set to 0.')
@@ -381,7 +381,7 @@ def take_out_a_sample_from_df(sampled_indices, *args):
     return sampled_args
 
 
-def initialize_monkey_sessions_df(raw_data_dir_name='all_monkey_data/raw_monkey_data/individual_monkey_data'):
+def initialize_monkey_sessions_df(raw_data_dir_name='all_monkey_data/raw_monkey_data'):
     list_of_monkey_name = []
     list_of_data_name = []
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']: # 'monkey_Quigley'

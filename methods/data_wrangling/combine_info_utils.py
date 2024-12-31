@@ -25,7 +25,7 @@ def check_which_df_exists_for_each_session(sessions_df_for_one_monkey,
         sessions_df_for_one_monkey[name] = False
 
     for index, row in sessions_df_for_one_monkey.iterrows():
-        folder = os.path.join(os.path.join(f'all_monkey_data/{data_category}/individual_monkey_data', row['monkey_name'], row['data_name'], data_folder_name))
+        folder = os.path.join(os.path.join(f'all_monkey_data/{data_category}', row['monkey_name'], row['data_name'], data_folder_name))
         os.makedirs(folder, exist_ok=True)
         # get the list of df names in the folder
         df_in_folder = os.listdir(folder)
@@ -53,7 +53,7 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
             print('Session {} has been finished. Skip.'.format(row['data_name']))
             continue 
 
-        folder = os.path.join(f'all_monkey_data/{data_category}/individual_monkey_data', row['monkey_name'], row['data_name'], data_folder_name)
+        folder = os.path.join(f'all_monkey_data/{data_category}', row['monkey_name'], row['data_name'], data_folder_name)
         important_info = dict()
         for df in df_names:
             important_info[df] = pd.read_csv(os.path.join(folder, df+'.csv'))

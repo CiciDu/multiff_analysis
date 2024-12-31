@@ -1,102 +1,100 @@
 /Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data
 └── planning
-    └── individual_monkey_data
-        └── monkey_Bruno
-            ├── data_0402            
-                ├── diff_in_curv_df
+    └── monkey_Bruno
+        ├── data_0402            
+            ├── diff_in_curv_df
+            │   ├── norm_opt_arc
+            │   │   ├── control
+            │   │   │   ├── dist_100_window_-100cm_0cm
+            │   │   │   ├── dist_100_window_-25cm_0cm
+            │   │   └── test
+            │   │       ├── dist_100_window_-100cm_0cm
+            │   │       ├── dist_100_window_-25cm_0cm
+            │   ├── opt_arc_stop_closest
+            │       ├── ...
+            │   └── opt_arc_stop_first_vis_bdry
+            │       ├── ...
+            ├── heading_info_df
+            │   ├── norm_opt_arc
+            │   │   ├── control
+            │   │   │   ├── dist_100_window
+            │   │   │   ├── dist_100_window
+            │   │   └── test
+            │   │       ├── dist_100_window
+            │   │       ├── dist_100_window
+            │   ├── opt_arc_stop_closest
+            │       ├── ...
+            │   └── opt_arc_stop_first_vis_bdry
+            │       ├── ...
+            ├── plan_x_df
+            │   ├── norm_opt_arc
+            │   │   ├── control
+            │   │   │   ├── dist_100_window_-100cm_0cm
+            │   │   │   ├── dist_100_window_-25cm_0cm
+            │   │   └── test
+            │   │       ├── dist_100_window_-100cm_0cm
+            │   │       ├── dist_100_window_-25cm_0cm
+            │   ├── opt_arc_stop_closest
+            │       ├── ...
+            │   └── opt_arc_stop_first_vis_bdry
+            │       ├── ...
+            ├── plan_y_df
+            │   ├── norm_opt_arc
+            │   │   ├── control
+            │   │   │   ├── dist_100_window_-100cm_0cm
+            │   │   │   ├── dist_100_window_-25cm_0cm
+            │   │   └── test
+            │   │       ├── dist_100_window_-100cm_0cm
+            │   │       ├── dist_100_window_-25cm_0cm
+            │   ├── opt_arc_stop_closest
+            │       ├── ...
+            │   └── opt_arc_stop_first_vis_bdry
+            │       ├── ...
+            └── shared_stops_near_ff_df.csv
+        └── combined_data
+            └── stop_and_alt
+                ├── data
+                │   ├── combd_diff_in_curv
+                │   │   ├── norm_opt_arc
+                │   │   │   ├── control
+                │   │   │   │   ├── dist_100_window_-100cm_0cm
+                │   │   │   │   ├── dist_100_window_-25cm_0cm
+                │   │   │   └── test
+                │   │   ├── opt_arc_stop_closest
+                │   │   └── opt_arc_stop_first_vis_bdry
+                │   ├── combd_heading_info
+                │   ├── combd_plan_x_tc
+                │   └── combd_plan_y_tc
+                ├── data_comparison
                 │   ├── norm_opt_arc
-                │   │   ├── control
+                │   │   ├── all_median_info
                 │   │   │   ├── dist_100_window_-100cm_0cm
                 │   │   │   ├── dist_100_window_-25cm_0cm
-                │   │   └── test
-                │   │       ├── dist_100_window_-100cm_0cm
-                │   │       ├── dist_100_window_-25cm_0cm
+                │   │   ├── all_perc_info.csv
+                │   │   └── overall_median_info.csv
                 │   ├── opt_arc_stop_closest
-                │       ├── ...
-                │   └── opt_arc_stop_first_vis_bdry
-                │       ├── ...
-                ├── heading_info_df
-                │   ├── norm_opt_arc
-                │   │   ├── control
-                │   │   │   ├── dist_100_window
-                │   │   │   ├── dist_100_window
-                │   │   └── test
-                │   │       ├── dist_100_window
-                │   │       ├── dist_100_window
-                │   ├── opt_arc_stop_closest
-                │       ├── ...
-                │   └── opt_arc_stop_first_vis_bdry
-                │       ├── ...
-                ├── plan_x_df
-                │   ├── norm_opt_arc
-                │   │   ├── control
+                │   │   ├── all_median_info
                 │   │   │   ├── dist_100_window_-100cm_0cm
                 │   │   │   ├── dist_100_window_-25cm_0cm
-                │   │   └── test
-                │   │       ├── dist_100_window_-100cm_0cm
-                │   │       ├── dist_100_window_-25cm_0cm
-                │   ├── opt_arc_stop_closest
-                │       ├── ...
+                │   │   ├── all_perc_info.csv
+                │   │   └── overall_median_info.csv
                 │   └── opt_arc_stop_first_vis_bdry
-                │       ├── ...
-                ├── plan_y_df
-                │   ├── norm_opt_arc
-                │   │   ├── control
-                │   │   │   ├── dist_100_window_-100cm_0cm
-                │   │   │   ├── dist_100_window_-25cm_0cm
-                │   │   └── test
-                │   │       ├── dist_100_window_-100cm_0cm
-                │   │       ├── dist_100_window_-25cm_0cm
-                │   ├── opt_arc_stop_closest
-                │       ├── ...
-                │   └── opt_arc_stop_first_vis_bdry
-                │       ├── ...
-                └── shared_stops_near_ff_df.csv
-            └── combined_data
-                └── stop_and_alt
-                    ├── data
-                    │   ├── combd_diff_in_curv
-                    │   │   ├── norm_opt_arc
-                    │   │   │   ├── control
-                    │   │   │   │   ├── dist_100_window_-100cm_0cm
-                    │   │   │   │   ├── dist_100_window_-25cm_0cm
-                    │   │   │   └── test
-                    │   │   ├── opt_arc_stop_closest
-                    │   │   └── opt_arc_stop_first_vis_bdry
-                    │   ├── combd_heading_info
-                    │   ├── combd_plan_x_tc
-                    │   └── combd_plan_y_tc
-                    ├── data_comparison
-                    │   ├── norm_opt_arc
-                    │   │   ├── all_median_info
-                    │   │   │   ├── dist_100_window_-100cm_0cm
-                    │   │   │   ├── dist_100_window_-25cm_0cm
-                    │   │   ├── all_perc_info.csv
-                    │   │   └── overall_median_info.csv
-                    │   ├── opt_arc_stop_closest
-                    │   │   ├── all_median_info
-                    │   │   │   ├── dist_100_window_-100cm_0cm
-                    │   │   │   ├── dist_100_window_-25cm_0cm
-                    │   │   ├── all_perc_info.csv
-                    │   │   └── overall_median_info.csv
-                    │   └── opt_arc_stop_first_vis_bdry
-                    └── ml_results
-                        └── lr_variations
-                            ├── norm_opt_arc
-                            │   ├── all_stop_and_alt_lr_df.csv
-                            │   └── all_stop_and_alt_lr_pred_ff_df.csv
-                            ├── opt_arc_stop_closest
-                            │   ├── all_stop_and_alt_lr_df.csv
-                            │   └── all_stop_and_alt_lr_pred_ff_df.csv
-                            └── opt_arc_stop_first_vis_bdry
-                                ├── all_stop_and_alt_lr_df.csv
-                                └── all_stop_and_alt_lr_pred_ff_df.csv
+                └── ml_results
+                    └── lr_variations
+                        ├── norm_opt_arc
+                        │   ├── all_stop_and_alt_lr_df.csv
+                        │   └── all_stop_and_alt_lr_pred_ff_df.csv
+                        ├── opt_arc_stop_closest
+                        │   ├── all_stop_and_alt_lr_df.csv
+                        │   └── all_stop_and_alt_lr_pred_ff_df.csv
+                        └── opt_arc_stop_first_vis_bdry
+                            ├── all_stop_and_alt_lr_df.csv
+                            └── all_stop_and_alt_lr_pred_ff_df.csv
 └── patterns_and_features
-    └── individual_monkey_data
-        └── monkey_Bruno
-            └── data_0402   
-                ├── all_trial_features.csv
-                ├── all_trial_patterns.csv
-                ├── feature_statistics.csv
-                └── pattern_frequencies.csv
+    └── monkey_Bruno
+        └── data_0402   
+            ├── all_trial_features.csv
+            ├── all_trial_patterns.csv
+            ├── feature_statistics.csv
+            └── pattern_frequencies.csv
                 

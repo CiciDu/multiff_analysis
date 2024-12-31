@@ -2,7 +2,7 @@ import sys
 from data_wrangling import basic_func, base_processing_class, further_processing_class
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
 from visualization import additional_plots, plot_statistics, animation_utils
-
+from visualization.animation import animation_class
 from machine_learning.RL.env_related import base_env, env_for_lstm, env_for_sb3, collect_agent_data_utils
 from machine_learning.RL.SB3 import interpret_neural_network, rl_for_multiff_utils, SB3_functions
 
@@ -28,7 +28,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 
 
-class _RLforMultifirefly(further_processing_class.FurtherProcessing):
+class _RLforMultifirefly(animation_class.AnimationClass):
 
     def __init__(self, 
                 overall_folder=None, 

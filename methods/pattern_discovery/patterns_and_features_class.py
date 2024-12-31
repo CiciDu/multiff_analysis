@@ -1,7 +1,8 @@
 import sys
-from data_wrangling import basic_func, base_processing_class, combine_info_utils, monkey_data_classes
+from data_wrangling import basic_func, base_processing_class, combine_info_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features, monkey_landing_in_ff
-from visualization import animation_func, animation_utils, plot_trials, plot_behaviors_utils, plot_statistics, plot_change_over_time
+from visualization import plot_trials, plot_behaviors_utils, plot_statistics, plot_change_over_time
+from visualization.animation import animation_func, animation_utils, animation_class
 from data_wrangling import base_processing_class
 
 import os
@@ -29,7 +30,7 @@ np.set_printoptions(suppress=True)
 
 class PatternsAndFeatures():
 
-    raw_data_dir_name = 'all_monkey_data/raw_monkey_data/individual_monkey_data'
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
     pattern_order = ['ff_capture_rate', 'stop_success_rate',
                         'two_in_a_row', 'waste_cluster_around_target', 'visible_before_last_one', 'disappear_latest', 
@@ -77,7 +78,7 @@ class PatternsAndFeatures():
             data_name = row['data_name']
             raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], data_name)
             print(raw_data_folder_path)
-            self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=raw_data_folder_path)
+            self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=raw_data_folder_path)
             self.data_item.make_df_related_to_patterns_and_features(exists_ok=exists_ok)
             print('Successfully made df related to patterns and features for ', data_name)
 
@@ -124,7 +125,7 @@ class PatternsAndFeatures():
             data_name = row['data_name']
             print('Processing data: ', data_name)
             raw_data_folder_path = os.path.join(self.raw_data_dir_name, row['monkey_name'], data_name)
-            self.data_item = monkey_data_classes.ProcessMonkeyData(raw_data_folder_path=raw_data_folder_path)
+            self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=raw_data_folder_path)
             self.data_item.retrieve_or_make_monkey_data(exists_ok=True)
             self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
             self.data_item.make_or_retrieve_scatter_around_target_df(exists_ok=True)

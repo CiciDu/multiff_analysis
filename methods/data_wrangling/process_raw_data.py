@@ -436,7 +436,6 @@ def add_columns_to_monkey_information(monkey_information, min_distance_to_calcul
                                                    (np.abs(monkey_information['monkey_dw']) > 0.0035)).astype(int) 
     
 
-
     if 'monkey_angles' not in monkey_information.columns:
         calculate_monkey_angles(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         # The Gaussian filter shouldn't be used because there will be a problem when monkey_angle changes from 3.14 to -3.14
