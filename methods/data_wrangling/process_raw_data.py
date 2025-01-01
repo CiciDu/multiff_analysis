@@ -87,7 +87,7 @@ class smr_extractor(object):
 class log_extractor(object):
     # Modified from Ruiyi's codes
     def __init__(self, raw_data_folder_path):
-        self.raw_data_folder_path = raw_data_folder_path      
+        self.raw_data_folder_path = raw_data_folder_path    
         files_names = [file for file in os.listdir(self.raw_data_folder_path) if ('txt' in file) and ('s' in file)]
         self.full_path_file_names = os.path.join(self.raw_data_folder_path, files_names[0])
 
@@ -513,8 +513,6 @@ def find_time_bins_for_an_array(array_of_interest):
     return time_bins
 
 
-
-
 def trimming_monkey_information(monkey_information, accurate_start_time, accurate_end_time):
     # Chop off the beginning part and the end part of monkey_information
     monkey_t = monkey_information['monkey_t']
@@ -523,8 +521,6 @@ def trimming_monkey_information(monkey_information, accurate_start_time, accurat
         monkey_information = monkey_information.iloc[valid_points]
 
     return monkey_information
-
-
 
 def find_start_and_accurate_end_time(raw_data_folder_path, exists_ok=True, return_signal_df=False):
     """
@@ -540,7 +536,8 @@ def find_start_and_accurate_end_time(raw_data_folder_path, exists_ok=True, retur
 
 
     """
-    filepath = os.path.join(raw_data_folder_path, 'start_and_end_of_juice_timestamps.csv')
+    metadata_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
+    filepath = os.path.join(metadata_folder_path, 'start_and_end_of_juice_timestamps.csv')
     if exists(filepath) & exists_ok & (not return_signal_df):
         start_and_end_time = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
         accurate_start_time = start_and_end_time.iloc[0].item()
@@ -571,7 +568,7 @@ def find_start_and_accurate_end_time(raw_data_folder_path, exists_ok=True, retur
                 # save them into a csv file
                 data = [accurate_start_time, accurate_end_time]
                 juice_timestamps = pd.DataFrame(data, columns=['time'])
-                filepath = raw_data_folder_path + '/start_and_end_of_juice_timestamps.csv'
+                filepath = metadata_folder_path + '/start_and_end_of_juice_timestamps.csv'
                 juice_timestamps.to_csv(filepath)
 
                 if return_signal_df:

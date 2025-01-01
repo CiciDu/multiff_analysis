@@ -30,9 +30,10 @@ def make_spike_df(raw_data_folder_path="all_monkey_data/raw_monkey_data/monkey_B
     
     neural_data_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')
     sorted_neural_data_name = os.path.join(neural_data_path, "Sorted")
+    metadata_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
 
     accurate_start_time, accurate_end_time = process_raw_data.find_start_and_accurate_end_time(raw_data_folder_path)
-    time_offset_df = pd.read_csv(os.path.join(neural_data_path, 'time_offset.txt'))
+    time_offset_df = pd.read_csv(os.path.join(metadata_path, 'neural_time_offset.txt'))
 
     spike_times = _load_spike_times(sorted_neural_data_name)
     
@@ -102,11 +103,13 @@ def calculate_window_parameters(window_width, bin_width):
     return window_width, num_bins_in_window, convolve_pattern
 
 
-def prepare_binned_spikes_matrix_and_df(max_bin, all_binned_spikes):
+def prepare_binned_spikes_matrix_and_df(all_binned_spikes, max_bin):
     """
     Prepare the binned_spikes_df dataframe by extracting the maximum bin from final_behavioral_data,
     slicing all_binned_spikes, and creating column names.
     """
+    if max_bin is None:
+        max_bin = all_binned_spikes.shape[0] - 1
     binned_spikes_matrix = all_binned_spikes[:max_bin + 1, :]
     column_names = 'unit_' + pd.Series(range(binned_spikes_matrix.shape[1])).astype(str)
     binned_spikes_df = pd.DataFrame(binned_spikes_matrix, columns=column_names)
@@ -225,6 +228,7 @@ def splineDesign(knots, x, ord=4, der=0, outer_ok=False):
     
 def get_mapping_table_between_hard_drive_and_local_folders(monkey_name, hdrive_dir, neural_data_folder_name, filter_neural_file_func, save_table=False):
     all_local_data_paths = []
+    all_time_offset_paths = []
     all_hdrive_data_folders = []
     all_hdrive_data_paths = []
 
@@ -236,6 +240,7 @@ def get_mapping_table_between_hard_drive_and_local_folders(monkey_name, hdrive_d
 
     for data_dir in sessions:
         local_data_path = os.path.join(neural_data_dir, data_dir)
+        time_offset_path = os.path.join(local_data_path.replace('neural_data', 'metadata'), 'neural_time_offset.txt')
         all_local_data_paths.append(local_data_path)
 
         data_number = data_dir.split('_')[-1]
@@ -255,6 +260,7 @@ def get_mapping_table_between_hard_drive_and_local_folders(monkey_name, hdrive_d
         all_hdrive_data_paths.append(hdrive_data_path)
 
     mapping_table = pd.DataFrame({'local_path': all_local_data_paths, 
+                            'time_offset_path': all_time_offset_paths,
                             'hdrive_path': all_hdrive_data_paths,
                             'hdrive_folder': all_hdrive_data_folders})
 

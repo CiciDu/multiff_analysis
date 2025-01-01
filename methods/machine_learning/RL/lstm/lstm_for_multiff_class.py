@@ -1,7 +1,7 @@
 import sys
 from data_wrangling import basic_func, base_processing_class, further_processing_class
 from pattern_discovery import organize_patterns_and_features
-from visualization import additional_plots, plot_statistics, animation_utils
+from visualization import additional_plots, plot_statistics
 
 
 from machine_learning.RL.env_related import base_env, collect_agent_data_utils, env_for_lstm

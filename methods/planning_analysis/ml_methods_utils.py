@@ -1,9 +1,10 @@
 import sys
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling
 from planning_analysis.plan_factors import plan_factors_utils, plan_factors_class, test_vs_control_utils
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.only_stop_ff import features_to_keep_utils, only_stop_ff_utils
 from planning_analysis import ml_methods_utils
-from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import neural_data_modeling, plot_modeling_result
+from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from machine_learning import machine_learning_utils
 import matplotlib.pyplot as plt
 import pandas as pd

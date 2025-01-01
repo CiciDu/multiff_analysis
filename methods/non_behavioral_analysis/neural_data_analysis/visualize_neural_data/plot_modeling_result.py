@@ -177,3 +177,80 @@ def get_color_dict(unique_feature_category):
     # Create a dictionary mapping each feature category to a color
     color_dict = {unique_feature_category[i]: qualitative_colors[i] for i in range(len(unique_feature_category))}
     return color_dict
+
+
+def plot_smoothed_temporal_feature(df, column, sm_handler, kernel_h_length):
+    event = df[column].values
+   
+    # Retrieve the B-spline convolved with the "event" variable
+    convolved_ev = sm_handler[column].X.toarray()
+
+    # Retrieve the B-spline used for the convolution
+    basis = sm_handler[column].basis_kernel.toarray()
+
+    # Get the x values for the 1st subplot
+    tps = np.repeat(np.arange(kernel_h_length) - kernel_h_length // 2, basis.shape[1]).reshape(basis.shape)
+
+    # Plot the basis & the convolved events
+    plt.figure(figsize=(8, 2.5))
+
+    # Plot the basis for the kernel h
+    plt.subplot(121)
+    plt.title('Kernel Basis')
+    plt.plot(tps, basis)
+    plt.xlabel('Time Points')
+
+    # Select an interval containing an event
+    event_time_points = np.where(event == 1)[0]
+    # Select the first event that occurs after 150 time points
+    event_time_points = event_time_points[event_time_points > 150]
+    if len(event_time_points) == 0:
+        raise ValueError('No event found in specified time interval')
+    idx0, idx1 = event_time_points[0] - 100, event_time_points[0] + 400
+
+    # Extract the events convolved with each of the B-spline elements
+    conv = convolved_ev[idx0:idx1, :]
+
+    # Get the x values for the 2nd subplot
+    tps = np.arange(0, idx1 - idx0) # - 100
+    tps = np.repeat(tps, conv.shape[1]).reshape(conv.shape)
+
+    # Plot the convolved events
+    plt.subplot(122)
+    plt.title('Convolved Events')
+    plt.plot(tps, conv)
+    plt.title(column)
+    plt.vlines(tps[0, 0] + np.where(event[idx0:idx1])[0], 0, 1.5, 'k', ls='--', label='Event')
+    plt.xlabel('Time Points')
+    plt.legend()
+    plt.show()
+    plt.close()
+
+
+def plot_smoothed_spatial_feature(df, column, sm_handler):
+    # Retrieve the B-spline evaluated at x
+    X_1D = sm_handler[column].X.toarray()
+    
+    # Get a sorted version of the variable
+    column_values = df[column].values
+    idx_srt = np.argsort(column_values)
+    X_srt = X_1D[idx_srt]
+    
+    # Plot the B-spline basis functions
+    plt.figure(figsize=(15, 3))
+    plt.subplot(131)
+    plt.title(column)
+    plt.plot(column_values[idx_srt], X_srt)
+    
+    # Unordered scatter plot
+    plt.subplot(132)
+    plt.title('Unordered scatter plot')
+    plt.scatter(range(len(column_values)), column_values, s=1)
+    
+    # Ordered scatter plot
+    plt.subplot(133)
+    plt.title('Ordered scatter plot')
+    plt.scatter(range(len(column_values)), column_values[idx_srt], s=1)
+    
+    plt.show()
+    plt.close()

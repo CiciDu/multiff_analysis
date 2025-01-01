@@ -1,4 +1,4 @@
-from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import neural_data_modeling
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling
 
 import sys
 import os
@@ -116,7 +116,7 @@ def make_individual_spike_plot_from_target_cluster_VBLO(target_cluster_VBLO, spi
     return 
 
 
-def plot_regression(final_behavioral_data, column, x_var, bins_to_plot=np.arange(1000), min_r_squared_to_plot=0.1):
+def plot_regression(final_behavioral_data, column, x_var, bins_to_plot=None, min_r_squared_to_plot=0.1):
     
     # # drop rows where either x_var or y_var is nan, and print the number of dropped rows
     # n_rows = len(x_var)
@@ -126,7 +126,7 @@ def plot_regression(final_behavioral_data, column, x_var, bins_to_plot=np.arange
     # print(f"Dropped {len(dropped_rows)} rows out of {n_rows} rows for {column} due to nan values.")
 
     if bins_to_plot is None:
-        bins_to_plot = final_behavioral_data['bin'].values
+        bins_to_plot = np.arange(final_behavioral_data.shape[0])
 
     y_var = final_behavioral_data[column].values
     slope, intercept, r_value, r_squared, p_values, f_p_value, y_pred = neural_data_modeling.conduct_linear_regression(x_var, y_var)

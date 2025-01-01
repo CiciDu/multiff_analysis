@@ -62,11 +62,11 @@ def add_pattern_info_base_on_points(binned_features, monkey_information,
     pattern_df.loc[try_a_few_times_indices_for_anim, 'try_a_few_times_indice_dummy'] = 1
     pattern_df['give_up_after_trying_indice_dummy'] = 0
     pattern_df.loc[GUAT_point_indices_for_anim, 'give_up_after_trying_indice_dummy'] = 1
-    pattern_df['ignore_sudden_flas_indice_dummy'] = 0
-    pattern_df.loc[ignore_sudden_flash_indices_for_anim, 'ignore_sudden_flas_indice_dummy'] = 1
+    pattern_df['ignore_sudden_flash_indice_dummy'] = 0
+    pattern_df.loc[ignore_sudden_flash_indices_for_anim, 'ignore_sudden_flash_indice_dummy'] = 1
 
     pattern_df_condensed = pattern_df[['bin', 'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
-                                    'ignore_sudden_flas_indice_dummy']].copy()
+                                    'ignore_sudden_flash_indice_dummy']].copy()
     pattern_df_condensed = pattern_df_condensed.groupby('bin').max().reset_index(drop=False) 
     binned_features = binned_features.merge(pattern_df_condensed, how='left', on='bin')
     binned_features = binned_features.fillna(method='ffill').reset_index(drop=True)
@@ -100,7 +100,7 @@ def _add_ff_info_to_binned_features(binned_features, ff_dataframe, ff_caught_T_n
     binned_features = binned_features.fillna(method='bfill').reset_index(drop=True)
     return binned_features
 
-def make_final_behavioral_data(rebinned_monkey_info_essential, binned_features):
+def _make_final_behavioral_data(rebinned_monkey_info_essential, binned_features):
     """
     Merge all the features back to rebinned_monkey_info_essential.
     """

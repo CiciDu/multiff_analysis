@@ -1,8 +1,10 @@
 import sys
 from data_wrangling import process_raw_data, basic_func, further_processing_class
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, reduce_multicollinearity
+from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
-from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data, neural_data_modeling, reduce_multicollinearity, plot_modeling_result
-from non_behavioral_analysis.neural_data_analysis import neural_data_processing
+from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
+from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
 import os
 import numpy as np
 import matplotlib
@@ -44,7 +46,6 @@ class CCAclass():
     def get_weight_df(self):
         self.X1_weight_df = neural_data_modeling.make_loading_or_weight_df(self.X1_weights, self.X1.columns, lagging_included=False)
         self.X2_weight_df = neural_data_modeling.make_loading_or_weight_df(self.X2_weights, self.X2.columns, lagging_included=self.lagging_included)
-
 
     def get_squared_loading_df(self):
         self.X1_squared_loading_df = neural_data_modeling.make_loading_or_weight_df(self.X1_loading**2, self.X1.columns, lagging_included=False)

@@ -16,7 +16,7 @@ dataTable = table(time', label, 'VariableNames', {'time', 'label'});
 disp(dataTable);
 
 % Save the table to a text file
-outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/neural_data/monkey_Schro/data_0328/time_offset.txt'
+outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/processed_neural_data/monkey_Schro/data_0328/neural_time_offset.txt'
 writetable(dataTable, outputFileName, 'Delimiter', '\t');
 
 disp(['Data saved to ', outputFileName]);
@@ -31,4 +31,4 @@ disp(['Data saved to ', outputFileName]);
 % Data
 label = [16; 64; 1; 64; 4; 64; 4; 64; 4; 64];
 time = [3.3351, 3.3352, 3.5811, 3.5812, 22.1467, 22.1468, 33.0195, 33.0196, 54.6641, 54.6642];
-outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/neural_data/monkey_Schro/data_0404/time_offset.txt'
+outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/processed_neural_data/monkey_Schro/data_0404/neural_time_offset.txt'

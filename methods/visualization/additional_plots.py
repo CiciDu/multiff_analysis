@@ -1,5 +1,6 @@
 import sys
 from visualization import plot_trials, plot_behaviors_utils
+from data_wrangling import process_raw_data, basic_func, further_processing_class, combine_info_utils
 
 import os
 import seaborn as sns
@@ -344,6 +345,48 @@ def PlotSidebySide(plot_whole_duration,
     plt.show()
     
 
+def plot_ff_caught_time(monkey_name='monkey_Bruno'):
+    sessions_df = combine_info_utils.make_sessions_df_for_one_monkey(raw_data_dir_name='all_monkey_data/raw_monkey_data', 
+                                                                    monkey_name=monkey_name)
+    raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
+    for index, row in sessions_df.iterrows():
+        if row['finished'] == True:
+            continue
+        
+        monkey_name = row['monkey_name']
+        data_name = row['data_name']
+
+        temp_raw_data_folder_path = os.path.join(raw_data_dir_name, monkey_name, data_name)
+        print(temp_raw_data_folder_path)
+
+        data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=temp_raw_data_folder_path)
+
+        data_item.retrieve_or_make_monkey_data()
+
+        # Create the figure and the first y-axis
+        fig, ax1 = plt.subplots(figsize=(6, 3))
+
+        # Plot the first dataset on the first y-axis
+        color = 'tab:blue'
+        ax1.set_xlabel('trial')
+        ax1.set_ylabel('ff caught time', color=color)
+        ax1.scatter(range(len(data_item.ff_caught_T_new)), data_item.ff_caught_T_new, s=7, color=color, label='ff caught time', alpha=0.7)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        # Create the second y-axis
+        ax2 = ax1.twinx()
+        color = 'tab:orange'
+        ax2.set_ylabel('interval between ff caught time', color=color)
+        ax2.plot(np.diff(data_item.ff_caught_T_new), color=color, label='interval between ff caught time', alpha=0.7)
+        ax2.tick_params(axis='y', labelcolor=color)
+        # plot a horizontal line at y = 100
+        ax2.axhline(y=100, color='r', linestyle='--', alpha=0.7)
+
+        # Add the title
+        plt.title(f'{data_name} - max time: {round(max(data_item.ff_caught_T_new), 1)}')
+
+        # Show the plot
+        plt.show()
 
 
 

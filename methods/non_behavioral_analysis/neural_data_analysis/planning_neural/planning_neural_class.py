@@ -3,23 +3,27 @@ from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from null_behaviors import curvature_utils
 from non_behavioral_analysis.neural_data_analysis.planning_neural import planning_neural_utils
+from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import neural_vs_behavioral_class
 import numpy as np
 import pandas as pd
 import os
 
 
 class PlanningAndNeural(plan_factors_class.PlanFactors):
-
+#class PlanningAndNeural(neural_vs_behavioral_class.NeuralVsBehavioralClass):
+    
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
         
+    def retrieve_neural_data(self, bin_width=0.25, window_width=1):
+        neural_vs_behavioral_class.NeuralVsBehavioralClass.retrieve_neural_data(self, bin_width=bin_width, window_width=window_width)
 
-    def get_all_planning_info(self, time_bins, both_ff_across_time_df_exists_ok=True):
+    def get_all_planning_info(self, both_ff_across_time_df_exists_ok=True):
 
-        self.monkey_information.loc[:, 'bin'] = np.digitize(self.monkey_information['monkey_t'].values, time_bins)-1
+        self.monkey_information.loc[:, 'bin'] = np.digitize(self.monkey_information['monkey_t'].values, self.time_bins)-1
         self.mid_bins = self.monkey_information[['bin', 'point_index']].groupby('bin').median().astype(int).reset_index(drop=False)
         self.mid_bins = self.mid_bins.merge(self.monkey_information.drop(columns={'bin'}), on='point_index', how='left')
-        self.both_ff_across_time_df = self.get_both_ff_across_time_df(exists_ok=both_ff_across_time_df_exists_ok)
+        self.both_ff_across_time_df = self._get_both_ff_across_time_df(exists_ok=both_ff_across_time_df_exists_ok)
 
         # self.both_ff_when_seen_df = self.get_both_ff_when_seen_df()
         # self.all_planning_info = self.both_ff_across_time_df.merge(self.both_ff_when_seen_df, on='stop_point_index', how='left')
@@ -31,7 +35,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
         
         return self.all_planning_info
 
-    def get_both_ff_across_time_df(self, exists_ok=True):
+    def _get_both_ff_across_time_df(self, exists_ok=True):
         # This contains the planning-related information for each time bin
         folder_path = os.path.join(self.planning_data_folder_path, 'planning_for_neural')
         os.makedirs(folder_path, exist_ok=True)
