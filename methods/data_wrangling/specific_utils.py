@@ -13,123 +13,6 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-
-class HiddenPrints:
-    def __enter__(self):
-        _original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = _original_stdout
-
-
-
-def plt_config(title=None, xlim=None, ylim=None, xlabel=None, ylabel=None, colorbar=False, sci=False):
-    """
-    Set some parameters for plotting
-    
-    """
-    for field in ['title', 'xlim', 'ylim', 'xlabel', 'ylabel']:
-        if eval(field) != None: getattr(plt, field)(eval(field))
-    if isinstance(sci, str): plt.ticklabel_format(style='sci', axis=sci, scilimits=(0,0))
-    if isinstance(colorbar,str): plt.colorbar(label=colorbar)
-    elif colorbar: plt.colorbar(label = '$Number\ of\ Entries$')
-
-
-@contextmanager
-def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
-    """
-    Set some parameters for plotting
-    
-    """
-    plt.rcParams['figure.figsize'] = (dimx, dimy)
-    plt.rcParams['font.weight'] = fontweight
-    plt.rcParams['mathtext.default'] = 'regular'
-    plt.rcParams["font.family"] = "sans serif"
-    global fig; fig = plt.figure(dpi=dpi)
-    yield
-    plt.show()
-
-
-
-class HiddenPrints:
-    """
-    Hide all the printed statements while running the coded
-
-    Parameters
-    ----------
-    merged_df: dataframe
-        containing various characteristics of each trial for both the monkey and the agent(s)
-
-    """
-
-    def __enter__(self):
-        _original_stdout = sys.stdout
-        sys.stdout = open(os.devnull, 'w')
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = _original_stdout
-
-
-
-def find_intersection(intervals, query):
-    """
-    Find intersections between intervals. Intervals are open and are 
-    represented as pairs (lower bound, upper bound). 
-    The source of the code is:
-    source: https://codereview.stackexchange.com/questions/203468/
-    find-the-intervals-which-have-a-non-empty-intersection-with-a-given-interval
-
-
-    Parameters
-    ----------
-    intervals: array_like, shape=(N, 2) 
-        Array of intervals.
-    query: array_like, shape=(2,) 
-        Interval to query
-
-    Returns
-    -------
-    indices_of_overlapped_intervals: array
-        Array of indexes of intervals that overlap with query
-    
-    """
-    intervals = np.asarray(intervals)
-    lower, upper = query
-    indices_of_overlapped_intervals = np.where((lower < intervals[:, 1]) & (intervals[:, 0] < upper))[0]
-    return indices_of_overlapped_intervals
-
-
-def flash_on_ff_in_trial(ff_flash_sorted, duration):
-    """
-    Find the index of the fireflies that have flashed during the trial
-
-    Parameters
-    ----------
-    ff_flash_sorted: list
-        contains the time that each firefly flashes on and off
-    duration: array_like, shape=(2,) 
-        the starting time and ending time of the trial
-
-    Returns
-    -------
-    flash_index: list
-        the indices of the fireflies that have flashed during the trial (among all fireflies)
-    
-    """
-    flash_index = []
-    for index in range(len(ff_flash_sorted)):
-      # Take out the flashing-on and flashing-off time of this particular firefly
-      ff = ff_flash_sorted[index]
-      if len(find_intersection(ff, duration)) > 0:
-        flash_index.append(index)
-    return flash_index
-
-
-
-
 def calculate_angles_to_ff_centers(ff_x, ff_y, mx, my, m_angle):
     """
     Calculate the angle to the center of a firefly or multiple fireflies from the monkey's or the agent's perspective
@@ -228,7 +111,6 @@ def calculate_angles_to_ff_boundaries(angles_to_ff, distances_to_ff, ff_radius=1
     return angles_to_boundaries
 
 
-
 def calculate_change_in_abs_ff_angle(current_ff_index, angles_to_ff, angles_to_boundaries, ff_real_position_sorted, monkey_x_array, 
                                      monkey_y_array, monkey_angles_array, in_memory_indices):
     ## To also calculate delta_angles_to_ff and delta_angles_to_boundaries:
@@ -242,7 +124,41 @@ def calculate_change_in_abs_ff_angle(current_ff_index, angles_to_ff, angles_to_b
     return delta_abs_angles_to_ff, delta_abs_angles_to_boundary
 
 
-    
+def get_distance_between_two_points(currentTrial, ff_caught_T_new, monkey_information, ff_believed_position_sorted):
+    """
+    Find the absolute displacement between the target for the currentTrial and the target for currentTrial.
+    Return 9999 if the monkey has hit the border at one point.
+
+    Parameters
+    ----------
+    currentTrial: numeric
+        the number of current trial 
+    ff_caught_T_new: np.array
+        containing the time when each captured firefly gets captured
+    monkey_information: df
+        containing the speed, angle, and location of the monkey at various points of time
+    ff_believed_position_sorted: np.array
+        containing the locations of the monkey (or agent) when each captured firefly was captured 
+
+    Returns
+    -------
+    displacement: numeric
+        the distance between the starting and ending points of the monkey during a trial; 
+        returns 9999 if the monkey has hit the border at any point during the trial
+
+    """
+    duration = [ff_caught_T_new[currentTrial-1], ff_caught_T_new[currentTrial]]
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0]
+    displacement = 0
+    if len(cum_pos_index) > 1:
+      cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_pos_index]), np.array(monkey_information['monkey_y'].iloc[cum_pos_index])
+      # If the monkey has hit the boundary
+      if np.any(cum_mx[1:]-cum_mx[:-1] > 10) or np.any(cum_my[1:]-cum_my[:-1] > 10):
+        displacement = 9999
+      else:
+        displacement = LA.norm(ff_believed_position_sorted[currentTrial]-ff_believed_position_sorted[currentTrial-1])
+    return displacement
+
 
 def get_cum_distance_traveled(currentTrial, ff_caught_T_new, monkey_information):
     """
@@ -265,64 +181,13 @@ def get_cum_distance_traveled(currentTrial, ff_caught_T_new, monkey_information)
 
     """
     duration = [ff_caught_T_new[currentTrial-1], ff_caught_T_new[currentTrial]]
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0]
     distance = 0
-    if len(cum_iloc_indices) > 1:
-        cum_t = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices])
-        cum_speed = np.array(monkey_information['monkey_speed'].iloc[cum_iloc_indices])
+    if len(cum_pos_index) > 1:
+        cum_t = np.array(monkey_information['time'].iloc[cum_pos_index])
+        cum_speed = np.array(monkey_information['monkey_speed'].iloc[cum_pos_index])
         distance = np.sum((cum_t[1:] - cum_t[:-1])*cum_speed[1:])
     return distance
-
-
-
-
-def get_distance_between_two_points(currentTrial, ff_caught_T_new, monkey_information, ff_believed_position_sorted):
-    """
-    Find the absolute displacement between the target for the currentTrial and the target for currentTrial.
-    Return 9999 if the monkey has hit the border at one point.
-
-    Parameters
-    ----------
-    currentTrial: numeric
-        the number of current trial 
-    ff_caught_T_new: np.array
-        containing the time when each captured firefly gets captured
-    monkey_information: df
-        containing the speed, angle, and location of the monkey at various points of time
-    ff_believed_position_sorted: np.array
-        containing the locations of the monkey (or agent) when each captured firefly was captured 
-
-
-    Returns
-    -------
-    displacement: numeric
-        the distance between the starting and ending points of the monkey during a trial; 
-        returns 9999 if the monkey has hit the border at any point during the trial
-
-    """
-    duration = [ff_caught_T_new[currentTrial-1], ff_caught_T_new[currentTrial]]
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-    displacement = 0
-    if len(cum_iloc_indices) > 1:
-      cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices])
-      # If the monkey has hit the boundary
-      if np.any(cum_mx[1:]-cum_mx[:-1] > 10) or np.any(cum_my[1:]-cum_my[:-1] > 10):
-        displacement = 9999
-      else:
-        displacement = LA.norm(ff_believed_position_sorted[currentTrial]-ff_believed_position_sorted[currentTrial-1])
-    return displacement
-
-
-def save_df_to_csv(df, df_name, data_folder_name, exists_ok=False):
-    if data_folder_name:
-        csv_name = df_name + '.csv'
-        filepath = os.path.join(data_folder_name, csv_name)
-        if exists(filepath) & exists_ok:
-            print(filepath, 'already exists.')
-        else:
-            os.makedirs(data_folder_name, exist_ok = True)
-            df.to_csv(filepath)
-            print("new", df_name, "is stored in ", filepath)
 
 
 def find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial=None, num_trials=None, duration=None):
@@ -366,21 +231,6 @@ def find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial=No
     return currentTrial, num_trials, duration
 
 
-def take_out_a_sample_from_arrays(sampled_indices, *args):
-    sampled_args = []
-    for arg in args:
-        sampled_arg = arg[sampled_indices]
-        sampled_args.append(sampled_arg)
-    return sampled_args
-
-def take_out_a_sample_from_df(sampled_indices, *args):
-    sampled_args = []
-    for arg in args:
-        sampled_arg = arg.iloc[sampled_indices]
-        sampled_args.append(sampled_arg)
-    return sampled_args
-
-
 def initialize_monkey_sessions_df(raw_data_dir_name='all_monkey_data/raw_monkey_data'):
     list_of_monkey_name = []
     list_of_data_name = []
@@ -401,17 +251,6 @@ def check_whether_finished(sessions_df, monkey_name, data_name):
     return whether_finished
 
 
-def find_outlier_position_index(data, outlier_z_score_threshold = 2):
-    data = np.array(data)
-    # calculate standard deviation in rel_curv_to_stop_ff_center
-    std = np.std(data)
-    # find z-score of each point
-    z_score = (data - np.mean(data)) / std
-    # find outliers
-    outlier_positions = np.where(np.abs(z_score) > outlier_z_score_threshold)[0]
-    return outlier_positions
-
-
 def init_variations_list_func(ref_point_params_based_on_mode, folder_path=None, monkey_name=None):
     key_value_pairs = []
     for key, values in ref_point_params_based_on_mode.items():
@@ -427,25 +266,49 @@ def init_variations_list_func(ref_point_params_based_on_mode, folder_path=None, 
     return variations_list
 
 
-def make_rotation_matrix(x0, y0, x1, y1):
-    # find a rotation matrix so that (x1, y1) is to the north of (x0, y0)
+def reorganize_data_into_chunks(monkey_information):
+    prev_speed = 0
+    chunk_counter = 0
+    chunk_numbers = [] # Each time point has a number corresponding to the index of the chunk it belongs to
+    new_chunk_indices = [0] # w[i] shows the index of the time point at which the i-th chunk starts
 
-    # Find the angle from the starting point to the target
-    theta = pi/2-np.arctan2(y1 - y0, x1 - x0)     
-    c, s = np.cos(theta), np.sin(theta)
-    # Find the rotation matrix
-    rotation_matrix = np.array(((c, -s), (s, c)))
-    return rotation_matrix
+    # for each time point
+    for i in range(len(monkey_information['monkey_speed'])):
+        speed = monkey_information['monkey_speed'].values[i]
+        # if the speed is above half of the full speed (100 cm/s) and if the previous speed is below half of the full speed
+        if (speed > 100) & (prev_speed <= 100):
+            # start a new chunk
+            chunk_counter += 1
+            new_chunk_indices.append(i)
+        chunk_numbers.append(chunk_counter)
+        prev_speed = speed
+
+    chunk_numbers = np.array(chunk_numbers)
+    new_chunk_indices = np.array(new_chunk_indices)
+
+    return chunk_numbers, new_chunk_indices
 
 
-@contextmanager
-def suppress_stdout():
-    original_stdout = sys.stdout
-    sys.stdout = open(os.devnull, 'w')
-    try:
-        yield
-    finally:
-        sys.stdout.close()
-        sys.stdout = original_stdout
+def take_out_valid_intervals_based_on_ff_caught_time(ff_caught_T_new,
+                                                    gap_too_large_threshold=100,
+                                                     min_combined_valid_interval_length=50):
+    caught_t_df = pd.DataFrame(ff_caught_T_new, columns=['caught_t'])
+    caught_t_df['prev_caught_t'] = caught_t_df['caught_t'].shift(1).fillna(0)
+    caught_t_df['interval'] = caught_t_df['caught_t'] - caught_t_df['prev_caught_t']
+    caught_t_df['invalid_interval'] = caught_t_df['interval'] > gap_too_large_threshold
 
+    # now, if a small valid interval is sandwiched by two invalid intervals, we should remove it
+    # we shall first combine all continuous valid intervals and give the same label to them; then calculate the length of each combined valid interval
+    caught_t_df['combd_valid_interval_group'] = caught_t_df['invalid_interval'].cumsum()
+    # remove all invalid intervals
+    caught_t_df = caught_t_df[~caught_t_df['invalid_interval']]
+    caught_t_df['combd_valid_interval_length'] = caught_t_df.groupby('combd_valid_interval_group')['interval'].transform('sum')
+    caught_t_df['combd_valid_interval_start'] = caught_t_df.groupby('combd_valid_interval_group')['caught_t'].transform('first')
+    caught_t_df['combd_valid_interval_end'] = caught_t_df.groupby('combd_valid_interval_group')['caught_t'].transform('last')
+
+    # remove the valid intervals that are too short
+    caught_t_df = caught_t_df[caught_t_df['combd_valid_interval_length'] > min_combined_valid_interval_length]
+
+    valid_intervals_df = caught_t_df[['combd_valid_interval_start', 'combd_valid_interval_end']].drop_duplicates()
+    return valid_intervals_df
 

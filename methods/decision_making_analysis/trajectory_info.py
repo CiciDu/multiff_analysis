@@ -1,6 +1,6 @@
 
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization.animation import animation_func, animation_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils
@@ -66,7 +66,7 @@ def find_trajectory_data(time, monkey_information, time_range_of_trajectory=[-0.
     duration_to_add = np.linspace(time_range_of_trajectory[0], time_range_of_trajectory[1], num_time_points_for_trajectory)
     traj_time_2d = traj_time_2d + duration_to_add
 
-    monkey_indices = np.searchsorted(monkey_information['monkey_t'], traj_time_2d)
+    monkey_indices = np.searchsorted(monkey_information['time'], traj_time_2d)
     monkey_indices = monkey_indices.reshape(-1)
     # make sure that the indices are within the range of monkey_information
     monkey_indices[monkey_indices < 0] = 0
@@ -81,7 +81,7 @@ def find_trajectory_data(time, monkey_information, time_range_of_trajectory=[-0.
     # monkey_y_2d = monkey_information['monkey_y'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
     # monkey_dv_2d = monkey_information['monkey_speed'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
     # monkey_dw_2d = monkey_information['monkey_dw'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
-    # monkey_angle_2d = monkey_information['monkey_angles'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
+    # monkey_angle_2d = monkey_information['monkey_angle'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
 
     return traj_time_2d, trajectory_data_dict
 
@@ -110,7 +110,7 @@ def find_monkey_info_on_trajectory_relative_to_origin(monkey_indices, monkey_inf
     monkey_indices[monkey_indices > len(monkey_information)-1] = len(monkey_information)-1
 
     monkey_xy = monkey_information[['monkey_x', 'monkey_y']].values[monkey_indices] # find the (0,0) positions of monkey for all the trials
-    monkey_angle = monkey_information[['monkey_angles']].values[monkey_indices] # find the heading of monkey at "0" time for all the trials
+    monkey_angle = monkey_information[['monkey_angle']].values[monkey_indices] # find the heading of monkey at "0" time for all the trials
     # let's also get the monkey angle on each trajectory point, with 0 pointing to the north at the current moment
     monkey_angle_on_trajectory_relative_to_the_current_north =  monkey_angle_2d - monkey_angle    
     # expand monkey_xy to the same shape as traj_xy_2d
@@ -121,7 +121,7 @@ def find_monkey_info_on_trajectory_relative_to_origin(monkey_indices, monkey_inf
     # treat traj_xy_2d as ffxy, and use the real monkey_xy to calculate distance and angle, so that we can plot trajectory points on polar plot
     traj_xy_2d = np.concatenate([traj_x_2d.reshape(-1,1), traj_y_2d.reshape(-1,1)], axis=1)        
     traj_distances = LA.norm(traj_xy_2d-monkey_xy, axis=1)
-    traj_angles = basic_func.calculate_angles_to_ff_centers(ff_x=traj_x_2d.reshape(-1), ff_y=traj_y_2d.reshape(-1), mx=monkey_xy[:,0], my=monkey_xy[:,1], m_angle=monkey_angle)
+    traj_angles = specific_utils.calculate_angles_to_ff_centers(ff_x=traj_x_2d.reshape(-1), ff_y=traj_y_2d.reshape(-1), mx=monkey_xy[:,0], my=monkey_xy[:,1], m_angle=monkey_angle)
     traj_distances = traj_distances.reshape(-1, num_time_points_for_trajectory)
     traj_angles = traj_angles.reshape(-1, num_time_points_for_trajectory)
 
@@ -148,9 +148,9 @@ def generate_trajectory_position_data(time_all, monkey_information, time_range_o
 
     traj_x_2d = trajectory_data_dict['monkey_x']
     traj_y_2d = trajectory_data_dict['monkey_y']
-    monkey_angle_2d = trajectory_data_dict['monkey_angles']
+    monkey_angle_2d = trajectory_data_dict['monkey_angle']
 
-    monkey_indices = np.searchsorted(monkey_information['monkey_t'], time_all) 
+    monkey_indices = np.searchsorted(monkey_information['time'], time_all) 
     traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north = find_monkey_info_on_trajectory_relative_to_origin(monkey_indices, monkey_information, traj_x_2d, traj_y_2d, monkey_angle_2d, num_time_points_for_trajectory=num_time_points_for_trajectory)
     trajectory_data_dict['monkey_distance'] = traj_distances
     trajectory_data_dict['monkey_angle_to_origin'] = traj_angles
@@ -261,7 +261,7 @@ def generate_stops_info(time_all, monkey_information, time_range_of_trajectory=[
     traj_time_2d = traj_time_2d + duration_to_add
 
     bin_width = (time_range_of_trajectory[1] - time_range_of_trajectory[0]) / (num_time_points_for_trajectory-1)
-    monkey_dt = (monkey_information['monkey_t'].iloc[-1] - monkey_information['monkey_t'].iloc[0]) / (len(monkey_information)-1)
+    monkey_dt = (monkey_information['time'].iloc[-1] - monkey_information['time'].iloc[0]) / (len(monkey_information)-1)
     num_points_in_window = math.ceil(bin_width/monkey_dt + 1)
     if num_points_in_window % 2 == 0:
         num_points_in_window += 1
@@ -272,14 +272,14 @@ def generate_stops_info(time_all, monkey_information, time_range_of_trajectory=[
     monkey_stops = (monkey_information['monkey_speeddummy'].values - 1) * (-1) # 1 means having a stop; 0 means not
     stops_convolved = np.convolve(monkey_stops, convolve_pattern, 'same')
     stops_convolved = (stops_convolved > 0).astype(int)
-    indices = np.searchsorted(monkey_information['monkey_t'].values, traj_time_2d) 
+    indices = np.searchsorted(monkey_information['time'].values, traj_time_2d) 
     # make sure that indices don't exceed the range of monkey_information
     indices[indices < 0] = 0
     indices[indices > len(monkey_information)-1] = len(monkey_information)-1
     traj_stops = stops_convolved[indices]
 
     ## The code below has more accurate points because it's based on time alone, not point_index, but it's much slower
-    # monkey_information_temp = monkey_information[monkey_information['monkey_t'].between(traj_time_2d.min(), traj_time_2d.max())].copy()
+    # monkey_information_temp = monkey_information[monkey_information['time'].between(traj_time_2d.min(), traj_time_2d.max())].copy()
     # traj_stops = add_stops_info_to_one_row_of_trajectory_info(traj_time_2d[0,:], monkey_information_temp).reshape(1,-1)
     # for time_1d in traj_time_2d[1:,:]:
     #     stopping_info = add_stops_info_to_one_row_of_trajectory_info(time_1d, monkey_information_temp).reshape(1,-1)
@@ -303,7 +303,7 @@ def add_stops_info_to_one_row_of_trajectory_info(traj_time_1d, monkey_informatio
     max_time = traj_time_1d[-1] + bin_width/2
     time_bins = np.arange(min_time, max_time+bin_width/2, bin_width)  # add bin_width/2 to max_time so that max_time will be included in the array
     num_bins = len(time_bins)-1
-    monkey_information.loc[:,'corresponding_bins'] = np.searchsorted(time_bins, monkey_information.loc[:,'monkey_t'].values)
+    monkey_information.loc[:,'corresponding_bins'] = np.searchsorted(time_bins, monkey_information.loc[:,'time'].values)
     monkey_sub = monkey_information[monkey_information['corresponding_bins'].between(1, num_bins)].copy()
     monkey_sub = monkey_sub[['corresponding_bins', 'monkey_speeddummy']].groupby('corresponding_bins').min()  
     stopping_info = monkey_sub['monkey_speeddummy'].values   # 0 means there has been stops in the bin
@@ -318,7 +318,7 @@ def add_stops_info_to_monkey_information(traj_time, monkey_information):
     max_time = traj_time[-1] + bin_width/2
     time_bins = np.arange(min_time, max_time+bin_width/2, bin_width)  # add bin_width/2 to max_time so that max_time will be included in the array
     num_bins = len(time_bins)-1
-    monkey_information.loc[:,'corresponding_bins'] = np.searchsorted(time_bins, monkey_information.loc[:,'monkey_t'].values)
+    monkey_information.loc[:,'corresponding_bins'] = np.searchsorted(time_bins, monkey_information.loc[:,'time'].values)
     monkey_sub = monkey_information[monkey_information['corresponding_bins'].between(1, num_bins)].copy()
     monkey_sub = monkey_sub[['corresponding_bins', 'monkey_speeddummy']].groupby('corresponding_bins').min()  
     stopping_info = monkey_sub['monkey_speeddummy'].values   # 0 means there has been stops in the bin
@@ -399,15 +399,13 @@ def retrieve_or_make_all_traj_feature_names(raw_data_dir_name, monkey_name, exis
     return all_traj_feature_names
 
 
-
 def calculate_monkey_angle_and_distance_from_now_to_other_time(all_current_point_indices, monkey_information, monkey_xy_from_other_time):
     monkey_xy_now = monkey_information.loc[all_current_point_indices, ['monkey_x', 'monkey_y']].values
-    monkey_angle_now = monkey_information.loc[all_current_point_indices, 'monkey_angles'].values
+    monkey_angle_now = monkey_information.loc[all_current_point_indices, 'monkey_angle'].values
     # distance_from_monkey_now_to_monkey_at_other_time means the distance between the monkey position when the ff was last seen and the monkey position now
     distance_from_monkey_now_to_monkey_at_other_time = np.linalg.norm(monkey_xy_from_other_time - monkey_xy_now, axis=1)
-    angle_from_monkey_now_to_monkey_at_other_time = basic_func.calculate_angles_to_ff_centers(ff_x=monkey_xy_from_other_time[:,0], ff_y=monkey_xy_from_other_time[:,1], mx=monkey_xy_now[:,0], my=monkey_xy_now[:,1], m_angle=monkey_angle_now)
+    angle_from_monkey_now_to_monkey_at_other_time = specific_utils.calculate_angles_to_ff_centers(ff_x=monkey_xy_from_other_time[:,0], ff_y=monkey_xy_from_other_time[:,1], mx=monkey_xy_now[:,0], my=monkey_xy_now[:,1], m_angle=monkey_angle_now)
     return distance_from_monkey_now_to_monkey_at_other_time, angle_from_monkey_now_to_monkey_at_other_time
-
 
 
 def add_distance_and_angle_from_monkey_now_to_monkey_when_ff_last_seen_or_next_seen(df, monkey_information, ff_dataframe, monkey_xy_from_other_time=None, use_last_seen=True):
@@ -427,7 +425,6 @@ def add_distance_and_angle_from_monkey_now_to_monkey_when_ff_last_seen_or_next_s
     return df
 
 
-
 def add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, ff_dataframe, monkey_information, use_last_seen=True):
     
     df = df.copy()
@@ -437,8 +434,8 @@ def add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(
 
     # if use_last_seen is False, then we assume we're using the information when the ff is next seen
     monkey_xy_now = monkey_information.loc[all_current_point_indices, ['monkey_x', 'monkey_y']].values
-    monkey_angle_now = monkey_information.loc[all_current_point_indices, 'monkey_angles'].values
-    all_current_time = monkey_information.loc[all_current_point_indices, 'monkey_t'].values
+    monkey_angle_now = monkey_information.loc[all_current_point_indices, 'monkey_angle'].values
+    all_current_time = monkey_information.loc[all_current_point_indices, 'time'].values
 
     additional_placeholder_mapping = {'ff_x': [9999, False], 'ff_y': [9999, False]}
     ff_info = decision_making_utils.find_attributes_of_ff_when_last_vis_OR_next_visible(all_ff_index, all_current_time, ff_dataframe, use_last_seen=use_last_seen, 
@@ -447,14 +444,13 @@ def add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(
     ff_xy_when_ff_last_seen_or_next_seen = ff_info[['ff_x', 'ff_y']].values
     df[['ff_x', 'ff_y']] = ff_xy_when_ff_last_seen_or_next_seen
     df['distance_from_monkey_now_to_ff_when_ff' + suffix] = np.linalg.norm(ff_xy_when_ff_last_seen_or_next_seen - monkey_xy_now, axis=1)
-    df['angle_from_monkey_now_to_ff_when_ff' + suffix] = basic_func.calculate_angles_to_ff_centers(ff_x=ff_xy_when_ff_last_seen_or_next_seen[:,0], ff_y=ff_xy_when_ff_last_seen_or_next_seen[:,1], mx=monkey_xy_now[:,0], my=monkey_xy_now[:,1], m_angle=monkey_angle_now)
+    df['angle_from_monkey_now_to_ff_when_ff' + suffix] = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_xy_when_ff_last_seen_or_next_seen[:,0], ff_y=ff_xy_when_ff_last_seen_or_next_seen[:,1], mx=monkey_xy_now[:,0], my=monkey_xy_now[:,1], m_angle=monkey_angle_now)
 
     df.loc[df['ff_x'] == 9999, 'distance_from_monkey_now_to_ff_when_ff' + suffix] = 1000
     df.loc[df['ff_x'] == 9999, 'angle_from_monkey_now_to_ff_when_ff' + suffix] = 0
     
     df.drop(['ff_x', 'ff_y'], axis=1, inplace=True)
     return df
-
 
 
 def add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_new, use_last_seen=True, curv_of_traj_df=None):

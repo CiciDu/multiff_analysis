@@ -1,4 +1,4 @@
-from data_wrangling import basic_func
+from data_wrangling import specific_utils, general_utils
 from pattern_discovery import pattern_by_trials
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from pattern_discovery import pattern_by_trials, cluster_analysis
@@ -98,7 +98,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
 
 
     if data_folder_name:
-        basic_func.save_df_to_csv(pattern_frequencies, 'pattern_frequencies', data_folder_name)
+        general_utils.save_df_to_csv(pattern_frequencies, 'pattern_frequencies', data_folder_name)
 
 
     return pattern_frequencies
@@ -204,7 +204,7 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, c
     all_trial_features = all_trial_features[all_trial_features['trial'] > 0].reset_index(drop=True)
     
     if data_folder_name:
-        basic_func.save_df_to_csv(all_trial_features, 'all_trial_features', data_folder_name)
+        general_utils.save_df_to_csv(all_trial_features, 'all_trial_features', data_folder_name)
     return all_trial_features
 
 
@@ -245,7 +245,7 @@ def make_feature_statistics(all_trial_features, data_folder_name=None):
 
 
 	if data_folder_name:
-		basic_func.save_df_to_csv(feature_statistics, 'feature_statistics', data_folder_name)
+		general_utils.save_df_to_csv(feature_statistics, 'feature_statistics', data_folder_name)
 		
 	return feature_statistics
 
@@ -322,8 +322,8 @@ def make_distance_df(ff_caught_T_new, monkey_information, ff_believed_position_s
     cum_distance_array = []
     distance_array = []
     for i in range(len(ff_caught_T_new)-1):
-        cum_distance_array.append(basic_func.get_cum_distance_traveled(i, ff_caught_T_new, monkey_information))
-        distance_array.append(basic_func.get_distance_between_two_points(i, ff_caught_T_new, monkey_information, ff_believed_position_sorted))
+        cum_distance_array.append(specific_utils.get_cum_distance_traveled(i, ff_caught_T_new, monkey_information))
+        distance_array.append(specific_utils.get_distance_between_two_points(i, ff_caught_T_new, monkey_information, ff_believed_position_sorted))
     cum_distance_array = np.array(cum_distance_array)
     distance_array = np.array(distance_array)
     distance_df = pd.DataFrame({'cum_distance': cum_distance_array, 'distance': distance_array})

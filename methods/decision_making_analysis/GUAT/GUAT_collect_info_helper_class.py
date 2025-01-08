@@ -35,8 +35,8 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 )
 
         # add time to self.GUAT_current_ff_info and self.GUAT_alt_ff_info
-        self.GUAT_current_ff_info['time'] = self.monkey_information.loc[self.GUAT_current_ff_info['point_index'].values, 'monkey_t'].values
-        self.GUAT_alt_ff_info['time'] = self.monkey_information.loc[self.GUAT_alt_ff_info['point_index'].values, 'monkey_t'].values
+        self.GUAT_current_ff_info['time'] = self.monkey_information.loc[self.GUAT_current_ff_info['point_index'].values, 'time'].values
+        self.GUAT_alt_ff_info['time'] = self.monkey_information.loc[self.GUAT_alt_ff_info['point_index'].values, 'time'].values
 
         self.GUAT_current_ff_info = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.GUAT_current_ff_info, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new, attributes_to_add=last_seen_and_next_seen_attributes_to_add, curv_of_traj_df=self.curv_of_traj_df)
         self.GUAT_alt_ff_info = cluster_replacement_utils.supply_info_of_ff_last_seen_and_next_seen_to_df(self.GUAT_alt_ff_info, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new, attributes_to_add=last_seen_and_next_seen_attributes_to_add, curv_of_traj_df=self.curv_of_traj_df)
@@ -83,7 +83,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.GUAT_current_ff_info, self.GUAT_alt_ff_info = GUAT_and_TAFT.make_sure_GUAT_alt_ff_info_and_GUAT_current_ff_info_have_the_same_point_indices(self.GUAT_current_ff_info, self.GUAT_alt_ff_info)
 
         self.point_index_all = self.GUAT_current_ff_info.point_index.unique()
-        self.time_all = self.monkey_information.loc[self.point_index_all, 'monkey_t'].values
+        self.time_all = self.monkey_information.loc[self.point_index_all, 'time'].values
 
 
     def set_time_of_eval(self, GUAT_w_ff_df, time_with_respect_to_first_stop=None, time_with_respect_to_second_stop=None, time_with_respect_to_last_stop=None):
@@ -104,7 +104,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         else:
             self.time_of_eval = self.GUAT_w_ff_df['last_stop_time'] + time_with_respect_to_last_stop
         self.GUAT_w_ff_df['time_of_eval'] = self.time_of_eval
-        self.GUAT_w_ff_df['point_index_of_eval'] = self.monkey_information['point_index'].values[np.searchsorted(self.monkey_information['monkey_t'].values, self.time_of_eval, side='right')-1]
+        self.GUAT_w_ff_df['point_index_of_eval'] = self.monkey_information['point_index'].values[np.searchsorted(self.monkey_information['time'].values, self.time_of_eval, side='right')-1]
 
 
     def eliminate_crossing_boundary_cases(self, n_seconds_before_crossing_boundary=None, n_seconds_after_crossing_boundary=None):
@@ -112,7 +112,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             n_seconds_before_crossing_boundary, n_seconds_after_crossing_boundary
             )
         
-        crossing_boundary_time = self.monkey_information.loc[self.monkey_information['crossing_boundary']==1, 'monkey_t'].values
+        crossing_boundary_time = self.monkey_information.loc[self.monkey_information['crossing_boundary']==1, 'time'].values
         original_length = len(self.time_of_eval)
         CB_indices, non_CB_indices, self.time_of_eval = decision_making_utils.find_time_points_that_are_within_n_seconds_after_crossing_boundary(self.time_of_eval, crossing_boundary_time, 
                 n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary, n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary)
@@ -176,7 +176,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                     self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
                     self.data_item.retrieve_or_make_monkey_data()
                 if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
-                    self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
+                    self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
                     self.ff_dataframe = self.data_item.ff_dataframe
                     self.ff_dataframe_visible = self.ff_dataframe.loc[self.ff_dataframe['visible']==1].copy()
 
@@ -185,9 +185,9 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 if not hasattr(self, 'data_item'):
                     self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
                     self.data_item.retrieve_or_make_monkey_data()
-                    self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
+                    self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
                 elif not hasattr(self, 'ff_dataframe'):
-                    self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
+                    self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
                 self.data_item.get_give_up_after_trying_info()
                 self.give_up_after_trying_info_bundle = self.data_item.give_up_after_trying_info_bundle
                 self.GUAT_w_ff_df = self.data_item.GUAT_w_ff_df
@@ -200,9 +200,9 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 if not hasattr(self, 'data_item'):
                     self.data_item = further_processing_class.FurtherProcessing(raw_data_folder_path=self.raw_data_folder_path)
                     self.data_item.retrieve_or_make_monkey_data()
-                    self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
+                    self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
                 elif not hasattr(self, 'ff_dataframe'):
-                    self.data_item.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=True)
+                    self.data_item.make_or_retrieve_ff_dataframe(exists_ok=True)
                 self.data_item.get_try_a_few_times_info()
 
             for df in ['try_a_few_times_trials', 'TAFT_indices_df', 'TAFT_trials_df', 'try_a_few_times_indices_for_anim']:
@@ -338,7 +338,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         traj_time_2d, trajectory_data_dict = trajectory_info.find_trajectory_data(self.time_all, self.monkey_information, time_range_of_trajectory=self.time_range_of_trajectory, num_time_points_for_trajectory=self.gc_kwargs['num_time_points_for_trajectory'])
 
         # convert traj_time_2d to point_index_2d use np.searchsorted
-        point_index_2d = np.searchsorted(self.monkey_information.monkey_t.values, traj_time_2d)
+        point_index_2d = np.searchsorted(self.monkey_information.time.values, traj_time_2d)
         # make sure no index is out of bound
         point_index_2d[point_index_2d >= len(self.monkey_information)] = len(self.monkey_information) - 1
 

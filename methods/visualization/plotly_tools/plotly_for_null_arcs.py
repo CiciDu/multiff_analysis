@@ -1,7 +1,7 @@
 import sys
 from turtle import fillcolor
 
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization import plot_behaviors_utils
 from null_behaviors import show_null_trajectory, curvature_utils, find_best_arc
 from planning_analysis.show_planning.get_stops_near_ff import plot_stops_near_ff_utils
@@ -88,20 +88,18 @@ def make_mini_ff_dataframe(ff_indices, duration, monkey_information, ff_real_pos
 
     for i in ff_indices:
         # Find the corresponding information in monkey_information in the given duration:
-        cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-        cum_t = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices])
-        cum_mx, cum_my, cum_angle = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_angles'].iloc[cum_iloc_indices])
-        
+        cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
+
         # Find distances to ff
         distances_to_ff = LA.norm(np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[i], axis = 1)
-        angles_to_ff = basic_func.calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)
-        angles_to_boundaries = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff, ff_radius=ff_radius)
+        angles_to_ff = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)
+        angles_to_boundaries = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff, ff_radius=ff_radius)
         # Find the indices of the points where the ff is both within a max_distance and valid angles
         ff_within_range_indices = np.where((np.absolute(angles_to_boundaries) <= 2*pi/9) & (distances_to_ff < max_distance))[0]
 
         # Append the values for this ff; Using list operations is faster than np.append here
         ff_index = ff_index + [i] * len(ff_within_range_indices)
-        point_index = point_index + cum_iloc_indices[ff_within_range_indices].tolist()
+        point_index = point_index + cum_point_index[ff_within_range_indices].tolist()
         time = time + cum_t[ff_within_range_indices].tolist()
         ff_x = ff_x + [ff_real_position_sorted[i, 0]]*len(ff_within_range_indices)
         ff_y = ff_y + [ff_real_position_sorted[i, 1]]*len(ff_within_range_indices)

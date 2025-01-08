@@ -2,7 +2,7 @@ import select
 import sys
 from turtle import fillcolor
 
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization import plot_behaviors_utils, monkey_heading_functions
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.get_stops_near_ff import plot_stops_near_ff_utils

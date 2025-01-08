@@ -2,7 +2,7 @@ import sys
 from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT
 from decision_making_analysis import free_selection, replacement, trajectory_info
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from pattern_discovery import cluster_analysis
 
 import os
@@ -69,10 +69,10 @@ def find_df_related_to_cluster_replacement(replacement_df, prior_to_replacement_
     if sample_size is not None:
         sampled_indices_1 = np.random.choice(len(new_ff_info), sample_size, replace=False)
         sampled_indices_2 = np.random.choice(len(non_chosen_ff_info), sample_size, replace=False)
-        old_ff_info, new_ff_info = basic_func.take_out_a_sample_from_df(sampled_indices_1, old_ff_info, new_ff_info)
-        old_ff_positions, new_ff_positions, all_point_index_1, all_time_1 = basic_func.take_out_a_sample_from_arrays(sampled_indices_1, old_ff_positions, new_ff_positions, all_point_index_1, all_time_1)
-        non_chosen_ff_info, parallel_old_ff_info = basic_func.take_out_a_sample_from_df(sampled_indices_2, non_chosen_ff_info, parallel_old_ff_info)
-        non_chosen_ff_positions, parallel_old_ff_positions, all_point_index_2, all_time_2 = basic_func.take_out_a_sample_from_arrays(sampled_indices_2, non_chosen_ff_positions, parallel_old_ff_positions, all_point_index_2, all_time_2)
+        old_ff_info, new_ff_info = general_utils.take_out_a_sample_from_df(sampled_indices_1, old_ff_info, new_ff_info)
+        old_ff_positions, new_ff_positions, all_point_index_1, all_time_1 = general_utils.take_out_a_sample_from_arrays(sampled_indices_1, old_ff_positions, new_ff_positions, all_point_index_1, all_time_1)
+        non_chosen_ff_info, parallel_old_ff_info = general_utils.take_out_a_sample_from_df(sampled_indices_2, non_chosen_ff_info, parallel_old_ff_info)
+        non_chosen_ff_positions, parallel_old_ff_positions, all_point_index_2, all_time_2 = general_utils.take_out_a_sample_from_arrays(sampled_indices_2, non_chosen_ff_positions, parallel_old_ff_positions, all_point_index_2, all_time_2)
 
 
     # find information of clusters of these ff
@@ -328,7 +328,7 @@ def turn_more_ff_df_into_free_selection_inputs_df_for_plotting(more_ff_df, point
 
 
 def add_time_till_next_visible(df, ff_dataframe_visible, monkey_information):
-    all_current_time = monkey_information.loc[df['point_index'].values, 'monkey_t'].values
+    all_current_time = monkey_information.loc[df['point_index'].values, 'time'].values
     df['time_till_next_visible'] = decision_making_utils.find_time_since_last_vis_OR_time_till_next_visible(df.ff_index.values, all_current_time, ff_dataframe_visible, time_since_last_vis=False)
 
 

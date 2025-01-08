@@ -308,8 +308,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         # for non-both-eye cases
         _, _, self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(trajectory_df, duration, rotation_matrix=R)
         self.monkey_subset = self.monkey_subset.merge(trajectory_df[['point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')
-        self.monkey_subset.set_index('point_index', inplace=True)
-        self.monkey_subset['point_index'] = self.monkey_subset.index
+        self.monkey_subset.index = self.monkey_subset['point_index'].values
 
 
 

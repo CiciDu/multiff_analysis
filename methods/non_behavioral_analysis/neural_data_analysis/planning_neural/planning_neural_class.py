@@ -20,7 +20,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
 
     def get_all_planning_info(self, both_ff_across_time_df_exists_ok=True):
 
-        self.monkey_information.loc[:, 'bin'] = np.digitize(self.monkey_information['monkey_t'].values, self.time_bins)-1
+        self.monkey_information.loc[:, 'bin'] = np.digitize(self.monkey_information['time'].values, self.time_bins)-1
         self.mid_bins = self.monkey_information[['bin', 'point_index']].groupby('bin').median().astype(int).reset_index(drop=False)
         self.mid_bins = self.mid_bins.merge(self.monkey_information.drop(columns={'bin'}), on='point_index', how='left')
         self.both_ff_across_time_df = self._get_both_ff_across_time_df(exists_ok=both_ff_across_time_df_exists_ok)
@@ -58,7 +58,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
 
     def _get_point_index_based_on_some_time_before_stop(self, n_seconds_before_stop=2):
         self.stops_near_ff_df['some_time_before_stop'] = self.stops_near_ff_df['stop_time'] - n_seconds_before_stop
-        self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(self.monkey_information['monkey_t'].values, self.stops_near_ff_df['some_time_before_stop'].values)
+        self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values)
 
 
     def _get_info_to_add(self, row):
@@ -105,9 +105,9 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
 
     def _get_ff_df_and_add_time_info(self, row, which_ff_info):
         ff_df = self.alt_ff_df2 if which_ff_info == 'alt_' else self.stop_ff_df2
-        ff_df['time'] = self.monkey_information.loc[ff_df['point_index'].values, 'monkey_t'].values
+        ff_df['time'] = self.monkey_information.loc[ff_df['point_index'].values, 'time'].values
         ff_df['stop_point_index'] = row['stop_point_index']
-        ff_df['stop_time'] = self.monkey_information.loc[row['stop_point_index'], 'monkey_t']
+        ff_df['stop_time'] = self.monkey_information.loc[row['stop_point_index'], 'time'].values
         return ff_df
 
 

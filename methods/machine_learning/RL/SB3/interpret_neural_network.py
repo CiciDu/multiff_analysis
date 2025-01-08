@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 
 import os
 import numpy as np
@@ -298,13 +298,13 @@ def sample_observations_for_one_ff(const_distance, const_angle, const_memory, sa
 
     if const_angle is None:
         angle2center = np.random.uniform(low=-pi, high=pi, size=sample_size,)
-        angle2boundary = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=angle2center, distances_to_ff=distances) 
+        angle2boundary = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=angle2center, distances_to_ff=distances) 
     else:
         angle2center = np.ones([sample_size, ]) * const_angle
         # Make sure the angles are within the range of -pi to pi.
         angle2center = np.remainder(angle2center, 2*pi)
         angle2center[angle2center > pi] = angle2center[angle2center > pi] - 2*pi
-        angle2boundary = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=angle2center, distances_to_ff=distances)      
+        angle2boundary = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=angle2center, distances_to_ff=distances)      
     
     if const_memory is None:
         memories = np.random.randint(low=0, high=full_memory+1, size=[sample_size, ])

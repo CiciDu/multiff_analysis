@@ -1,9 +1,9 @@
-from data_wrangling import basic_func, base_processing_class
+from data_wrangling import specific_utils, base_processing_class, general_utils
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import plot_behaviors_utils
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from decision_making_analysis.GUAT import GUAT_utils
-from data_wrangling import basic_func, process_raw_data
+from data_wrangling import specific_utils, process_monkey_information
 from pattern_discovery import pattern_by_points
 
 import os
@@ -61,7 +61,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         self.make_or_retrieve_scatter_around_target_df(exists_ok=exists_ok)
 
-    def prepare_to_find_patterns_and_features(self, find_patterns=True):
+    def _prepare_to_find_patterns_and_features(self, find_patterns=True):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
         self.make_or_retrieve_ff_dataframe(already_made_ok=True, exists_ok=True)
         if find_patterns:
@@ -82,7 +82,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         # take out trials in cluster_around_target_trials but not in used_cluster_trials
         self.waste_cluster_around_target_trials = np.setdiff1d(self.cluster_around_target_trials, self.used_cluster_trials)
         self.ignore_sudden_flash_trials, self.sudden_flash_trials, self.ignore_sudden_flash_indices, self.ignore_sudden_flash_indices_for_anim, self.ignored_ff_target_pairs = pattern_by_trials.ignore_sudden_flash_func(self.ff_dataframe, self.max_point_index, max_ff_distance_from_monkey = 50)
-        self.ignore_sudden_flash_time = self.monkey_information['monkey_t'][self.ignore_sudden_flash_indices]
+        self.ignore_sudden_flash_time = self.monkey_information['time'][self.ignore_sudden_flash_indices]
         self.get_give_up_after_trying_info()
         self.get_try_a_few_times_info()
 
@@ -117,7 +117,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         if self.all_trial_patterns is None:       
             if getattr(self, 'n_ff_in_a_row', None) is None:
-                self.prepare_to_find_patterns_and_features()
+                self._prepare_to_find_patterns_and_features()
             self.all_trial_patterns = self.make_all_trial_patterns()
             print("made all_trial_patterns")
 
@@ -144,7 +144,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         if self.all_trial_features is None:   
             if getattr(self, 'cluster_around_target_indices', None) is None:
-                self.prepare_to_find_patterns_and_features()             
+                self._prepare_to_find_patterns_and_features()             
             self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.cluster_around_target_indices,\
                                                               self.ff_real_position_sorted, self.ff_believed_position_sorted, data_folder_name = self.patterns_and_features_data_folder_path)
             print("made all_trial_features")
@@ -274,12 +274,12 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.all_trial_patterns = pd.DataFrame(all_trial_patterns_dict)
 
         if self.patterns_and_features_data_folder_path:
-            basic_func.save_df_to_csv(self.all_trial_patterns, 'all_trial_patterns', self.patterns_and_features_data_folder_path)
+            general_utils.save_df_to_csv(self.all_trial_patterns, 'all_trial_patterns', self.patterns_and_features_data_folder_path)
 
         return self.all_trial_patterns
 
     def make_one_stop_w_ff_df(self):   
-        self.prepare_to_find_patterns_and_features(find_patterns=False)
+        self._prepare_to_find_patterns_and_features(find_patterns=False)
 
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.one_stop_df)
@@ -338,16 +338,3 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                 # -1 means both the target and other ff are neither visible or in memory
             self.target_angle_smallest = pattern_by_points.make_target_angle_smallest(self.ff_dataframe, self.max_point_index, data_folder_name=self.patterns_and_features_data_folder_path)
             print("made target_angle_smallest")
-
-    def make_distance_dataframe(self):
-        corresponding_t = np.array(self.monkey_information['monkey_t'])[:self.max_point_index+1]
-        distance_dataframe = process_raw_data.turn_array_into_df(self, array=self.target_closest, corresponding_t=corresponding_t)
-        self.distance_dataframe = distance_dataframe
-        self.trial_vs_distance = distance_dataframe[['num', 'trial']].groupby('trial').max()
-
-    def make_angle_dataframe(self):
-        corresponding_t = np.array(self.monkey_information['monkey_t'])[:self.max_point_index+1]
-        angle_dataframe = process_raw_data.turn_array_into_df(self, array=self.target_angle_smallest, corresponding_t=corresponding_t)
-        self.angle_dataframe = angle_dataframe
-        self.trial_vs_angle = angle_dataframe[['num', 'trial']].groupby('trial').max()
-

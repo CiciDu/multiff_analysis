@@ -3,7 +3,7 @@ from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.plan_factors import plan_factors_utils
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -319,7 +319,7 @@ def make_variations_df_across_ref_point_values(variation_func,
                                                 ):
 
     all_variations_df = pd.DataFrame()
-    variations_list = basic_func.init_variations_list_func(ref_point_params_based_on_mode,
+    variations_list = specific_utils.init_variations_list_func(ref_point_params_based_on_mode,
                                                                 monkey_name=monkey_name)
 
     for index, row in variations_list.iterrows():

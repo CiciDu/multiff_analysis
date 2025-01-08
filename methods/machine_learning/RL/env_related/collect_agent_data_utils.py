@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func, process_raw_data
+from data_wrangling import specific_utils, process_monkey_information
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe
 
 import os
@@ -93,7 +93,7 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
     monkey_speed = []
     monkey_dw = []
     monkey_angles = []  # in radians
-    monkey_t = []
+    time = []
 
 
     # I shall make a dataframe composed of time point, unique identifier, ff_x_noisy, and ff_y_noisy.
@@ -127,7 +127,7 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
         monkey_speed.append(env.v.item())
         monkey_dw.append(env.w.item())
         monkey_angles.append(env.agentheading.item())
-        monkey_t.append(env.time)
+        time.append(env.time)
 
         env.topk_indices = env.topk_indices.tolist()
         indexes_in_ff_flash.extend(env.topk_indices)
@@ -167,11 +167,11 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
                          'Try using groupby(["point_index", "index_in_ff_flash"]).last() after sorting to correct the error.')
 
     # collect all monkey's data into a dictionary
-    monkey_information = pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
+    monkey_information = pack_monkey_information(time, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
+    monkey_information['point_index'] = range(len(monkey_information))
     monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > env.linear_terminal_vel * 200) | \
                                                 (np.abs(monkey_information['monkey_dw']) > env.angular_terminal_vel * pi/2)).astype(int) 
     
-
     # get information about fireflies from env.ff_information and env.ff_lash
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
     caught_ff_num = len(ff_caught_T_new)
@@ -199,7 +199,7 @@ def collect_agent_data_func(env, sac_model, n_steps = 15000, LSTM = False, hidde
 
 
     # find and print ff capture rate
-    ff_capture_rate = len(set(ff_caught_T_new))/monkey_information['monkey_t'].max()
+    ff_capture_rate = len(set(ff_caught_T_new))/monkey_information['time'].max()
     print('Firefly capture rate: ', ff_capture_rate)
 
 
@@ -215,14 +215,14 @@ def find_decimals(x):
         return int(abs(math.log10(abs(x))))
 
 
-def pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, dt):
+def pack_monkey_information(time, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, dt):
     """
     Organize the information of the monkey/agent into a dictionary
 
 
     Parameters
     ----------
-    monkey_t: list
+    time: list
         containing a series of time points
     monkey_x: list
         containing a series of x-positions of the monkey/agent
@@ -241,7 +241,7 @@ def pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_d
         containing the information such as the speed, angle, and location of the monkey at various points of time
 
     """
-    monkey_t = np.array(monkey_t)
+    time = np.array(time)
     monkey_x = np.array(monkey_x)
     monkey_y = np.array(monkey_y)
     monkey_speed = np.array(monkey_speed)
@@ -250,12 +250,12 @@ def pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_d
     monkey_angles = np.remainder(monkey_angles, 2*pi)
 
     monkey_information = {
-        'monkey_t': monkey_t,
+        'time': time,
         'monkey_x': monkey_x,
         'monkey_y': monkey_y,
         'monkey_speed': monkey_speed,
         'monkey_dw': monkey_dw,
-        'monkey_angles': monkey_angles,
+        'monkey_angle': monkey_angles,
     }
 
 
@@ -272,7 +272,7 @@ def pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_d
 
     monkey_information = pd.DataFrame(monkey_information)
 
-    process_raw_data.add_more_columns_to_monkey_information(monkey_information)
+    process_monkey_information.add_more_columns_to_monkey_information(monkey_information)
 
     return monkey_information
 
@@ -298,7 +298,7 @@ def find_flash_time_for_one_ff(ff_flash, lifetime):
     """
 
     # Find indices of overlapped intervals between ff_flash and duration
-    indices_of_overlapped_intervals = basic_func.find_intersection(ff_flash, lifetime)
+    indices_of_overlapped_intervals = general_utils.find_intersection(ff_flash, lifetime)
     if len(indices_of_overlapped_intervals) > 0:
         ff_flash_valid = ff_flash[indices_of_overlapped_intervals]
         # Make sure that the first interval does not start until the ff starts to be alive
@@ -386,14 +386,14 @@ def make_env_ff_flash_from_real_data(ff_flash_sorted_of_monkey, alive_ffs, ff_fl
     return env_ff_flash
 
 
-def increase_dt_for_monkey_information(monkey_t, monkey_x, monkey_y, new_dt, old_dt = 0.0166):
+def increase_dt_for_monkey_information(time, monkey_x, monkey_y, new_dt, old_dt = 0.0166):
     """
     Extract data points from monkey's information by increasing the interval between the points
 
 
     Parameters
     ----------
-    monkey_t: np.array
+    time: np.array
         containing an array of time
     monkey_x: np.array
         containing an array of x-positions of the monkey
@@ -407,7 +407,7 @@ def increase_dt_for_monkey_information(monkey_t, monkey_x, monkey_y, new_dt, old
 
     Returns
     -------
-    monkey_t: np.array
+    time: np.array
         containing an array of time
     monkey_x: np.array
         containing an array of x-positions of the monkey
@@ -424,15 +424,15 @@ def increase_dt_for_monkey_information(monkey_t, monkey_x, monkey_y, new_dt, old
 
 
     ratio = new_dt/old_dt
-    agent_indices = np.arange(0, len(monkey_t)-1, ratio)
-    # used len(monkey_t)-1 for fear that after rounding, the last number will exceed the limit
+    agent_indices = np.arange(0, len(time)-1, ratio)
+    # used len(time)-1 for fear that after rounding, the last number will exceed the limit
     agent_indices = np.round(agent_indices).astype('int') 
     
-    monkey_t = monkey_t[agent_indices]
+    time = time[agent_indices]
     monkey_x = monkey_x[agent_indices]
     monkey_y = monkey_y[agent_indices]
 
-    delta_time = np.diff(monkey_t)
+    delta_time = np.diff(time)
     delta_x = np.diff(monkey_x)
     delta_y = np.diff(monkey_y)
     delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
@@ -456,7 +456,7 @@ def increase_dt_for_monkey_information(monkey_t, monkey_x, monkey_y, new_dt, old
     monkey_dw = np.divide(delta_angle, delta_time)
     monkey_dw = np.append(monkey_dw[0], monkey_dw)
 
-    return monkey_t, monkey_x, monkey_y, monkey_speed, monkey_angles, monkey_dw
+    return time, monkey_x, monkey_y, monkey_speed, monkey_angles, monkey_dw
 
 
 def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
@@ -593,8 +593,8 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     # Find the indices of alive fireflies
     alive_ffs = np.array([index for index, life in enumerate(info_of_monkey['ff_life_sorted']) if (life[1] >= plot_whole_duration[0]) and (life[0] < plot_whole_duration[1])])  
     # Take out relevant information from the monkey data
-    M_cum_indices = np.where((info_of_monkey['monkey_information']['monkey_t'] >= monkey_acting_duration[0]) & (info_of_monkey['monkey_information']['monkey_t'] <= monkey_acting_duration[1]))[0]
-    M_cum_t = np.array(info_of_monkey['monkey_information']['monkey_t'][M_cum_indices])
+    M_cum_indices = np.where((info_of_monkey['monkey_information']['time'] >= monkey_acting_duration[0]) & (info_of_monkey['monkey_information']['time'] <= monkey_acting_duration[1]))[0]
+    M_cum_t = np.array(info_of_monkey['monkey_information']['time'][M_cum_indices])
     M_cum_mx, M_cum_my = np.array(info_of_monkey['monkey_information']['monkey_x'][M_cum_indices]), np.array(info_of_monkey['monkey_information']['monkey_y'][M_cum_indices])
     # Find the correponding agent information (replicated from the monkey's data, but with a bigger time interval)
     A_cum_t, A_cum_mx, A_cum_my, A_cum_speed, A_cum_angle, A_cum_dw = increase_dt_for_monkey_information(M_cum_t, M_cum_mx, M_cum_my, agent_dt)
@@ -645,7 +645,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     monkey_speed = []
     monkey_dw = []
     monkey_angles = []  # in radians
-    monkey_t = []
+    time = []
     obs_ff_unique_identifiers = []
 
 
@@ -682,7 +682,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
         monkey_speed.append(env.v.item())
         monkey_dw.append(env.w.item())
         monkey_angles.append(env.agentheading.item())
-        monkey_t.append(env.time)
+        time.append(env.time)
 
         indexes_in_ff_information = []
         for index in env.topk_indices:
@@ -710,7 +710,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
         monkey_speed.append(env.v.item())
         monkey_dw.append(env.w.item())
         monkey_angles.append(env.agentheading.item())
-        monkey_t.append(env.time)
+        time.append(env.time)
 
         indexes_in_ff_information = []
         for index in env.topk_indices:
@@ -721,7 +721,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
 
     #======================================= Organize Collected Data ==========================================
-    monkey_information = pack_monkey_information(monkey_t, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
+    monkey_information = pack_monkey_information(time, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
     caught_ff_num = len(ff_caught_T_new)
 
@@ -731,7 +731,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
     # Make ff_dataframe
     ff_dataframe_args = (monkey_information, ff_caught_T_new, ff_flash_sorted,  ff_real_position_sorted, ff_life_sorted)
-    ff_dataframe_kargs = {"max_distance": 400, "num_missed_index": 0}
+    ff_dataframe_kargs = {"max_distance": 400}
     ff_dataframe = make_ff_dataframe.make_ff_dataframe_func(*ff_dataframe_args, **ff_dataframe_kargs, player = "agent", \
                                     obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe)
     # Only keep the relevant part of ff_dataframe

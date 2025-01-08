@@ -379,7 +379,7 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
     
     def get_null_arc_info_for_counted_points(self, use_fixed_arc_length=False, fixed_arc_length=None):
 
-        #with basic_func.HiddenPrints():
+        #with general_utils.HiddenPrints():
         if self.overall_params['use_curvature_to_ff_center']:
             self.stop_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(self.ref_point_index_counted, self.stop_ff_counted_df.ff_index.values, self.monkey_information, self.ff_real_position_sorted)
             self.alt_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(self.ref_point_index_counted, self.alt_ff_counted_df.ff_index.values, self.monkey_information, self.ff_real_position_sorted)

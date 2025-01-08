@@ -48,7 +48,7 @@ def take_optimal_row_per_group_based_on_columns(df, columns, groupby_column='poi
 
 def supply_info_of_cluster_to_df(df, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=50):
 
-    ff_time = monkey_information.loc[df['point_index'].values, 'monkey_t'].values
+    ff_time = monkey_information.loc[df['point_index'].values, 'time'].values
     ff_cluster = cluster_analysis.find_alive_ff_clusters(ff_real_position_sorted[df['ff_index'].values], ff_real_position_sorted, ff_time-10, ff_time+10, 
                                                    ff_life_sorted, max_distance=max_cluster_distance)
     ff_cluster_df = cluster_analysis.turn_list_of_ff_clusters_info_into_dataframe(ff_cluster, df['point_index'].values)
@@ -103,15 +103,6 @@ def find_GUAT_current_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sor
         # either the ff has appeared lately, or will appear shortly
         GUAT_current_ff_info = GUAT_current_ff_info[(GUAT_current_ff_info['time_since_last_vis'] <= max_time_since_last_vis) | 
                                                     (GUAT_current_ff_info['time_till_next_visible'] <= GUAT_current_ff_info['total_stop_time'] + duration_into_future)] 
-
-    # if min_time_till_next_visible is not None:
-    #     # This is to eliminate the point_index that has a targeted_ff whose time_till_next_visible is too small; in other words, we only want ff that will not re-appear soon.
-    #     GUAT_current_ff_info['time'] = monkey_information.loc[GUAT_current_ff_info['point_index'].values, 'monkey_t'].values
-    #     GUAT_current_ff_info['time_till_next_visible'] = decision_making_utils.find_time_since_last_vis_OR_time_till_next_visible(GUAT_current_ff_info['ff_index'].values, GUAT_current_ff_info['time'].values, ff_dataframe_visible, time_since_last_vis=False)
-    #     GUAT_current_ff_info.loc[GUAT_current_ff_info['ff_index'] < 0, 'time_till_next_visible'] = np.nan
-    #     point_index_to_eliminate = GUAT_current_ff_info[GUAT_current_ff_info['time_till_next_visible'] < min_time_till_next_visible]['point_index'].values
-    #     print('The number of point indices eliminated because of time_till_next_visible is', len(point_index_to_eliminate), 'which is', round(len(point_index_to_eliminate)/len(GUAT_current_ff_info)*100, 2), '% of the total number of point indices.')
-    #     GUAT_current_ff_info = GUAT_current_ff_info[~GUAT_current_ff_info['point_index'].isin(point_index_to_eliminate)].copy()
 
     # get distance_to_monkey
     GUAT_current_ff_info = GUAT_current_ff_info.merge(GUAT_current_ff[['point_index', 'first_stop_point_index']], on='point_index', how='left')
@@ -323,7 +314,7 @@ def find_curv_diff_for_ff_info(ff_info, monkey_information, ff_real_position_sor
     ff_info_temp = ff_info.groupby(['point_index', 'ff_index']).first().reset_index(drop=False).copy()
     ff_info_temp['monkey_x'] = monkey_information.loc[ff_info_temp['point_index'], 'monkey_x'].values
     ff_info_temp['monkey_y'] = monkey_information.loc[ff_info_temp['point_index'], 'monkey_y'].values
-    ff_info_temp['monkey_angle'] = monkey_information.loc[ff_info_temp['point_index'], 'monkey_angles'].values
+    ff_info_temp['monkey_angle'] = monkey_information.loc[ff_info_temp['point_index'], 'monkey_angle'].values
     ff_info_temp['ff_x'] = ff_real_position_sorted[ff_info_temp['ff_index'].values, 0]
     ff_info_temp['ff_y'] = ff_real_position_sorted[ff_info_temp['ff_index'].values, 1]
     temp_curvature_df = curvature_utils.make_curvature_df(ff_info_temp, curv_of_traj_df, ff_radius_for_optimal_arc=15)
@@ -395,7 +386,7 @@ def find_ff_aimed_at_through_manual_annotation(relevant_indices, monkey_informat
         manual_anno_sub = manual_anno_sub_during_interval
 
     # make sure the info is not too old
-    min_time_from_relevant_indices = monkey_information.monkey_t.values[relevant_indices.min()]
+    min_time_from_relevant_indices = monkey_information.time.values[relevant_indices.min()]
     if manual_anno_sub.time.max() > min_time_from_relevant_indices - 4:
         ff_aimed_at = manual_anno_sub.ff_index.values
     else:
@@ -408,7 +399,7 @@ def find_alive_ff_close_to_monkey(relevant_indices, monkey_information, ff_life_
     # find alive ff that are close to monkey at certain indices
     close_ff_indices = np.array([], dtype=int)
     monkey_xy = monkey_information[['monkey_x', 'monkey_y']].values
-    duration = [monkey_information['monkey_t'].iloc[min(relevant_indices)].item(), monkey_information['monkey_t'].iloc[max(relevant_indices)].item()]
+    duration = [monkey_information['time'].loc[min(relevant_indices)].item(), monkey_information['time'].loc[max(relevant_indices)].item()]
 
     # take out alive ff during the trial
     alive_ff_indices, alive_ff_positions = plot_behaviors_utils.find_alive_ff(duration, ff_life_sorted, ff_real_position_sorted, rotation_matrix=None)

@@ -1,10 +1,10 @@
-from data_wrangling import basic_func, base_processing_class, further_processing_class
+from data_wrangling import specific_utils, base_processing_class, further_processing_class
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import plot_behaviors_utils, plot_trials
 from visualization.animation import animation_utils, animation_func
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from decision_making_analysis.GUAT import GUAT_utils
-from data_wrangling import basic_func, process_raw_data
+from data_wrangling import specific_utils, process_monkey_information
 from pattern_discovery import pattern_by_points
 
 import os
@@ -37,7 +37,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
     def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left = False, max_num_frames=150, max_duration=30, min_duration=1, rotated=True): 
         # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
-        currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(self.ff_caught_T_new, currentTrial, num_trials, duration)
+        currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(self.ff_caught_T_new, currentTrial, num_trials, duration)
         
         # if the duration is too short, then increase the number of trials
         while duration[1] - duration[0] < 0.1:
@@ -204,7 +204,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
             print(f"No trials found for category: {category_name}")
             return 
 
-        with basic_func.initiate_plot(10,10,100):
+        with general_utils.initiate_plot(10,10,100):
             for currentTrial in category[:max_trial_to_plot]:
                 file_name = f"{self.data_name}_{currentTrial-num_trials+1}-{currentTrial}.mp4"
                 video_path_name = os.path.join(self.video_dir, file_name)
@@ -239,11 +239,11 @@ class AnimationClass(further_processing_class.FurtherProcessing):
         if additional_kwargs is not None:
             animation_plot_kwargs.update(additional_kwargs)
 
-        with basic_func.initiate_plot(10,10,100):
+        with general_utils.initiate_plot(10,10,100):
             for chunk in chunk_numbers:
                 chunk_df = df_with_chunks[df_with_chunks['chunk'] == chunk]
                 duration_points = [chunk_df['point_index'].min(), chunk_df['point_index'].max()]
-                duration = [monkey_information['monkey_t'][duration_points[0]], monkey_information['monkey_t'][duration_points[0]]+10]
+                duration = [monkey_information['time'][duration_points[0]], monkey_information['time'][duration_points[0]]+10]
 
                 file_name = f"chunk{chunk}_{round(duration[0], 1)}s-{round(duration[1], 1)}s.mp4"
                 video_path_name = os.path.join(self.video_dir, file_name)

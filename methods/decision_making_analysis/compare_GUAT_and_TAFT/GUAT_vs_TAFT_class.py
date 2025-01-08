@@ -50,7 +50,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'num_time_points_for_trajectory': 11, # originally 8
              'time_range_of_trajectory_to_plot': [0, 10], # original [-2, 5]
              'num_time_points_for_trajectory_to_plot': 41,
-             'trajectory_features': ['monkey_distance', 'monkey_angle_to_origin', 'monkey_t', 'curvature_of_traj'],
+             'trajectory_features': ['monkey_distance', 'monkey_angle_to_origin', 'time', 'curvature_of_traj'],
 
              'include_ff_in_near_future': True,
              'max_time_since_last_vis': 2.5,
@@ -227,7 +227,8 @@ class CompareGUATandTAFTclass():
         self.stops_near_ff_df = self.TAFT_df.copy() if (self.TAFT_or_GUAT == 'TAFT') else self.GUAT_df.copy()
 
         self.stops_near_ff_df.rename(columns={'ff_index': 'stop_ff_index'}, inplace=True)
-        self.stops_near_ff_df[['stop_x', 'stop_y', 'monkey_angle', 'stop_time', 'stop_cum_distance']] = self.monkey_information.loc[self.stops_near_ff_df['stop_point_index'], ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_t', 'cum_distance']].values
+        self.stops_near_ff_df[['stop_x', 'stop_y', 'monkey_angle', 'stop_time', 'stop_cum_distance']] = self.monkey_information.loc[self.stops_near_ff_df['stop_point_index'], 
+                                                                                                                                                             ['monkey_x', 'monkey_y', 'monkey_angle', 'time', 'cum_distance']].values
         self.stops_near_ff_df.rename(columns={'ff_index': 'stop_ff_index',
                                         'monkey_angle': 'stop_monkey_angle',}, inplace=True)
 

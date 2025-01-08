@@ -21,7 +21,7 @@ def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_n
     if n_max is not None:
         points_w_more_than_n_ff = points_w_more_than_n_ff[points_w_more_than_n_ff['num_alive_ff'] <= n_max].copy()
     # Eliminate the points before the capture of the 1st firefly
-    valid_earliest_point = np.where(monkey_information['monkey_t'] > ff_caught_T_new[0])[0][0]
+    valid_earliest_point = np.where(monkey_information['time'] > ff_caught_T_new[0])[0][0]
     points_w_more_than_n_ff = points_w_more_than_n_ff[points_w_more_than_n_ff['point_index'] >= valid_earliest_point].copy()
     diff = np.diff(points_w_more_than_n_ff['point_index'])
     points_w_more_than_n_ff['diff'] = np.append(0, diff) # in the array, numbers not equal to 1 are starts of a chunk
@@ -37,29 +37,30 @@ def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_n
 
 def find_points_w_more_than_n_ff(chunk_df, monkey_information, ff_caught_T_new, chunk_interval=10, minimum_time_before_capturing=0.5):
     first_point = chunk_df['point_index'].min()
-    duration = [monkey_information['monkey_t'][first_point], monkey_information['monkey_t'][first_point]+chunk_interval]
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0] 
+    duration = [monkey_information['time'][first_point], monkey_information['time'][first_point]+chunk_interval]
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0] 
+    cum_point_index = np.array(monkey_information['point_index'].iloc[cum_pos_index])
 
     # Take out the part right before catching a ff
     # First find ff caught in the interval and a little beyond the interval
     relevant_ff_caught_T = ff_caught_T_new[(ff_caught_T_new >= duration[0]) & (ff_caught_T_new <= duration[1]+minimum_time_before_capturing)]
     for time in relevant_ff_caught_T:
         duration_to_take_out = [time-minimum_time_before_capturing, time]        
-        # Take out corresponding indices from cum_iloc_indices
-        cum_iloc_indices = cum_iloc_indices[~((cum_iloc_indices >= duration_to_take_out[0]) & (cum_iloc_indices <= duration_to_take_out[1]))]
+        # Take out corresponding indices from cum_pos_index
+        cum_pos_index = cum_pos_index[~((cum_pos_index >= duration_to_take_out[0]) & (cum_pos_index <= duration_to_take_out[1]))]
 
-    cum_t = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices])
-    cum_dw, cum_ddw = np.array(monkey_information['monkey_dw'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_ddw'].iloc[cum_iloc_indices])
+    cum_t = np.array(monkey_information['time'].iloc[cum_pos_index])
+    cum_dw, cum_ddw = np.array(monkey_information['monkey_dw'].iloc[cum_pos_index]), np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index])
     cum_abs_ddw = np.abs(cum_ddw)
-    changing_dw_info = pd.DataFrame({'relative_point_index': np.where(cum_abs_ddw > 0.15)[0]})
+    changing_dw_info = pd.DataFrame({'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
     # find the first point of each sequence of consecutive points
-    changing_dw_info['group'] = np.append(0, (np.diff(changing_dw_info['relative_point_index'])!=1).cumsum())
+    changing_dw_info['group'] = np.append(0, (np.diff(changing_dw_info['relative_pos_index'])!=1).cumsum())
     changing_dw_info = changing_dw_info.groupby('group').min()
-    relative_point_index = changing_dw_info['relative_point_index'].astype(int)
-    changing_dw_info['point_index'] = cum_iloc_indices[relative_point_index]
-    changing_dw_info['time'] = cum_t[relative_point_index]
-    changing_dw_info['dw'] = cum_dw[relative_point_index]
-    changing_dw_info['ddw'] = cum_ddw[relative_point_index]
+    relative_pos_index = changing_dw_info['relative_pos_index'].astype(int)
+    changing_dw_info['point_index'] = cum_pos_index[relative_pos_index]
+    changing_dw_info['time'] = cum_t[relative_pos_index]
+    changing_dw_info['dw'] = cum_dw[relative_pos_index]
+    changing_dw_info['ddw'] = cum_ddw[relative_pos_index]
     return changing_dw_info
 
 
@@ -78,7 +79,7 @@ def increase_durations_between_points(df, min_duration=5):
 
 def decrease_overlaps_between_chunks(points_w_more_than_n_ff, monkey_information, min_interval_between_chunks):
     temp_df = points_w_more_than_n_ff.groupby('chunk').min()
-    temp_df['time'] = monkey_information['monkey_t'].values[temp_df['point_index'].values]
+    temp_df['time'] = monkey_information['time'].values[temp_df['point_index'].values]
     temp_df = temp_df.reset_index()[['chunk', 'time']]
     new_df = increase_durations_between_points(temp_df)
     new_chunks = new_df['chunk'].astype('int')

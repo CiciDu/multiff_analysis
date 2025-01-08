@@ -1,5 +1,5 @@
 from decision_making_analysis.decision_making import decision_making_utils
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from planning_analysis.show_planning import alt_ff_utils
 from null_behaviors import show_null_trajectory
 from pattern_discovery import cluster_analysis
@@ -37,8 +37,8 @@ def find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dat
 
     # eliminate boundary cases
     selected_point_index = captured_ff_info.stop_point_index.values
-    time_of_stops = monkey_information.loc[selected_point_index, 'monkey_t'].values
-    crossing_boundary_time = monkey_information.loc[monkey_information['crossing_boundary']==1, 'monkey_t'].values
+    time_of_stops = monkey_information.loc[selected_point_index, 'time'].values
+    crossing_boundary_time = monkey_information.loc[monkey_information['crossing_boundary']==1, 'time'].values
     CB_indices, non_CB_indices, left_input_time = decision_making_utils.find_time_points_that_are_within_n_seconds_after_crossing_boundary(time_of_stops, crossing_boundary_time, 
                                                                                                                                            n_seconds_before_crossing_boundary=0.2, 
                                                                                                                                            n_seconds_after_crossing_boundary=stop_period_duration + 0.2)
@@ -87,7 +87,7 @@ def make_shared_stops_near_ff_df(monkey_information, ff_dataframe_visible,
 
     shared_stops_near_ff_df = find_captured_ff_info_for_making_stops_near_ff_df(monkey_information, ff_dataframe_visible, closest_stop_to_capture_df, stop_period_duration=stop_period_duration)
 
-    shared_stops_near_ff_df[['stop_x', 'stop_y', 'monkey_angle', 'stop_time', 'stop_cum_distance']] = monkey_information.loc[shared_stops_near_ff_df['stop_point_index'], ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_t', 'cum_distance']].values
+    shared_stops_near_ff_df[['stop_x', 'stop_y', 'monkey_angle', 'stop_time', 'stop_cum_distance']] = monkey_information.loc[shared_stops_near_ff_df['stop_point_index'], ['monkey_x', 'monkey_y', 'monkey_angle', 'time', 'cum_distance']].values
 
     shared_stops_near_ff_df = alt_ff_utils.rename_first_and_last_seen_info_columns(shared_stops_near_ff_df, prefix='STOP_')
 
@@ -165,7 +165,7 @@ def add_stop_ff_cluster_50_size(shared_stops_near_ff_df, ff_real_position_sorted
 
 def check_for_different_ref_points_to_remove_rows_with_big_stop_or_alt_ff_angle_boundary(shared_stops_near_ff_df, monkey_information, ff_real_position_sorted):
     ref_point_params_based_on_mode = {'time after stop ff visible': [0, 0.1], 'distance': [-150, -100, -50]}
-    variations_list = basic_func.init_variations_list_func(ref_point_params_based_on_mode)
+    variations_list = specific_utils.init_variations_list_func(ref_point_params_based_on_mode)
     print('===================== Clearing shared_stops_near_ff_df based on ref_point_mode and ref_point_value =====================')
     for index, row in variations_list.iterrows():
         stops_near_ff_df, alt_ff_df, stop_ff_df = alt_ff_utils.get_alt_ff_df_and_stop_ff_df(shared_stops_near_ff_df)
@@ -210,10 +210,10 @@ def remove_cases_where_monkey_too_close_to_edge_func(stops_near_ff_df, monkey_in
 
 def calculate_info_based_on_monkey_angles(stops_near_ff_df, monkey_angles):
     info_df = stops_near_ff_df[['stop_point_index', 'd_from_stop_ff_to_stop', 'd_from_stop_ff_to_alt_ff']].copy()
-    info_df['monkey_angles'] = monkey_angles
-    info_df['angle_from_stop_ff_to_stop'] = basic_func.calculate_angles_to_ff_centers(ff_x=stops_near_ff_df['stop_x'].values, ff_y=stops_near_ff_df['stop_y'], \
+    info_df['monkey_angle'] = monkey_angles
+    info_df['angle_from_stop_ff_to_stop'] = specific_utils.calculate_angles_to_ff_centers(ff_x=stops_near_ff_df['stop_x'].values, ff_y=stops_near_ff_df['stop_y'], \
                                                                                                   mx=stops_near_ff_df['stop_ff_x'].values, my=stops_near_ff_df['stop_ff_y'], m_angle=monkey_angles)
-    info_df['angle_from_stop_ff_to_alt_ff'] = basic_func.calculate_angles_to_ff_centers(ff_x=stops_near_ff_df['alt_ff_x'].values, ff_y=stops_near_ff_df['alt_ff_y'], \
+    info_df['angle_from_stop_ff_to_alt_ff'] = specific_utils.calculate_angles_to_ff_centers(ff_x=stops_near_ff_df['alt_ff_x'].values, ff_y=stops_near_ff_df['alt_ff_y'], \
                                                                                                               mx=stops_near_ff_df['stop_ff_x'].values, my=stops_near_ff_df['stop_ff_y'], m_angle=monkey_angles)
     info_df['dir_from_stop_ff_to_stop'] = np.sign(info_df['angle_from_stop_ff_to_stop'])
     info_df['dir_from_stop_ff_to_alt_ff'] = np.sign(info_df['angle_from_stop_ff_to_alt_ff'])
@@ -228,11 +228,11 @@ def add_monkey_info_before_stop(monkey_information, stops_near_ff_df):
     # we take out all the potential information from monkey_information first
     monkey_info_sub = monkey_information[monkey_information['monkey_speed'] > 20].copy()
     monkey_info_sub['closest_future_stop'] = np.searchsorted(stops_near_ff_df['stop_point_index'].values, monkey_info_sub.index.values)
-    monkey_info_sub.sort_values(by='monkey_t', inplace=True)
+    monkey_info_sub.sort_values(by='time', inplace=True)
     # then, for each stop, we only keep the most recent monkey info before the stop
     monkey_info_sub = monkey_info_sub.groupby('closest_future_stop').tail(1).reset_index(drop=False)
     monkey_info_sub.rename(columns={'closest_future_stop': 'stop_counter',
-                                    'monkey_angles': 'monkey_angle_before_stop',
+                                    'monkey_angle': 'monkey_angle_before_stop',
                                     'point_index': 'point_index_before_stop'}, inplace=True)
 
     # then, we furnish stops_near_ff_df with the monkey info before the stop by merging
@@ -244,7 +244,7 @@ def add_monkey_info_before_stop(monkey_information, stops_near_ff_df):
     stops_near_ff_df.dropna(subset=['point_index_before_stop'], inplace=True)
     stops_near_ff_df['point_index_before_stop'] = stops_near_ff_df['point_index_before_stop'].astype(int)
     stops_near_ff_df['distance_before_stop'] = monkey_information.loc[stops_near_ff_df['point_index_before_stop'].values, 'cum_distance'].values
-    stops_near_ff_df['time_before_stop'] = monkey_information.loc[stops_near_ff_df['point_index_before_stop'].values, 'monkey_t'].values
+    stops_near_ff_df['time_before_stop'] = monkey_information.loc[stops_near_ff_df['point_index_before_stop'].values, 'time'].values
     stops_near_ff_df.drop(columns=['stop_counter'], inplace=True)
 
     return stops_near_ff_df
@@ -292,7 +292,7 @@ def modify_position_of_ff_with_big_angle_for_finding_null_arc(ff_df, remove_i_o_
             ff_distance = np.sqrt(ff_x_relative**2 + ff_y_relative**2)
             ff_df['ff_angle'] = ff_angle
             ff_df['ff_distance'] = ff_distance
-            ff_df['ff_angle_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance, ff_radius=10)
+            ff_df['ff_angle_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance, ff_radius=10)
 
             ff_x, ff_y = show_null_trajectory.turn_relative_xy_positions_to_absolute_xy_positions(ff_x_relative, ff_y_relative, ff_df.monkey_x, ff_df.monkey_y, ff_df.monkey_angle)
             ff_df['ff_x'] = ff_x
@@ -309,8 +309,8 @@ def find_ff_info_n_seconds_ago(ff_df, monkey_information, ff_real_position_sorte
     #new_ff_df = ff_df[['ff_index']].copy()
     ff_df = ff_df.copy()
     ff_df['time'] = ff_df['stop_time'] + n_seconds
-    ff_df['point_index'] = np.searchsorted(monkey_information['monkey_t'].values, ff_df['time'].values, side='right') - 1
-    ff_df['point_index'] = np.clip(ff_df['point_index'], 0, len(monkey_information)-1)
+    ff_df['point_index'] = monkey_information['point_index'].values[np.searchsorted(monkey_information['time'].values, ff_df['time'].values, side='right') - 1]
+    ff_df['point_index'] = np.clip(ff_df['point_index'], monkey_information['point_index'].min(), monkey_information['point_index'].max())
     new_ff_df = find_ff_info(ff_df.ff_index.values, ff_df.point_index.values, monkey_information, ff_real_position_sorted)
     new_ff_df['stop_point_index'] = ff_df['stop_point_index'].values
     return new_ff_df
@@ -320,8 +320,8 @@ def find_ff_info_n_cm_ago(ff_df, monkey_information, ff_real_position_sorted, n_
     #new_ff_df = ff_df[['ff_index']].copy()
     ff_df = ff_df.copy()
     ff_df['cum_distance'] = ff_df['stop_cum_distance'] + n_cm
-    ff_df['point_index'] = np.searchsorted(monkey_information['cum_distance'].values, ff_df['cum_distance'].values, side='right') - 1
-    ff_df['point_index'] = np.clip(ff_df['point_index'], 0, len(monkey_information)-1)
+    ff_df['point_index'] = monkey_information['point_index'].values[np.searchsorted(monkey_information['cum_distance'].values, ff_df['cum_distance'].values, side='right') - 1]
+    ff_df['point_index'] = np.clip(ff_df['point_index'], monkey_information['point_index'].min(), monkey_information['point_index'].max())
     new_ff_df = find_ff_info(ff_df.ff_index.values, ff_df.point_index.values, monkey_information, ff_real_position_sorted)
     new_ff_df['stop_point_index'] = ff_df['stop_point_index'].values
     return new_ff_df
@@ -329,11 +329,11 @@ def find_ff_info_n_cm_ago(ff_df, monkey_information, ff_real_position_sorted, n_
 def find_ff_info(all_ff_index, all_point_index, monkey_information, ff_real_position_sorted):
     ff_df = pd.DataFrame({'ff_index': all_ff_index, 'point_index': all_point_index})
     ff_df[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_df['ff_index'].values]
-    ff_df[['monkey_x', 'monkey_y', 'monkey_angle']] = monkey_information.loc[ff_df['point_index'], ['monkey_x', 'monkey_y', 'monkey_angles']].values
+    ff_df[['monkey_x', 'monkey_y', 'monkey_angle']] = monkey_information.loc[ff_df['point_index'], ['monkey_x', 'monkey_y', 'monkey_angle']].values
     ff_df['ff_distance'] = np.linalg.norm(ff_df[['monkey_x', 'monkey_y']].values - ff_real_position_sorted[ff_df['ff_index'].values], axis=1)
-    ff_df['ff_angle'] = basic_func.calculate_angles_to_ff_centers(ff_x=ff_df['ff_x'].values, ff_y=ff_df['ff_y'].values, \
+    ff_df['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_df['ff_x'].values, ff_y=ff_df['ff_y'].values, \
                                                                             mx=ff_df['monkey_x'].values, my=ff_df['monkey_y'].values, m_angle=ff_df['monkey_angle'].values)
-    ff_df['ff_angle_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_df.ff_angle.values, distances_to_ff=ff_df.ff_distance.values, ff_radius=10)
+    ff_df['ff_angle_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_df.ff_angle.values, distances_to_ff=ff_df.ff_distance.values, ff_radius=10)
     return ff_df
 
 
@@ -392,7 +392,7 @@ def find_relative_curvature(alt_ff_counted_df, stop_ff_counted_df, curv_of_traj_
 
 
 def find_outliers_in_a_column(df, column, outlier_z_score_threshold=2):
-    outlier_positions = basic_func.find_outlier_position_index(df[column].values, outlier_z_score_threshold=outlier_z_score_threshold)
+    outlier_positions = general_utils.find_time_bins_for_an_array(df[column].values, outlier_z_score_threshold=outlier_z_score_threshold)
     non_outlier_positions = np.setdiff1d(range(len(df)), outlier_positions)
     return outlier_positions, non_outlier_positions
 
@@ -584,8 +584,8 @@ def find_ff_info_based_on_ref_point(ff_info, monkey_information, ff_real_positio
         if point_index_stop_ff_first_seen is None:
             point_index_stop_ff_first_seen = ff_info['point_index_ff_first_seen'].values
         all_time = monkey_information.loc[point_index_stop_ff_first_seen, 'time'].values + ref_point_value
-        new_point_index = np.searchsorted(monkey_information['monkey_t'].values, all_time, side='right') - 1
-        new_point_index = np.clip(new_point_index, 0, len(monkey_information)-1)
+        new_point_index =  monkey_information['point_index'].values[np.searchsorted(monkey_information['time'].values, all_time, side='right') - 1]
+        new_point_index = np.clip(new_point_index, monkey_information['point_index'].min(), monkey_information['point_index'].max())
         ff_info2 = find_ff_info(ff_info.ff_index.values, new_point_index, monkey_information, ff_real_position_sorted)
         ff_info2['stop_point_index'] = ff_info['stop_point_index'].values
     else:

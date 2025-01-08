@@ -162,7 +162,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.make_or_retrieve_curv_of_traj_df(exists_ok=curv_of_traj_df_exists_ok)
         self.add_curv_of_traj_info_to_monkey_information(column_exists_ok=True)
 
-        self.time_all = self.monkey_information.loc[self.point_index_all, 'monkey_t'].values
+        self.time_all = self.monkey_information.loc[self.point_index_all, 'time'].values
         
         self.get_trajectory_and_stop_info_for_machine_learning()
         self.get_more_trajectory_info_for_plotting(time_range_of_trajectory_to_plot=self.gc_kwargs['time_range_of_trajectory_to_plot'], num_time_points_for_trajectory_to_plot=self.gc_kwargs['num_time_points_for_trajectory_to_plot'])

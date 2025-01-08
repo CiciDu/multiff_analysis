@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization import plot_behaviors_utils
 from null_behaviors import show_null_trajectory, find_best_arc
 from non_behavioral_analysis import eye_positions
@@ -85,9 +85,9 @@ def PlotTrials(duration,
                indices_of_ff_to_mark = None, # None or a list
                indices_of_ff_to_mark_2nd_kind = None,
                steps_to_be_marked=None,
-               absolute_steps_to_be_marked=None,
-               absolute_steps_to_be_marked_2nd_kind=None,
-               absolute_steps_to_be_marked_3rd_kind=None,
+               point_indices_to_be_marked=None,
+               point_indices_to_be_marked_2nd_kind=None,
+               point_indices_to_be_marked_3rd_kind=None,
                adjust_xy_limits = True,
                zoom_in = False, # can only be effective if adjust_xy_limits is True
                images_dir = None,
@@ -183,7 +183,7 @@ def PlotTrials(duration,
         a list of indices of fireflies that will be marked (can be used to show the ignored fireflies in "ignore sudden flash" trials) 
     steps_to_be_marked: None or a list
         indices of the points on the trajectory to be marked by a different color from the path color
-    absolute_steps_to_be_marked: None or a list
+    point_indices_to_be_marked: None or a list
         similar as steps_to_be_marked, but here the absolute indices are passed, rather than relative indices
     adjust_xy_limits: bool
         whether to adjust xmin, xmax, ymin, ymax
@@ -215,9 +215,9 @@ def PlotTrials(duration,
 
 
     # If currentTrial is not given, then it will be calculated based on the duration
-    currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
+    currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
     print('currentTrial:', currentTrial, 'num_trials:', num_trials)
-    cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
+    cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
 
 
     cum_r = LA.norm(np.stack((cum_mx, cum_my)), axis = 0)
@@ -231,7 +231,7 @@ def PlotTrials(duration,
 
 
     if truncate_part_before_crossing_arena_edge:
-        cum_crossing_boundary = np.array(monkey_information['crossing_boundary'].iloc[cum_iloc_indices])
+        cum_crossing_boundary = np.array(monkey_information['crossing_boundary'].iloc[cum_pos_index])
         # find the last time point of crossing boundary
         cross_boundary_points = np.where(cum_crossing_boundary==1)[0]
         if len(cross_boundary_points) > 0:
@@ -242,8 +242,8 @@ def PlotTrials(duration,
                 # need to find the new currentTrial and num_trials and related information
                 currentTrial = None
                 num_trials = None
-                currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
-                cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
+                currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
+                cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
             else:
                 print("The monkey crossed the arena edge at {} but the duration is long enough (more than 2/3 of the original duration) to include the crossing".format(cross_boundary_time))
 
@@ -258,7 +258,7 @@ def PlotTrials(duration,
     #         duration[0] = null_agent_starting_time - assumed_memory_duration_of_agent
     #         print("duration[0] is changed to %s to ensure that the duration is sufficient for assumed_memory_duration_of_agent" % duration[0])
     #         # recalculate currentTrial and num_trials accordingly
-    #         currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
+    #         currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
 
     target_indices = np.arange(currentTrial-num_trials+1, currentTrial+1)
 
@@ -317,7 +317,7 @@ def PlotTrials(duration,
            
 
     if show_monkey_angles:
-        left_end_xy_rotated, right_end_xy_rotated = plot_behaviors_utils.find_triangles_to_show_monkey_angles(cum_mx, cum_my, cum_angles, rotation_matrix=R)
+        left_end_xy_rotated, right_end_xy_rotated = plot_behaviors_utils.find_triangles_to_show_monkey_angles(cum_mx, cum_my, cum_angle, rotation_matrix=R)
         axes = plot_behaviors_utils.visualize_monkey_angles_using_triangles(axes, cum_mxy_rotated, left_end_xy_rotated, right_end_xy_rotated, linewidth=0.5)
 
     if show_start:
@@ -401,32 +401,32 @@ def PlotTrials(duration,
     if steps_to_be_marked is not None:
         axes.scatter(cum_mxy_rotated[0, steps_to_be_marked]-x0, cum_mxy_rotated[1, steps_to_be_marked]-y0, marker='s', s=steps_to_be_marked_size[player], color="gold", zorder=3, alpha=0.3)
 
-    if absolute_steps_to_be_marked is not None:
-        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].iloc[absolute_steps_to_be_marked]), np.array(monkey_information['monkey_y'].iloc[absolute_steps_to_be_marked])
+    if point_indices_to_be_marked is not None:
+        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].loc[point_indices_to_be_marked]), np.array(monkey_information['monkey_y'].loc[point_indices_to_be_marked])
         temp_cum_mxy_rotated = np.matmul(R, np.stack((temp_cum_mx, temp_cum_my)))
         axes.scatter(temp_cum_mxy_rotated[0]-x0, temp_cum_mxy_rotated[1]-y0, marker='s', s=steps_to_be_marked_size[player], color="gold", zorder=3, alpha=0.7)
 
-    if absolute_steps_to_be_marked_2nd_kind is not None:
-        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].iloc[absolute_steps_to_be_marked_2nd_kind]), np.array(monkey_information['monkey_y'].iloc[absolute_steps_to_be_marked_2nd_kind])
+    if point_indices_to_be_marked_2nd_kind is not None:
+        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].loc[point_indices_to_be_marked_2nd_kind]), np.array(monkey_information['monkey_y'].loc[point_indices_to_be_marked_2nd_kind])
         temp_cum_mxy_rotated = np.matmul(R, np.stack((temp_cum_mx, temp_cum_my)))
         axes.scatter(temp_cum_mxy_rotated[0]-x0, temp_cum_mxy_rotated[1]-y0, marker='*', s=100, color="blue", zorder=3, alpha=0.6)
 
-    if absolute_steps_to_be_marked_3rd_kind is not None:
-        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].iloc[absolute_steps_to_be_marked_3rd_kind]), np.array(monkey_information['monkey_y'].iloc[absolute_steps_to_be_marked_3rd_kind])
+    if point_indices_to_be_marked_3rd_kind is not None:
+        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].loc[point_indices_to_be_marked_3rd_kind]), np.array(monkey_information['monkey_y'].loc[point_indices_to_be_marked_3rd_kind])
         temp_cum_mxy_rotated = np.matmul(R, np.stack((temp_cum_mx, temp_cum_my)))
         axes.scatter(temp_cum_mxy_rotated[0]-x0, temp_cum_mxy_rotated[1]-y0, marker='X', s=200, color="pink", zorder=4, alpha=0.8)
 
 
     if show_path_when_target_visible:
         path_size = {"agent": 50, "monkey": 30, "combined": 2}
-        ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(currentTrial, ff_dataframe_in_duration, cum_iloc_indices, visible_distance, rotation_matrix=R)
+        ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(currentTrial, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
         marker = axes.scatter(ff_visible_path_rotated[0]-x0, ff_visible_path_rotated[1]-y0, s=path_size[player], c="green", alpha=0.6, zorder=5)
         legend_markers.append(marker)
         legend_names.append('Path when target is visible')
 
     if show_path_when_prev_target_visible: # for previous target
         path_size = {"agent": 65, "monkey": 40, "combined": 2}
-        ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(currentTrial-1, ff_dataframe_in_duration, cum_iloc_indices, visible_distance, rotation_matrix=R)
+        ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(currentTrial-1, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
         marker = axes.scatter(ff_visible_path_rotated[0]-x0, ff_visible_path_rotated[1]-y0, s=path_size[player], c="aqua", alpha=0.8, zorder=3)
         legend_markers.append(marker)
         legend_names.append('Path when previous target is visible')
@@ -434,7 +434,7 @@ def PlotTrials(duration,
 
     if index_of_ff_to_show_path_when_ff_visible is not None:
         path_size = {"agent": 40, "monkey": 20, "combined": 2}
-        ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(index_of_ff_to_show_path_when_ff_visible, ff_dataframe_in_duration, cum_iloc_indices, visible_distance, rotation_matrix=R)
+        ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(index_of_ff_to_show_path_when_ff_visible, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
         marker = axes.scatter(ff_visible_path_rotated[0]-x0, ff_visible_path_rotated[1]-y0, s=path_size[player], c="aqua", alpha=0.7, zorder=3)
         legend_markers.append(marker)
         legend_names.append('Path when ff marked by aqua square is visible')     
@@ -555,7 +555,7 @@ def PlotTrials(duration,
     if show_eye_positions:
         if not show_eye_positions_for_both_eyes:
             gaze_world_xy_rotated, overall_valid_indices, _ = eye_positions.find_eye_positions_rotated_in_world_coordinates(monkey_information, duration, rotation_matrix=R)
-            axes, gaze_world_xy_rotated_valid = plot_behaviors_utils._show_eye_positions(axes, x0, y0, 'o', cum_iloc_indices, overall_valid_indices, gaze_world_xy_rotated)
+            axes, gaze_world_xy_rotated_valid = plot_behaviors_utils._show_eye_positions(axes, x0, y0, 'o', cum_pos_index, overall_valid_indices, gaze_world_xy_rotated)
             if show_connect_path_eye_positions:  
                 axes = plot_behaviors_utils._show_connect_path_eye_positions(gaze_world_xy_rotated_valid, cum_mxy_rotated, overall_valid_indices, axes, x0, y0, player, connection_alpha, connection_linewidth)
 
@@ -564,7 +564,7 @@ def PlotTrials(duration,
             for left_or_right, marker in [('left', 'o'), ('right', 's')]:
                 overall_valid_indices = both_eyes_info['overall_valid_indices'][left_or_right]
                 gaze_world_xy_rotated = both_eyes_info['gaze_world_xy_rotated'][left_or_right]
-                axes, gaze_world_xy_rotated_valid = plot_behaviors_utils._show_eye_positions(axes, x0, y0, marker, cum_iloc_indices, overall_valid_indices, gaze_world_xy_rotated)
+                axes, gaze_world_xy_rotated_valid = plot_behaviors_utils._show_eye_positions(axes, x0, y0, marker, cum_pos_index, overall_valid_indices, gaze_world_xy_rotated)
                 if show_connect_path_eye_positions:  
                     axes = plot_behaviors_utils._show_connect_path_eye_positions(gaze_world_xy_rotated_valid, cum_mxy_rotated, overall_valid_indices, axes, x0, y0, player, connection_alpha, 
                                                                                        connection_linewidth, sample_ratio=6)
@@ -572,7 +572,7 @@ def PlotTrials(duration,
     if show_eye_positions_on_the_right:
         gaze_world_xy_rotated, overall_valid_indices, monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(monkey_information, duration, rotation_matrix=R)
         gaze_monkey_view_xy = monkey_subset[['gaze_monkey_view_x', 'gaze_monkey_view_y']].values.T
-        used_cum_t = cum_iloc_indices[overall_valid_indices]
+        used_cum_t = cum_pos_index[overall_valid_indices]
         axes2 = fig.add_subplot(1, 2, 2)
         axes2.scatter(gaze_monkey_view_xy[0, overall_valid_indices], gaze_monkey_view_xy[1, overall_valid_indices], s=7, c=used_cum_t, cmap='viridis')
         mx_min, mx_max, my_min, my_max = plot_behaviors_utils.find_xy_min_max_for_plots(gaze_world_xy_rotated[:, overall_valid_indices], x0, y0, temp_ff_positions=None)
@@ -585,7 +585,7 @@ def PlotTrials(duration,
 
     colorbar_max_value = None
     if show_trajectory:
-        axes = plot_behaviors_utils.show_trajectory_func(axes, player, cum_iloc_indices, cum_mxy_rotated, cum_t, cum_speed, monkey_information, 
+        axes = plot_behaviors_utils.show_trajectory_func(axes, player, cum_pos_index, cum_mxy_rotated, cum_t, cum_speed, monkey_information, 
                     x0, y0, trail_color_var, show_eye_positions, subplots, hitting_arena_edge)
         # Some other procedures
         if trail_color_var is None:
@@ -594,7 +594,7 @@ def PlotTrials(duration,
             legend_markers.append(line)
             legend_names.append('Monkey trajectory')
         elif trail_color_var == 'abs_ddw':
-            cum_abs_ddw = np.abs(np.array(monkey_information['monkey_ddw'].iloc[cum_iloc_indices]))
+            cum_abs_ddw = np.abs(np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index]))
             colorbar_max_value = max(cum_abs_ddw)
 
 

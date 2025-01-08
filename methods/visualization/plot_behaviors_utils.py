@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization import plot_polar, plot_trials
 
 import os
@@ -92,7 +92,7 @@ def plot_trials_from_a_category(category, category_name, max_trial_to_plot, Plot
     
     num_trial_plotted = 0
     if len(category) > 0:
-        with basic_func.initiate_plot(figsize[0],figsize[1],100):
+        with general_utils.initiate_plot(figsize[0],figsize[1],100):
             if using_subplots:
                 fig = plt.figure()
             for currentTrial in category:
@@ -123,18 +123,19 @@ def plot_behaviors_in_clusters(points_w_more_than_2_ff, chunk_numbers, monkey_in
     for chunk in chunk_numbers:
         chunk_df = points_w_more_than_2_ff[points_w_more_than_2_ff['chunk'] == chunk]
         duration_points = [chunk_df['point_index'].min(), chunk_df['point_index'].max()]
-        duration = [monkey_information['monkey_t'][duration_points[0]], monkey_information['monkey_t'][duration_points[0]]+10]
-        cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-        cum_ddw = np.array(monkey_information['monkey_ddw'].iloc[cum_iloc_indices])
+        duration = [monkey_information['time'][duration_points[0]], monkey_information['time'][duration_points[0]]+10]
+        cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0]
+        cum_point_index = np.array(monkey_information['point_index'].iloc[cum_pos_index])
+        cum_ddw = np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index])
         cum_abs_ddw = np.abs(cum_ddw)
-        changing_dw_info = pd.DataFrame({'relative_point_index': np.where(cum_abs_ddw > 0.15)[0]})
+        changing_dw_info = pd.DataFrame({'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
         # find the first point of each sequence of consecutive points
-        changing_dw_info['group'] = np.append(0, (np.diff(changing_dw_info['relative_point_index'])!=1).cumsum())
+        changing_dw_info['group'] = np.append(0, (np.diff(changing_dw_info['relative_pos_index'])!=1).cumsum())
         changing_dw_info_short = changing_dw_info.groupby('group').min()
-        changing_dw_info_short['relative_point_index'] = changing_dw_info_short['relative_point_index'].astype(int)
-        changing_dw_info_short['point_index'] = cum_iloc_indices[changing_dw_info_short['relative_point_index']]
+        changing_dw_info_short['relative_pos_index'] = changing_dw_info_short['relative_pos_index'].astype(int)
+        changing_dw_info_short['point_index'] = cum_point_index[changing_dw_info_short['relative_pos_index']]
         for point_index in changing_dw_info_short['point_index']:
-            duration = [monkey_information['monkey_t'][point_index]-2, monkey_information['monkey_t'][point_index]]
+            duration = [monkey_information['time'][point_index]-2, monkey_information['time'][point_index]]
             ff_dataframe_sub = ff_dataframe[ff_dataframe['time'].between(duration[0], duration[1], inclusive='both')]
             # Make a polar plot from the monkey's perspective in the duration
             plot_polar.PlotPolar(duration,
@@ -157,7 +158,7 @@ def plot_behaviors_in_clusters(points_w_more_than_2_ff, chunk_numbers, monkey_in
 
 
 
-def show_trajectory_func(axes, player, cum_iloc_indices, cum_mxy_rotated, cum_t, cum_speed, monkey_information, 
+def show_trajectory_func(axes, player, cum_pos_index, cum_mxy_rotated, cum_t, cum_speed, monkey_information, 
                     x0, y0, trail_color_var, show_eye_positions, subplots, hitting_arena_edge):
     trail_size = {"agent": 70, "monkey": 2, "combined": 2}
     trail_alpha = {"agent": 1, "monkey": 0.9, "combined": 0.5}
@@ -168,7 +169,7 @@ def show_trajectory_func(axes, player, cum_iloc_indices, cum_mxy_rotated, cum_t,
     elif trail_color_var == 'speed': # the color of the path will vary by speed
         axes.scatter(cum_mxy_rotated[0]-x0, cum_mxy_rotated[1]-y0, marker='o', s=trail_size[player], alpha=trail_alpha[player], c=cum_speed, cmap='viridis', zorder=3)
     elif trail_color_var == 'abs_ddw':
-        cum_abs_ddw = np.abs(np.array(monkey_information['monkey_ddw'].iloc[cum_iloc_indices]))
+        cum_abs_ddw = np.abs(np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index]))
         axes.scatter(cum_mxy_rotated[0]-x0, cum_mxy_rotated[1]-y0, marker='o', s=trail_size[player], alpha=trail_alpha[player], c=cum_abs_ddw, cmap='viridis_r', zorder=3)            
         # To mark the points where high abs_ddw occur:
         points_to_mark = np.where(cum_abs_ddw > 0.1)[0]
@@ -246,11 +247,12 @@ def connect_points_to_points(axes, temp_ff_positions, temp_monkey_positions, x0,
 
 
 def find_monkey_information_in_the_duration(duration, monkey_information):
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-    cum_t, cum_angles = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_angles'].iloc[cum_iloc_indices])
-    cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices])
-    cum_speed, cum_speeddummy = np.array(monkey_information['monkey_speed'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_speeddummy'].iloc[cum_iloc_indices])
-    return cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0]
+    cum_point_index = np.array(monkey_information['point_index'].iloc[cum_pos_index])
+    cum_t, cum_angle = np.array(monkey_information['time'].iloc[cum_pos_index]), np.array(monkey_information['monkey_angle'].iloc[cum_pos_index])
+    cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_pos_index]), np.array(monkey_information['monkey_y'].iloc[cum_pos_index])
+    cum_speed, cum_speeddummy = np.array(monkey_information['monkey_speed'].iloc[cum_pos_index]), np.array(monkey_information['monkey_speeddummy'].iloc[cum_pos_index])
+    return cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy
     
 
 
@@ -300,11 +302,11 @@ def find_rotation_matrix(cum_mx, cum_my, also_return_angle=False):
         return R
 
 
-def find_triangles_to_show_monkey_angles(cum_mx, cum_my, cum_angles, rotation_matrix=None):
-    left_end_x = cum_mx + 30 * np.cos(cum_angles + 2*pi/9) 
-    left_end_y = cum_my + 30 * np.sin(cum_angles + 2*pi/9)
-    right_end_x = cum_mx + 30 * np.cos(cum_angles - 2*pi/9) 
-    right_end_y = cum_my + 30 * np.sin(cum_angles - 2*pi/9)
+def find_triangles_to_show_monkey_angles(cum_mx, cum_my, cum_angle, rotation_matrix=None):
+    left_end_x = cum_mx + 30 * np.cos(cum_angle + 2*pi/9) 
+    left_end_y = cum_my + 30 * np.sin(cum_angle + 2*pi/9)
+    right_end_x = cum_mx + 30 * np.cos(cum_angle - 2*pi/9) 
+    right_end_y = cum_my + 30 * np.sin(cum_angle - 2*pi/9)
 
     left_end_xy = np.stack((left_end_x, left_end_y), axis=1).T
     right_end_xy = np.stack((right_end_x, right_end_y), axis=1).T
@@ -317,10 +319,10 @@ def find_triangles_to_show_monkey_angles(cum_mx, cum_my, cum_angles, rotation_ma
 
 
 
-def find_path_when_ff_visible(ff_index, ff_dataframe_in_duration, cum_iloc_indices, visible_distance, rotation_matrix=None):
+def find_path_when_ff_visible(ff_index, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=None):
     temp_df = ff_dataframe_in_duration
     temp_df = temp_df.loc[(temp_df['ff_index'] == ff_index) & (temp_df['visible'] == 1) & (temp_df['ff_distance'] <= visible_distance)]
-    temp_df = temp_df[(temp_df['point_index'] >= cum_iloc_indices[0]) & (temp_df['point_index'] <= cum_iloc_indices[-1])]
+    temp_df = temp_df[(temp_df['point_index'] >= np.min(cum_point_index)) & (temp_df['point_index'] <= np.max(cum_point_index))]
     ff_visible_path_rotated = np.array(temp_df[['monkey_x', 'monkey_y']]).T
     if (rotation_matrix is not None) & (ff_visible_path_rotated.shape[1]>0):
         ff_visible_path_rotated = np.matmul(rotation_matrix, ff_visible_path_rotated)
@@ -416,7 +418,7 @@ def find_perpendicular_lines_to_monkey_trajectory_at_certain_points(certain_poin
         # find monkey xy and angles at all_points and all_ending_points
         monkey_x = monkey_information.loc[certain_points, 'monkey_x'].values
         monkey_y = monkey_information.loc[certain_points, 'monkey_y'].values
-        monkey_angle = monkey_information.loc[certain_points, 'monkey_angles'].values
+        monkey_angle = monkey_information.loc[certain_points, 'monkey_angle'].values
 
         # find lines perpendicular to monkey_angles at these points
         angles_to_left = monkey_angle + pi/2
@@ -927,9 +929,7 @@ def find_ff_distance_and_angles(ff_index, duration, ff_real_position_sorted, mon
         containing the distances of angles (to the boundary or to the center) of the fireflies in the duration
     """  
     # Find the indices in monkey information:
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-    cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices])
-    cum_angle = np.array(monkey_information['monkey_angles'].iloc[cum_iloc_indices])
+    cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = find_monkey_information_in_the_duration(duration, monkey_information)
     
     distances_to_ff = LA.norm(np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[ff_index], axis = 1)
     angles_to_ff = np.arctan2(ff_real_position_sorted[ff_index, 1]-cum_my, ff_real_position_sorted[ff_index, 0]-cum_mx)-cum_angle
@@ -943,7 +943,7 @@ def find_ff_distance_and_angles(ff_index, duration, ff_real_position_sorted, mon
     ff_distance_and_angles['ff_distance'] = distances_to_ff
     ff_distance_and_angles['ff_angle'] = angles_to_ff
     ff_distance_and_angles['ff_angle_boundary'] = angles_to_boundaries
-    ff_distance_and_angles['point_index'] = cum_iloc_indices
+    ff_distance_and_angles['point_index'] = cum_point_index
     ff_distance_and_angles = pd.DataFrame.from_dict(ff_distance_and_angles)
     return ff_distance_and_angles
 
@@ -1078,8 +1078,8 @@ def plot_change_in_ff_angle(ff_dataframe, trial_numbers, var_of_interest = "abs_
         plt.show()
         
 
-def _show_eye_positions(axes, x0, y0, marker, cum_iloc_indices, overall_valid_indices, gaze_world_xy_rotated):
-    used_cum_iloc = cum_iloc_indices[overall_valid_indices]
+def _show_eye_positions(axes, x0, y0, marker, cum_pos_index, overall_valid_indices, gaze_world_xy_rotated):
+    used_cum_iloc = cum_pos_index[overall_valid_indices]
     gaze_world_xy_rotated_valid = gaze_world_xy_rotated[:, overall_valid_indices]
     # the below is the same as used above
     axes.scatter(gaze_world_xy_rotated_valid[0]-x0, gaze_world_xy_rotated_valid[1]-y0, marker=marker, c=used_cum_iloc, s=7, zorder=2, cmap='gist_ncar')

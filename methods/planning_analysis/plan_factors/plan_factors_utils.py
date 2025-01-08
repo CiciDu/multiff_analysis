@@ -3,7 +3,7 @@ from planning_analysis.show_planning import alt_ff_utils, show_planning_class, s
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class, stops_near_ff_based_on_ref_class
 from planning_analysis.only_stop_ff import only_stop_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
@@ -181,10 +181,10 @@ def get_df_for_stat_extended_for_eye_info(stops_near_ff_df, monkey_information):
     df_for_stat_extended = df_for_stat_extended.merge(stops_near_ff_df[['stop_point_index', 'stop_ff_x', 'stop_ff_y', 'alt_ff_x', 'alt_ff_y']],
                                                       on='stop_point_index', how='left')
 
-    df_for_stat_extended['stop_ff_angle'] = basic_func.calculate_angles_to_ff_centers(df_for_stat_extended['stop_ff_x'], df_for_stat_extended['stop_ff_y'], df_for_stat_extended['monkey_x'], 
+    df_for_stat_extended['stop_ff_angle'] = specific_utils.calculate_angles_to_ff_centers(df_for_stat_extended['stop_ff_x'], df_for_stat_extended['stop_ff_y'], df_for_stat_extended['monkey_x'], 
                                                                             df_for_stat_extended['monkey_y'], df_for_stat_extended['monkey_angle'])
 
-    df_for_stat_extended['alt_ff_angle'] = basic_func.calculate_angles_to_ff_centers(df_for_stat_extended['alt_ff_x'], df_for_stat_extended['alt_ff_y'], df_for_stat_extended['monkey_x'], 
+    df_for_stat_extended['alt_ff_angle'] = specific_utils.calculate_angles_to_ff_centers(df_for_stat_extended['alt_ff_x'], df_for_stat_extended['alt_ff_y'], df_for_stat_extended['monkey_x'], 
                                                                             df_for_stat_extended['monkey_y'], df_for_stat_extended['monkey_angle'])                                                
     return df_for_stat_extended
 
@@ -392,7 +392,7 @@ def _get_left_and_right_eye_time(ff_index, duration, monkey_information, ff_real
     
     monkey_sub = monkey_information[(monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1])].copy()
     monkey_sub[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_index]
-    monkey_sub['ff_angle'] = basic_func.calculate_angles_to_ff_centers(monkey_sub['ff_x'], monkey_sub['ff_y'], monkey_sub['monkey_x'], 
+    monkey_sub['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(monkey_sub['ff_x'], monkey_sub['ff_y'], monkey_sub['monkey_x'], 
                                                                         monkey_sub['monkey_y'], monkey_sub['monkey_angle'])
     left_eye = monkey_sub[(monkey_sub['gaze_monkey_view_angle_l'] - monkey_sub['ff_angle']).abs() <= max_degrees/180 * math.pi].copy()
     left_eye_time = left_eye['dt'].sum()

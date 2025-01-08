@@ -192,8 +192,8 @@ def make_free_selection_predictions_using_trained_model(trained_model, ff_indice
 
     if time_of_evaluation is None:
         time_of_evaluation = ff_caught_T_new[target_indices-1] # here it denotes the beginning of a trial
-    starting_point_index = np.searchsorted(monkey_information['monkey_t'], time_of_evaluation)
-    time_of_evaluation = monkey_information['monkey_t'][starting_point_index] 
+    starting_point_index = monkey_information['point_index'].values[np.searchsorted(monkey_information['time'], time_of_evaluation)]
+    time_of_evaluation = monkey_information['time'][starting_point_index] 
 
     
     

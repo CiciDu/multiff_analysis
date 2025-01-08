@@ -115,7 +115,7 @@ class ProcessGUATtrials:
 
         if R is not None:
             # plot circles around relevant_indices with radius of self.max_distance_to_stop_for_GUAT_target
-            temp_cum_mx, temp_cum_my = np.array(self.monkey_information['monkey_x'].iloc[relevant_indices]), np.array(self.monkey_information['monkey_y'].iloc[relevant_indices])
+            temp_cum_mx, temp_cum_my = np.array(self.monkey_information['monkey_x'].loc[relevant_indices]), np.array(self.monkey_information['monkey_y'].loc[relevant_indices])
             if len(temp_cum_mx) > 0:
                 temp_cum_mxy_rotated = np.matmul(R, np.stack((temp_cum_mx, temp_cum_my)))
                 for i in range(len(temp_cum_mx)):

@@ -208,7 +208,6 @@ def _find_eye_positions_rotated_in_world_coordinates(monkey_information, duratio
     monkey_subset['gaze_world_y_rotated'] = gaze_world_xy_rotated[1, :]
     monkey_subset['eye_position_meaningful'] = False
     monkey_subset['eye_position_overall_valid'] = False
-    monkey_subset.reset_index(drop=True, inplace=True)
     monkey_subset.loc[meaningful_indices, 'eye_position_meaningful'] = True
     monkey_subset.loc[overall_valid_indices, 'eye_position_overall_valid'] = True
 
@@ -256,7 +255,7 @@ def plot_eye_world_speed_vs_monkey_speed(gaze_monkey_view_xy, cum_t, overall_val
     eye_world_speed = find_eye_world_speed(gaze_monkey_view_xy, cum_t, overall_valid_indices)
     eye_world_speed[eye_world_speed > 1000] = 1000
     cum_t_to_plot = cum_t - cum_t[0]
-    relevant_monkey_info = monkey_information[monkey_information.monkey_t.isin(cum_t)]
+    relevant_monkey_info = monkey_information[monkey_information.time.isin(cum_t)]
     corresponding_monkey_speed = relevant_monkey_info.monkey_speed.values
     corresponding_monkey_dw = relevant_monkey_info.monkey_dw.values
     

@@ -1,5 +1,5 @@
 
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from planning_analysis.show_planning.get_stops_near_ff import plot_stops_near_ff_utils, find_stops_near_ff_utils
 from null_behaviors import curv_of_traj_utils, curvature_utils
 
@@ -250,15 +250,15 @@ def make_heading_info_df(alt_and_stop_ff_df, stops_near_ff_df, monkey_informatio
     heading_info_df = heading_info_df.merge(alt_and_stop_ff_df[columns_to_keep], how='left', on='stop_point_index')
 
     # Calculate angles from monkey before stop to alt ff and from stop ff null arc landing position to alternative ff
-    heading_info_df['angle_from_m_before_stop_to_stop_ff'] = basic_func.calculate_angles_to_ff_centers(heading_info_df['stop_ff_x'], heading_info_df['stop_ff_y'], heading_info_df['mx_before_stop'], heading_info_df['my_before_stop'], heading_info_df['monkey_angle_before_stop'])
-    heading_info_df['angle_from_m_before_stop_to_alt_ff'] = basic_func.calculate_angles_to_ff_centers(heading_info_df['alt_ff_x'], heading_info_df['alt_ff_y'], heading_info_df['mx_before_stop'], heading_info_df['my_before_stop'], heading_info_df['monkey_angle_before_stop'])
+    heading_info_df['angle_from_m_before_stop_to_stop_ff'] = specific_utils.calculate_angles_to_ff_centers(heading_info_df['stop_ff_x'], heading_info_df['stop_ff_y'], heading_info_df['mx_before_stop'], heading_info_df['my_before_stop'], heading_info_df['monkey_angle_before_stop'])
+    heading_info_df['angle_from_m_before_stop_to_alt_ff'] = specific_utils.calculate_angles_to_ff_centers(heading_info_df['alt_ff_x'], heading_info_df['alt_ff_y'], heading_info_df['mx_before_stop'], heading_info_df['my_before_stop'], heading_info_df['monkey_angle_before_stop'])
     if 'stop_arc_end_x' in heading_info_df:
-        heading_info_df['angle_from_stop_ff_landing_to_alt_ff'] = basic_func.calculate_angles_to_ff_centers(heading_info_df['alt_ff_x'], heading_info_df['alt_ff_y'], heading_info_df['stop_arc_end_x'], heading_info_df['stop_arc_end_y'], heading_info_df['stop_arc_end_heading'])
+        heading_info_df['angle_from_stop_ff_landing_to_alt_ff'] = specific_utils.calculate_angles_to_ff_centers(heading_info_df['alt_ff_x'], heading_info_df['alt_ff_y'], heading_info_df['stop_arc_end_x'], heading_info_df['stop_arc_end_y'], heading_info_df['stop_arc_end_heading'])
 
     # The following two columns are originally from calculate_info_based_on_monkey_angles
-    heading_info_df['angle_from_stop_ff_to_stop'] = basic_func.calculate_angles_to_ff_centers(ff_x=heading_info_df['stop_x'].values, ff_y=heading_info_df['stop_y'], \
+    heading_info_df['angle_from_stop_ff_to_stop'] = specific_utils.calculate_angles_to_ff_centers(ff_x=heading_info_df['stop_x'].values, ff_y=heading_info_df['stop_y'], \
                                                                                                   mx=heading_info_df['stop_ff_x'].values, my=heading_info_df['stop_ff_y'], m_angle=heading_info_df['monkey_angle_before_stop'])
-    heading_info_df['angle_from_stop_ff_to_alt_ff'] = basic_func.calculate_angles_to_ff_centers(ff_x=heading_info_df['alt_ff_x'].values, ff_y=heading_info_df['alt_ff_y'], \
+    heading_info_df['angle_from_stop_ff_to_alt_ff'] = specific_utils.calculate_angles_to_ff_centers(ff_x=heading_info_df['alt_ff_x'].values, ff_y=heading_info_df['alt_ff_y'], \
                                                                                                     mx=heading_info_df['stop_ff_x'].values, my=heading_info_df['stop_ff_y'], m_angle=heading_info_df['monkey_angle_before_stop'])
     
     return heading_info_df
@@ -389,9 +389,9 @@ def make_alt_ff_info_for_null_arc(alt_ff_df_modified, stop_ff_final_df, heading_
 
     # then calculate ff_distance', 'ff_angle', 'ff_angle_boundary'
     alt_ff_info_for_null_arc['ff_distance'] = np.sqrt((alt_ff_info_for_null_arc['monkey_x'] - alt_ff_info_for_null_arc['ff_x'])**2 + (alt_ff_info_for_null_arc['monkey_y'] - alt_ff_info_for_null_arc['ff_y'])**2)
-    alt_ff_info_for_null_arc['ff_angle'] = basic_func.calculate_angles_to_ff_centers(ff_x=alt_ff_info_for_null_arc['ff_x'].values, ff_y=alt_ff_info_for_null_arc['ff_y'].values, mx=alt_ff_info_for_null_arc['monkey_x'].values,
+    alt_ff_info_for_null_arc['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(ff_x=alt_ff_info_for_null_arc['ff_x'].values, ff_y=alt_ff_info_for_null_arc['ff_y'].values, mx=alt_ff_info_for_null_arc['monkey_x'].values,
                                                                                      my=alt_ff_info_for_null_arc['monkey_y'].values, m_angle=alt_ff_info_for_null_arc['monkey_angle'].values)
-    alt_ff_info_for_null_arc['ff_angle_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=alt_ff_info_for_null_arc['ff_angle'].values, distances_to_ff=alt_ff_info_for_null_arc['ff_distance'].values)
+    alt_ff_info_for_null_arc['ff_angle_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=alt_ff_info_for_null_arc['ff_angle'].values, distances_to_ff=alt_ff_info_for_null_arc['ff_distance'].values)
 
     # make the point index as point index right before stop
     alt_ff_info_for_null_arc['point_index'] = heading_info_df['point_index_before_stop'].values

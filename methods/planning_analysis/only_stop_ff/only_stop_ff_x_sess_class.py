@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import combine_info_utils, base_processing_class, basic_func
+from data_wrangling import combine_info_utils, base_processing_class, specific_utils
 from planning_analysis import ml_methods_class, ml_methods_utils
 from planning_analysis.only_stop_ff import only_stop_ff_class
 from planning_analysis.show_planning import alt_ff_utils
@@ -177,7 +177,7 @@ class OnlyStopFFAcrossSessions():
             else:
                 print(f'Failed to retrieve all_only_stop_lr_df from {df_path}; will make a new one')
                 
-        self.variations_list = basic_func.init_variations_list_func(ref_point_params_based_on_mode, folder_path=self.combd_only_stop_ff_df_folder_path, 
+        self.variations_list = specific_utils.init_variations_list_func(ref_point_params_based_on_mode, folder_path=self.combd_only_stop_ff_df_folder_path, 
                                                                     monkey_name=self.monkey_name)
 
         self.all_only_stop_lr_df = pd.DataFrame()
@@ -202,7 +202,7 @@ class OnlyStopFFAcrossSessions():
             else:
                 print(f'Failed to retrieve all_only_stop_ml_df from {df_path}; will make a new one')
 
-        self.variations_list = basic_func.init_variations_list_func(ref_point_params_based_on_mode, folder_path=self.combd_only_stop_ff_df_folder_path, 
+        self.variations_list = specific_utils.init_variations_list_func(ref_point_params_based_on_mode, folder_path=self.combd_only_stop_ff_df_folder_path, 
                                                                     monkey_name=self.monkey_name)
 
         all_only_stop_ml_df = pd.DataFrame()

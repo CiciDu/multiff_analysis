@@ -1,7 +1,7 @@
 import sys
 from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
 from decision_making_analysis import free_selection
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization import plot_trials, plot_behaviors_utils
 from pattern_discovery import pattern_by_points
 
@@ -333,7 +333,7 @@ class ProcessCategoryData:
         ## By monkey
         # plot the chunks
         for trial in trials:
-            with basic_func.initiate_plot(7, 7, 100):
+            with general_utils.initiate_plot(7, 7, 100):
                 duration = [self.ff_caught_T_new[trial-1]-2, self.ff_caught_T_new[trial]+0.01]
                 print("duration", duration)
 
@@ -438,10 +438,10 @@ class ProcessCategoryData:
             for trial in weird_trials:
                 on_duration = self.ff_flash_sorted[trial][-1]
                 # calculate ff_distance and ff_angle during the last flashing-on duration of the target
-                cum_iloc_indices, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(on_duration, self.monkey_information)
+                cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(on_duration, self.monkey_information)
                 distances_to_ff = LA.norm(np.stack([cum_mx, cum_my], axis=1)-self.ff_real_position_sorted[trial], axis = 1)
-                angles_to_ff = basic_func.calculate_angles_to_ff_centers(ff_x=self.ff_real_position_sorted[trial, 0], ff_y=self.ff_real_position_sorted[trial, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)
-                angles_to_boundaries = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff)
+                angles_to_ff = specific_utils.calculate_angles_to_ff_centers(ff_x=self.ff_real_position_sorted[trial, 0], ff_y=self.ff_real_position_sorted[trial, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)
+                angles_to_boundaries = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff)
 
 
                 print("distances_to_ff: \n", distances_to_ff)
@@ -456,7 +456,7 @@ class ProcessCategoryData:
                         self.sort_1_inputs[corresponding_row].reshape(-1,3))
 
 
-                with basic_func.initiate_plot(7, 7, 100):
+                with general_utils.initiate_plot(7, 7, 100):
                     duration = [self.ff_caught_T_new[trial]-3, self.ff_caught_T_new[trial]+0.01]
                     print("duration", duration)
 

@@ -67,11 +67,11 @@ def plot_stops_near_ff_func(row, monkey_information, ff_real_position_sorted, ff
     null_arcs_plotting_kwargs_temp['show_in_memory_fireflies'] = False
 
     # null_arcs_plotting_kwargs_temp['show_connect_path_ff_specific_indices'] = [int(row.stop_ff_index), int(row.alt_ff_index)]
-    # null_arcs_plotting_kwargs_temp['absolute_steps_to_be_marked_2nd_kind'] = int(row['earlest_point_index_when_alt_ff_and_stop_ff_have_both_been_seen_bbas'])
-    # null_arcs_plotting_kwargs_temp['absolute_steps_to_be_marked_3rd_kind'] = [int(row.stop_point_index), int(row.next_stop_point_index)]
+    # null_arcs_plotting_kwargs_temp['point_indices_to_be_marked_2nd_kind'] = int(row['earlest_point_index_when_alt_ff_and_stop_ff_have_both_been_seen_bbas'])
+    # null_arcs_plotting_kwargs_temp['point_indices_to_be_marked_3rd_kind'] = [int(row.stop_point_index), int(row.next_stop_point_index)]
     
-    #null_arcs_plotting_kwargs_temp['absolute_steps_to_be_marked_3rd_kind'] = [int(row.stop_point_index)]
-    null_arcs_plotting_kwargs_temp['absolute_steps_to_be_marked_2nd_kind'] = [int(row.point_index_before_stop)]
+    #null_arcs_plotting_kwargs_temp['point_indices_to_be_marked_3rd_kind'] = [int(row.stop_point_index)]
+    null_arcs_plotting_kwargs_temp['point_indices_to_be_marked_2nd_kind'] = [int(row.point_index_before_stop)]
     null_arcs_plotting_kwargs_temp['show_believed_target_positions'] = False
 
     if eliminate_irrelevant_points_beyond_boundaries:
@@ -125,8 +125,8 @@ def show_null_arcs_func(axes, point_index_for_null_arc, monkey_information, R, x
                         ):
     if point_index_for_null_arc is not None:
         x0, y0 = 0, 0
-        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].iloc[point_index_for_null_arc]), \
-                                    np.array(monkey_information['monkey_y'].iloc[point_index_for_null_arc])
+        temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].loc[point_index_for_null_arc]), \
+                                    np.array(monkey_information['monkey_y'].loc[point_index_for_null_arc])
         temp_cum_mxy_rotated = np.matmul(R, np.stack((temp_cum_mx, temp_cum_my)))
         axes.scatter(temp_cum_mxy_rotated[0]-x0, temp_cum_mxy_rotated[1]-y0, marker='^', s=130, color="cyan", zorder=5, alpha=0.6)
 

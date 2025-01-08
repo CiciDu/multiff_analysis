@@ -1,6 +1,6 @@
 
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils
 import math
 
@@ -183,7 +183,7 @@ def add_curv_diff_to_df(df, monkey_information, curv_of_traj_df, ff_real_positio
     if 'monkey_x' not in df.columns:
         df['monkey_x'] = monkey_information.loc[df['point_index'].values, 'monkey_x'].values
         df['monkey_y'] = monkey_information.loc[df['point_index'].values, 'monkey_y'].values
-        df['monkey_angle'] = monkey_information.loc[df['point_index'].values, 'monkey_angles'].values
+        df['monkey_angle'] = monkey_information.loc[df['point_index'].values, 'monkey_angle'].values
     if 'ff_x' not in df.columns:
         if ff_real_position_sorted is None:
             raise ValueError('ff_real_position_sorted should be provided if ff_x and ff_y are not in df')
@@ -237,11 +237,11 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
     ff_xy = ff_real_position_sorted[ff_indices,:]
     monkey_info = monkey_information.loc[point_index]
     monkey_xy = monkey_info[['monkey_x', 'monkey_y']].values
-    monkey_angle = monkey_info['monkey_angles'].values
-    all_current_time = monkey_info['monkey_t'].values
+    monkey_angle = monkey_info['monkey_angle'].values
+    all_current_time = monkey_info['time'].values
     ff_distance = LA.norm(ff_xy-monkey_xy, axis=1)
-    ff_angle = basic_func.calculate_angles_to_ff_centers(ff_x=ff_xy[:,0], ff_y=ff_xy[:,1], mx=monkey_xy[:,0], my=monkey_xy[:,1], m_angle=monkey_angle)
-    ff_angle_boundary = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
+    ff_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_xy[:,0], ff_y=ff_xy[:,1], mx=monkey_xy[:,0], my=monkey_xy[:,1], m_angle=monkey_angle)
+    ff_angle_boundary = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
     # find time since last visible
     time_since_last_vis, duration_of_last_vis_period = find_time_since_last_vis_OR_time_till_next_visible(ff_indices, all_current_time, ff_dataframe_visible, return_duration_of_last_vis_period=True)
     #ff_info = pd.DataFrame([ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis'])
@@ -266,6 +266,7 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
         if (ff_caught_T_new is None):
             raise ValueError('ff_caught_T_newshould be provided if add_curv_diff is True')
         ff_info = add_curv_diff_to_df(ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted, ff_radius_for_optimal_arc=ff_radius)
+    
     if add_duration_of_last_vis_period:
         ff_info['duration_of_last_vis_period'] = duration_of_last_vis_period
     return ff_info
@@ -279,13 +280,13 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
 def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_dataframe, monkey_information):
     # This function is only intended to use on a single ff
     ff_xy = ff_real_position_sorted[ff_index,:]
-    monkey_info = monkey_information.loc[monkey_information.index==point_index]
+    monkey_info = monkey_information.loc[monkey_information['point_index']==point_index]
     monkey_xy = monkey_info[['monkey_x', 'monkey_y']].values.reshape(-1)
-    monkey_angle = monkey_info['monkey_angles'].item()
-    time = monkey_info['monkey_t'].item()
+    monkey_angle = monkey_info['monkey_angle'].item()
+    time = monkey_info['time'].item()
     ff_distance = LA.norm(ff_xy-monkey_xy)
-    ff_angle = basic_func.calculate_angles_to_ff_centers(ff_x=ff_xy[0], ff_y=ff_xy[1], mx=monkey_xy[0], my=monkey_xy[1], m_angle=monkey_angle)
-    ff_angle_boundary = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
+    ff_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_xy[0], ff_y=ff_xy[1], mx=monkey_xy[0], my=monkey_xy[1], m_angle=monkey_angle)
+    ff_angle_boundary = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
     # find time since last visible
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible']==1]
     ff_visible_df = ff_dataframe_visible[(ff_dataframe_visible['ff_index']==ff_index) & (ff_dataframe_visible['time'] <= time)]
@@ -319,19 +320,6 @@ def find_ff_info_at_some_time(ff_index, point_index, ff_real_position_sorted, ff
         ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis = find_ff_info_anew(int(ff_index), point_index, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
         #ff_info = pd.DataFrame([[ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis]], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis'])
     else:
-        '''# the following chunk is no longer needed since time_since_last_vis is already calculated in ff_dataframe
-        # since "memory" is based on points, not time, I shall recalculate the time since the ff last visible
-        if raw_ff_info['visible'].item() == 1:
-            raw_ff_info['time_since_last_vis'] = 0
-        else:
-            ff_visible_df = ff_dataframe_visible[(ff_dataframe_visible['ff_index']==ff_index) & (ff_dataframe_visible['point_index'] <= point_index)]
-            if len(ff_visible_df) > 0:
-               ff_last_vis = ff_visible_df.time.max()
-            else:
-                ff_last_vis = 0
-            time = monkey_information.loc[monkey_information.index==point_index]['monkey_t'].item()
-            raw_ff_info['time_since_last_vis'] = time-ff_last_vis
-        '''
         ff_info = raw_ff_info[['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis']]
     return ff_info
 
@@ -343,11 +331,11 @@ def get_distance_and_angle_from_previous_target(current_ff_positions, prev_targe
     target_angles = []     
     for i in range(len(prev_target_caught_T)):      
         current_ff_position = current_ff_positions[i]                             
-        monkey_info = monkey_information[monkey_information['monkey_t'] >= prev_target_caught_T[i]].iloc[0]
+        monkey_info = monkey_information[monkey_information['time'] >= prev_target_caught_T[i]].iloc[0]
         monkey_xy = monkey_info[['monkey_x', 'monkey_y']].values.reshape(-1)
         ffxy = current_ff_position
         target_distances.append(LA.norm(monkey_xy - ffxy))
-        target_angles.append(basic_func.calculate_angles_to_ff_centers(ff_x=ffxy[0], ff_y=ffxy[1], mx=monkey_xy[0], my=monkey_xy[1], m_angle=monkey_info['monkey_angles']))
+        target_angles.append(specific_utils.calculate_angles_to_ff_centers(ff_x=ffxy[0], ff_y=ffxy[1], mx=monkey_xy[0], my=monkey_xy[1], m_angle=monkey_info['monkey_angle']))
     target_distances = np.array(target_distances)
     target_angles = np.array(target_angles)
     return target_distances, target_angles
@@ -360,8 +348,8 @@ def find_crossing_boundary_trials(original_trials, trial_ending_time, monkey_inf
     for i in range(len(original_trials)):
         trial = original_trials[i]
         duration = [trial_ending_time[i] - min_time_no_crossing_boundary, trial_ending_time[i]]
-        cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-        cum_t, cum_crossing_boundary = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices]), np.array(monkey_information['crossing_boundary'].iloc[cum_iloc_indices])
+        cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0]
+        cum_t, cum_crossing_boundary = np.array(monkey_information['time'].iloc[cum_pos_index]), np.array(monkey_information['crossing_boundary'].iloc[cum_pos_index])
         cross_boundary_points = np.where(cum_crossing_boundary==1)[0]
         if len(cross_boundary_points) > 0:
             crossing_boundary_trials.append(trial)
@@ -528,7 +516,7 @@ def make_pseudo_manual_anno(best_arc_df, monkey_information, ff_caught_T_new):
     pseudo_manual_anno_long = best_arc_df.copy()
     pseudo_manual_anno_long.rename(columns={'point_index': 'starting_point_index'}, inplace=True)
 
-    pseudo_manual_anno_long['time'] = monkey_information['monkey_t'].iloc[pseudo_manual_anno_long.starting_point_index.values].values
+    pseudo_manual_anno_long['time'] = monkey_information['time'].loc[pseudo_manual_anno_long.starting_point_index.values].values
     pseudo_manual_anno_long['target_index'] = np.searchsorted(ff_caught_T_new, pseudo_manual_anno_long['time'].values).astype(int)        
     pseudo_manual_anno_long['ff_index'] = pseudo_manual_anno_long['ff_index'].astype(int)  
     pseudo_manual_anno_long['starting_point_index'] = pseudo_manual_anno_long['starting_point_index'].astype(int)  

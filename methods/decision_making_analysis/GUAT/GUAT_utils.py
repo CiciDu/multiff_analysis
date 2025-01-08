@@ -85,7 +85,7 @@ def filter_stops_based_on_distance_to_ff_capture(filtered_stops_df, monkey_infor
 
     # first find the corresponding point index of each time point in ff_caught_T_new
     ff_caught_points_sorted = np.searchsorted(monkey_information['time'].values, ff_caught_T_new)
-    ff_caught_points_df = monkey_information.loc[ff_caught_points_sorted].copy()
+    ff_caught_points_df = monkey_information.iloc[ff_caught_points_sorted].copy()
 
     # for each value in filtered_stops_df's cum_distance column, find the closest cum_distance in ff_caught_points
     filtered_stops_df['closest_cum_distance_to_ff_capture'] = filtered_stops_df['cum_distance'].apply(lambda x: np.abs(ff_caught_points_df['cum_distance'].values - x).min())

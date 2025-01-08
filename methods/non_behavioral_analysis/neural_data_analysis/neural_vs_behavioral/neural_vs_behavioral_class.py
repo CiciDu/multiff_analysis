@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_raw_data, basic_func, further_processing_class
+from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
 from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, reduce_multicollinearity
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
@@ -21,6 +21,8 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
+
+    def get_basic_data(self):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
         self.make_or_retrieve_ff_dataframe(already_made_ok=True, exists_ok=True)
         self.make_relevant_paths()
@@ -34,7 +36,8 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         os.makedirs(self.lr_result_df_path, exist_ok=True)
 
     def streamline_preparing_neural_and_behavioral_data(self):
-        self.prepare_to_find_patterns_and_features()
+        self.get_basic_data()
+        self._prepare_to_find_patterns_and_features()
         self.make_df_related_to_patterns_and_features()
         self.retrieve_neural_data()
         self.prep_behavioral_data_for_neural_data_modeling()
@@ -61,6 +64,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self._add_pattern_info_base_on_points_and_trials()
         self._make_final_behavioral_data()
         self._match_binned_spikes_to_range_of_behavioral_data()
+        self._get_index_of_bins_in_valid_intervals()
         self._get_x_and_y_var()
         self._get_x_and_y_var_lags(max_lag_number=max_lag_number)
 
@@ -184,13 +188,35 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.max_bin = self.final_behavioral_data['bin'].max()
         self.binned_spikes_matrix, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_matrix_and_df(self.all_binned_spikes, self.max_bin)
 
+    def _get_index_of_bins_in_valid_intervals(self, gap_too_large_threshold=100, min_combined_valid_interval_length=50):
+        """
+        Calculate the midpoints of the time bins and get the indices of bins that fall within valid intervals.
+        """
+        # Calculate the midpoints of the time bins
+        mid_bin_time = (self.time_bins[1:] + self.time_bins[:-1]) / 2
+        
+        self.valid_intervals_df = specific_utils.take_out_valid_intervals_based_on_ff_caught_time(
+            self.ff_caught_T_new, gap_too_large_threshold=gap_too_large_threshold,
+            min_combined_valid_interval_length=min_combined_valid_interval_length
+        )
+        
+        # Get the indices of bins that fall within valid intervals
+        self.valid_bin_mid_time, self.valid_bin_index = general_utils.take_out_data_points_in_valid_intervals(
+            mid_bin_time, self.valid_intervals_df
+        )
+
+        # print the number of bins out of total numbers that are in valid intervals
+        print(f"Number of bins in valid intervals based on ff caught time: {len(self.valid_bin_index)} out of {len(mid_bin_time)}"
+              f" ({len(self.valid_bin_index)/len(mid_bin_time)*100:.2f}%)")
+
     def _get_x_and_y_var(self):
-        self.x_var = self.binned_spikes_df.copy()
-        self.y_var = self.final_behavioral_data.copy()
+        self.x_var = self.binned_spikes_df.set_index('bin').loc[self.valid_bin_index].reset_index(drop=True)
+        self.y_var = self.final_behavioral_data.set_index('bin').loc[self.valid_bin_index].reset_index(drop=False)
 
     def _get_x_and_y_var_lags(self, max_lag_number):
         self.max_lag_number = max_lag_number
         self.lag_numbers = np.arange(-max_lag_number, max_lag_number+1)
         if not hasattr(self, 'x_var'):
             self._get_x_and_y_var()
-        self.y_var_lags = neural_data_processing.add_lags_to_each_feature(self.y_var, self.lag_numbers)
+        self.y_var_lags = neural_data_processing.add_lags_to_each_feature(self.final_behavioral_data, self.lag_numbers)
+        self.y_var_lags = self.y_var_lags.set_index('bin_0').loc[self.valid_bin_index].reset_index(drop=False)

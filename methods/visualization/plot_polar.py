@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe
 from visualization import plot_behaviors_utils
 
@@ -87,15 +87,16 @@ def PlotPolar(duration,
         whether to show the color bars
     """  
 
-    currentTrial, num_trials, duration = basic_func.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
+    currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
     target_indices = np.arange(currentTrial-num_trials+1, currentTrial+1)
     sns.set_style(style="white")
     if duration[1]-duration[0] == 0:
         return
 
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))[0]
+    cum_point_index = np.array(monkey_information['point_index'].iloc[cum_pos_index])
     if not hitting_arena_edge_ok: # Stop plotting for the trial if the monkey/agent has gone across the edge
-        cum_crossing_boundary = np.array(monkey_information['crossing_boundary'].iloc[cum_iloc_indices])
+        cum_crossing_boundary = np.array(monkey_information['crossing_boundary'].iloc[cum_pos_index])
         if (np.any(cum_crossing_boundary == 1)):
             print("Current plot is omitted because the monkey has crossed the boundary at some point.")
             return
@@ -140,7 +141,7 @@ def PlotPolar(duration,
 
 
     if colors_show_overall_time:
-        num_color_elements = len(cum_iloc_indices)+1
+        num_color_elements = len(cum_pos_index)+1
     else:
         num_color_elements = 101
 
@@ -150,8 +151,8 @@ def PlotPolar(duration,
 
     if colors_show_overall_time:
         # color is based on time into the past
-        ff_color = colors_ffs[cum_iloc_indices[-1] - np.array(ff_info['point_index'].astype('int'))]
-        target_color = colors_target[cum_iloc_indices[-1] - np.array(target_info['point_index'].astype('int'))]
+        ff_color = colors_ffs[cum_point_index.max() - np.array(ff_info['point_index'].astype('int'))]
+        target_color = colors_target[cum_point_index.max() - np.array(target_info['point_index'].astype('int'))]
     else:
         # color is based on memory
         ff_color = colors_ffs[np.array(ff_info['memory'].astype('int'))]

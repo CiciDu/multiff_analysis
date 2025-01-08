@@ -7,8 +7,8 @@ from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, age
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, variations_base_class
 from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_utils
 
-from data_wrangling import basic_func, combine_info_utils
-from data_wrangling import basic_func
+from data_wrangling import specific_utils, combine_info_utils
+from data_wrangling import specific_utils
 import pandas as pd
 import os
 import matplotlib.pyplot as plt

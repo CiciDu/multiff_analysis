@@ -44,7 +44,7 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
         self.manual_anno_long = self.manual_anno_long.reset_index()
 
         # recalculate time and target_index based on starting_point_index
-        self.manual_anno_long['time'] = self.monkey_information['monkey_t'].iloc[self.manual_anno_long.starting_point_index.values].values
+        self.manual_anno_long['time'] = self.monkey_information['time'].loc[self.manual_anno_long.starting_point_index.values].values
         self.manual_anno_long['target_index'] = np.searchsorted(self.ff_caught_T_new, self.manual_anno_long['time'].values)        
 
         # change data type
@@ -60,7 +60,7 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
             n_seconds_before_crossing_boundary, n_seconds_after_crossing_boundary
             )
         
-        crossing_boundary_time = self.monkey_information.loc[self.monkey_information['crossing_boundary']==1, 'monkey_t'].values
+        crossing_boundary_time = self.monkey_information.loc[self.monkey_information['crossing_boundary']==1, 'time'].values
 
         input_time = self.manual_anno_long.time.values
         original_length = len(input_time)

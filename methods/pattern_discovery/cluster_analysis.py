@@ -1,7 +1,7 @@
 import sys
 from visualization import plot_behaviors_utils
 from pattern_discovery import ff_dataframe_utils
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
 
 import os
@@ -171,7 +171,7 @@ def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_new):
 	# Combine the information of the above 2 dataframes
 	temp_dataframe3 = temp_dataframe1.merge(temp_dataframe2, how="left", on="point_index")
 	# Find the corresponding time to all the points
-	corresponding_t = monkey_information['monkey_t'].values[np.array(temp_dataframe3['point_index'])]
+	corresponding_t = monkey_information['time'].values[np.array(temp_dataframe3['point_index'])]
 	temp_dataframe3['time'] = corresponding_t
 	# From the time of each point, find the target index that corresponds to that point
 	temp_dataframe3['target_index'] = np.searchsorted(ff_caught_T_new, corresponding_t)
@@ -338,11 +338,11 @@ def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_n
             metrics['last_vis_ang'].append(row['ff_angle'])
             metrics['last_vis_ang_to_bndry'].append(row['ff_angle_boundary'])
             metrics['last_vis_target_dist'].append(LA.norm(row[['ff_x', 'ff_y']].values - ff_real_position_sorted[i]))
-            metrics['last_vis_target_ang'].append(basic_func.calculate_angles_to_ff_centers(
+            metrics['last_vis_target_ang'].append(specific_utils.calculate_angles_to_ff_centers(
                 ff_x=ff_real_position_sorted[i][0], ff_y=ff_real_position_sorted[i][1],
                 mx=row['monkey_x'], my=row['monkey_y'], m_angle=row['monkey_angle']
             ))
-            metrics['last_vis_target_ang_to_bndry'].append(basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=metrics['last_vis_target_ang'][-1],
+            metrics['last_vis_target_ang_to_bndry'].append(specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=metrics['last_vis_target_ang'][-1],
                                                             distances_to_ff=metrics['last_vis_target_dist'][-1]
                                                             ))
             metrics['nearby_vis_ff_indices'].append(relevant_df['ff_index'].unique().tolist())

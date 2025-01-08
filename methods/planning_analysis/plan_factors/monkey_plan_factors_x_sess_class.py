@@ -3,7 +3,7 @@ from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.variations_of_factors_vs_results import plot_variations_class
-from data_wrangling import basic_func, combine_info_utils, base_processing_class
+from data_wrangling import specific_utils, combine_info_utils, base_processing_class
 import os
 import numpy as np
 import matplotlib
@@ -159,7 +159,7 @@ class PlanAcrossSessions(plot_variations_class.PlotVariations):
 
 
     def initialize_monkey_sessions_df(self):
-        self.sessions_df = basic_func.initialize_monkey_sessions_df(raw_data_dir_name=self.raw_data_dir_name)
+        self.sessions_df = specific_utils.initialize_monkey_sessions_df(raw_data_dir_name=self.raw_data_dir_name)
         return self.sessions_df
 
 

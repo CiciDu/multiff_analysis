@@ -1,5 +1,5 @@
 from decision_making_analysis.GUAT import GUAT_and_TAFT
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 
 import os
 from os.path import exists
@@ -9,31 +9,10 @@ import gc
 
 
 def make_sessions_df_for_one_monkey(raw_data_dir_name, monkey_name):
-    sessions_df = basic_func.initialize_monkey_sessions_df(raw_data_dir_name=raw_data_dir_name)
+    sessions_df = specific_utils.initialize_monkey_sessions_df(raw_data_dir_name=raw_data_dir_name)
     sessions_df_for_one_monkey = sessions_df[sessions_df['monkey_name']==monkey_name].copy()
     sessions_df_for_one_monkey.sort_values(by='data_name', inplace=True)
     return sessions_df_for_one_monkey
-
-
-    
-def check_which_df_exists_for_each_session(sessions_df_for_one_monkey, 
-                                           data_category='decision_making',
-                                           data_folder_name='GUAT_info',
-                                    df_names=['GUAT_alt_ff_info', 'GUAT_current_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']):
-    # first assess which df need to be remade
-    for name in df_names:
-        sessions_df_for_one_monkey[name] = False
-
-    for index, row in sessions_df_for_one_monkey.iterrows():
-        folder = os.path.join(os.path.join(f'all_monkey_data/{data_category}', row['monkey_name'], row['data_name'], data_folder_name))
-        os.makedirs(folder, exist_ok=True)
-        # get the list of df names in the folder
-        df_in_folder = os.listdir(folder)
-        for df in df_names:
-            if df in df_in_folder:
-                sessions_df_for_one_monkey.loc[index, df] = True
-    return sessions_df_for_one_monkey
-
 
 
 def collect_info_from_all_sessions(sessions_df_for_one_monkey, 
@@ -74,6 +53,23 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
     return all_important_info, all_point_index_to_new_number                                
 
 
+def check_which_df_exists_for_each_session(sessions_df_for_one_monkey, 
+                                           data_category='decision_making',
+                                           data_folder_name='GUAT_info',
+                                    df_names=['GUAT_alt_ff_info', 'GUAT_current_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']):
+    # first assess which df need to be remade
+    for name in df_names:
+        sessions_df_for_one_monkey[name] = False
+
+    for index, row in sessions_df_for_one_monkey.iterrows():
+        folder = os.path.join(os.path.join(f'all_monkey_data/{data_category}', row['monkey_name'], row['data_name'], data_folder_name))
+        os.makedirs(folder, exist_ok=True)
+        # get the list of df names in the folder
+        df_in_folder = os.listdir(folder)
+        for df in df_names:
+            if df in df_in_folder:
+                sessions_df_for_one_monkey.loc[index, df] = True
+    return sessions_df_for_one_monkey
 
 
 def turn_all_important_info_into_combined_info(all_important_info, folder_name, save_each_df_as_csv=False):

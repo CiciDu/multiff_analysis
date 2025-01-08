@@ -12,7 +12,6 @@ class CurvatureOfPath():
 
         if seed is not None:
             np.random.seed(seed)
-        monkey_information['point_index'] = monkey_information.index
 
         self.ff_dataframe = ff_dataframe[ff_dataframe.ff_angle_boundary.between(-45*math.pi/180, 45*math.pi/180)]
         self.monkey_information = monkey_information
@@ -57,7 +56,7 @@ class CurvatureOfPath():
     def get_elements_for_plotting(self, optimal_arc_stop_at_visible_boundary=False, ignore_error=False):
         arc_ff_xy = self.ff_real_position_sorted[self.all_ff_indices]
         monkey_xy = self.monkey_information.loc[self.curvature_df.point_index.values, ['monkey_x', 'monkey_y']].values
-        monkey_angles = self.monkey_information.loc[self.curvature_df.point_index.values, 'monkey_angles'].values
+        monkey_angles = self.monkey_information.loc[self.curvature_df.point_index.values, 'monkey_angle'].values
         ff_distance = self.curvature_df.ff_distance.values
         ff_angle = self.curvature_df.ff_angle.values
         whether_ff_behind = (np.abs(ff_angle) > math.pi/2)

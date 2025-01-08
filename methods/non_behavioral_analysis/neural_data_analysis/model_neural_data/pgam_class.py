@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_raw_data, basic_func, further_processing_class
+from data_wrangling import process_monkey_information, specific_utils, further_processing_class
 from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, reduce_multicollinearity
 from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
@@ -142,3 +142,66 @@ class PGAMclass():
             if plot_each_feature:
                 plot_modeling_result.plot_smoothed_spatial_feature(self.spatial_sub, column, self.sm_handler)
             
+    
+    def run_pgam(self, neural_cluster_number=10):
+        link = sm.genmod.families.links.log()
+        self.poissFam = sm.genmod.families.family.Poisson(link=link)
+        self.spk_counts =  self.x_var.iloc[:, neural_cluster_number].values
+
+        # create the pgam model
+        self.pgam = general_additive_model(self.sm_handler,
+                                    self.sm_handler.smooths_var, # list of covariate we want to include in the model
+                                    self.spk_counts, # vector of spike counts
+                                    self.poissFam # poisson family with exponential link from statsmodels.api
+                                    )
+
+        # with all covariate, remove according to stat testing, and then refit
+        self.full, self.reduced = self.pgam.fit_full_and_reduced(self.sm_handler.smooths_var, 
+                                                th_pval=0.001,# pval for significance of covariate icluseioon
+                                                max_iter=10 ** 2, # max number of iteration
+                                                use_dgcv=True, # learn the smoothing penalties by dgcv
+                                                trial_num_vec=self.trial_ids)
+                
+        print('Minimal subset of variables driving the activity:')
+        print(self.reduced.var_list)
+
+    def post_processing(self):
+        # take out 2/3 of the trials for training
+        train_trials = self.trial_ids % 3 != 1
+        # string with the neuron identifier
+        neuron_id = 'neuron_000_session_1_monkey_001'
+        # dictionary containing some information about the neuron, keys must be strings and values can be anything since are stored with type object.
+        info_save = {'x':100,
+                    'y':801.2,
+                    'brain_region': 'V1',
+                    'subject':'monkey_001'
+                    }
+
+
+        # assume that we used 90% of the trials for training, 10% for evaluation
+        self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, train_trials, self.sm_handler, self.poissFam, self.trial_ids, 
+                                       var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
+                                
+        # find which variables in res['variable'] are in reduced.var_list
+        # and then plot the corresponding x_rate_Hz
+        indices_of_vars_to_plot = np.where(np.isin(self.res['variable'], self.reduced.var_list))[0]
+        
+        self._rename_variables_in_results()
+        plot_modeling_result.plot_pgam_tuning_functions(self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
+
+
+    def _rename_variables_in_results(self):
+        variable = self.res['variable']
+        # rename each variable to the corresponding label
+        variable[variable=='catching_ff'] = 'whether catching ff at current time bin'
+        variable[variable=='min_target_cluster_has_disappeared_for_last_time_dummy'] = 'whether target cluster has disappeared for last time'
+        variable[variable=='max_target_cluster_visible_dummy'] = 'whether target cluster is visible'
+        variable[variable=='gaze_world_y'] = 'gaze y-coordinate'
+        variable[variable=='monkey_speed'] = 'monkey linear speed'
+        variable[variable=='monkey_dw'] = 'monkey linear acceleration'
+        variable[variable=='monkey_ddw'] = 'change in monkey linear acceleration'
+        variable[variable=='monkey_ddv'] = 'change in monkey angular acceleration'
+        variable[variable=='avg_target_cluster_last_seen_distance'] = 'distance of target cluster last seen'
+        variable[variable=='avg_target_cluster_last_seen_angle'] = 'angle of target cluster last seen'
+        self.res['variable'] =  variable
+        

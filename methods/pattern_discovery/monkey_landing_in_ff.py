@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils, general_utils
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning import examine_null_arcs, alt_ff_utils
 
@@ -88,7 +88,7 @@ def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
 
         monkey_sub = iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, int(row.stop_ff_index), row.time, initial_duration_before_stop=2, reward_boundary_radius=reward_boundary_radius)
         if len(monkey_sub) == 0:
-            #print(f"no monkey_sub for ff_index {row.stop_ff_index} at time {row.time}")
+            print(f"no data where monkey is inside reward boundary for ff_index {int(row.stop_ff_index)} at time around {row.time}")
             continue
 
         monkey_sub.sort_values('time', inplace=True)
@@ -117,8 +117,9 @@ def add_distance_from_ff_to_stop(closest_stop_to_capture_df, monkey_information,
 
     df[['monkey_x', 'monkey_y']] = monkey_information.loc[df['stop_point_index'].values, ['monkey_x', 'monkey_y']].values
 
-    df['caught_time_point_index'] = np.searchsorted(monkey_information['monkey_t'].values,
-                                                   df['caught_time'].values)
+    df['caught_time_point_index'] = monkey_information['point_index'].values[np.searchsorted(monkey_information['time'].values,
+                                                   df['caught_time'].values)]
+    df.loc[df['caught_time_point_index'] == len(monkey_information), 'caught_time_point_index'] = len(monkey_information) - 1                                               
 
 
     df[['caught_time_monkey_x', 'caught_time_monkey_y']] = monkey_information.loc[df['caught_time_point_index'].values, ['monkey_x', 'monkey_y']].values
@@ -152,7 +153,7 @@ def find_angle_from_ff_center_to_monkey_stop(closest_stop_to_capture_df, monkey_
         ff_x = 0
         ff_y = 0
         # calculate the angle from the ff center to the monkey's stop point ("monkey_angle" will be just to the north)
-        angle = basic_func.calculate_angles_to_ff_centers(ff_x=stop_x, ff_y=stop_y, mx=ff_x, my=ff_y, m_angle=math.pi/2)
+        angle = specific_utils.calculate_angles_to_ff_centers(ff_x=stop_x, ff_y=stop_y, mx=ff_x, my=ff_y, m_angle=math.pi/2)
         list_of_angle.append(angle)
         list_of_rel_stop_x.append(stop_x)
         list_of_rel_stop_y.append(stop_y)
@@ -223,7 +224,7 @@ def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df
         scatter_around_target_df[col_name] = perc
 
     if data_folder_name is not None:
-        basic_func.save_df_to_csv(scatter_around_target_df, 'scatter_around_target_df', data_folder_name)
+        general_utils.save_df_to_csv(scatter_around_target_df, 'scatter_around_target_df', data_folder_name)
 
     return scatter_around_target_df
 

@@ -1,6 +1,6 @@
 
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization.animation import animation_func, animation_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils
@@ -43,7 +43,7 @@ def find_mheading_in_xy(traj_point_index_2d, monkey_information):
     num_time_points_for_trajectory = traj_point_index_2d.shape[1]
     traj_x_2d = monkey_information['monkey_x'].values[traj_point_index_2d].reshape(-1, num_time_points_for_trajectory)
     traj_y_2d = monkey_information['monkey_y'].values[traj_point_index_2d].reshape(-1, num_time_points_for_trajectory)
-    monkey_angle_2d = monkey_information['monkey_angles'].values[traj_point_index_2d].reshape(-1, num_time_points_for_trajectory)
+    monkey_angle_2d = monkey_information['monkey_angle'].values[traj_point_index_2d].reshape(-1, num_time_points_for_trajectory)
     left_end_x, left_end_y, right_end_x, right_end_y = animation_utils.find_triangle_to_show_direction(traj_x_2d, traj_y_2d, monkey_angle_2d)
 
     mheading_in_xy = {
@@ -263,8 +263,8 @@ def find_all_mheading_components_in_polar(monkey_information, time_all, time_ran
     traj_time_2d, trajectory_data_dict = trajectory_info.find_trajectory_data(time_all, monkey_information, time_range_of_trajectory = time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
     traj_x_2d = trajectory_data_dict['monkey_x']
     traj_y_2d = trajectory_data_dict['monkey_y']
-    monkey_angle_2d = trajectory_data_dict['monkey_angles']  
-    monkey_indices = np.searchsorted(monkey_information['monkey_t'], time_all)  
+    monkey_angle_2d = trajectory_data_dict['monkey_angle']  
+    monkey_indices = np.searchsorted(monkey_information['time'], time_all)  
     traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north = trajectory_info.find_monkey_info_on_trajectory_relative_to_origin(monkey_indices, monkey_information, traj_x_2d, traj_y_2d, monkey_angle_2d, num_time_points_for_trajectory=num_time_points_for_trajectory)
     left_end_r, left_end_theta, right_end_r, right_end_theta = find_coordinates_of_triangles_for_monkey_heading_in_polar(traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north)
 

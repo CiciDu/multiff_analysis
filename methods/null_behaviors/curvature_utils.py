@@ -130,16 +130,16 @@ def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plo
     ff_dataframe_sub = ff_dataframe_sub[ff_dataframe_sub.ff_angle.between(-45*math.pi/180, 45*math.pi/180)]
 
     curvature_df_in_duration = make_curvature_df(ff_dataframe_sub, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_new=ff_caught_T_new, clean=clean)
-    curvature_df_in_duration['time'] = monkey_information.loc[curvature_df_in_duration['point_index'].values, 'monkey_t'].values
+    curvature_df_in_duration['time'] = monkey_information.loc[curvature_df_in_duration['point_index'].values, 'time'].values
     return curvature_df_in_duration
 
 
 def furnish_curvature_df(curvature_df, monkey_information, ff_real_position_sorted):
     curvature_df = curvature_df.copy()
-    curvature_df['time'] = monkey_information.loc[curvature_df['point_index'], 'monkey_t'].values
+    curvature_df['time'] = monkey_information.loc[curvature_df['point_index'], 'time'].values
     curvature_df['monkey_x'] = monkey_information.loc[curvature_df['point_index'], 'monkey_x'].values
     curvature_df['monkey_y'] = monkey_information.loc[curvature_df['point_index'], 'monkey_y'].values
-    curvature_df['monkey_angle'] = monkey_information.loc[curvature_df['point_index'], 'monkey_angles'].values
+    curvature_df['monkey_angle'] = monkey_information.loc[curvature_df['point_index'], 'monkey_angle'].values
 
     v = curvature_df['abs_curv_diff'].values.copy()
     curvature_df['diff_percentile'] = rankdata(v)*100/len(v)
@@ -275,7 +275,7 @@ def find_arc_end_position(all_arc_measure, all_arc_radius, arc_end_direction,
             raise ValueError("Please provide all_point_index and monkey_information, since use_world_coordinates is True.")
 
         # get the rotated version
-        all_monkey_angles = monkey_information.loc[all_point_index, 'monkey_angles'].values
+        all_monkey_angles = monkey_information.loc[all_point_index, 'monkey_angle'].values
         all_monkey_x = monkey_information.loc[all_point_index, 'monkey_x'].values
         all_monkey_y = monkey_information.loc[all_point_index, 'monkey_y'].values
 
@@ -424,7 +424,7 @@ def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monk
     pass_by_within_n_cm = 50
     curvature_df['monkey_passed_by'] = False
     unique_ff_index = curvature_df.ff_index.unique()
-    monkey_t_array = monkey_information.monkey_t.values
+    monkey_t_array = monkey_information.time.values
     point_index_array = monkey_information.point_index.values
     print('There are %d unique ff_index in the curvature_df' % len(unique_ff_index))
 

@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from null_behaviors import show_null_trajectory
 
 import os
@@ -40,7 +40,7 @@ def _make_arc_df(null_arc_info_for_the_point, ff_real_position_sorted):
 def _get_arc_xy_rotated(arc_df, reward_boundary_radius=25):
     target_xy = arc_df[['ff_x', 'ff_y']].iloc[0]
     arc_df_sub = arc_df[arc_df['distance_to_ff_center'] <= reward_boundary_radius].copy()
-    rotation_matrix = basic_func.make_rotation_matrix(arc_df_sub['monkey_x'].iloc[0], arc_df_sub['monkey_y'].iloc[0], target_xy.iloc[0], target_xy.iloc[1])
+    rotation_matrix = general_utils.make_rotation_matrix(arc_df_sub['monkey_x'].iloc[0], arc_df_sub['monkey_y'].iloc[0], target_xy.iloc[0], target_xy.iloc[1])
     arc_xy_rotated = np.matmul(rotation_matrix, arc_df_sub[['monkey_x', 'monkey_y']].values.T)
     return arc_xy_rotated, rotation_matrix
 

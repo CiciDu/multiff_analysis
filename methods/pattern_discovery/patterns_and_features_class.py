@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func, base_processing_class, combine_info_utils
+from data_wrangling import specific_utils, base_processing_class, combine_info_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import plot_trials, plot_behaviors_utils, plot_statistics, plot_change_over_time
 from visualization.animation import animation_func, animation_utils, animation_class
@@ -56,7 +56,7 @@ class PatternsAndFeatures():
                 pass
 
         if not verbose:
-            with basic_func.suppress_stdout():
+            with general_utils.suppress_stdout():
                 self._combine_patterns_and_features(exists_ok=exists_ok, save_data=save_data)
         else:
             self._combine_patterns_and_features(exists_ok=exists_ok, save_data=save_data)

@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_raw_data, basic_func
+from data_wrangling import process_monkey_information, specific_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 import os
 import numpy as np
@@ -24,12 +24,13 @@ np.set_printoptions(suppress=True)
 def make_rebinned_monkey_info_essential(monkey_information, time_bins, ff_caught_T_new, convolve_pattern, window_width):
     """Prepare behavioral data."""
     monkey_information = monkey_information.copy()
-    monkey_t = monkey_information['monkey_t'].values
+    time = monkey_information['time'].values
 
     monkey_information = _add_turning_right(monkey_information)
-    monkey_information.loc[:, 'bin'] = np.digitize(monkey_t, time_bins)-1
+    monkey_information['bin'] = np.digitize(time, time_bins)-1
 
-    rebinned_monkey_info = _rebin_monkey_info(monkey_information)
+    rebinned_monkey_info = _rebin_monkey_info(monkey_information).reset_index(drop=True)
+    rebinned_monkey_info.index = rebinned_monkey_info['bin'].values
     rebinned_monkey_info = _add_num_caught_ff(rebinned_monkey_info, ff_caught_T_new, time_bins)
     rebinned_monkey_info = _make_bin_continuous(rebinned_monkey_info)
     rebinned_monkey_info = _clip_columns(rebinned_monkey_info)
@@ -44,10 +45,10 @@ def make_rebinned_monkey_info_essential(monkey_information, time_bins, ff_caught
 
 
 def make_binned_features(monkey_information, bin_width, ff_dataframe, ff_caught_T_new):
-    min_time = monkey_information['monkey_t'].min()
-    max_time = monkey_information['monkey_t'].max()
+    min_time = monkey_information['time'].min()
+    max_time = monkey_information['time'].max()
     time_bins = np.arange(min_time, max_time, bin_width) 
-    monkey_information.loc[:, 'bin'] = np.digitize(monkey_information['monkey_t'].values, time_bins)-1
+    monkey_information['bin'] = np.digitize(monkey_information['time'].values, time_bins)-1
     binned_features = pd.DataFrame({'bin': range(len(time_bins))})
     binned_features = _add_ff_info_to_binned_features(binned_features, ff_dataframe, ff_caught_T_new, time_bins)
     return binned_features
@@ -55,8 +56,8 @@ def make_binned_features(monkey_information, bin_width, ff_dataframe, ff_caught_
 def add_pattern_info_base_on_points(binned_features, monkey_information,
                                     try_a_few_times_indices_for_anim, GUAT_point_indices_for_anim,
                                     ignore_sudden_flash_indices_for_anim):
-    pattern_df = monkey_information[['bin']].copy()
-    pattern_df['point_index'] = pattern_df.index
+    pattern_df = monkey_information[['bin', 'point_index']].copy()
+    pattern_df.index = pattern_df['point_index'].values
     
     pattern_df['try_a_few_times_indice_dummy'] = 0
     pattern_df.loc[try_a_few_times_indices_for_anim, 'try_a_few_times_indice_dummy'] = 1
@@ -124,9 +125,13 @@ def _add_turning_right(monkey_information):
 def _rebin_monkey_info(monkey_information):
     """Rebin monkey information."""
     monkey_information = monkey_information.copy()
-    monkey_information['stop_duration'] = monkey_information['monkey_t']
+    monkey_information['stop_duration'] = monkey_information['time']
     monkey_information.loc[monkey_information['monkey_speeddummy'] > 1, 'stop_duration'] = 0
-    rebinned_monkey_info = monkey_information.groupby('bin').mean().reset_index(drop=False)
+    rebinned_monkey_info = monkey_information.groupby('bin').mean()
+    # take out the name of the index
+
+
+    rebinned_monkey_info['bin'] = rebinned_monkey_info.index
     rebinned_monkey_info.rename(columns={'monkey_speeddummy': 'stop_time_ratio_in_bin'}, inplace=True)
     rebinned_monkey_info['stop_time_ratio_in_bin'] = rebinned_monkey_info['stop_time_ratio_in_bin']/rebinned_monkey_info['time']
     rebinned_monkey_info['num_distinct_stops'] = monkey_information.groupby('bin').sum()['whether_new_distinct_stop'].values
@@ -158,7 +163,7 @@ def _clip_columns(rebinned_monkey_info):
 def _select_columns_of_interest(rebinned_monkey_info):
     """Select columns of interest."""
     columns_of_interest = ['bin', 'LDy', 'LDz', 'RDy', 'RDz', 'gaze_monkey_view_x', 'gaze_monkey_view_y', 'gaze_world_x', 'gaze_world_y', 
-                        'monkey_speed', 'monkey_angles', 'monkey_dw', 'monkey_ddw', 'monkey_ddv', 'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff']
+                        'monkey_speed', 'monkey_angle', 'monkey_dw', 'monkey_ddw', 'monkey_ddv', 'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff']
     rebinned_monkey_info_essential = rebinned_monkey_info[columns_of_interest].copy()
     return rebinned_monkey_info_essential
 

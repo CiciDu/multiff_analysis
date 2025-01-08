@@ -1,5 +1,5 @@
 
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from pattern_discovery import cluster_analysis
 from pattern_discovery import monkey_landing_in_ff
 
@@ -96,8 +96,8 @@ def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_informa
     closest_stop_to_capture_df = pd.DataFrame()
     for i in range(len(ff_caught_T_sorted)):
         caught_time = ff_caught_T_sorted[i]
-        monkey_t = stop_sub['time'].values
-        iloc_of_closest_time = np.argmin(np.abs(monkey_t - caught_time))
+        time = stop_sub['time'].values
+        iloc_of_closest_time = np.argmin(np.abs(time - caught_time))
         closest_point_row = stop_sub.iloc[[iloc_of_closest_time]].copy()
         closest_point_row['caught_time'] = caught_time
         closest_stop_to_capture_df = pd.concat([closest_stop_to_capture_df, closest_point_row], axis=0)
@@ -110,7 +110,7 @@ def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_informa
         closest_stop_to_capture_df['stop_point_index'] = stop_point_index_array
     else:
         closest_stop_to_capture_df['stop_point_index'] = closest_stop_to_capture_df['point_index']
-    closest_stop_to_capture_df['stop_time'] = monkey_information.loc[closest_stop_to_capture_df['point_index'], 'monkey_t'].values
+    closest_stop_to_capture_df['stop_time'] = monkey_information.loc[closest_stop_to_capture_df['point_index'], 'time'].values
 
     closest_stop_to_capture_df = monkey_landing_in_ff.add_distance_from_ff_to_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
     closest_stop_to_capture_df['whether_stop_inside_boundary'] = closest_stop_to_capture_df['distance_from_ff_to_stop'] <= 25
@@ -338,8 +338,8 @@ def get_first_seen_and_last_seen_info_for_ff_in_time_windows(all_ff_index, all_s
     point_index_ff_last_seen = ff_info.loc[~ff_info['point_index_ff_last_seen'].isnull(), 'point_index_ff_last_seen']
     ff_info.loc[~ff_info['point_index_ff_last_seen'].isnull(), 'point_index_ff_last_seen'] = point_index_ff_last_seen.astype(int)
 
-    ff_info.loc[~ff_info['point_index_ff_first_seen'].isnull(), 'time_ff_first_seen'] = monkey_information.loc[point_index_ff_first_seen.values, 'monkey_t'].values
-    ff_info.loc[~ff_info['point_index_ff_last_seen'].isnull(), 'time_ff_last_seen'] = monkey_information.loc[point_index_ff_last_seen.values, 'monkey_t'].values
+    ff_info.loc[~ff_info['point_index_ff_first_seen'].isnull(), 'time_ff_first_seen'] = monkey_information.loc[point_index_ff_first_seen.values, 'time'].values
+    ff_info.loc[~ff_info['point_index_ff_last_seen'].isnull(), 'time_ff_last_seen'] = monkey_information.loc[point_index_ff_last_seen.values, 'time'].values
 
     return ff_info
 
@@ -473,7 +473,7 @@ def _get_flash_on_columns(df, ff_flash_sorted, ff_real_position_sorted, ff_life_
         alt_ff_cluster_last_flash_time_bbas = -999
         for ff_index in ff_cluster:
             ff_flash = ff_flash_sorted[ff_index]
-            result = basic_func.find_intersection(ff_flash, [row[duration_start_column], row[duration_end_column]])
+            result = general_utils.find_intersection(ff_flash, [row[duration_start_column], row[duration_end_column]])
             if len(result) > 0:
                 if_alt_ff_cluster_flash_bbas = True
                 latest_flash_time_before_stop = min(ff_flash[result[-1]][-1], row[duration_end_column]) 

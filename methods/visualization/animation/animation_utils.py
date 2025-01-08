@@ -57,11 +57,11 @@ def prepare_for_animation(ff_dataframe, ff_caught_T_new, ff_life_sorted, ff_beli
             num_trials = None
 
 
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] > duration[0]) & 
-                           (monkey_information['monkey_t'] <= duration[1]))[0]
+    cum_pos_index = np.where((monkey_information['time'] > duration[0]) & 
+                           (monkey_information['time'] <= duration[1]))[0]
     
 
-    anim_monkey_info = make_anim_monkey_info(monkey_information, cum_iloc_indices, k = k)
+    anim_monkey_info = make_anim_monkey_info(monkey_information, cum_pos_index, k = k)
     ff_dataframe_anim = ff_dataframe[(ff_dataframe['time'] >= duration[0]) & (ff_dataframe['time'] <= duration[1])].copy()
     if rotated:
         R, theta = plot_behaviors_utils.find_rotation_matrix(anim_monkey_info['anim_mx'], anim_monkey_info['anim_my'], also_return_angle=True)    
@@ -119,7 +119,7 @@ def find_xy_min_max_for_animation(anim_monkey_info, ff_dataframe_anim):
 
 
 
-def make_anim_monkey_info(monkey_information, cum_iloc_indices, k = 3):
+def make_anim_monkey_info(monkey_information, cum_pos_index, k = 3):
     """
     Get information of the monkey/agent as well as the limits of the axes to be used in animation
 
@@ -127,10 +127,10 @@ def make_anim_monkey_info(monkey_information, cum_iloc_indices, k = 3):
     ----------
     monkey_information: df
         containing the speed, angle, and location of the monkey at various points of time
-    cum_iloc_indices: array
+    cum_pos_index: array
         an array of indices involved in the current trajectory, in reference to monkey_information 
     k: num
-        every k point in cum_iloc_indices will be plotted in the animation
+        every k point in cum_pos_index will be plotted in the animation
 
 
     Returns
@@ -140,10 +140,10 @@ def make_anim_monkey_info(monkey_information, cum_iloc_indices, k = 3):
         to be plotted in animation, as well as the limits of the axes
     
     """
-    cum_t, cum_angle = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_angles'].iloc[cum_iloc_indices])
-    cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices])
-    cum_speed = np.array(monkey_information['monkey_speed'].iloc[cum_iloc_indices])
-    anim_indices = cum_iloc_indices[0:-1:k]
+    cum_t, cum_angle = np.array(monkey_information['time'].iloc[cum_pos_index]), np.array(monkey_information['monkey_angle'].iloc[cum_pos_index])
+    cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_pos_index]), np.array(monkey_information['monkey_y'].iloc[cum_pos_index])
+    cum_speed = np.array(monkey_information['monkey_speed'].iloc[cum_pos_index])
+    anim_indices = cum_pos_index[0:-1:k]
     anim_t = cum_t[0:-1:k]
     anim_mx = cum_mx[0:-1:k]
     anim_my = cum_my[0:-1:k]
@@ -156,7 +156,7 @@ def make_anim_monkey_info(monkey_information, cum_iloc_indices, k = 3):
                         "anim_speed": anim_speed, "xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax}
     
     if 'gaze_world_x' in monkey_information.columns:
-        gaze_world_x, gaze_world_y = np.array(monkey_information['gaze_world_x'].iloc[cum_iloc_indices]), np.array(monkey_information['gaze_world_y'].iloc[cum_iloc_indices])
+        gaze_world_x, gaze_world_y = np.array(monkey_information['gaze_world_x'].iloc[cum_pos_index]), np.array(monkey_information['gaze_world_y'].iloc[cum_pos_index])
         anim_gaze_world_x = gaze_world_x[0:-1:k]
         anim_gaze_world_y = gaze_world_y[0:-1:k]
         anim_monkey_info['gaze_world_x'] = anim_gaze_world_x

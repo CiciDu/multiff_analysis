@@ -28,9 +28,9 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
                                                  max_features_to_show_per_plot=20, 
                                                  horizontal_bars=True):
     # Get the unique feature categories
-    unique_feature_category = get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot)
+    unique_feature_category = _get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot)
     # Generate a color dictionary for the unique feature categories
-    color_dict = get_color_dict(unique_feature_category)
+    color_dict = _get_color_dict (unique_feature_category)
 
     if max_plots_to_show is None:
         max_plots_to_show = num_variates
@@ -83,72 +83,8 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
         # Close the plot to free up memory
         
 
-def plot_pgam_tuning_functions(res, indices_of_vars_to_plot=None):
-    if indices_of_vars_to_plot is None:
-        indices_of_vars_to_plot = np.arange(len(res['x_kernel']))
-
-
-    # each row of res contains the info about a variable
-    # some info are shared for all the variables (p-rsquared for example is a goodness of fit measure for the model
-    # it is shared, not a property of the variable), while other, like the parameters of the b-splines, 
-    # are variable specific
-
-    # print('\n\n')
-    # print('Result structarray types\n========================\n')
-    # for name in res.dtype.names: 
-    #     print('%s: \t %s'%(name, type(res[name][0])))
-
-
-    num_vars = len(indices_of_vars_to_plot)
-    num_var_per_plot = 3
-    num_plots = math.ceil(num_vars/num_var_per_plot)
-    var_counter = 0
-    var_index = indices_of_vars_to_plot[var_counter]
-    # plot tuning functions
-
-    for j in range(num_plots):
-        plt.figure(figsize=(5*num_var_per_plot,7))
-        for k in range(num_var_per_plot):
-            plt.subplot(2, num_var_per_plot,k+1)
-            #plt.title(str(var_index) + ', log-space %s'%res['variable'][var_index])
-            plt.title('log-space %s'%res['variable'][var_index])
-            x_kernel = res['x_kernel'][var_index]
-            y_kernel = res['y_kernel'][var_index]
-            ypCI_kernel = res['y_kernel_pCI'][var_index]
-            ymCI_kernel = res['y_kernel_mCI'][var_index]
-            
-            plt.plot(x_kernel.reshape(-1), y_kernel.reshape(-1), color='r')
-            plt.fill_between(x_kernel.reshape(-1), ymCI_kernel.reshape(-1), ypCI_kernel.reshape(-1), color='r', alpha=0.3)
-            
-            
-            x_firing = res['x_rate_Hz'][var_index]
-            # y_firing_model = res['model_rate_Hz'][var_index]
-            # y_firing_raw = res['raw_rate_Hz'][var_index]
-            y_firing_model = res['y_rate_Hz_model'][var_index]
-            y_firing_raw = res['y_rate_Hz_raw'][var_index]
-
-
-            plt.subplot(2,num_var_per_plot,k+1+num_var_per_plot)
-            plt.title('rate-space %s'%res['variable'][var_index])
-            
-            # modify the code below so that it makes plot despite NANs
-            
-            plt.plot(x_firing[0], y_firing_raw.reshape(-1), 'o-', markersize=2, color='k',label='raw')
-            plt.plot(x_firing[0], y_firing_model.reshape(-1), 'o-', markersize=2, color='r',label='model')
-            
-            
-            plt.legend()
-            plt.tight_layout()
-
-            var_counter += 1
-            if var_counter == num_vars:
-                break
-            var_index = indices_of_vars_to_plot[var_counter]
-        plt.show()
-
-
 # Function to get unique feature categories based on the given parameters
-def get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot):
+def _get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot):
     unique_feature_category = np.array([])
     for variate in range(num_variates):
         # If the flag is set to keep one value for each feature
@@ -166,8 +102,9 @@ def get_unique_feature_category(squared_loading, num_variates, keep_one_value_fo
     logging.info(f"{len(unique_feature_category)} out of {len(squared_loading.feature_category.unique())} feature categories are included in the plot")
     return unique_feature_category
 
+
 # Function to generate a color dictionary for the unique feature categories
-def get_color_dict(unique_feature_category):
+def _get_color_dict (unique_feature_category):
     # Get the first 10 colors from the Set3 palette
     qualitative_colors = sns.color_palette("Set3", 10)
     # Get the remaining colors from the Glasbey palette
@@ -177,6 +114,58 @@ def get_color_dict(unique_feature_category):
     # Create a dictionary mapping each feature category to a color
     color_dict = {unique_feature_category[i]: qualitative_colors[i] for i in range(len(unique_feature_category))}
     return color_dict
+
+
+def plot_pgam_tuning_functions(res, indices_of_vars_to_plot=None):
+    if indices_of_vars_to_plot is None:
+        indices_of_vars_to_plot = np.arange(len(res['x_kernel']))
+
+    # each row of res contains the info about a variable
+    # some info are shared for all the variables (p-rsquared for example is a goodness of fit measure for the model;
+    # it is shared, not a property of the variable), while other, like the parameters of the b-splines, 
+    # are variable-specific
+
+    print('\n\n')
+    print('Result structarray types\n========================\n')
+    for name in res.dtype.names: 
+        print('%s: \t %s'%(name, type(res[name][0])))
+
+    num_vars = len(indices_of_vars_to_plot)
+    num_var_per_plot = 3
+    num_plots = math.ceil(num_vars/num_var_per_plot)
+    var_counter = 0
+    var_index = indices_of_vars_to_plot[var_counter]
+    # plot tuning functions
+
+    for j in range(num_plots):
+        plt.figure(figsize=(5*num_var_per_plot,7))
+        for k in range(num_var_per_plot):
+            x_kernel = res['x_kernel'][var_index]
+            y_kernel = res['y_kernel'][var_index]
+            ypCI_kernel = res['y_kernel_pCI'][var_index]
+            ymCI_kernel = res['y_kernel_mCI'][var_index]
+
+            plt.subplot(2, num_var_per_plot,k+1)
+            plt.title('log-space %s'%res['variable'][var_index])
+            plt.plot(x_kernel.reshape(-1), y_kernel.reshape(-1), color='r')
+            plt.fill_between(x_kernel.reshape(-1), ymCI_kernel.reshape(-1), ypCI_kernel.reshape(-1), color='r', alpha=0.3)
+            
+            x_firing = res['x_rate_Hz'][var_index]
+            y_firing_model = res['y_rate_Hz_model'][var_index]
+            y_firing_raw = res['y_rate_Hz_raw'][var_index]
+            plt.subplot(2, num_var_per_plot,k+1+num_var_per_plot)
+            plt.title('rate-space %s'%res['variable'][var_index])
+            plt.plot(x_firing[0], y_firing_raw.reshape(-1), 'o-', markersize=2, color='k',label='raw')
+            plt.plot(x_firing[0], y_firing_model.reshape(-1), 'o-', markersize=2, color='r',label='model')
+            
+            plt.legend()
+            plt.tight_layout()
+
+            var_counter += 1
+            if var_counter == num_vars:
+                break
+            var_index = indices_of_vars_to_plot[var_counter]
+        plt.show()
 
 
 def plot_smoothed_temporal_feature(df, column, sm_handler, kernel_h_length):

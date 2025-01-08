@@ -17,7 +17,7 @@ disp(dataTable);
 
 % Save the table to a text file
 outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/processed_neural_data/monkey_Schro/data_0328/neural_time_offset.txt'
-writetable(dataTable, outputFileName, 'Delimiter', '\t');
+writetable(dataTable, outputFileName);
 
 disp(['Data saved to ', outputFileName]);
 
@@ -25,7 +25,7 @@ disp(['Data saved to ', outputFileName]);
 
 
 
-% For Schro data_0328
+% For Schro data_0404
 %openNEV('report', 'read', 'm53s420.nev')
 
 % Data

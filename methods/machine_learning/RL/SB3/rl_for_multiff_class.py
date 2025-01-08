@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func, base_processing_class, further_processing_class
+from data_wrangling import specific_utils, base_processing_class, further_processing_class
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
 from visualization import additional_plots, plot_statistics
 from visualization.animation import animation_class, animation_utils
@@ -223,7 +223,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         if save_data:
             base_processing_class.BaseProcessing.save_ff_info_into_npz(self)
-            base_processing_class.BaseProcessing.save_monkey_information(self)
+            self.monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
+            self.monkey_information.to_csv(self.monkey_information_path)
             print("saved monkey_information and ff info at", (self.processed_data_folder_path))
         self.make_or_retrieve_ff_dataframe_for_agent(exists_ok=False, save_data=save_data)
         
@@ -588,7 +589,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
 
     def plot_side_by_side(self):
-        with basic_func.HiddenPrints():
+        with general_utils.HiddenPrints():
             num_trials = 2
             plotting_params = {"show_stops": True,
                               "show_believed_target_positions": True,
@@ -602,7 +603,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 # more: 259, 263, 265, 299, 393, 496, 523, 556, 601, 666, 698, 760, 805, 808, 930, 946, 955, 1002, 1003
                 info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = collect_agent_data.find_corresponding_info_of_agent(self.info_of_monkey, currentTrial, num_trials, self.sac_model, self.agent_dt, LSTM=False, env_kwargs=self.env_kwargs)
 
-                with basic_func.initiate_plot(20,20,400):
+                with general_utils.initiate_plot(20,20,400):
                     additional_plots.PlotSidebySide(plot_whole_duration = plot_whole_duration,
                                     info_of_monkey = self.info_of_monkey,
                                     info_of_agent = info_of_agent,  

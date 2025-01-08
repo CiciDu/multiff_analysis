@@ -63,7 +63,7 @@ class ClusterReplacement(decision_making_class.DecisionMaking):
             ff_attributes = list(set(ff_attributes) | set(arc_info_to_add))      
         self.free_selection_inputs_df, self.free_selection_inputs_df_for_plotting, self.sequence_of_obs_ff_indices, self.point_index_array, self.pred_var = free_selection.find_free_selection_inputs_from_info_of_n_ff_per_point(self.joined_cluster_df, self.monkey_information, ff_attributes=ff_attributes, 
                                                                                     num_ff_per_row=num_old_ff_per_row + num_new_ff_per_row, add_current_curvature_of_traj=add_current_curvature_of_traj, ff_caught_T_new=self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)        
-        self.free_selection_time = self.monkey_information.loc[self.point_index_array, 'monkey_t'].values
+        self.free_selection_time = self.monkey_information.loc[self.point_index_array, 'time'].values
         # incorporate whether_changed
         self.whether_changed = self.joined_cluster_df[['point_index', 'whether_changed']].drop_duplicates()        
         self.output = self.whether_changed['whether_changed'].values.astype(int).copy()        

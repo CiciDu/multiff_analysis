@@ -1,9 +1,9 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from planning_analysis.show_planning import alt_ff_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_utils
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils, optimal_arc_utils
 import numpy as np
 import pandas as pd
@@ -71,7 +71,7 @@ def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_
 
     # add angle_from_stop_ff_to_stop
     only_stop_ff_df['stop_x'], only_stop_ff_df['stop_y'] = monkey_information.loc[only_stop_ff_df['stop_point_index'], ['monkey_x', 'monkey_y']].values.T
-    only_stop_ff_df['angle_from_stop_ff_to_stop'] = basic_func.calculate_angles_to_ff_centers(ff_x=only_stop_ff_df['stop_x'].values, ff_y=only_stop_ff_df['stop_y'], \
+    only_stop_ff_df['angle_from_stop_ff_to_stop'] = specific_utils.calculate_angles_to_ff_centers(ff_x=only_stop_ff_df['stop_x'].values, ff_y=only_stop_ff_df['stop_y'], \
                                                                                         mx=only_stop_ff_df['ff_x'].values, my=only_stop_ff_df['ff_y'], 
                                                                                         m_angle=only_stop_ff_df['monkey_angle_before_stop'])
     only_stop_ff_df['dir_from_stop_ff_to_stop'] = np.sign(only_stop_ff_df['angle_from_stop_ff_to_stop'])
@@ -191,12 +191,12 @@ def find_ff_flash_df_within_all_stop_periods(monkey_info_in_all_stop_periods, ff
 
 
 def _get_info_of_ff_whose_flash_time_overlaps_with_stop_periods(monkey_info_in_all_stop_periods, ff_flash_sorted, ff_life_sorted):
-    monkey_t = monkey_info_in_all_stop_periods['time'].values
+    time = monkey_info_in_all_stop_periods['time'].values
     all_in_flash_iloc = []
     all_ff_index = []
     for i in range(len(ff_life_sorted)):
         ff_flash = ff_flash_sorted[i]
-        in_flash_iloc, _ = _find_index_of_points_within_flash_period_for_a_ff(monkey_t, ff_flash)
+        in_flash_iloc, _ = _find_index_of_points_within_flash_period_for_a_ff(time, ff_flash)
         all_in_flash_iloc.extend(in_flash_iloc.tolist())
         all_ff_index.extend([i] * len(in_flash_iloc))
     monkey_sub_for_ff = monkey_info_in_all_stop_periods[['point_index', 'time', 'dt', 'stop_point_index']].iloc[all_in_flash_iloc].copy()
@@ -238,8 +238,8 @@ def _add_basic_ff_info_to_df_for_ff(df, ff_radius=10):
     # For the selected time points, find ff distance and angle to boundary 
 
     df['ff_distance'] = np.sqrt((df['ff_x'] - df['monkey_x'])**2 + (df['ff_y'] - df['monkey_y'])**2)
-    df['ff_angle'] = basic_func.calculate_angles_to_ff_centers(df['ff_x'],df['ff_y'], mx=df['monkey_x'], my=df['monkey_y'], m_angle=df['monkey_angle'])
-    df['ff_angle_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=df['ff_angle'], distances_to_ff=df['ff_distance'], ff_radius=ff_radius)
+    df['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(df['ff_x'],df['ff_y'], mx=df['monkey_x'], my=df['monkey_y'], m_angle=df['monkey_angle'])
+    df['ff_angle_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=df['ff_angle'], distances_to_ff=df['ff_distance'], ff_radius=ff_radius)
     df['abs_ff_angle_boundary'] = np.abs(df['ff_angle_boundary'])
     return df
 

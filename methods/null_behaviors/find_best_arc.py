@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from null_behaviors import show_null_trajectory
 
 import os
@@ -106,7 +106,7 @@ def furnish_best_arc_df(best_arc_df, monkey_information, ff_real_position_sorted
     best_arc_df = best_arc_df.merge(repetitions_df, on='whether_new_ff_cum_sum', how='left')
     
     # have a new column: intended_target_id by copying the values from chunk_id
-    best_arc_df['time'] = monkey_information.loc[best_arc_df['point_index'], 'monkey_t'].values
+    best_arc_df['time'] = monkey_information.loc[best_arc_df['point_index'], 'time'].values
     best_arc_df['chunk_id'] = best_arc_df['whether_new_ff_cum_sum'] - 1
 
     '''
@@ -198,12 +198,12 @@ def add_column_monkey_passed_by_to_best_arc_df(best_arc_df, ff_dataframe):
 
 
 def find_point_on_ff_boundary_with_smallest_angle_to_monkey(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ff_radius=10):
-    angles_to_ff = basic_func.calculate_angles_to_ff_centers(ff_x, ff_y, monkey_x, monkey_y, monkey_angle)
+    angles_to_ff = specific_utils.calculate_angles_to_ff_centers(ff_x, ff_y, monkey_x, monkey_y, monkey_angle)
     diff_x = ff_x - monkey_x
     diff_y = ff_y - monkey_y
     diff_xy = np.stack((diff_x, diff_y), axis=1)
     distances_to_ff = LA.norm(diff_xy, axis=1)
-    angles_to_boundaries = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff, distances_to_ff, ff_radius=ff_radius)
+    angles_to_boundaries = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff, distances_to_ff, ff_radius=ff_radius)
     dif_in_angles = angles_to_ff - angles_to_boundaries
     new_ff_distance = np.abs(np.cos(dif_in_angles)*distances_to_ff)
     new_ff_angle_in_world = angles_to_boundaries + monkey_angle

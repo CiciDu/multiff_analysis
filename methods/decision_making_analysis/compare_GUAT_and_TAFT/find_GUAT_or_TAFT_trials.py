@@ -147,9 +147,9 @@ def _make_trials_df(monkey_sub):
 
     # Get stop times for first, second, and last stops
     monkey_sub.set_index('point_index', inplace=True)
-    trials_df['first_stop_time'] = monkey_sub.loc[trials_df['first_stop_point_index'], 'monkey_t'].values
-    trials_df['second_stop_time'] = monkey_sub.loc[trials_df['second_stop_point_index'], 'monkey_t'].values
-    trials_df['last_stop_time'] = monkey_sub.loc[trials_df['last_stop_point_index'], 'monkey_t'].values
+    trials_df['first_stop_time'] = monkey_sub.loc[trials_df['first_stop_point_index'], 'time'].values
+    trials_df['second_stop_time'] = monkey_sub.loc[trials_df['second_stop_point_index'], 'time'].values
+    trials_df['last_stop_time'] = monkey_sub.loc[trials_df['last_stop_point_index'], 'time'].values
 
     return trials_df
 

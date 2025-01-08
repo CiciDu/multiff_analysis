@@ -1,6 +1,6 @@
 import sys
 from visualization import plot_trials, plot_behaviors_utils
-from data_wrangling import process_raw_data, basic_func, further_processing_class, combine_info_utils
+from data_wrangling import process_monkey_information, specific_utils, further_processing_class, combine_info_utils
 
 import os
 import seaborn as sns
@@ -104,10 +104,10 @@ def PlotPoints(point,
     """
     sns.set_style(style="white")
 
-    time = np.array(monkey_information['monkey_t'])[point]
+    time = np.array(monkey_information['time'])[point]
     duration = [time - duration_of_trajectory, time]
-    cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))
-    cum_t, cum_mx, cum_my = monkey_information['monkey_t'].iloc[cum_iloc_indices].values, monkey_information['monkey_x'].iloc[cum_iloc_indices].values, monkey_information['monkey_y'].iloc[cum_iloc_indices].values
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (monkey_information['time'] <= duration[1]))
+    cum_t, cum_mx, cum_my = monkey_information['time'].iloc[cum_pos_index].values, monkey_information['monkey_x'].iloc[cum_pos_index].values, monkey_information['monkey_y'].iloc[cum_pos_index].values
     
     if not hitting_arena_edge_ok:
         # Stop plotting for the trial if the monkey/agent has gone across the edge
@@ -203,7 +203,7 @@ def PlotPoints(point,
                     axes.add_patch(circle)
 
     # Also plot the trajectory of the monkey/agent
-    axes.scatter(cum_mx, cum_my, s=15, c=cum_iloc_indices, cmap="Blues")
+    axes.scatter(cum_mx, cum_my, s=15, c=cum_pos_index, cmap="Blues")
 
     # Set the limits of the x-axis and y-axis
     mx_min, mx_max, my_min, my_max = plot_behaviors_utils.find_xy_min_max_for_plots(np.stack((cum_mx, cum_my)), x0=0, y0=0, temp_ff_positions=None)

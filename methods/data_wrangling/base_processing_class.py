@@ -1,4 +1,4 @@
-from data_wrangling import basic_func, process_raw_data
+from data_wrangling import specific_utils, process_monkey_information, retrieve_raw_data, time_offset_utils
 from pattern_discovery import make_ff_dataframe
 from non_behavioral_analysis import eye_positions
 from null_behaviors import curv_of_traj_utils
@@ -106,6 +106,7 @@ class BaseProcessing:
         self.decision_making_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
         self.neural_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')
         self.processed_neural_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_neural_data')
+        self.metadata_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
@@ -114,6 +115,7 @@ class BaseProcessing:
         os.makedirs(self.decision_making_folder_path, exist_ok=True)
         os.makedirs(self.neural_data_folder_path, exist_ok=True)
         os.makedirs(self.processed_neural_data_folder_path, exist_ok=True)
+        os.makedirs(self.metadata_folder_path, exist_ok=True)
 
 
     def try_retrieving_df(self, df_name, exists_ok=True, data_folder_name_for_retrieval=None):
@@ -129,24 +131,23 @@ class BaseProcessing:
         return df_of_interest 
 
 
-    def make_or_retrieve_ff_dataframe(self, num_missed_index=0, exists_ok=True, already_made_ok=False, save_into_h5=True, to_furnish_ff_dataframe=True, **kwargs):
+    def make_or_retrieve_ff_dataframe(self, exists_ok=True, already_made_ok=False, save_into_h5=True, to_furnish_ff_dataframe=True, **kwargs):
         
         if already_made_ok & (getattr(self, 'ff_dataframe', None) is not None):
             return
 
-        h5_file_name = 'ff_dataframe.h5'
+        h5_file_pathway = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_dataframe.h5'))
         try:
             if not exists_ok:
                 raise Exception('ff_dataframe exists_ok is False. Will make new ff_dataframe')
-            h5_file_pathway = os.path.join(os.path.join(self.processed_data_folder_path, h5_file_name))
+            
             self.ff_dataframe = pd.read_hdf(h5_file_pathway, 'ff_dataframe')
-            print("Retrieved ff_dataframe from ", h5_file_pathway) 
+            print("Retrieved ff_dataframe from", h5_file_pathway) 
         # otherwise, recreate the dataframe
         except Exception as e:
             print("Failed to retrieve ff_dataframe. Will make new ff_dataframe. Error: ", e)
             ff_dataframe_args = (self.monkey_information, self.ff_caught_T_new, self.ff_flash_sorted,  self.ff_real_position_sorted, self.ff_life_sorted)
             ff_dataframe_kargs = {"max_distance": 500, 
-                                  "num_missed_index": num_missed_index, 
                                   "to_add_essential_columns": False,
                                   "to_furnish_ff_dataframe": False}
             
@@ -161,8 +162,6 @@ class BaseProcessing:
             print("made ff_dataframe")
             
             if save_into_h5:
-                
-                h5_file_pathway = os.path.join(os.path.join(self.processed_data_folder_path, h5_file_name))
                 with pd.HDFStore(h5_file_pathway) as h5_store:
                     h5_store['ff_dataframe'] = self.ff_dataframe
 
@@ -181,21 +180,21 @@ class BaseProcessing:
                                                     self.ff_caught_T_new, self.ff_life_sorted)
 
 
-    def retrieve_monkey_data(self, min_distance_to_calculate_angle=5):
+    def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1):
         self.npz_file_pathway = os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz')
-        self.monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
-
         self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
             self.ff_flash_end_sorted = self.retrieve_ff_info_from_npz()
-        self.monkey_information = pd.read_csv(self.monkey_information_path).drop(["Unnamed: 0"], axis=1)
-
-        self.monkey_information = process_raw_data.process_monkey_information_after_retrieval(self.monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         
+        self.monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
+        self.monkey_information = pd.read_csv(self.monkey_information_path).drop(["Unnamed: 0"], axis=1)
+        self.monkey_information.index = self.monkey_information.point_index.values
+        self.monkey_information = process_monkey_information.add_more_columns_to_monkey_information(self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop) 
+        self.monkey_information = process_monkey_information.take_out_suspicious_information_from_monkey_information(self.monkey_information)
+
         print("Retrieved monkey data from ", self.monkey_information_path, " and ff data from ", self.npz_file_pathway)
 
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
-
         return 
     
     def make_or_retrieve_closest_stop_to_capture_df(self, exists_ok=True):
@@ -204,7 +203,7 @@ class BaseProcessing:
             self.closest_stop_to_capture_df = pd.read_csv(path).drop(["Unnamed: 0"], axis=1)
         else:
             self.closest_stop_to_capture_df = alt_ff_utils.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted, 
-                                                                                                    stop_ff_index_array=np.arange(len(self.ff_caught_T_sorted)))
+                                                                                                     stop_ff_index_array=np.arange(len(self.ff_caught_T_sorted)))
             self.closest_stop_to_capture_df.to_csv(path)
         return
 
@@ -242,7 +241,7 @@ class BaseProcessing:
 
         print('Note: ff_caught_T_sorted is replaced with ff_caught_T_new')
 
-        self.monkey_information['trial'] = np.searchsorted(self.ff_caught_T_new, self.monkey_information['monkey_t'])
+        self.monkey_information['trial'] = np.searchsorted(self.ff_caught_T_new, self.monkey_information['time'])
 
         assert len(self.ff_caught_T_new) == len(self.ff_caught_T_sorted)
 
@@ -258,50 +257,35 @@ class BaseProcessing:
             self.target_cluster_df.to_csv(path)
             print("Made target_cluster_df and saved it at ", path)
         return
-    
-    def save_monkey_information(self):
-        columns_to_keep = ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_speed', 'monkey_speeddummy',
-                           'monkey_angles', 'monkey_dw', 'LDy', 'LDz', 'RDy', 'RDz']
-        more_columns_to_keep = [col for col in self.monkey_information.columns if 'gaze' in col]
-        columns_to_keep.extend(more_columns_to_keep)
-        
-        columns_to_keep = [col for col in columns_to_keep if col in self.monkey_information.columns]
-        monkey_information_small = self.monkey_information[columns_to_keep]
-        data_dir = self.processed_data_folder_path
-        os.makedirs(data_dir, exist_ok=True)
-        self.monkey_information_path = os.path.join(os.path.join(data_dir, 'monkey_information.csv'))
-        monkey_information_small.to_csv(self.monkey_information_path)
-        return 
 
 
-    def retrieve_or_make_monkey_data(self, exists_ok=True, already_made_ok=False, min_distance_to_calculate_angle=5):
+    def retrieve_or_make_monkey_data(self, exists_ok=True, already_made_ok=False, save_data=True, speed_threshold_for_distinct_stop=1, min_distance_to_calculate_angle=5):
         if already_made_ok & (getattr(self, 'monkey_information', None) is not None):
             return
         
-        self.accurate_start_time, self.accurate_end_time = process_raw_data.find_start_and_accurate_end_time(self.raw_data_folder_path)
+        self.smr_markers_start_time, self.smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path)
         self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
 
         if exists_ok:
             try:
-                self.retrieve_monkey_data(min_distance_to_calculate_angle)
+                self.retrieve_monkey_data(speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
                 return 
             except Exception as e:
                 print("Failed to retrieve monkey data. Will make new monkey data. Error: ", e)
 
         # if not exists, then retrieve from csv files
-        self.monkey_information, self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
-                self.ff_flash_end_sorted = process_raw_data.log_extractor(raw_data_folder_path = self.raw_data_folder_path).extract_data(monkey_information_exists_OK=exists_ok, min_distance_to_calculate_angle=min_distance_to_calculate_angle,
-                                                                                                                                            interocular_dist=self.interocular_dist)   
+        self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
+                self.ff_flash_end_sorted = retrieve_raw_data.extract_txt_data(self.raw_data_folder_path)   
+        self.monkey_information = process_monkey_information.make_or_retrieve_monkey_information(self.raw_data_folder_path, self.interocular_dist, min_distance_to_calculate_angle=min_distance_to_calculate_angle, 
+                                                                                       exists_ok=exists_ok, save_data=save_data)
         
-        # store them
-        self.save_ff_info_into_npz()
-        self.save_monkey_information()
-
+        if save_data:
+            self.save_ff_info_into_npz()
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
 
     def get_more_monkey_data(self, exists_ok=True):
-        self.make_or_retrieve_ff_dataframe(num_missed_index=0, exists_ok=exists_ok, to_furnish_ff_dataframe=False)
+        self.make_or_retrieve_ff_dataframe(exists_ok=exists_ok, to_furnish_ff_dataframe=False)
         self.crudely_furnish_ff_dataframe()
         #self.find_patterns()
         self.cluster_around_target_indices = None
@@ -310,7 +294,7 @@ class BaseProcessing:
 
     def crudely_furnish_ff_dataframe(self):
         # instead of furnishing ff_dataframe in the line above, we just add a few columns, so as not to make ff_dataframe_too_big
-        self.ff_dataframe[['monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']] = self.monkey_information.loc[self.ff_dataframe['point_index'].values, ['monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']].values
+        self.ff_dataframe[['monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']] = self.monkey_information.loc[self.ff_dataframe['point_index'].values, ['monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']].values
         self.ff_dataframe = self.ff_dataframe.drop(columns=['left_right', 'abs_delta_ff_angle', 'abs_delta_ff_angle_boundary'], errors='ignore')
 
 
@@ -338,7 +322,7 @@ class BaseProcessing:
     def init_variations_list_func(self, folder_path=None, ref_point_params_based_on_mode=None):
         if ref_point_params_based_on_mode is None:
             ref_point_params_based_on_mode = self.ref_point_params_based_on_mode
-        self.variations_list = basic_func.init_variations_list_func(ref_point_params_based_on_mode, folder_path=folder_path, 
+        self.variations_list = specific_utils.init_variations_list_func(ref_point_params_based_on_mode, folder_path=folder_path, 
                                                                     monkey_name=self.monkey_name)
 
 

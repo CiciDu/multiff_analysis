@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_raw_data, basic_func
+from data_wrangling import process_monkey_information, specific_utils, time_offset_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 import os
 import numpy as np
@@ -32,18 +32,18 @@ def make_spike_df(raw_data_folder_path="all_monkey_data/raw_monkey_data/monkey_B
     sorted_neural_data_name = os.path.join(neural_data_path, "Sorted")
     metadata_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
 
-    accurate_start_time, accurate_end_time = process_raw_data.find_start_and_accurate_end_time(raw_data_folder_path)
-    time_offset_df = pd.read_csv(os.path.join(metadata_path, 'neural_time_offset.txt'))
+    smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
+    neural_offset_df = pd.read_csv(os.path.join(metadata_path, 'neural_time_offset.txt'))
 
     spike_times = _load_spike_times(sorted_neural_data_name)
     
-    neural_data_offset = time_offset_df.loc[time_offset_df['label']==1, 'time'].item()
+    neural_events_start_time = neural_offset_df.loc[neural_offset_df['label']==1, 'time'].item()
 
-    spike_times_in_s = spike_times/sampling_rate - neural_data_offset + accurate_start_time
+    spike_times_in_s = spike_times/sampling_rate - neural_events_start_time + smr_markers_start_time
 
     spike_clusters = _load_spike_clusters(sorted_neural_data_name)
 
-    spike_times_in_s, spike_clusters = _filter_spike_data(spike_times_in_s, spike_clusters, accurate_start_time)
+    spike_times_in_s, spike_clusters = _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
 
     spike_df = pd.DataFrame({'time': spike_times_in_s, 'cluster': spike_clusters})
 
@@ -63,9 +63,9 @@ def _load_spike_clusters(sorted_neural_data_path):
     spike_clusters = spike_clusters.reshape(-1)
     return spike_clusters
 
-def _filter_spike_data(spike_times_in_s, spike_clusters, accurate_start_time):
+def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time):
     """Filter spike times and clusters based on start time."""
-    valid_idx = np.where(spike_times_in_s >= accurate_start_time)[0]
+    valid_idx = np.where(spike_times_in_s >= smr_markers_start_time)[0]
     spike_times_in_s = spike_times_in_s[valid_idx]
     spike_clusters = spike_clusters[valid_idx]
     return spike_times_in_s, spike_clusters
@@ -82,7 +82,7 @@ def bin_spikes(spike_df, bin_width=0.25):
     for i in range(len(unique_clusters)):
         cluster = unique_clusters[i]
         spike_subset = spike_df[spike_df['cluster']==cluster]
-        binned_spikes, _ = np.histogram(spike_subset.time, time_bins)
+        binned_spikes, bin_numbers = np.histogram(spike_subset.time, time_bins)
         all_binned_spikes[:, i] = binned_spikes
 
     # make sure that the number of time bins in all_binned_spikes does not exceed len(time_bins) - 1
@@ -113,7 +113,7 @@ def prepare_binned_spikes_matrix_and_df(all_binned_spikes, max_bin):
     binned_spikes_matrix = all_binned_spikes[:max_bin + 1, :]
     column_names = 'unit_' + pd.Series(range(binned_spikes_matrix.shape[1])).astype(str)
     binned_spikes_df = pd.DataFrame(binned_spikes_matrix, columns=column_names)
-    #binned_spikes_df['bin'] = np.arange(binned_spikes_matrix.shape[0])
+    binned_spikes_df['bin'] = np.arange(binned_spikes_matrix.shape[0])
     return binned_spikes_matrix, binned_spikes_df
 
 

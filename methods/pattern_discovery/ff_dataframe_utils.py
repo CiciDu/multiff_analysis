@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 
 import os
 import numpy as np
@@ -9,9 +9,6 @@ from numpy import linalg as LA
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
-
-
-
 
 
 def make_empty_ff_dataframe():
@@ -26,142 +23,103 @@ def make_empty_ff_dataframe():
    return ff_dataframe
 
 
-
-
-def find_valid_indices(monkey_information, ff_caught_T_new, player='monkey', num_missed_index=None):
-    monkey_t_array0 = np.array(monkey_information['monkey_t'])
-    if player == "monkey":
-        if num_missed_index is None:
-            num_missed_index = np.where(monkey_t_array0 > ff_caught_T_new[0])[0][0]
-        
-    else:
-        upper_limit = len(monkey_t_array0)-1
-        num_missed_index = 0
-    upper_limit = np.where(monkey_t_array0 < ff_caught_T_new[-1])[0]
-    if len(upper_limit) == 0:
-        valid_index = np.array([])
-    else:
-        upper_limit = upper_limit[-1]
-        if num_missed_index >= upper_limit +1:
-            valid_index = np.array([])
-        else:
-            valid_index = np.arange(num_missed_index, upper_limit+1)
-    
-    return valid_index, num_missed_index
-
-
-
-
-
-def find_visible_indices_AND_memory_array_AND_time_since_last_vis(current_ff_index, monkey_information, valid_index, obs_ff_indices_in_ff_dataframe, ff_flash_sorted, ff_real_position_sorted, ff_caught_T_new, max_distance, player='monkey', max_memory=100, truncate_info_beyond_capture=True): 
-    monkey_t_array_all = monkey_information['monkey_t'][:valid_index[-1]+1].values
-    monkey_angles_array_all = monkey_information['monkey_angles'][:valid_index[-1]+1].values
-    monkey_x_array_all = monkey_information['monkey_x'][:valid_index[-1]+1].values
-    monkey_y_array_all = monkey_information['monkey_y'][:valid_index[-1]+1].values
+def find_visible_indices_AND_memory_array_AND_time_since_last_vis(current_ff_index, monkey_information, obs_ff_indices_in_ff_dataframe, ff_flash_sorted, ff_real_position_sorted, 
+                                                                  ff_caught_T_new, max_distance, player='monkey', max_memory=100, truncate_info_beyond_capture=True): 
+    monkey_t_array_all = monkey_information['time'].values
+    monkey_angles_array_all = monkey_information['monkey_angle'].values
+    monkey_x_array_all = monkey_information['monkey_x'].values
+    monkey_y_array_all = monkey_information['monkey_y'].values
     # Here we use monkey_t_array_all instead of monkey_t_array because if the ff has been visible before the beginning of monkey_t_array, then there might be memory points at the beginning of monkey_t_array
     if player == "monkey":
-        raw_visible_indices = find_visible_indices(current_ff_index, ff_flash_sorted, ff_caught_T_new, ff_real_position_sorted, monkey_t_array_all, monkey_x_array_all, monkey_y_array_all, monkey_angles_array_all, max_distance)
+        visible_pos_indices = find_visible_pos_indices(current_ff_index, ff_flash_sorted, ff_caught_T_new, ff_real_position_sorted, monkey_t_array_all, monkey_x_array_all, monkey_y_array_all, monkey_angles_array_all, max_distance)
 
     else: # Otherwise, if the player is "agent"  
-        raw_visible_indices = find_visible_indices_for_agent(current_ff_index, obs_ff_indices_in_ff_dataframe, valid_index=range(valid_index[-1]+1))
-    visible_indices = raw_visible_indices[raw_visible_indices >= valid_index[0]]
-
+        visible_pos_indices = find_visible_pos_indices_for_agent(current_ff_index, obs_ff_indices_in_ff_dataframe, valid_index=monkey_information['point_index'].values)
 
     memory_array = np.array([])
-    in_memory_indices = np.array([])
+    in_memory_pos_indices = np.array([])
     time_since_last_vis = np.array([])
-    if len(raw_visible_indices) > 0:
-        memory_array = make_memory_array(raw_visible_indices, current_ff_index, ff_caught_T_new, monkey_t_array_all, max_memory=max_memory, truncate_info_beyond_capture=truncate_info_beyond_capture)
-        if len(memory_array) > valid_index[0]:
-            memory_valid_index = range(valid_index[0], min(valid_index[-1]+1, len(memory_array))) # this is necessary because memory_array has been truncated by last_alive_point
-            memory_array = memory_array[memory_valid_index]
+    if len(visible_pos_indices) > 0:
+        memory_array = make_memory_array(visible_pos_indices, current_ff_index, ff_caught_T_new, monkey_t_array_all, max_memory=max_memory, truncate_info_beyond_capture=truncate_info_beyond_capture)
+        # Find the point indices where the firefly is in memory or visible
+        in_memory_pos_indices = np.where(memory_array > 0)[0]
+        # Find the corresponding memory for these points and only keep those, since we don't need information of the ff
+        # when the ff is neither visible nor in memory
+        memory_array = memory_array[in_memory_pos_indices]
+        time_since_last_vis = find_time_since_last_vis(visible_pos_indices, monkey_t_array_all)
+        time_since_last_vis = time_since_last_vis[in_memory_pos_indices]
 
-            # Find the point indices where the firefly is in memory or visible
-            in_memory_indices = np.where(memory_array > 0)[0]
-            # Find the corresponding memory for these points and only keep those, since we don't need information of the ff
-            # when the ff is neither visible nor in memory
-            memory_array = memory_array[in_memory_indices]
-            time_since_last_vis = find_time_since_last_vis(raw_visible_indices, monkey_t_array_all)
-            time_since_last_vis = time_since_last_vis[in_memory_indices]
+    visible_indices = monkey_information.iloc[visible_pos_indices].index.values
+    in_memory_indices = monkey_information.iloc[in_memory_pos_indices].index.values
 
-    return visible_indices, memory_array, in_memory_indices, time_since_last_vis
-
+    return visible_indices, in_memory_indices, memory_array, time_since_last_vis
 
 
-
-
-def find_visible_indices(current_ff_index, ff_flash_sorted, ff_caught_T_new, ff_real_position_sorted, monkey_t_array, monkey_x_array, monkey_y_array, monkey_angles_array, max_distance):
+def find_visible_pos_indices(current_ff_index, ff_flash_sorted, ff_caught_T_new, ff_real_position_sorted, monkey_t_array, monkey_x_array, monkey_y_array, monkey_angles_array, max_distance):
     i = current_ff_index
     ff_flash = ff_flash_sorted[i]
-    # visible_indices contains the indices of the points when the ff is visible (within a suitable distance & at the right angle)
-    visible_indices = np.array([])
+    # visible_pos_indices contains the indices of the points when the ff is visible (within a suitable distance & at the right angle)
+    visible_pos_indices = np.array([])
     all_cum_indices = []
     for j in range(len(ff_flash)):
         visible_duration = ff_flash[j]
         # Find the corresponding monkey information:
-        cum_iloc_indices = np.where((monkey_t_array >= visible_duration[0]) & (monkey_t_array <= visible_duration[1]))[0].tolist()
-        all_cum_indices.extend(cum_iloc_indices)
+        cum_pos_index = np.where((monkey_t_array >= visible_duration[0]) & (monkey_t_array <= visible_duration[1]))[0].tolist()
+        all_cum_indices.extend(cum_pos_index)
     all_cum_indices = np.array(all_cum_indices).astype('int')
     if len(all_cum_indices) > 0: 
         cum_mx, cum_my, cum_angle = monkey_x_array[all_cum_indices], monkey_y_array[all_cum_indices], monkey_angles_array[all_cum_indices]
         distances_to_ff = LA.norm(np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[i], axis = 1)
         valid_distance_indices = np.where(distances_to_ff < max_distance)[0]
         if len(valid_distance_indices) > 0:
-            angles_to_ff = basic_func.calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx[valid_distance_indices], my=cum_my[valid_distance_indices], m_angle=cum_angle[valid_distance_indices])
-            angles_to_boundaries = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff[valid_distance_indices])
+            angles_to_ff = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx[valid_distance_indices], my=cum_my[valid_distance_indices], m_angle=cum_angle[valid_distance_indices])
+            angles_to_boundaries = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff[valid_distance_indices])
             overall_valid_indices = valid_distance_indices[np.where(np.absolute(angles_to_boundaries) <= 2*pi/9)[0]]
-            # Store these points from the current duration into visible_indices
-            visible_indices = all_cum_indices[overall_valid_indices]
+            # Store these points from the current duration into visible_pos_indices
+            visible_pos_indices = all_cum_indices[overall_valid_indices]
     
     # See if the current ff has been captured at any point
     # If it has been captured, then its index i should be smaller than the number of caught fireflies (i.e. the number of elements in ff_caught_T_new)
     if current_ff_index < len(ff_caught_T_new):
         # Find the index of the time at which the ff is captured
         last_alive_point = np.where(monkey_t_array <= ff_caught_T_new[current_ff_index])[0][-1]
-        # Truncate visible_indices so that its last point does not exceed last_live_time
-        visible_indices = visible_indices[visible_indices <= last_alive_point]
+        # Truncate visible_pos_indices so that its last point does not exceed last_live_time
+        visible_pos_indices = visible_pos_indices[visible_pos_indices <= last_alive_point]
     
-    return visible_indices
+    return visible_pos_indices
 
 
-
-def find_visible_indices_for_agent(current_ff_index, obs_ff_indices_in_ff_dataframe, valid_index):
+def find_visible_pos_indices_for_agent(current_ff_index, obs_ff_indices_in_ff_dataframe):
     # We'll only consider the points of time when the ff of interest was in obs space
     whether_in_obs = []
     # iterate through every point (step taken by the agent)
-    for index in valid_index:
-        # take out all the fireflies in the obs space
-        obs_ff_indices = obs_ff_indices_in_ff_dataframe[index]
+    for obs_ff_indices in obs_ff_indices_in_ff_dataframe:
         # if the ff of interest was in the obs space
         if current_ff_index in obs_ff_indices:
             whether_in_obs.append(True) 
         else:
             whether_in_obs.append(False)
     # find the point indices where the ff of interest was in the obs space
-    cum_iloc_indices = np.array(whether_in_obs).nonzero()[0]
-    if len(cum_iloc_indices) == 0:
+    cum_pos_index = np.array(whether_in_obs).nonzero()[0]
+    if len(cum_pos_index) == 0:
         # The ff of interest has never been in the obs space, so we move on to the next ff
-        visible_indices = np.array([]) 
+        visible_pos_indices = np.array([]) 
     else: 
-        visible_indices = cum_iloc_indices
-    return visible_indices
+        visible_pos_indices = cum_pos_index
+    return visible_pos_indices
 
 
-
-
-def make_memory_array(visible_indices, current_ff_index, ff_caught_T_new, monkey_t_array, max_memory=100, truncate_info_beyond_capture=True):
+def make_memory_array(visible_pos_indices, current_ff_index, ff_caught_T_new, monkey_t_array, max_memory=100, truncate_info_beyond_capture=True):
     # Make an array of points to denote memory, with 0 means being invisible, and 100 being fully visible. 
     # After a firefly turns from being visible to being invisible, memory will decrease by 1 for each additional step taken by the monkey/agent.    
     # We append max_memory elements at the end of initial_memory_array to aid iteration through this array later
-    initial_memory_array = np.zeros(max(visible_indices[-1]+max_memory, len(monkey_t_array)), dtype=int)
+    initial_memory_array = np.zeros(max(visible_pos_indices[-1]+max_memory, len(monkey_t_array)), dtype=int)
     # Make sure that the points where the ff is fully visible has a memory of max_memory (100 by default)
-    initial_memory_array[visible_indices] = max_memory
+    initial_memory_array[visible_pos_indices] = max_memory
     
-
     # We preserve the first element of initial_memory_array and then iterate through initial_memory_array to make a new list to 
     # denote memory (replacing some 0s with other numbers based on time). 
     
-  
     memory_array = [initial_memory_array[0]]
     for k in range(1, len(initial_memory_array)):
         # If the ff is currently invisible
@@ -181,17 +139,17 @@ def make_memory_array(visible_indices, current_ff_index, ff_caught_T_new, monkey
         if current_ff_index < len(ff_caught_T_new):
             # Find the index of the time at which the ff is captured
             last_alive_point = np.where(monkey_t_array <= ff_caught_T_new[current_ff_index])[0][-1]
-            # Truncate visible_indices so that its last point does not exceed last_live_time
+            # Truncate visible_pos_indices so that its last point does not exceed last_live_time
             memory_array = memory_array[:last_alive_point+1]
 
     return memory_array
 
 
 
-def find_time_since_last_vis(visible_indices, monkey_t_array):
-    invisible_indices = np.setdiff1d(np.arange(len(monkey_t_array)), visible_indices)
+def find_time_since_last_vis(visible_pos_indices, monkey_t_array):
+    invisible_pos_indices = np.setdiff1d(np.arange(len(monkey_t_array)), visible_pos_indices)
     monkey_t_array_copy = monkey_t_array.copy()
-    monkey_t_array_copy[invisible_indices] = np.nan
+    monkey_t_array_copy[invisible_pos_indices] = np.nan
     # use forward fill to fill in the nan values
     monkey_t_array_copy = pd.Series(monkey_t_array_copy).ffill().values
     # and fill the rest of NA to be the the first value of monkey_t_array
@@ -202,7 +160,7 @@ def find_time_since_last_vis(visible_indices, monkey_t_array):
     ''' Below is another method with similar speed
     monkey_t_array_diff = np.diff(monkey_t_array)
     monkey_t_array_diff = np.insert(monkey_t_array_diff, 0, 0)
-    monkey_t_array_diff[visible_indices] = 0
+    monkey_t_array_diff[visible_pos_indices] = 0
     time_since_last_vis = []
     for i in monkey_t_array_diff:
         if i == 0:
@@ -214,10 +172,10 @@ def find_time_since_last_vis(visible_indices, monkey_t_array):
     return time_since_last_vis
 
 
-def find_time_till_next_visible(visible_indices, monkey_t_array):
-    invisible_indices = np.setdiff1d(np.arange(len(monkey_t_array)), visible_indices)
+def find_time_till_next_visible(visible_pos_indices, monkey_t_array):
+    invisible_pos_indices = np.setdiff1d(np.arange(len(monkey_t_array)), visible_pos_indices)
     monkey_t_array_copy = monkey_t_array.copy()
-    monkey_t_array_copy[invisible_indices] = np.nan
+    monkey_t_array_copy[invisible_pos_indices] = np.nan
     # use forward fill to fill in the nan values
     monkey_t_array_copy = pd.Series(monkey_t_array_copy).fillna(method='bfill').values
     # and fill the rest of NA to be the the first value of monkey_t_array

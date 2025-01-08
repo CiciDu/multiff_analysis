@@ -1,6 +1,6 @@
 
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from visualization import plot_behaviors_utils, plot_trials
 from visualization.animation import animation_func, animation_utils
 from null_behaviors import find_best_arc, curvature_utils, optimal_arc_utils
@@ -27,7 +27,7 @@ def find_relative_xy_positions(ff_x, ff_y, monkey_x, monkey_y, monkey_angle):
     ff_xy = np.stack((ff_x, ff_y), axis=1)
     monkey_xy = np.stack([monkey_x, monkey_y]).T
     ff_distance = LA.norm(ff_xy-monkey_xy, axis = 1)
-    ff_angle = basic_func.calculate_angles_to_ff_centers(ff_x=ff_x, ff_y=ff_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
+    ff_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_x, ff_y=ff_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
     ff_x_relative = np.cos(ff_angle+pi/2)*ff_distance
     ff_y_relative = np.sin(ff_angle+pi/2)*ff_distance
     return ff_x_relative, ff_y_relative
@@ -69,8 +69,8 @@ def find_arc_length_and_radius(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ver
     ff_xy = np.stack([ff_x, ff_y]).T
 
     ff_distance = LA.norm(ff_xy-monkey_xy, axis = 1)
-    ff_angle = basic_func.calculate_angles_to_ff_centers(ff_x=ff_x, ff_y=ff_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
-    ff_angle_boundary = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
+    ff_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_x, ff_y=ff_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
+    ff_angle_boundary = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_angle, distances_to_ff=ff_distance)
     #ff_x_relative = np.cos(ff_angle+pi/2)*ff_distance
     ff_y_relative = np.sin(ff_angle+pi/2)*ff_distance # we used +pi/2 here because the ff_angle is counted as starting from 0 which is to the north of the monkey
 
@@ -122,7 +122,7 @@ def find_and_package_optimal_arc_info_for_plotting(best_arc_df, monkey_informati
         else:
             whether_ff_behind = (np.abs(best_arc_df['ff_angle']) > math.pi/2)
         monkey_xy = monkey_information.loc[arc_point_index, ['monkey_x', 'monkey_y']].values
-        monkey_angle = monkey_information.loc[arc_point_index, 'monkey_angles'].values
+        monkey_angle = monkey_information.loc[arc_point_index, 'monkey_angle'].values
         center_x, center_y, arc_starting_angle, arc_ending_angle = optimal_arc_utils.find_cartesian_arc_center_and_angle_for_optimal_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
                                                                                                                                        arc_end_direction, whether_ff_behind=whether_ff_behind,
                                                                                                                                        ignore_error=ignore_error)
@@ -156,7 +156,7 @@ def find_and_package_arc_to_center_info_for_plotting(all_point_index, all_ff_ind
     monkey_x = monkey_information['monkey_x'].loc[all_point_index].values
     monkey_y = monkey_information['monkey_y'].loc[all_point_index].values
     monkey_xy = np.stack((monkey_x, monkey_y))
-    monkey_angle = monkey_information['monkey_angles'].loc[all_point_index].values
+    monkey_angle = monkey_information['monkey_angle'].loc[all_point_index].values
     ff_xy, ff_distance, ff_angle, ff_angle_boundary, arc_length, arc_radius = find_arc_length_and_radius(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, verbose=verbose, ignore_error=ignore_error)
     arc_end_direction = np.sign(ff_angle)
     center_x, center_y, arc_starting_angle, arc_ending_angle = curvature_utils.find_cartesian_arc_center_and_angle_for_arc_to_center(monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, ff_xy, arc_end_direction,
@@ -223,10 +223,10 @@ def find_arc_xy_rotated(center_x, center_y, min_arc_radius, arc_starting_angle, 
 
 def find_most_recent_monkey_information(monkey_information, current_moment):
     duration = [current_moment-2, current_moment]
-    cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)         
-    monkey_x, monkey_y, monkey_angle = cum_mx[-1], cum_my[-1], cum_angles[-1]
+    cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)         
+    monkey_x, monkey_y, monkey_angle = cum_mx[-1], cum_my[-1], cum_angle[-1]
     monkey_xy = np.stack([monkey_x, monkey_y]).T
-    point_index = cum_iloc_indices[-1]
+    point_index = monkey_information.iloc[cum_pos_index[-1]]['point_index']
     return monkey_xy, monkey_angle, point_index
 
 def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_information, ff_dataframe, ff_caught_T_new,
@@ -444,14 +444,14 @@ def eliminate_irrelevant_points_before_or_after_crossing_boundary(duration, rele
     # eliminate unnecessary parts seperated by crossing boundary
     if len(relevant_point_index) == 0:
         raise ValueError('relevant_point_index cannot be empty.')
-    crossing_boundary_points = monkey_information.loc[monkey_information['monkey_t'].between(duration[0], duration[1]) & 
+    crossing_boundary_points = monkey_information.loc[monkey_information['time'].between(duration[0], duration[1]) & 
                                                         monkey_information['crossing_boundary']==1, 'point_index'].values
     cb_after_ff = crossing_boundary_points[crossing_boundary_points >= max(relevant_point_index)]
     cb_before_ff = crossing_boundary_points[crossing_boundary_points <= min(relevant_point_index)]
     if len(cb_after_ff) > 0:
-        duration[1] = max(monkey_information.loc[monkey_information['point_index'] < min(cb_after_ff), 'monkey_t'].values)
+        duration[1] = max(monkey_information.loc[monkey_information['point_index'] < min(cb_after_ff), 'time'].values)
     if len(cb_before_ff) > 0:
-        duration[0] = min(monkey_information.loc[monkey_information['point_index'] >= max(cb_before_ff), 'monkey_t'].values)
+        duration[0] = min(monkey_information.loc[monkey_information['point_index'] >= max(cb_before_ff), 'time'].values)
     
     if verbose:
         print('duration after eliminating unnecessary parts: ', duration)
@@ -463,7 +463,7 @@ def eliminate_invalid_ff_for_null_arc(all_ff_index, all_point_index, ff_real_pos
     ff_y = ff_real_position_sorted[all_ff_index, 1]
     monkey_x = monkey_information['monkey_x'].loc[all_point_index].values
     monkey_y = monkey_information['monkey_y'].loc[all_point_index].values
-    monkey_angle = monkey_information['monkey_angles'].loc[all_point_index].values
+    monkey_angle = monkey_information['monkey_angle'].loc[all_point_index].values
     ff_x_relative, ff_y_relative = find_relative_xy_positions(ff_x, ff_y, monkey_x, monkey_y, monkey_angle)
     ff_angle = np.arctan2(ff_y_relative, ff_x_relative) - math.pi/2
     print(round(len(np.where(ff_y_relative < 0)[0])/len(ff_y_relative)*100, 2) , '% of ff has negative y relative to monkey')
@@ -491,8 +491,8 @@ def find_point_indices_to_plot_null_arc(duration_to_plot, monkey_information, ti
     if time_to_end_plotting_null_arc <= time_to_begin_plotting_null_arc:
         raise ValueError('time_to_end_plotting_null_arc cannot be smaller than or equal to time_to_begin_plotting_null_arc.')
 
-    point_indices_to_plot_null_arc = monkey_information[monkey_information['monkey_t'].between(time_to_begin_plotting_null_arc, time_to_end_plotting_null_arc)].index.values
-    monkey_dt = (monkey_information['monkey_t'].iloc[-1] - monkey_information['monkey_t'].iloc[0])/(len(monkey_information)-1)
+    point_indices_to_plot_null_arc = monkey_information[monkey_information['time'].between(time_to_begin_plotting_null_arc, time_to_end_plotting_null_arc)].index.values
+    monkey_dt = (monkey_information['time'].iloc[-1] - monkey_information['time'].iloc[0])/(len(monkey_information)-1)
     num_point_index_between_every_two_null_arcs = int(time_between_every_two_null_arcs/monkey_dt)
     point_indices_to_plot_null_arc = point_indices_to_plot_null_arc[range(0, len(point_indices_to_plot_null_arc), num_point_index_between_every_two_null_arcs)]
     
@@ -553,9 +553,9 @@ def make_pretty_plot_for_a_duration(duration_to_plot, best_arc_df, monkey_inform
                     (point_index_to_plot_null_arc not in temp_null_arc_to_center_info_df.arc_point_index.values):
                     continue
             print('Current point_index_to_plot_null_arc: ', point_index_to_plot_null_arc)
-            absolute_steps_to_be_marked_3rd_kind = [point_index_to_plot_null_arc]
+            point_indices_to_be_marked_3rd_kind = [point_index_to_plot_null_arc]
         else:
-            absolute_steps_to_be_marked_3rd_kind = None
+            point_indices_to_be_marked_3rd_kind = None
 
         for key in additional_plotting_kwargs.keys():
             pretty_null_arc_plot_kwargs[key] = additional_plotting_kwargs[key]
@@ -565,7 +565,7 @@ def make_pretty_plot_for_a_duration(duration_to_plot, best_arc_df, monkey_inform
                     *PlotTrials_args,
                     **pretty_null_arc_plot_kwargs,   
                     show_visible_segments_ff_indices = ff_indices_to_plot_null_arc,
-                    absolute_steps_to_be_marked_3rd_kind = absolute_steps_to_be_marked_3rd_kind,
+                    point_indices_to_be_marked_3rd_kind = point_indices_to_be_marked_3rd_kind,
                     indices_of_ff_to_be_plotted_in_a_basic_way = ff_indices_to_plot_null_arc,
                     )
         R = returned_info['R']
@@ -615,7 +615,7 @@ def find_ff_indices_near_intended_target_to_plot_null_arc(duration_to_plot, ff_d
 
 def mark_path_where_intended_target_has_best_arc_among_all_ff_func(axes, best_arc_df_for_one_id, relevant_point_index, monkey_information, rotation_matrix=None):
     relevant_percentile = best_arc_df_for_one_id.diff_percentile_in_decimal.values
-    temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].iloc[relevant_point_index]), np.array(monkey_information['monkey_y'].iloc[relevant_point_index])
+    temp_cum_mx, temp_cum_my = np.array(monkey_information['monkey_x'].loc[relevant_point_index]), np.array(monkey_information['monkey_y'].loc[relevant_point_index])
     temp_cum_mxy_rotated = np.matmul(rotation_matrix, np.stack((temp_cum_mx, temp_cum_my)))
     axes.scatter(temp_cum_mxy_rotated[0], temp_cum_mxy_rotated[1], marker='*', s=50, c=relevant_percentile, cmap='viridis', zorder=3, alpha=0.6)
     return axes

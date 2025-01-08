@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_raw_data, basic_func
+from data_wrangling import process_monkey_information, specific_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 import os
 import numpy as np
@@ -45,8 +45,8 @@ def _initialize_target_df(monkey_information, ff_caught_T_new, ff_real_position_
     """
     Create a DataFrame with target information.
     """
-    target_df = monkey_information[['bin', 'monkey_t', 'monkey_x', 'monkey_y', 'monkey_angles']].copy()
-    target_df.rename(columns={'monkey_angles': 'monkey_angle', 'monkey_t': 'time'}, inplace=True)
+    target_df = monkey_information[['bin', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']].copy()
+    target_df.rename(columns={'monkey_angle': 'monkey_angle', 'time': 'time'}, inplace=True)
     target_df['point_index'] = target_df.index
     target_df['target_index'] = np.searchsorted(ff_caught_T_new, target_df['time'])
     target_df['target_x'] = ff_real_position_sorted[target_df['target_index'].values, 0]
@@ -58,10 +58,10 @@ def _calculate_target_distance_and_angle(target_df):
     Calculate target distance and angle.
     """
     target_distance = np.sqrt((target_df['target_x'] - target_df['monkey_x'])**2 + (target_df['target_y'] - target_df['monkey_y'])**2)
-    target_angle = basic_func.calculate_angles_to_ff_centers(ff_x=target_df['target_x'], ff_y=target_df['target_y'], mx=target_df['monkey_x'], my=target_df['monkey_y'], m_angle=target_df['monkey_angle'])
+    target_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=target_df['target_x'], ff_y=target_df['target_y'], mx=target_df['monkey_x'], my=target_df['monkey_y'], m_angle=target_df['monkey_angle'])
     target_df['target_distance'] = target_distance
     target_df['target_angle'] = target_angle
-    target_df['target_angle_to_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
+    target_df['target_angle_to_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
     return target_df
 
 
@@ -71,6 +71,7 @@ def _add_target_and_target_cluster_last_seen_info(target_df, ff_real_position_so
     """
     if 'target_cluster_last_seen_time' not in target_df.columns:
         nearby_alive_ff_indices = cluster_analysis.find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=50)
+        print("Adding target-cluster-last-seen info to target_df...")
         target_df = add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=True)
         target_df = target_df.rename(columns={'target_last_seen_time': 'target_cluster_last_seen_time', 
                                                 'target_last_seen_distance': 'target_cluster_last_seen_distance', 
@@ -79,6 +80,7 @@ def _add_target_and_target_cluster_last_seen_info(target_df, ff_real_position_so
                                                 'target_last_seen_distance_frozen': 'target_cluster_last_seen_distance_frozen', 
                                                 'target_last_seen_angle_frozen': 'target_cluster_last_seen_angle_frozen', 
                                                 'target_last_seen_angle_to_boundary_frozen': 'target_cluster_last_seen_angle_to_boundary_frozen'})
+    print("Adding target-last-seen info to target_df...")
     target_df = add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=False, include_frozen_info=True)
     target_df['point_index'] = target_df['point_index'].astype(int)
     return target_df, nearby_alive_ff_indices
@@ -230,13 +232,17 @@ def add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive
     _add_placeholder_last_seen_values(target_df, DEFAULT_LAST_SEEN_TIME, DEFAULT_LAST_SEEN_DISTANCE, DEFAULT_LAST_SEEN_ANGLE, include_frozen_info)
 
     if use_target_cluster:
-        print("Adding target-cluster-last-seen info to target_df...")
         if nearby_alive_ff_indices is None:
             raise ValueError("nearby_alive_ff_indices is None, but use_target_cluster is True")
 
     # Process each target index and add the last-seen info to target_df
-    for target_index in np.sort(ff_dataframe['target_index'].unique()):
-        print(f'Processing target_index = {target_index}', end='\r')
+    sorted_target_index = np.sort(ff_dataframe['target_index'].unique())
+    for i in range(len(sorted_target_index)):
+        target_index = sorted_target_index[i]
+        if i < len(sorted_target_index) - 1:
+            print(f'Processing target_index = {target_index}', end='\r')
+        else:
+            print(f'Processing target_index = {target_index}')
         target_df = _update_info_for_current_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info)
 
     return target_df
@@ -332,20 +338,20 @@ def _get_last_seen_info(unique_time_points, target_visible_info, include_frozen_
 
     target_x, target_y = unique_time_points.target_x, unique_time_points.target_y
     monkey_x, monkey_y, monkey_angle = unique_time_points.monkey_x, unique_time_points.monkey_y, unique_time_points.monkey_angle
-    target_angle = basic_func.calculate_angles_to_ff_centers(ff_x=target_x, ff_y=target_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
+    target_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=target_x, ff_y=target_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
     target_distance = np.sqrt((target_x - monkey_x) ** 2 + (target_y - monkey_y) ** 2)
     unique_time_points['target_last_seen_time'] = unique_time_points.time - unique_time_points.target_time
     unique_time_points['target_last_seen_distance'] = target_distance
     unique_time_points['target_last_seen_angle'] = target_angle
-    unique_time_points['target_last_seen_angle_to_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
+    unique_time_points['target_last_seen_angle_to_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
 
     if include_frozen_info:
         monkey_x, monkey_y, monkey_angle = unique_time_points.frozen_monkey_x, unique_time_points.frozen_monkey_y, unique_time_points.frozen_monkey_angle
-        target_angle = basic_func.calculate_angles_to_ff_centers(ff_x=target_x, ff_y=target_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
+        target_angle = specific_utils.calculate_angles_to_ff_centers(ff_x=target_x, ff_y=target_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
         target_distance = np.sqrt((target_x - monkey_x) ** 2 + (target_y - monkey_y) ** 2)
         unique_time_points['target_last_seen_distance_frozen'] = target_distance
         unique_time_points['target_last_seen_angle_frozen'] = target_angle
-        unique_time_points['target_last_seen_angle_to_boundary_frozen'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
+        unique_time_points['target_last_seen_angle_to_boundary_frozen'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=target_angle, distances_to_ff=target_distance)
         essential_columns = ['point_index', 'target_last_seen_time', 'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
                              'target_last_seen_distance_frozen', 'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen']
     else:

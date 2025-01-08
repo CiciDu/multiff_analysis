@@ -1,7 +1,7 @@
 import sys
 from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
 from decision_making_analysis import free_selection, replacement, trajectory_info
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from pattern_discovery import cluster_analysis
 from visualization.plotly_polar_tools import plotly_for_trajectory_polar
 from visualization import plot_behaviors_utils
@@ -135,9 +135,9 @@ def make_trajectory_df(PlotTrials_args,
 
     monkey_information = PlotTrials_args[0]
 
-    cum_iloc_indices, cum_t, cum_angles, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration_to_plot, monkey_information)
-    cum_point_indices = np.array(monkey_information['point_index'])[cum_iloc_indices]
-    cum_distance = np.array(monkey_information['cum_distance'])[cum_iloc_indices]
+    cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration_to_plot, monkey_information)
+    cum_point_indices = np.array(monkey_information['point_index'])[cum_pos_index]
+    cum_distance = np.array(monkey_information['cum_distance'])[cum_pos_index]
    
     if rotation_matrix is None:
         R = plot_behaviors_utils.find_rotation_matrix(cum_mx, cum_my)
@@ -148,7 +148,7 @@ def make_trajectory_df(PlotTrials_args,
     # create trajectory_df
     cum_mxy_rotated = np.matmul(R, np.stack((cum_mx, cum_my)))
     trajectory_df = pd.DataFrame({'monkey_x': cum_mxy_rotated[0], 'monkey_y': cum_mxy_rotated[1], 
-                                  'point_index': cum_point_indices, 'time': cum_t, 'monkey_angle': cum_angles, 
+                                  'point_index': cum_point_indices, 'time': cum_t, 'monkey_angle': cum_angle, 
                                   'monkey_speed': cum_speed, 'monkey_speeddummy': cum_speeddummy, 'cum_distance': cum_distance})
     
     # in case we need to plot eye positions later

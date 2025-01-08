@@ -1,6 +1,7 @@
 import sys
-from data_wrangling import basic_func
+from data_wrangling import specific_utils
 from pattern_discovery import ff_dataframe_utils
+from visualization import plot_behaviors_utils
 
 import os
 import numpy as np
@@ -12,17 +13,16 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-
-
 def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,  
                             ff_real_position_sorted, ff_life_sorted, player = "monkey", 
                             max_distance = 500, ff_radius = 10, reward_boundary_radius = 25, 
-                            num_missed_index = None, print_progress = True, 
-                            obs_ff_indices_in_ff_dataframe = None, max_time_since_last_vis = 3,
+                            obs_ff_indices_in_ff_dataframe = None, 
+                            max_time_since_last_vis = 3,
                             ff_in_obs_df = None, 
                             to_add_essential_columns=True,
                             to_furnish_ff_dataframe=True,
-                            truncate_info_beyond_capture = True):
+                            truncate_info_beyond_capture = True,
+                            print_progress = True, ):
 
     """
     Make a dataframe called ff_dataframe that contains various information about all visible or "in-memory" fireflies at each time point
@@ -49,9 +49,6 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
         the radius of a firefly; the current setting of the game sets it to be 10
     data_folder_name: str, default is None
         the place to store the output as a csv
-    num_missed_index: num, default is None
-        the number of invalid indices at the beginning of any array in monkey_information;
-        if default is used, then it will be calculated as the number of indices till the capture of first the firefly
     print_progress: bool
         whether to print the progress of making ff_dataframe
     obs_ff_indices_in_ff_dataframe: list
@@ -67,7 +64,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
 
     """
 
-    dt = (monkey_information['monkey_t'].iloc[-1] - monkey_information['monkey_t'].iloc[0])/(len(monkey_information)-1)
+    dt = (monkey_information['time'].iloc[-1] - monkey_information['time'].iloc[0])/(len(monkey_information)-1)
     if max_time_since_last_vis is None:
       max_memory = 200
     else:
@@ -77,15 +74,9 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     if player == 'monkey':
       if len(ff_caught_T_new) < 1:
           return ff_dataframe_utils.make_empty_ff_dataframe()
-      # Let's use data from monkey_information. But we shall cut off portion that is before the time of capturing the first target and the after capturing the last target
-      valid_index, num_missed_index = ff_dataframe_utils.find_valid_indices(monkey_information, ff_caught_T_new, player=player, num_missed_index=num_missed_index)
-      if len(valid_index) == 0:
-          return ff_dataframe_utils.make_empty_ff_dataframe()
     else:
-      valid_index = np.arange(len(monkey_information))
-      num_missed_index = 0
       if len(ff_caught_T_new) == 0:
-         ff_caught_T_new = [monkey_information['monkey_t'].max() + 10]
+         ff_caught_T_new = [monkey_information['time'].max() + 10]
         
     ff_index = []
     point_index = []
@@ -98,14 +89,14 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     for i in range(starting_ff[player], total_ff_num):
       current_ff_index = i
 
-      visible_indices, memory_array, in_memory_indices, time_since_last_vis_array = ff_dataframe_utils.find_visible_indices_AND_memory_array_AND_time_since_last_vis(current_ff_index, monkey_information, valid_index, obs_ff_indices_in_ff_dataframe, ff_flash_sorted, \
+      visible_indices, in_memory_indices, memory_array, time_since_last_vis_array = ff_dataframe_utils.find_visible_indices_AND_memory_array_AND_time_since_last_vis(current_ff_index, monkey_information, obs_ff_indices_in_ff_dataframe, ff_flash_sorted, \
                                                                                               ff_real_position_sorted, ff_caught_T_new, max_distance, player, max_memory, truncate_info_beyond_capture=truncate_info_beyond_capture)
       if len(visible_indices) > 0:
         num_points_in_memory = len(memory_array)
 
         # Append the values for this ff; Using list operations is faster than np.append here
         ff_index = ff_index + [current_ff_index] * num_points_in_memory
-        point_index = point_index + [point + num_missed_index for point in in_memory_indices.tolist()]
+        point_index = point_index + in_memory_indices.tolist()
         visible = visible + [1 if point == max_memory else 0 for point in memory_array.tolist()]
         memory = memory + memory_array.tolist()
         time_since_last_vis = time_since_last_vis + time_since_last_vis_array.tolist()
@@ -132,21 +123,26 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     if to_furnish_ff_dataframe:
         ff_dataframe = furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted)
 
+    # make sure the point_index in ff_dataframe are within monkey_information['point_index'].values
+    ff_dataframe = ff_dataframe[ff_dataframe['point_index'].isin(monkey_information['point_index'].values)]
+    # also make sure max target_index is less than len(ff_caught_T_new)
+    ff_dataframe = ff_dataframe[ff_dataframe['target_index'] < len(ff_caught_T_new)].copy()
+
     return ff_dataframe
 
 
 def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
-    ff_dataframe[['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']]  \
-        = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_t', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angles', 'monkey_dw', 'dt', 'cum_distance']].values
+    ff_dataframe[['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']]  \
+        = monkey_information.loc[ff_dataframe['point_index'].values, ['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']].values
     ff_dataframe[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
     ff_dataframe['ff_distance'] = LA.norm(np.array(ff_dataframe[['monkey_x', 'monkey_y']])-np.array(ff_dataframe[['ff_x', 'ff_y']]), axis=1)
-    ff_dataframe['ff_angle'] = basic_func.calculate_angles_to_ff_centers(ff_x=ff_dataframe['ff_x'], ff_y=ff_dataframe['ff_y'], mx=ff_dataframe['monkey_x'], 
+    ff_dataframe['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_dataframe['ff_x'], ff_y=ff_dataframe['ff_y'], mx=ff_dataframe['monkey_x'], 
                                                                          my=ff_dataframe['monkey_y'], m_angle=ff_dataframe['monkey_angle'])
-    ff_dataframe['ff_angle_boundary'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_dataframe['ff_angle'], distances_to_ff=ff_dataframe['ff_distance'], ff_radius=ff_radius)
+    ff_dataframe['ff_angle_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_dataframe['ff_angle'], distances_to_ff=ff_dataframe['ff_distance'], ff_radius=ff_radius)
     ff_dataframe['abs_ff_angle'] = np.abs(ff_dataframe['ff_angle'])
     ff_dataframe['abs_ff_angle_boundary'] = np.abs(ff_dataframe['ff_angle_boundary'])
     ff_dataframe['left_right'] = (np.array(ff_dataframe['ff_angle']) > 0).astype(int)
-    ff_dataframe['angles_to_reward_boundaries'] = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=ff_dataframe.ff_angle, distances_to_ff=ff_dataframe.ff_distance, ff_radius=reward_boundary_radius)
+    ff_dataframe['angles_to_reward_boundaries'] = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=ff_dataframe.ff_angle, distances_to_ff=ff_dataframe.ff_distance, ff_radius=reward_boundary_radius)
 
 
 def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_vis):
@@ -161,7 +157,7 @@ def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_vis):
 
 def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted):
     
-    ff_dataframe['abs_delta_ff_angle'], ff_dataframe['abs_delta_ff_angle_boundary'] = basic_func.calculate_change_in_abs_ff_angle(current_ff_index=ff_dataframe['ff_index'].values, angles_to_ff=ff_dataframe['ff_angle'].values, 
+    ff_dataframe['abs_delta_ff_angle'], ff_dataframe['abs_delta_ff_angle_boundary'] = specific_utils.calculate_change_in_abs_ff_angle(current_ff_index=ff_dataframe['ff_index'].values, angles_to_ff=ff_dataframe['ff_angle'].values, 
             angles_to_boundaries=ff_dataframe['ff_angle_boundary'].values, ff_real_position_sorted=ff_real_position_sorted, monkey_x_array=ff_dataframe['monkey_x'].values, monkey_y_array=ff_dataframe['monkey_y'].values, 
             monkey_angles_array=ff_dataframe['monkey_angle'].values, in_memory_indices=ff_dataframe['point_index'].values)
     
@@ -256,15 +252,13 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_
     alive_ffs = np.array([index for index, life in enumerate(ff_life_sorted) if (life[1] >= duration[0]) and (life[0] < duration[1])])  
     for i in alive_ffs:
         # Find the corresponding information in monkey_information in the given duration:
-        cum_iloc_indices = np.where((monkey_information['monkey_t'] >= duration[0]) & (monkey_information['monkey_t'] <= duration[1]))[0]
-        cum_t = np.array(monkey_information['monkey_t'].iloc[cum_iloc_indices])
-        cum_mx, cum_my, cum_angle = np.array(monkey_information['monkey_x'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_y'].iloc[cum_iloc_indices]), np.array(monkey_information['monkey_angles'].iloc[cum_iloc_indices])
-        
+        cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(duration, monkey_information)
+
         # Find distances to ff
         distances_to_ff = LA.norm(np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[i], axis = 1)
         valid_distance_indices = np.where(distances_to_ff < max_distance)[0]   
-        angles_to_ff = basic_func.calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)
-        angles_to_boundaries = basic_func.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff, ff_radius=ff_radius)
+        angles_to_ff = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)
+        angles_to_boundaries = specific_utils.calculate_angles_to_ff_boundaries(angles_to_ff=angles_to_ff, distances_to_ff=distances_to_ff, ff_radius=ff_radius)
         # Find the indices of the points where the ff is both within a max_distance and valid angles
         ff_within_range_indices = np.where((np.absolute(angles_to_boundaries) <= 2*pi/9) & (distances_to_ff < max_distance))[0]
 
@@ -279,7 +273,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_
 
         # Append the values for this ff; Using list operations is faster than np.append here
         ff_index = ff_index + [i] * len(valid_distance_indices)
-        point_index = point_index + cum_iloc_indices[valid_distance_indices].tolist()
+        point_index = point_index + monkey_information.iloc[cum_pos_index[valid_distance_indices]]['point_index'].values.tolist()
         time = time + cum_t[valid_distance_indices].tolist()
         target_index = target_index + np.searchsorted(ff_caught_T_new, cum_t[valid_distance_indices]).tolist()
         ff_x = ff_x + [ff_real_position_sorted[i, 0]]*len(valid_distance_indices)
@@ -309,7 +303,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_
     ff_dataframe_v2['target_x'] = ff_real_position_sorted[np.array(ff_dataframe_v2['target_index'])][:, 0]
     ff_dataframe_v2['target_y'] = ff_real_position_sorted[np.array(ff_dataframe_v2['target_index'])][:, 1]
     ff_dataframe_v2['ffdistance2target'] = LA.norm(np.array(ff_dataframe_v2[['ff_x', 'ff_y']])-np.array(ff_dataframe_v2[['target_x', 'target_y']]), axis = 1)
-    ff_dataframe_v2['point_index_in_duration'] = ff_dataframe_v2['point_index'] - cum_iloc_indices[0]
+    ff_dataframe_v2['point_index_in_duration'] = ff_dataframe_v2['point_index'] - monkey_information['point_index'].iloc[cum_pos_index[0]]
     ff_dataframe_v2['being_target'] = (ff_dataframe_v2['ff_index'] == ff_dataframe_v2['target_index']).astype('int')
 
     # Also to show whether each ff has been caught;
