@@ -34,7 +34,7 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
             self.neural_events_start_time = self.neural_offset_df.loc[self.neural_offset_df['label'] == 4, 'time'].values[0]
             self.smr_markers_start_time = self.marker_list[0]['values'][self.marker_list[0]['labels'] == 4][0]
         else:
-            self.neural_events_start_time = self.neural_offset_df.loc[self.neural_offset_df['label'] == 1, 'time'].item()
+            self.neural_events_start_time = self.neural_offset_df.loc[self.neural_offset_df['label'] == 1, 'time'].values[0]
             self.smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path,
                                                                                             exists_ok=False)
 
@@ -85,6 +85,30 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
         plt.scatter(np.arange(num_rows), self.ff_caught_times_df['diff_txt_adj_2_smr_closest'], s=5, c='green', label='adjusted txt_2 - closest smr')
         plt.plot(np.arange(num_rows), np.zeros(num_rows))
         plt.title('txt capture time - closest smr capture time')
+        plt.legend()
+        plt.show()
+
+
+    def compare_txt_and_neural_with_scatterplot(self):
+        # make a scatter plot of the differences in capture time
+        num_rows = len(self.txt_and_neural)
+        plt.figure(figsize=(6, 4))
+        plt.scatter(np.arange(num_rows), self.txt_and_neural['diff_txt_adj_neural_adj'], s=5, c='blue', label='txt adjusted - neural adjusted by label==4')
+        plt.scatter(np.arange(num_rows), self.txt_and_neural['diff_txt_adj_2_neural_adj'], s=5, c='orange', label='txt adjusted - neural adjusted by label==1')
+        plt.plot(np.arange(num_rows), np.zeros(num_rows))
+        plt.title('txt adjusted capture time - neural adjusted capture time')
+        plt.legend()
+        plt.show()
+
+
+    def compare_smr_and_neural_with_scatterplot(self):
+        # make a scatter plot of the differences in capture time
+        num_rows = len(self.smr_and_neural)
+        plt.figure(figsize=(6, 4))
+        plt.scatter(np.arange(num_rows), self.smr_and_neural['diff_neural_adj_smr'], s=5, c='blue', label='neural - smr adjusted by label==4')
+        plt.scatter(np.arange(num_rows), self.smr_and_neural['diff_neural_adj_2_smr'], s=5, c='orange', label='neural - smr adjusted by label==1')
+        plt.plot(np.arange(num_rows), np.zeros(num_rows))
+        plt.title('neural capture time - smr capture time')
         plt.legend()
         plt.show()
 

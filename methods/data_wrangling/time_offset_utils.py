@@ -10,6 +10,9 @@ import pandas as pd
 from numpy import linalg as LA
 from contextlib import contextmanager
 from os.path import exists
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import linregress
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
@@ -93,17 +96,70 @@ def make_ff_caught_times_df(neural_t, smr_t, txt_t, neural_events_start_time, sm
     df['txt_t_adj'] = df['txt_t'] - df['txt_t'].iloc[0] + df['smr_t'].iloc[0]
     df['txt_t_adj_2'] = df['txt_t'] - np.median(df['txt_t'] - df['closest_smr_t_to_txt_t'])
 
-    df['diff_neural_adj_smr'] = df['neural_t_adj'] - df['smr_t']
-    df['diff_neural_adj_2_smr'] = df['neural_t_adj_2'] - df['smr_t']
+    closest_neural_t_adj_to_txt_t = get_closest_smr_t_to_txt_t(txt_t[:len(neural_t)], df['neural_t_adj'].values)
+    closest_neural_t_2_adj_to_txt_t = get_closest_smr_t_to_txt_t(txt_t[:len(neural_t)], df['neural_t_adj_2'].values)
+    if len(closest_neural_t_adj_to_txt_t) < len(df):
+        # append closest_neural_t_adj_to_txt_t with na values to match the length of txt_t
+        closest_neural_t_adj_to_txt_t = np.append(closest_neural_t_adj_to_txt_t, np.nan * np.ones(len(df) - len(closest_neural_t_adj_to_txt_t)))
+        closest_neural_t_2_adj_to_txt_t = np.append(closest_neural_t_2_adj_to_txt_t, np.nan * np.ones(len(df) - len(closest_neural_t_2_adj_to_txt_t)))
+    else:
+        closest_neural_t_adj_to_txt_t = closest_neural_t_adj_to_txt_t[:len(df)]
+        closest_neural_t_2_adj_to_txt_t = closest_neural_t_2_adj_to_txt_t[:len(df)]
+    df['closest_neural_t_adj_to_txt_t'] = closest_neural_t_adj_to_txt_t
+    df['closest_neural_t_2_adj_to_txt_t'] = closest_neural_t_2_adj_to_txt_t
+    # df['closest_neural_t_adj'] = closest_neural_t_adj_to_txt_t - df['neural_t'].iloc[0] + df['smr_t'].iloc[0]
+    # df['closest_neural_t_adj_2'] = closest_neural_t_adj_to_txt_t - neural_events_start_time + smr_markers_start_time
+
+    df['diff_neural_adj_smr'] = df['closest_neural_t_adj_to_txt_t'] - df['closest_smr_t_to_txt_t']
+    df['diff_neural_adj_2_smr'] = df['closest_neural_t_2_adj_to_txt_t'] - df['closest_smr_t_to_txt_t']
     
     df['diff_txt_smr_closest'] = df['txt_t'] - df['closest_smr_t_to_txt_t']
     df['diff_txt_adj_smr_closest'] = df['txt_t_adj'] - df['closest_smr_t_to_txt_t']
     df['diff_txt_adj_2_smr_closest'] = df['txt_t_adj_2'] - df['closest_smr_t_to_txt_t']
 
-    df['diff_txt_adj_neural_adj'] = df['txt_t_adj'] - df['neural_t_adj']
-    df['diff_txt_adj_neural_adj_2'] = df['txt_t_adj'] - df['neural_t_adj_2']
-    df['diff_txt_adj_2_neural_adj'] = df['txt_t_adj_2'] - df['neural_t_adj']
+    df['diff_txt_adj_neural_adj'] = df['txt_t_adj'] - df['closest_neural_t_adj_to_txt_t']
+    df['diff_txt_adj_neural_adj_2'] = df['txt_t_adj'] - df['closest_neural_t_2_adj_to_txt_t']
+    df['diff_txt_adj_2_neural_adj'] = df['txt_t_adj_2'] - df['closest_neural_t_adj_to_txt_t']
 
     ff_caught_times_df = df
 
     return ff_caught_times_df
+
+
+# Identify and remove outliers using the IQR method
+def remove_outliers(x, y):
+    q1, q3 = np.percentile(y, [25, 75])
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    mask = (y >= lower_bound) & (y <= upper_bound)
+    return x[mask], y[mask]
+
+
+def get_liearn_regression(list_of_time, list_of_time_offsets):
+    cleaned_time, cleaned_time_offsets = remove_outliers(list_of_time, list_of_time_offsets)
+
+    # Scatter plot of cleaned data
+    plt.scatter(cleaned_time, cleaned_time_offsets, s=2, alpha=0.5, color='blue')
+
+    # Plot zero line
+    plt.plot(cleaned_time, np.zeros(len(cleaned_time)), color='red')
+
+    # Perform linear regression on cleaned data
+    slope, intercept, r_value, p_value, std_err = linregress(cleaned_time, cleaned_time_offsets)
+
+    # Plot linear regression line
+    plt.plot(cleaned_time, intercept + slope * cleaned_time, color='green', label='Linear Regression')
+
+    # also put the stat into a df and print it
+    stat_df = pd.DataFrame({'slope': [slope], 'intercept': [intercept], 'r_value': [r_value], 'p_value': [p_value], 'std_err': [std_err]})
+    print(stat_df)
+
+    # Labels and title
+    plt.xlabel('Time')
+    plt.ylabel('Time offset')
+    #plt.legend()
+    plt.title('Linear Regression after Removing Outliers')
+    plt.show()
+
+    return stat_df

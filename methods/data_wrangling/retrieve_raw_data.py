@@ -76,7 +76,7 @@ def extract_smr_data(raw_data_folder_path):
     return Channel_signal_output, marker_list, smr_sampling_rate
 
 
-def extract_txt_data(raw_data_folder_path):
+def get_ff_information_from_txt_data(raw_data_folder_path):
 
     txt_files_names = [file for file in os.listdir(raw_data_folder_path) if ('txt' in file) and ('s' in file)]
     txt_file_path = os.path.join(raw_data_folder_path, txt_files_names[0])
@@ -97,9 +97,42 @@ def extract_txt_data(raw_data_folder_path):
     ff_caught_T_sorted = ff_caught_T_sorted[captured_ffs]
     ff_believed_position_sorted = np.array(ff_believed_position_sorted)[captured_ffs]
 
-    # get monkey_information
     return ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, \
             ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
+
+
+def get_raw_monkey_information_from_txt_data(raw_data_folder_path):
+    txt_files_names = [file for file in os.listdir(raw_data_folder_path) if ('txt' in file) and ('s' in file)]
+    txt_file_path = os.path.join(raw_data_folder_path, txt_files_names[0])
+
+    with open(txt_file_path,'r',encoding='UTF-8') as content:
+        log_content = content.readlines()
+        
+    ffLinenumberList, monkeyLineNum = _take_out_ff_and_monkey_line_numbers(log_content)
+
+    Monkey_Position_T = []
+    Monkey_X = []
+    Monkey_Y = []
+
+    for line in log_content[monkeyLineNum+1:]:
+        Monkey_X.append(float(line.split(' ')[0]))
+        Monkey_Y.append(float(line.split(' ')[1]))
+        Monkey_Position_T.append(float(line.split(' ')[2]))            
+    raw_monkey_information = {'monkey_x': np.array(Monkey_X), 'monkey_y': np.array(Monkey_Y), 'time': np.array(Monkey_Position_T)}
+    raw_monkey_information = pd.DataFrame(raw_monkey_information)
+    raw_monkey_information['point_index'] = np.arange(len(raw_monkey_information))
+    return raw_monkey_information
+
+
+def trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time):
+    # Chop off the beginning part and the end part of monkey_information
+    monkey_t = raw_monkey_information['time']
+    if raw_monkey_information['time'][0] < smr_markers_start_time:
+        valid_points = np.where((monkey_t >= smr_markers_start_time) & (monkey_t <= smr_markers_end_time))[0]
+        monkey_information = raw_monkey_information.iloc[valid_points].copy()
+    else:
+        monkey_information = raw_monkey_information
+    return monkey_information
 
          
 def _take_out_ff_and_monkey_line_numbers(log_content):

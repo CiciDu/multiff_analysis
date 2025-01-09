@@ -275,7 +275,7 @@ class BaseProcessing:
 
         # if not exists, then retrieve from csv files
         self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
-                self.ff_flash_end_sorted = retrieve_raw_data.extract_txt_data(self.raw_data_folder_path)   
+                self.ff_flash_end_sorted = retrieve_raw_data.get_ff_information_from_txt_data(self.raw_data_folder_path)   
         self.monkey_information = process_monkey_information.make_or_retrieve_monkey_information(self.raw_data_folder_path, self.interocular_dist, min_distance_to_calculate_angle=min_distance_to_calculate_angle, 
                                                                                        exists_ok=exists_ok, save_data=save_data)
         

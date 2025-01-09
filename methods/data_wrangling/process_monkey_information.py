@@ -60,6 +60,38 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
     return monkey_information
 
 
+# def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1,
+#                                         exists_ok=True, save_data=True):
+#     processed_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_data')
+#     monkey_information_path = os.path.join(processed_data_folder_path, 'monkey_information.csv')
+#     if exists(monkey_information_path) & exists_ok:
+#         print("Retrieved monkey_information")
+#         monkey_information = pd.read_csv(monkey_information_path).drop(["Unnamed: 0"], axis=1)
+#     else:
+#         smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
+#         monkey_information = pd.DataFrame({'time': np.arange(0, smr_markers_end_time, 0.01)})
+#         monkey_information['point_index'] = np.arange(len(monkey_information['time']))          
+#         monkey_information = _trim_monkey_information(monkey_information, smr_markers_start_time, smr_markers_end_time)
+#         monkey_information = _add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path = raw_data_folder_path,
+#                                                                     variables = ['LDy', 'LDz', 'RDy', 'RDz', 'MonkeyX', 'MonkeyY', 'LateralV', 'ForwardV', 'AngularV'])
+#         monkey_information.rename(columns={'MonkeyX': 'monkey_x', 'MonkeyY': 'monkey_y', 'AngularV': 'monkey_dw'}, inplace=True)
+#         monkey_information = _get_monkey_speed_and_dw(monkey_information)
+
+#         add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
+#         monkey_information.drop(columns=['LateralV', 'ForwardV'], inplace=True)
+
+#         # convert the eye position data
+#         monkey_information = eye_positions.convert_eye_positions_in_monkey_information(monkey_information, add_left_and_right_eyes_info=True, interocular_dist=interocular_dist)
+#         if save_data:
+#             monkey_information.to_csv(monkey_information_path)
+#             print("Saved monkey_information")
+
+#     monkey_information.index = monkey_information.point_index.values
+#     monkey_information = add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop) 
+#     monkey_information = take_out_suspicious_information_from_monkey_information(monkey_information)
+#     return monkey_information
+
+
 def _get_monkey_speed_and_dw(monkey_information):
     monkey_information['monkey_speed'] = LA.norm(monkey_information[['LateralV', 'ForwardV']].values, axis=1)
     monkey_information['monkey_dw'] = monkey_information['monkey_dw'] * pi/180
@@ -206,8 +238,29 @@ def _trim_monkey_information(monkey_information, smr_markers_start_time, smr_mar
 
     return monkey_information
 
+def add_monkey_speed_column(monkey_information):
+    delta_time = np.diff(monkey_information['time'])
+    delta_x = np.diff(monkey_information['monkey_x'])
+    delta_y = np.diff(monkey_information['monkey_y'])
+    delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
+    ceiling_of_delta_position = max(10, np.max(delta_time)*200*1.5)
 
-def _add_monkey_dw_column(monkey_information):
+    # If the monkey's delta_position at one point exceeds 50, we replace it with the previous speed.
+    # (This can happen when the monkey reaches the boundary and comes out at another place)
+    while np.where(delta_position >= ceiling_of_delta_position)[0].size > 0:
+        above_ceiling_point_index = np.where(delta_position>=ceiling_of_delta_position)[0]
+        # find the previous speed for all those points
+        delta_position_prev = np.append(np.array([0]), delta_position)
+        delta_position[above_ceiling_point_index] = delta_position_prev[above_ceiling_point_index]  
+
+    monkey_speed = np.divide(delta_position, delta_time)
+    monkey_speed = np.append(monkey_speed[0], monkey_speed)
+    monkey_information['monkey_speed'] = monkey_speed
+    # and make sure that the monkey_speed does not exceed maximum speed
+    monkey_information.loc[monkey_information['monkey_speed'] > 200, 'monkey_speed'] = 200
+
+
+def add_monkey_dw_column(monkey_information):
     # positive dw means the monkey is turning counterclockwise
     delta_time = np.diff(monkey_information['time'])
     delta_angle = np.diff(monkey_information['monkey_angle'])
@@ -217,6 +270,7 @@ def _add_monkey_dw_column(monkey_information):
     monkey_dw = np.append(monkey_dw[0], monkey_dw)
     monkey_information['monkey_dw'] = monkey_dw
     #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
+
 
 
 def add_crossing_boundary_column(monkey_information):
