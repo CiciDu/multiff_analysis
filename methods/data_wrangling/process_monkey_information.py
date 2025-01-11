@@ -60,6 +60,33 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
     return monkey_information
 
 
+def make_signal_df(raw_data_folder_path):
+    channel_signal_output, marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(raw_data_folder_path)
+    signal_df = None
+    # Considering the first smr file, using channel_signal_output[0]
+    channel_signal_smr = channel_signal_output[0]
+    smr_markers_start_time = marker_list[0]['values'][marker_list[0]['labels']==1][0]
+    juice_timestamp = marker_list[0]['values'][marker_list[0]['labels'] == 4]
+    if len(channel_signal_smr) > 0:
+        # Seperate analog signal by juice timestamps
+        channel_signal_smr['section'] = np.digitize(channel_signal_smr.Time, juice_timestamp) 
+        # Remove head and tail of analog data
+        channel_signal_smr = channel_signal_smr[channel_signal_smr['Time'] > smr_markers_start_time]
+        # Remove tail of analog data
+        channel_signal_smr = channel_signal_smr[channel_signal_smr['section'] < channel_signal_smr['section'].unique()[-1]]
+        if len(channel_signal_smr) > 0:
+            # Since there might be very slight difference between the last recorded sampling time and juice_timestamp[-1], we replace the former with the latter
+            channel_signal_smr.loc[channel_signal_smr.index[-1], 'Time'] = juice_timestamp[-1]
+            # get the signal_df
+            signal_df = channel_signal_smr[['LateralV', 'LDy', 'LDz', 'MonkeyX', 'MonkeyY', 'RDy', 'RDz', 'AngularV', 'ForwardV', 'Time', 'section']].copy()
+            # Convert columns to float, except for the 'section' column
+            for column in signal_df.columns:
+                if column != 'section':
+                    signal_df.loc[:,column] = np.array(signal_df.loc[:,column]).astype('float')
+    signal_df.rename(columns={'Time': 'time'}, inplace=True)
+    return signal_df
+
+
 # def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1,
 #                                         exists_ok=True, save_data=True):
 #     processed_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_data')
@@ -211,13 +238,13 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
 
 def _add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path, variables = ['LDy', 'LDz', 'RDy', 'RDz']):
     monkey_information = monkey_information.copy()
-    signal_df = time_offset_utils.make_signal_df(raw_data_folder_path)
+    signal_df = make_signal_df(raw_data_folder_path)
     time_bins = general_utils.find_time_bins_for_an_array(monkey_information['time'].values)
 
     # add time_box to monkey_information
     monkey_information.loc[:, 'time_box'] = np.arange(1, len(monkey_information)+1)
     # group signal_df.time based on intervals in monkey_information['time'], thus adding the column time_box to signal_df
-    signal_df.loc[:, 'time_box'] = np.digitize(signal_df['Time'].values, time_bins)
+    signal_df.loc[:, 'time_box'] = np.digitize(signal_df['time'].values, time_bins)
     # use groupby and then find average for LDy, LDz, RDy, RDz
     variables.append('time_box')
     condensed_signal_df = signal_df[variables]

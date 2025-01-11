@@ -40,7 +40,7 @@ def find_smr_markers_start_and_end_time(raw_data_folder_path, exists_ok=True, sa
         smr_markers_start_time = start_and_end_time.iloc[0].item()
         smr_markers_end_time = start_and_end_time.iloc[1].item()
     else:
-        Channel_signal_output, marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(raw_data_folder_path)
+        channel_signal_output, marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(raw_data_folder_path)
         juice_timestamp = marker_list[0]['values'][marker_list[0]['labels'] == 4]
         smr_markers_start_time = marker_list[0]['values'][marker_list[0]['labels']==1][0]
         smr_markers_end_time =juice_timestamp[-1]
@@ -51,15 +51,69 @@ def find_smr_markers_start_and_end_time(raw_data_folder_path, exists_ok=True, sa
     return smr_markers_start_time, smr_markers_end_time
     
 
-def make_signal_df(raw_data_folder_path):
-    Channel_signal_output, marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(raw_data_folder_path)
-    juice_timestamp = marker_list[0]['values'][marker_list[0]['labels'] == 4]
-    smr_markers_start_time = marker_list[0]['values'][marker_list[0]['labels']==1][0]
-    signal_df = retrieve_raw_data.get_signal_df(Channel_signal_output, juice_timestamp, smr_markers_start_time)
-    return signal_df
+def make_adjusted_ff_caught_times_df(neural_t_raw, smr_t_raw, txt_t, neural_events_start_time, smr_markers_start_time):
+    # make df to compare the capture times between the files
+
+    min_rows = min(len(txt_t), len(smr_t_raw))
+    txt_t = txt_t[:min_rows]
+    smr_t_raw = smr_t_raw[:min_rows]
+    
+    # adjust smr_t based on the difference in first capture time between txt and smr
+    txt_smr_offset = smr_t_raw[0] - txt_t[0]
+    smr_t_adj = smr_t_raw - txt_smr_offset
+
+    smr_t_adj_ext = get_closest_t_to_txt_t(txt_t[:len(smr_t_adj)], smr_t_adj)  
+    smr_t_raw_ext = smr_t_adj_ext + txt_smr_offset
+
+    # adjust smr_t based on the the median of the differences between capture times of txt and closest smr
+    txt_smr_offset_2 = np.median(smr_t_raw_ext - txt_t)
+    smr_t_adj_ext_2 = smr_t_raw_ext - txt_smr_offset_2
+      
+    
+    df = pd.DataFrame({'txt_t': txt_t, 
+                       'smr_t_raw': smr_t_raw_ext,
+                        'smr_t': smr_t_adj_ext, 
+                        'smr_t_2': smr_t_adj_ext_2, 
+                        })
+    
+    # adjust neural_t based on the difference in first capture time between txt and smr
+    offset_neural_txt = neural_t_raw[0] - txt_t[0]
+    neural_t_adj = neural_t_raw - offset_neural_txt
+    # adjust neural_t based first on the difference in time of label==1 between neural_t and smr_t, and then on the median difference between txt_t and smr_t
+    neural_t_adj_2 = neural_t_raw - neural_events_start_time + smr_markers_start_time - txt_smr_offset_2
+    # adjust neural_t based first on the difference in time of label==1 between neural_t and smr_t, and then on the difference in first capture time between txt and smr
+    neural_t_adj_3 = neural_t_raw - neural_events_start_time + smr_markers_start_time - txt_smr_offset
+    # adjust neural_t based only on label==1 (or first label==4, for sessions without label==1)
+    neural_t_adj_4 = neural_t_raw - neural_events_start_time + smr_markers_start_time
+
+    df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj, txt_t, new_column_name='neural_t')
+    df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj_2, txt_t, new_column_name='neural_t_2')
+    df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj_3, txt_t, new_column_name='neural_t_3')
+    df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj_4, txt_t, new_column_name='neural_t_4')
+
+    df['neural_t_raw'] = df['neural_t'] + offset_neural_txt
+    calculate_offsets_in_ff_capture_time_between_data(df)
+    ff_caught_times_df = df
+
+    return ff_caught_times_df
 
 
-def get_closest_smr_t_to_txt_t(txt_t, smr_t):
+def calculate_offsets_in_ff_capture_time_between_data(df):
+    df['diff_txt_neural_raw'] = df['txt_t'] - df['neural_t_raw']
+    df['diff_txt_neural'] = df['txt_t'] - df['neural_t'] # neural adjusted by first txt capture
+    df['diff_txt_neural_2'] = df['txt_t'] - df['neural_t_2'] # neural first adjusted to smr by label==1, then adjusted to txt by median of time difference between txt and smr
+    df['diff_txt_neural_3'] = df['txt_t'] - df['neural_t_3'] # neural first adjusted to smr by label==1, then adjusted to txt by difference between first txt capture and first smr capture
+    df['diff_txt_neural_4'] = df['txt_t'] - df['neural_t_4'] # neural adjusted only by label=1
+
+    df['diff_txt_smr_raw'] = df['txt_t'] - df['smr_t_raw']
+    df['diff_txt_smr'] = df['txt_t'] - df['smr_t'] # smr adjusted by first txt capture
+    df['diff_txt_smr_2'] = df['txt_t'] - df['smr_t_2'] # smr adjusted by median of time difference
+
+    df['diff_neural_smr'] = df['neural_t'] - df['smr_t'] # both adjusted by first txt capture
+    df['diff_neural_2_smr_2'] = df['neural_t_2'] - df['smr_t_2'] # both adjusted by the time of label=1 (and the offset compared to txt canceled out)
+
+
+def get_closest_t_to_txt_t(txt_t, smr_t):
     # Compute the absolute differences between each element in txt_t and all elements in smr_t
     differences = np.abs(txt_t[:, np.newaxis] - smr_t)
 
@@ -67,99 +121,135 @@ def get_closest_smr_t_to_txt_t(txt_t, smr_t):
     closest_indices = np.argmin(differences, axis=1)
 
     # Use the indices to get the closest points in smr_t
-    closest_smr_t_to_txt_t = smr_t[closest_indices]
+    smr_t_adj_ext = smr_t[closest_indices]
 
-    return closest_smr_t_to_txt_t
+    return smr_t_adj_ext
 
 
-def make_ff_caught_times_df(neural_t, smr_t, txt_t, neural_events_start_time, smr_markers_start_time):
-    # make df to compare the capture times between the files
+def add_closest_neural_t_adj_to_txt_t(df, neural_t_adj, txt_t, new_column_name='neural_t'):
 
-    min_rows = min(len(txt_t), len(smr_t))
-    df = pd.DataFrame({'smr_t': smr_t[:min_rows],
-                        'txt_t': txt_t[:min_rows],
-                        })
-    
-    closest_smr_t_to_txt_t = get_closest_smr_t_to_txt_t(txt_t, smr_t)
-    df['closest_smr_t_to_txt_t'] = closest_smr_t_to_txt_t[:min_rows]
+    closest_neural_t_adj_to_txt_t = get_closest_t_to_txt_t(txt_t[:len(neural_t_adj)], neural_t_adj)
 
-    # neural_t might have fewer rows than txt_t and smr_t
-    df['neural_t'] = np.nan
-    df['neural_t'][:len(neural_t)] = neural_t[:min_rows]
-
-    # Note: neural_t_adj means that the offset is based on label==4; 
-    # neural_t_adj_2 means that the offset is based on label==1; 
-    df['neural_t_adj'] = df['neural_t'] - df['neural_t'].iloc[0] + df['smr_t'].iloc[0]
-    df['neural_t_adj_2'] = df['neural_t'] - neural_events_start_time + smr_markers_start_time
-    # Note: txt_t_adj means that the offset is based on the difference in first capture time between txt and smr; 
-    # txt_t_adj_2 means that the offset is based on the the median of the differences between capture times of txt and closest smr
-    df['txt_t_adj'] = df['txt_t'] - df['txt_t'].iloc[0] + df['smr_t'].iloc[0]
-    df['txt_t_adj_2'] = df['txt_t'] - np.median(df['txt_t'] - df['closest_smr_t_to_txt_t'])
-
-    closest_neural_t_adj_to_txt_t = get_closest_smr_t_to_txt_t(txt_t[:len(neural_t)], df['neural_t_adj'].values)
-    closest_neural_t_2_adj_to_txt_t = get_closest_smr_t_to_txt_t(txt_t[:len(neural_t)], df['neural_t_adj_2'].values)
+    # make sure that the length of closest_neural_t_adj_to_txt_t is the same as the length of df
     if len(closest_neural_t_adj_to_txt_t) < len(df):
-        # append closest_neural_t_adj_to_txt_t with na values to match the length of txt_t
+        # append closest_neural_t_adj_to_txt_t with na values to match the length of df
         closest_neural_t_adj_to_txt_t = np.append(closest_neural_t_adj_to_txt_t, np.nan * np.ones(len(df) - len(closest_neural_t_adj_to_txt_t)))
-        closest_neural_t_2_adj_to_txt_t = np.append(closest_neural_t_2_adj_to_txt_t, np.nan * np.ones(len(df) - len(closest_neural_t_2_adj_to_txt_t)))
     else:
         closest_neural_t_adj_to_txt_t = closest_neural_t_adj_to_txt_t[:len(df)]
-        closest_neural_t_2_adj_to_txt_t = closest_neural_t_2_adj_to_txt_t[:len(df)]
-    df['closest_neural_t_adj_to_txt_t'] = closest_neural_t_adj_to_txt_t
-    df['closest_neural_t_2_adj_to_txt_t'] = closest_neural_t_2_adj_to_txt_t
-    # df['closest_neural_t_adj'] = closest_neural_t_adj_to_txt_t - df['neural_t'].iloc[0] + df['smr_t'].iloc[0]
-    # df['closest_neural_t_adj_2'] = closest_neural_t_adj_to_txt_t - neural_events_start_time + smr_markers_start_time
 
-    df['diff_neural_adj_smr'] = df['closest_neural_t_adj_to_txt_t'] - df['closest_smr_t_to_txt_t']
-    df['diff_neural_adj_2_smr'] = df['closest_neural_t_2_adj_to_txt_t'] - df['closest_smr_t_to_txt_t']
+    # Note: neural_t means that the offset is based on label==4, while neural_t_2 means that the offset is based on label==1; 
+    df[new_column_name] = closest_neural_t_adj_to_txt_t
+    return df
     
-    df['diff_txt_smr_closest'] = df['txt_t'] - df['closest_smr_t_to_txt_t']
-    df['diff_txt_adj_smr_closest'] = df['txt_t_adj'] - df['closest_smr_t_to_txt_t']
-    df['diff_txt_adj_2_smr_closest'] = df['txt_t_adj_2'] - df['closest_smr_t_to_txt_t']
+def make_or_retrieve_txt_smr_t_offset_via_xy(raw_data_folder_path):
+    raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(raw_data_folder_path)
+    smr_markers_start_time, smr_markers_end_time = find_smr_markers_start_and_end_time(raw_data_folder_path)
+    monkey_information = retrieve_raw_data.trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)
+    process_monkey_information.add_monkey_speed_column(monkey_information)
 
-    df['diff_txt_adj_neural_adj'] = df['txt_t_adj'] - df['closest_neural_t_adj_to_txt_t']
-    df['diff_txt_adj_neural_adj_2'] = df['txt_t_adj'] - df['closest_neural_t_2_adj_to_txt_t']
-    df['diff_txt_adj_2_neural_adj'] = df['txt_t_adj_2'] - df['closest_neural_t_adj_to_txt_t']
-
-    ff_caught_times_df = df
-
-    return ff_caught_times_df
+    signal_df = process_monkey_information.make_signal_df(raw_data_folder_path)
+    txt_smr_t_offset_via_xy_df = find_txt_smr_t_offset_via_xy(monkey_information, signal_df, n_points=1000)
+    filename = 'txt_smr_t_offset_via_xy.csv'
+    txt_smr_t_offset_via_xy_df.to_csv(os.path.join(raw_data_folder_path, filename))
+    
 
 
-# Identify and remove outliers using the IQR method
-def remove_outliers(x, y):
-    q1, q3 = np.percentile(y, [25, 75])
+def find_txt_smr_t_offset_via_xy(raw_monkey_information, signal_df, n_points=1000):
+    # This function finds the time offset between txt and smr based on the xy positions of the monkey
+
+    # limit raw_monkey_information to the same duration as channel_signal_smr
+    txt_sub = raw_monkey_information[raw_monkey_information['time'].between(signal_df['time'].iloc[0], signal_df['time'].iloc[-1])].copy()
+    # take out points where monkey speed is above 10 cm/s (because otherwise when finding the closest position, there can be too much noise)
+    txt_sub = txt_sub[txt_sub['monkey_speed'] > 50].copy()
+
+    # sample n_points at nearly equal interval based on positional index
+    n_points_total = len(txt_sub['point_index'].unique())
+    sampled_pos_idx = np.linspace(1, n_points_total-1, n_points).astype(int)
+    list_of_point_index = []
+    list_of_txt_smr_offset = []
+    list_of_min_distance = []
+    list_of_time = []
+    for i in range(len(sampled_pos_idx)):
+        if i % 100 == 0:
+            print(f'{i} out of {len(sampled_pos_idx)} sampled points processed')
+        # get one point in raw_monkey_information, and take out a window of 1s around it in smr. Then find the smr point that's closest in distance to raw_monkey_information, and record the time offset
+        txt_row = txt_sub.iloc[sampled_pos_idx[i]]
+        smr_sub = signal_df[signal_df['time'].between(txt_row['time'] - 0.5, txt_row['time'] + 0.5)].copy()
+        smr_sub['distance'] = np.sqrt((smr_sub['MonkeyX'] - txt_row['monkey_x'])**2 + (smr_sub['MonkeyY'] - txt_row['monkey_y'])**2)
+        closest_smr_row = smr_sub.loc[smr_sub['distance'].idxmin()]
+        txt_smr_offset = txt_row['time'] - closest_smr_row['time']
+        list_of_point_index.append(txt_row['point_index'])
+        list_of_txt_smr_offset.append(txt_smr_offset)
+        list_of_min_distance.append(closest_smr_row['distance'])
+        list_of_time.append(closest_smr_row['time'])
+
+    list_of_point_index = np.array(list_of_point_index)
+    list_of_txt_smr_offset = np.array(list_of_txt_smr_offset)
+    list_of_min_distance = np.array(list_of_min_distance)
+
+    txt_smr_t_offset_via_xy_df = pd.DataFrame({'point_index': list_of_point_index, 
+                                          'time_offset': list_of_txt_smr_offset, 
+                                          'min_distance': list_of_min_distance,
+                                          'time': list_of_time
+                                          })
+
+    return txt_smr_t_offset_via_xy_df
+
+
+def clean_txt_smr_offset_via_xy_df_based_on_min_distance(txt_smr_t_offset_via_xy_df, ceiling_of_min_distance=1):
+    original_length = len(txt_smr_t_offset_via_xy_df)
+    # take out subset of txt_smr_t_offset_via_xy_df where min_distance is less than 1
+    txt_smr_t_offset_via_xy_df = txt_smr_t_offset_via_xy_df[txt_smr_t_offset_via_xy_df['min_distance'] < ceiling_of_min_distance].copy()
+    # calculate what percentage is taken off
+    print(f'Percentage of points taken off because min_distance is greater than {ceiling_of_min_distance}: {(original_length - len(txt_smr_t_offset_via_xy_df)) / original_length * 100:.2f}%, '
+          f'{(original_length - len(txt_smr_t_offset_via_xy_df))} out of {original_length}')
+    return txt_smr_t_offset_via_xy_df
+
+
+def remove_outliers_func(x, y):
+    # Identify and remove outliers using the IQR method
+    mask = find_non_outliers_based_on_IQR(y)
+    return x[mask], y[mask]
+
+def find_non_outliers_based_on_IQR(array):
+    q1, q3 = np.percentile(array, [25, 75])
     iqr = q3 - q1
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
-    mask = (y >= lower_bound) & (y <= upper_bound)
-    return x[mask], y[mask]
+    mask = (array >= lower_bound) & (array <= upper_bound)
+    return mask
 
+def get_linear_regression(list_of_time, list_of_time_offsets, ax=None, color='blue', label='Linear Regression',
+                          remove_outliers=True, make_plot=True):
 
-def get_liearn_regression(list_of_time, list_of_time_offsets):
-    cleaned_time, cleaned_time_offsets = remove_outliers(list_of_time, list_of_time_offsets)
-
-    # Scatter plot of cleaned data
-    plt.scatter(cleaned_time, cleaned_time_offsets, s=2, alpha=0.5, color='blue')
-
-    # Plot zero line
-    plt.plot(cleaned_time, np.zeros(len(cleaned_time)), color='red')
+    if remove_outliers:
+        cleaned_time, cleaned_time_offsets = remove_outliers_func(list_of_time, list_of_time_offsets)
+    else:
+        cleaned_time, cleaned_time_offsets = list_of_time, list_of_time_offsets
 
     # Perform linear regression on cleaned data
     slope, intercept, r_value, p_value, std_err = linregress(cleaned_time, cleaned_time_offsets)
 
-    # Plot linear regression line
-    plt.plot(cleaned_time, intercept + slope * cleaned_time, color='green', label='Linear Regression')
+    # Also put the stat into a df
+    stat_df = pd.DataFrame({'name':[label], 'slope': [slope], 'intercept': [intercept], 
+                            'r_value': [r_value], 'p_value': [p_value], 'std_err': [std_err],
+                            'slope x time': [slope * (max(cleaned_time) - min(cleaned_time))],
+                            'sample_size': [len(cleaned_time)]
+                            })
+    if make_plot:
+        if ax is None:
+            fig, ax = plt.subplots()
+            
+        # Scatter plot of cleaned data
+        ax.scatter(cleaned_time, cleaned_time_offsets, s=2, alpha=0.5, color=color)
 
-    # also put the stat into a df and print it
-    stat_df = pd.DataFrame({'slope': [slope], 'intercept': [intercept], 'r_value': [r_value], 'p_value': [p_value], 'std_err': [std_err]})
-    print(stat_df)
+        # Plot linear regression line
+        ax.plot(cleaned_time, intercept + slope * cleaned_time, color=color, alpha=0.5, label=label)
 
-    # Labels and title
-    plt.xlabel('Time')
-    plt.ylabel('Time offset')
-    #plt.legend()
-    plt.title('Linear Regression after Removing Outliers')
-    plt.show()
+        # Labels and title
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Time offset')
+        ax.set_title('Linear Regression after Removing Outliers')
+        ax.legend()
 
-    return stat_df
+    return ax, stat_df

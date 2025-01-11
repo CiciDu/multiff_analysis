@@ -33,7 +33,7 @@ def extract_smr_data(raw_data_folder_path):
     smr_files_names = [file for file in os.listdir(raw_data_folder_path) if 'smr' in file]
     smr_file_paths = [os.path.join(raw_data_folder_path,smr_files_names[i]) 
                                     for i, value in enumerate(smr_files_names)]
-    Channel_signal_output = []
+    channel_signal_output = []
     marker_list = [] # used to store information about time of juice rewards
     smr_sampling_rate = None
     
@@ -64,7 +64,7 @@ def extract_smr_data(raw_data_folder_path):
         Channel_signal = np.append(Channel_signal, time_stamps_array, axis=1) 
         Channel_index.append('Time') 
 
-        Channel_signal_output.append(pd.DataFrame(Channel_signal, columns=Channel_index))
+        channel_signal_output.append(pd.DataFrame(Channel_signal, columns=Channel_index))
 
         # Find the time juice rewards
         marker_channel_index = [index for index, value in enumerate(seg_reader.events) if value.name == 'marker'][0] 
@@ -73,7 +73,7 @@ def extract_smr_data(raw_data_folder_path):
                   } # arrange labels and values in a dict
         marker_list.append(marker)
         
-    return Channel_signal_output, marker_list, smr_sampling_rate
+    return channel_signal_output, marker_list, smr_sampling_rate
 
 
 def get_ff_information_from_txt_data(raw_data_folder_path):
@@ -255,26 +255,3 @@ def _unpack_raw_ff_information(raw_ff_information, smr_markers_end_time):
     ff_flash_end_sorted = np.array(ff_flash_end)[sort_index]
 
     return ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
-
-
-def get_signal_df(Channel_signal_output, juice_timestamp, smr_markers_start_time):
-    signal_df = None
-    # Considering the first smr file, using Channel_signal_output[0]
-    Channel_signal_smr1 = Channel_signal_output[0]
-    if len(Channel_signal_smr1) > 0:
-        # Seperate analog signal by juice timestamps
-        Channel_signal_smr1['section'] = np.digitize(Channel_signal_smr1.Time, juice_timestamp) 
-        # Remove head and tail of analog data
-        Channel_signal_smr1 = Channel_signal_smr1[Channel_signal_smr1['Time'] > smr_markers_start_time]
-        # Remove tail of analog data
-        Channel_signal_smr1 = Channel_signal_smr1[Channel_signal_smr1['section'] < Channel_signal_smr1['section'].unique()[-1]]
-        if len(Channel_signal_smr1) > 0:
-            # Since there might be very slight difference between the last recorded sampling time and juice_timestamp[-1], we replace the former with the latter
-            Channel_signal_smr1.loc[Channel_signal_smr1.index[-1], 'Time'] = juice_timestamp[-1]
-            # get the signal_df
-            signal_df = Channel_signal_smr1[['LateralV', 'LDy', 'LDz', 'MonkeyX', 'MonkeyY', 'RDy', 'RDz', 'AngularV', 'ForwardV', 'Time', 'section']].copy()
-            # Convert columns to float, except for the 'section' column
-            for column in signal_df.columns:
-                if column != 'section':
-                    signal_df.loc[:,column] = np.array(signal_df.loc[:,column]).astype('float')
-    return signal_df

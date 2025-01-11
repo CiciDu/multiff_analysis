@@ -1,12 +1,17 @@
-function [] = AlignNeuralData(neural_data_path, time_offset_path)
-[~, ts, sv, freq] = plx_event_ts_modified(neural_data_path, 257); 
+function [] = AlignNeuralData(neural_data_path, time_offset_path, max_n)
+tic; % Start the timer
+[~, ts, sv, freq] = plx_event_ts_modified(neural_data_path, 257, max_n); 
 ts_s = ts/freq; ts_s = ts_s.'; sv = sv.'; ts = ts.';
 time_offset = table(sv, ts, ts_s, 'VariableNames', {'label', 'timestamp', 'time'})
 writetable(time_offset, time_offset_path)
 type(time_offset_path)
+% Stop the timer and display the elapsed time
+elapsedTime = toc;
+fprintf('Elapsed time: %.2f seconds\n', elapsedTime);
 end
 
-function [n, ts, sv, freq] = plx_event_ts_modified(filename, ch)
+
+function [n, ts, sv, freq] = plx_event_ts_modified(filename, ch, max_n)
 % Modified from plx_event_ts
 % 
 % plx_event_ts(filename, channel) Read event timestamps from a .plx file
@@ -22,8 +27,8 @@ function [n, ts, sv, freq] = plx_event_ts_modified(filename, ch)
 %   ts - array of timestamps 
 %   sv - array of strobed event values (filled only if channel is 257)
 
-if(nargin ~= 2)
-   disp('2 input arguments are required')
+if(nargin ~= 3)
+   disp('3 input arguments are required')
    return
 end
 
@@ -79,19 +84,19 @@ while feof(fid) == 0
                 n = n + 1;
          		ts(n) = timestamp;
 				sv(n) = unit;
-                if unit ==4
+                if n > max_n
                     break
                 end
 
       	 end
    	end
-   
+
    record = record + 1;
    if feof(fid) == 1
       break
    end
 
-   
+
 end
 disp(strcat('number of timestamps = ', num2str(n)));
 

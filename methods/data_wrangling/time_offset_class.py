@@ -29,7 +29,7 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
 
     def get_ff_capture_time_from_smr_and_neural_data(self):
         self.neural_offset_df = pd.read_csv(os.path.join(self.metadata_folder_path, 'neural_time_offset.txt'))
-        self.Channel_signal_output, self.marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(self.raw_data_folder_path)
+        self.channel_signal_output, self.marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(self.raw_data_folder_path)
         if ('Schro' in self.raw_data_folder_path) & ('data_0410' in self.raw_data_folder_path):
             self.neural_events_start_time = self.neural_offset_df.loc[self.neural_offset_df['label'] == 4, 'time'].values[0]
             self.smr_markers_start_time = self.marker_list[0]['values'][self.marker_list[0]['labels'] == 4][0]
@@ -38,15 +38,15 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
             self.smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path,
                                                                                             exists_ok=False)
 
-        self.neural_t = self.neural_offset_df.loc[self.neural_offset_df['label'] == 4, 'time'].values
-        self.smr_t = self.marker_list[0]['values'][self.marker_list[0]['labels'] == 4]
+        self.neural_t_raw = self.neural_offset_df.loc[self.neural_offset_df['label'] == 4, 'time'].values
+        self.smr_t_raw = self.marker_list[0]['values'][self.marker_list[0]['labels'] == 4]
         self.txt_t = self.ff_caught_T_sorted.copy()
 
 
-    def make_ff_caught_times_df(self):
+    def make_adjusted_ff_caught_times_df(self):
         if not hasattr(self, 'neural_t'):
             self.get_ff_capture_time_from_smr_and_neural_data()
-        self.ff_caught_times_df = time_offset_utils.make_ff_caught_times_df(self.neural_t, self.smr_t, self.txt_t, 
+        self.ff_caught_times_df = time_offset_utils.make_adjusted_ff_caught_times_df(self.neural_t_raw, self.smr_t_raw, self.txt_t, 
                                                                        self.neural_events_start_time, self.smr_markers_start_time)
     
     def separate_ff_caught_times_df(self):
@@ -54,61 +54,84 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
         self.smr_and_neural_columns = [col for col in self.ff_caught_times_df.columns if ('txt' not in col)]
         self.txt_and_neural_columns = [col for col in self.ff_caught_times_df.columns if ('smr' not in col)]
 
-        self.txt_and_smr = self.ff_caught_times_df[['txt_t', 'txt_t_adj', 'closest_smr_t_to_txt_t', 'diff_txt_smr_closest', 'diff_txt_adj_smr_closest', 'diff_txt_adj_2_smr_closest']].dropna(axis=0)
-        self.smr_and_neural = self.ff_caught_times_df[['smr_t', 'neural_t_adj', 'neural_t_adj_2', 'diff_neural_adj_smr', 'diff_neural_adj_2_smr']].dropna(axis=0)
-        self.txt_and_neural = self.ff_caught_times_df[['txt_t_adj', 'neural_t_adj', 'neural_t_adj_2', 'diff_txt_adj_neural_adj', 'diff_txt_adj_neural_adj_2', 'diff_txt_adj_2_neural_adj']].dropna(axis=0)
+        self.txt_and_smr = self.ff_caught_times_df[['txt_t', 'smr_t', 'diff_txt_smr', 'diff_txt_smr', 'diff_txt_smr_2']].dropna(axis=0)
+        self.smr_and_neural = self.ff_caught_times_df[['txt_t', 'smr_t', 'neural_t', 'neural_t_2', 'diff_neural_smr', 'diff_neural_2_smr_2']].dropna(axis=0)
+        self.txt_and_neural = self.ff_caught_times_df[['txt_t', 'neural_t', 'neural_t_2', 'diff_txt_neural', 'diff_txt_neural_2', 'diff_txt_neural_3', 'diff_txt_neural_4', 'diff_txt_neural_raw']].dropna(axis=0)
 
     def compare_txt_and_smr_with_boxplot(self):
         # make a long df for plotting
-        self.long_txt_smr_df = self.ff_caught_times_df[['diff_txt_adj_smr_closest', 'diff_txt_smr_closest', 'diff_txt_adj_2_smr_closest']].melt()
-        self.long_txt_smr_df.columns = ['whether_txt_adjusted', 'diff_in_time_between_txt_and_smr']
-        self.long_txt_smr_df['whether txt adjusted'] = 'txt - closest smr'
-        self.long_txt_smr_df.loc[self.long_txt_smr_df['whether_txt_adjusted'] == 'diff_txt_adj_smr_closest', 'whether txt adjusted'] = 'adjusted txt - closest smr'
-        self.long_txt_smr_df.loc[self.long_txt_smr_df['whether_txt_adjusted'] == 'diff_txt_adj_2_smr_closest', 'whether txt adjusted'] = 'adjusted txt_2 - closest smr'
+        self.long_txt_smr_df = self.ff_caught_times_df[['diff_txt_smr_raw', 'diff_txt_smr', 'diff_txt_smr_2']].melt()
+        self.long_txt_smr_df.columns = ['whether_smr_adjusted', 'diff_in_time_between_txt_and_smr']
+        self.long_txt_smr_df['whether smr adjusted'] = 'txt - smr raw'
+        self.long_txt_smr_df.loc[self.long_txt_smr_df['whether_smr_adjusted'] == 'diff_txt_smr', 'whether smr adjusted'] = 'adj by 1st txt t'
+        self.long_txt_smr_df.loc[self.long_txt_smr_df['whether_smr_adjusted'] == 'diff_txt_smr_2', 'whether smr adjusted'] = 'adj by median of diff_t'
 
         # make a boxplot of the differences in capture time
         plt.figure(figsize=(8, 4))
-        sns.boxplot(data=self.long_txt_smr_df, x='diff_in_time_between_txt_and_smr', hue='whether txt adjusted')
-        plt.title('txt capture time - closest smr capture time')
+        sns.boxplot(data=self.long_txt_smr_df, x='diff_in_time_between_txt_and_smr', hue='whether smr adjusted')
+        plt.title('txt capture time - smr capture time')
         # hide the title of the legend
         plt.gca().get_legend().set_title('')
         # make the legend outside the plot
         plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
         plt.show()
 
-    def compare_txt_and_smr_with_scatterplot(self):
-        # make a scatter plot of the differences in capture time
-        num_rows = len(self.ff_caught_times_df)
-        plt.figure(figsize=(6, 4))
-        plt.scatter(np.arange(num_rows), self.ff_caught_times_df['diff_txt_smr_closest'], s=5, c='blue', label='txt - closest smr')
-        plt.scatter(np.arange(num_rows), self.ff_caught_times_df['diff_txt_adj_smr_closest'], s=5, c='orange', label='adjusted txt - closest smr')
-        plt.scatter(np.arange(num_rows), self.ff_caught_times_df['diff_txt_adj_2_smr_closest'], s=5, c='green', label='adjusted txt_2 - closest smr')
-        plt.plot(np.arange(num_rows), np.zeros(num_rows))
-        plt.title('txt capture time - closest smr capture time')
+    def compare_txt_and_smr_with_scatterplot(self, remove_outliers=True):
+
+        time_axis = self.ff_caught_times_df['txt_t'].values
+        ax, stat_df = time_offset_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_raw'], remove_outliers=remove_outliers,
+                                                        label='txt - smr raw')
+        ax, temp_stat_df1 = time_offset_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr'], remove_outliers=remove_outliers,
+                                                        ax=ax, color='green', label='adj by 1st txt t')
+        ax, temp_stat_df2 = time_offset_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_2'], remove_outliers=remove_outliers,
+                                                        ax=ax, color='orange', label='adj by median of diff_t')
+        
+        stat_df = pd.concat([stat_df, temp_stat_df1, temp_stat_df2], axis=0).reset_index(drop=True)
+        print(stat_df)
+
+        plt.plot(time_axis, np.zeros(len(time_axis)), c='red')
+        title_str = 'txt capture time - smr capture time'
+        title_str = title_str + ' (outliers removed in linreg_model)' if remove_outliers else title_str
+        plt.title(title_str)
+        plt.legend()
+        plt.show()
+
+    def compare_txt_and_neural_with_scatterplot(self, remove_outliers=True):
+        time_axis = self.txt_and_neural['txt_t'].values
+        ax, stat_df = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural'], remove_outliers=remove_outliers,
+                                                        label='adj by 1st txt t')
+        ax, temp_stat_df1 = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_2'], remove_outliers=remove_outliers,
+                                                        ax=ax, color='green', label='adj by label=1, median of diff_t')
+        ax, temp_stat_df2 = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_3'], remove_outliers=remove_outliers,
+                                                        ax=ax, color='orange', label='adj by label=1, 1st txt t')
+        ax, temp_stat_df3 = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_4'], remove_outliers=remove_outliers,
+                                                        ax=ax, color='purple', label='adj by only label=1')
+    
+        stat_df = pd.concat([stat_df, temp_stat_df1, temp_stat_df2, temp_stat_df3], axis=0).reset_index(drop=True)
+        print(stat_df)
+        
+        plt.plot(time_axis, np.zeros(len(time_axis)), c='red')
+        title_str = 'txt capture time - neural capture time'
+        title_str = title_str + ' (outliers removed in linreg_model)' if remove_outliers else title_str
+        plt.title(title_str)
         plt.legend()
         plt.show()
 
 
-    def compare_txt_and_neural_with_scatterplot(self):
-        # make a scatter plot of the differences in capture time
-        num_rows = len(self.txt_and_neural)
-        plt.figure(figsize=(6, 4))
-        plt.scatter(np.arange(num_rows), self.txt_and_neural['diff_txt_adj_neural_adj'], s=5, c='blue', label='txt adjusted - neural adjusted by label==4')
-        plt.scatter(np.arange(num_rows), self.txt_and_neural['diff_txt_adj_2_neural_adj'], s=5, c='orange', label='txt adjusted - neural adjusted by label==1')
-        plt.plot(np.arange(num_rows), np.zeros(num_rows))
-        plt.title('txt adjusted capture time - neural adjusted capture time')
-        plt.legend()
-        plt.show()
-
-
-    def compare_smr_and_neural_with_scatterplot(self):
-        # make a scatter plot of the differences in capture time
-        num_rows = len(self.smr_and_neural)
-        plt.figure(figsize=(6, 4))
-        plt.scatter(np.arange(num_rows), self.smr_and_neural['diff_neural_adj_smr'], s=5, c='blue', label='neural - smr adjusted by label==4')
-        plt.scatter(np.arange(num_rows), self.smr_and_neural['diff_neural_adj_2_smr'], s=5, c='orange', label='neural - smr adjusted by label==1')
-        plt.plot(np.arange(num_rows), np.zeros(num_rows))
-        plt.title('neural capture time - smr capture time')
+    def compare_neural_and_smr_with_scatterplot(self, remove_outliers=True):
+        time_axis = self.smr_and_neural['txt_t'].values
+        ax, stat_df = time_offset_utils.get_linear_regression(time_axis, self.smr_and_neural['diff_neural_smr'], remove_outliers=remove_outliers,
+                                                        label='adj by 1st txt t')
+        ax, temp_stat_df1 = time_offset_utils.get_linear_regression(time_axis, self.smr_and_neural['diff_neural_2_smr_2'], remove_outliers=remove_outliers,
+                                                        ax=ax, color='green', label='adj by label=1')
+    
+        stat_df = pd.concat([stat_df, temp_stat_df1], axis=0).reset_index(drop=True)
+        print(stat_df)
+        
+        plt.plot(time_axis, np.zeros(len(time_axis)), c='red')
+        title_str = 'neural capture time - smr capture time'
+        title_str = title_str + ' (outliers removed in linreg_model)' if remove_outliers else title_str
+        plt.title(title_str)
         plt.legend()
         plt.show()
 
