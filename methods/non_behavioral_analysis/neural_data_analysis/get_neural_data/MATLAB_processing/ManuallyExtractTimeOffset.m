@@ -1,10 +1,10 @@
 
 % For Schro data_0328
-% outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/metadata/monkey_Schro/data_0328/neural_event_time.txt'
+% outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/time_calibration/monkey_Schro/data_0328/neural_event_time.txt'
 % %openNEV('report', 'read', 'm53s393.nev')
 
 % For Schro data_0404
-outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/metadata/monkey_Schro/data_0404/neural_event_time.txt'
+outputFileName = '/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/time_calibration/monkey_Schro/data_0404/neural_event_time.txt'
 openNEV('report', 'read', 'm53s420.nev')
 
 

@@ -1,4 +1,4 @@
-from data_wrangling import specific_utils, process_monkey_information, retrieve_raw_data, time_offset_utils
+from data_wrangling import specific_utils, process_monkey_information, retrieve_raw_data, time_calib_utils
 from pattern_discovery import make_ff_dataframe
 from non_behavioral_analysis import eye_positions
 from null_behaviors import curv_of_traj_utils
@@ -106,7 +106,7 @@ class BaseProcessing:
         self.decision_making_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'decision_making')
         self.neural_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')
         self.processed_neural_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_neural_data')
-        self.metadata_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
+        self.time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
@@ -115,7 +115,7 @@ class BaseProcessing:
         os.makedirs(self.decision_making_folder_path, exist_ok=True)
         os.makedirs(self.neural_data_folder_path, exist_ok=True)
         os.makedirs(self.processed_neural_data_folder_path, exist_ok=True)
-        os.makedirs(self.metadata_folder_path, exist_ok=True)
+        os.makedirs(self.time_calibration_folder_path, exist_ok=True)
 
 
     def try_retrieving_df(self, df_name, exists_ok=True, data_folder_name_for_retrieval=None):
@@ -263,8 +263,7 @@ class BaseProcessing:
         if already_made_ok & (getattr(self, 'monkey_information', None) is not None):
             return
         
-        self.smr_markers_start_time, self.smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path)
-        self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
+        self.smr_markers_start_time, self.smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path)
 
         if exists_ok:
             try:
@@ -276,14 +275,21 @@ class BaseProcessing:
         # if not exists, then retrieve from csv files
         self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
                 self.ff_flash_end_sorted = retrieve_raw_data.get_ff_information_from_txt_data(self.raw_data_folder_path)   
-        self.monkey_information = process_monkey_information.make_or_retrieve_monkey_information(self.raw_data_folder_path, self.interocular_dist, min_distance_to_calculate_angle=min_distance_to_calculate_angle, 
-                                                                                       exists_ok=exists_ok, save_data=save_data)
+
+        self.make_or_retrieve_monkey_information(exists_ok=exists_ok, save_data=save_data, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         
         if save_data:
             self.save_ff_info_into_npz()
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
 
+
+    def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5):
+        self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
+        self.monkey_information = process_monkey_information.make_or_retrieve_monkey_information(self.raw_data_folder_path, self.interocular_dist, min_distance_to_calculate_angle=min_distance_to_calculate_angle, 
+                                                                                       exists_ok=exists_ok, save_data=save_data)
+        return
+        
     def get_more_monkey_data(self, exists_ok=True):
         self.make_or_retrieve_ff_dataframe(exists_ok=exists_ok, to_furnish_ff_dataframe=False)
         self.crudely_furnish_ff_dataframe()

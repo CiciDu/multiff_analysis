@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import time_offset_utils, retrieve_raw_data, general_utils
+from data_wrangling import time_calib_utils, retrieve_raw_data, general_utils
 from pattern_discovery import pattern_by_trials, pattern_by_trials
 
 import os
@@ -36,17 +36,14 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
         print("Retrieved monkey_information")
         monkey_information = pd.read_csv(monkey_information_path).drop(["Unnamed: 0"], axis=1)
     else:
-        smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
-        monkey_information = pd.DataFrame({'time': np.arange(0, smr_markers_end_time, 0.01)})
-        monkey_information['point_index'] = np.arange(len(monkey_information['time']))          
-        monkey_information = _trim_monkey_information(monkey_information, smr_markers_start_time, smr_markers_end_time)
-        monkey_information = _add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path = raw_data_folder_path,
-                                                                    variables = ['LDy', 'LDz', 'RDy', 'RDz', 'MonkeyX', 'MonkeyY', 'LateralV', 'ForwardV', 'AngularV'])
-        monkey_information.rename(columns={'MonkeyX': 'monkey_x', 'MonkeyY': 'monkey_y', 'AngularV': 'monkey_dw'}, inplace=True)
-        monkey_information = _get_monkey_speed_and_dw(monkey_information)
-
+        raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(raw_data_folder_path)
+        smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
+        monkey_information = retrieve_raw_data.trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)        
         add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
-        monkey_information.drop(columns=['LateralV', 'ForwardV'], inplace=True)
+        add_monkey_speed_column(monkey_information)    
+        add_monkey_dw_column(monkey_information)  
+
+        monkey_information = add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path)
 
         # convert the eye position data
         monkey_information = eye_positions.convert_eye_positions_in_monkey_information(monkey_information, add_left_and_right_eyes_info=True, interocular_dist=interocular_dist)
@@ -61,6 +58,14 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
 
 
 def make_signal_df(raw_data_folder_path):
+    # make signal_df with time_adjusted
+    txt_smr_t_linreg_df = time_calib_utils.make_or_retrieve_txt_smr_t_linreg_df(raw_data_folder_path)
+    signal_df = get_raw_signal_df(raw_data_folder_path)
+    # adjust the time in signal_df based on the linear regression result stored in txt_smr_t_linreg_df
+    signal_df['time'] = signal_df['time'] + txt_smr_t_linreg_df['intercept'].item() + signal_df['time'] * txt_smr_t_linreg_df['slope'].item()
+    return signal_df
+
+def get_raw_signal_df(raw_data_folder_path):
     channel_signal_output, marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(raw_data_folder_path)
     signal_df = None
     # Considering the first smr file, using channel_signal_output[0]
@@ -87,54 +92,21 @@ def make_signal_df(raw_data_folder_path):
     return signal_df
 
 
-# def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1,
-#                                         exists_ok=True, save_data=True):
-#     processed_data_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'processed_data')
-#     monkey_information_path = os.path.join(processed_data_folder_path, 'monkey_information.csv')
-#     if exists(monkey_information_path) & exists_ok:
-#         print("Retrieved monkey_information")
-#         monkey_information = pd.read_csv(monkey_information_path).drop(["Unnamed: 0"], axis=1)
-#     else:
-#         smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
-#         monkey_information = pd.DataFrame({'time': np.arange(0, smr_markers_end_time, 0.01)})
-#         monkey_information['point_index'] = np.arange(len(monkey_information['time']))          
-#         monkey_information = _trim_monkey_information(monkey_information, smr_markers_start_time, smr_markers_end_time)
-#         monkey_information = _add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path = raw_data_folder_path,
-#                                                                     variables = ['LDy', 'LDz', 'RDy', 'RDz', 'MonkeyX', 'MonkeyY', 'LateralV', 'ForwardV', 'AngularV'])
-#         monkey_information.rename(columns={'MonkeyX': 'monkey_x', 'MonkeyY': 'monkey_y', 'AngularV': 'monkey_dw'}, inplace=True)
-#         monkey_information = _get_monkey_speed_and_dw(monkey_information)
-
-#         add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
-#         monkey_information.drop(columns=['LateralV', 'ForwardV'], inplace=True)
-
-#         # convert the eye position data
-#         monkey_information = eye_positions.convert_eye_positions_in_monkey_information(monkey_information, add_left_and_right_eyes_info=True, interocular_dist=interocular_dist)
-#         if save_data:
-#             monkey_information.to_csv(monkey_information_path)
-#             print("Saved monkey_information")
-
-#     monkey_information.index = monkey_information.point_index.values
-#     monkey_information = add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop) 
-#     monkey_information = take_out_suspicious_information_from_monkey_information(monkey_information)
-#     return monkey_information
-
-
-def _get_monkey_speed_and_dw(monkey_information):
-    monkey_information['monkey_speed'] = LA.norm(monkey_information[['LateralV', 'ForwardV']].values, axis=1)
-    monkey_information['monkey_dw'] = monkey_information['monkey_dw'] * pi/180
-    #monkey_information['monkey_speed'] = gaussian_filter1d(monkey_information['monkey_speed'], 1)
-    #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
+def get_monkey_speed_and_dw_from_smr_info(monkey_information):
+    monkey_information['monkey_speed_smr'] = LA.norm(monkey_information[['LateralV', 'ForwardV']].values, axis=1)
+    monkey_information['monkey_dw_smr'] = monkey_information['monkey_dw_smr'] * pi/180
 
     # check if any point has a speed that's too high. Print the number of such points (and proportion of them) as well as highest speed
-    too_high_speed_points = monkey_information[monkey_information['monkey_speed'] > 200]
+    too_high_speed_points = monkey_information[monkey_information['monkey_speed_smr'] > 200]
     if len(too_high_speed_points) > 0:
         print("There are", len(too_high_speed_points), "points with speed greater than 200 cm/s")
         print("The proportion of such points is", len(too_high_speed_points)/len(monkey_information))
-        print("The highest speed is", np.max(monkey_information['monkey_speed']))
-        monkey_information.loc[ monkey_information['monkey_speed'] > 200, 'monkey_speed'] = 200
-    monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > 0.1) | \
-                                                (np.abs(monkey_information['monkey_dw']) > 0.0035)).astype(int) 
+        print("The highest speed is", np.max(monkey_information['monkey_speed_smr']))
+        monkey_information.loc[ monkey_information['monkey_speed_smr'] > 200, 'monkey_speed_smr'] = 200
+    monkey_information['monkey_speeddummy_smr'] = ((monkey_information['monkey_speed_smr'] > 0.1) | \
+                                                (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int) 
     return monkey_information
+
 
 def _get_derivative_of_a_column(monkey_information, column_name, derivative_name):
     dvar = np.diff(monkey_information[column_name])
@@ -226,6 +198,7 @@ def _calculate_delta_xy_and_current_delta_position_given_num_points(monkey_infor
 def add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=1):
     monkey_information = _get_derivative_of_a_column(monkey_information, column_name='monkey_dw', derivative_name='monkey_ddw')
     monkey_information = _get_derivative_of_a_column(monkey_information, column_name='monkey_speed', derivative_name='monkey_ddv')
+    monkey_information = add_monkey_speeddummy_column(monkey_information)
     add_crossing_boundary_column(monkey_information)
     add_delta_distance_and_cum_distance_to_monkey_information(monkey_information)
     monkey_information = add_whether_new_distinct_stop_column(monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
@@ -235,16 +208,22 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
     monkey_information['dt'] = (monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
     return monkey_information
 
-
-def _add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path, variables = ['LDy', 'LDz', 'RDy', 'RDz']):
-    monkey_information = monkey_information.copy()
+def add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path):
     signal_df = make_signal_df(raw_data_folder_path)
-    time_bins = general_utils.find_time_bins_for_an_array(monkey_information['time'].values)
+    monkey_information = _add_smr_file_info_to_monkey_information(monkey_information, signal_df)
+    monkey_information.rename(columns={'MonkeyX': 'monkey_x_smr', 'MonkeyY': 'monkey_y_smr', 'AngularV': 'monkey_dw_smr'}, inplace=True)
+    monkey_information = get_monkey_speed_and_dw_from_smr_info(monkey_information)
+    monkey_information.drop(columns=['LateralV', 'ForwardV'], inplace=True)
+    return monkey_information
 
+def _add_smr_file_info_to_monkey_information(monkey_information, signal_df, 
+                                             variables=['LDy', 'LDz', 'RDy', 'RDz', 'MonkeyX', 'MonkeyY', 'LateralV', 'ForwardV', 'AngularV']):
+    monkey_information = monkey_information.copy()
+    time_bins = general_utils.find_time_bins_for_an_array(monkey_information['time'].values)
     # add time_box to monkey_information
     monkey_information.loc[:, 'time_box'] = np.arange(1, len(monkey_information)+1)
     # group signal_df.time based on intervals in monkey_information['time'], thus adding the column time_box to signal_df
-    signal_df.loc[:, 'time_box'] = np.digitize(signal_df['time'].values, time_bins)
+    signal_df['time_box'] = np.digitize(signal_df['time'].values, time_bins)
     # use groupby and then find average for LDy, LDz, RDy, RDz
     variables.append('time_box')
     condensed_signal_df = signal_df[variables]
@@ -285,19 +264,6 @@ def add_monkey_speed_column(monkey_information):
     monkey_information['monkey_speed'] = monkey_speed
     # and make sure that the monkey_speed does not exceed maximum speed
     monkey_information.loc[monkey_information['monkey_speed'] > 200, 'monkey_speed'] = 200
-
-
-def add_monkey_dw_column(monkey_information):
-    # positive dw means the monkey is turning counterclockwise
-    delta_time = np.diff(monkey_information['time'])
-    delta_angle = np.diff(monkey_information['monkey_angle'])
-    delta_angle = np.remainder(delta_angle, 2*pi)
-    delta_angle[delta_angle >= pi] = delta_angle[delta_angle >= pi]-2*pi
-    monkey_dw = np.divide(delta_angle, delta_time)
-    monkey_dw = np.append(monkey_dw[0], monkey_dw)
-    monkey_information['monkey_dw'] = monkey_dw
-    #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
-
 
 
 def add_crossing_boundary_column(monkey_information):
@@ -378,3 +344,40 @@ def add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=
         list_of_num_points_future.append(num_points_future)
         list_of_delta_positions.append(current_delta_position)
     monkey_information['monkey_angle'] = np.array(monkey_angles)
+
+def add_monkey_speed_column(monkey_information):
+    delta_time = np.diff(monkey_information['time'])
+    delta_x = np.diff(monkey_information['monkey_x'])
+    delta_y = np.diff(monkey_information['monkey_y'])
+    delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
+    monkey_speed = np.divide(delta_position, delta_time)
+    monkey_speed = np.append(monkey_speed[0], monkey_speed)
+    # use Gaussian filter on monkey_speed
+    monkey_information['monkey_speed'] = monkey_speed
+    #monkey_speed = gaussian_filter1d(monkey_speed, 1)
+    # print the percentage of points where the speed is greater than 200 cm/s
+    print("The percentage of points where the speed is greater than 200 cm/s is", np.mean(monkey_speed > 200))
+    # and make sure that the monkey_speed does not exceed maximum speed
+    monkey_information.loc[monkey_information['monkey_speed'] > 200, 'monkey_speed'] = 200
+
+
+def add_monkey_dw_column(monkey_information):
+    # positive dw means the monkey is turning counterclockwise
+    delta_time = np.diff(monkey_information['time'])
+    delta_angle = np.diff(monkey_information['monkey_angle'])
+    delta_angle = np.remainder(delta_angle, 2*pi)
+    delta_angle[delta_angle >= pi] = delta_angle[delta_angle >= pi]-2*pi
+    monkey_dw = np.divide(delta_angle, delta_time)
+    monkey_dw = np.append(monkey_dw[0], monkey_dw)
+    monkey_information['monkey_dw'] = monkey_dw
+    #monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
+
+def add_monkey_speeddummy_column(monkey_information):
+    monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > 0.1) | \
+                                               (np.abs(monkey_information['monkey_dw']) > 0.0035)).astype(int) 
+    monkey_information['monkey_speeddummy_smr'] = ((monkey_information['monkey_speed_smr'] > 0.1) | \
+                                                (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int)
+    # now, make monkey_speeddummy 0 if it's 0 in either monkey_speeddummy or monkey_speeddummy_smr
+    monkey_information['monkey_speeddummy'] = monkey_information['monkey_speeddummy'] & monkey_information['monkey_speeddummy_smr']
+    monkey_information.drop(columns=['monkey_speeddummy_smr'], inplace=True)
+    return monkey_information

@@ -33,8 +33,8 @@ def find_smr_markers_start_and_end_time(raw_data_folder_path, exists_ok=True, sa
 
 
     """
-    metadata_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
-    filepath = os.path.join(metadata_folder_path, 'start_and_end_time_of_smr_markers.csv')
+    time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    filepath = os.path.join(time_calibration_folder_path, 'start_and_end_time_of_smr_markers.csv')
     if exists(filepath) & exists_ok:
         start_and_end_time = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
         smr_markers_start_time = start_and_end_time.iloc[0].item()
@@ -46,10 +46,27 @@ def find_smr_markers_start_and_end_time(raw_data_folder_path, exists_ok=True, sa
         smr_markers_end_time =juice_timestamp[-1]
         if save_start_and_end_time:
             start_and_end_time = pd.DataFrame([smr_markers_start_time, smr_markers_end_time], columns=['time'])
-            start_and_end_time.to_csv(os.path.join(metadata_folder_path, 'start_and_end_time_of_smr_markers.csv'))
+            start_and_end_time.to_csv(os.path.join(time_calibration_folder_path, 'start_and_end_time_of_smr_markers.csv'))
             print("Saved start and end time of juice timestamps")
     return smr_markers_start_time, smr_markers_end_time
     
+
+def make_temp_smr_and_neural(raw_data_folder_path, ff_caught_T_sorted):   
+    time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    neural_event_time = pd.read_csv(os.path.join(time_calibration_folder_path, 'neural_event_time.txt'))
+    neural_t_raw = neural_event_time.loc[neural_event_time['label'] == 4, 'time'].values
+    txt_t = ff_caught_T_sorted.copy()
+
+    df = pd.DataFrame({'txt_t': txt_t})
+    offset_neural_txt = neural_t_raw[0] - txt_t[0]
+    neural_t_adj = neural_t_raw - offset_neural_txt
+    df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj, txt_t, new_column_name='neural_t')
+    df['neural_t_raw_ext'] = df['neural_t'] + offset_neural_txt
+    df['diff_txt_neural_raw'] = df['txt_t'] - df['neural_t_raw_ext'] # neural adjusted by first txt capture
+    # drop NA
+    df = df.dropna()
+    return df
+
 
 def make_adjusted_ff_caught_times_df(neural_t_raw, smr_t_raw, txt_t, neural_events_start_time, smr_markers_start_time):
     # make df to compare the capture times between the files
@@ -91,7 +108,7 @@ def make_adjusted_ff_caught_times_df(neural_t_raw, smr_t_raw, txt_t, neural_even
     df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj_3, txt_t, new_column_name='neural_t_3')
     df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj_4, txt_t, new_column_name='neural_t_4')
 
-    df['neural_t_raw'] = df['neural_t'] + offset_neural_txt
+    df['neural_t_raw_ext'] = df['neural_t'] + offset_neural_txt
     calculate_offsets_in_ff_capture_time_between_data(df)
     ff_caught_times_df = df
 
@@ -99,7 +116,7 @@ def make_adjusted_ff_caught_times_df(neural_t_raw, smr_t_raw, txt_t, neural_even
 
 
 def calculate_offsets_in_ff_capture_time_between_data(df):
-    df['diff_txt_neural_raw'] = df['txt_t'] - df['neural_t_raw']
+    df['diff_txt_neural_raw'] = df['txt_t'] - df['neural_t_raw_ext']
     df['diff_txt_neural'] = df['txt_t'] - df['neural_t'] # neural adjusted by first txt capture
     df['diff_txt_neural_2'] = df['txt_t'] - df['neural_t_2'] # neural first adjusted to smr by label==1, then adjusted to txt by median of time difference between txt and smr
     df['diff_txt_neural_3'] = df['txt_t'] - df['neural_t_3'] # neural first adjusted to smr by label==1, then adjusted to txt by difference between first txt capture and first smr capture
@@ -140,21 +157,64 @@ def add_closest_neural_t_adj_to_txt_t(df, neural_t_adj, txt_t, new_column_name='
     # Note: neural_t means that the offset is based on label==4, while neural_t_2 means that the offset is based on label==1; 
     df[new_column_name] = closest_neural_t_adj_to_txt_t
     return df
-    
-def make_or_retrieve_txt_smr_t_offset_via_xy(raw_data_folder_path):
-    raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(raw_data_folder_path)
-    smr_markers_start_time, smr_markers_end_time = find_smr_markers_start_and_end_time(raw_data_folder_path)
-    monkey_information = retrieve_raw_data.trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)
-    process_monkey_information.add_monkey_speed_column(monkey_information)
-
-    signal_df = process_monkey_information.make_signal_df(raw_data_folder_path)
-    txt_smr_t_offset_via_xy_df = find_txt_smr_t_offset_via_xy(monkey_information, signal_df, n_points=1000)
-    filename = 'txt_smr_t_offset_via_xy.csv'
-    txt_smr_t_offset_via_xy_df.to_csv(os.path.join(raw_data_folder_path, filename))
-    
 
 
-def find_txt_smr_t_offset_via_xy(raw_monkey_information, signal_df, n_points=1000):
+def make_or_retrieve_txt_smr_t_diff_via_xy_df(raw_data_folder_path, exists_ok=True):
+    time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    os.makedirs(time_calibration_folder_path, exist_ok=True)
+    filename = 'txt_smr_t_diff_via_xy.csv'
+    file_path = os.path.join(time_calibration_folder_path, filename)
+    if exists(file_path) & exists_ok:
+        txt_smr_t_diff_via_xy_df = pd.read_csv(file_path).drop(["Unnamed: 0"], axis=1)
+        print(f'Retrieved {filename} from {file_path}')
+    else:
+        raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(raw_data_folder_path)
+        smr_markers_start_time, smr_markers_end_time = find_smr_markers_start_and_end_time(raw_data_folder_path)
+        monkey_information = retrieve_raw_data.trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)
+        process_monkey_information.add_monkey_speed_column(monkey_information)
+        raw_signal_df = process_monkey_information.get_raw_signal_df(raw_data_folder_path)
+        txt_smr_t_diff_via_xy_df = find_txt_smr_t_diff_via_xy_df(monkey_information, raw_signal_df, n_points=1000)
+        txt_smr_t_diff_via_xy_df.to_csv(file_path)
+        print(f'Saved {filename} to {file_path}')
+    return txt_smr_t_diff_via_xy_df
+
+
+def make_or_retrieve_txt_smr_t_linreg_df(raw_data_folder_path, ceiling_of_min_distance=2, exists_ok=True):
+    time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    filename = 'txt_smr_t_linreg.csv'
+    file_path = os.path.join(time_calibration_folder_path, filename)
+    if exists(file_path) & exists_ok:
+        txt_smr_t_linreg_df = pd.read_csv(file_path).drop(["Unnamed: 0"], axis=1)
+        print(f'Retrieved {filename} from {file_path}')
+    else:
+        txt_smr_t_diff_via_xy_df = make_or_retrieve_txt_smr_t_diff_via_xy_df(raw_data_folder_path)
+        df_sub = clean_txt_smr_t_diff_via_xy_df_based_on_min_distance(txt_smr_t_diff_via_xy_df, ceiling_of_min_distance=ceiling_of_min_distance)
+        _, txt_smr_t_linreg_df = get_linear_regression(df_sub['time'].values, df_sub['time_offset'].values, make_plot=False)
+        txt_smr_t_linreg_df.to_csv(file_path)
+        print(f'Saved {filename} to {file_path}')
+    return txt_smr_t_linreg_df
+
+
+def make_or_retrieve_txt_neural_t_linreg_df(raw_data_folder_path, ff_caught_T_sorted, exists_ok=True, show_plot=False):
+    time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    filename = 'txt_neural_t_linreg.csv'
+    file_path = os.path.join(time_calibration_folder_path, filename)
+    if exists(file_path) & exists_ok & (not show_plot):
+        txt_neural_t_linreg_df = pd.read_csv(file_path).drop(["Unnamed: 0"], axis=1)
+        print(f'Retrieved {filename} from {file_path}')
+    else:
+        temp_smr_and_neural = make_temp_smr_and_neural(raw_data_folder_path, ff_caught_T_sorted)
+        _, txt_neural_t_linreg_df = get_linear_regression(temp_smr_and_neural['neural_t_raw_ext'].values, temp_smr_and_neural['diff_txt_neural_raw'].values,
+                                                        label='adj by 1st txt t', make_plot=show_plot)
+        if show_plot:
+            plt.show()
+        txt_neural_t_linreg_df.to_csv(file_path)
+        print(f'Saved {filename} to {file_path}')
+    print(txt_neural_t_linreg_df)
+    return txt_neural_t_linreg_df
+
+
+def find_txt_smr_t_diff_via_xy_df(raw_monkey_information, signal_df, n_points=1000):
     # This function finds the time offset between txt and smr based on the xy positions of the monkey
 
     # limit raw_monkey_information to the same duration as channel_signal_smr
@@ -187,23 +247,30 @@ def find_txt_smr_t_offset_via_xy(raw_monkey_information, signal_df, n_points=100
     list_of_txt_smr_offset = np.array(list_of_txt_smr_offset)
     list_of_min_distance = np.array(list_of_min_distance)
 
-    txt_smr_t_offset_via_xy_df = pd.DataFrame({'point_index': list_of_point_index, 
+    txt_smr_t_diff_via_xy_df = pd.DataFrame({'point_index': list_of_point_index, 
                                           'time_offset': list_of_txt_smr_offset, 
                                           'min_distance': list_of_min_distance,
                                           'time': list_of_time
                                           })
 
-    return txt_smr_t_offset_via_xy_df
+    return txt_smr_t_diff_via_xy_df
 
 
-def clean_txt_smr_offset_via_xy_df_based_on_min_distance(txt_smr_t_offset_via_xy_df, ceiling_of_min_distance=1):
-    original_length = len(txt_smr_t_offset_via_xy_df)
-    # take out subset of txt_smr_t_offset_via_xy_df where min_distance is less than 1
-    txt_smr_t_offset_via_xy_df = txt_smr_t_offset_via_xy_df[txt_smr_t_offset_via_xy_df['min_distance'] < ceiling_of_min_distance].copy()
+def clean_txt_smr_t_diff_via_xy_df_based_on_min_distance(txt_smr_t_diff_via_xy_df, ceiling_of_min_distance=1):
+    original_length = len(txt_smr_t_diff_via_xy_df)
+    # take out subset of txt_smr_t_diff_via_xy_df where min_distance is less than 1
+    txt_smr_t_diff_via_xy_df = txt_smr_t_diff_via_xy_df[txt_smr_t_diff_via_xy_df['min_distance'] < ceiling_of_min_distance].copy()
     # calculate what percentage is taken off
-    print(f'Percentage of points taken off because min_distance is greater than {ceiling_of_min_distance}: {(original_length - len(txt_smr_t_offset_via_xy_df)) / original_length * 100:.2f}%, '
-          f'{(original_length - len(txt_smr_t_offset_via_xy_df))} out of {original_length}')
-    return txt_smr_t_offset_via_xy_df
+    print(f'Percentage of points taken off because min_distance is greater than {ceiling_of_min_distance} cm: {(original_length - len(txt_smr_t_diff_via_xy_df)) / original_length * 100:.2f}%, '
+          f'{(original_length - len(txt_smr_t_diff_via_xy_df))} out of {original_length}')
+    return txt_smr_t_diff_via_xy_df
+
+
+def calibrate_neural_data_time(spike_times_in_s, raw_data_folder_path, ff_caught_T_sorted, show_plot=False):
+    txt_neural_t_linreg_df = make_or_retrieve_txt_neural_t_linreg_df(raw_data_folder_path, ff_caught_T_sorted,
+                                                                                    show_plot=show_plot)
+    spike_times_in_s = spike_times_in_s + txt_neural_t_linreg_df['intercept'].item() + spike_times_in_s * txt_neural_t_linreg_df['slope'].item()
+    return spike_times_in_s
 
 
 def remove_outliers_func(x, y):

@@ -282,8 +282,8 @@ class _VariationsBase():
                                                             self.ctrl_heading_info_df, verbose=verbose)
             self.all_median_info['ref_point_mode'] = ref_point_mode
             self.all_median_info['ref_point_value'] = ref_point_value
-            metadata = {'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value, 'monkey_name': self.monkey_name}
-            self.all_median_info.attrs.update(metadata)
+            time_calibration = {'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value, 'monkey_name': self.monkey_name}
+            self.all_median_info.attrs.update(time_calibration)
             os.makedirs(self.all_median_info_folder_path, exist_ok=True)
             self.all_median_info.to_csv(df_path)
             print('Stored new all_median_info in ', self.all_median_info_folder_path)

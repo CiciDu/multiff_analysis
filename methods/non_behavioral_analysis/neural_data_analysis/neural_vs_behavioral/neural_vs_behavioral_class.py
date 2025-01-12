@@ -47,7 +47,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.bin_width = bin_width
         self.window_width = window_width
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
-        self.spike_df = neural_data_processing.make_spike_df(raw_data_folder_path=self.raw_data_folder_path,
+        self.raw_spike_df = neural_data_processing.make_raw_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                              sampling_rate=self.sampling_rate)
         self.time_bins, self.all_binned_spikes = neural_data_processing.bin_spikes(self.spike_df, bin_width=bin_width)
         self.num_bins = self.all_binned_spikes.shape[0]

@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_monkey_information, time_offset_utils
+from data_wrangling import process_monkey_information, time_calib_utils
 from pattern_discovery import pattern_by_trials, pattern_by_trials
 
 import os
@@ -87,7 +87,7 @@ def get_ff_information_from_txt_data(raw_data_folder_path):
     ffLinenumberList, monkeyLineNum = _take_out_ff_and_monkey_line_numbers(log_content)
     raw_ff_information = _get_raw_ff_information(log_content, ffLinenumberList, monkeyLineNum)
 
-    smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
+    smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
 
     ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, \
             ff_flash_end_sorted = _unpack_raw_ff_information(raw_ff_information, smr_markers_end_time)
@@ -122,6 +122,13 @@ def get_raw_monkey_information_from_txt_data(raw_data_folder_path):
     raw_monkey_information = pd.DataFrame(raw_monkey_information)
     raw_monkey_information['point_index'] = np.arange(len(raw_monkey_information))
     return raw_monkey_information
+
+
+def get_trimmed_monkey_information(raw_data_folder_path):
+    raw_monkey_information = get_raw_monkey_information_from_txt_data(raw_data_folder_path)
+    smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
+    monkey_information = trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)
+    return monkey_information
 
 
 def trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time):

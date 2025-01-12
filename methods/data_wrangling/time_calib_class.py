@@ -1,4 +1,4 @@
-from data_wrangling import specific_utils, further_processing_class, general_utils, retrieve_raw_data, time_offset_utils
+from data_wrangling import specific_utils, further_processing_class, general_utils, retrieve_raw_data, time_calib_utils
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import plot_behaviors_utils
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
@@ -18,35 +18,32 @@ from os.path import exists
 import seaborn as sns
 
 
-class TimeOffsetClass(further_processing_class.FurtherProcessing):
+class TimeCalibration(further_processing_class.FurtherProcessing):
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
 
     def prepare_data(self):
-
         self.retrieve_or_make_monkey_data()
 
-
     def get_ff_capture_time_from_smr_and_neural_data(self):
-        self.neural_offset_df = pd.read_csv(os.path.join(self.metadata_folder_path, 'neural_time_offset.txt'))
+        self.neural_event_time = pd.read_csv(os.path.join(self.time_calibration_folder_path, 'neural_event_time.txt'))
         self.channel_signal_output, self.marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(self.raw_data_folder_path)
         if ('Schro' in self.raw_data_folder_path) & ('data_0410' in self.raw_data_folder_path):
-            self.neural_events_start_time = self.neural_offset_df.loc[self.neural_offset_df['label'] == 4, 'time'].values[0]
+            self.neural_events_start_time = self.neural_event_time.loc[self.neural_event_time['label'] == 4, 'time'].values[0]
             self.smr_markers_start_time = self.marker_list[0]['values'][self.marker_list[0]['labels'] == 4][0]
         else:
-            self.neural_events_start_time = self.neural_offset_df.loc[self.neural_offset_df['label'] == 1, 'time'].values[0]
-            self.smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path,
+            self.neural_events_start_time = self.neural_event_time.loc[self.neural_event_time['label'] == 1, 'time'].values[0]
+            self.smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path,
                                                                                             exists_ok=False)
 
-        self.neural_t_raw = self.neural_offset_df.loc[self.neural_offset_df['label'] == 4, 'time'].values
+        self.neural_t_raw = self.neural_event_time.loc[self.neural_event_time['label'] == 4, 'time'].values
         self.smr_t_raw = self.marker_list[0]['values'][self.marker_list[0]['labels'] == 4]
         self.txt_t = self.ff_caught_T_sorted.copy()
-
 
     def make_adjusted_ff_caught_times_df(self):
         if not hasattr(self, 'neural_t'):
             self.get_ff_capture_time_from_smr_and_neural_data()
-        self.ff_caught_times_df = time_offset_utils.make_adjusted_ff_caught_times_df(self.neural_t_raw, self.smr_t_raw, self.txt_t, 
+        self.ff_caught_times_df = time_calib_utils.make_adjusted_ff_caught_times_df(self.neural_t_raw, self.smr_t_raw, self.txt_t, 
                                                                        self.neural_events_start_time, self.smr_markers_start_time)
     
     def separate_ff_caught_times_df(self):
@@ -79,11 +76,11 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
     def compare_txt_and_smr_with_scatterplot(self, remove_outliers=True):
 
         time_axis = self.ff_caught_times_df['txt_t'].values
-        ax, stat_df = time_offset_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_raw'], remove_outliers=remove_outliers,
+        ax, stat_df = time_calib_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_raw'], remove_outliers=remove_outliers,
                                                         label='txt - smr raw')
-        ax, temp_stat_df1 = time_offset_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr'], remove_outliers=remove_outliers,
+        ax, temp_stat_df1 = time_calib_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr'], remove_outliers=remove_outliers,
                                                         ax=ax, color='green', label='adj by 1st txt t')
-        ax, temp_stat_df2 = time_offset_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_2'], remove_outliers=remove_outliers,
+        ax, temp_stat_df2 = time_calib_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_2'], remove_outliers=remove_outliers,
                                                         ax=ax, color='orange', label='adj by median of diff_t')
         
         stat_df = pd.concat([stat_df, temp_stat_df1, temp_stat_df2], axis=0).reset_index(drop=True)
@@ -98,13 +95,13 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
 
     def compare_txt_and_neural_with_scatterplot(self, remove_outliers=True):
         time_axis = self.txt_and_neural['txt_t'].values
-        ax, stat_df = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural'], remove_outliers=remove_outliers,
+        ax, stat_df = time_calib_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural'], remove_outliers=remove_outliers,
                                                         label='adj by 1st txt t')
-        ax, temp_stat_df1 = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_2'], remove_outliers=remove_outliers,
+        ax, temp_stat_df1 = time_calib_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_2'], remove_outliers=remove_outliers,
                                                         ax=ax, color='green', label='adj by label=1, median of diff_t')
-        ax, temp_stat_df2 = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_3'], remove_outliers=remove_outliers,
+        ax, temp_stat_df2 = time_calib_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_3'], remove_outliers=remove_outliers,
                                                         ax=ax, color='orange', label='adj by label=1, 1st txt t')
-        ax, temp_stat_df3 = time_offset_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_4'], remove_outliers=remove_outliers,
+        ax, temp_stat_df3 = time_calib_utils.get_linear_regression(time_axis, self.txt_and_neural['diff_txt_neural_4'], remove_outliers=remove_outliers,
                                                         ax=ax, color='purple', label='adj by only label=1')
     
         stat_df = pd.concat([stat_df, temp_stat_df1, temp_stat_df2, temp_stat_df3], axis=0).reset_index(drop=True)
@@ -120,9 +117,9 @@ class TimeOffsetClass(further_processing_class.FurtherProcessing):
 
     def compare_neural_and_smr_with_scatterplot(self, remove_outliers=True):
         time_axis = self.smr_and_neural['txt_t'].values
-        ax, stat_df = time_offset_utils.get_linear_regression(time_axis, self.smr_and_neural['diff_neural_smr'], remove_outliers=remove_outliers,
+        ax, stat_df = time_calib_utils.get_linear_regression(time_axis, self.smr_and_neural['diff_neural_smr'], remove_outliers=remove_outliers,
                                                         label='adj by 1st txt t')
-        ax, temp_stat_df1 = time_offset_utils.get_linear_regression(time_axis, self.smr_and_neural['diff_neural_2_smr_2'], remove_outliers=remove_outliers,
+        ax, temp_stat_df1 = time_calib_utils.get_linear_regression(time_axis, self.smr_and_neural['diff_neural_2_smr_2'], remove_outliers=remove_outliers,
                                                         ax=ax, color='green', label='adj by label=1')
     
         stat_df = pd.concat([stat_df, temp_stat_df1], axis=0).reset_index(drop=True)

@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import process_monkey_information, specific_utils, time_offset_utils
+from data_wrangling import process_monkey_information, specific_utils, time_calib_utils
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 import os
 import numpy as np
@@ -25,21 +25,19 @@ np.set_printoptions(suppress=True)
 
 
 
-def make_spike_df(raw_data_folder_path="all_monkey_data/raw_monkey_data/monkey_Bruno/data_0330",
-                  sampling_rate=20000):
+def make_raw_spike_df(raw_data_folder_path, ff_caught_T_sorted,
+                      sampling_rate=20000):
     
     neural_data_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')
     sorted_neural_data_name = os.path.join(neural_data_path, "Sorted")
-    metadata_path = raw_data_folder_path.replace('raw_monkey_data', 'metadata')
+    time_calibration_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
 
-    smr_markers_start_time, smr_markers_end_time = time_offset_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
-    neural_offset_df = pd.read_csv(os.path.join(metadata_path, 'neural_time_offset.txt'))
+    smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
 
     spike_times = _load_spike_times(sorted_neural_data_name)
     
-    neural_events_start_time = neural_offset_df.loc[neural_offset_df['label']==1, 'time'].item()
-
-    spike_times_in_s = spike_times/sampling_rate - neural_events_start_time + smr_markers_start_time
+    spike_times_in_s = spike_times/sampling_rate
+    spike_times_in_s = time_calib_utils.calibrate_neural_data_time(spike_times_in_s, raw_data_folder_path, ff_caught_T_sorted)
 
     spike_clusters = _load_spike_clusters(sorted_neural_data_name)
 
@@ -48,7 +46,6 @@ def make_spike_df(raw_data_folder_path="all_monkey_data/raw_monkey_data/monkey_B
     spike_df = pd.DataFrame({'time': spike_times_in_s, 'cluster': spike_clusters})
 
     return spike_df
-
 
 def _load_spike_times(sorted_neural_data_path):
     """Load and process spike times."""
@@ -228,8 +225,8 @@ def splineDesign(knots, x, ord=4, der=0, outer_ok=False):
     
 def get_mapping_table_between_hard_drive_and_local_folders(monkey_name, hdrive_dir, neural_data_folder_name, filter_neural_file_func, save_table=False):
     all_local_data_paths = []
-    all_time_offset_paths = []
-    all_hdrive_data_folders = []
+    all_time_calib_paths = []
+    all_hdrive_folders = []
     all_hdrive_data_paths = []
 
     raw_data_dir = os.path.join('/Users/dusiyi/Documents/Multifirefly-Project/all_monkey_data/raw_monkey_data/', monkey_name)
@@ -240,29 +237,31 @@ def get_mapping_table_between_hard_drive_and_local_folders(monkey_name, hdrive_d
 
     for data_dir in sessions:
         local_data_path = os.path.join(neural_data_dir, data_dir)
-        time_offset_path = os.path.join(local_data_path.replace('neural_data', 'metadata'), 'neural_time_offset.txt')
-        all_local_data_paths.append(local_data_path)
-
+        neural_event_time_path = os.path.join(local_data_path.replace('neural_data', 'time_calibration'), 'neural_event_time.txt')
+    
         data_number = data_dir.split('_')[-1]
         data_name = month_dict[int(data_number[1])] + ' ' + data_number[-2:] + ' 2018'
-        hdrive_folder_path = os.path.join(hdrive_dir, data_name, neural_data_folder_name)
-        all_hdrive_data_folders.append(hdrive_folder_path)
+
+        all_local_data_paths.append(local_data_path)
+        all_time_calib_paths.append(neural_event_time_path)
+        hdrive_folder = os.path.join(hdrive_dir, data_name, neural_data_folder_name)
+        all_hdrive_folders.append(hdrive_folder)
 
         #get the neural file path
-        result = subprocess.run(['ls', '--color=never', hdrive_folder_path], capture_output=True, text=True, check=True)
+        result = subprocess.run(['ls', '--color=never', hdrive_folder], capture_output=True, text=True, check=True)
         file_list = result.stdout.splitlines()  # Split into clean file names
         neural_files = filter_neural_file_func(file_list)
         if len(neural_files) != 1:
             raise ValueError(f"There should be exactly one neural file in the directory. Found {len(neural_files)} files. The files in the directory are {file_list}")
         else:
-            hdrive_data_path = os.path.join(hdrive_folder_path, neural_files[0])
+            hdrive_data_path = os.path.join(hdrive_folder, neural_files[0])
             
         all_hdrive_data_paths.append(hdrive_data_path)
 
     mapping_table = pd.DataFrame({'local_path': all_local_data_paths, 
-                            'time_offset_path': all_time_offset_paths,
+                            'neural_event_time_path': all_time_calib_paths,
                             'hdrive_path': all_hdrive_data_paths,
-                            'hdrive_folder': all_hdrive_data_folders})
+                            'hdrive_folder': all_hdrive_folders})
 
     if save_table:
         monkey = 'bruno' if 'bruno' in monkey_name.lower() else 'schro'

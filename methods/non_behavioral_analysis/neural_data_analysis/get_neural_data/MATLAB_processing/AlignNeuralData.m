@@ -1,10 +1,10 @@
-function [] = AlignNeuralData(neural_data_path, time_offset_path, max_n)
+function [] = AlignNeuralData(neural_data_path, neural_event_time_path, max_n)
 tic; % Start the timer
 [~, ts, sv, freq] = plx_event_ts_modified(neural_data_path, 257, max_n); 
 ts_s = ts/freq; ts_s = ts_s.'; sv = sv.'; ts = ts.';
-time_offset = table(sv, ts, ts_s, 'VariableNames', {'label', 'timestamp', 'time'})
-writetable(time_offset, time_offset_path)
-type(time_offset_path)
+neural_event_time = table(sv, ts, ts_s, 'VariableNames', {'label', 'timestamp', 'time'})
+writetable(neural_event_time, neural_event_time_path)
+type(neural_event_time_path)
 % Stop the timer and display the elapsed time
 elapsedTime = toc;
 fprintf('Elapsed time: %.2f seconds\n', elapsedTime);

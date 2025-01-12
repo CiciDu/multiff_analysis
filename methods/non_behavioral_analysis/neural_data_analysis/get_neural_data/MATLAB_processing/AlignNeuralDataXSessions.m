@@ -22,13 +22,13 @@ disp(head(data_table));
 for i = 1:height(data_table)
     % get the local_file_path and neural_data_path
     neural_data_path = data_table{i, 'hdrive_path'}{1}
-    time_offset_path = data_table{i, 'time_offset_path'}{1};
-    % get the parent folder of time_offset_path
-    local_path = fileparts(time_offset_path);
+    neural_event_time_path = data_table{i, 'neural_event_time_path'}{1};
+    % get the parent folder of neural_event_time_path
+    local_path = fileparts(neural_event_time_path);
     if ~isfolder(local_path)
         mkdir(local_path);
     end
     disp(neural_data_path)
-    AlignNeuralData(neural_data_path, time_offset_path)
+    AlignNeuralData(neural_data_path, neural_event_time_path)
 
 end

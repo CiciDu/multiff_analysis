@@ -126,6 +126,7 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     # make sure the point_index in ff_dataframe are within monkey_information['point_index'].values
     ff_dataframe = ff_dataframe[ff_dataframe['point_index'].isin(monkey_information['point_index'].values)]
     # also make sure max target_index is less than len(ff_caught_T_new)
+    ff_dataframe['target_index'] = np.searchsorted(ff_caught_T_new, ff_dataframe['time'])
     ff_dataframe = ff_dataframe[ff_dataframe['target_index'] < len(ff_caught_T_new)].copy()
 
     return ff_dataframe
