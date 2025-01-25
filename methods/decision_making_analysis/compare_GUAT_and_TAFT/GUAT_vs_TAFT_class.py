@@ -50,7 +50,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'num_time_points_for_trajectory': 11, # originally 8
              'time_range_of_trajectory_to_plot': [0, 10], # original [-2, 5]
              'num_time_points_for_trajectory_to_plot': 41,
-             'trajectory_features': ['monkey_distance', 'monkey_angle_to_origin', 'time', 'curvature_of_traj'],
+             'trajectory_features': ['monkey_distance', 'monkey_angle_to_origin', 'time', 'curv_of_traj'],
 
              'include_ff_in_near_future': True,
              'max_time_since_last_vis': 2.5,
@@ -403,8 +403,8 @@ class CompareGUATandTAFTclass():
         self.stop_point_index_modified = self.alt_ff_df_modified.stop_point_index.values.copy()
         self.stops_near_ff_df_modified = self.stops_near_ff_df.copy()
 
-        self.alt_ff_df2 = self.alt_ff_df2.merge(self.curv_of_traj_df[['point_index', 'curvature_of_traj']], on='point_index', how='left')
-        self.stop_ff_df2 = self.stop_ff_df2.merge(self.curv_of_traj_df[['point_index', 'curvature_of_traj']], on='point_index', how='left')
+        self.alt_ff_df2 = self.alt_ff_df2.merge(self.curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
+        self.stop_ff_df2 = self.stop_ff_df2.merge(self.curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
         
         self.alt_ff_final_df = self.alt_ff_df2.copy()
         self.stop_ff_final_df = self.stop_ff_df2.copy()

@@ -136,8 +136,8 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         if include_ff_in_near_future:
             self.update_curvature_df_with_additional_curvature_df()
 
-        relevant_curvature_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new, monkey_information=self.monkey_information)
-        self.relevant_curv_of_traj_df = pd.DataFrame({'point_index': self.point_index_all, 'curvature_of_traj': relevant_curvature_of_traj})
+        relevant_curv_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new, monkey_information=self.monkey_information)
+        self.relevant_curv_of_traj_df = pd.DataFrame({'point_index': self.point_index_all, 'curv_of_traj': relevant_curv_of_traj})
 
         # combine the trajectory data
         self.traj_data_df, self.traj_data_feature_names = trajectory_info.combine_trajectory_and_stop_info_and_curvature_info(self.traj_points_df, self.traj_stops_df, self.relevant_curv_of_traj_df)
@@ -167,8 +167,8 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.get_trajectory_and_stop_info_for_machine_learning()
         self.get_more_trajectory_info_for_plotting(time_range_of_trajectory_to_plot=self.gc_kwargs['time_range_of_trajectory_to_plot'], num_time_points_for_trajectory_to_plot=self.gc_kwargs['num_time_points_for_trajectory_to_plot'])
 
-        relevant_curvature_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new, monkey_information=self.monkey_information)
-        self.relevant_curv_of_traj_df = pd.DataFrame({'point_index': self.point_index_all, 'curvature_of_traj': relevant_curvature_of_traj})
+        relevant_curv_of_traj = trajectory_info.find_trajectory_arc_info(self.point_index_all, self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new, monkey_information=self.monkey_information)
+        self.relevant_curv_of_traj_df = pd.DataFrame({'point_index': self.point_index_all, 'curv_of_traj': relevant_curv_of_traj})
 
         # combine the trajectory data
         self.traj_data_df, self.traj_data_feature_names = trajectory_info.combine_trajectory_and_stop_info_and_curvature_info(self.traj_points_df, self.traj_stops_df, self.relevant_curv_of_traj_df)

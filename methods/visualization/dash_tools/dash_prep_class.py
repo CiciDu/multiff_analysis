@@ -96,7 +96,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         self.use_two_y_axes=self.scatter_plot_params['use_two_y_axes']
         self.fig = self._produce_fig_for_dash()
         self.fig_scatter_s, self.fig_scatter_cm = self._produce_fig_scatter(use_two_y_axes=self.use_two_y_axes)
-        self.fig_scatter_natural_y_range = [np.min(self.curv_of_traj_df_in_duration['curvature_of_traj_deg_over_cm'].values), np.max(self.curv_of_traj_df_in_duration['curvature_of_traj_deg_over_cm'].values)]                                                                                                                                                              
+        self.fig_scatter_natural_y_range = [np.min(self.curv_of_traj_df_in_duration['curv_of_traj_deg_over_cm'].values), np.max(self.curv_of_traj_df_in_duration['curv_of_traj_deg_over_cm'].values)]                                                                                                                                                              
         y_column_name = 'curv_to_ff_center' if self.overall_params['use_curvature_to_ff_center'] else 'optimal_curvature'
         if self.scatter_plot_params['show_alt_ff_curv_in_scatterplot']:
             self._show_alt_ff_curv_in_scatterplot_func(y_column_name=y_column_name)

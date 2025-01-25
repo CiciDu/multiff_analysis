@@ -25,7 +25,7 @@ np.set_printoptions(suppress=True)
 
 
 
-def make_raw_spike_df(raw_data_folder_path, ff_caught_T_sorted,
+def make_spike_df(raw_data_folder_path, ff_caught_T_sorted,
                       sampling_rate=20000):
     
     neural_data_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')

@@ -172,7 +172,7 @@ def _supply_curvature_df_with_optimal_arc_info(curvature_df, ff_radius_for_optim
     curvature_df['curvature_lower_bound'] = curvature_lower_bound
     curvature_df['curvature_upper_bound'] = curvature_upper_bound
     # clip curvature to be between lower and upper bound
-    curvature_df['optimal_curvature'] = np.clip(curvature_df['curvature_of_traj'], curvature_df['curvature_lower_bound'], curvature_df['curvature_upper_bound'])
+    curvature_df['optimal_curvature'] = np.clip(curvature_df['curv_of_traj'], curvature_df['curvature_lower_bound'], curvature_df['curvature_upper_bound'])
     # make sure that optimal_curvature has the same sign has ff_angle
     abs_optimal_curvature = np.abs(curvature_df['optimal_curvature'])
     # if there's any 0, make it a small number

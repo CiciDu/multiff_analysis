@@ -379,7 +379,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self._get_curv_of_traj_df_in_duration()
         self.fig = self._update_fig_based_on_curv_of_traj()
         self.fig_scatter_combd = plotly_for_scatterplot.add_new_curv_of_traj_to_fig_scatter_combd(self.fig_scatter_combd, self.curv_of_traj_df_in_duration, curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end)
-        self.fig_scatter_natural_y_range = plotly_for_scatterplot.update_fig_scatter_natural_y_range(self.fig_scatter_natural_y_range, self.curv_of_traj_df_in_duration, y_column_name='curvature_of_traj_deg_over_cm')
+        self.fig_scatter_natural_y_range = plotly_for_scatterplot.update_fig_scatter_natural_y_range(self.fig_scatter_natural_y_range, self.curv_of_traj_df_in_duration, y_column_name='curv_of_traj_deg_over_cm')
         self._update_fig_scatter_combd_y_range()
         return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
 

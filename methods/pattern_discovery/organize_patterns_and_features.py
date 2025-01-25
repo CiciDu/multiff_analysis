@@ -177,7 +177,7 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, c
     caught_ff_num = len(ff_caught_T_new)
     visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
     trial_array, t_array = _calculate_trial_durations(ff_caught_T_new)
-    target_clust_last_vis_df = cluster_analysis.get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted)
+    target_clust_last_vis_df = cluster_analysis._get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted)
                                                                                
     hitting_arena_edge = _calculate_hitting_arena_edge(monkey_information, ff_caught_T_new)
     num_stops_array = get_num_stops_array(monkey_information, np.arange(len(ff_caught_T_new)))

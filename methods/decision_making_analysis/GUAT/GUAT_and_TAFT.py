@@ -318,7 +318,7 @@ def find_curv_diff_for_ff_info(ff_info, monkey_information, ff_real_position_sor
     ff_info_temp['ff_x'] = ff_real_position_sorted[ff_info_temp['ff_index'].values, 0]
     ff_info_temp['ff_y'] = ff_real_position_sorted[ff_info_temp['ff_index'].values, 1]
     temp_curvature_df = curvature_utils.make_curvature_df(ff_info_temp, curv_of_traj_df, ff_radius_for_optimal_arc=15)
-    temp_curvature_df.loc[:,'curv_diff'] = temp_curvature_df['optimal_curvature'].values - temp_curvature_df['curvature_of_traj'].values
+    temp_curvature_df.loc[:,'curv_diff'] = temp_curvature_df['optimal_curvature'].values - temp_curvature_df['curv_of_traj'].values
     #temp_curvature_df.loc[:,'abs_curv_diff'] = np.abs(temp_curvature_df.loc[:,'curv_diff'])
     if 'curv_diff' in ff_info.columns:
         ff_info.drop(['curv_diff'], axis=1, inplace=True)

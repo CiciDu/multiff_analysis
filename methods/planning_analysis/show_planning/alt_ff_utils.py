@@ -1,5 +1,5 @@
 
-from data_wrangling import specific_utils
+from data_wrangling import specific_utils, general_utils
 from pattern_discovery import cluster_analysis
 from pattern_discovery import monkey_landing_in_ff
 

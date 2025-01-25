@@ -48,10 +48,10 @@ def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_positio
         free_selection_df_temp['selection_criterion'] = min(-9999, ff_dataframe_sub[selection_criterion_if_too_many_ff].min()-1000)
         ff_dataframe_sub = guarantee_ff_dataframe_include_target_info(free_selection_df_temp, ff_dataframe_sub, ff_real_position_sorted, ff_dataframe, monkey_information)
 
-    # if 'curvature_of_traj' not in ff_dataframe_sub.columns:
+    # if 'curv_of_traj' not in ff_dataframe_sub.columns:
     #     if curv_of_traj_df is None:
-    #         raise ValueError('curv_of_traj_df is None, but add_current_curvature_of_traj is True')
-    #     ff_dataframe_sub = ff_dataframe_sub.merge(curv_of_traj_df[['point_index', 'curvature_of_traj']], on='point_index', how='left')
+    #         raise ValueError('curv_of_traj_df is None, but add_current_curv_of_traj is True')
+    #     ff_dataframe_sub = ff_dataframe_sub.merge(curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
     if add_arc_info:
         curvature_utils.add_arc_info_to_df(ff_dataframe_sub, curvature_df, arc_info_to_add=arc_info_to_add)
@@ -89,7 +89,7 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
                                                            monkey_information=None, 
                                                            ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], 
                                                            attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis'],
-                                                           add_current_curvature_of_traj=False, 
+                                                           add_current_curv_of_traj=False, 
                                                            num_ff_per_row=5, 
                                                            ff_caught_T_new=None, 
                                                            curv_of_traj_df=None,
@@ -118,15 +118,15 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
         free_selection_inputs_df_for_plotting[column_for_plotting_names] = current_info[attributes_for_plotting].copy().values
         sequence_of_obs_ff_indices.append(current_info['ff_index'].values)
 
-    if add_current_curvature_of_traj:
+    if add_current_curv_of_traj:
         if monkey_information is None:
-            raise ValueError('monkey_information is None, but add_current_curvature_of_traj is True')
+            raise ValueError('monkey_information is None, but add_current_curv_of_traj is True')
         if curv_of_traj_df is None:
             curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-        curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
-        free_selection_inputs['curvature_of_traj'] = curvature_of_traj
-        # since curvature_of_traj depends completely on the point index, we just have to include this variable once.
-        pred_var.append('curvature_of_traj')
+        curv_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
+        free_selection_inputs['curv_of_traj'] = curv_of_traj
+        # since curv_of_traj depends completely on the point index, we just have to include this variable once.
+        pred_var.append('curv_of_traj')
 
     # also add point_index
     free_selection_inputs.reset_index(drop=True, inplace=True)
@@ -139,7 +139,7 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
 
 
 def organize_free_selection_data(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, only_select_n_ff_case=None, num_ff_per_row=5, 
-                                 guarantee_including_target_info=True, add_current_curvature_of_traj=False, ff_caught_T_new=None, 
+                                 guarantee_including_target_info=True, add_current_curv_of_traj=False, ff_caught_T_new=None, 
                                  curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1],
                                   curvature_df=None, curv_of_traj_df=None, selection_criterion_if_too_many_ff='time_since_last_vis',
                                  ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], 
@@ -161,7 +161,7 @@ def organize_free_selection_data(free_selection_df, ff_dataframe, ff_real_positi
         print('Note: info_of_n_ff_per_point is not None, so the following parameters will be ignored: free_selection_df, num_ff_per_row, guarantee_including_target_info, only_select_n_ff_case, selection_criterion_if_too_many_ff')
 
     free_selection_inputs_df, free_selection_inputs_df_for_plotting, sequence_of_obs_ff_indices, point_index_array, pred_var = find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_point, monkey_information, ff_attributes=ff_attributes, num_ff_per_row=num_ff_per_row, \
-                                                                                                                                                       add_current_curvature_of_traj=add_current_curvature_of_traj, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df,
+                                                                                                                                                       add_current_curv_of_traj=add_current_curv_of_traj, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df,
                                                                                                                                                        curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
     free_selection_labels = find_label_of_ff_in_obs_ff(sequence_of_obs_ff_indices, free_selection_df['ff_index'].values, na_filler=num_ff_per_row)
 
@@ -285,7 +285,7 @@ def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_i
                                                                    placeholder_ff_angle_boundary=placeholder_ff_angle_boundary, placeholder_time_till_next_visible=placeholder_time_till_next_visible)
         
         if curv_of_traj_df is not None:
-            df_to_add = df_to_add.merge(curv_of_traj_df[['point_index', 'curvature_of_traj']], on='point_index', how='left')
+            df_to_add = df_to_add.merge(curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
         df_to_add['selection_criterion'] = max(9999, ff_dataframe_sub[selection_criterion_if_too_many_ff].max()+1000)
         

@@ -31,7 +31,7 @@ class CCAclass():
     def conduct_cca(self, n_components=10, plot_correlations=True):
         self.n_components = n_components
         self.cca, self.X1_sc, self.X2_sc, self.X1_c, self.X2_c, self.canon_corr = neural_data_modeling.conduct_cca(
-            self.X1,self.X2, n_components=n_components, plot_correlations=plot_correlations)
+            self.X1, self.X2, n_components=n_components, plot_correlations=plot_correlations)
         self.X1_weights = self.cca.ws[0]
         self.X2_weights = self.cca.ws[1]
         self.X1_loading = neural_data_modeling.calculate_loadings(self.X1_sc, self.X1_c)

@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import specific_utils, base_processing_class, combine_info_utils
+from data_wrangling import specific_utils, base_processing_class, combine_info_utils, further_processing_class
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features, monkey_landing_in_ff
 from visualization import plot_trials, plot_behaviors_utils, plot_statistics, plot_change_over_time
 from visualization.animation import animation_func, animation_utils, animation_class
@@ -49,15 +49,17 @@ class PatternsAndFeatures():
         if exists_ok:
             try:
                 self._retrieve_combined_patterns_and_features()
-                print('Successfully retrieved combined_patterns_and_features')
+                print('Successfully retrieved combd_pattern_frequencies, combd_feature_statistics, '
+                      'combd_all_trial_features, agg_pattern_frequencies, agg_feature_statistics, and combd_scatter_around_target_df')
                 return
             except FileNotFoundError:
-                print('Failed to retrieve combined_patterns_and_features. Will make them anew.')
+                print('Failed to retrieve combd_pattern_frequencies, combd_feature_statistics, combd_all_trial_features, '
+                      'agg_pattern_frequencies, agg_feature_statistics, and combd_scatter_around_target_df. Will make them anew.')
                 pass
 
         if not verbose:
-            with general_utils.suppress_stdout():
-                self._combine_patterns_and_features(exists_ok=exists_ok, save_data=save_data)
+            #with general_utils.suppress_stdout():
+            self._combine_patterns_and_features(exists_ok=exists_ok, save_data=save_data)
         else:
             self._combine_patterns_and_features(exists_ok=exists_ok, save_data=save_data)
 
@@ -153,7 +155,7 @@ class PatternsAndFeatures():
         return
 
     def _make_agg_pattern_frequency(self):
-        self.agg_pattern_frequencies = self.combd_pattern_frequencies[['Item', 'Group', 'Label', 'Frequency', 'N_total']].groupby(['Item', 'Group', 'Label']).sum().reset_index()
+        self.agg_pattern_frequencies = self.combd_pattern_frequencies[['Item', 'Group', 'Label', 'Frequency', 'N_total']].groupby(['Item', 'Group', 'Label']).sum(numeric_only=False).reset_index()
         self.agg_pattern_frequencies['Rate'] = self.agg_pattern_frequencies['Frequency']/self.agg_pattern_frequencies['N_total']
         self.agg_pattern_frequencies['Percentage'] = self.agg_pattern_frequencies['Rate']*100
         return self.agg_pattern_frequencies
@@ -194,4 +196,5 @@ class PatternsAndFeatures():
         plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_around_target_df, x="Session", 
                                                                 y_columns=y_columns,
                                                                 monkey_name=self.monkey_name, 
+                                                                title_prefix='Landing Position From FF Center \n'
                                                                 )

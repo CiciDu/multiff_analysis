@@ -223,10 +223,10 @@ def plot_pattern_frequencies(pattern_frequencies, compare_monkey_and_agent=False
                              ax=None, return_ax=False, hue=None):
     subset = pattern_frequencies[pattern_frequencies['Item'].isin(['two_in_a_row', 'visible_before_last_one', 'disappear_latest', 'waste_cluster_around_target',
                                                                    'ignore_sudden_flash', 'give_up_after_trying', 'try_a_few_times', 'ff_capture_rate', 'stop_success_rate'])]
-    label_order = ['Visible before last capture', 'Target disappears latest', 'Two in a row', 'Waste cluster around last target', 'Try a few times', 'Give up after trying', 'Ignore sudden flash', 'Firefly capture rate (per s)', 'Stop success rate']
+    label_order = ['Visible before last capture', 'Target disappears latest', 'Two in a row', 'Waste cluster around target', 'Try a few times', 'Give up after trying', 'Ignore sudden flash', 'Firefly capture rate (per s)', 'Stop success rate']
     if compare_monkey_and_agent:
         hue = "Player"
-    ax = plot_merged_df(subset, x="Label", y="Rate", hue=hue, label_order = label_order, ax=ax)
+    ax = plot_merged_df(subset, x="Label", y="Rate", hue=hue, label_order=label_order, ax=ax)
 
 
     if data_folder_name is not None:
@@ -543,7 +543,7 @@ def plot_last_seen_info_vs_stops(last_vis_df):
                         'abs_last_vis_ang', 'abs_last_vis_ang_to_bndry',
                         'abs_last_vis_target_ang', 'abs_last_vis_target_ang_to_bndry']:
             if x_column in last_vis_df.columns:
-                #plot_statistics.fit_and_plot_linear_regression(target_cluster_df2[x_column].values, target_cluster_df2['num_stops'].values, show_regression = True)
+                #plot_statistics.fit_and_plot_linear_regression(target_clust_last_vis_df2[x_column].values, target_clust_last_vis_df2['num_stops'].values, show_regression = True)
                 r, p = pearsonr(last_vis_df[x_column], last_vis_df[y_column])
                 if p > 0.05:
                     print(f'P-value for {x_column} and {y_column} is {p}. Plot skipped.')

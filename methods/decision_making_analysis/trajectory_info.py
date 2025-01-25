@@ -33,21 +33,21 @@ def find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new
     # curvature_df has duplicate point_index
     curv_of_traj_df_temp = curv_of_traj_df.groupby('point_index').first().reset_index().set_index('point_index')
     try:
-        curvature_of_traj = curv_of_traj_df_temp.loc[point_index_array, 'curvature_of_traj'].values
+        curv_of_traj = curv_of_traj_df_temp.loc[point_index_array, 'curv_of_traj'].values
     except KeyError:
         if ff_caught_T_new is None:
-            raise ValueError('Since add_current_curvature_of_traj is True and the current information is insufficient, ff_caught_T_new cannot be None')
+            raise ValueError('Since add_current_curv_of_traj is True and the current information is insufficient, ff_caught_T_new cannot be None')
         # see which point_index is in point_index_array but not in curv_of_traj_df_temp
         missing_point_index = np.setdiff1d(point_index_array, curv_of_traj_df_temp.index.values)
         print('missing_point_index', missing_point_index)
 
-        print('Since add_current_curvature_of_traj is True and the information in curv_of_traj_df is insufficient, we will calculate the curvature_of_traj now')
+        print('Since add_current_curv_of_traj is True and the information in curv_of_traj_df is insufficient, we will calculate the curv_of_traj now')
         curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-        curvature_of_traj = curv_of_traj_df.loc[point_index_array, 'curvature_of_traj'].values
+        curv_of_traj = curv_of_traj_df.loc[point_index_array, 'curv_of_traj'].values
     except:
         print('Other errors?')
 
-    return curvature_of_traj
+    return curv_of_traj
 
 
         
@@ -354,13 +354,13 @@ def combine_trajectory_and_stop_info_and_curvature_info(traj_points_df, traj_sto
     return traj_data_df, traj_data_feature_names
 
 
-def make_traj_data_feature_names(time_range_of_trajectory, num_time_points_for_trajectory, use_more_as_prefix=False, traj_point_features=['monkey_distance', 'monkey_angle'], relevant_curv_of_traj_feature_names=['curvature_of_traj']):
+def make_traj_data_feature_names(time_range_of_trajectory, num_time_points_for_trajectory, use_more_as_prefix=False, traj_point_features=['monkey_distance', 'monkey_angle'], relevant_curv_of_traj_feature_names=['curv_of_traj']):
     relative_time_points_of_trajectory = np.linspace(time_range_of_trajectory[0], time_range_of_trajectory[1], num_time_points_for_trajectory)
     traj_data_feature_names = dict()
     if use_more_as_prefix:
         traj_data_feature_names['more_traj_points'] = generate_feature_names_given_relative_time_points(relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=traj_point_features)
         traj_data_feature_names['more_traj_stops'] = generate_feature_names_given_relative_time_points(relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=['whether_stopped'])
-        traj_data_feature_names['more_relevant_curv_of_traj'] = ['curvature_of_traj']
+        traj_data_feature_names['more_relevant_curv_of_traj'] = ['curv_of_traj']
     else:
         traj_data_feature_names['traj_points'] = generate_feature_names_given_relative_time_points(relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=traj_point_features)
         traj_data_feature_names['traj_stops'] = generate_feature_names_given_relative_time_points(relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=['whether_stopped'])

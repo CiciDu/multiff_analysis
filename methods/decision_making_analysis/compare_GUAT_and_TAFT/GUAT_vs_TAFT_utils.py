@@ -128,11 +128,11 @@ columns_to_keep_from_only_stop_ff_df = ['optimal_curvature',
                                         'curv_to_ff_center',
                                         # 'd_heading_to_center', # this is perfectly correlated with stop_ff_angle_at_ref
                                         # 'stop_d_heading_of_arc', 
-                                        # 'dev_d_angle_from_null',
+                                        # 'diff_d_heading_of_traj_from_null',
                                         ## the columns below are repeated later
-                                        # 'curvature_of_traj', 
-                                        # 'curvature_of_traj_before_stop',
-                                        # 'ref_d_heading_of_traj',
+                                        # 'curv_of_traj', 
+                                        # 'curv_of_traj_before_stop',
+                                        # 'd_heading_of_traj',
                                         # 'd_heading_of_traj',
                                         # 'curv_mean', 'curv_std', 'curv_min', 'curv_25%', 'curv_50%', 'curv_75%',
                                         # 'curv_max', 'curv_iqr', 'curv_range', 
@@ -194,7 +194,7 @@ columns_to_keep_from_plan_y_df = [
 #  'alt_ff_cluster_last_seen_time_bsans_rel_to_stop',
 #  'alt_ff_cluster_last_flash_time_bbas_rel_to_stop',
 #  'alt_ff_cluster_last_flash_time_bsans_rel_to_stop',
- 'ref_d_heading_of_traj',
+ 'd_heading_of_traj',
  'ref_curv_of_traj',
 # 'angle_from_m_before_stop_to_stop_ff',
  'angle_from_m_before_stop_to_alt_ff',
@@ -209,7 +209,7 @@ columns_to_keep_from_plan_y_df = [
  'curv_max',
 #  'curv_iqr', # this will cause perfect correlation
 #  'curv_range', # this will cause perfect correlation
- 'curvature_of_traj_before_stop',
+ 'curv_of_traj_before_stop',
 # 'dir_from_stop_ff_to_stop', # this has high correlation with dir_from_stop_ff_to_alt_ff
  'dir_from_stop_ff_to_alt_ff', 
  'dir_from_stop_ff_same_side']

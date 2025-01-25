@@ -69,6 +69,9 @@ def _supply_info_to_ref_column_subset_to_match_more_columns_subset(overall_df):
         ref_sub = ref_sub[ref_sub['use_combd_features_for_cluster_only'] == False].copy() # in case there are any rows with use_combd_features_for_cluster_only == True
     more_sub = overall_df[overall_df['ref_columns_only']==False].copy()
 
+    more_sub = specific_utils.ensure_boolean_dtype(more_sub)
+    ref_sub = specific_utils.ensure_boolean_dtype(ref_sub)
+
     columns_to_match = ['cluster_to_keep', 'cluster_for_interaction', 'use_combd_features_for_cluster_only']
     columns_to_match = [col for col in columns_to_match if col in more_sub.columns]
 
@@ -176,7 +179,7 @@ def process_lr_or_ml_df_for_visualization(lr_or_ml_df,
         vars_to_keep.extend(['se_upper', 'se_lower'])
 
     try:
-        lr_or_ml_df['ref_point_value'] = lr_or_ml_df['ref_point_value'].astype('str')
+        #lr_or_ml_df['ref_point_value'] = lr_or_ml_df['ref_point_value'].astype('str')
         if 'ref_columns_only' in lr_or_ml_df.columns:
             lr_or_ml_df['ref_columns_only'] = lr_or_ml_df['ref_columns_only'].astype('object')
             lr_or_ml_df.loc[lr_or_ml_df['ref_columns_only']==True, 'ref_columns_only'] = 'ref_columns_only'

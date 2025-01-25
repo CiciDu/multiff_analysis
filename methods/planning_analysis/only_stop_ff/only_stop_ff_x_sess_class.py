@@ -62,10 +62,6 @@ class OnlyStopFFAcrossSessions():
 
     def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
         self.optimal_arc_type = optimal_arc_type
-
-        self.only_stop_ff_folder_path = os.path.join(self.planning_data_folder_path, f'only_stop_ff/only_stop_ff_df/{self.optimal_arc_type}')
-
-
         self.combd_only_stop_ff_path = make_variations_utils.make_combd_only_stop_ff_path(self.monkey_name)
         self.combd_only_stop_ff_df_folder_path = os.path.join(self.combd_only_stop_ff_path, f'data/combd_only_stop_ff_df/{self.optimal_arc_type}')
         self.combd_x_features_folder_path = os.path.join(self.combd_only_stop_ff_path, f'data/combd_x_features_df/{self.optimal_arc_type}')
@@ -130,8 +126,8 @@ class OnlyStopFFAcrossSessions():
 
             print('len(self.only_stop_ff_df): ', self.osf.only_stop_ff_df.shape[0])
             print('len(self.x_features_df): ', self.osf.x_features_df.shape[0])
-            if len(self.osf.only_stop_ff_df) != len(self.osf.x_features_df):
-                raise ValueError('The length of only_stop_ff_df and x_features_df are not the same.')
+            # if len(self.osf.only_stop_ff_df) != len(self.osf.x_features_df):
+            #     raise ValueError('The length of only_stop_ff_df and x_features_df are not the same.')
 
         self.combd_only_stop_ff_df = self.combd_only_stop_ff_df.sort_values(by=['data_name', 'stop_point_index']).reset_index(drop=True)
         self.combd_x_features_df = self.combd_x_features_df.sort_values(by=['data_name', 'stop_point_index']).reset_index(drop=True)
@@ -168,6 +164,9 @@ class OnlyStopFFAcrossSessions():
 
 
     def make_or_retrieve_all_only_stop_lr_df(self, ref_point_params_based_on_mode=None, exists_ok=True):
+        if ref_point_params_based_on_mode is None:
+            ref_point_params_based_on_mode = self.ref_point_params_based_on_mode
+
         df_path = self.only_stop_ff_lr_df_path
         if exists_ok:
             if exists(df_path):
@@ -182,9 +181,22 @@ class OnlyStopFFAcrossSessions():
 
         self.all_only_stop_lr_df = pd.DataFrame()
         for index, row in self.variations_list.iterrows():
-            self.make_only_stop_ff_df_and_x_features_df_across_sessions(exists_ok=True, x_features_df_exists_ok=True, only_stop_ff_df_exists_ok=True,
-                                                                    ref_point_mode=row['ref_point_mode'], ref_point_value=row['ref_point_value'])
-            self.only_stop_lr_df = self.ml_inst.try_different_combinations_for_linear_regressions(self)
+            self.make_only_stop_ff_df_and_x_features_df_across_sessions(
+                exists_ok=True,
+                x_features_df_exists_ok=True,
+                only_stop_ff_df_exists_ok=True,
+                ref_point_mode=row['ref_point_mode'],
+                ref_point_value=row['ref_point_value']
+            )
+            self.only_stop_lr_df = self.ml_inst.try_different_combinations_for_linear_regressions(
+                self,
+                y_columns_of_interest=[
+                    'd_heading_of_traj',
+                    'diff_d_heading_of_traj_from_null',
+                    'curv_of_traj_before_stop',
+                    'dir_from_stop_ff_to_stop'
+                ]
+            )
             self.all_only_stop_lr_df = pd.concat([self.all_only_stop_lr_df, self.only_stop_lr_df], axis=0)
         self.all_only_stop_lr_df.reset_index(drop=True, inplace=True)
         self.all_only_stop_lr_df.to_csv(df_path, index=False)
@@ -193,6 +205,9 @@ class OnlyStopFFAcrossSessions():
 
 
     def make_or_retrieve_all_only_stop_ml_df(self, ref_point_params_based_on_mode=None, exists_ok=True):
+        if ref_point_params_based_on_mode is None:
+            ref_point_params_based_on_mode = self.ref_point_params_based_on_mode
+            
         df_path = self.only_stop_ff_ml_df_path
         if exists_ok:
             if exists(df_path):
@@ -209,7 +224,12 @@ class OnlyStopFFAcrossSessions():
         for index, row in self.variations_list.iterrows():
             self.make_only_stop_ff_df_and_x_features_df_across_sessions(exists_ok=True, x_features_df_exists_ok=True, only_stop_ff_df_exists_ok=True,
                                                                     ref_point_mode=row['ref_point_mode'], ref_point_value=row['ref_point_value'])
-            only_stop_ml_df = self.ml_inst.try_different_combinations_for_ml(self, model_names=['rf'])
+            only_stop_ml_df = self.ml_inst.try_different_combinations_for_ml(self, model_names=['grad_boosting', 'rf'],
+                                                                             y_columns_of_interest=[
+                                                                                'd_heading_of_traj',
+                                                                                'diff_d_heading_of_traj_from_null',
+                                                                                'curv_of_traj_before_stop',
+                                                                                'dir_from_stop_ff_to_stop'])
             all_only_stop_ml_df = pd.concat([all_only_stop_ml_df, only_stop_ml_df], axis=0)
         all_only_stop_ml_df.reset_index(drop=True, inplace=True)
         all_only_stop_ml_df.to_csv(df_path, index=False)   

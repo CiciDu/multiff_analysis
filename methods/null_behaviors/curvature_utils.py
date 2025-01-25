@@ -51,7 +51,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_optimal_arc
     if (not include_curv_to_ff_center) and (not include_optimal_curvature):
         raise ValueError("At least one of include_curv_to_ff_center and include_optimal_curvature should be True.")
 
-    curvature_df = pd.DataFrame({'curvature_of_traj': curv_of_traj, 
+    curvature_df = pd.DataFrame({'curv_of_traj': curv_of_traj, 
                                  'point_index': ff_dataframe_sub['point_index'].values,
                                  'ff_index': ff_dataframe_sub['ff_index'].values,
                                  })
@@ -66,7 +66,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_optimal_arc
     add_d_heading_info(curvature_df, include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature)
 
     if include_optimal_curvature:
-        curvature_df.loc[:,'curv_diff'] = curvature_df['optimal_curvature'].values - curvature_df['curvature_of_traj'].values
+        curvature_df.loc[:,'curv_diff'] = curvature_df['optimal_curvature'].values - curvature_df['curv_of_traj'].values
         curvature_df.loc[:,'abs_curv_diff'] = np.abs(curvature_df.loc[:,'curv_diff'])
         curvature_df = curvature_df.sort_values(by=['point_index', 'abs_curv_diff', 'ff_distance'], ascending=[True, True, True])
         
@@ -154,7 +154,7 @@ def _supply_curvature_df_with_arc_to_ff_center_info(curvature_df, invalid_curvat
     curvature_df['curv_to_ff_center'], curvature_df['arc_radius_to_ff_center'] = optimal_arc_utils.find_arc_curvature(all_ff_angle, all_ff_distance, invalid_curvature_ok=invalid_curvature_ok)
     curvature_df['arc_end_direction_to_ff_center'] = np.sign(curvature_df['curv_to_ff_center'])
     curvature_df['arc_measure_to_ff_center'], curvature_df['arc_length_to_ff_center'] = find_arc_measure_and_length_to_ff_center(curvature_df['arc_radius_to_ff_center'], all_ff_distance, all_ff_angle)
-    curvature_df.loc[curvature_df['ff_distance'] <= 25, 'curv_to_ff_center'] = curvature_df.loc[curvature_df['ff_distance'] <= 25, 'curvature_of_traj']
+    curvature_df.loc[curvature_df['ff_distance'] <= 25, 'curv_to_ff_center'] = curvature_df.loc[curvature_df['ff_distance'] <= 25, 'curv_of_traj']
 
     # also add arc end xy
     curvature_df = _add_arc_ending_xy_to_ff_center_to_curvature_df(curvature_df)
@@ -310,7 +310,7 @@ def _find_polar_arc_starting_and_ending_angles(arc_radius, arc_measure, arc_end_
 
 
 def clean_curvature_info(curvature_df, include_optimal_curvature=True):
-    curvature_df['curvature_of_traj'] = curvature_df['curvature_of_traj'].clip(lower=-0.5, upper=0.5)
+    curvature_df['curv_of_traj'] = curvature_df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
     if include_optimal_curvature:
         curvature_df['curvature_lower_bound'] = curvature_df['curvature_lower_bound'].clip(lower=-20, upper=2)
         curvature_df['curvature_upper_bound'] = curvature_df['curvature_upper_bound'].clip(lower=-20, upper=-2)
@@ -332,32 +332,32 @@ def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_info
     if 'curv_diff' in df.columns:
         df['curv_diff'] = df[['curv_diff']].fillna(0)
     
-    # let's also deal with the NA in curvature_of_traj, but we can fill it with the curvature of the trajectory
-    point_index_array = df.loc[df.curvature_of_traj.isna(), 'point_index'].values
+    # let's also deal with the NA in curv_of_traj, but we can fill it with the curvature of the trajectory
+    point_index_array = df.loc[df.curv_of_traj.isna(), 'point_index'].values
     
-    if 'curvature_of_traj' in df.columns:
+    if 'curv_of_traj' in df.columns:
         if len(point_index_array) > 0:
-            curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
-            df.loc[df.curvature_of_traj.isna(), 'curvature_of_traj'] = curvature_of_traj    
+            curv_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
+            df.loc[df.curv_of_traj.isna(), 'curv_of_traj'] = curv_of_traj    
     return df
 
 
 def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_new=None, curv_of_traj_df=None):
     # assume that none of the ff is a placeholder ff, but just ff that doesn't have valid arc information
 
-    # if there's any NA in curvature_of_traj, then we recalculate them
-    if 'curvature_of_traj' in df.columns:
-        curv_traj_na_index = df['curvature_of_traj'].isna()
+    # if there's any NA in curv_of_traj, then we recalculate them
+    if 'curv_of_traj' in df.columns:
+        curv_traj_na_index = df['curv_of_traj'].isna()
         if curv_traj_na_index.any():
             if (ff_caught_T_new is None) or (curv_of_traj_df is None):
-                raise ValueError("Please provide ff_caught_T_new and curv_of_traj_df, since it's needed to calculate curvature_of_traj.")
+                raise ValueError("Please provide ff_caught_T_new and curv_of_traj_df, since it's needed to calculate curv_of_traj.")
             point_index_array = df.loc[curv_traj_na_index, 'point_index'].values
-            curvature_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
-            df.loc[curv_traj_na_index, 'curvature_of_traj'] = curvature_of_traj
-            df['curvature_of_traj'] = df['curvature_of_traj'].clip(lower=-0.5, upper=0.5)
+            curv_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
+            df.loc[curv_traj_na_index, 'curv_of_traj'] = curv_of_traj
+            df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
 
 
-    # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the optimal_curvature value shall be the same as curvature_of_traj
+    # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the optimal_curvature value shall be the same as curv_of_traj
     if 'optimal_curvature' in df.columns:
         within_ff_na_index = (df['ff_distance'] <= 25) & df['optimal_curvature'].isna()
     elif 'curv_diff' in df.columns:
@@ -368,7 +368,7 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
         raise ValueError("Please provide either optimal_curvature, curv_diff, or abs_curv_diff in df.columns. Otherwise, change the algorithm here.")
 
     if 'optimal_curvature' in df.columns:
-        df.loc[within_ff_na_index, 'optimal_curvature'] = df.loc[within_ff_na_index, 'curvature_of_traj'].values
+        df.loc[within_ff_na_index, 'optimal_curvature'] = df.loc[within_ff_na_index, 'curv_of_traj'].values
         df.loc[within_ff_na_index, 'optimal_curvature'] = df.loc[within_ff_na_index, 'optimal_curvature'].clip(lower=-0.1, upper=0.1)
    
     # Fill NA values for other columns
@@ -403,7 +403,7 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
         middle_ff_na_index = (df['ff_angle_boundary'] == 0) & df['optimal_curvature'].isna()
         df.loc[middle_ff_na_index, 'optimal_curvature'] = 0
 
-    df['curv_diff'] = df['optimal_curvature'].values - df['curvature_of_traj'].values
+    df['curv_diff'] = df['optimal_curvature'].values - df['curv_of_traj'].values
     df['abs_curv_diff'] = np.abs(df['curv_diff'].values)
         
 

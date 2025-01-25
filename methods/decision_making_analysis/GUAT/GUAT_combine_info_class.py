@@ -192,17 +192,17 @@ class GUATProcessCombinedInfo(GUATCombineInfoAcrossSessions):
 
     def find_input_and_output(self,
                               add_arc_info=False,
-                              add_current_curvature_of_traj=False,
+                              add_current_curv_of_traj=False,
                               ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis', 'time_till_next_visible'],
                               add_num_ff_in_cluster=False,
                               arc_info_to_add=['curv_diff', 'abs_curv_diff'],
                               ):
-        if add_current_curvature_of_traj is True:
-            # see if any element of all_traj_feature_names['traj_points'] contains 'curvature_of_traj' even if it's just part of the string
-            curvature_of_traj_feature_names = [name for name in self.all_traj_feature_names['traj_points'] if 'curvature_of_traj' in name]
-            if len(curvature_of_traj_feature_names) > 0:
-                add_current_curvature_of_traj = False
-                print('Warning: add_current_curvature_of_traj is set to False because \'curvature_of_traj\' is already in the trajectory features.')
+        if add_current_curv_of_traj is True:
+            # see if any element of all_traj_feature_names['traj_points'] contains 'curv_of_traj' even if it's just part of the string
+            curv_of_traj_feature_names = [name for name in self.all_traj_feature_names['traj_points'] if 'curv_of_traj' in name]
+            if len(curv_of_traj_feature_names) > 0:
+                add_current_curv_of_traj = False
+                print('Warning: add_current_curv_of_traj is set to False because \'curv_of_traj\' is already in the trajectory features.')
             
         self.GUAT_current_ff_info['group'] = 'Original'
         self.GUAT_alt_ff_info['group'] = 'Alternative'    
@@ -220,9 +220,9 @@ class GUATProcessCombinedInfo(GUATCombineInfoAcrossSessions):
         self.free_selection_inputs_df, self.free_selection_inputs_df_for_plotting, self.sequence_of_obs_ff_indices, self.point_index_array, self.pred_var = free_selection.find_free_selection_inputs_from_info_of_n_ff_per_point(self.GUAT_joined_ff_info, \
                                             ff_attributes=ff_attributes, attributes_for_plotting=self.attributes_for_plotting, num_ff_per_row=self.num_old_ff_per_row + self.num_new_ff_per_row)
 
-        if add_current_curvature_of_traj: # manually add trajectory arc info
-            curvature_of_traj = self.relevant_curv_of_traj_df.set_index('point_index').loc[self.point_index_array, 'curvature_of_traj'].values
-            self.free_selection_inputs_df['curvature_of_traj'] = curvature_of_traj
+        if add_current_curv_of_traj: # manually add trajectory arc info
+            curv_of_traj = self.relevant_curv_of_traj_df.set_index('point_index').loc[self.point_index_array, 'curv_of_traj'].values
+            self.free_selection_inputs_df['curv_of_traj'] = curv_of_traj
 
         if add_num_ff_in_cluster:
             self.free_selection_inputs_df['num_current_ff_in_cluster'] = self.GUAT_current_ff_info.groupby('point_index').first()['num_ff_in_cluster'].values

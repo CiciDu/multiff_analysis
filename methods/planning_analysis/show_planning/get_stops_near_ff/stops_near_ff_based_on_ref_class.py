@@ -424,7 +424,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                                                                                     self.ff_real_position_sorted, self.monkey_information)
 
         # use merge to add curvature_info
-        shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'optimal_arc_measure', 'optimal_arc_radius', 'optimal_arc_end_direction', 'curvature_of_traj', 'curv_to_ff_center', 
+        shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'optimal_arc_measure', 'optimal_arc_radius', 'optimal_arc_end_direction', 'curv_of_traj', 'curv_to_ff_center', 
                           'arc_radius_to_ff_center', 'd_heading_to_center', 'optimal_arc_d_heading', 'optimal_arc_end_x', 'optimal_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
         self.alt_ff_final_df = self.alt_ff_df_modified.merge(self.alt_curv_df[shared_columns], on=['ff_index', 'point_index'], how='left')
         self.stop_ff_final_df = self.stop_ff_df_modified.merge(self.stop_curv_df[shared_columns], on=['ff_index', 'point_index'], how='left')
@@ -461,7 +461,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         self.stops_near_ff_df_counted = self.stops_near_ff_df.set_index('stop_point_index').loc[self.stop_point_index_counted].reset_index()
 
     def _find_curv_of_traj_counted(self):
-        self.curv_of_traj_counted = self.stop_ff_counted_df['curvature_of_traj'].values
+        self.curv_of_traj_counted = self.stop_ff_counted_df['curv_of_traj'].values
 
 
     def _eliminate_outliers_in_stop_ff_curv(self):

@@ -67,7 +67,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
     def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
         self.optimal_arc_type = optimal_arc_type
-
+        self.planning_data_folder_path = self.raw_data_folder_path.replace('raw_monkey_data', 'planning')
         self.only_stop_ff_folder_path = os.path.join(self.planning_data_folder_path, f'only_stop_ff/only_stop_ff_df/{self.optimal_arc_type}')
         self.x_features_folder_path = os.path.join(self.planning_data_folder_path, f'only_stop_ff/x_features_df/{self.optimal_arc_type}')
         os.makedirs(self.only_stop_ff_folder_path, exist_ok=True)
@@ -166,10 +166,16 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
 
     def _prepare_only_stop_ff_data_for_ml(self):
-        # make sure that the two df share the same set of stop periods
-        shared_stop_periods = set(self.only_stop_ff_df_for_ml['stop_point_index'].unique()).intersection(set(self.x_features_df_for_ml['stop_point_index'].unique()))
-        self.only_stop_ff_df_for_ml = self.only_stop_ff_df_for_ml[self.only_stop_ff_df_for_ml['stop_point_index'].isin(shared_stop_periods)].reset_index(drop=True)
-        self.x_features_df_for_ml = self.x_features_df_for_ml[self.x_features_df_for_ml['stop_point_index'].isin(shared_stop_periods)].reset_index(drop=True)
+        if 'data_name' not in self.only_stop_ff_df_for_ml.columns:
+            # make sure that the two df share the same set of stop_point_index
+            shared_stop_periods = set(self.only_stop_ff_df_for_ml['stop_point_index'].unique()).intersection(set(self.x_features_df_for_ml['stop_point_index'].unique()))
+            self.only_stop_ff_df_for_ml = self.only_stop_ff_df_for_ml[self.only_stop_ff_df_for_ml['stop_point_index'].isin(shared_stop_periods)].reset_index(drop=True)
+            self.x_features_df_for_ml = self.x_features_df_for_ml[self.x_features_df_for_ml['stop_point_index'].isin(shared_stop_periods)].reset_index(drop=True)
+            print('Note: only_stop_ff_df_for_ml and x_features_df_for_ml have been aligned to share the same set of stop_point_index.')
+        else:
+            # make sure that the two df share the same set of data_name + stop_point_index pairs
+            self.only_stop_ff_df_for_ml, self.x_features_df_for_ml = only_stop_ff_utils.keep_same_data_name_and_stop_point_pairs(self.only_stop_ff_df_for_ml, self.x_features_df_for_ml)
+            print('Note: only_stop_ff_df_for_ml and x_features_df_for_ml have been aligned to share the same set of data_name + stop_point_index pairs.')
 
         self.x_features_df_w_all_columns = self.x_features_df_for_ml.copy()
         
@@ -178,8 +184,6 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
                 self.x_features_df_for_ml.drop(columns=[column], inplace=True)
 
         self.only_stop_ff_df_for_ml['dir_from_stop_ff_to_stop'] = ((self.only_stop_ff_df_for_ml['dir_from_stop_ff_to_stop'] + 1)/2).astype(int)
-
-
 
 
     def streamline_preparing_for_ml(self, y_var_column, 

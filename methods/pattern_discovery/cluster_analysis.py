@@ -293,22 +293,63 @@ def find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life
     return ff_indices_of_each_cluster
 
 
-def find_target_cluster_df(monkey_information, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, max_distance=50,
-                           keep_all_rows=False):
-    ff_indices_of_each_cluster = find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=max_distance)
-    target_clust_last_vis_df = get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted)
+def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=3):
+    """
+    Calculate metrics for the last visible target.
+    """
+    metrics = {
+        'last_vis_point_index': [], 'time_since_last_vis': [],
+        'last_vis_dist': [], 'last_vis_cum_dist': [], 'last_vis_ang': [], 'last_vis_ang_to_bndry': []
+    }
+
+    ff_capture_rows = monkey_information.iloc[np.searchsorted(monkey_information['time'].values, ff_caught_T_new)]
+    visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
+
+    for i, caught_time in enumerate(ff_caught_T_new):
+        ff_info_sub = visible_ff[visible_ff['time'].between(caught_time - duration_of_evaluation, caught_time)].copy()
+        ff_info_sub['ff_distance_to_target'] = LA.norm(ff_info_sub[['ff_x', 'ff_y']].values - ff_real_position_sorted[i], axis=1)
+        relevant_df = ff_info_sub[ff_info_sub['ff_index'] == i].copy()
+
+        if not relevant_df.empty:
+            relevant_df.sort_values(by=['point_index', 'ff_distance_to_target'], ascending=[True, False], inplace=True)
+            row = relevant_df.iloc[-1]
+            metrics['last_vis_point_index'].append(row['point_index'])
+            metrics['time_since_last_vis'].append(caught_time - row['time'])
+            metrics['last_vis_dist'].append(row['ff_distance'])
+            metrics['last_vis_cum_dist'].append(ff_capture_rows.iloc[i]['cum_distance'] - row['cum_distance'])
+            metrics['last_vis_ang'].append(row['ff_angle'])
+            metrics['last_vis_ang_to_bndry'].append(row['ff_angle_boundary'])
+        else:
+            for key in metrics:
+                metrics[key].append(9999)
+
+    target_last_vis_df = pd.DataFrame({
+        **metrics,
+        'target_index': np.arange(len(ff_caught_T_new)),
+        'abs_last_vis_ang': np.abs(metrics['last_vis_ang']),
+        'abs_last_vis_ang_to_bndry': np.abs(metrics['last_vis_ang_to_bndry'])
+    })
+
+    return target_last_vis_df
+
+
+def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_life_sorted, duration_of_evaluation=3, 
+                                 max_distance_to_target_in_cluster=50, keep_all_rows=False):
+    ff_indices_of_each_cluster = find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=max_distance_to_target_in_cluster)
+    target_clust_last_vis_df = _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted,
+                                                             max_distance_to_target_in_cluster=max_distance_to_target_in_cluster, duration_of_evaluation=duration_of_evaluation)
     target_clust_last_vis_df['nearby_alive_ff_indices'] = ff_indices_of_each_cluster
     if not keep_all_rows:
       # drop the rows whose last_vis_dist is 9999
-      target_cluster_df = target_clust_last_vis_df[target_clust_last_vis_df['last_vis_dist']!=9999].copy()
+      target_clust_last_vis_df = target_clust_last_vis_df[target_clust_last_vis_df['last_vis_dist']!=9999].copy()
       # also drop target_index = 0
-      target_cluster_df = target_cluster_df[target_cluster_df['target_index']!=0].copy()
+      target_clust_last_vis_df = target_clust_last_vis_df[target_clust_last_vis_df['target_index']!=0].copy()
     else:
-      target_cluster_df = target_clust_last_vis_df
-    return target_cluster_df
+      target_clust_last_vis_df = target_clust_last_vis_df
+    return target_clust_last_vis_df
 
 
-def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=3, max_distance_to_target_in_cluster=50):
+def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=3, max_distance_to_target_in_cluster=50):
     """
     Calculate metrics for the last visible target cluster.
     """
@@ -360,43 +401,3 @@ def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_n
     })
 
     return target_clust_last_vis_df
-
-
-def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=3):
-    """
-    Calculate metrics for the last visible target.
-    """
-    metrics = {
-        'last_vis_point_index': [], 'time_since_last_vis': [],
-        'last_vis_dist': [], 'last_vis_cum_dist': [], 'last_vis_ang': [], 'last_vis_ang_to_bndry': []
-    }
-
-    ff_capture_rows = monkey_information.iloc[np.searchsorted(monkey_information['time'].values, ff_caught_T_new)]
-    visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
-
-    for i, caught_time in enumerate(ff_caught_T_new):
-        ff_info_sub = visible_ff[visible_ff['time'].between(caught_time - duration_of_evaluation, caught_time)].copy()
-        ff_info_sub['ff_distance_to_target'] = LA.norm(ff_info_sub[['ff_x', 'ff_y']].values - ff_real_position_sorted[i], axis=1)
-        relevant_df = ff_info_sub[ff_info_sub['ff_index'] == i].copy()
-
-        if not relevant_df.empty:
-            relevant_df.sort_values(by=['point_index', 'ff_distance_to_target'], ascending=[True, False], inplace=True)
-            row = relevant_df.iloc[-1]
-            metrics['last_vis_point_index'].append(row['point_index'])
-            metrics['time_since_last_vis'].append(caught_time - row['time'])
-            metrics['last_vis_dist'].append(row['ff_distance'])
-            metrics['last_vis_cum_dist'].append(ff_capture_rows.iloc[i]['cum_distance'] - row['cum_distance'])
-            metrics['last_vis_ang'].append(row['ff_angle'])
-            metrics['last_vis_ang_to_bndry'].append(row['ff_angle_boundary'])
-        else:
-            for key in metrics:
-                metrics[key].append(9999)
-
-    target_last_vis_df = pd.DataFrame({
-        **metrics,
-        'target_index': np.arange(len(ff_caught_T_new)),
-        'abs_last_vis_ang': np.abs(metrics['last_vis_ang']),
-        'abs_last_vis_ang_to_bndry': np.abs(metrics['last_vis_ang_to_bndry'])
-    })
-
-    return target_last_vis_df

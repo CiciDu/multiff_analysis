@@ -312,3 +312,12 @@ def take_out_valid_intervals_based_on_ff_caught_time(ff_caught_T_new,
     valid_intervals_df = caught_t_df[['combd_valid_interval_start', 'combd_valid_interval_end']].drop_duplicates()
     return valid_intervals_df
 
+
+def ensure_boolean_dtype(df):
+    """
+    Ensure that all object-dtype columns with boolean values are cast to boolean dtype.
+    """
+    bool_columns = df.select_dtypes(include='object').applymap(lambda x: x in [True, False]).all()
+    for col in bool_columns.index[bool_columns]:
+        df[col] = df[col].astype(bool)
+    return df

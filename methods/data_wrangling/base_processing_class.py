@@ -41,49 +41,12 @@ class BaseProcessing:
         self.curv_of_traj_params = {}
 
 
-    def retrieve_ff_info_from_npz(self):
-        npz_file = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz'))
-        loaded_arrays = np.load(npz_file, allow_pickle = True)
-        ff_life_sorted = loaded_arrays['ff_life_sorted']
-        ff_caught_T_sorted = loaded_arrays['ff_caught_T_sorted']
-        ff_index_sorted = loaded_arrays['ff_index_sorted']
-        ff_real_position_sorted = loaded_arrays['ff_real_position_sorted']
-        ff_believed_position_sorted = loaded_arrays['ff_believed_position_sorted']
-        ff_flash_end_sorted = loaded_arrays['ff_flash_end_sorted']
-
-        npz_file_for_flash = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_flash_sorted.npz'))
-        loaded_ff_flash_sorted = np.load(npz_file_for_flash, allow_pickle=True)
-        ff_flash_sorted = []
-        # for keys, values in loaded_ff_flash_sorted.items():
-        #     ff_flash_sorted.append(values)
-        for file in loaded_ff_flash_sorted.files:
-            ff_flash_sorted.append(loaded_ff_flash_sorted[file])
-        return ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted
-
-
-    def save_ff_info_into_npz(self):
-        # save ff info
-        npz_file = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz'))
-        
-        np.savez(npz_file, 
-                ff_life_sorted = self.ff_life_sorted, 
-                ff_caught_T_sorted = self.ff_caught_T_sorted,
-                ff_index_sorted = self.ff_index_sorted,
-                ff_real_position_sorted = self.ff_real_position_sorted,
-                ff_believed_position_sorted = self.ff_believed_position_sorted,
-                ff_flash_end_sorted = self.ff_flash_end_sorted)
-
-        # also save ff_flash_sorted
-        npz_flash = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_flash_sorted.npz'))
-        np.savez(npz_flash, *self.ff_flash_sorted)
-        return 
-
-
     def load_raw_data(self, raw_data_folder_path, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         self.extract_info_from_raw_data_folder_path(raw_data_folder_path)
         self.retrieve_or_make_monkey_data(exists_ok=monkey_data_exists_ok)
         if curv_of_traj_mode is not None:
             self.curv_of_traj_df = self.get_curv_of_traj_df(window_for_curv_of_traj=window_for_curv_of_traj, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+
 
     def extract_info_from_raw_data_folder_path(self, raw_data_folder_path):
         self.get_related_folder_names_from_raw_data_folder_path(raw_data_folder_path)
@@ -178,24 +141,6 @@ class BaseProcessing:
         if to_furnish_ff_dataframe:
             self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
                                                     self.ff_caught_T_new, self.ff_life_sorted)
-
-
-    def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1):
-        self.npz_file_pathway = os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz')
-        self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
-            self.ff_flash_end_sorted = self.retrieve_ff_info_from_npz()
-        
-        self.monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
-        self.monkey_information = pd.read_csv(self.monkey_information_path).drop(["Unnamed: 0"], axis=1)
-        self.monkey_information.index = self.monkey_information.point_index.values
-        self.monkey_information = process_monkey_information.add_more_columns_to_monkey_information(self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop) 
-        self.monkey_information = process_monkey_information.take_out_suspicious_information_from_monkey_information(self.monkey_information)
-
-        print("Retrieved monkey data from ", self.monkey_information_path, " and ff data from ", self.npz_file_pathway)
-
-        self.make_or_retrieve_closest_stop_to_capture_df()
-        self.make_ff_caught_T_new()
-        return 
     
     def make_or_retrieve_closest_stop_to_capture_df(self, exists_ok=True):
         path = os.path.join(self.processed_data_folder_path, 'closest_stop_to_capture_df.csv')
@@ -246,48 +191,50 @@ class BaseProcessing:
         assert len(self.ff_caught_T_new) == len(self.ff_caught_T_sorted)
 
 
-    def make_or_retrieve_target_cluster_df(self, exists_ok=True, max_distance=50):
-        path = os.path.join(self.processed_data_folder_path, 'target_cluster_df.csv')
+    def make_or_retrieve_target_clust_last_vis_df(self, exists_ok=True, max_distance_to_target_in_cluster=50):
+        path = os.path.join(self.processed_data_folder_path, 'target_clust_last_vis_df.csv')
         if exists_ok & exists(path):
-            self.target_cluster_df = pd.read_csv(path).drop(["Unnamed: 0"], axis=1)
-            print("Retrieved target_cluster_df")
+            self.target_clust_last_vis_df = pd.read_csv(path).drop(["Unnamed: 0"], axis=1)
+            print("Retrieved target_clust_last_vis_df")
         else:
-            self.target_cluster_df = cluster_analysis.find_target_cluster_df(self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new, self.ff_life_sorted, self.ff_dataframe, 
-                                                                             max_distance=max_distance, keep_all_rows=True)
-            self.target_cluster_df.to_csv(path)
-            print("Made target_cluster_df and saved it at ", path)
+            self.target_clust_last_vis_df = cluster_analysis.get_target_clust_last_vis_df(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, 
+                                                                                          self.ff_life_sorted, max_distance_to_target_in_cluster=max_distance_to_target_in_cluster, keep_all_rows=True)
+            self.target_clust_last_vis_df.to_csv(path)
+            print("Made target_clust_last_vis_df and saved it at ", path)
         return
 
+    def make_or_retrieve_target_last_vis_df(self, exists_ok=True):
+        path = os.path.join(self.processed_data_folder_path, 'target_last_vis_df.csv')
+        if exists_ok & exists(path):
+            self.target_last_vis_df = pd.read_csv(path).drop(["Unnamed: 0"], axis=1)
+            print("Retrieved target_last_vis_df")
+        else:
+            self.target_last_vis_df = cluster_analysis.get_target_last_vis_df(self.ff_dataframe, self.monkey_information, 
+                                                                              self.ff_caught_T_new, self.ff_real_position_sorted, duration_of_evaluation=3)
+            self.target_last_vis_df.to_csv(path)
+            print("Made target_last_vis_df and saved it at ", path)
+        return
 
     def retrieve_or_make_monkey_data(self, exists_ok=True, already_made_ok=False, save_data=True, speed_threshold_for_distinct_stop=1, min_distance_to_calculate_angle=5):
         if already_made_ok & (getattr(self, 'monkey_information', None) is not None):
             return
+
+        self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
+                self.ff_flash_end_sorted = retrieve_raw_data.make_or_retrieve_ff_info_from_txt_data(self.raw_data_folder_path, exists_ok=exists_ok, save_data=save_data)
         
         self.smr_markers_start_time, self.smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(self.raw_data_folder_path)
 
-        if exists_ok:
-            try:
-                self.retrieve_monkey_data(speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
-                return 
-            except Exception as e:
-                print("Failed to retrieve monkey data. Will make new monkey data. Error: ", e)
+        self.ff_flash_sorted = retrieve_raw_data.make_or_retrieve_ff_flash_sorted_from_txt_data(self.raw_data_folder_path, exists_ok=exists_ok, save_data=save_data)
 
-        # if not exists, then retrieve from csv files
-        self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, self.ff_flash_sorted, \
-                self.ff_flash_end_sorted = retrieve_raw_data.get_ff_information_from_txt_data(self.raw_data_folder_path)   
-
-        self.make_or_retrieve_monkey_information(exists_ok=exists_ok, save_data=save_data, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
-        
-        if save_data:
-            self.save_ff_info_into_npz()
+        self.make_or_retrieve_monkey_information(exists_ok=exists_ok, save_data=save_data, min_distance_to_calculate_angle=min_distance_to_calculate_angle, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
 
 
-    def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5):
+    def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):
         self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
         self.monkey_information = process_monkey_information.make_or_retrieve_monkey_information(self.raw_data_folder_path, self.interocular_dist, min_distance_to_calculate_angle=min_distance_to_calculate_angle, 
-                                                                                       exists_ok=exists_ok, save_data=save_data)
+                                                                                       exists_ok=exists_ok, save_data=save_data, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
         return
         
     def get_more_monkey_data(self, exists_ok=True):

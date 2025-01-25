@@ -38,7 +38,7 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
     else:
         raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(raw_data_folder_path)
         smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
-        monkey_information = retrieve_raw_data.trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)        
+        monkey_information = retrieve_raw_data._trim_monkey_information(raw_monkey_information, smr_markers_start_time, smr_markers_end_time)        
         add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
         add_monkey_speed_column(monkey_information)    
         add_monkey_dw_column(monkey_information)  
@@ -51,27 +51,31 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
             monkey_information.to_csv(monkey_information_path)
             print("Saved monkey_information")
 
+    monkey_information = _process_monkey_information_after_retrieval(monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+    return monkey_information
+
+def _process_monkey_information_after_retrieval(monkey_information, speed_threshold_for_distinct_stop=1):
     monkey_information.index = monkey_information.point_index.values
     monkey_information = add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop) 
     monkey_information = take_out_suspicious_information_from_monkey_information(monkey_information)
     return monkey_information
-
 
 def make_signal_df(raw_data_folder_path):
     # make signal_df with time_adjusted
     txt_smr_t_linreg_df = time_calib_utils.make_or_retrieve_txt_smr_t_linreg_df(raw_data_folder_path)
     signal_df = get_raw_signal_df(raw_data_folder_path)
     # adjust the time in signal_df based on the linear regression result stored in txt_smr_t_linreg_df
-    signal_df['time'] = signal_df['time'] + txt_smr_t_linreg_df['intercept'].item() + signal_df['time'] * txt_smr_t_linreg_df['slope'].item()
+    signal_df = time_calib_utils.calibrate_smr_t(signal_df, txt_smr_t_linreg_df)
     return signal_df
+
 
 def get_raw_signal_df(raw_data_folder_path):
     channel_signal_output, marker_list, smr_sampling_rate = retrieve_raw_data.extract_smr_data(raw_data_folder_path)
     signal_df = None
     # Considering the first smr file, using channel_signal_output[0]
     channel_signal_smr = channel_signal_output[0]
-    smr_markers_start_time = marker_list[0]['values'][marker_list[0]['labels']==1][0]
     juice_timestamp = marker_list[0]['values'][marker_list[0]['labels'] == 4]
+    smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
     if len(channel_signal_smr) > 0:
         # Seperate analog signal by juice timestamps
         channel_signal_smr['section'] = np.digitize(channel_signal_smr.Time, juice_timestamp) 
@@ -80,8 +84,8 @@ def get_raw_signal_df(raw_data_folder_path):
         # Remove tail of analog data
         channel_signal_smr = channel_signal_smr[channel_signal_smr['section'] < channel_signal_smr['section'].unique()[-1]]
         if len(channel_signal_smr) > 0:
-            # Since there might be very slight difference between the last recorded sampling time and juice_timestamp[-1], we replace the former with the latter
-            channel_signal_smr.loc[channel_signal_smr.index[-1], 'Time'] = juice_timestamp[-1]
+            # # Since there might be very slight difference between the last recorded sampling time and juice_timestamp[-1], we replace the former with the latter
+            # channel_signal_smr.loc[channel_signal_smr.index[-1], 'Time'] = juice_timestamp[-1]
             # get the signal_df
             signal_df = channel_signal_smr[['LateralV', 'LDy', 'LDz', 'MonkeyX', 'MonkeyY', 'RDy', 'RDz', 'AngularV', 'ForwardV', 'Time', 'section']].copy()
             # Convert columns to float, except for the 'section' column
@@ -226,6 +230,8 @@ def _add_smr_file_info_to_monkey_information(monkey_information, signal_df,
     signal_df['time_box'] = np.digitize(signal_df['time'].values, time_bins)
     # use groupby and then find average for LDy, LDz, RDy, RDz
     variables.append('time_box')
+    # treat variables as a set, and then convert it back to a list
+    variables = list(set(variables))
     condensed_signal_df = signal_df[variables]
     condensed_signal_df = condensed_signal_df.groupby('time_box').median().reset_index(drop=False)
 
@@ -243,27 +249,6 @@ def _trim_monkey_information(monkey_information, smr_markers_start_time, smr_mar
         monkey_information = monkey_information.iloc[valid_points]
 
     return monkey_information
-
-def add_monkey_speed_column(monkey_information):
-    delta_time = np.diff(monkey_information['time'])
-    delta_x = np.diff(monkey_information['monkey_x'])
-    delta_y = np.diff(monkey_information['monkey_y'])
-    delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
-    ceiling_of_delta_position = max(10, np.max(delta_time)*200*1.5)
-
-    # If the monkey's delta_position at one point exceeds 50, we replace it with the previous speed.
-    # (This can happen when the monkey reaches the boundary and comes out at another place)
-    while np.where(delta_position >= ceiling_of_delta_position)[0].size > 0:
-        above_ceiling_point_index = np.where(delta_position>=ceiling_of_delta_position)[0]
-        # find the previous speed for all those points
-        delta_position_prev = np.append(np.array([0]), delta_position)
-        delta_position[above_ceiling_point_index] = delta_position_prev[above_ceiling_point_index]  
-
-    monkey_speed = np.divide(delta_position, delta_time)
-    monkey_speed = np.append(monkey_speed[0], monkey_speed)
-    monkey_information['monkey_speed'] = monkey_speed
-    # and make sure that the monkey_speed does not exceed maximum speed
-    monkey_information.loc[monkey_information['monkey_speed'] > 200, 'monkey_speed'] = 200
 
 
 def add_crossing_boundary_column(monkey_information):
@@ -345,18 +330,25 @@ def add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=
         list_of_delta_positions.append(current_delta_position)
     monkey_information['monkey_angle'] = np.array(monkey_angles)
 
+
 def add_monkey_speed_column(monkey_information):
     delta_time = np.diff(monkey_information['time'])
     delta_x = np.diff(monkey_information['monkey_x'])
     delta_y = np.diff(monkey_information['monkey_y'])
     delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
+    ceiling_of_delta_position = max(10, np.max(delta_time)*200*1.5)
+
+    # If the monkey's delta_position at one point exceeds 50, we replace it with the previous speed.
+    # (This can happen when the monkey reaches the boundary and comes out at another place)
+    while np.where(delta_position >= ceiling_of_delta_position)[0].size > 0:
+        above_ceiling_point_index = np.where(delta_position>=ceiling_of_delta_position)[0]
+        # find the previous speed for all those points
+        delta_position_prev = np.append(np.array([0]), delta_position)
+        delta_position[above_ceiling_point_index] = delta_position_prev[above_ceiling_point_index]  
+
     monkey_speed = np.divide(delta_position, delta_time)
     monkey_speed = np.append(monkey_speed[0], monkey_speed)
-    # use Gaussian filter on monkey_speed
     monkey_information['monkey_speed'] = monkey_speed
-    #monkey_speed = gaussian_filter1d(monkey_speed, 1)
-    # print the percentage of points where the speed is greater than 200 cm/s
-    print("The percentage of points where the speed is greater than 200 cm/s is", np.mean(monkey_speed > 200))
     # and make sure that the monkey_speed does not exceed maximum speed
     monkey_information.loc[monkey_information['monkey_speed'] > 200, 'monkey_speed'] = 200
 

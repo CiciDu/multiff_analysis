@@ -44,20 +44,86 @@ class PGAMclass():
                 'try_a_few_times', 'give_up_after_trying', 'cluster_around_target',
                 ]
 
-    def __init__(self, x_var, y_var, bin_width):
+    def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):
         self.x_var = x_var
         self.y_var = y_var
         self.bin_width = bin_width
+        self.processed_neural_data_folder_path = processed_neural_data_folder_path
 
-    def streamline_pgam(self, temporal_vars=None, num_total_trials=10):
+
+    def streamline_pgam(self, temporal_vars=None, neural_cluster_number=10, num_total_trials=10):
+        self.prepare_for_pgam(temporal_vars, num_total_trials)
+        self._add_temporal_features_to_model(plot_each_feature=False)
+        self._add_spatial_features_to_model(plot_each_feature=False)
+        self.run_pgam(neural_cluster_number=neural_cluster_number)
+        self.post_processing()
+        self.save_results()
+
+
+    def prepare_for_pgam(self, temporal_vars=None, num_total_trials=10):
         if temporal_vars is None:
             temporal_vars = self.temporal_vars
         self._categorize_features(temporal_vars)
         self._scale_features()
         self._get_mock_trials_df(num_total_trials)
         self.sm_handler = gdh.smooths_handler()
-        self._add_temporal_features_to_model()
-        self._add_spatial_features_to_model()
+
+
+    def run_pgam(self, neural_cluster_number=10):
+        self.neural_cluster_number = neural_cluster_number
+        link = sm.genmod.families.links.log()
+        self.poissFam = sm.genmod.families.family.Poisson(link=link)
+        self.spk_counts =  self.x_var.iloc[:, neural_cluster_number].values
+
+        # create the pgam model
+        self.pgam = general_additive_model(self.sm_handler,
+                                    self.sm_handler.smooths_var, # list of covariate we want to include in the model
+                                    self.spk_counts, # vector of spike counts
+                                    self.poissFam # poisson family with exponential link from statsmodels.api
+                                    )
+
+        # with all covariate, remove according to stat testing, and then refit
+        self.full, self.reduced = self.pgam.fit_full_and_reduced(self.sm_handler.smooths_var, 
+                                                th_pval=0.001,# pval for significance of covariate icluseioon
+                                                max_iter=10 ** 2, # max number of iteration
+                                                use_dgcv=True, # learn the smoothing penalties by dgcv
+                                                trial_num_vec=self.trial_ids,
+                                                filter_trials=self.train_trials,
+                                                )
+                
+        print('Minimal subset of variables driving the activity:')
+        print(self.reduced.var_list)
+
+
+    def post_processing(self):
+        # string with the neuron identifier
+        neuron_id = 'neuron_000_session_1_monkey_001'
+        # dictionary containing some information about the neuron, keys must be strings and values can be anything since are stored with type object.
+        info_save = {'x':100,
+                    'y':801.2,
+                    'brain_region': 'V1',
+                    'subject':'monkey_001'
+                    }
+
+
+        # assume that we used 90% of the trials for training, 10% for evaluation
+        self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, self.train_trials, self.sm_handler, self.poissFam, self.trial_ids, 
+                                       var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
+                                
+        # find which variables in res['variable'] are in reduced.var_list
+        # and then plot the corresponding x_rate_Hz
+        indices_of_vars_to_plot = np.where(np.isin(self.res['variable'], self.reduced.var_list))[0]
+        
+        self._rename_variables_in_results()
+        plot_modeling_result.plot_pgam_tuning_functions(self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
+
+
+    def save_results(self):
+        res_path = os.path.join(self.processed_neural_data_folder_path, 'pgam_res')
+        os.makedirs(res_path, exist_ok=True)
+        save_name = f'neuron_{self.neural_cluster_number}'
+        np.savez(os.path.join(res_path, save_name+'.npz'), results=self.res)
+
 
     def _categorize_features(self, temporal_vars):
         self.temporal_vars = [x for x in temporal_vars if x in self.y_var.columns]
@@ -79,6 +145,8 @@ class PGAMclass():
         num_repeats = math.ceil(num_data_points/num_total_trials)
         trial_ids = np.repeat(np.arange(num_total_trials), num_repeats)
         self.trial_ids = trial_ids[:num_data_points]
+        # take out 2/3 of the trials for training
+        self.train_trials = self.trial_ids % 3 != 1
 
     def _add_temporal_features_to_model(self,         
                                         kernel_time_window=10, # Duration of the kernel h(t) in seconds
@@ -88,9 +156,9 @@ class PGAMclass():
                                         ):
         # Define the B-spline parameters
 
-        kernel_h_length = int(kernel_time_window / self.bin_width)  # length in time points of the kernel
-        if kernel_h_length % 2 == 0:
-            kernel_h_length += 1  
+        self.kernel_h_length = int(kernel_time_window / self.bin_width)  # length in time points of the kernel
+        if self.kernel_h_length % 2 == 0:
+            self.kernel_h_length += 1  
 
         # Iterate over columns in the temporal subset
         for column in self.temporal_sub.columns:
@@ -102,13 +170,13 @@ class PGAMclass():
                 ord=order, 
                 knots_num=num_internal_knots,
                 trial_idx=self.trial_ids,
-                kernel_length=kernel_h_length,
+                kernel_length=self.kernel_h_length,
                 kernel_direction=0,
                 time_bin=self.bin_width
             )
             
             if plot_each_feature:
-                plot_modeling_result.plot_smoothed_temporal_feature(self.temporal_sub, column, self.sm_handler, kernel_h_length)
+                plot_modeling_result.plot_smoothed_temporal_feature(self.temporal_sub, column, self.sm_handler, self.kernel_h_length)
 
 
     def _add_spatial_features_to_model(self, 
@@ -141,53 +209,6 @@ class PGAMclass():
 
             if plot_each_feature:
                 plot_modeling_result.plot_smoothed_spatial_feature(self.spatial_sub, column, self.sm_handler)
-            
-    
-    def run_pgam(self, neural_cluster_number=10):
-        link = sm.genmod.families.links.log()
-        self.poissFam = sm.genmod.families.family.Poisson(link=link)
-        self.spk_counts =  self.x_var.iloc[:, neural_cluster_number].values
-
-        # create the pgam model
-        self.pgam = general_additive_model(self.sm_handler,
-                                    self.sm_handler.smooths_var, # list of covariate we want to include in the model
-                                    self.spk_counts, # vector of spike counts
-                                    self.poissFam # poisson family with exponential link from statsmodels.api
-                                    )
-
-        # with all covariate, remove according to stat testing, and then refit
-        self.full, self.reduced = self.pgam.fit_full_and_reduced(self.sm_handler.smooths_var, 
-                                                th_pval=0.001,# pval for significance of covariate icluseioon
-                                                max_iter=10 ** 2, # max number of iteration
-                                                use_dgcv=True, # learn the smoothing penalties by dgcv
-                                                trial_num_vec=self.trial_ids)
-                
-        print('Minimal subset of variables driving the activity:')
-        print(self.reduced.var_list)
-
-    def post_processing(self):
-        # take out 2/3 of the trials for training
-        train_trials = self.trial_ids % 3 != 1
-        # string with the neuron identifier
-        neuron_id = 'neuron_000_session_1_monkey_001'
-        # dictionary containing some information about the neuron, keys must be strings and values can be anything since are stored with type object.
-        info_save = {'x':100,
-                    'y':801.2,
-                    'brain_region': 'V1',
-                    'subject':'monkey_001'
-                    }
-
-
-        # assume that we used 90% of the trials for training, 10% for evaluation
-        self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, train_trials, self.sm_handler, self.poissFam, self.trial_ids, 
-                                       var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
-                                
-        # find which variables in res['variable'] are in reduced.var_list
-        # and then plot the corresponding x_rate_Hz
-        indices_of_vars_to_plot = np.where(np.isin(self.res['variable'], self.reduced.var_list))[0]
-        
-        self._rename_variables_in_results()
-        plot_modeling_result.plot_pgam_tuning_functions(self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
 
 
     def _rename_variables_in_results(self):

@@ -190,7 +190,7 @@ def find_new_curv_of_traj_counted(point_index_for_curv_of_traj_df, monkey_inform
             new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_distance_window(point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         else:
             raise PreventUpdate
-        new_curv_of_traj_counted = new_curv_of_traj_df['curvature_of_traj'].values
+        new_curv_of_traj_counted = new_curv_of_traj_df['curv_of_traj'].values
         return new_curv_of_traj_counted
     else:
         raise PreventUpdate
@@ -200,7 +200,7 @@ def find_new_curv_of_traj_counted(point_index_for_curv_of_traj_df, monkey_inform
 
 def find_curv_of_traj_counted_from_curv_of_traj_df(curv_of_traj_df, point_index_for_curv_of_traj_df):
     curv_of_traj_df = curv_of_traj_df.set_index('point_index')
-    curv_of_traj_counted = curv_of_traj_df.loc[point_index_for_curv_of_traj_df, 'curvature_of_traj'].values
+    curv_of_traj_counted = curv_of_traj_df.loc[point_index_for_curv_of_traj_df, 'curv_of_traj'].values
     return curv_of_traj_counted
 
 

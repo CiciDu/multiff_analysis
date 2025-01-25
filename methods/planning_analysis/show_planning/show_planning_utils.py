@@ -176,7 +176,7 @@ def make_new_ff_at_monkey_xy_if_within_1_cm(new_ff_x, new_ff_y, monkey_x, monkey
 
 def make_alt_and_stop_ff_df(alt_ff_final_df, stop_ff_final_df):
     # Define shared and relevant columns
-    shared_columns = ['monkey_x', 'monkey_y', 'monkey_angle', 'curvature_of_traj', 'point_index',
+    shared_columns = ['monkey_x', 'monkey_y', 'monkey_angle', 'curv_of_traj', 'point_index',
                       'stop_point_index', 'monkey_angle_before_stop', 'd_heading_of_traj']
 
     relevant_columns = ['ff_index', 'ff_x', 'ff_y', 'ff_distance', 'ff_angle', 'ff_angle_boundary',
@@ -192,8 +192,8 @@ def make_alt_and_stop_ff_df(alt_ff_final_df, stop_ff_final_df):
                                        'monkey_x': 'ref_monkey_x',
                                        'monkey_y': 'ref_monkey_y',
                                        'monkey_angle': 'ref_monkey_angle',
-                                       'curvature_of_traj': 'ref_curv_of_traj',
-                                       'd_heading_of_traj': 'ref_d_heading_of_traj'}, inplace=True)
+                                       'curv_of_traj': 'ref_curv_of_traj',
+                                       'd_heading_of_traj': 'd_heading_of_traj'}, inplace=True)
 
 
     relevant_columns = [col for col in relevant_columns if col in alt_ff_final_df.columns]
@@ -244,7 +244,7 @@ def make_heading_info_df(alt_and_stop_ff_df, stops_near_ff_df, monkey_informatio
     # Merge with alt_and_stop_ff_df to get landing headings
     columns_to_keep = ['stop_point_index', 'stop_arc_end_heading', 'alt_arc_end_heading',
                         'stop_arc_end_x', 'stop_arc_end_y', 
-                        'ref_d_heading_of_traj', 'stop_d_heading_of_arc', 'ref_monkey_angle', 'ref_curv_of_traj', 'alt_d_heading_of_arc',
+                        'd_heading_of_traj', 'stop_d_heading_of_arc', 'ref_monkey_angle', 'ref_curv_of_traj', 'alt_d_heading_of_arc',
                         ]
     columns_to_keep = [col for col in columns_to_keep if col in alt_and_stop_ff_df.columns]
     heading_info_df = heading_info_df.merge(alt_and_stop_ff_df[columns_to_keep], how='left', on='stop_point_index')
@@ -410,7 +410,7 @@ def make_alt_ff_info_for_monkey(alt_ff_df_modified, heading_info_df, monkey_info
     curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(curv_traj_window_before_stop, monkey_information, ff_caught_T_new, 
                                                                 curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
     curv_of_traj_df.set_index('point_index', inplace=True)
-    monkey_curv_before_stop = curv_of_traj_df.loc[heading_info_df['point_index_before_stop'].values, 'curvature_of_traj'].values
+    monkey_curv_before_stop = curv_of_traj_df.loc[heading_info_df['point_index_before_stop'].values, 'curv_of_traj'].values
 
     alt_ff_info_for_monkey['curv_of_traj'] = monkey_curv_before_stop
 

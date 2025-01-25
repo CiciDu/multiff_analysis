@@ -80,8 +80,8 @@ class PlanAcrossSessions(plot_variations_class.PlotVariations):
         self.use_curvature_to_ff_center = use_curvature_to_ff_center
 
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value, 
-                                                                     curv_traj_window_before_stop=curv_traj_window_before_stop)
+        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, 
+                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop)
         #df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode, ref_point_value, curv_traj_window_before_stop)   
         combd_plan_x_tc_path = os.path.join(self.combd_plan_x_tc_folder_path, df_name)
         combd_plan_y_tc_path = os.path.join(self.combd_plan_y_tc_folder_path, df_name)
@@ -106,6 +106,8 @@ class PlanAcrossSessions(plot_variations_class.PlotVariations):
             os.makedirs(self.combd_plan_y_tc_folder_path, exist_ok=True)
             self.combd_plan_x_tc.to_csv(combd_plan_x_tc_path, index=False)
             self.combd_plan_y_tc.to_csv(combd_plan_y_tc_path, index=False)
+            print('Saved combd_plan_x_tc to: ', combd_plan_x_tc_path)
+            print('Saved combd_plan_y_tc to: ', combd_plan_y_tc_path)
 
         return
     
@@ -121,8 +123,7 @@ class PlanAcrossSessions(plot_variations_class.PlotVariations):
         self.combd_plan_y_tc = pd.DataFrame()
         self.combd_plan_x_tc = pd.DataFrame()
     
-        if self.sessions_df_for_one_monkey is None:
-            self.initialize_monkey_sessions_df_for_one_monkey()
+        self.initialize_monkey_sessions_df_for_one_monkey()
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")  

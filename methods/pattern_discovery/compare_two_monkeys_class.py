@@ -78,8 +78,10 @@ class CompareTwoMonkeys():
             plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_around_target_df, x="Session", 
                                                                         y_columns=y_column_list,
                                                                         monkey_name=self.monkey_name, 
-                                                                        multiple_monkeys=True
-                                                                        )
+                                                                        multiple_monkeys=True,
+                                                                        title_prefix='Landing position from ff center: '
+            )
+                                                                        
 
 
     def prepare_to_compare_success_rates(self):

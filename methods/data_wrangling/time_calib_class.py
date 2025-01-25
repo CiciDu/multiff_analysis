@@ -43,21 +43,21 @@ class TimeCalibration(further_processing_class.FurtherProcessing):
     def make_adjusted_ff_caught_times_df(self):
         if not hasattr(self, 'neural_t'):
             self.get_ff_capture_time_from_smr_and_neural_data()
-        self.ff_caught_times_df = time_calib_utils.make_adjusted_ff_caught_times_df(self.neural_t_raw, self.smr_t_raw, self.txt_t, 
+        self.adjusted_caught_times_df = time_calib_utils.make_adjusted_ff_caught_times_df(self.neural_t_raw, self.smr_t_raw, self.txt_t, 
                                                                        self.neural_events_start_time, self.smr_markers_start_time)
     
     def separate_ff_caught_times_df(self):
-        self.txt_and_smr_columns = [col for col in self.ff_caught_times_df.columns if ('neural' not in col)]
-        self.smr_and_neural_columns = [col for col in self.ff_caught_times_df.columns if ('txt' not in col)]
-        self.txt_and_neural_columns = [col for col in self.ff_caught_times_df.columns if ('smr' not in col)]
+        self.txt_and_smr_columns = [col for col in self.adjusted_caught_times_df.columns if ('neural' not in col)]
+        self.smr_and_neural_columns = [col for col in self.adjusted_caught_times_df.columns if ('txt' not in col)]
+        self.txt_and_neural_columns = [col for col in self.adjusted_caught_times_df.columns if ('smr' not in col)]
 
-        self.txt_and_smr = self.ff_caught_times_df[['txt_t', 'smr_t', 'diff_txt_smr', 'diff_txt_smr', 'diff_txt_smr_2']].dropna(axis=0)
-        self.smr_and_neural = self.ff_caught_times_df[['txt_t', 'smr_t', 'neural_t', 'neural_t_2', 'diff_neural_smr', 'diff_neural_2_smr_2']].dropna(axis=0)
-        self.txt_and_neural = self.ff_caught_times_df[['txt_t', 'neural_t', 'neural_t_2', 'diff_txt_neural', 'diff_txt_neural_2', 'diff_txt_neural_3', 'diff_txt_neural_4', 'diff_txt_neural_raw']].dropna(axis=0)
+        self.txt_and_smr = self.adjusted_caught_times_df[['txt_t', 'smr_t', 'diff_txt_smr', 'diff_txt_smr', 'diff_txt_smr_2']].dropna(axis=0)
+        self.smr_and_neural = self.adjusted_caught_times_df[['txt_t', 'smr_t', 'neural_t', 'neural_t_2', 'diff_neural_smr', 'diff_neural_2_smr_2']].dropna(axis=0)
+        self.txt_and_neural = self.adjusted_caught_times_df[['txt_t', 'neural_t', 'neural_t_2', 'diff_txt_neural', 'diff_txt_neural_2', 'diff_txt_neural_3', 'diff_txt_neural_4', 'diff_txt_neural_raw']].dropna(axis=0)
 
     def compare_txt_and_smr_with_boxplot(self):
         # make a long df for plotting
-        self.long_txt_smr_df = self.ff_caught_times_df[['diff_txt_smr_raw', 'diff_txt_smr', 'diff_txt_smr_2']].melt()
+        self.long_txt_smr_df = self.adjusted_caught_times_df[['diff_txt_smr_raw', 'diff_txt_smr', 'diff_txt_smr_2']].melt()
         self.long_txt_smr_df.columns = ['whether_smr_adjusted', 'diff_in_time_between_txt_and_smr']
         self.long_txt_smr_df['whether smr adjusted'] = 'txt - smr raw'
         self.long_txt_smr_df.loc[self.long_txt_smr_df['whether_smr_adjusted'] == 'diff_txt_smr', 'whether smr adjusted'] = 'adj by 1st txt t'
@@ -75,12 +75,12 @@ class TimeCalibration(further_processing_class.FurtherProcessing):
 
     def compare_txt_and_smr_with_scatterplot(self, remove_outliers=True):
 
-        time_axis = self.ff_caught_times_df['txt_t'].values
-        ax, stat_df = time_calib_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_raw'], remove_outliers=remove_outliers,
+        time_axis = self.adjusted_caught_times_df['txt_t'].values
+        ax, stat_df = time_calib_utils.get_linear_regression(time_axis, self.adjusted_caught_times_df['diff_txt_smr_raw'], remove_outliers=remove_outliers,
                                                         label='txt - smr raw')
-        ax, temp_stat_df1 = time_calib_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr'], remove_outliers=remove_outliers,
+        ax, temp_stat_df1 = time_calib_utils.get_linear_regression(time_axis, self.adjusted_caught_times_df['diff_txt_smr'], remove_outliers=remove_outliers,
                                                         ax=ax, color='green', label='adj by 1st txt t')
-        ax, temp_stat_df2 = time_calib_utils.get_linear_regression(time_axis, self.ff_caught_times_df['diff_txt_smr_2'], remove_outliers=remove_outliers,
+        ax, temp_stat_df2 = time_calib_utils.get_linear_regression(time_axis, self.adjusted_caught_times_df['diff_txt_smr_2'], remove_outliers=remove_outliers,
                                                         ax=ax, color='orange', label='adj by median of diff_t')
         
         stat_df = pd.concat([stat_df, temp_stat_df1, temp_stat_df2], axis=0).reset_index(drop=True)

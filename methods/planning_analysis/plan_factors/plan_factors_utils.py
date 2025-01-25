@@ -56,7 +56,7 @@ def find_curv_of_traj_stat_df(df_to_iter, curv_of_traj_df, start_time_column='st
     groupby_column = 'stop_point_index'
     stat_prefix = ['curv']
     curv_of_traj_df = curv_of_traj_df.copy()
-    curv_of_traj_df['curvature_of_traj'] = curv_of_traj_df['curvature_of_traj'] * 180/math.pi* 100
+    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'] * 180/math.pi* 100
 
     df_for_stat_extended = extend_df_based_on_groups(curv_of_traj_df, 
                                                      all_start_time=df_to_iter[start_time_column].values, 
@@ -66,7 +66,7 @@ def find_curv_of_traj_stat_df(df_to_iter, curv_of_traj_df, start_time_column='st
 
     curv_of_traj_stat_df = find_stat_of_columns_after_groupby(df_for_stat_extended,
                                                             groupby_column='stop_point_index',
-                                                            stat_columns=['curvature_of_traj'],
+                                                            stat_columns=['curv_of_traj'],
                                                             stat_prefix=stat_prefix)
 
     if add_to_df_to_iter:
@@ -110,7 +110,7 @@ def add_stat_columns_to_df_to_iter(stat_df, df_to_iter, stat_prefix, groupby_col
 
 def find_stat_of_columns_after_groupby(df_for_stat_extended,
                                       groupby_column='stop_point_index',
-                                      stat_columns=['curvature_of_traj'],
+                                      stat_columns=['curv_of_traj'],
                                       stat_prefix=None):
 
     if stat_prefix is None:
@@ -202,7 +202,7 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
 
     # merge plan_y_df with heading_info_df to get more variables
     # heading_info_df = heading_info_df[['stop_point_index', 'angle_from_m_before_stop_to_alt_ff', 'angle_from_stop_ff_landing_to_alt_ff',
-    #                                    'ref_d_heading_of_traj', 'stop_d_heading_of_arc',
+    #                                    'd_heading_of_traj', 'stop_d_heading_of_arc',
     #                                    'stop_time', 'ALT_time_ff_last_seen_bbas',
     #                                     'alt_ff_cluster_last_seen_time_bbas',
     #                                     'alt_ff_last_flash_time_bbas',
@@ -216,7 +216,7 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
     plan_y_df = heading_info_df.merge(curv_of_traj_stat_df[columns_to_add + ['stop_point_index']], on='stop_point_index', how='left')
 
     if curv_of_traj_df_w_one_sided_window is not None:
-        plan_y_df = _add_column_curvature_of_traj_before_stop(plan_y_df, curv_of_traj_df_w_one_sided_window)
+        plan_y_df = _add_column_curv_of_traj_before_stop(plan_y_df, curv_of_traj_df_w_one_sided_window)
 
     add_dir_from_stop_ff_same_side(plan_y_df)
 
@@ -225,12 +225,12 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
     return plan_y_df
 
 
-def _add_column_curvature_of_traj_before_stop(df, curv_of_traj_df_w_one_sided_window):
-    curv_of_traj_df_w_one_sided_window = curv_of_traj_df_w_one_sided_window[['point_index', 'curvature_of_traj']].copy()
-    curv_of_traj_df_w_one_sided_window['curvature_of_traj'] = curv_of_traj_df_w_one_sided_window['curvature_of_traj'] * 180/math.pi * 100 # change unit
+def _add_column_curv_of_traj_before_stop(df, curv_of_traj_df_w_one_sided_window):
+    curv_of_traj_df_w_one_sided_window = curv_of_traj_df_w_one_sided_window[['point_index', 'curv_of_traj']].copy()
+    curv_of_traj_df_w_one_sided_window['curv_of_traj'] = curv_of_traj_df_w_one_sided_window['curv_of_traj'] * 180/math.pi * 100 # change unit
     curv_of_traj_df_w_one_sided_window = curv_of_traj_df_w_one_sided_window.rename(columns={
                                                 'point_index': 'point_index_before_stop',
-                                                'curvature_of_traj': 'curvature_of_traj_before_stop'})    
+                                                'curv_of_traj': 'curv_of_traj_before_stop'})    
     df = df.merge(curv_of_traj_df_w_one_sided_window, on='point_index_before_stop', how='left')
     return df
 
@@ -239,9 +239,9 @@ def process_heading_info_df(heading_info_df):
     heading_info_df = heading_info_df.copy()
     if 'angle_from_stop_ff_landing_to_alt_ff' in heading_info_df.columns:
         heading_info_df[['angle_from_m_before_stop_to_alt_ff', 'angle_from_stop_ff_landing_to_alt_ff']] = heading_info_df[['angle_from_m_before_stop_to_alt_ff', 'angle_from_stop_ff_landing_to_alt_ff']] * (180/np.pi)
-        heading_info_df['dev_d_angle_from_null'] = heading_info_df['ref_d_heading_of_traj'] - heading_info_df['stop_d_heading_of_arc']
-        heading_info_df['dev_d_angle_from_null'] = heading_info_df['dev_d_angle_from_null'] * 180/math.pi % 360
-        heading_info_df.loc[heading_info_df['dev_d_angle_from_null'] > 180, 'dev_d_angle_from_null'] = heading_info_df.loc[heading_info_df['dev_d_angle_from_null'] > 180, 'dev_d_angle_from_null'] - 360
+        heading_info_df['diff_d_heading_of_traj_from_null'] = heading_info_df['d_heading_of_traj'] - heading_info_df['stop_d_heading_of_arc']
+        heading_info_df['diff_d_heading_of_traj_from_null'] = heading_info_df['diff_d_heading_of_traj_from_null'] * 180/math.pi % 360
+        heading_info_df.loc[heading_info_df['diff_d_heading_of_traj_from_null'] > 180, 'diff_d_heading_of_traj_from_null'] = heading_info_df.loc[heading_info_df['diff_d_heading_of_traj_from_null'] > 180, 'diff_d_heading_of_traj_from_null'] - 360
         heading_info_df['diff'] = heading_info_df['angle_from_stop_ff_landing_to_alt_ff'] - heading_info_df['angle_from_m_before_stop_to_alt_ff']
         heading_info_df['diff_in_abs'] = np.abs(heading_info_df['angle_from_stop_ff_landing_to_alt_ff']) - np.abs(heading_info_df['angle_from_m_before_stop_to_alt_ff'])
         heading_info_df['ratio'] = heading_info_df['angle_from_stop_ff_landing_to_alt_ff'] / heading_info_df['angle_from_m_before_stop_to_alt_ff']
@@ -550,7 +550,7 @@ monkey_info_columns = ['left_eye_stop_ff_time_perc_5',
                         'curv_range',
                         'curv_iqr']
 
-more_monkey_info_columns = ['ref_d_heading_of_traj',
+more_monkey_info_columns = ['d_heading_of_traj',
                         'ref_curv_of_traj',
                         'curv_mean',
                         'curv_std',
@@ -613,8 +613,8 @@ def process_plan_x_to_predict_ff_info(plan_x, plan_y):
 
     # add columns 
     columns_from_plan_y_to_add = ['angle_from_stop_ff_to_stop',
-                                'dev_d_angle_from_null',
-                                'curvature_of_traj_before_stop',
+                                'diff_d_heading_of_traj_from_null',
+                                'curv_of_traj_before_stop',
                                 'dir_from_stop_ff_to_stop']
 
     plan_x[columns_from_plan_y_to_add] = plan_y[columns_from_plan_y_to_add].values.copy()

@@ -47,20 +47,20 @@ def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_
     shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'optimal_arc_measure', 'optimal_arc_radius', 'optimal_arc_end_direction', 'curv_to_ff_center', 
                         'arc_radius_to_ff_center', 'd_heading_to_center', 'optimal_arc_d_heading', 'optimal_arc_end_x', 'optimal_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
     only_stop_ff_df = ff_info2.merge(curv_df[shared_columns], on=['ff_index', 'point_index'], how='left')
-    only_stop_ff_df = only_stop_ff_df.merge(curv_of_traj_df[['point_index', 'curvature_of_traj']], on='point_index', how='left')
+    only_stop_ff_df = only_stop_ff_df.merge(curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
     only_stop_ff_df['d_heading_of_traj'] = only_stop_ff_df['monkey_angle_before_stop'] - only_stop_ff_df['monkey_angle']
     only_stop_ff_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(only_stop_ff_df['d_heading_of_traj'].values)
-    only_stop_ff_df[['stop_d_heading_of_arc', 'ref_d_heading_of_traj']] = only_stop_ff_df[['optimal_arc_d_heading', 'd_heading_of_traj']]
-    only_stop_ff_df[['stop_d_heading_of_arc', 'ref_d_heading_of_traj']] = only_stop_ff_df[['stop_d_heading_of_arc', 'ref_d_heading_of_traj']]*180/math.pi
+    only_stop_ff_df[['stop_d_heading_of_arc', 'd_heading_of_traj']] = only_stop_ff_df[['optimal_arc_d_heading', 'd_heading_of_traj']]
+    only_stop_ff_df[['stop_d_heading_of_arc', 'd_heading_of_traj']] = only_stop_ff_df[['stop_d_heading_of_arc', 'd_heading_of_traj']]*180/math.pi
     only_stop_ff_df['ref_time'] = monkey_information.loc[only_stop_ff_df['point_index'].values, 'time'].values
     only_stop_ff_df['stop_time'] = monkey_information.loc[only_stop_ff_df['stop_point_index'].values, 'time'].values
     only_stop_ff_df.rename(columns={'point_index': 'ref_point_index'}, inplace=True)
     only_stop_ff_df['beginning_time'] = only_stop_ff_df['stop_time'] - stop_period_duration
 
-    only_stop_ff_df['ref_d_heading_of_traj'] = only_stop_ff_df['ref_d_heading_of_traj'] % 360
-    only_stop_ff_df.loc[only_stop_ff_df['ref_d_heading_of_traj'] > 180, 'ref_d_heading_of_traj'] = only_stop_ff_df.loc[only_stop_ff_df['ref_d_heading_of_traj'] > 180, 'ref_d_heading_of_traj'] - 360
-    only_stop_ff_df['dev_d_angle_from_null'] = only_stop_ff_df['ref_d_heading_of_traj'] - only_stop_ff_df['stop_d_heading_of_arc']
+    only_stop_ff_df['d_heading_of_traj'] = only_stop_ff_df['d_heading_of_traj'] % 360
+    only_stop_ff_df.loc[only_stop_ff_df['d_heading_of_traj'] > 180, 'd_heading_of_traj'] = only_stop_ff_df.loc[only_stop_ff_df['d_heading_of_traj'] > 180, 'd_heading_of_traj'] - 360
+    only_stop_ff_df['diff_d_heading_of_traj_from_null'] = only_stop_ff_df['d_heading_of_traj'] - only_stop_ff_df['stop_d_heading_of_arc']
     
     # get curv range info etc
     curv_of_traj_stat_df, only_stop_ff_df = plan_factors_utils.find_curv_of_traj_stat_df(only_stop_ff_df, curv_of_traj_df, start_time_column='beginning_time',
@@ -78,7 +78,7 @@ def get_only_stop_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_
     
     curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode([-25, 0], monkey_information, ff_caught_T_new, 
                                                                                                                 curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
-    only_stop_ff_df = plan_factors_utils._add_column_curvature_of_traj_before_stop(only_stop_ff_df, curv_of_traj_df_w_one_sided_window)
+    only_stop_ff_df = plan_factors_utils._add_column_curv_of_traj_before_stop(only_stop_ff_df, curv_of_traj_df_w_one_sided_window)
 
     only_stop_ff_df = only_stop_ff_df.sort_values(by='stop_point_index').reset_index(drop=True)
 
@@ -527,3 +527,24 @@ def make_monkey_info_in_all_stop_periods(closest_stop_to_capture_df, monkey_info
 
     return monkey_info_in_all_stop_periods
 
+
+def keep_same_data_name_and_stop_point_pairs(only_stop_ff_df_for_ml, x_features_df_for_ml):
+    # Make sure that the two df share the same set of data_name + stop period pairs
+    
+    # First create a set of data_name + stop_point_index pairs for both DataFrames
+    only_stop_ff_df_for_ml['data_name_stop_point_pair'] = only_stop_ff_df_for_ml['data_name'] + '_' + only_stop_ff_df_for_ml['stop_point_index'].astype(str)
+    x_features_df_for_ml['data_name_stop_point_pair'] = x_features_df_for_ml['data_name'] + '_' + x_features_df_for_ml['stop_point_index'].astype(str)
+    
+    # Find the intersection of both sets
+    shared_stop_point_pairs = set(only_stop_ff_df_for_ml['data_name_stop_point_pair']).intersection(set(x_features_df_for_ml['data_name_stop_point_pair']))
+
+    # Filter both DataFrames to retain only the shared stop point pairs
+    only_stop_ff_df_for_ml = only_stop_ff_df_for_ml[only_stop_ff_df_for_ml['data_name_stop_point_pair'].isin(shared_stop_point_pairs)].copy()
+
+    x_features_df_for_ml = x_features_df_for_ml[x_features_df_for_ml['data_name_stop_point_pair'].isin(shared_stop_point_pairs)].copy()
+
+    # drop the column
+    only_stop_ff_df_for_ml.drop(columns=['data_name_stop_point_pair'], inplace=True)
+    x_features_df_for_ml.drop(columns=['data_name_stop_point_pair'], inplace=True)
+    
+    return only_stop_ff_df_for_ml, x_features_df_for_ml

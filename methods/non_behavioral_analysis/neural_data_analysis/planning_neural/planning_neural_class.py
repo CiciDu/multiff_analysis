@@ -99,7 +99,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
         if which_ff_info == 'alt_': # because we only have to do it once, we choose one kind of which_ff_info to do it
             ff_df.set_index('point_index', inplace=True)
             info_to_add['time_rel_to_stop'] = ff_df['time'] - ff_df['stop_time']
-            info_to_add['traj_curv'] = self.curv_df['curvature_of_traj']
+            info_to_add['traj_curv'] = self.curv_df['curv_of_traj']
             columns_added.extend(['time_rel_to_stop', 'traj_curv'])
         return info_to_add, columns_added
 
@@ -119,5 +119,5 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
     #     # self.both_ff_when_seen_df[f'{which_ff_info}opt_arc_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['optimal_curvature']
     #     # self.both_ff_when_seen_df[f'{which_ff_info}opt_arc_dheading_{when_which_ff}_{first_or_last}_seen'] = curv_df['optimal_arc_d_heading']
     #     self.both_ff_when_seen_df[f'time_{when_which_ff}_{first_or_last}_seen_rel_to_stop'] = ff_df[f'time_ff_{first_or_last}_seen'].values - ff_df['stop_time'].values
-    #     self.both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curvature_of_traj']
+    #     self.both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_of_traj']
 

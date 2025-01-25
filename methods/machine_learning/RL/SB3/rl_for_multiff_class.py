@@ -1,5 +1,5 @@
 import sys
-from data_wrangling import specific_utils, base_processing_class, further_processing_class
+from data_wrangling import specific_utils, base_processing_class, further_processing_class, retrieve_raw_data, process_monkey_information
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
 from visualization import additional_plots, plot_statistics
 from visualization.animation import animation_class, animation_utils
@@ -167,7 +167,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         
         if exists_ok:
             try:
-                base_processing_class.BaseProcessing.retrieve_monkey_data(self)
+                self.retrieve_monkey_data()
                 self.ff_caught_T_new = self.ff_caught_T_sorted
                 self.make_or_retrieve_ff_dataframe_for_agent(exists_ok=exists_ok, save_data=save_data)
     
@@ -222,14 +222,47 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.ff_caught_T_new = self.ff_caught_T_sorted
 
         if save_data:
-            base_processing_class.BaseProcessing.save_ff_info_into_npz(self)
+            self.save_ff_info_into_npz(self)
             self.monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
             self.monkey_information.to_csv(self.monkey_information_path)
             print("saved monkey_information and ff info at", (self.processed_data_folder_path))
         self.make_or_retrieve_ff_dataframe_for_agent(exists_ok=False, save_data=save_data)
         
         return 
+
+
+    def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1):
+        self.npz_file_pathway = os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz')
+        self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
+            self.ff_flash_end_sorted = retrieve_raw_data._retrieve_ff_info_in_npz_from_txt_data(self.processed_data_folder_path)
+        self.ff_flash_sorted = retrieve_raw_data._retrieve_ff_flash_sorted_in_npz_from_txt_data(self.processed_data_folder_path)
+        
+        self.monkey_information_path = os.path.join(self.processed_data_folder_path, 'monkey_information.csv')
+        self.monkey_information = pd.read_csv(self.monkey_information_path).drop(["Unnamed: 0"], axis=1)
+        monkey_information = process_monkey_information._process_monkey_information_after_retrieval(monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+
+        self.make_or_retrieve_closest_stop_to_capture_df()
+        self.make_ff_caught_T_new()
+        return 
     
+
+    def save_ff_info_into_npz(self):
+        # save ff info
+        npz_file = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_basic_info.npz'))
+        
+        np.savez(npz_file, 
+                ff_life_sorted = self.ff_life_sorted, 
+                ff_caught_T_sorted = self.ff_caught_T_sorted,
+                ff_index_sorted = self.ff_index_sorted,
+                ff_real_position_sorted = self.ff_real_position_sorted,
+                ff_believed_position_sorted = self.ff_believed_position_sorted,
+                ff_flash_end_sorted = self.ff_flash_end_sorted)
+
+        # also save ff_flash_sorted
+        npz_flash = os.path.join(os.path.join(self.processed_data_folder_path, 'ff_flash_sorted.npz'))
+        np.savez(npz_flash, *self.ff_flash_sorted)
+        return 
+
 
     def make_or_retrieve_ff_dataframe_for_agent(self, exists_ok=False, save_data=False):
         self.ff_dataframe = None
@@ -263,7 +296,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=False, load_replay_buffer=False, **env_kwargs):
         if exists_ok:
             try:
-                base_processing_class.BaseProcessing.retrieve_monkey_data(self)
+                self.retrieve_monkey_data()
                 self.make_or_retrieve_ff_dataframe_for_agent(exists_ok=exists_ok, save_data=save_data)
                 return
             except Exception as e:

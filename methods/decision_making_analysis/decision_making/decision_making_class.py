@@ -174,7 +174,7 @@ class DecisionMaking():
 
 
 
-    def get_replacement_data(self, add_arc_info=False, add_current_curvature_of_traj=False, curvature_df=None, curv_of_traj_df=None, replacement_inputs_format = 'old_plus_diff_between_old_and_new', 
+    def get_replacement_data(self, add_arc_info=False, add_current_curv_of_traj=False, curvature_df=None, curv_of_traj_df=None, replacement_inputs_format = 'old_plus_diff_between_old_and_new', 
                              ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], arc_info_to_add=['optimal_curvature', 'curv_diff'], 
                              non_chosen_ff_selection_criterion='ff_angle_boundary', ff_caught_T_new=None):
         '''
@@ -198,7 +198,7 @@ class DecisionMaking():
             add_old_values_to_diff_df = False
 
         self.changing_pursued_ff_data, self.changing_pursued_ff_data_diff, self.replacement_inputs_addition_info, self.replacement_inputs_for_plotting = replacement.organize_replacement_data(self.replacement_df, self.prior_to_replacement_df, self.non_chosen_df, self.manual_anno, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, equal_sample_from_two_cases=True,
-                                                                                                                                                        add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curvature_of_traj=add_current_curvature_of_traj, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, add_old_values_to_diff_df=add_old_values_to_diff_df, ff_attributes=ff_attributes, ff_caught_T_new=ff_caught_T_new, 
+                                                                                                                                                        add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curv_of_traj=add_current_curv_of_traj, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, add_old_values_to_diff_df=add_old_values_to_diff_df, ff_attributes=ff_attributes, ff_caught_T_new=ff_caught_T_new, 
                                                                                                                                                         non_chosen_ff_selection_criterion=non_chosen_ff_selection_criterion)
         self.replacement_time = self.replacement_inputs_addition_info['time'].values
         self.replacement_point_index = self.replacement_inputs_addition_info['point_index'].values.astype(int)
@@ -630,7 +630,7 @@ class DecisionMaking():
 
 
 def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, pseudo_manual_anno,
-                              add_arc_info=True, arc_info_to_add=['optimal_curvature', 'curv_diff'], add_current_curvature_of_traj=True, furnish_with_trajectory_data=True, num_time_points_for_trajectory=20,
+                              add_arc_info=True, arc_info_to_add=['optimal_curvature', 'curv_diff'], add_current_curv_of_traj=True, furnish_with_trajectory_data=True, num_time_points_for_trajectory=20,
                               ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None,
                               time_range_of_trajectory=[-0.8, 0.8], n_seconds_before_crossing_boundary=0.8, n_seconds_after_crossing_boundary=0.8,
                               replacement_inputs_format = 'diff_between_old_and_new'):
@@ -640,7 +640,7 @@ def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_p
     dm.manual_anno = pseudo_manual_anno
     dm.separate_manual_anno()
     dm.eliminate_crossing_boundary_cases(n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary, n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary)
-    dm.get_replacement_data(add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curvature_of_traj=add_current_curvature_of_traj, curvature_df=curvature_df, ff_attributes=ff_attributes, replacement_inputs_format=replacement_inputs_format)
+    dm.get_replacement_data(add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curv_of_traj=add_current_curv_of_traj, curvature_df=curvature_df, ff_attributes=ff_attributes, replacement_inputs_format=replacement_inputs_format)
     dm.prepare_data_for_machine_learning(kind="replacement", furnish_with_trajectory_data=furnish_with_trajectory_data, trajectory_data_kind=trajectory_data_kind)
     dm.split_data_to_train_and_test(scaling_data=True)
     dm.use_machine_learning_model(model=None)

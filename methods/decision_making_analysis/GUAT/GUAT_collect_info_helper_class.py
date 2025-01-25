@@ -240,15 +240,15 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
     def add_curv_of_traj_info_to_monkey_information(self, column_exists_ok=False):
         # add the column abs_curv_diff to ff_dataframe through merging with curvature_df
-        if ('curvature_of_traj' not in self.monkey_information.columns) or (column_exists_ok is False):
-            curv_of_traj_df_sub = self.curv_of_traj_df[['point_index', 'curvature_of_traj']]
+        if ('curv_of_traj' not in self.monkey_information.columns) or (column_exists_ok is False):
+            curv_of_traj_df_sub = self.curv_of_traj_df[['point_index', 'curv_of_traj']]
             self.monkey_information = pd.merge(self.monkey_information, curv_of_traj_df_sub, on=['point_index'], how='left')
-            self.monkey_information['abs_curvature_of_traj']  = self.monkey_information['curvature_of_traj'].abs()
+            self.monkey_information['abs_curv_of_traj']  = self.monkey_information['curv_of_traj'].abs()
             # check if there are any NAs
-            if self.monkey_information['curvature_of_traj'].isna().sum() > 0:
-                print('There are NAs in monkey_information.curvature_of_traj after merging with curv_of_traj_df. Fill them with 0. Their indices are:')
-                print(self.monkey_information.loc[self.monkey_information['curvature_of_traj'].isna(), 'point_index'].values)
-                self.monkey_information['curvature_of_traj'] = self.monkey_information['curvature_of_traj'].fillna(0)
+            if self.monkey_information['curv_of_traj'].isna().sum() > 0:
+                print('There are NAs in monkey_information.curv_of_traj after merging with curv_of_traj_df. Fill them with 0. Their indices are:')
+                print(self.monkey_information.loc[self.monkey_information['curv_of_traj'].isna(), 'point_index'].values)
+                self.monkey_information['curv_of_traj'] = self.monkey_information['curv_of_traj'].fillna(0)
 
 
     def make_or_retrieve_curv_of_traj_df(self, exists_ok=True, curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1], truncate_curv_of_traj_by_time_of_capture=False):
@@ -256,11 +256,11 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         filepath = os.path.join(self.GUAT_folder_path, 'curv_of_traj_df.csv')
         if exists(filepath) & exists_ok:
             self.curv_of_traj_df = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
-            self.curv_of_traj_df = self.curv_of_traj_df[['point_index', 'curvature_of_traj']]
+            self.curv_of_traj_df = self.curv_of_traj_df[['point_index', 'curv_of_traj']]
             print('Retrieved curv_of_traj_df')
         else:
             self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-            self.curv_of_traj_df = self.curv_of_traj_df[['point_index', 'curvature_of_traj']]
+            self.curv_of_traj_df = self.curv_of_traj_df[['point_index', 'curv_of_traj']]
             self.curv_of_traj_df.to_csv(filepath)
             print(f'Made and saved curv_of_traj_df at {filepath}')
 
@@ -407,7 +407,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         curvature_df = pd.concat([curvature_df, self.additional_curvature_df], axis=0)
         curvature_df_sub = curvature_df[['point_index', 'ff_index']].copy()
         curvature_df = curvature_df[~curvature_df_sub.duplicated()]
-        arc_info = ['curvature_of_traj', 'curvature_lower_bound', 'curvature_upper_bound', 'optimal_curvature', 'curv_diff', 'abs_curv_diff']
+        arc_info = ['curv_of_traj', 'curvature_lower_bound', 'curvature_upper_bound', 'optimal_curvature', 'curv_diff', 'abs_curv_diff']
         
         curvature_df_sub = curvature_df[['ff_index', 'point_index'] + arc_info].copy()
         for column in arc_info:

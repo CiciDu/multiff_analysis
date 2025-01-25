@@ -397,7 +397,9 @@ class _VariationsBase():
 
     def use_clf_to_predict_monkey_info(self, plan_xy_test, plan_xy_ctrl, **agg_regrouped_info_kwargs):
 
-        method_kwargs = dict(y_columns_of_interest=['dir_from_stop_ff_to_stop'],
+        method_kwargs = dict(y_columns_of_interest=['dir_from_stop_ff_to_stop',
+                                                    'dir_from_stop_ff_same_side',
+                                                    ],
                             add_ref_interaction_choices=[True],                      
                             clusters_to_keep_choices=['none', 'stop_ff_cluster_100_PLUS_alt_ff_cluster_100'],
                             clusters_for_interaction_choices=['none', 'stop_ff_cluster_100'],
@@ -418,25 +420,24 @@ class _VariationsBase():
 
     def use_lr_to_predict_monkey_info(self, plan_xy_test, plan_xy_ctrl):
 
-        method_kwargs = dict(y_columns_of_interest=[
-                                'curvature_of_traj_before_stop',
-                                'ref_d_heading_of_traj',
-                                'dev_d_angle_from_null',
-                                'diff_in_abs',   
-                                'dir_from_stop_ff_to_stop', # this one is classification though
-                                # 'dir_from_stop_ff_same_side',
-                                # 'diff'
-                                ], 
+        method_kwargs = dict(y_columns_of_interest=['diff_d_heading_of_traj_from_null',
+                                                    'diff_in_abs',
+                                                    'diff_in_abs_d_curv',
+                                                    'curv_of_traj_before_stop',
+                                                    'dir_from_stop_ff_to_stop', # this one is classification though
+                                                    # 'dir_from_stop_ff_same_side',
+                                                    # 'diff'
+                                                    ], 
                             clusters_for_interaction_choices=[
                                     'stop_ff_cluster_100',
                                     #'alt_ff_cluster_100',
-
                                     #'stop_ff_cluster_200',
                                     #'alt_ff_cluster_200',
                                     # 'stop_ff_cluster_300',
                                     # 'stop_ff_ang_cluster_20',
                                     ],
                             clusters_to_keep_choices=[
+                                                    'stop_ff_cluster_100',
                                                     #'stop_ff_cluster_100_PLUS_stop_ff_cluster_200_PLUS_alt_ff_cluster_100_PLUS_alt_ff_cluster_200',
                                                     #'stop_ff_cluster_100_PLUS_stop_ff_cluster_200_PLUS_alt_ff_cluster_100_PLUS_alt_ff_cluster_300',            
                                                     'stop_ff_cluster_100_PLUS_alt_ff_cluster_100_PLUS_alt_ff_cluster_300',
@@ -488,7 +489,7 @@ class _VariationsBase():
     def process_combd_plan_x_tc_and_plan_y_tc(self):
         test_vs_control_utils.process_combd_plan_x_and_y_combd(self.combd_plan_x_tc, self.combd_plan_y_tc, curv_columns=self.curv_columns)
         self.ref_columns = [column for column in self.combd_plan_x_tc.columns if ('ref' in column) & ('stop_ff' in column)]
-        # note that it will include ref_d_heading_of_traj
+        # note that it will include d_heading_of_traj
 
         # drop columns with NA in self.combd_plan_x_tc and print them
         columns_with_null_info = self.combd_plan_x_tc.isnull().sum(axis=0)[self.combd_plan_x_tc.isnull().sum(axis=0) > 0]

@@ -143,13 +143,15 @@ class MlMethods():
 
 
     def try_different_combinations_for_linear_regressions(self, data_source,
-                                                        y_columns_of_interest=['curvature_of_traj_before_stop',
-                                                                                'ref_d_heading_of_traj',
-                                                                                'dev_d_angle_from_null',
-                                                                                'dir_from_stop_ff_to_stop'],
+                                                        y_columns_of_interest=['diff_d_heading_of_traj_from_null',
+                                                                               'diff_in_abs',
+                                                                               'diff_in_abs_d_curv',
+                                                                               'dir_from_stop_ff_to_stop',
+                                                                               'curv_of_traj_before_stop',
+                                                                               ],
                                                         add_ref_interaction_choices=[True],                        
-                                                        clusters_to_keep_choices=['none'],  
-                                                        clusters_for_interaction_choices=['none'],                                                                                                                                                  
+                                                        clusters_to_keep_choices=['stop_ff_cluster_100'],  
+                                                        clusters_for_interaction_choices=['none', 'stop_ff_cluster_100'],                                                                                                                                                  
                                                         ref_columns_only_choices=[False, True],
                                                         use_combd_features_for_cluster_only_choices=[False, True],
                                                         max_features_to_save=None,
@@ -175,14 +177,16 @@ class MlMethods():
 
 
     def try_different_combinations_for_ml(self, data_source,
-                                            y_columns_of_interest=['curvature_of_traj_before_stop',
-                                                                    'ref_d_heading_of_traj',
-                                                                    'dev_d_angle_from_null',
-                                                                    'dir_from_stop_ff_to_stop'],
+                                            y_columns_of_interest=['diff_d_heading_of_traj_from_null',
+                                                                    'diff_in_abs',
+                                                                    'diff_in_abs_d_curv',
+                                                                    'dir_from_stop_ff_to_stop',
+                                                                    'curv_of_traj_before_stop',
+                                                                    ],
                                             add_ref_interaction_choices=[True],                        
-                                            clusters_to_keep_choices=['none'],                                                                                                                                                  
+                                            clusters_to_keep_choices=['stop_ff_cluster_100'],                                                                                                                                                  
                                             ref_columns_only_choices=[False, True],                                       
-                                            model_names=['linreg', 'grad_boosting', 'rf']):
+                                            model_names=['grad_boosting', 'rf']):
         
         self.ml_variations_df = pd.DataFrame()
         process_combination_kwargs = dict(model_names=model_names)
@@ -201,7 +205,9 @@ class MlMethods():
 
 
     def try_different_combinations_for_classification(self, data_source,
-                                            y_columns_of_interest=['dir_from_stop_ff_to_stop'],
+                                            y_columns_of_interest=['dir_from_stop_ff_to_stop',
+                                                                   'dir_from_stop_ff_same_side',
+                                                                   ],
                                             add_ref_interaction_choices=[True],                        
                                             clusters_to_keep_choices=['stop_ff_cluster_100_PLUS_alt_ff_cluster_100'],  
                                             clusters_for_interaction_choices=['stop_ff_cluster_100'],                                                                                                                                                  
@@ -311,13 +317,15 @@ class MlMethods():
 
     def _try_different_combinations_for_learning(self, data_source,
                                                 process_combination_func,
-                                                y_columns_of_interest=['curvature_of_traj_before_stop',
-                                                                        'ref_d_heading_of_traj',
-                                                                        'dev_d_angle_from_null',
-                                                                        'dir_from_stop_ff_to_stop'],
+                                                y_columns_of_interest=['diff_d_heading_of_traj_from_null',
+                                                                        'diff_in_abs',
+                                                                        'diff_in_abs_d_curv',
+                                                                        'dir_from_stop_ff_to_stop',
+                                                                        'curv_of_traj_before_stop',
+                                                                        ],
                                                 add_ref_interaction_choices=[False],                        
-                                                clusters_to_keep_choices=['none'],  
-                                                clusters_for_interaction_choices=['none'],                                                                                                                                                  
+                                                clusters_to_keep_choices=['stop_ff_cluster_100'],  
+                                                clusters_for_interaction_choices=['none', 'stop_ff_cluster_100'],                                                                                                                                                  
                                                 ref_columns_only_choices=[False, True],
                                                 use_combd_features_for_cluster_only_choices=[False],
                                                 winsorize_angle_features_choices=[True],   

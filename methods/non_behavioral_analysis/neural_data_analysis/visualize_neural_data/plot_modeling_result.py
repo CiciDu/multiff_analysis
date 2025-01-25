@@ -131,21 +131,24 @@ def plot_pgam_tuning_functions(res, indices_of_vars_to_plot=None):
         print('%s: \t %s'%(name, type(res[name][0])))
 
     num_vars = len(indices_of_vars_to_plot)
-    num_var_per_plot = 3
-    num_plots = math.ceil(num_vars/num_var_per_plot)
+    num_vars_per_row = 3
+    # Note: because each var occupies two subplots, we make a new plot for every num_vars_per_row variables, rather than put all vars into a big plot
+    num_plots = math.ceil(num_vars/num_vars_per_row)
     var_counter = 0
     var_index = indices_of_vars_to_plot[var_counter]
     # plot tuning functions
 
     for j in range(num_plots):
-        plt.figure(figsize=(5*num_var_per_plot,7))
-        for k in range(num_var_per_plot):
+        plt.figure(figsize=(5*num_vars_per_row, 7))
+        for k in range(num_vars_per_row):
+            var_counter += 1
+
             x_kernel = res['x_kernel'][var_index]
             y_kernel = res['y_kernel'][var_index]
             ypCI_kernel = res['y_kernel_pCI'][var_index]
             ymCI_kernel = res['y_kernel_mCI'][var_index]
 
-            plt.subplot(2, num_var_per_plot,k+1)
+            plt.subplot(2, num_vars_per_row,k+1)
             plt.title('log-space %s'%res['variable'][var_index])
             plt.plot(x_kernel.reshape(-1), y_kernel.reshape(-1), color='r')
             plt.fill_between(x_kernel.reshape(-1), ymCI_kernel.reshape(-1), ypCI_kernel.reshape(-1), color='r', alpha=0.3)
@@ -153,7 +156,7 @@ def plot_pgam_tuning_functions(res, indices_of_vars_to_plot=None):
             x_firing = res['x_rate_Hz'][var_index]
             y_firing_model = res['y_rate_Hz_model'][var_index]
             y_firing_raw = res['y_rate_Hz_raw'][var_index]
-            plt.subplot(2, num_var_per_plot,k+1+num_var_per_plot)
+            plt.subplot(2, num_vars_per_row,k+1+num_vars_per_row)
             plt.title('rate-space %s'%res['variable'][var_index])
             plt.plot(x_firing[0], y_firing_raw.reshape(-1), 'o-', markersize=2, color='k',label='raw')
             plt.plot(x_firing[0], y_firing_model.reshape(-1), 'o-', markersize=2, color='r',label='model')
@@ -161,7 +164,6 @@ def plot_pgam_tuning_functions(res, indices_of_vars_to_plot=None):
             plt.legend()
             plt.tight_layout()
 
-            var_counter += 1
             if var_counter == num_vars:
                 break
             var_index = indices_of_vars_to_plot[var_counter]

@@ -117,10 +117,10 @@ def add_distance_from_ff_to_stop(closest_stop_to_capture_df, monkey_information,
 
     df[['monkey_x', 'monkey_y']] = monkey_information.loc[df['stop_point_index'].values, ['monkey_x', 'monkey_y']].values
 
-    df['caught_time_point_index'] = monkey_information['point_index'].values[np.searchsorted(monkey_information['time'].values,
-                                                   df['caught_time'].values)]
-    df.loc[df['caught_time_point_index'] == len(monkey_information), 'caught_time_point_index'] = len(monkey_information) - 1                                               
-
+    # find the point index where the monkey was caught
+    pos_index = np.searchsorted(monkey_information['time'].values, df['caught_time'].values)
+    pos_index[pos_index == len(monkey_information)] = len(monkey_information) - 1
+    df['caught_time_point_index'] = monkey_information['point_index'].iloc[pos_index].values
 
     df[['caught_time_monkey_x', 'caught_time_monkey_y']] = monkey_information.loc[df['caught_time_point_index'].values, ['monkey_x', 'monkey_y']].values
 

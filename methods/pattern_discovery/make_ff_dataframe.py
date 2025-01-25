@@ -111,6 +111,14 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     
     ff_dataframe = pd.DataFrame(ff_dict).reset_index(drop=True)
 
+    # make sure the point_index in ff_dataframe are within monkey_information['point_index'].values
+    ff_dataframe = ff_dataframe[ff_dataframe['point_index'].isin(monkey_information['point_index'].values)]
+    # also make sure max target_index is less than len(ff_caught_T_new)
+    ff_dataframe['time'] = monkey_information.loc[ff_dataframe['point_index'].values, 'time'].values
+    ff_dataframe['target_index'] = np.searchsorted(ff_caught_T_new, ff_dataframe['time'])
+    ff_dataframe = ff_dataframe[ff_dataframe['target_index'] < len(ff_caught_T_new)].copy()
+
+
     if ff_in_obs_df is not None:
       ff_dataframe[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
       ff_dataframe = pd.merge(ff_dataframe, ff_in_obs_df, how="left", on=["ff_index", "point_index"])
@@ -123,18 +131,13 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     if to_furnish_ff_dataframe:
         ff_dataframe = furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted)
 
-    # make sure the point_index in ff_dataframe are within monkey_information['point_index'].values
-    ff_dataframe = ff_dataframe[ff_dataframe['point_index'].isin(monkey_information['point_index'].values)]
-    # also make sure max target_index is less than len(ff_caught_T_new)
-    ff_dataframe['target_index'] = np.searchsorted(ff_caught_T_new, ff_dataframe['time'])
-    ff_dataframe = ff_dataframe[ff_dataframe['target_index'] < len(ff_caught_T_new)].copy()
 
     return ff_dataframe
 
 
 def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
-    ff_dataframe[['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']]  \
-        = monkey_information.loc[ff_dataframe['point_index'].values, ['time', 'monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']].values
+    ff_dataframe[['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']]  \
+        = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']].values
     ff_dataframe[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
     ff_dataframe['ff_distance'] = LA.norm(np.array(ff_dataframe[['monkey_x', 'monkey_y']])-np.array(ff_dataframe[['ff_x', 'ff_y']]), axis=1)
     ff_dataframe['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_dataframe['ff_x'], ff_y=ff_dataframe['ff_y'], mx=ff_dataframe['monkey_x'], 

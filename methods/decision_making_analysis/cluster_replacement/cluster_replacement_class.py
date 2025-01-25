@@ -36,7 +36,7 @@ class ClusterReplacement(decision_making_class.DecisionMaking):
         
 
     def find_input_and_output_for_cluster_replacement(self, num_old_ff_per_row=2, num_new_ff_per_row=2, selection_criterion_if_too_many_ff='time_since_last_vis', sorting_criterion=None,\
-                                                      add_arc_info=False, add_current_curvature_of_traj=False, curvature_df=None, curv_of_traj_df=None, ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'],
+                                                      add_arc_info=False, add_current_curv_of_traj=False, curvature_df=None, curv_of_traj_df=None, ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'],
                                                       curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1], truncate_curv_of_traj_by_time_of_capture=False,
                                                       arc_info_to_add=['optimal_curvature', 'curv_diff']):
         if curv_of_traj_df is None:
@@ -62,7 +62,7 @@ class ClusterReplacement(decision_making_class.DecisionMaking):
             curvature_utils.add_arc_info_to_df(self.joined_cluster_df, curvature_df, arc_info_to_add=arc_info_to_add)
             ff_attributes = list(set(ff_attributes) | set(arc_info_to_add))      
         self.free_selection_inputs_df, self.free_selection_inputs_df_for_plotting, self.sequence_of_obs_ff_indices, self.point_index_array, self.pred_var = free_selection.find_free_selection_inputs_from_info_of_n_ff_per_point(self.joined_cluster_df, self.monkey_information, ff_attributes=ff_attributes, 
-                                                                                    num_ff_per_row=num_old_ff_per_row + num_new_ff_per_row, add_current_curvature_of_traj=add_current_curvature_of_traj, ff_caught_T_new=self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)        
+                                                                                    num_ff_per_row=num_old_ff_per_row + num_new_ff_per_row, add_current_curv_of_traj=add_current_curv_of_traj, ff_caught_T_new=self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)        
         self.free_selection_time = self.monkey_information.loc[self.point_index_array, 'time'].values
         # incorporate whether_changed
         self.whether_changed = self.joined_cluster_df[['point_index', 'whether_changed']].drop_duplicates()        
