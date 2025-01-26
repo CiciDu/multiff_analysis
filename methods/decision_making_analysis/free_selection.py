@@ -93,8 +93,8 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
                                                            num_ff_per_row=5, 
                                                            ff_caught_T_new=None, 
                                                            curv_of_traj_df=None,
-                                                           curv_of_traj_mode='time',
-                                                           window_for_curv_of_traj=[-1, 1],
+                                                           window_for_curv_of_traj=[-25, 25], 
+                                                           curv_of_traj_mode='distance', 
                                                            truncate_curv_of_traj_by_time_of_capture=False):
     
     info_of_n_ff_per_point = info_of_n_ff_per_point.sort_values(['point_index', 'order'], ascending=True)
@@ -122,8 +122,10 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
         if monkey_information is None:
             raise ValueError('monkey_information is None, but add_current_curv_of_traj is True')
         if curv_of_traj_df is None:
-            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-        curv_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
+            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, 
+                                                                                                                  truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
+        curv_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode, 
+                                                                window_for_curv_of_traj=window_for_curv_of_traj)
         free_selection_inputs['curv_of_traj'] = curv_of_traj
         # since curv_of_traj depends completely on the point index, we just have to include this variable once.
         pred_var.append('curv_of_traj')
@@ -140,7 +142,7 @@ def find_free_selection_inputs_from_info_of_n_ff_per_point(info_of_n_ff_per_poin
 
 def organize_free_selection_data(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, only_select_n_ff_case=None, num_ff_per_row=5, 
                                  guarantee_including_target_info=True, add_current_curv_of_traj=False, ff_caught_T_new=None, 
-                                 curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1],
+                                 window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', 
                                   curvature_df=None, curv_of_traj_df=None, selection_criterion_if_too_many_ff='time_since_last_vis',
                                  ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], 
                                  add_arc_info = False,

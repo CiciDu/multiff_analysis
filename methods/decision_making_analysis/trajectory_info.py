@@ -29,7 +29,8 @@ np.set_printoptions(suppress=True)
 
 
 
-def find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=None, monkey_information=None, curv_of_traj_mode='time', window_for_curv_of_traj=[-1, 1], truncate_curv_of_traj_by_time_of_capture=False):
+def find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=None, monkey_information=None, 
+                             window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
     # curvature_df has duplicate point_index
     curv_of_traj_df_temp = curv_of_traj_df.groupby('point_index').first().reset_index().set_index('point_index')
     try:

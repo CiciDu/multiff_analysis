@@ -126,6 +126,8 @@ def find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_tr
         curv_of_traj_df.loc[curv_of_traj_df['delta_monkey_angle'] < -math.pi, 'delta_monkey_angle'] = curv_of_traj_df.loc[curv_of_traj_df['delta_monkey_angle'] < -math.pi, 'delta_monkey_angle'] + 2*math.pi
         
     curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['delta_monkey_angle'] / curv_of_traj_df['delta_distance'] 
+    # forward fill NA in curv_of_traj
+    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].fillna(method='ffill')
     curv_of_traj_df['curv_of_traj_deg_over_cm'] = curv_of_traj_df['curv_of_traj'] * 180/np.pi * 100 # so that the unit is degree/cm
 
     curv_of_traj_df['min_point_index'] = curv_of_traj_df['point_index_lower_end']
@@ -270,7 +272,8 @@ def find_traj_curv_descr(curv_of_traj_mode, lower_end, upper_end):
     return traj_curv_descr
 
 
-def find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, stops_near_ff_df=None, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=False):
+def find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, stops_near_ff_df=None, 
+                                                    curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
     if curv_of_traj_mode == 'now to stop':
         if stops_near_ff_df is None:
             raise ValueError('stops_near_ff_df must be specified if curv_of_traj_mode is from current point to right before stop')

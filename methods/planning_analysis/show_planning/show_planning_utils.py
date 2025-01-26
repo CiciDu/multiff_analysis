@@ -218,7 +218,6 @@ def make_alt_and_stop_ff_df(alt_ff_final_df, stop_ff_final_df):
     return alt_and_stop_ff_df
 
 
-
 def make_heading_info_df(alt_and_stop_ff_df, stops_near_ff_df, monkey_information, ff_real_position_sorted):
     # Select relevant columns from stops_near_ff_df
     heading_info_df = stops_near_ff_df[['stop_point_index', 'stop_x', 'stop_y', 'stop_time', 

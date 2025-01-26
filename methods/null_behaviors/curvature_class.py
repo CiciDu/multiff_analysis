@@ -19,7 +19,7 @@ class CurvatureOfPath():
         self.ff_real_position_sorted = ff_real_position_sorted
         self.seed = seed
 
-    def make_curvature_df(self, window_for_curv_of_traj, curv_of_traj_mode='time', truncate_curv_of_traj_by_time_of_capture=False, ff_radius_for_optimal_arc=15, clean=True,
+    def make_curvature_df(self, window_for_curv_of_traj, curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False, ff_radius_for_optimal_arc=15, clean=True,
                           include_curv_to_ff_center=True, include_optimal_curvature=True,
                           optimal_arc_stop_at_visible_boundary=False,
                           ignore_error=False):

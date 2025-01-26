@@ -44,7 +44,7 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         self.trajectory_features = gc_kwargs['trajectory_features']
         if self.collect_info_flag:
             self.combined_info, self.all_traj_feature_names = self.collect_combined_info_for_GUAT(gc_kwargs, GUAT_w_ff_df_exists_ok=GUAT_w_ff_df_exists_ok, 
-                                       ff_df_exist_in_GUAT_store_ok=ff_df_exist_in_GUAT_store_ok, traj_df_exist_in_GUAT_store_ok=traj_df_exist_in_GUAT_store_ok, curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, )
+                                       ff_df_exist_in_GUAT_store_ok=ff_df_exist_in_GUAT_store_ok, traj_df_exist_in_GUAT_store_ok=traj_df_exist_in_GUAT_store_ok, curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok)
         else:
             self.all_traj_feature_names = self.find_all_traj_feature_names(gc_kwargs, traj_point_features=gc_kwargs['trajectory_features'])
 
