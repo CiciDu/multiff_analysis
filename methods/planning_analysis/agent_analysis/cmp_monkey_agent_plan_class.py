@@ -1,11 +1,11 @@
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_class
+from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_class, variations_base_class
 
 import os
 
 # This class collects data from many agents and compares them
-class CompareMonkeyAgentPlan(plot_variations_class.PlotVariations):
+class CompareMonkeyAgentPlan(plot_variations_class.PlotVariations, variations_base_class.VariationsBase):
 
     def __init__(self,                               
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3'):

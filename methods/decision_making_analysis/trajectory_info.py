@@ -152,7 +152,10 @@ def generate_trajectory_position_data(time_all, monkey_information, time_range_o
     monkey_angle_2d = trajectory_data_dict['monkey_angle']
 
     monkey_indices = np.searchsorted(monkey_information['time'], time_all) 
-    traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north = find_monkey_info_on_trajectory_relative_to_origin(monkey_indices, monkey_information, traj_x_2d, traj_y_2d, monkey_angle_2d, num_time_points_for_trajectory=num_time_points_for_trajectory)
+    traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north = find_monkey_info_on_trajectory_relative_to_origin(
+        monkey_indices, monkey_information, traj_x_2d, traj_y_2d, monkey_angle_2d,
+        num_time_points_for_trajectory=num_time_points_for_trajectory
+    )
     trajectory_data_dict['monkey_distance'] = traj_distances
     trajectory_data_dict['monkey_angle_to_origin'] = traj_angles
     trajectory_data_dict['monkey_angle_on_trajectory_relative_to_the_current_north'] = monkey_angle_on_trajectory_relative_to_the_current_north

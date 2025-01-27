@@ -64,7 +64,6 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         if update_point_index:
             self._update_point_index_of_important_df_in_important_info()
 
-
         return self.important_info
 
     def _try_retrieve_all_GUAT_info_from_one_session(self,

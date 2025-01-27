@@ -2,7 +2,7 @@ from planning_analysis.variations_of_factors_vs_results import make_variations_u
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.variations_of_factors_vs_results import plot_variations_class
+from planning_analysis.variations_of_factors_vs_results import plot_variations_class, variations_base_class
 from data_wrangling import specific_utils, combine_info_utils, base_processing_class
 import os
 import numpy as np
@@ -23,7 +23,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class PlanAcrossSessions(plot_variations_class.PlotVariations):
+class PlanAcrossSessions(plot_variations_class.PlotVariations, variations_base_class.VariationsBase):
 
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 

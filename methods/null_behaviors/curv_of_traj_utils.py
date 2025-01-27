@@ -126,8 +126,13 @@ def find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_tr
         curv_of_traj_df.loc[curv_of_traj_df['delta_monkey_angle'] < -math.pi, 'delta_monkey_angle'] = curv_of_traj_df.loc[curv_of_traj_df['delta_monkey_angle'] < -math.pi, 'delta_monkey_angle'] + 2*math.pi
         
     curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['delta_monkey_angle'] / curv_of_traj_df['delta_distance'] 
+    # replace all inf with Na
+    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].replace([np.inf, -np.inf], np.nan)
     # forward fill NA in curv_of_traj
     curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].fillna(method='ffill')
+    # Backward fill NA in curv_of_traj to handle any remaining NA at the beginning
+    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].fillna(method='bfill')
+
     curv_of_traj_df['curv_of_traj_deg_over_cm'] = curv_of_traj_df['curv_of_traj'] * 180/np.pi * 100 # so that the unit is degree/cm
 
     curv_of_traj_df['min_point_index'] = curv_of_traj_df['point_index_lower_end']
