@@ -1,17 +1,11 @@
 
 from planning_analysis.variations_of_factors_vs_results import plot_variations_utils
-from planning_analysis.variations_of_factors_vs_results import variations_base_class
 
 import os
 
 
-class PlotVariations():
+class _PlotVariations():
 
-    def __init__(self,
-                 # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='norm_opt_arc',
-                 ):
-        self.optimal_arc_type = optimal_arc_type
 
     def plot_heading_in_overall_median_info(self,
                                             x_var_column_list=[
