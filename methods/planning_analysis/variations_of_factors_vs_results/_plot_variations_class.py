@@ -6,11 +6,10 @@ import os
 
 class _PlotVariations():
 
-
     def plot_heading_in_overall_median_info(self,
                                             x_var_column_list=[
                                                 'ref_point_value'],
-                                            fixed_variable_values_to_use={'if_test_alt_ff_group_appear_after_stop': 'flexible',
+                                            fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                           'key_for_split': 'ff_seen'},
                                             changeable_variables=[
                                                 'whether_even_out_dist'],
@@ -36,7 +35,7 @@ class _PlotVariations():
 
     def plot_curv_in_overall_median_info(self,
                                          x_var_column_list=['ref_point_value'],
-                                         fixed_variable_values_to_use={'if_test_alt_ff_group_appear_after_stop': 'flexible',
+                                         fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                        'key_for_split': 'ff_seen'},
                                          changeable_variables=[
                                              'whether_even_out_dist'],
@@ -63,7 +62,7 @@ class _PlotVariations():
     def plot_heading_in_overall_median_info_across_monkeys_and_arc_types(self,
                                                                          x_var_column_list=[
                                                                              'optimal_arc_type'],
-                                                                         fixed_variable_values_to_use={'if_test_alt_ff_group_appear_after_stop': 'flexible',
+                                                                         fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                                        'key_for_split': 'ff_seen',
                                                                                                        'whether_even_out_dist': False,
                                                                                                        'curv_traj_window_before_stop': '[-50, 0]'
@@ -85,7 +84,7 @@ class _PlotVariations():
     def plot_curv_in_overall_median_info_across_monkeys_and_arc_types(self,
                                                                       x_var_column_list=[
                                                                           'optimal_arc_type'],
-                                                                      fixed_variable_values_to_use={'if_test_alt_ff_group_appear_after_stop': 'flexible',
+                                                                      fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                                     'key_for_split': 'ff_seen',
                                                                                                     'whether_even_out_dist': False,
                                                                                                     'curv_traj_window_before_stop': '[-50, 0]'
@@ -108,7 +107,7 @@ class _PlotVariations():
     def plot_direction_in_all_perc_info(self,
                                         x_var_column_list=['key_for_split'],
                                         fixed_variable_values_to_use={
-                                            'if_test_alt_ff_group_appear_after_stop': 'flexible'},
+                                            'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
                                         changeable_variables=[
                                             'whether_even_out_dist'],
                                         columns_to_find_unique_combinations_for_color=[],
@@ -131,7 +130,7 @@ class _PlotVariations():
     def plot_direction_in_all_perc_info_across_monkeys(self,
                                                        x_var_column_list=[
                                                            'monkey_name'],
-                                                       fixed_variable_values_to_use={'if_test_alt_ff_group_appear_after_stop': 'flexible',
+                                                       fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                      'key_for_split': 'ff_seen',
                                                                                      'whether_even_out_dist': False,
                                                                                      },

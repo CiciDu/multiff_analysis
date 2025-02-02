@@ -27,8 +27,10 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
 
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
-    default_ref_point_params_based_on_mode = {'time after stop ff visible': [-0.2, -0.1, 0, 0.1, 0.2], 
-                                              'distance': [-100, -50]}
+    # default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2, -0.1, 0, 0.1, 0.2],
+    #                                           'distance': [-100, -50]}
+
+    default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2]}
 
     def __init__(self,
                  monkey_name='monkey_Bruno',
@@ -42,7 +44,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.sessions_df_for_one_monkey = None
         self.combd_planning_info_folder_path = make_variations_utils.make_combd_planning_info_folder_path(
             self.monkey_name)
-        self.combd_stop_and_alt_folder_path = make_variations_utils.make_combd_stop_and_alt_folder_path(
+        self.combd_cur_and_nxt_folder_path = make_variations_utils.make_combd_cur_and_nxt_folder_path(
             self.monkey_name)
         self.make_key_paths()
 

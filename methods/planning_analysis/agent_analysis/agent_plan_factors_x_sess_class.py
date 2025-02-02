@@ -34,8 +34,8 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
 
         self.combd_planning_info_folder_path = os.path.join(model_folder_name.replace(
             'all_agents', 'all_collected_data/planning'), 'combined_data')
-        self.combd_stop_and_alt_folder_path = os.path.join(
-            self.combd_planning_info_folder_path, 'stop_and_alt')
+        self.combd_cur_and_nxt_folder_path = os.path.join(
+            self.combd_planning_info_folder_path, 'cur_and_nxt')
         # note that we used dir_name for the above because those data folder path includes "individual_data_sessions/data_0" and so on at the end.
         self.make_key_paths()
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
@@ -43,7 +43,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
 
     def streamline_getting_y_values(self,
                                     num_datasets_to_collect=5,
-                                    ref_point_mode='time after stop ff visible',
+                                    ref_point_mode='time after cur ff visible',
                                     ref_point_value=0.1,
                                     save_data=True,
                                     final_products_exist_ok=True,
@@ -78,7 +78,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
 
         print(' ')
         print('Making overall all median info ......')
-        self.make_or_retrieve_overall_median_info(ref_point_params_based_on_mode={'time after stop ff visible': [0.1, 0],
+        self.make_or_retrieve_overall_median_info(ref_point_params_based_on_mode={'time after cur ff visible': [0.1, 0],
                                                                                   'distance': [-150, -100, -50]},
                                                   list_of_curv_traj_window_before_stop=[
                                                       [-50, 0]],
@@ -233,7 +233,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
         if save_data:
             for test_or_control in ['test', 'control']:
                 path = self.dict_of_combd_heading_info_folder_path[test_or_control]
-                df_name = find_stops_near_ff_utils.find_df_name(
+                df_name = find_stops_near_ff_utils.get_df_name_by_ref(
                     'monkey_agent', ref_point_mode, ref_point_value)
                 df_path = os.path.join(path, df_name)
                 os.makedirs(path, exist_ok=True)

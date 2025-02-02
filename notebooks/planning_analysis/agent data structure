@@ -26,7 +26,7 @@
 │   │   └── ff3
 │   │       └── dv10_dw10_w10_mem3
 │   │           ├── combined_data
-│   │           │   └── stop_and_alt
+│   │           │   └── cur_and_nxt
 │   │           │       ├── data
 │   │           │       │   └── combd_heading_info
 │   │           │       │       └── norm_opt_arc

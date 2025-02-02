@@ -1,7 +1,7 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils, GUAT_vs_TAFT_class
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.only_stop_ff import only_stop_ff_utils, features_to_keep_utils
-from planning_analysis.show_planning import alt_ff_utils, show_planning_utils
+from planning_analysis.only_cur_ff import only_cur_ff_utils, features_to_keep_utils
+from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
 from planning_analysis.plan_factors import plan_factors_utils
 from null_behaviors import curv_of_traj_utils
@@ -61,8 +61,8 @@ class GUATandTAFTacrossSessionsClass():
                     [self.combd_TAFT_x_df, cgt.TAFT_x_df], axis=0)
                 self.combd_GUAT_x_df = pd.concat(
                     [self.combd_GUAT_x_df, cgt.GUAT_x_df], axis=0)
-                
+
         self.combd_GUAT_x_df.reset_index(drop=True, inplace=True)
         self.combd_TAFT_x_df.reset_index(drop=True, inplace=True)
-        
+
         return self.combd_GUAT_x_df, self.combd_TAFT_x_df

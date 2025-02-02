@@ -52,7 +52,7 @@
             │       ├── ...
             └── shared_stops_near_ff_df.csv
         └── combined_data
-            └── stop_and_alt
+            └── cur_and_nxt
                 ├── data
                 │   ├── combd_diff_in_curv
                 │   │   ├── norm_opt_arc
@@ -82,14 +82,14 @@
                 └── ml_results
                     └── lr_variations
                         ├── norm_opt_arc
-                        │   ├── all_stop_and_alt_lr_df.csv
-                        │   └── all_stop_and_alt_lr_pred_ff_df.csv
+                        │   ├── all_cur_and_nxt_lr_df.csv
+                        │   └── all_cur_and_nxt_lr_pred_ff_df.csv
                         ├── opt_arc_stop_closest
-                        │   ├── all_stop_and_alt_lr_df.csv
-                        │   └── all_stop_and_alt_lr_pred_ff_df.csv
+                        │   ├── all_cur_and_nxt_lr_df.csv
+                        │   └── all_cur_and_nxt_lr_pred_ff_df.csv
                         └── opt_arc_stop_first_vis_bdry
-                            ├── all_stop_and_alt_lr_df.csv
-                            └── all_stop_and_alt_lr_pred_ff_df.csv
+                            ├── all_cur_and_nxt_lr_df.csv
+                            └── all_cur_and_nxt_lr_pred_ff_df.csv
 └── patterns_and_features
     └── monkey_Bruno
         └── data_0402   

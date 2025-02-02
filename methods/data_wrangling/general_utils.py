@@ -8,7 +8,7 @@ import pandas as pd
 from numpy import linalg as LA
 from contextlib import contextmanager
 from os.path import exists
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
@@ -21,6 +21,7 @@ class HiddenPrints:
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout.close()
         sys.stdout = self._original_stdout
+
 
 @contextmanager
 def suppress_stdout():
@@ -52,12 +53,14 @@ def find_intersection(intervals, query):
     -------
     indices_of_overlapped_intervals: array
         Array of indexes of intervals that overlap with query
-    
+
     """
     intervals = np.asarray(intervals)
     lower, upper = query
-    indices_of_overlapped_intervals = np.where((lower < intervals[:, 1]) & (intervals[:, 0] < upper))[0]
+    indices_of_overlapped_intervals = np.where(
+        (lower < intervals[:, 1]) & (intervals[:, 0] < upper))[0]
     return indices_of_overlapped_intervals
+
 
 def save_df_to_csv(df, df_name, data_folder_name, exists_ok=False):
     if data_folder_name:
@@ -66,7 +69,7 @@ def save_df_to_csv(df, df_name, data_folder_name, exists_ok=False):
         if exists(filepath) & exists_ok:
             print(filepath, 'already exists.')
         else:
-            os.makedirs(data_folder_name, exist_ok = True)
+            os.makedirs(data_folder_name, exist_ok=True)
             df.to_csv(filepath)
             print("new", df_name, "is stored in ", filepath)
 
@@ -91,7 +94,8 @@ def find_time_bins_for_an_array(array_of_interest):
     # find mid-points of each interval in monkey_information['time']
     interval_lengths = np.diff(array_of_interest)
     half_interval_lengths = interval_lengths/2
-    half_interval_lengths = np.append(half_interval_lengths, half_interval_lengths[-1])
+    half_interval_lengths = np.append(
+        half_interval_lengths, half_interval_lengths[-1])
     # find the boundaries of boxes that surround each element of monkey_information['time']
     time_bins = array_of_interest + half_interval_lengths
     # add the position of the leftmost boundary
@@ -100,14 +104,15 @@ def find_time_bins_for_an_array(array_of_interest):
     return time_bins
 
 
-def find_outlier_position_index(data, outlier_z_score_threshold = 2):
+def find_outlier_position_index(data, outlier_z_score_threshold=2):
     data = np.array(data)
-    # calculate standard deviation in rel_curv_to_stop_ff_center
+    # calculate standard deviation in rel_curv_to_cur_ff_center
     std = np.std(data)
     # find z-score of each point
     z_score = (data - np.mean(data)) / std
     # find outliers
-    outlier_positions = np.where(np.abs(z_score) > outlier_z_score_threshold)[0]
+    outlier_positions = np.where(
+        np.abs(z_score) > outlier_z_score_threshold)[0]
     return outlier_positions
 
 
@@ -115,7 +120,7 @@ def make_rotation_matrix(x0, y0, x1, y1):
     # find a rotation matrix so that (x1, y1) is to the north of (x0, y0)
 
     # Find the angle from the starting point to the target
-    theta = pi/2-np.arctan2(y1 - y0, x1 - x0)     
+    theta = pi/2-np.arctan2(y1 - y0, x1 - x0)
     c, s = np.cos(theta), np.sin(theta)
     # Find the rotation matrix
     rotation_matrix = np.array(((c, -s), (s, c)))
@@ -138,12 +143,13 @@ def take_out_data_points_in_valid_intervals(t_array, valid_intervals_df):
 def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
     """
     Set some parameters for plotting
-    
+
     """
     plt.rcParams['figure.figsize'] = (dimx, dimy)
     plt.rcParams['font.weight'] = fontweight
     plt.rcParams['mathtext.default'] = 'regular'
     plt.rcParams["font.family"] = "sans serif"
-    global fig; fig = plt.figure(dpi=dpi)
+    global fig
+    fig = plt.figure(dpi=dpi)
     yield
     plt.show()

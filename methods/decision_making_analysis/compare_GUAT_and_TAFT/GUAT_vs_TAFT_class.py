@@ -102,7 +102,7 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
             self.TAFT_trials_df['first_stop_time'] = self.monkey_information.loc[
                 self.TAFT_trials_df['first_stop_point_index'], 'time'].values
             self.TAFT_trials_df['ff_index'] = self.TAFT_trials_df['trial']
-            # because we need to have alt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
+            # because we need to have nxt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
             self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(
                 self.ff_caught_T_new) - 2]
             GUAT_vs_TAFT_utils.add_stop_point_index(
@@ -124,21 +124,21 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
     def get_GUAT_or_TAFT_x_df(self, save_data=True):
         self._get_stops_near_ff_df(already_made_ok=True)
         self._make_plan_y_df()
-        self._make_plan_x_df(list_of_stop_ff_cluster_radius=[100],
-                             list_of_alt_ff_cluster_radius=[200])
+        self._make_plan_x_df(list_of_cur_ff_cluster_radius=[100],
+                             list_of_nxt_ff_cluster_radius=[200])
 
-        self._get_x_features_df(list_of_stop_ff_cluster_radius=[],
-                                list_of_stop_ff_ang_cluster_radius=[20],
+        self._get_x_features_df(list_of_cur_ff_cluster_radius=[],
+                                list_of_cur_ff_ang_cluster_radius=[20],
                                 list_of_start_dist_cluster_radius=[100],
                                 list_of_start_ang_cluster_radius=[20],
                                 list_of_flash_cluster_period=[[1.0, 1.5], [1.5, 2.0]])
-        self._make_only_stop_ff_df()
+        self._make_only_cur_ff_df()
         self._get_GUAT_or_TAFT_x_df(save_data=save_data)
 
     def get_x_and_y_var_df(self):
         self.x_var_df = pd.concat([self.TAFT_x_df, self.GUAT_x_df], axis=0).reset_index(
             drop=True).drop(columns=['stop_point_index'])
-        self.x_var_df['dir_from_stop_ff_same_side'] = self.x_var_df['dir_from_stop_ff_same_side'].astype(
+        self.x_var_df['dir_from_cur_ff_same_side'] = self.x_var_df['dir_from_cur_ff_same_side'].astype(
             int)
         self.y_var_df = pd.DataFrame(np.array(
             [1]*len(self.TAFT_x_df) + [0]*len(self.GUAT_x_df)).reshape(-1, 1), columns=['y_var'])
@@ -160,7 +160,7 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
 
         GUAT_or_TAFT_x_df = getattr(self, f"{GUAT_or_TAFT}_x_df")
         sub = sub.merge(GUAT_or_TAFT_x_df[[
-                        'stop_point_index', 'stop_ff_distance_at_ref']], on='stop_point_index', how='left')
+                        'stop_point_index', 'cur_ff_distance_at_ref']], on='stop_point_index', how='left')
 
         sub2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(sub, self.monkey_information, self.ff_real_position_sorted,
                                                                         ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)

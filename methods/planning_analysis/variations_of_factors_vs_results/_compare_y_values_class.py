@@ -28,7 +28,8 @@ class _CompareYValues():
                                              exists_ok=True,
                                              all_median_info_exists_ok=True,
                                              ref_point_params_based_on_mode=None,
-                                             list_of_curv_traj_window_before_stop=[[-50, 0]],
+                                             list_of_curv_traj_window_before_stop=[
+                                                 [-50, 0]],
                                              save_data=True,
                                              combd_heading_df_x_sessions_exists_ok=True,
                                              stops_near_ff_df_exists_ok=True,
@@ -99,7 +100,7 @@ class _CompareYValues():
 
         return self.all_perc_info
 
-    def make_all_median_info(self, ref_point_mode='time after stop ff visible',
+    def make_all_median_info(self, ref_point_mode='time after cur ff visible',
                              ref_point_value=0.1,
                              curv_traj_window_before_stop=[-50, 0],
                              all_median_info_exists_ok=True,
