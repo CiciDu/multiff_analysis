@@ -154,8 +154,8 @@ def get_eye_perc_df(df_for_stat_extended, list_of_max_degrees=[5, 10]):
     df = df_for_stat_extended.copy()
 
     eye_columns = []
-    eye_to_gaze = {'left_eye': 'gaze_monkey_view_angle_l',
-                   'right_eye': 'gaze_monkey_view_angle_r'
+    eye_to_gaze = {'left_eye': 'gaze_mky_view_angle_l',
+                   'right_eye': 'gaze_mky_view_angle_r'
                    }
 
     for eye in ['left_eye', 'right_eye']:
@@ -458,10 +458,10 @@ def _get_left_and_right_eye_time(ff_index, duration, monkey_information, ff_real
     monkey_sub[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_index]
     monkey_sub['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(monkey_sub['ff_x'], monkey_sub['ff_y'], monkey_sub['monkey_x'],
                                                                            monkey_sub['monkey_y'], monkey_sub['monkey_angle'])
-    left_eye = monkey_sub[(monkey_sub['gaze_monkey_view_angle_l'] -
+    left_eye = monkey_sub[(monkey_sub['gaze_mky_view_angle_l'] -
                            monkey_sub['ff_angle']).abs() <= max_degrees/180 * math.pi].copy()
     left_eye_time = left_eye['dt'].sum()
-    right_eye = monkey_sub[(monkey_sub['gaze_monkey_view_angle_r'] -
+    right_eye = monkey_sub[(monkey_sub['gaze_mky_view_angle_r'] -
                             monkey_sub['ff_angle']).abs() <= max_degrees/180 * math.pi].copy()
     right_eye_time = right_eye['dt'].sum()
 

@@ -47,6 +47,9 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
 
         # convert the eye position data
         monkey_information = eye_positions.convert_eye_positions_in_monkey_information(monkey_information, add_left_and_right_eyes_info=True, interocular_dist=interocular_dist)
+        monkey_information = eye_positions.find_valid_view_points(monkey_information)
+        monkey_information = eye_positions.find_eye_world_speed(monkey_information)
+
         if save_data:
             monkey_information.to_csv(monkey_information_path)
             print("Saved monkey_information")

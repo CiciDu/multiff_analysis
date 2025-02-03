@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import pi
 import math
+import pandas as pd
 
 
 def convert_eye_positions_in_monkey_information(monkey_information, add_left_and_right_eyes_info=False, interocular_dist=4):
@@ -19,41 +20,41 @@ def convert_eye_positions_in_monkey_information(monkey_information, add_left_and
     # left eye
     ver_theta = np.array(monkey_information.LDz)*pi/180
     hor_theta = np.array(monkey_information.LDy)*pi/180
-    gaze_monkey_view_x_l, gaze_monkey_view_y_l, gaze_monkey_view_angle_l, gaze_world_x_l, gaze_world_y_l \
+    gaze_mky_view_x_l, gaze_mky_view_y_l, gaze_mky_view_angle_l, gaze_world_x_l, gaze_world_y_l \
         = apply_formulas_to_convert_eye_position_to_ff_position(hor_theta, ver_theta, monkey_angle, monkey_height, body_x, body_y,
                                                                 interocular_dist=interocular_dist, left_or_right_eye='left')
 
     # right eye
     ver_theta = np.array(monkey_information.RDz)*pi/180
     hor_theta = np.array(monkey_information.RDy)*pi/180
-    gaze_monkey_view_x_r, gaze_monkey_view_y_r, gaze_monkey_view_angle_r, gaze_world_x_r, gaze_world_y_r \
+    gaze_mky_view_x_r, gaze_mky_view_y_r, gaze_mky_view_angle_r, gaze_world_x_r, gaze_world_y_r \
         = apply_formulas_to_convert_eye_position_to_ff_position(hor_theta, ver_theta, monkey_angle, monkey_height, body_x, body_y,
                                                                 interocular_dist=interocular_dist, left_or_right_eye='right')
 
     # average the two eyes
-    gaze_monkey_view_x = (gaze_monkey_view_x_l + gaze_monkey_view_x_r)/2
-    gaze_monkey_view_y = (gaze_monkey_view_y_l + gaze_monkey_view_y_r)/2
-    gaze_monkey_view_angle = (
-        gaze_monkey_view_angle_l + gaze_monkey_view_angle_r)/2
+    gaze_mky_view_x = (gaze_mky_view_x_l + gaze_mky_view_x_r)/2
+    gaze_mky_view_y = (gaze_mky_view_y_l + gaze_mky_view_y_r)/2
+    gaze_mky_view_angle = (
+        gaze_mky_view_angle_l + gaze_mky_view_angle_r)/2
     gaze_world_x = (gaze_world_x_l + gaze_world_x_r)/2
     gaze_world_y = (gaze_world_y_l + gaze_world_y_r)/2
 
-    monkey_information['gaze_monkey_view_x'] = gaze_monkey_view_x
-    monkey_information['gaze_monkey_view_y'] = gaze_monkey_view_y
-    monkey_information['gaze_monkey_view_angle'] = gaze_monkey_view_angle
+    monkey_information['gaze_mky_view_x'] = gaze_mky_view_x
+    monkey_information['gaze_mky_view_y'] = gaze_mky_view_y
+    monkey_information['gaze_mky_view_angle'] = gaze_mky_view_angle
     monkey_information['gaze_world_x'] = gaze_world_x
     monkey_information['gaze_world_y'] = gaze_world_y
 
     if add_left_and_right_eyes_info:
-        monkey_information['gaze_monkey_view_x_l'] = gaze_monkey_view_x_l
-        monkey_information['gaze_monkey_view_y_l'] = gaze_monkey_view_y_l
-        monkey_information['gaze_monkey_view_angle_l'] = gaze_monkey_view_angle_l
+        monkey_information['gaze_mky_view_x_l'] = gaze_mky_view_x_l
+        monkey_information['gaze_mky_view_y_l'] = gaze_mky_view_y_l
+        monkey_information['gaze_mky_view_angle_l'] = gaze_mky_view_angle_l
         monkey_information['gaze_world_x_l'] = gaze_world_x_l
         monkey_information['gaze_world_y_l'] = gaze_world_y_l
 
-        monkey_information['gaze_monkey_view_x_r'] = gaze_monkey_view_x_r
-        monkey_information['gaze_monkey_view_y_r'] = gaze_monkey_view_y_r
-        monkey_information['gaze_monkey_view_angle_r'] = gaze_monkey_view_angle_r
+        monkey_information['gaze_mky_view_x_r'] = gaze_mky_view_x_r
+        monkey_information['gaze_mky_view_y_r'] = gaze_mky_view_y_r
+        monkey_information['gaze_mky_view_angle_r'] = gaze_mky_view_angle_r
         monkey_information['gaze_world_x_r'] = gaze_world_x_r
         monkey_information['gaze_world_y_r'] = gaze_world_y_r
     return monkey_information
@@ -69,7 +70,7 @@ def average_and_then_convert_eye_positions_in_monkey_information(monkey_informat
                  np.array(monkey_information.RDz))*pi/180/2
     hor_theta = (np.array(monkey_information.LDy) +
                  np.array(monkey_information.RDy))*pi/180/2
-    gaze_monkey_view_x_avg, gaze_monkey_view_y_avg, gaze_monkey_view_angle_avg, gaze_world_x_avg, gaze_world_y_avg \
+    gaze_mky_view_x_avg, gaze_mky_view_y_avg, gaze_mky_view_angle_avg, gaze_world_x_avg, gaze_world_y_avg \
         = apply_formulas_to_convert_eye_position_to_ff_position(hor_theta, ver_theta, monkey_angle, monkey_height, body_x, body_y,
                                                                 interocular_dist=0)
 
@@ -77,10 +78,10 @@ def average_and_then_convert_eye_positions_in_monkey_information(monkey_informat
         suffix = '_avg'
     else:
         suffix = ''
-    monkey_information['gaze_monkey_view_x'+suffix] = gaze_monkey_view_x_avg
-    monkey_information['gaze_monkey_view_y'+suffix] = gaze_monkey_view_y_avg
-    monkey_information['gaze_monkey_view_angle' +
-                       suffix] = gaze_monkey_view_angle_avg
+    monkey_information['gaze_mky_view_x'+suffix] = gaze_mky_view_x_avg
+    monkey_information['gaze_mky_view_y'+suffix] = gaze_mky_view_y_avg
+    monkey_information['gaze_mky_view_angle' +
+                       suffix] = gaze_mky_view_angle_avg
     monkey_information['gaze_world_x'+suffix] = gaze_world_x_avg
     monkey_information['gaze_world_y'+suffix] = gaze_world_y_avg
 
@@ -111,39 +112,39 @@ def apply_formulas_to_convert_eye_position_to_ff_position(hor_theta, ver_theta, 
     numerator = numerator_component * monkey_height**2
     # hide warnings
     with np.errstate(divide='ignore', invalid='ignore'):
-        gaze_monkey_view_y = np.sqrt(numerator/denominator)
+        gaze_mky_view_y = np.sqrt(numerator/denominator)
 
-    # based on theta_to_north, we can know the direction of gaze_monkey_viewy
-    gaze_monkey_view_x = np.sqrt(
-        (np.tan(inside_tan))**2*(monkey_height**2 + gaze_monkey_view_y**2))
+    # based on theta_to_north, we can know the direction of gaze_mky_viewy
+    gaze_mky_view_x = np.sqrt(
+        (np.tan(inside_tan))**2*(monkey_height**2 + gaze_mky_view_y**2))
 
     # 4th quadrant
     indices = np.where((theta_to_north > pi/2) & (theta_to_north <= pi))[0]
-    gaze_monkey_view_y[indices] = -gaze_monkey_view_y[indices]
+    gaze_mky_view_y[indices] = -gaze_mky_view_y[indices]
 
     # 3rd quadrant
     indices = np.where((theta_to_north > pi) & (theta_to_north <= 3*pi/2))[0]
-    gaze_monkey_view_x[indices] = -gaze_monkey_view_x[indices]
-    gaze_monkey_view_y[indices] = -gaze_monkey_view_y[indices]
+    gaze_mky_view_x[indices] = -gaze_mky_view_x[indices]
+    gaze_mky_view_y[indices] = -gaze_mky_view_y[indices]
 
     # 2nd quadrant
     indices = np.where(theta_to_north > 3*pi/2)[0]
-    gaze_monkey_view_x[indices] = -gaze_monkey_view_x[indices]
+    gaze_mky_view_x[indices] = -gaze_mky_view_x[indices]
 
     # take interocular distance into account
     if left_or_right_eye == 'left':
-        gaze_monkey_view_x = gaze_monkey_view_x - interocular_dist / 2
+        gaze_mky_view_x = gaze_mky_view_x - interocular_dist / 2
     elif left_or_right_eye == 'right':
-        gaze_monkey_view_x = gaze_monkey_view_x + interocular_dist / 2
+        gaze_mky_view_x = gaze_mky_view_x + interocular_dist / 2
 
-    # Now we need to rotated back gaze_monkey_view_x and gaze_monkey_view_y, because they are based on monkey's angle not absolute angles.
+    # Now we need to rotated back gaze_mky_view_x and gaze_mky_view_y, because they are based on monkey's angle not absolute angles.
     # Also, every point has its own rotation matrix
     # Iterate over the points and angles
     if rotate_world_xy_based_on_m_angle_to_get_abs_coord:
         new_monkey_view_xy = []
         # because the monkey angle is the angle from the x-axis, but now we want the angle from the y-axis, so that to the north is 0
         monkey_angle = monkey_angle - math.pi/2
-        for i, (x, y, angle) in enumerate(zip(gaze_monkey_view_x, gaze_monkey_view_y, monkey_angle)):
+        for i, (x, y, angle) in enumerate(zip(gaze_mky_view_x, gaze_mky_view_y, monkey_angle)):
             # Create the rotation matrix
             rotation_matrix = np.array([
                 [np.cos(angle), -np.sin(angle)],
@@ -154,74 +155,72 @@ def apply_formulas_to_convert_eye_position_to_ff_position(hor_theta, ver_theta, 
         new_monkey_view_xy = np.array(new_monkey_view_xy)
     else:
         new_monkey_view_xy = np.stack(
-            (gaze_monkey_view_x, gaze_monkey_view_y), axis=1)
+            (gaze_mky_view_x, gaze_mky_view_y), axis=1)
 
     gaze_world_x = body_x + new_monkey_view_xy[:, 0]
     gaze_world_y = body_y + new_monkey_view_xy[:, 1]
 
-    gaze_monkey_view_angle = np.arctan2(gaze_monkey_view_y, gaze_monkey_view_x)
+    gaze_mky_view_angle = np.arctan2(gaze_mky_view_y, gaze_mky_view_x)
     # We want to make the north as 0, so we need to subtract pi/2 from the angle
-    gaze_monkey_view_angle = (gaze_monkey_view_angle - math.pi/2) % (2*math.pi)
-    gaze_monkey_view_angle[gaze_monkey_view_angle >
-                           math.pi] = gaze_monkey_view_angle[gaze_monkey_view_angle > math.pi] - 2*math.pi
+    gaze_mky_view_angle = (gaze_mky_view_angle - math.pi/2) % (2*math.pi)
+    gaze_mky_view_angle[gaze_mky_view_angle >
+                        math.pi] = gaze_mky_view_angle[gaze_mky_view_angle > math.pi] - 2*math.pi
 
-    return gaze_monkey_view_x, gaze_monkey_view_y, gaze_monkey_view_angle, gaze_world_x, gaze_world_y
-
-
-def find_eye_positions_rotated_in_world_coordinates(monkey_information, duration, rotation_matrix, separate_left_and_right_eyes=False):
-
-    if not separate_left_and_right_eyes:
-        gaze_world_xy_rotated, overall_valid_indices, monkey_subset = _find_eye_positions_rotated_in_world_coordinates(
-            monkey_information, duration, rotation_matrix, suffix_for_column='')
-        return gaze_world_xy_rotated, overall_valid_indices, monkey_subset
-    else:
-        gaze_world_xy_rotated_l, overall_valid_indices_l, monkey_subset_l = _find_eye_positions_rotated_in_world_coordinates(
-            monkey_information, duration, rotation_matrix, suffix_for_column='_l')
-        gaze_world_xy_rotated_r, overall_valid_indices_r, monkey_subset_r = _find_eye_positions_rotated_in_world_coordinates(
-            monkey_information, duration, rotation_matrix, suffix_for_column='_r')
-
-        both_eyes_info = {'gaze_world_xy_rotated': {'left': gaze_world_xy_rotated_l, 'right': gaze_world_xy_rotated_r},
-                          'overall_valid_indices': {'left': overall_valid_indices_l, 'right': overall_valid_indices_r},
-                          'monkey_subset': {'left': monkey_subset_l, 'right': monkey_subset_r}
-                          }
-        return both_eyes_info
+    return gaze_mky_view_x, gaze_mky_view_y, gaze_mky_view_angle, gaze_world_x, gaze_world_y
 
 
-def _find_eye_positions_rotated_in_world_coordinates(monkey_information, duration, rotation_matrix, suffix_for_column=''):
-    monkey_subset = monkey_information[(monkey_information['time'] >= duration[0]) & (
+def find_eye_positions_rotated_in_world_coordinates(monkey_information, duration, rotation_matrix, eye_col_suffix=''):
+    monkey_sub = monkey_information[(monkey_information['time'] >= duration[0]) & (
         monkey_information['time'] <= duration[1])].copy()
 
-    ver_theta = np.array(monkey_subset['LDz'])
-    if suffix_for_column == '_r':
-        ver_theta = np.array(monkey_subset['RDz'])
+    gaze_world_x = np.array(monkey_sub['gaze_world_x'+eye_col_suffix])
+    gaze_world_y = np.array(monkey_sub['gaze_world_y'+eye_col_suffix])
+    gaze_world_xy = np.stack((gaze_world_x, gaze_world_y), axis=0)
 
-    gaze_world_x = np.array(monkey_subset['gaze_world_x'+suffix_for_column])
-    gaze_world_y = np.array(monkey_subset['gaze_world_y'+suffix_for_column])
+    gaze_world_xy_rotated = np.matmul(rotation_matrix, gaze_world_xy)
+    monkey_sub['gaze_world_x_rotated'] = gaze_world_xy_rotated[0, :]
+    monkey_sub['gaze_world_y_rotated'] = gaze_world_xy_rotated[1, :]
 
-    gaze_world_xy_rotated, meaningful_pos_indices, overall_valid_pos_indices = find_eye_positions_given_info(
-        gaze_world_x, gaze_world_y, ver_theta, rotation_matrix)
-
-    monkey_subset = monkey_subset[['point_index', 'time']].copy()
-    monkey_subset['gaze_world_x_rotated'] = gaze_world_xy_rotated[0, :]
-    monkey_subset['gaze_world_y_rotated'] = gaze_world_xy_rotated[1, :]
-    monkey_subset['eye_position_meaningful'] = False
-    monkey_subset['eye_position_overall_valid'] = False
-    # find index in df for meaningful_pos_indices
-
-    meaningful_indices = monkey_subset.index[meaningful_pos_indices]
-    overall_valid_indices = monkey_subset.index[overall_valid_pos_indices]
-    monkey_subset.loc[meaningful_indices, 'eye_position_meaningful'] = True
-    monkey_subset.loc[overall_valid_indices, 'eye_position_overall_valid'] = True
-
-    return gaze_world_xy_rotated, overall_valid_indices, monkey_subset
+    return monkey_sub
 
 
-def find_eye_positions_given_info(gaze_world_x, gaze_world_y, ver_theta, rotation_matrix):
+def find_valid_view_points(monkey_information):
+    # Process left eye view
+    valid_view_points_pos_indices = _find_valid_view_points(
+        monkey_information[['gaze_world_x_l', 'gaze_world_y_l']].values,
+        monkey_information.LDz.values*pi/180
+    )
+    monkey_information['valid_view_point_l'] = False
+    monkey_information.loc[valid_view_points_pos_indices,
+                           'valid_view_point_l'] = True
 
-    gaze_world_xy = np.stack((gaze_world_x, gaze_world_y), axis=1)
+    # Process right eye view
+    valid_view_points_pos_indices = _find_valid_view_points(
+        monkey_information[['gaze_world_x_r', 'gaze_world_y_r']].values,
+        monkey_information.RDz.values*pi/180
+    )
+    monkey_information['valid_view_point_r'] = False
+    monkey_information.loc[valid_view_points_pos_indices,
+                           'valid_view_point_r'] = True
+
+    # Process combined-eye view
+    valid_view_points_pos_indices = _find_valid_view_points(
+        monkey_information[['gaze_world_x', 'gaze_world_y']].values,
+        np.minimum(monkey_information.LDz.values*pi/180,
+                   monkey_information.RDz.values*pi/180)
+        # use the smaller of the two vertical angles, because we only care if the angle is below 0)
+    )
+    monkey_information['valid_view_point'] = False
+    monkey_information.loc[valid_view_points_pos_indices,
+                           'valid_view_point'] = True
+
+    return monkey_information
+
+
+def _find_valid_view_points(gaze_world_xy, ver_theta):
+
     gaze_world_r = LA.norm(gaze_world_xy, axis=1)
-    gaze_world_xy_rotated = gaze_world_xy.T
-    gaze_world_xy_rotated = np.matmul(rotation_matrix, gaze_world_xy_rotated)
+    gaze_world_x = gaze_world_xy[:, 0]
 
     valid_ver_theta_points = np.where(ver_theta < 0)[0]
     not_nan_indices = np.where(np.isnan(gaze_world_x) == False)[0]
@@ -229,37 +228,46 @@ def find_eye_positions_given_info(gaze_world_x, gaze_world_y, ver_theta, rotatio
         valid_ver_theta_points, not_nan_indices)
 
     within_arena_points = np.where(gaze_world_r < 1000)[0]
-    overall_valid_pos_indices = np.intersect1d(
+    valid_view_points_pos_indices = np.intersect1d(
         meaningful_pos_indices, within_arena_points)
 
-    return gaze_world_xy_rotated, meaningful_pos_indices, overall_valid_pos_indices
+    return valid_view_points_pos_indices
 
 
-def find_eye_world_speed(gaze_monkey_view_xy, cum_t, overall_valid_indices):
-    gaze_x = gaze_monkey_view_xy[0]
-    gaze_y = gaze_monkey_view_xy[1]
-
-    delta_x = np.diff(gaze_x[overall_valid_indices])
-    delta_y = np.diff(gaze_y[overall_valid_indices])
-    delta_t = np.diff(cum_t[overall_valid_indices])
-
+def find_eye_world_speed(monkey_information):
+    monkey_df = monkey_information[monkey_information['valid_view_point']==True].copy(
+    )
+    delta_x = np.diff(monkey_df['gaze_mky_view_x'])
+    delta_y = np.diff(monkey_df['gaze_mky_view_y'])
+    delta_t = np.diff(monkey_df['time'])
     delta_position = LA.norm(np.array([delta_x, delta_y]), axis=0)
-    eye_world_speed = delta_position/delta_t
+    eye_world_speed = delta_position / delta_t
     eye_world_speed = np.append(eye_world_speed[0], eye_world_speed)
+    monkey_df['eye_world_speed'] = eye_world_speed
 
-    return eye_world_speed
+    # now, use merge to put eye_world_speed back to the original monkey_information
+    monkey_information = pd.merge(monkey_information, monkey_df[[
+                                  'point_index', 'eye_world_speed']], on='point_index', how='left')
+    # convert inf to NA
+    monkey_information['eye_world_speed'] = monkey_information['eye_world_speed'].replace([
+                                                                                          np.inf, -np.inf], np.nan)
+    # use forward and backward fill to fill in the nans
+    monkey_information['eye_world_speed'] = monkey_information['eye_world_speed'].fillna(
+        method='ffill')
+    monkey_information['eye_world_speed'] = monkey_information['eye_world_speed'].fillna(
+        method='bfill')
+    return monkey_information
 
 
-def plot_eye_world_speed_vs_monkey_speed(gaze_monkey_view_xy, cum_t, overall_valid_indices, monkey_information):
+def plot_eye_world_speed_vs_monkey_speed(monkey_sub):
+    # gaze_mky_view_xy, cum_t, overall_valid_indices,
+    monkey_sub = monkey_sub.copy()
+    monkey_sub['cum_t'] = monkey_sub['time'] - monkey_sub['time'].values[0]
 
-    eye_world_speed = find_eye_world_speed(
-        gaze_monkey_view_xy, cum_t, overall_valid_indices)
-    eye_world_speed[eye_world_speed > 1000] = 1000
-    cum_t_to_plot = cum_t - cum_t[0]
-    relevant_monkey_info = monkey_information[monkey_information.time.isin(
-        cum_t)]
-    corresponding_monkey_speed = relevant_monkey_info.monkey_speed.values
-    corresponding_monkey_dw = relevant_monkey_info.monkey_dw.values
+    # get eye data to plot
+    monkey_sub2 = monkey_sub[monkey_sub['valid_view_point'] == True].copy()
+    monkey_sub2.loc[monkey_sub2['eye_world_speed']
+                    > 1000, 'eye_world_speed'] = 1000
 
     legend_labels = {1: "Eye Speed",
                      2: 'Monkey linear speed',
@@ -278,8 +286,8 @@ def plot_eye_world_speed_vs_monkey_speed(gaze_monkey_view_xy, cum_t, overall_val
     fig.subplots_adjust(right=0.75)
 
     i = 1  # eye speed
-    p1, = ax.plot(cum_t_to_plot[overall_valid_indices],
-                  eye_world_speed, color=colors[i], label=legend_labels[i])
+    p1, = ax.plot(monkey_sub2['cum_t'], monkey_sub2['eye_world_speed'],
+                  color=colors[i], label=legend_labels[i])
     ax.set_xlabel('Time (s)', fontsize=12)
     ax.set_ylabel(ylabels[i], color='darkgoldenrod', fontsize=10)
 
@@ -293,13 +301,13 @@ def plot_eye_world_speed_vs_monkey_speed(gaze_monkey_view_xy, cum_t, overall_val
 
     i = 2  # monkey linear speed
     ax2 = ax.twinx()
-    p2, = ax2.plot(cum_t_to_plot, corresponding_monkey_speed,
+    p2, = ax2.plot(monkey_sub['cum_t'], monkey_sub['monkey_speed'],
                    color=colors[i], label=legend_labels[i])
     ax2.set_ylabel(ylabels[i], color=colors[i], fontsize=13)
 
     i = 3  # monkey angular speed
     ax3 = ax.twinx()
-    p3, = ax3.plot(cum_t_to_plot, corresponding_monkey_dw,
+    p3, = ax3.plot(monkey_sub['cum_t'], monkey_sub['monkey_dw'],
                    color=colors[i], label=legend_labels[i])
     ax3.set_ylabel(ylabels[i], color=colors[i], fontsize=13)
 

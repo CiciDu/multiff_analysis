@@ -324,19 +324,19 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         R = self.current_plotly_plot_key_comp['R']
 
         # prepare for both-eye cases and non-both-eye cases
-        self.both_eyes_info = eye_positions.find_eye_positions_rotated_in_world_coordinates(
-            trajectory_df, duration, rotation_matrix=R, separate_left_and_right_eyes=True)
-        for left_or_right in ['left', 'right']:
-            monkey_subset = self.both_eyes_info['monkey_subset'][left_or_right]
+        self.both_eyes_info = {}
+        for left_or_right, suffix, marker in [('left', '_r', 'o'), ('right', '_r', 's')]:
+            monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
+                trajectory_df, duration, rotation_matrix=R, eye_col_suffix=suffix
+            )
             monkey_subset = monkey_subset.merge(trajectory_df[[
                                                 'point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')
             monkey_subset.set_index('point_index', inplace=True)
             monkey_subset['point_index'] = monkey_subset.index
-            # put it back
-            self.both_eyes_info['monkey_subset'][left_or_right] = monkey_subset
+            self.both_eyes_info[left_or_right] = monkey_subset
 
         # for non-both-eye cases
-        _, _, self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
+        self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
             trajectory_df, duration, rotation_matrix=R)
         self.monkey_subset = self.monkey_subset.merge(trajectory_df[[
                                                       'point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')

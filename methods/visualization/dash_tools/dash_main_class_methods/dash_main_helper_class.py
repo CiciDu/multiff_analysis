@@ -168,7 +168,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                                                                     marker='circle', marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions)
         else:
             for left_or_right, marker, trace_name, arrowcolor in [('left', 'triangle-left', trace_name + '_left', 'purple'), ('right', 'triangle-right', trace_name + '_right', 'orange')]:
-                monkey_subset = self.both_eyes_info['monkey_subset'][left_or_right]
+                monkey_subset = self.both_eyes_info[left_or_right]
                 monkey_subset2 = self.monkey_subset.copy()
                 if point_index_to_show_traj_curv is not None:
                     try:

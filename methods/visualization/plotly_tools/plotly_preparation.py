@@ -171,10 +171,10 @@ def make_trajectory_df(PlotTrials_args,
 
     # in case we need to plot eye positions later
     eye_positions_columns = ['point_index', 'gaze_world_x', 'gaze_world_y',
-                             'gaze_monkey_view_x', 'gaze_monkey_view_y', 'LDz', 'RDz']
+                             'gaze_mky_view_x', 'gaze_mky_view_y', 'LDz', 'RDz']
     if 'gaze_world_x_l' in monkey_information.columns:
-        eye_positions_columns.extend(['gaze_world_x_l', 'gaze_world_y_l', 'gaze_monkey_view_x_l', 'gaze_monkey_view_y_l',
-                                      'gaze_world_x_r', 'gaze_world_y_r', 'gaze_monkey_view_x_r', 'gaze_monkey_view_y_r'])
+        eye_positions_columns.extend(['gaze_world_x_l', 'gaze_world_y_l', 'gaze_mky_view_x_l', 'gaze_mky_view_y_l',
+                                      'gaze_world_x_r', 'gaze_world_y_r', 'gaze_mky_view_x_r', 'gaze_mky_view_y_r'])
     try:
         trajectory_df = trajectory_df.merge(
             monkey_information[eye_positions_columns], on='point_index', how='left')
