@@ -27,10 +27,10 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
 
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
-    # default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2, -0.1, 0, 0.1, 0.2],
-    #                                           'distance': [-100, -50]}
+    default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2, -0.1, 0, 0.1, 0.2],
+                                              'distance': [-100, -150]}
 
-    default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2]}
+    # default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2]}
 
     def __init__(self,
                  monkey_name='monkey_Bruno',

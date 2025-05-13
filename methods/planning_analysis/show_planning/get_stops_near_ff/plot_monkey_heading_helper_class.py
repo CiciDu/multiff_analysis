@@ -6,7 +6,7 @@ from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff
 from planning_analysis.plan_factors import plan_factors_utils
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.dash_tools import dash_utils
-from visualization import monkey_heading_functions, plot_behaviors_utils
+from visualization.matplotlib_tools import monkey_heading_functions, plot_behaviors_utils
 from planning_analysis.test_params_for_planning import params_utils
 from non_behavioral_analysis import eye_positions
 from matplotlib.lines import Line2D
@@ -61,7 +61,7 @@ class PlotMonkeyHeadingHelper():
         self.mheading_for_traj_in_duration = monkey_heading_functions.find_mheading_dict_from_curv_of_traj(
             self.curv_of_traj_df_in_duration)
         self.traj_triangle_df_in_duration = monkey_heading_functions.turn_mheading_into_triangle_df(
-            self.mheading_for_traj_in_duration, self.current_plotly_plot_key_comp['R'], point_index=self.curv_of_traj_df_in_duration['point_index'].values)
+            self.mheading_for_traj_in_duration, self.current_plotly_key_comp['rotation_matrix'], point_index=self.curv_of_traj_df_in_duration['point_index'].values)
 
         self._find_mheading_and_triangle_df_for_stop_for_the_duration()
 
@@ -72,7 +72,7 @@ class PlotMonkeyHeadingHelper():
             mheading_before_stop_row = self.mheading_before_stop[
                 self.mheading_before_stop['stop_point_index'] == self.stop_point_index]
             self.before_stop_triangle_df = monkey_heading_functions.turn_mheading_into_triangle_df(
-                mheading_before_stop_row, self.current_plotly_plot_key_comp['R'])
+                mheading_before_stop_row, self.current_plotly_key_comp['rotation_matrix'])
 
     def show_all_monkey_heading_in_plotly(self):
         """
@@ -83,7 +83,7 @@ class PlotMonkeyHeadingHelper():
         """
 
         def plot_heading(fig, triangle_df, trace_name_prefix, color, linewidth=1):
-            return monkey_heading_functions.plot_triangles_to_show_monkey_heading_in_xy_in_plotly(
+            return plotly_for_monkey.plot_triangles_to_show_monkey_heading_in_xy_in_plotly(
                 fig, triangle_df, trace_name_prefix=trace_name_prefix, color=color, linewidth=linewidth
             )
 
@@ -131,11 +131,11 @@ class PlotMonkeyHeadingHelper():
         self.mheading_for_before_stop = monkey_heading_functions.find_mheading_in_xy(
             self.stops_near_ff_row.point_index_before_stop.reshape(-1, 1), self.monkey_information)
         self.stop_triangle_df = monkey_heading_functions.turn_mheading_into_triangle_df(
-            self.mheading_for_stop, self.current_plotly_plot_key_comp['R'])
+            self.mheading_for_stop, self.current_plotly_key_comp['rotation_matrix'])
         self.next_stop_triangle_df = monkey_heading_functions.turn_mheading_into_triangle_df(
-            self.mheading_for_next_stop, self.current_plotly_plot_key_comp['R'])
+            self.mheading_for_next_stop, self.current_plotly_key_comp['rotation_matrix'])
         self.before_stop_triangle_df = monkey_heading_functions.turn_mheading_into_triangle_df(
-            self.mheading_for_before_stop, self.current_plotly_plot_key_comp['R'])
+            self.mheading_for_before_stop, self.current_plotly_key_comp['rotation_matrix'])
 
     def _find_mheading_and_triangle_df_for_null_arcs_for_the_duration(self):
         self.mheading_for_cur_ff_in_duration = monkey_heading_functions.find_mheading_in_xy_for_null_curv(
@@ -143,9 +143,9 @@ class PlotMonkeyHeadingHelper():
         self.mheading_for_nxt_ff_in_duration = monkey_heading_functions.find_mheading_in_xy_for_null_curv(
             self.nxt_null_arc_info_for_duration)
         self.cur_ff_triangle_df_in_duration = monkey_heading_functions.turn_mheading_into_triangle_df(
-            self.mheading_for_cur_ff_in_duration, self.current_plotly_plot_key_comp['R'], point_index=self.cur_null_arc_info_for_duration['arc_point_index'].values)
+            self.mheading_for_cur_ff_in_duration, self.current_plotly_key_comp['rotation_matrix'], point_index=self.cur_null_arc_info_for_duration['arc_point_index'].values)
         self.nxt_ff_triangle_df_in_duration = monkey_heading_functions.turn_mheading_into_triangle_df(
-            self.mheading_for_nxt_ff_in_duration, self.current_plotly_plot_key_comp['R'], point_index=self.nxt_null_arc_info_for_duration['arc_point_index'].values)
+            self.mheading_for_nxt_ff_in_duration, self.current_plotly_key_comp['rotation_matrix'], point_index=self.nxt_null_arc_info_for_duration['arc_point_index'].values)
 
     def _get_all_triangle_df_for_the_point_from_triangle_df_in_duration(self):
         # note that we already have stop_triangle_df, next_stop_triangle_df and before_stop_triangle_df because they are the same for the whole duration

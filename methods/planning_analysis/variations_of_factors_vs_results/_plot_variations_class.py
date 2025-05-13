@@ -4,7 +4,10 @@ from planning_analysis.variations_of_factors_vs_results import plot_variations_u
 import os
 
 
-class _PlotVariations():
+class _PlotVariations:
+
+    def __init__(self):
+        pass
 
     def plot_heading_in_overall_median_info(self,
                                             x_var_column_list=[
@@ -19,13 +22,13 @@ class _PlotVariations():
                                             use_subplots_based_on_changeable_variables=False,
                                             ):
 
-        se_column = 'diff_in_abs_boot_med_std' if add_error_bars else None
+        se_column = 'diff_in_abs_d_heading_boot_med_std' if add_error_bars else None
 
         plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(self.all_median_info_heading,
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
-                                                                                        y_var_column='diff_in_abs_50%',
+                                                                                        y_var_column='diff_in_abs_d_heading_median',
                                                                                         se_column=se_column,
                                                                                         # var_to_determine_x_offset_direction=None,
                                                                                         var_to_determine_x_offset_direction='test_or_control',
@@ -51,7 +54,7 @@ class _PlotVariations():
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
-                                                                                        y_var_column='diff_in_abs_d_curv_50%',
+                                                                                        y_var_column='diff_in_abs_d_curv_median',
                                                                                         se_column=se_column,
                                                                                         # var_to_determine_x_offset_direction=None,
                                                                                         var_to_determine_x_offset_direction='test_or_control',

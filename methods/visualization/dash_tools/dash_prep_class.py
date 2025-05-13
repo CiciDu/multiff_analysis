@@ -1,11 +1,12 @@
 
 import sys
-from visualization.plotly_tools import plotly_preparation, plotly_for_scatterplot, plotly_for_null_arcs, plotly_for_correlation
+from visualization.plotly_tools import plotly_preparation, plotly_for_scatterplot, plotly_for_null_arcs, plotly_for_correlation, plotly_for_monkey, plotly_plot_class
 from visualization.dash_tools import dash_utils, dash_utils
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
-from visualization import monkey_heading_functions
+from visualization.matplotlib_tools import monkey_heading_functions
 from non_behavioral_analysis import eye_positions
+from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
 
 
 import os
@@ -69,7 +70,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
     def _find_trajectory_ref_row(self):
         ref_point_index = self.nxt_ff_df2[self.nxt_ff_df2['stop_point_index']
                                           == self.stop_point_index]['point_index'].item()
-        trajectory_df = self.current_plotly_plot_key_comp['trajectory_df']
+        trajectory_df = self.current_plotly_key_comp['trajectory_df']
         self.trajectory_ref_row = trajectory_df[trajectory_df['point_index']
                                                 <= ref_point_index]
         if len(self.trajectory_ref_row) > 0:
@@ -79,7 +80,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
     def _find_trajectory_next_stop_row(self):
         next_stop_point_index = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                       == self.stop_point_index]['next_stop_point_index'].item()
-        trajectory_df = self.current_plotly_plot_key_comp['trajectory_df']
+        trajectory_df = self.current_plotly_key_comp['trajectory_df']
         self.trajectory_next_stop_row = trajectory_df[trajectory_df['point_index']
                                                       == next_stop_point_index].iloc[0]
         return self.trajectory_next_stop_row
@@ -128,7 +129,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                        == self.stop_point_index].iloc[0]
         self.curv_of_traj_df_in_duration = curv_of_traj_utils.find_curv_of_traj_df_in_duration(
-            self.curv_of_traj_df, self.current_plotly_plot_key_comp['duration_to_plot'])
+            self.curv_of_traj_df, self.current_plotly_key_comp['duration_to_plot'])
         self.curv_of_traj_df_in_duration['rel_time'] = np.round(
             self.curv_of_traj_df_in_duration['time'] - self.stops_near_ff_row.stop_time, 2)
         self.curv_of_traj_df_in_duration['rel_distance'] = np.round(
@@ -140,10 +141,10 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
     def _produce_fig_scatter(self, use_two_y_axes=True):
         self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_scatterplot.find_monkey_hoverdata_value_for_both_fig_scatter(
-            self.hoverdata_column, self.monkey_hoverdata_value, self.current_plotly_plot_key_comp['trajectory_df'])
+            self.hoverdata_column, self.monkey_hoverdata_value, self.current_plotly_key_comp['trajectory_df'])
 
         if self.monkey_plot_params['show_visible_segments'] is True:
-            self.visible_segments_info = {'ff_info': self.current_plotly_plot_key_comp['ff_dataframe_in_duration_visible_qualified'],
+            self.visible_segments_info = {'ff_info': self.current_plotly_key_comp['ff_dataframe_in_duration_visible_qualified'],
                                           'monkey_information': self.monkey_information,
                                           'stops_near_ff_row': self.stops_near_ff_row
                                           }
@@ -152,12 +153,12 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
         self.fig_scatter_s = plotly_for_scatterplot.make_the_initial_fig_scatter(self.curv_of_traj_df_in_duration, self.monkey_hoverdata_value_s, self.cur_ff_color, self.nxt_ff_color, trajectory_ref_row=self.trajectory_ref_row,
                                                                                  use_two_y_axes=use_two_y_axes, x_column_name='rel_time', curv_of_traj_trace_name=self.curv_of_traj_trace_name,
-                                                                                 show_visible_segments=self.current_plotly_plot_key_comp[
+                                                                                 show_visible_segments=self.current_plotly_key_comp[
                                                                                      'show_visible_segments'],
                                                                                  visible_segments_info=self.visible_segments_info, trajectory_next_stop_row=self.trajectory_next_stop_row)
         self.fig_scatter_cm = plotly_for_scatterplot.make_the_initial_fig_scatter(self.curv_of_traj_df_in_duration, self.monkey_hoverdata_value_cm, self.cur_ff_color, self.nxt_ff_color, trajectory_ref_row=self.trajectory_ref_row,
                                                                                   use_two_y_axes=use_two_y_axes, x_column_name='rel_distance', curv_of_traj_trace_name=self.curv_of_traj_trace_name,
-                                                                                  show_visible_segments=self.current_plotly_plot_key_comp[
+                                                                                  show_visible_segments=self.current_plotly_key_comp[
                                                                                       'show_visible_segments'],
                                                                                   visible_segments_info=self.visible_segments_info, trajectory_next_stop_row=self.trajectory_next_stop_row)
 
@@ -184,16 +185,16 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         if self.curv_of_traj_df is None:
             raise ValueError(
                 'curv_of_traj_df is None, so cannot show nxt_ff_curv')
-        self.nxt_ff_curv_df = plotly_preparation.find_nxt_ff_curv_df(
-            self.current_plotly_plot_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
+        self.nxt_ff_curv_df = dash_utils._find_nxt_ff_curv_df(
+            self.current_plotly_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
         self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
             self.fig_scatter_s, self.nxt_ff_curv_df, name='Alt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-down')
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
             self.fig_scatter_cm, self.nxt_ff_curv_df, name='Alt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-down')
 
     def _show_cur_ff_curv_in_scatterplot_func(self, y_column_name='curv_to_ff_center'):
-        self.cur_ff_curv_df = plotly_preparation.find_cur_ff_curv_df(
-            self.current_plotly_plot_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
+        self.cur_ff_curv_df = dash_utils._find_cur_ff_curv_df(
+            self.current_plotly_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
         self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
             self.fig_scatter_s, self.cur_ff_curv_df, name='cur ff Curv to Center', color=self.cur_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-up')
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
@@ -201,12 +202,18 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
     def _update_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
-        rotation_matrix = self.current_plotly_plot_key_comp['R']
+        rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
         self.fig = plotly_for_null_arcs.update_null_arcs_in_plotly(
             self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix, trace_name='nxt null arc')
         self.fig = plotly_for_null_arcs.update_null_arcs_in_plotly(
             self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix, trace_name='cur null arc')
         return self.fig
+
+    def _find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration(self):
+        self.cur_null_arc_info_for_the_point = self.cur_null_arc_info_for_duration[
+            self.cur_null_arc_info_for_duration['arc_point_index'] == self.point_index_to_show_traj_curv]
+        self.nxt_null_arc_info_for_the_point = self.nxt_null_arc_info_for_duration[
+            self.nxt_null_arc_info_for_duration['arc_point_index'] == self.point_index_to_show_traj_curv]
 
     def _make_fig_corr_2(self):
 
@@ -318,16 +325,16 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
     def _prepare_to_plot_eye_positions_for_dash(self):
 
-        trajectory_df = self.current_plotly_plot_key_comp['trajectory_df'].copy(
+        trajectory_df = self.current_plotly_key_comp['trajectory_df'].copy(
         )
-        duration = self.current_plotly_plot_key_comp['duration_to_plot']
-        R = self.current_plotly_plot_key_comp['R']
+        duration = self.current_plotly_key_comp['duration_to_plot']
+        rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
 
         # prepare for both-eye cases and non-both-eye cases
         self.both_eyes_info = {}
         for left_or_right, suffix, marker in [('left', '_r', 'o'), ('right', '_r', 's')]:
             monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
-                trajectory_df, duration, rotation_matrix=R, eye_col_suffix=suffix
+                trajectory_df, duration, rotation_matrix=rotation_matrix, eye_col_suffix=suffix
             )
             monkey_subset = monkey_subset.merge(trajectory_df[[
                                                 'point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')
@@ -337,17 +344,70 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
         # for non-both-eye cases
         self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
-            trajectory_df, duration, rotation_matrix=R)
+            trajectory_df, duration, rotation_matrix=rotation_matrix)
         self.monkey_subset = self.monkey_subset.merge(trajectory_df[[
                                                       'point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')
         self.monkey_subset.index = self.monkey_subset['point_index'].values
 
+    def _produce_fig_for_dash(self, mark_reference_point=True):
 
-# def _update_eye_positions_based_on_monkey_hoverdata(fig, point_index_to_show_traj_curv, current_plotly_plot_key_comp, show_eye_positions_for_both_eyes=False):
-#     current_plotly_plot_key_comp_2 = copy.deepcopy(current_plotly_plot_key_comp)
-#     trajectory_df = current_plotly_plot_key_comp_2['trajectory_df']
+        self.monkey_plot_params = self.monkey_plot_params.update({'show_reward_boundary': True,
+                                                                  'show_traj_points_when_making_lines': True,
+                                                                  'eye_positions_trace_name': 'all_eye_positions',
+                                                                  'hoverdata_multi_columns': self.hoverdata_multi_columns,
+                                                                  })
+
+        self.monkey_plot_params['traj_portion'] = self.traj_portion if self.monkey_plot_params['show_traj_portion'] else None
+
+        self._update_show_stop_point_indices()
+
+        self._prepare_to_plot_eye_positions_for_dash()
+
+        self.fig = plotly_plot_class.PlotlyPlotter.make_one_monkey_plotly_plot(self,
+                                                                               monkey_plot_params=self.monkey_plot_params)
+
+        if self.monkey_plot_params['show_monkey_heading']:
+            plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper._get_all_triangle_df_for_the_point_from_triangle_df_in_duration(
+                self)
+            self.fig = plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.show_all_monkey_heading_in_plotly(
+                self)
+
+        if self.monkey_plot_params['show_null_arcs_to_ff']:
+            self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
+            self.fig = plotly_plot_class._show_null_arcs_for_cur_and_nxt_ff_in_plotly(
+                self)
+
+        if mark_reference_point:
+            self.fig = plotly_for_monkey.mark_reference_point_in_monkey_plot(
+                self.fig, self.trajectory_ref_row)
+
+        for i, trace in enumerate(self.fig.data):
+            if trace.name == 'trajectory_data':
+                self.trajectory_data_trace_index = i
+                break
+
+        self.traj_portion_trace_index = -1
+        for i, trace in enumerate(self.fig.data):
+            if trace.name == 'to_show_the_scope_for_curv':
+                self.traj_portion_trace_index = i
+                break
+
+        return self.fig
+
+    def _update_show_stop_point_indices(self):
+        if self.monkey_plot_params.get('show_stops', False):
+            self.monkey_plot_params['show_stop_point_indices'] = [
+                int(self.stops_near_ff_row.stop_point_index),
+                int(self.stops_near_ff_row.next_stop_point_index)
+            ]
+        # else:
+        #     self.monkey_plot_params['show_stop_point_indices'] = None
+
+# def _update_eye_positions_based_on_monkey_hoverdata(fig, point_index_to_show_traj_curv, current_plotly_key_comp, show_eye_positions_for_both_eyes=False):
+#     current_plotly_key_comp_2 = copy.deepcopy(current_plotly_key_comp)
+#     trajectory_df = current_plotly_key_comp_2['trajectory_df']
 #     trajectory_df = trajectory_df[trajectory_df['point_index'] == point_index_to_show_traj_curv]
-#     current_plotly_plot_key_comp_2['trajectory_df'] = trajectory_df
-#     fig = plotly_for_monkey.plot_eye_positions_in_plotly(fig, current_plotly_plot_key_comp_2, show_eye_positions_for_both_eyes=show_eye_positions_for_both_eyes,
+#     current_plotly_key_comp_2['trajectory_df'] = trajectory_df
+#     fig = plotly_for_monkey.plot_eye_positions_in_plotly(fig, current_plotly_key_comp_2, show_eye_positions_for_both_eyes=show_eye_positions_for_both_eyes,
 #                                                         use_arrow_to_show_eye_positions=True, marker_size=15)
 #     return fig

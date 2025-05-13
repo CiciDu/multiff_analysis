@@ -246,7 +246,7 @@ def _set_minimal_y_scale(fig, sub_df, y_var_column,
 
 def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
                                                  x_var_column,
-                                                 y_var_column='diff_in_abs_50%',
+                                                 y_var_column='diff_in_abs_d_heading_median',
                                                  var_to_determine_x_offset_direction='ref_columns_only',
                                                  title=None,
                                                  x_offset=0.1,

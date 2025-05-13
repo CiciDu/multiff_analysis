@@ -218,54 +218,37 @@ def plot_scatter_around_target_df(closest_stop_to_capture_df, monkey_information
         valid_subset, monkey_information, ff_real_position_sorted)
 
 
+def describe_and_rename_one_variable(df, prefix=''):
+    desc = df.describe().T[['mean', 'std', '25%', '50%', '75%']].rename(columns={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    desc['iqr'] = desc['Q3'] - desc['Q1']
+    desc.columns = [prefix + col for col in desc.columns]
+    desc.reset_index(inplace=True, drop=True)
+    return desc
+
 def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df, ff_real_position_sorted, data_folder_name=None, make_plot=False):
     valid_subset = get_valid_subset_to_construct_scatter_around_target_df(
         closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
 
     if make_plot:
-        plot_monkey_landings_in_ff(
-            valid_subset, monkey_information, ff_real_position_sorted)
+        plot_monkey_landings_in_ff(valid_subset, monkey_information, ff_real_position_sorted)
 
-    # get the mean, std, 25%, 50%, 75% of distance, angle, and abs_angle
-    scatter_around_target_df = valid_subset[['distance_from_ff_to_stop']].describe(
-    ).T[['mean', 'std', '25%', '50%', '75%']]
-    scatter_around_target_df['iqr'] = scatter_around_target_df['75%'] - \
-        scatter_around_target_df['25%']
-    scatter_around_target_df.columns = [
-        'distance_' + i for i in scatter_around_target_df.columns]
-    scatter_around_target_df.reset_index(inplace=True, drop=True)
+    # Describe and rename columns for distance, angle, and abs_angle
+    scatter_around_target_df = describe_and_rename_one_variable(valid_subset[['distance_from_ff_to_stop']], 'distance_')
+    scatter_around_target_df_angle = describe_and_rename_one_variable(valid_subset[['angle_in_degrees_from_ff_to_stop']], 'angle_')
+    scatter_around_target_df_abs_angle = describe_and_rename_one_variable(valid_subset[['angle_in_degrees_from_ff_to_stop']].abs(), 'abs_angle_')
 
-    scatter_around_target_df_angle = valid_subset[[
-        'angle_in_degrees_from_ff_to_stop']].describe().T[['mean', 'std', '25%', '50%', '75%']]
-    scatter_around_target_df_angle['iqr'] = scatter_around_target_df_angle['75%'] - \
-        scatter_around_target_df_angle['25%']
-    scatter_around_target_df_angle.columns = [
-        'angle_' + i for i in scatter_around_target_df_angle.columns]
-    scatter_around_target_df_angle.reset_index(inplace=True, drop=True)
-    scatter_around_target_df = pd.concat(
-        [scatter_around_target_df, scatter_around_target_df_angle], axis=1)
+    # Concatenate all descriptions into one DataFrame
+    scatter_around_target_df = pd.concat([scatter_around_target_df, scatter_around_target_df_angle, scatter_around_target_df_abs_angle], axis=1)
 
-    scatter_around_target_df_abs_angle = valid_subset[['angle_in_degrees_from_ff_to_stop']].abs(
-    ).describe().T[['mean', 'std', '25%', '50%', '75%']]
-    scatter_around_target_df_abs_angle['iqr'] = scatter_around_target_df_abs_angle['75%'] - \
-        scatter_around_target_df_abs_angle['25%']
-    scatter_around_target_df_abs_angle.columns = [
-        'abs_angle_' + i for i in scatter_around_target_df_abs_angle.columns]
-    scatter_around_target_df_abs_angle.reset_index(inplace=True, drop=True)
-    scatter_around_target_df = pd.concat(
-        [scatter_around_target_df, scatter_around_target_df_abs_angle], axis=1)
-
-    # get the percentage of points in each quadrant
+    # Get the percentage of points in each quadrant
     quadrants = {1: [-90, 0], 2: [0, 90], 3: [90, 180], 4: [-180, -90]}
-    for quad in range(1, 5):
-        valid_subset2 = valid_subset[(valid_subset['angle_in_degrees_from_ff_to_stop'] >= quadrants[quad][0]) & (
-            valid_subset['angle_in_degrees_from_ff_to_stop'] < quadrants[quad][1])].copy()
+    for quad, (low, high) in quadrants.items():
+        valid_subset_quad = valid_subset[(valid_subset['angle_in_degrees_from_ff_to_stop'] >= low) & (valid_subset['angle_in_degrees_from_ff_to_stop'] < high)]
         col_name = f'Q{quad}_perc'
-        perc = len(valid_subset2)/len(valid_subset) * 100
-        scatter_around_target_df[col_name] = perc
+        scatter_around_target_df[col_name] = len(valid_subset_quad) / len(valid_subset) * 100
 
     if data_folder_name is not None:
-        general_utils.save_df_to_csv(
-            scatter_around_target_df, 'scatter_around_target_df', data_folder_name)
+        general_utils.save_df_to_csv(scatter_around_target_df, 'scatter_around_target_df', data_folder_name)
 
     return scatter_around_target_df
+

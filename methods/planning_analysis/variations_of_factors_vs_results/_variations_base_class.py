@@ -12,6 +12,7 @@ from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
 from os.path import exists
+from types import MethodType
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -22,31 +23,35 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
+    
+    
 class _VariationsBase(_predict_y_values_class._PredictYValues,
                       _compare_y_values_class._CompareYValues,
-                      _plot_variations_class._PlotVariations, ):
+                      _plot_variations_class._PlotVariations):
+    
+# class _VariationsBase:
 
     x_columns = ['time_when_cur_ff_last_seen_rel_to_stop',
                  'left_eye_cur_ff_time_perc',
                  'right_eye_cur_ff_time_perc',
                  'left_eye_cur_ff_time_perc_10',
                  'right_eye_cur_ff_time_perc_10',
-                 'LDy_25%',
-                 'LDy_50%',
-                 'LDy_75%',
-                 'LDz_25%',
-                 'LDz_50%',
-                 'LDz_75%',
-                 'RDy_25%',
-                 'RDy_50%',
-                 'RDy_75%',
-                 'RDz_25%',
-                 'monkey_speed_25%',
-                 'monkey_speed_50%',
-                 'monkey_speed_75%',
-                 'monkey_dw_25%',
-                 'monkey_dw_50%',
-                 'monkey_dw_75%',
+                 'LDy_Q1',
+                 'LDy_median',
+                 'LDy_Q3',
+                 'LDz_Q1',
+                 'LDz_median',
+                 'LDz_Q3',
+                 'RDy_Q1',
+                 'RDy_median',
+                 'RDy_Q3',
+                 'RDz_Q1',
+                 'monkey_speed_Q1',
+                 'monkey_speed_median',
+                 'monkey_speed_Q3',
+                 'monkey_dw_Q1',
+                 'monkey_dw_median',
+                 'monkey_dw_Q3',
                  # 'cur_ff_angle_when_cur_ff_last_seen',
                  # 'cur_ff_distance_when_cur_ff_last_seen',
                  # 'traj_curv_when_cur_ff_last_seen',
@@ -83,23 +88,29 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                     'curv_mean',
                     'curv_std',
                     'curv_min',
-                    'curv_25%',
-                    'curv_50%',
-                    'curv_75%',
+                    'curv_Q1',
+                    'curv_median',
+                    'curv_Q3',
                     'curv_max']
 
-    def __init__(self,
-                 # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='norm_opt_arc',
-                 ):
-
+    def __init__(self, optimal_arc_type='norm_opt_arc'):
         self.optimal_arc_type = optimal_arc_type
-        self.predict_inst = _predict_y_values_class._PredictYValues()
-        self.compare_inst = _compare_y_values_class._CompareYValues()
-        self.plot_inst = _plot_variations_class._PlotVariations()
-        self.__dict__.update(self.predict_inst.__dict__)
-        self.__dict__.update(self.compare_inst.__dict__)
-        self.__dict__.update(self.plot_inst.__dict__)
+
+        # # Bind methods from _PredictYValues
+        # for name, method in _predict_y_values_class._PredictYValues.__dict__.items():
+        #     if callable(method):
+        #         setattr(self, name, MethodType(method, self))
+
+        # # Bind methods from _CompareYValues
+        # for name, method in _compare_y_values_class._CompareYValues.__dict__.items():
+        #     if callable(method):
+        #         setattr(self, name, MethodType(method, self))
+
+        # # Bind methods from _PlotVariations
+        # for name, method in _plot_variations_class._PlotVariations.__dict__.items():
+        #     if callable(method):
+        #         setattr(self, name, MethodType(method, self))
+
 
     def make_key_paths(self):
         self.cur_and_nxt_data_comparison_path = os.path.join(

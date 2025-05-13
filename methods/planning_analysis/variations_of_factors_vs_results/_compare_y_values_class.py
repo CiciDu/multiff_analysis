@@ -22,7 +22,10 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class _CompareYValues():
+class _CompareYValues:
+
+    def __init__(self):
+        pass
 
     def make_or_retrieve_overall_median_info(self,
                                              exists_ok=True,

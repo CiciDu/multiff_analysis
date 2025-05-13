@@ -81,6 +81,8 @@ def find_curv_of_traj_stat_df(df_to_iter, curv_of_traj_df, start_time_column='st
 
 
 def extend_df_based_on_groups(ori_df, all_start_time, all_end_time, all_group_id, group_id='stop_point_index'):
+    # This function takes an original DataFrame (ori_df) and extends it by including all rows that fall within specified time intervals.
+    # It also assigns a group ID to each of these rows based on the provided group IDs. Here's a step-by-step explanation of what the function does:
 
     # Take out all the time points between start time and stop time for all captured ff
     extended_cum_indices = []
@@ -104,7 +106,7 @@ def extend_df_based_on_groups(ori_df, all_start_time, all_end_time, all_group_id
 
 def add_stat_columns_to_df_to_iter(stat_df, df_to_iter, stat_prefix, groupby_column):
     for prefix in stat_prefix:
-        columns_to_add = [f'{prefix}_mean', f'{prefix}_std', f'{prefix}_min', f'{prefix}_25%', f'{prefix}_50%', f'{prefix}_75%',
+        columns_to_add = [f'{prefix}_mean', f'{prefix}_std', f'{prefix}_min', f'{prefix}_Q1', f'{prefix}_median', f'{prefix}_Q3',
                           f'{prefix}_max', f'{prefix}_iqr', f'{prefix}_range']
         # drop the columns if already exist
         df_to_iter = df_to_iter.drop(columns=columns_to_add, errors='ignore')
@@ -123,30 +125,25 @@ def find_stat_of_columns_after_groupby(df_for_stat_extended,
     stat_prefix = [prefix + '_' for prefix in stat_prefix]
 
     # make a dict of column to prefix
-    dict_of_column_to_prefix = {
-        column: prefix for column, prefix in zip(stat_columns, stat_prefix)}
+    column_prefix_map = {column: prefix for column, prefix in zip(stat_columns, stat_prefix)}
 
-    stat_df = df_for_stat_extended.groupby(
-        groupby_column)[stat_columns].describe()
-    stat_df.columns = [dict_of_column_to_prefix[column[0]] + column[1]
-                       for column in stat_df.columns]
+    # Note: The describe() method after using groupby generates a df with multi-level column names,
+    # where the first level is the original column name (e.g., 'curv_of_traj') and the second level is the statistical measure (e.g., 'mean', 'std', 'min', 'Q1', 'median', 'Q3', 'max').
+    
+    # Group by the specified column and calculate descriptive statistics
+    stat_df = df_for_stat_extended.groupby(groupby_column)[stat_columns].describe()
+
+    # Rename the percentile columns for better readability
+    stat_df.rename(columns={'25%': 'Q1', '50%': 'median', '75%': 'Q3'}, inplace=True)
+
+    # Flatten the multi-level column names and add prefixes
+    stat_df.columns = [f"{column_prefix_map[column[0]]}{column[1]}" for column in stat_df.columns]
 
     for prefix in stat_prefix:
-        stat_df[prefix + 'range'] = stat_df[prefix + 'max'] - \
-            stat_df[prefix + 'min']
-        stat_df[prefix + 'iqr'] = stat_df[prefix + '75%'] - \
-            stat_df[prefix + '25%']
+        stat_df[prefix + 'range'] = stat_df[prefix + 'max'] - stat_df[prefix + 'min']
+        stat_df[prefix + 'iqr'] = stat_df[prefix + 'Q3'] - stat_df[prefix + 'Q1']
         stat_df.drop(columns=prefix + 'count', inplace=True)
     stat_df.reset_index(drop=False, inplace=True)
-
-    # stat_df = df_for_stat_extended.groupby(groupby_column)[stat_columns].describe()
-    # stat_df['range'] = stat_df['max'] - stat_df['min']
-    # stat_df['iqr'] = stat_df['75%'] - stat_df['25%']
-    # stat_df.drop(columns='count', inplace=True)
-    # stat_df.columns = [prefix + column for column in stat_df.columns if column != groupby_column]
-
-    # stat_df.reset_index(drop=False, inplace=True)
-    # stat_df[groupby_column] = stat_df[groupby_column].astype('int')
     return stat_df
 
 
@@ -205,7 +202,7 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
 
     curv_of_traj_stat_df, _ = find_curv_of_traj_stat_df(
         heading_info_df, curv_of_traj_df, add_to_df_to_iter=False)
-    curv_of_traj_stat_df = curv_of_traj_stat_df[['curv_mean', 'curv_std', 'curv_min', 'curv_25%', 'curv_50%', 'curv_75%',
+    curv_of_traj_stat_df = curv_of_traj_stat_df[['curv_mean', 'curv_std', 'curv_min', 'curv_Q1', 'curv_median', 'curv_Q3',
                                                 'curv_max', 'curv_iqr', 'curv_range', 'stop_point_index']]
     # print the number of rows with NA and drop them
     if curv_of_traj_stat_df.isnull().any(axis=1).sum() > 0:
@@ -223,7 +220,7 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
     #                                     'nxt_ff_cluster_last_flash_time_bbas']].copy()
     heading_info_df = process_heading_info_df(heading_info_df)
 
-    columns_to_add = ['curv_mean', 'curv_std', 'curv_min', 'curv_25%', 'curv_50%', 'curv_75%',
+    columns_to_add = ['curv_mean', 'curv_std', 'curv_min', 'curv_Q1', 'curv_median', 'curv_Q3',
                       'curv_max', 'curv_iqr', 'curv_range']
     # drop the columns if already exist
     heading_info_df = heading_info_df.drop(
@@ -441,11 +438,11 @@ def get_eye_data_etc(stops_near_ff_df, monkey_information, ff_real_position_sort
 def get_quartile_data_in_a_row(monkey_sub, columns, suffix=''):
     quartile_data_dict = {}
     for column in columns:
-        quartile_data_dict[column + '_25%' +
+        quartile_data_dict[column + '_Q1' +
                            suffix] = monkey_sub[column].quantile(0.25)
-        quartile_data_dict[column + '_50%' +
+        quartile_data_dict[column + '_median' +
                            suffix] = monkey_sub[column].quantile(0.5)
-        quartile_data_dict[column + '_75%' +
+        quartile_data_dict[column + '_Q3' +
                            suffix] = monkey_sub[column].quantile(0.75)
     quartile_data_row = pd.DataFrame(quartile_data_dict, index=[0])
     return quartile_data_row
@@ -651,9 +648,9 @@ more_monkey_info_columns = ['d_heading_of_traj',
                             'curv_mean',
                             'curv_std',
                             'curv_min',
-                            'curv_25%',
-                            'curv_50%',
-                            'curv_75%',
+                            'curv_Q1',
+                            'curv_median',
+                            'curv_Q3',
                             'curv_max']
 
 
@@ -667,7 +664,7 @@ ff_at_ref_columns = ['nxt_ff_distance_at_ref',
 
 # def _process_plan_x_for_prediction(plan_x):
 #     plan_x['curv_range'] = plan_x['curv_max'] - plan_x['curv_min']
-#     plan_x['curv_iqr'] = plan_x['curv_75%'] - plan_x['curv_25%']
+#     plan_x['curv_iqr'] = plan_x['curv_Q3'] - plan_x['curv_Q1']
 
 #     non_cluster_columns_to_save = ['distance_between_stop_and_arena_edge'] + ff_at_ref_columns + monkey_info_columns
 
@@ -678,7 +675,7 @@ ff_at_ref_columns = ['nxt_ff_distance_at_ref',
 
 def process_plan_x_to_predict_monkey_info(plan_x, for_classification=False):
     plan_x['curv_range'] = plan_x['curv_max'] - plan_x['curv_min']
-    plan_x['curv_iqr'] = plan_x['curv_75%'] - plan_x['curv_25%']
+    plan_x['curv_iqr'] = plan_x['curv_Q3'] - plan_x['curv_Q1']
 
     non_cluster_columns_to_save = [
         'distance_between_stop_and_arena_edge'] + ff_at_ref_columns + monkey_info_columns

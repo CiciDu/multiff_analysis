@@ -2,7 +2,7 @@ import sys
 from decision_making_analysis.cluster_replacement import cluster_replacement_utils
 from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
 from decision_making_analysis import free_selection, replacement, trajectory_info
-from visualization import plot_trials, monkey_heading_functions
+from visualization.matplotlib_tools import plot_trials, monkey_heading_functions
 from machine_learning import machine_learning_utils
 from data_wrangling import base_processing_class
 

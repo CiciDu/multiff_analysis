@@ -1,7 +1,7 @@
 from decision_making_analysis.decision_making import decision_making_utils
 
 from pattern_discovery import cluster_analysis
-from visualization import plot_behaviors_utils
+from visualization.matplotlib_tools import plot_behaviors_utils
 from null_behaviors import curvature_utils
 
 import os

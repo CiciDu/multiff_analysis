@@ -155,7 +155,7 @@ columns_to_keep_from_only_cur_ff_df = ['optimal_curvature',
                                        # 'curv_of_traj_before_stop',
                                        # 'd_heading_of_traj',
                                        # 'd_heading_of_traj',
-                                       # 'curv_mean', 'curv_std', 'curv_min', 'curv_25%', 'curv_50%', 'curv_75%',
+                                       # 'curv_mean', 'curv_std', 'curv_min', 'curv_Q1', 'curv_median', 'curv_Q3',
                                        # 'curv_max', 'curv_iqr', 'curv_range',
                                        ]
 
@@ -223,9 +223,9 @@ columns_to_keep_from_plan_y_df = [
     'curv_mean',
     'curv_std',
     'curv_min',
-    'curv_25%',
-    'curv_50%',
-    'curv_75%',
+    'curv_Q1',
+    'curv_median',
+    'curv_Q3',
     'curv_max',
     #  'curv_iqr', # this will cause perfect correlation
     #  'curv_range', # this will cause perfect correlation

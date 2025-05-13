@@ -2,7 +2,7 @@ import sys
 from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, optimal_arc_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_class
-from visualization import monkey_heading_functions
+from visualization.matplotlib_tools import monkey_heading_functions
 import pandas as pd
 import os
 import copy
@@ -28,9 +28,6 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             self.default_monkey_plot_params)
         default_monkey_plot_params.update(self.monkey_plot_params)
         self.monkey_plot_params = default_monkey_plot_params
-
-        self.cur_ff_color = 'brown'
-        self.nxt_ff_color = 'green'
 
         if raw_data_folder_path is not None:
             self.load_raw_data(

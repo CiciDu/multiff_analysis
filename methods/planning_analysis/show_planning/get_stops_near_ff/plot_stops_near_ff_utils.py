@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import seaborn as sns
 import sys
-from visualization import plot_behaviors_utils, plot_trials
+from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
 from null_behaviors import show_null_trajectory
 from pattern_discovery import ff_dataframe_utils
 
@@ -106,7 +106,7 @@ def plot_stops_near_ff_func(row, monkey_information, ff_real_position_sorted, ff
         **null_arcs_plotting_kwargs_temp,
     )
 
-    R = returned_info['R']
+    R = returned_info['rotation_matrix']
     x0, y0 = returned_info['x0'], returned_info['y0']
     fig = returned_info['fig']
     axes = returned_info['axes']

@@ -124,7 +124,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
         ff_df = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
         ff_df['time'] = self.monkey_information.loc[ff_df['point_index'].values, 'time'].values
         ff_df['stop_point_index'] = row['stop_point_index']
-        ff_df['stop_time'] = self.monkey_information.loc[row['stop_point_index'], 'time'].values
+        ff_df['stop_time'] = self.monkey_information.loc[row['stop_point_index'], 'time']
         return ff_df
 
     # def _add_to_both_ff_when_seen_df(self, which_ff_info, when_which_ff, first_or_last, curv_df, ff_df):

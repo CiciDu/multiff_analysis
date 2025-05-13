@@ -3,7 +3,7 @@ import sys
 from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot
 from visualization.dash_tools import dash_prep_class, dash_utils, dash_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_monkey_heading_helper_class
-from visualization import monkey_heading_functions
+from visualization.matplotlib_tools import monkey_heading_functions
 from visualization.plotly_tools import plotly_for_monkey
 
 import os
@@ -202,7 +202,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         for param in ['show_visible_segments', 'show_visible_fireflies', 'show_in_memory_fireflies']:
             if old_checklist_params[param] != self.monkey_plot_params[param]:
-                self.current_plotly_plot_key_comp = plotly_preparation.prepare_to_plot_a_planning_instance_in_plotly(
+                self.current_plotly_key_comp = plotly_preparation.prepare_to_plot_a_planning_instance_in_plotly(
                     self.stops_near_ff_row, self.PlotTrials_args, self.monkey_plot_params)
 
                 self._produce_initial_plots()
@@ -268,7 +268,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         ONLY_UPDATE_EYE_POSITION = False
         self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_scatterplot.find_monkey_hoverdata_value_for_both_fig_scatter(
-            self.hoverdata_column, monkey_hoverdata_value, self.current_plotly_plot_key_comp['trajectory_df'])
+            self.hoverdata_column, monkey_hoverdata_value, self.current_plotly_key_comp['trajectory_df'])
         if self.curv_of_traj_params['curv_of_traj_mode'] == 'now to stop':
             if (self.monkey_hoverdata_value_s >= self.hoverdata_value_upper_bound_s) or (self.monkey_hoverdata_value_cm >= self.hoverdata_value_upper_bound_cm):
                 ONLY_UPDATE_EYE_POSITION = True
@@ -307,7 +307,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         else:
             x_column_name = 'rel_time'
         self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_scatterplot.find_monkey_hoverdata_value_for_both_fig_scatter(
-            x_column_name, scatter_plot_hoverdata_values, self.current_plotly_plot_key_comp['trajectory_df'])
+            x_column_name, scatter_plot_hoverdata_values, self.current_plotly_key_comp['trajectory_df'])
 
         if self.hoverdata_column == 'rel_distance':
             self.monkey_hoverdata_value = self.monkey_hoverdata_value_cm
@@ -419,11 +419,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
     def _find_point_index_to_show_traj_curv(self):
         try:
-            self.point_index_to_show_traj_curv = self.current_plotly_plot_key_comp['trajectory_df'].loc[
-                self.current_plotly_plot_key_comp['trajectory_df'][self.hoverdata_column] >= self.monkey_hoverdata_value, 'point_index'].iloc[0]
+            self.point_index_to_show_traj_curv = self.current_plotly_key_comp['trajectory_df'].loc[
+                self.current_plotly_key_comp['trajectory_df'][self.hoverdata_column] >= self.monkey_hoverdata_value, 'point_index'].iloc[0]
         except IndexError:
             self.point_index_to_show_traj_curv = int(
-                self.current_plotly_plot_key_comp['trajectory_df'].iloc[-1]['point_index'])
+                self.current_plotly_key_comp['trajectory_df'].iloc[-1]['point_index'])
 
     def _update_fig_and_fig_scatter_based_on_monkey_hover_data(self):
         self.fig_scatter_combd = dash_utils.update_fig_scatter_combd_plot_based_on_monkey_hoverdata(
@@ -454,17 +454,17 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
     def _find_traj_portion(self):
         self.curv_of_traj_current_row = self.curv_of_traj_df[self.curv_of_traj_df[
             'point_index'] == self.point_index_to_show_traj_curv].copy()
-        self.traj_portion, self.traj_length = plotly_preparation.find_traj_portion_for_traj_curv(
-            self.current_plotly_plot_key_comp['trajectory_df'], self.curv_of_traj_current_row)
+        self.traj_portion, self.traj_length = dash_utils._find_traj_portion_for_traj_curv(
+            self.current_plotly_key_comp['trajectory_df'], self.curv_of_traj_current_row)
         return self.traj_portion
 
     def _update_fig_based_on_curv_of_traj(self):
         # also update monkey plot
-        # point_index_to_mark = self.current_plotly_plot_key_comp['trajectory_df'].loc[self.current_plotly_plot_key_comp['trajectory_df'][self.hoverdata_column] >= self.monkey_hoverdata_value, 'point_index'].iloc[0]
+        # point_index_to_mark = self.current_plotly_key_comp['trajectory_df'].loc[self.current_plotly_key_comp['trajectory_df'][self.hoverdata_column] >= self.monkey_hoverdata_value, 'point_index'].iloc[0]
         # curv_of_traj_current_row = self.curv_of_traj_df[self.curv_of_traj_df['point_index']==point_index_to_mark].copy()
         if self.monkey_plot_params['show_traj_portion']:
-            self.traj_portion, self.traj_length = plotly_preparation.find_traj_portion_for_traj_curv(
-                self.current_plotly_plot_key_comp['trajectory_df'], self.curv_of_traj_current_row)
+            self.traj_portion, self.traj_length = dash_utils._find_traj_portion_for_traj_curv(
+                self.current_plotly_key_comp['trajectory_df'], self.curv_of_traj_current_row)
             self.fig = dash_utils.update_marked_traj_portion_in_monkey_plot(
                 self.fig, self.traj_portion, hoverdata_multi_columns=self.hoverdata_multi_columns)
         if self.monkey_plot_params['show_monkey_heading']:
@@ -511,3 +511,68 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.other_messages += ", \n Alt FF angle at ref point: " + \
             str(round(nxt_ff_angle_at_ref_point, decimals))
         return self.other_messages
+
+    def _prepare_to_make_plotly_fig_for_dash_given_stop_point_index(self, stop_point_index):
+        if self.ff_dataframe is None:
+            self.get_more_monkey_data()
+
+        self.stop_point_index = stop_point_index
+        self.stops_near_ff_row = self.stops_near_ff_df_counted[
+            self.stops_near_ff_df_counted['stop_point_index'] == self.stop_point_index].copy()
+        self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted,
+                                self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
+
+        self.current_plotly_key_comp = plotly_preparation.prepare_to_plot_a_planning_instance_in_plotly(
+            self.stops_near_ff_row, self.PlotTrials_args, self.monkey_plot_params)
+
+        self.trajectory_ref_row = self._find_trajectory_ref_row()
+        self.trajectory_next_stop_row = self._find_trajectory_next_stop_row()
+        self.monkey_hoverdata_value = self.trajectory_ref_row[self.hoverdata_column]
+        self.point_index_to_show_traj_curv = self.trajectory_ref_row['point_index'].astype(
+            int)
+
+        self._further_prepare_plotting_info_for_the_duration()
+
+    def _further_prepare_plotting_info_for_the_duration(self):
+        self.curv_of_traj_df_in_duration = self._get_curv_of_traj_df_in_duration()
+        try:
+            self.curv_of_traj_current_row = self.curv_of_traj_df_in_duration[
+                self.curv_of_traj_df_in_duration['point_index'] == self.point_index_to_show_traj_curv].copy()
+            self.traj_portion, self.traj_length = dash_utils._find_traj_portion_for_traj_curv(
+                self.current_plotly_key_comp['trajectory_df'], self.curv_of_traj_current_row)
+        except:
+            self.traj_portion = None
+            self.traj_length = 0
+
+        if self.monkey_plot_params['show_null_arcs_to_ff']:
+            self.find_null_arcs_info_for_plotting_for_the_duration()
+
+        if self.monkey_plot_params['show_monkey_heading']:
+            plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_and_triangle_df_for_the_duration(
+                self)
+
+    def find_null_arcs_info_for_plotting_for_the_duration(self):
+
+        duration = self.current_plotly_key_comp['duration_to_plot']
+        self.cur_ff_index = self.stops_near_ff_row.cur_ff_index
+        self.nxt_ff_index = self.stops_near_ff_row.nxt_ff_index
+
+        # for the cur ff, we eliminate the point index after the capture
+
+        if self.overall_params['use_curvature_to_ff_center']:
+            all_point_index = self.curv_of_traj_df_in_duration['point_index'].values
+            self.cur_null_arc_info_for_duration = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(all_point_index, np.repeat(
+                np.array([self.cur_ff_index]), len(all_point_index)), self.monkey_information, self.ff_real_position_sorted, verbose=False)
+            self.nxt_null_arc_info_for_duration = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(all_point_index, np.repeat(
+                np.array([self.nxt_ff_index]), len(all_point_index)), self.monkey_information, self.ff_real_position_sorted, verbose=False)
+        else:
+            opt_arc_stop_first_vis_bdry = True if (
+                self.optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
+            self.cur_ff_best_arc_df = plotly_for_null_arcs.find_best_arc_df_for_ff_in_duration([self.cur_ff_index], duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                               opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+            self.cur_null_arc_info_for_duration = show_null_trajectory.find_and_package_optimal_arc_info_for_plotting(
+                self.cur_ff_best_arc_df, self.monkey_information)
+            self.nxt_ff_best_arc_df = plotly_for_null_arcs.find_best_arc_df_for_ff_in_duration([self.nxt_ff_index], duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                               opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+            self.nxt_null_arc_info_for_duration = show_null_trajectory.find_and_package_optimal_arc_info_for_plotting(
+                self.nxt_ff_best_arc_df, self.monkey_information)

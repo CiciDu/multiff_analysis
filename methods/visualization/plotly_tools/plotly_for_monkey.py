@@ -3,7 +3,7 @@ import sys
 from turtle import fillcolor
 
 from data_wrangling import specific_utils
-from visualization import plot_behaviors_utils, monkey_heading_functions
+from visualization.matplotlib_tools import plot_behaviors_utils, monkey_heading_functions
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.get_stops_near_ff import plot_stops_near_ff_utils
 from decision_making_analysis.decision_making import plot_decision_making
@@ -31,92 +31,9 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def make_one_monkey_plotly_plot(current_plotly_plot_key_comp,
-                                monkey_plot_params={},
-                                point_index_gap_threshold_to_sep_vis_intervals=12):
-
-    default_params = {'show_reward_boundary': True,
-                      'show_points_on_trajectory': True,
-                      'show_current_eye_positions': False,
-                      'show_all_eye_positions': False,
-                      'show_traj_color_as_speed': True,
-                      'show_eye_positions_for_both_eyes': False,
-                      'show_stop_point_indices': None,
-                      'traj_portion': None,
-                      'hoverdata_multi_columns': ['rel_time'],
-                      'eye_positions_trace_name': 'eye_positions',
-                      'use_arrow_to_show_eye_positions': False}
-
-    default_params.update(monkey_plot_params)
-    monkey_plot_params = default_params
-
-    show_reward_boundary = monkey_plot_params['show_reward_boundary']
-    show_points_on_trajectory = monkey_plot_params['show_points_on_trajectory']
-    show_current_eye_positions = monkey_plot_params['show_current_eye_positions']
-    show_all_eye_positions = monkey_plot_params['show_all_eye_positions']
-    show_eye_positions_for_both_eyes = monkey_plot_params['show_eye_positions_for_both_eyes']
-    show_stop_point_indices = monkey_plot_params['show_stop_point_indices']
-    traj_portion = monkey_plot_params['traj_portion']
-    hoverdata_multi_columns = monkey_plot_params['hoverdata_multi_columns']
-    eye_positions_trace_name = monkey_plot_params['eye_positions_trace_name']
-    use_arrow_to_show_eye_positions = monkey_plot_params['use_arrow_to_show_eye_positions']
-
-    fig = plot_fireflies(None, current_plotly_plot_key_comp['ff_df'])
-    fig = plot_arena_edge_in_plotly(fig)
-
-    if current_plotly_plot_key_comp['connect_path_ff_df'] is not None:
-        fig = connect_points_to_points(fig, current_plotly_plot_key_comp['connect_path_ff_df'],
-                                       show_points_on_trajectory=show_points_on_trajectory,
-                                       hoverdata_multi_columns=hoverdata_multi_columns)
-
-    if current_plotly_plot_key_comp['show_visible_segments']:
-        fig = plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig,
-                                                                       current_plotly_plot_key_comp[
-                                                                           'ff_dataframe_in_duration_visible_qualified'],
-                                                                       current_plotly_plot_key_comp['monkey_information'],
-                                                                       current_plotly_plot_key_comp['R'], 0, 0,
-                                                                       how_to_show_ff='square',
-                                                                       unique_ff_indices=None)
-
-    if traj_portion is not None:
-        fig = plot_a_portion_of_trajectory_to_show_the_scope_for_curv(fig, traj_portion,
-                                                                      hoverdata_multi_columns=hoverdata_multi_columns)
-
-    if show_reward_boundary:
-        fig = plot_reward_boundary_in_plotly(
-            fig, current_plotly_plot_key_comp['ff_df'])
-
-    if show_stop_point_indices is not None:
-        fig = plot_stops_in_plotly(fig, current_plotly_plot_key_comp['trajectory_df'].copy(),
-                                   show_stop_point_indices,
-                                   hoverdata_multi_columns=hoverdata_multi_columns)
-
-    if show_all_eye_positions:
-        fig = plot_eye_positions_in_plotly(fig, current_plotly_plot_key_comp,
-                                           show_eye_positions_for_both_eyes=show_eye_positions_for_both_eyes,
-                                           trace_name=eye_positions_trace_name,
-                                           use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions)
-
-    fig = plot_trajectory_data(fig, current_plotly_plot_key_comp['trajectory_df'],
-                               hoverdata_multi_columns=hoverdata_multi_columns,
-                               show_color_as_time=show_all_eye_positions,
-                               show_traj_color_as_speed=monkey_plot_params['show_traj_color_as_speed'])
-
-    fig = update_layout_and_x_and_y_limit(fig, current_plotly_plot_key_comp,
-                                          show_current_eye_positions or show_all_eye_positions)
-
-    # update the x label and y label
-    fig.update_xaxes(title_text='monkey x after rotation (cm)')
-    fig.update_yaxes(title_text='monkey y after rotation (cm)',
-                     scaleanchor="x",
-                     scaleratio=1)
-
-    return fig
-
-
-def update_layout_and_x_and_y_limit(fig, current_plotly_plot_key_comp, show_eye_positions):
+def update_layout_and_x_and_y_limit(fig, current_plotly_key_comp, show_eye_positions):
     x_min, x_max, y_min, y_max = find_monkey_xy_min_max(
-        current_plotly_plot_key_comp['trajectory_df'])
+        current_plotly_key_comp['trajectory_df'])
     if show_eye_positions:
         fig.update_layout(
             autosize=False,
@@ -142,7 +59,7 @@ def update_layout_and_x_and_y_limit(fig, current_plotly_plot_key_comp, show_eye_
     return fig
 
 
-# def update_layout_and_x_and_y_limit_show_eye_positions(fig, current_plotly_plot_key_comp):
+# def update_layout_and_x_and_y_limit_show_eye_positions(fig, current_plotly_key_comp):
 #     fig.update_layout(
 #                 autosize=False,
 #                 width=850,
@@ -150,7 +67,7 @@ def update_layout_and_x_and_y_limit(fig, current_plotly_plot_key_comp, show_eye_
 #                 margin={'l': 10, 'b': 0, 't': 20, 'r': 10},
 #             )
 
-#     x_min, x_max, y_min, y_max = find_monkey_xy_min_max(current_plotly_plot_key_comp['trajectory_df'])
+#     x_min, x_max, y_min, y_max = find_monkey_xy_min_max(current_plotly_key_comp['trajectory_df'])
 #     fig.update_xaxes(range=[x_min - 100, x_max + 100])
 #     fig.update_yaxes(range=[y_min - 50, y_max + 450])
 #     return fig
@@ -164,11 +81,11 @@ def find_monkey_xy_min_max(trajectory_df):
     return x_min, x_max, y_min, y_max
 
 
-def plot_eye_positions_in_plotly(fig, current_plotly_plot_key_comp, show_eye_positions_for_both_eyes=False, x0=0, y0=0, trace_name='eye_positions',
+def plot_eye_positions_in_plotly(fig, current_plotly_key_comp, show_eye_positions_for_both_eyes=False, x0=0, y0=0, trace_name='eye_positions',
                                  update_if_already_exist=True, marker_size=6, use_arrow_to_show_eye_positions=True):
 
-    trajectory_df = current_plotly_plot_key_comp['trajectory_df'].copy()
-    duration = current_plotly_plot_key_comp['duration_to_plot']
+    trajectory_df = current_plotly_key_comp['trajectory_df'].copy()
+    duration = current_plotly_key_comp['duration_to_plot']
 
     if use_arrow_to_show_eye_positions:
         # clear existing annotations first
@@ -177,7 +94,8 @@ def plot_eye_positions_in_plotly(fig, current_plotly_plot_key_comp, show_eye_pos
 
     if not show_eye_positions_for_both_eyes:
         monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
-            df_for_eye_positions, duration, rotation_matrix=current_plotly_plot_key_comp['R']
+            df_for_eye_positions, duration, rotation_matrix=current_plotly_key_comp[
+                'rotation_matrix']
         )
         monkey_subset = monkey_subset.merge(
             trajectory_df[['point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left'
@@ -192,8 +110,8 @@ def plot_eye_positions_in_plotly(fig, current_plotly_plot_key_comp, show_eye_pos
             ('_r', 'triangle-right', '_right', 'orange')
         ]:
             monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
-                df_for_eye_positions, duration, rotation_matrix=current_plotly_plot_key_comp[
-                    'R'], eye_col_suffix=suffix
+                df_for_eye_positions, duration, rotation_matrix=current_plotly_key_comp[
+                    'rotation_matrix'], eye_col_suffix=suffix
             )
             monkey_subset = monkey_subset.merge(
                 trajectory_df[['point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left'
@@ -391,9 +309,11 @@ def plot_reward_boundary_in_plotly(fig, ff_df, radius=25):
                       y0=ff_df.loc[i, 'ff_y'] - radius,
                       x1=ff_df.loc[i, 'ff_x'] + radius,
                       y1=ff_df.loc[i, 'ff_y'] + radius,
-                      line_color="orange",
-                      opacity=0.45,
-                      fillcolor="grey",
+                    #   line_color="orange",
+                    #   opacity=0.25,
+                    #   fillcolor="grey",
+                      line=dict(color="rgba(255, 165, 0, 0.45)"),  # Orange color with full opacity for the line
+                      fillcolor="rgba(128, 128, 128, 0.25)",      # Grey color with 25% opacity for the fill
                       )
     return fig
 
@@ -461,6 +381,9 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
         fig.update_traces(marker=marker_dict, hovertemplate=hovertemplate, selector=dict(
             name='trajectory_data'))
         # If show color as speed, let's add it to hover data, keep 2 decimals
+    else:
+        fig.update_traces(marker=dict(color='gold'),
+                          selector=dict(name='trajectory_data'))
 
     return fig
 
@@ -512,7 +435,7 @@ def mark_reference_point_in_monkey_plot(fig, trajectory_ref_row):
     return fig
 
 
-def connect_points_to_points(fig, connect_path_ff_df, show_points_on_trajectory=True, hoverdata_multi_columns=['rel_time']):
+def connect_points_to_points(fig, connect_path_ff_df, show_traj_points_when_making_lines=True, hoverdata_multi_columns=['rel_time']):
 
     connect_path_ff_df = connect_path_ff_df.copy()
     ff_component = connect_path_ff_df[['ff_x', 'ff_y', 'counter']].copy().rename(
@@ -535,8 +458,7 @@ def connect_points_to_points(fig, connect_path_ff_df, show_points_on_trajectory=
     fig.update_traces(opacity=.2, selector=dict(name='connect_path_ff'))
 
     # also mark the ending points of the lines on the trajectory
-    if show_points_on_trajectory:
-
+    if show_traj_points_when_making_lines:
         plot_to_add = px.scatter(connect_path_ff_df, x='monkey_x', y='monkey_y',
                                  color_discrete_sequence=['blue'],
                                  hover_data=hoverdata_multi_columns,
@@ -652,14 +574,14 @@ def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monke
             all_point_index, all_breaking_points, monkey_information, rotation_matrix)
 
         # Show firefly position
+        shared_kwargs = dict(mode='markers', legendgroup='ff '+str(ff_number),
+                             customdata=[[ff_number]], name='ff '+str(ff_number), visible=visible)
         if how_to_show_ff == 'square':
-            fig.add_trace(go.Scatter(x=ff_position_rotated[0]-x0, y=ff_position_rotated[1]-y0, mode='markers',
-                                     marker=dict(symbol='square', color=color, size=15), legendgroup='ff '+str(ff_number),
-                                     customdata=[[ff_number]], name='ff '+str(ff_number), visible=visible))
+            fig.add_trace(go.Scatter(x=ff_position_rotated[0]-x0, y=ff_position_rotated[1]-y0,
+                                     marker=dict(symbol='square', color=color, size=15), **shared_kwargs))
         elif how_to_show_ff == 'circle':
-            fig.add_trace(go.Scatter(x=ff_position_rotated[0]-x0, y=ff_position_rotated[1]-y0, mode='markers',
-                                     marker=dict(symbol='circle', color=color, size=15), legendgroup='ff '+str(ff_number),
-                                     customdata=[[ff_number]], name='ff '+str(ff_number), visible=visible))
+            fig.add_trace(go.Scatter(x=ff_position_rotated[0]-x0, y=ff_position_rotated[1]-y0,
+                                     marker=dict(symbol='circle', color=color, size=15), **shared_kwargs))
 
         # Find and plot beginning and end of each visible segment
         for j in range(len(all_breaking_points)+1):
@@ -698,4 +620,27 @@ def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monke
         fig.update_traces(hovertemplate='ff %{customdata[0]}',
                           selector=dict(name='ff '+str(ff_number) + ' stops visible'))
 
+    return fig
+
+
+def plot_triangles_to_show_monkey_heading_in_xy_in_plotly(fig, triangle_df, trace_name_prefix=None, color='red', point_index=None, linewidth=2):
+    if point_index is not None:
+        triangle_df = triangle_df[triangle_df['point_index'] == point_index]
+    triangle_x_rotated = triangle_df[['x_0', 'x_1', 'x_2']].values
+    triangle_y_rotated = triangle_df[['y_0', 'y_1', 'y_2']].values
+
+    for j in range(triangle_x_rotated.shape[0]):
+        if trace_name_prefix is None:
+            name = 'triangle_to_show_monkey_heading_' + str(j)
+        else:
+            name = trace_name_prefix + str(j)
+        fig.add_trace(
+            go.Scatter(x=triangle_x_rotated[j], y=triangle_y_rotated[j],
+                       mode='lines',
+                       name=name,
+                       hoverinfo='name',
+                       showlegend=False,
+                       line=dict(color=color,
+                                 width=linewidth)),
+        )
     return fig

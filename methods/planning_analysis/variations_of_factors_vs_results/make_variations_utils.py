@@ -218,7 +218,7 @@ def make_all_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
     return all_perc_info
 
 
-def extract_key_info_from_stat_df(stat_df, metrics=['25%', '50%', '75%']):
+def extract_key_info_from_stat_df(stat_df, metrics=['Q1', 'median', 'Q3']):
     current_row = pd.DataFrame([])
     for metric in metrics:
         col_to_add = stat_df.loc[[metric], :].reset_index(drop=True)
@@ -230,10 +230,10 @@ def extract_key_info_from_stat_df(stat_df, metrics=['25%', '50%', '75%']):
 def get_rows_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df,
                                 columns_to_get_metrics=[
                                     'diff_in_d_heading', 'diff_in_abs_d_heading', 'diff_in_abs_d_curv'],
-                                metrics=['25%', '50%', '75%']):
-
-    test_stat = test_heading_info_df[columns_to_get_metrics].describe()
-    ctrl_stat = ctrl_heading_info_df[columns_to_get_metrics].describe()
+                                metrics=['Q1', 'median', 'Q3']):
+    
+    test_stat = test_heading_info_df[columns_to_get_metrics].describe().rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    ctrl_stat = ctrl_heading_info_df[columns_to_get_metrics].describe().rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
 
     row_from_test = extract_key_info_from_stat_df(test_stat, metrics=metrics)
     row_from_ctrl = extract_key_info_from_stat_df(ctrl_stat, metrics=metrics)
@@ -267,7 +267,7 @@ def get_delta_values_between_test_and_control(test_heading_info_df, ctrl_heading
         'delta_diff_in_abs_d_heading', 'delta_diff_in_d_heading', 'delta_diff_in_abs_d_curv']].copy()
 
     delta_row = extract_key_info_from_stat_df(
-        new_diff_and_ratio_stat_df, metrics=['50%'])
+        new_diff_and_ratio_stat_df, metrics=['median'])
     return delta_row
 
 

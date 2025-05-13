@@ -4,7 +4,7 @@ import math
 import pandas as pd
 import sys
 from data_wrangling import specific_utils
-from visualization import plot_behaviors_utils, plot_trials
+from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
 from visualization.animation import animation_func, animation_utils
 from null_behaviors import find_best_arc, curvature_utils, optimal_arc_utils
 from pattern_discovery import ff_dataframe_utils
@@ -119,7 +119,7 @@ def find_and_package_optimal_arc_info_for_plotting(best_arc_df, monkey_informati
     arc_point_index = best_arc_df.point_index.values
     arc_measure = best_arc_df.optimal_arc_measure.values
     arc_ff_index = best_arc_df.ff_index.values
-    # Note, here arc_ff_xy is replaced by arc ending xy, which produces the same result if the normal optimal arc is used; 
+    # Note, here arc_ff_xy is replaced by arc ending xy, which produces the same result if the normal optimal arc is used;
     # but if opt_arc_stop_closest was True (optimal arc stop at closest point to monkey stop), then arc ending xy has to be used to mimic a new ff center
     arc_end_xy = best_arc_df[['optimal_arc_end_x', 'optimal_arc_end_y']].values
     ff_distance = best_arc_df.ff_distance.values
@@ -654,7 +654,7 @@ def make_pretty_plot_for_a_duration(duration_to_plot, best_arc_df, monkey_inform
             point_indices_to_be_marked_3rd_kind=point_indices_to_be_marked_3rd_kind,
             indices_of_ff_to_be_plotted_in_a_basic_way=ff_indices_to_plot_null_arc,
         )
-        R = returned_info['R']
+        R = returned_info['rotation_matrix']
         axes = returned_info['axes']
 
         if whether_mark_path_where_intended_target_has_best_arc_among_all_ff:
@@ -771,7 +771,7 @@ def make_plots_to_show_monkey_reaction_time(curvature_df,
         **additional_plotting_kwargs,
     )
 
-    R = returned_info['R']
+    R = returned_info['rotation_matrix']
     axes = returned_info['axes']
     whether_plotted = returned_info['whether_plotted']
 

@@ -22,7 +22,10 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class _PredictYValues():
+class _PredictYValues:
+
+    def __init__(self):
+        pass
 
     def make_or_retrieve_all_cur_and_nxt_lr_pred_ff_df(self, ref_point_params_based_on_mode=None, exists_ok=True):
         df_path = self.cur_and_nxt_lr_pred_ff_df_path

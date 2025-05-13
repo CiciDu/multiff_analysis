@@ -118,7 +118,7 @@ class PlanFactorsAcrossAgents():
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
-                                                                                        y_var_column='diff_in_abs_50%',
+                                                                                        y_var_column='diff_in_abs_d_heading_median',
                                                                                         var_to_determine_x_offset_direction='test_or_control',
                                                                                         columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
                                                                                         columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)

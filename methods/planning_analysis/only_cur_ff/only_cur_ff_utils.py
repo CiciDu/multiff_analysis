@@ -82,7 +82,7 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
     # get curv range info etc
     curv_of_traj_stat_df, only_cur_ff_df = plan_factors_utils.find_curv_of_traj_stat_df(only_cur_ff_df, curv_of_traj_df, start_time_column='beginning_time',
                                                                                         end_time_column='stop_time', add_to_df_to_iter=False)
-    columns_to_add = ['curv_mean', 'curv_std', 'curv_min', 'curv_25%', 'curv_50%', 'curv_75%',
+    columns_to_add = ['curv_mean', 'curv_std', 'curv_min', 'curv_Q1', 'curv_median', 'curv_Q3',
                       'curv_max', 'curv_iqr', 'curv_range']
     only_cur_ff_df = only_cur_ff_df.merge(
         curv_of_traj_stat_df[columns_to_add + ['stop_point_index']], on='stop_point_index', how='left')

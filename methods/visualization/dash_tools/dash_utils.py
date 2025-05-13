@@ -2,6 +2,7 @@ import sys
 from visualization.plotly_tools import plotly_for_monkey, plotly_for_scatterplot, plotly_for_correlation
 from null_behaviors import curv_of_traj_utils
 from non_behavioral_analysis import eye_positions
+from null_behaviors import curvature_utils, curv_of_traj_utils
 
 import os
 import numpy as np
@@ -284,4 +285,40 @@ def print_other_messages(id_prefix='main_plots_', other_messages=''):
     )
 
 
+def _find_traj_portion_for_traj_curv(trajectory_df, curv_of_traj_current_row):
+    traj_portion = trajectory_df[(trajectory_df.point_index >= curv_of_traj_current_row['min_point_index'].item()) & (
+        trajectory_df.point_index <= curv_of_traj_current_row['max_point_index'].item())]
+    traj_length = traj_portion['rel_distance'].iloc[-1] - \
+        traj_portion['rel_distance'].iloc[0]
+    return traj_portion, traj_length
 
+
+def _find_nxt_ff_curv_df(current_plotly_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=None):
+    nxt_ff_curv_df = _find_ff_curv_df(current_plotly_key_comp['row'].nxt_ff_index, current_plotly_key_comp,
+                                      ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new)
+    return nxt_ff_curv_df
+
+
+def _find_cur_ff_curv_df(current_plotly_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=None):
+    cur_ff_curv_df = _find_ff_curv_df(current_plotly_key_comp['row'].cur_ff_index, current_plotly_key_comp,
+                                      ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new)
+    return cur_ff_curv_df
+
+
+def _find_ff_curv_df(ff_index, current_plotly_key_comp, ff_dataframe, monkey_information, curv_of_traj_df, ff_caught_T_new=None):
+    duration_to_plot = current_plotly_key_comp['duration_to_plot']
+    row = current_plotly_key_comp['row']
+    ff_curv_df = curvature_utils.find_curvature_df_for_ff_in_duration(
+        ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df,  ff_caught_T_new=ff_caught_T_new, clean=False)
+    ff_curv_df['rel_time'] = ff_curv_df['time'] - row.stop_time
+    ff_curv_df = ff_curv_df.merge(
+        monkey_information[['point_index', 'cum_distance']], on='point_index', how='left')
+    ff_curv_df['rel_distance'] = np.round(
+        ff_curv_df['cum_distance'] - row.stop_cum_distance, 2)
+    ff_curv_df['curv_to_ff_center'] = ff_curv_df['curv_to_ff_center'] * \
+        180/np.pi * 100  # convert to degree/cm
+    ff_curv_df['optimal_curvature'] = ff_curv_df['optimal_curvature'] * \
+        180/np.pi * 100  # convert to degree/cm
+    ff_curv_df_sub = ff_curv_df[['point_index', 'rel_time',
+                                 'rel_distance', 'curv_to_ff_center', 'optimal_curvature']].copy()
+    return ff_curv_df_sub
