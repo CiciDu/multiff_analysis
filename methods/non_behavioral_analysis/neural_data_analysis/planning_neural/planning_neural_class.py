@@ -3,7 +3,7 @@ from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from null_behaviors import curvature_utils
 from non_behavioral_analysis.neural_data_analysis.planning_neural import planning_neural_utils
-from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import neural_vs_behavioral_class
+from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
 import numpy as np
 import pandas as pd
 import os
@@ -12,23 +12,30 @@ import os
 class PlanningAndNeural(plan_factors_class.PlanFactors):
     # class PlanningAndNeural(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
-    def __init__(self, raw_data_folder_path=None, bin_width=0.25, window_width=1):
+    def __init__(self, raw_data_folder_path=None, bin_width=0.02, window_width=0.1,
+                 one_behav_idx_per_bin=True):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
         self.bin_width = bin_width
         self.window_width = window_width
+        self.one_behav_idx_per_bin = one_behav_idx_per_bin
 
     def retrieve_neural_data(self):
         neural_vs_behavioral_class.NeuralVsBehavioralClass.retrieve_neural_data(
-            self, bin_width=self.bin_width, window_width=self.window_width)
+            self)
 
     def get_all_planning_info(self, both_ff_across_time_df_exists_ok=True):
 
-        self.monkey_information.loc[:, 'bin'] = np.digitize(
-            self.monkey_information['time'].values, self.time_bins)-1
-        self.mid_bins = self.monkey_information[['bin', 'point_index']].groupby(
-            'bin').median().astype(int).reset_index(drop=False)
-        self.mid_bins = self.mid_bins.merge(self.monkey_information.drop(
-            columns={'bin'}), on='point_index', how='left')
+        self.monkey_info_in_bins = prep_monkey_data.bin_monkey_information(
+            self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
+
+        if not self.one_behav_idx_per_bin:
+            self.bin_info = self.monkey_info_in_bins[['bin', 'point_index']].groupby(
+                'bin').median().astype(int).reset_index(drop=False)
+            self.bin_info = self.bin_info.merge(self.monkey_info_in_bins.drop(
+                columns={'bin'}), on='point_index', how='left')
+        else:
+            self.bin_info = self.monkey_info_in_bins
+
         self.both_ff_across_time_df = self._get_both_ff_across_time_df(
             exists_ok=both_ff_across_time_df_exists_ok)
 
@@ -74,7 +81,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
             self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values)
 
     def _get_info_to_add(self, row):
-        info_to_add = self.mid_bins[self.mid_bins['point_index'].between(
+        info_to_add = self.bin_info[self.bin_info['point_index'].between(
             row['point_index_in_the_past'], row['next_stop_point_index'])].copy()
         info_to_add['stop_point_index'] = row['stop_point_index']
         all_point_index = info_to_add['point_index'].values
@@ -93,7 +100,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
         if self.both_ff_across_time_df['bin'].duplicated().any():
             # retain the rows with the bigger stop_point_index
             self.both_ff_across_time_df = self.both_ff_across_time_df.sort_values(
-                by='stop_point_index', ascending=True).drop_duplicates(subset='bin', keep='last')
+                by=['stop_point_index', 'bin'], ascending=True).drop_duplicates(subset='bin', keep='last')
 
     def _find_ff_info(self, row, all_point_index):
         self.nxt_ff_df2 = find_stops_near_ff_utils.find_ff_info(np.repeat(row.nxt_ff_index, len(

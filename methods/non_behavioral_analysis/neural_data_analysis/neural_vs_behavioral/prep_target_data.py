@@ -22,18 +22,41 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_life_sorted, ff_dataframe):
-    target_df = _initialize_target_df(
-        monkey_information, ff_caught_T_new, ff_real_position_sorted)
-    target_df = _calculate_target_distance_and_angle(target_df)
-    target_df, nearby_alive_ff_indices = _add_target_and_target_cluster_last_seen_info(
-        target_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe)
-    target_df = _add_disappeared_for_last_time_dummy(
-        target_df, ff_caught_T_new, ff_dataframe, nearby_alive_ff_indices)
-    target_df = _add_visible_dummy(target_df)
+def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe,
+                   include_frozen_info=True):
+    target_df = _initialize_target_df(monkey_information, ff_caught_T_new)
+
+    target_df = _calculate_target_distance_and_angle(target_df, ff_real_position_sorted)
+
+    # Add target last seen info
+    print("Calculating target-last-seen info.")
+    target_df = _add_target_last_seen_info(
+        target_df, ff_dataframe, include_frozen_info=include_frozen_info)
+
+    target_df = _add_target_disappeared_for_last_time_dummy(
+        target_df, ff_caught_T_new, ff_dataframe)
+
+    target_df = _add_target_visible_dummy(target_df)
+
     target_df = _find_time_since_last_capture(target_df, ff_caught_T_new)
-    target_df = _add_while_last_seeing_target_cluster_dummy(target_df)
     return target_df
+
+
+def make_target_cluster_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, ff_life_sorted, include_frozen_info=True):
+    target_clust_df = _initialize_target_df(
+        monkey_information, ff_caught_T_new)
+    
+    target_clust_df, nearby_alive_ff_indices = _add_target_cluster_last_seen_info(
+        target_clust_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, include_frozen_info=include_frozen_info)
+    
+    target_clust_df = _add_target_cluster_disappeared_for_last_time_dummy(
+        target_clust_df, ff_caught_T_new, ff_dataframe, nearby_alive_ff_indices)
+    
+    target_clust_df = _add_target_cluster_visible_dummy(target_clust_df)
+    
+    target_clust_df = _add_while_last_seeing_target_cluster_dummy(target_clust_df)
+
+    return target_clust_df
 
 
 def get_max_min_and_avg_info_from_target_df(target_df):
@@ -43,26 +66,23 @@ def get_max_min_and_avg_info_from_target_df(target_df):
     return target_average_info, target_min_info, target_max_info
 
 
-def _initialize_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted):
+
+def _initialize_target_df(monkey_information, ff_caught_T_new):
     """
     Create a DataFrame with target information.
     """
-    target_df = monkey_information[[
-        'bin', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']].copy()
-    target_df.rename(
-        columns={'monkey_angle': 'monkey_angle', 'time': 'time'}, inplace=True)
-    target_df['point_index'] = target_df.index
+    target_df = monkey_information[['point_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']].copy()
     target_df['target_index'] = np.searchsorted(
         ff_caught_T_new, target_df['time'])
-    target_df['target_x'] = ff_real_position_sorted[target_df['target_index'].values, 0]
-    target_df['target_y'] = ff_real_position_sorted[target_df['target_index'].values, 1]
     return target_df
 
 
-def _calculate_target_distance_and_angle(target_df):
+def _calculate_target_distance_and_angle(target_df, ff_real_position_sorted):
     """
     Calculate target distance and angle.
     """
+    target_df['target_x'] = ff_real_position_sorted[target_df['target_index'].values, 0]
+    target_df['target_y'] = ff_real_position_sorted[target_df['target_index'].values, 1]
     target_distance = np.sqrt((target_df['target_x'] - target_df['monkey_x'])**2 + (
         target_df['target_y'] - target_df['monkey_y'])**2)
     target_angle = specific_utils.calculate_angles_to_ff_centers(
@@ -74,16 +94,13 @@ def _calculate_target_distance_and_angle(target_df):
     return target_df
 
 
-def _add_target_and_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe):
-    """
-    Add some target last seen info to target_df
-    """
+def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, include_frozen_info=True):
     if 'target_cluster_last_seen_time' not in target_df.columns:
         nearby_alive_ff_indices = cluster_analysis.find_alive_target_clusters(
             ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=50)
-        print("Adding target-cluster-last-seen info to target_df...")
-        target_df = add_target_last_seen_info_to_target_df(
-            target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=True)
+        print("Calculating target-cluster-last-seen info.")
+        target_df = _add_target_last_seen_info(
+            target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=include_frozen_info)
         target_df = target_df.rename(columns={'target_last_seen_time': 'target_cluster_last_seen_time',
                                               'target_last_seen_distance': 'target_cluster_last_seen_distance',
                                               'target_last_seen_angle': 'target_cluster_last_seen_angle',
@@ -91,14 +108,10 @@ def _add_target_and_target_cluster_last_seen_info(target_df, ff_real_position_so
                                               'target_last_seen_distance_frozen': 'target_cluster_last_seen_distance_frozen',
                                               'target_last_seen_angle_frozen': 'target_cluster_last_seen_angle_frozen',
                                               'target_last_seen_angle_to_boundary_frozen': 'target_cluster_last_seen_angle_to_boundary_frozen'})
-    print("Adding target-last-seen info to target_df...")
-    target_df = add_target_last_seen_info_to_target_df(
-        target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=False, include_frozen_info=True)
-    target_df['point_index'] = target_df['point_index'].astype(int)
     return target_df, nearby_alive_ff_indices
 
 
-def _add_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_dataframe, nearby_alive_ff_indices):
+def _add_target_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_dataframe):
     """
     Add target_has_disappeared_for_last_time_dummy to target_df
     """
@@ -109,6 +122,11 @@ def _add_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_datafram
         target_last_vis_time = target_visible_info['time'].max()
         target_df.loc[(target_df['target_index'] == target) & (
             target_df['time'] > target_last_vis_time), 'target_has_disappeared_for_last_time_dummy'] = 1
+
+    return target_df
+
+
+def _add_target_cluster_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_dataframe, nearby_alive_ff_indices):
     target_df['target_cluster_has_disappeared_for_last_time_dummy'] = 0
     for target in range(len(ff_caught_T_new)):
         target_cluster_indices = nearby_alive_ff_indices[target]
@@ -120,14 +138,21 @@ def _add_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_datafram
     return target_df
 
 
-def _add_visible_dummy(target_df):
+def _add_target_visible_dummy(target_df):
     """
     Add dummy variable of target being visible
     """
     target_df[['target_visible_dummy']] = 1
-    target_df[['target_cluster_visible_dummy']] = 1
     target_df.loc[target_df['target_last_seen_time']
                   > 0, 'target_visible_dummy'] = 0
+    return target_df
+
+
+def _add_target_cluster_visible_dummy(target_df):
+    """
+    Add dummy variable of target cluster being visible
+    """
+    target_df[['target_cluster_visible_dummy']] = 1
     target_df.loc[target_df['target_cluster_last_seen_time']
                   > 0, 'target_cluster_visible_dummy'] = 0
     return target_df
@@ -241,7 +266,7 @@ def _calculate_max_info(target_df):
     return target_max_info
 
 
-def add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive_ff_indices=None, use_target_cluster=False, include_frozen_info=False):
+def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=None, use_target_cluster=False, include_frozen_info=False):
     """
     Add target last seen information to the target DataFrame.
 
@@ -274,11 +299,13 @@ def add_target_last_seen_info_to_target_df(target_df, ff_dataframe, nearby_alive
     for i in range(len(sorted_target_index)):
         target_index = sorted_target_index[i]
         if i < len(sorted_target_index) - 1:
-            print(f'Processing target_index = {target_index}', end='\r')
+            print(f'Adding last seen info: target_index = {target_index}', end='\r')
         else:
-            print(f'Processing target_index = {target_index}')
+            print(f'Adding last seen info: target_index = {target_index}')
         target_df = _update_info_for_current_target_index(
             target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info)
+
+    target_df['point_index'] = target_df['point_index'].astype(int)
 
     return target_df
 

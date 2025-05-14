@@ -11,6 +11,7 @@ import seaborn as sns
 import colorcet
 import logging
 from matplotlib import rc
+import warnings
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -22,50 +23,71 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def make_rebinned_monkey_info_essential(monkey_information, time_bins, ff_caught_T_new, convolve_pattern, window_width):
-    """Prepare behavioral data."""
+monkey_info_columns_of_interest = ['bin', 
+ 'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
+  'monkey_speed', 'monkey_angle', 'monkey_dw', 'monkey_ddw', 'monkey_ddv', 
+  'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff',
+  ]
+
+def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=True):
     monkey_information = monkey_information.copy()
     time = monkey_information['time'].values
-
-    monkey_information = _add_turning_right(monkey_information)
     monkey_information['bin'] = np.digitize(time, time_bins)-1
 
-    rebinned_monkey_info = _rebin_monkey_info(
-        monkey_information).reset_index(drop=True)
-    rebinned_monkey_info.index = rebinned_monkey_info['bin'].values
-    rebinned_monkey_info = _add_num_caught_ff(
-        rebinned_monkey_info, ff_caught_T_new, time_bins)
-    rebinned_monkey_info = _make_bin_continuous(rebinned_monkey_info)
-    rebinned_monkey_info = _clip_columns(rebinned_monkey_info)
+    if one_behav_idx_per_bin:
+        # note, if one_behav_idx_per_bin is True, there won't be the column stop_time_ratio_in_bin
+        monkey_info_in_bins = monkey_information.sort_values(
+            by=['bin', 'point_index']).groupby('bin').first().reset_index()
+    else:
+        monkey_info_in_bins = _rebin_monkey_info(
+            monkey_information).reset_index(drop=True)
+
+    return monkey_info_in_bins
+
+
+def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught_T_new, convolve_pattern, window_width):
+    """Prepare behavioral data."""
+
+    monkey_info_in_bins_ess = monkey_info_in_bins.copy()
+
+    # add the number of distinct stops; it's more meaningful when one_behav_idx_per_bin is False; otherwise, it's the same as the monkey_speeddummy
+    monkey_info_in_bins_ess['num_distinct_stops'] = monkey_info_in_bins.groupby(
+        'bin').sum()['whether_new_distinct_stop'].values
+
+    monkey_info_in_bins_ess.index = monkey_info_in_bins_ess['bin'].values
+
+    monkey_info_in_bins_ess = _add_num_caught_ff(
+        monkey_info_in_bins_ess, ff_caught_T_new, time_bins)
+    monkey_info_in_bins_ess = _make_bin_continuous(monkey_info_in_bins_ess)
+    monkey_info_in_bins_ess = _clip_columns(monkey_info_in_bins_ess)
 
     # only preserve the rows in monkey_information where bin is within the range of time_bins (there are in total len(time_bins)-1 bins)
-    rebinned_monkey_info = rebinned_monkey_info[rebinned_monkey_info['bin'].between(
+    monkey_info_in_bins_ess = monkey_info_in_bins_ess[monkey_info_in_bins_ess['bin'].between(
         0, len(time_bins)-1, inclusive='left')].reset_index(drop=True)
 
-    rebinned_monkey_info_essential = _select_columns_of_interest(
-        rebinned_monkey_info)
-    rebinned_monkey_info_essential = _add_stop_rate_and_success_rate(
-        rebinned_monkey_info_essential, convolve_pattern, window_width)
+    monkey_info_in_bins_essential = _select_monkey_info_columns_of_interest(
+        monkey_info_in_bins_ess)
+    monkey_info_in_bins_essential = _add_stop_rate_and_success_rate(
+        monkey_info_in_bins_essential, convolve_pattern, window_width)
 
-    return rebinned_monkey_info_essential, monkey_information
+    return monkey_info_in_bins_essential
 
 
-def make_binned_features(monkey_information, bin_width, ff_dataframe, ff_caught_T_new):
+def initialize_binned_features(monkey_information, bin_width):
     min_time = monkey_information['time'].min()
     max_time = monkey_information['time'].max()
     time_bins = np.arange(min_time, max_time, bin_width)
     monkey_information['bin'] = np.digitize(
         monkey_information['time'].values, time_bins)-1
     binned_features = pd.DataFrame({'bin': range(len(time_bins))})
-    binned_features = _add_ff_info_to_binned_features(
-        binned_features, ff_dataframe, ff_caught_T_new, time_bins)
-    return binned_features
+    return binned_features, time_bins
 
 
-def add_pattern_info_base_on_points(binned_features, monkey_information,
+def add_pattern_info_base_on_points(binned_features, monkey_info_in_bins, monkey_information,
                                     try_a_few_times_indices_for_anim, GUAT_point_indices_for_anim,
                                     ignore_sudden_flash_indices_for_anim):
-    pattern_df = monkey_information[['bin', 'point_index']].copy()
+
+    pattern_df = monkey_information[['point_index']].copy()
     pattern_df.index = pattern_df['point_index'].values
 
     pattern_df['try_a_few_times_indice_dummy'] = 0
@@ -77,6 +99,10 @@ def add_pattern_info_base_on_points(binned_features, monkey_information,
     pattern_df['ignore_sudden_flash_indice_dummy'] = 0
     pattern_df.loc[ignore_sudden_flash_indices_for_anim,
                    'ignore_sudden_flash_indice_dummy'] = 1
+    pattern_df.reset_index(drop=True, inplace=True)
+
+    pattern_df = pattern_df.merge(
+        monkey_info_in_bins[['bin', 'point_index']], on='point_index', how='right')
 
     pattern_df_condensed = pattern_df[['bin', 'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
                                        'ignore_sudden_flash_indice_dummy']].copy()
@@ -124,30 +150,20 @@ def _add_ff_info_to_binned_features(binned_features, ff_dataframe, ff_caught_T_n
     return binned_features
 
 
-def _make_final_behavioral_data(rebinned_monkey_info_essential, binned_features):
+def _make_final_behavioral_data(monkey_info_in_bins_essential, binned_features):
     """
-    Merge all the features back to rebinned_monkey_info_essential.
+    Merge all the features back to monkey_info_in_bins_essential.
     """
-    # drop columns in rebinned_monkey_info_essential that are already in binned_features, except for 'bin'
-    shared_columns = set(rebinned_monkey_info_essential.columns).intersection(
+    # drop columns in monkey_info_in_bins_essential that are already in binned_features, except for 'bin'
+    shared_columns = set(monkey_info_in_bins_essential.columns).intersection(
         set(binned_features.columns))
     shared_columns = shared_columns - {'bin'}
-    rebinned_monkey_info_essential = rebinned_monkey_info_essential.drop(
+    monkey_info_in_bins_essential = monkey_info_in_bins_essential.drop(
         columns=shared_columns)
-    final_behavioral_data = rebinned_monkey_info_essential.merge(
+    final_behavioral_data = monkey_info_in_bins_essential.merge(
         binned_features, how='left', on='bin')
     final_behavioral_data.fillna(0, inplace=True)
-    final_behavioral_data = _add_whether_any_ff_is_visible(
-        final_behavioral_data)
     return final_behavioral_data
-
-
-def _add_turning_right(monkey_information):
-    """Add dummy variable of turning left or right: 0 means left and 1 means right."""
-    monkey_information['turning_right'] = 0
-    monkey_information.loc[monkey_information['monkey_dw']
-                           < 0, 'turning_right'] = 1
-    return monkey_information
 
 
 def _rebin_monkey_info(monkey_information):
@@ -156,73 +172,75 @@ def _rebin_monkey_info(monkey_information):
     monkey_information['stop_duration'] = monkey_information['time']
     monkey_information.loc[monkey_information['monkey_speeddummy']
                            > 1, 'stop_duration'] = 0
-    rebinned_monkey_info = monkey_information.groupby('bin').mean()
+    monkey_info_in_bins_ess = monkey_information.groupby('bin').mean()
     # take out the name of the index
 
-    rebinned_monkey_info['bin'] = rebinned_monkey_info.index
-    rebinned_monkey_info.rename(
+    monkey_info_in_bins_ess['bin'] = monkey_info_in_bins_ess.index
+    monkey_info_in_bins_ess.rename(
         columns={'monkey_speeddummy': 'stop_time_ratio_in_bin'}, inplace=True)
-    rebinned_monkey_info['stop_time_ratio_in_bin'] = rebinned_monkey_info['stop_time_ratio_in_bin'] / \
-        rebinned_monkey_info['time']
-    rebinned_monkey_info['num_distinct_stops'] = monkey_information.groupby(
-        'bin').sum()['whether_new_distinct_stop'].values
-    return rebinned_monkey_info
+    monkey_info_in_bins_ess['stop_time_ratio_in_bin'] = monkey_info_in_bins_ess['stop_time_ratio_in_bin'] / \
+        monkey_info_in_bins_ess['time']
+    return monkey_info_in_bins_ess
 
 
-def _add_num_caught_ff(rebinned_monkey_info, ff_caught_T_new, time_bins):
-    """Add num_caught_ff to rebinned_monkey_info."""
+def _add_num_caught_ff(monkey_info_in_bins_ess, ff_caught_T_new, time_bins):
+    """Add num_caught_ff to monkey_info_in_bins_ess."""
     catching_target_bins = np.digitize(ff_caught_T_new, time_bins)-1
     catching_target_bins_unique, counts = np.unique(
         catching_target_bins, return_counts=True)
     catching_target_bins_unique = catching_target_bins_unique[catching_target_bins_unique < len(
         time_bins)-1]
     counts = counts[:len(catching_target_bins_unique)]
-    rebinned_monkey_info['num_caught_ff'] = 0
-    rebinned_monkey_info.loc[catching_target_bins_unique,
-                             'num_caught_ff'] = counts
-    return rebinned_monkey_info
+    monkey_info_in_bins_ess['num_caught_ff'] = 0
+    monkey_info_in_bins_ess.loc[catching_target_bins_unique,
+                                'num_caught_ff'] = counts
+    return monkey_info_in_bins_ess
 
 
-def _make_bin_continuous(rebinned_monkey_info):
-    """Make sure that the bin number is continuous in rebinned_monkey_info."""
+def _make_bin_continuous(monkey_info_in_bins_ess):
+    """Make sure that the bin number is continuous in monkey_info_in_bins_ess."""
     continuous_bins = pd.DataFrame(
-        {'bin': range(rebinned_monkey_info.bin.max()+1)})
-    rebinned_monkey_info = continuous_bins.merge(
-        rebinned_monkey_info, how='left', on='bin')
-    rebinned_monkey_info = rebinned_monkey_info.ffill().reset_index(drop=True)
-    return rebinned_monkey_info
+        {'bin': range(monkey_info_in_bins_ess.bin.max()+1)})
+    monkey_info_in_bins_ess = continuous_bins.merge(
+        monkey_info_in_bins_ess, how='left', on='bin')
+    monkey_info_in_bins_ess = monkey_info_in_bins_ess.ffill().reset_index(drop=True)
+    return monkey_info_in_bins_ess
 
 
-def _clip_columns(rebinned_monkey_info):
+def _clip_columns(monkey_info_in_bins_ess):
     """Clip values of specified columns."""
     for column in ['gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y']:
-        rebinned_monkey_info.loc[:, column] = np.clip(
-            rebinned_monkey_info.loc[:, column], -1000, 1000)
-    return rebinned_monkey_info
+        monkey_info_in_bins_ess.loc[:, column] = np.clip(
+            monkey_info_in_bins_ess.loc[:, column], -1000, 1000)
+    return monkey_info_in_bins_ess
 
 
-def _select_columns_of_interest(rebinned_monkey_info):
+def _select_monkey_info_columns_of_interest(monkey_info_in_bins_ess):
     """Select columns of interest."""
-    columns_of_interest = ['bin', 'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
-                           'monkey_speed', 'monkey_angle', 'monkey_dw', 'monkey_ddw', 'monkey_ddv', 'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff']
-    rebinned_monkey_info_essential = rebinned_monkey_info[columns_of_interest].copy(
+    # make sure the columns are in the df
+    columns_to_keep = [
+        col for col in monkey_info_columns_of_interest if col in monkey_info_in_bins_ess.columns]
+    monkey_info_in_bins_essential = monkey_info_in_bins_ess[columns_to_keep].copy(
     )
-    return rebinned_monkey_info_essential
+    return monkey_info_in_bins_essential
 
 
-def _add_stop_rate_and_success_rate(rebinned_monkey_info_essential, convolve_pattern, window_width):
-    """Add stop_rate and stop_success_rate to rebinned_monkey_info_essential."""
+def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, convolve_pattern, window_width):
+    """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
     num_distinct_stops_convolved = np.convolve(
-        rebinned_monkey_info_essential['num_distinct_stops'], convolve_pattern, 'same')
+        monkey_info_in_bins_essential['num_distinct_stops'], convolve_pattern, 'same')
     num_caught_ff_convolved = np.convolve(
-        rebinned_monkey_info_essential['num_caught_ff'], convolve_pattern, 'same')
-    rebinned_monkey_info_essential['stop_rate'] = num_distinct_stops_convolved/window_width
-    rebinned_monkey_info_essential['stop_success_rate'] = num_caught_ff_convolved / \
-        num_distinct_stops_convolved
-    # if there's na or inf in rebinned_monkey_info_essential['stop_success_rate'], replace it with 0
-    rebinned_monkey_info_essential['stop_success_rate'] = rebinned_monkey_info_essential['stop_success_rate'].replace([
-                                                                                                                      np.inf, -np.inf], np.nan).fillna(0)
-    return rebinned_monkey_info_essential
+        monkey_info_in_bins_essential['num_caught_ff'], convolve_pattern, 'same')
+    monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved/window_width
+    # suppress the warning for the line below
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        monkey_info_in_bins_essential['stop_success_rate'] = num_caught_ff_convolved / \
+            num_distinct_stops_convolved
+    # if there's na or inf in monkey_info_in_bins_essential['stop_success_rate'], replace it with 0
+    monkey_info_in_bins_essential['stop_success_rate'] = monkey_info_in_bins_essential['stop_success_rate'].replace([
+        np.inf, -np.inf], np.nan).fillna(0)
+    return monkey_info_in_bins_essential
 
 
 def _prepare_bin_midlines(time_bins, ff_caught_T_new, all_trial_patterns):
@@ -313,7 +331,7 @@ def _mark_bin_where_ff_is_caught(binned_features, ff_caught_T_new, time_bins):
 
 
 def _add_whether_any_ff_is_visible(binned_features):
-    # only add it if the ratio of bins with visible ff is between 10% and 90% within all the bins, since otherwise it might not be so meaningful (a.k.a. most bins have visible ff or most bins don't have visible ff)
+    # only add the column if the ratio of bins with visible ff is between 10% and 90% within all the bins, since otherwise it might not be so meaningful (a.k.a. most bins have visible ff or most bins don't have visible ff)
     any_ff_visible = (binned_features['num_visible_ff'] > 0).astype(int)
     if (any_ff_visible.sum()/len(binned_features) > 0.1) and (any_ff_visible.sum()/len(binned_features) < 0.9):
         binned_features['any_ff_visible'] = binned_features['num_visible_ff'] > 0

@@ -2,7 +2,7 @@ import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
 from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, reduce_multicollinearity
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
-from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
+from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
 import os
 import numpy as np
@@ -19,10 +19,16 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
 class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
-    def __init__(self, raw_data_folder_path=None, bin_width=0.25, window_width=1):
+    def __init__(self,
+                 raw_data_folder_path=None,
+                 bin_width=0.02,
+                 window_width=0.1,
+                 one_behav_idx_per_bin=True):
+
         super().__init__(raw_data_folder_path=raw_data_folder_path)
         self.bin_width = bin_width
         self.window_width = window_width
+        self.one_behav_idx_per_bin = one_behav_idx_per_bin
 
     def get_basic_data(self):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
@@ -61,11 +67,12 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         # get convolution data
         self.window_width, self.num_bins_in_window, self.convolve_pattern = neural_data_processing.calculate_window_parameters(
             window_width=self.window_width, bin_width=self.bin_width)
-        print("Updated window width (to get convolved data): ", self.window_width)
 
     def prep_behavioral_data_for_neural_data_modeling(self, max_lag_number=3):
-        self.binned_features = prep_monkey_data.make_binned_features(
-            self.monkey_information, self.bin_width, self.ff_dataframe, self.ff_caught_T_new)
+        self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
+            self.monkey_information, self.bin_width)
+        self.binned_features = prep_monkey_data._add_ff_info_to_binned_features(
+            self.binned_features, self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
         self._add_monkey_info()
         self._add_all_target_info()
         self._add_pattern_info_based_on_points_and_trials()
@@ -157,32 +164,71 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                                                                                           )
 
     def _add_monkey_info(self):
-        self.rebinned_monkey_info_essential, self.monkey_information = prep_monkey_data.make_rebinned_monkey_info_essential(
-            self.monkey_information, self.time_bins, self.ff_caught_T_new, self.convolve_pattern, self.window_width)
+        self.monkey_info_in_bins = prep_monkey_data.bin_monkey_information(
+            self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
+        self.monkey_info_in_bins_ess = prep_monkey_data.make_monkey_info_in_bins_ess(
+            self.monkey_info_in_bins, self.time_bins, self.ff_caught_T_new, self.convolve_pattern, self.window_width)
         self.binned_features = self.binned_features.merge(
-            self.rebinned_monkey_info_essential, how='left', on='bin')
+            self.monkey_info_in_bins_ess, how='left', on='bin')
 
     def _add_all_target_info(self):
         self._make_or_retrieve_target_df()
+        self._make_or_retrieve_target_cluster_df()
+        self._make_cmb_target_df()
+
+        if self.one_behav_idx_per_bin:
+            self.target_df_to_use = self.cmb_target_df[self.cmb_target_df['point_index'].isin(
+                self.monkey_info_in_bins['point_index'].values)]
+        else:
+            self.target_df_to_use = self.cmb_target_df
+            
         self.target_average_info, self.target_min_info, self.target_max_info = prep_target_data.get_max_min_and_avg_info_from_target_df(
-            self.target_df)
+            self.target_df_to_use)
         for df in [self.target_average_info, self.target_min_info, self.target_max_info]:
             self.binned_features = self.binned_features.merge(
                 df, how='left', on='bin')
 
-    def _make_or_retrieve_target_df(self, exists_ok=True):
-        filepath = os.path.join(
+
+    def _make_cmb_target_df(self):
+        # merge target df and target cluster df based on point_index; make sure no other columns are duplicated
+        columns_to_drop = [col for col in self.target_cluster_df.columns if col in self.target_df.columns]
+        columns_to_drop.remove('point_index')
+        target_cluster_df = self.target_cluster_df.drop(columns=columns_to_drop)
+        self.cmb_target_df = pd.merge(self.target_df, target_cluster_df, on='point_index', how='left')
+        
+        # add bin column to the target_df
+        self.cmb_target_df = self.cmb_target_df.merge(self.monkey_information[[
+            'point_index', 'bin']].copy(), on='point_index', how='left')
+
+
+    def _make_or_retrieve_target_df(self, exists_ok=True, include_frozen_info=True):
+        target_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_df.csv')
-        if exists(filepath) & exists_ok:
-            self.target_df = pd.read_csv(filepath)
+        if exists(target_df_filepath) & exists_ok:
+            self.target_df = pd.read_csv(target_df_filepath)
+            print("Retrieved target_df")
         else:
             self.target_df = prep_target_data.make_target_df(
-                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe)
-            self.target_df.to_csv(filepath, index=False)
+                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe, include_frozen_info=include_frozen_info)
+            self.target_df.to_csv(target_df_filepath, index=False)
             print("Made new target_df")
 
+    def _make_or_retrieve_target_cluster_df(self, exists_ok=True, include_frozen_info=True):
+        target_cluster_df_filepath = os.path.join(
+            self.patterns_and_features_data_folder_path, 'target_cluster_df.csv')
+        if exists(target_cluster_df_filepath) & exists_ok:
+            self.target_cluster_df = pd.read_csv(target_cluster_df_filepath)
+            print("Retrieved target_cluster_df")
+        else:
+            self.target_cluster_df = prep_target_data.make_target_cluster_df(
+                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe, 
+                self.ff_life_sorted, include_frozen_info=include_frozen_info)
+            self.target_cluster_df.to_csv(target_cluster_df_filepath, index=False)
+            print("Made new target_cluster_df")
+
+
     def _add_pattern_info_based_on_points_and_trials(self):
-        self.binned_features = prep_monkey_data.add_pattern_info_base_on_points(self.binned_features, self.monkey_information,
+        self.binned_features = prep_monkey_data.add_pattern_info_base_on_points(self.binned_features, self.monkey_info_in_bins, self.monkey_information,
                                                                                 self.try_a_few_times_indices_for_anim, self.GUAT_point_indices_for_anim,
                                                                                 self.ignore_sudden_flash_indices_for_anim)
         self.binned_features = prep_monkey_data.add_pattern_info_based_on_trials(
@@ -190,7 +236,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
 
     def _make_final_behavioral_data(self):
         self.final_behavioral_data = prep_monkey_data._make_final_behavioral_data(
-            self.rebinned_monkey_info_essential, self.binned_features)
+            self.monkey_info_in_bins_ess, self.binned_features)
         # take out column that has angle_to_boundary
         columns_to_drop = [col for col in self.final_behavioral_data.columns if (
             'angle_to_boundary' in col) or ('angle_boundary' in col)]
@@ -224,9 +270,9 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             mid_bin_time, self.valid_intervals_df
         )
 
-        # print the number of bins out of total numbers that are in valid intervals
-        print(f"Number of bins in valid intervals based on ff caught time: {len(self.valid_bin_index)} out of {len(mid_bin_time)}"
-              f" ({len(self.valid_bin_index)/len(mid_bin_time)*100:.2f}%)")
+        # # print the number of bins out of total numbers that are in valid intervals
+        # print(f"Number of bins in valid intervals based on ff caught time: {len(self.valid_bin_index)} out of {len(mid_bin_time)}"
+        #       f" ({len(self.valid_bin_index)/len(mid_bin_time)*100:.2f}%)")
 
     def _get_x_and_y_var(self):
         self.x_var = self.binned_spikes_df.set_index(
