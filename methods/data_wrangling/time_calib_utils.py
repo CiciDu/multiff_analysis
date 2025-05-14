@@ -59,14 +59,22 @@ def _get_adjusted_smr_markers_start_time_and_end_time(marker_list, ff_caught_T_s
     smr_markers_end_time = unadj_smr_markers_end_time + txt_smr_offset_2
     return smr_markers_start_time, smr_markers_end_time
 
+def find_offset_neural_txt_const(raw_data_folder_path, ff_caught_T_sorted):
+    time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    neural_event_time = pd.read_csv(os.path.join(time_calibration_folder_path, 'neural_event_time.txt'))
+    neural_t_raw = neural_event_time.loc[neural_event_time['label'] == 4, 'time'].values
+    txt_t = ff_caught_T_sorted.copy()
+    offset_neural_txt = neural_t_raw[0] - txt_t[0]
+    return offset_neural_txt
+
 def make_temp_txt_and_neural(raw_data_folder_path, ff_caught_T_sorted):   
     time_calibration_folder_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
     neural_event_time = pd.read_csv(os.path.join(time_calibration_folder_path, 'neural_event_time.txt'))
     neural_t_raw = neural_event_time.loc[neural_event_time['label'] == 4, 'time'].values
     txt_t = ff_caught_T_sorted.copy()
+    offset_neural_txt = neural_t_raw[0] - txt_t[0]
 
     df = pd.DataFrame({'txt_t': txt_t})
-    offset_neural_txt = neural_t_raw[0] - txt_t[0]
     neural_t_adj = neural_t_raw - offset_neural_txt
     df = add_closest_neural_t_adj_to_txt_t(df, neural_t_adj, txt_t, new_column_name='neural_t')
     df['neural_t_raw_ext'] = df['neural_t'] + offset_neural_txt

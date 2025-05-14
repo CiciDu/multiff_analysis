@@ -12,12 +12,14 @@ import os
 class PlanningAndNeural(plan_factors_class.PlanFactors):
     # class PlanningAndNeural(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
-    def __init__(self, raw_data_folder_path=None):
+    def __init__(self, raw_data_folder_path=None, bin_width=0.25, window_width=1):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
+        self.bin_width = bin_width
+        self.window_width = window_width
 
-    def retrieve_neural_data(self, bin_width=0.25, window_width=1):
+    def retrieve_neural_data(self):
         neural_vs_behavioral_class.NeuralVsBehavioralClass.retrieve_neural_data(
-            self, bin_width=bin_width, window_width=window_width)
+            self, bin_width=self.bin_width, window_width=self.window_width)
 
     def get_all_planning_info(self, both_ff_across_time_df_exists_ok=True):
 

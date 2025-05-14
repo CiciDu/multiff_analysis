@@ -213,6 +213,11 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
     monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum() - 1
     monkey_information.loc[monkey_information['monkey_speeddummy'] == 1, 'stop_id'] = np.nan        
     monkey_information['dt'] = (monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
+    # add turning right column
+    monkey_information['turning_right'] = 0
+    monkey_information.loc[monkey_information['monkey_dw']
+                           < 0, 'turning_right'] = 1
+    
     return monkey_information
 
 def add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path):

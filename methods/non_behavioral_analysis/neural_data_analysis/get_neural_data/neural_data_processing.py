@@ -30,14 +30,19 @@ def make_spike_df(raw_data_folder_path, ff_caught_T_sorted,
     
     neural_data_path = raw_data_folder_path.replace('raw_monkey_data', 'neural_data')
     sorted_neural_data_name = os.path.join(neural_data_path, "Sorted")
-    time_calibration_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
+    # time_calibration_path = raw_data_folder_path.replace('raw_monkey_data', 'time_calibration')
 
     smr_markers_start_time, smr_markers_end_time = time_calib_utils.find_smr_markers_start_and_end_time(raw_data_folder_path)
 
     spike_times = _load_spike_times(sorted_neural_data_name)
     
     spike_times_in_s = spike_times/sampling_rate
-    spike_times_in_s = time_calib_utils.calibrate_neural_data_time(spike_times_in_s, raw_data_folder_path, ff_caught_T_sorted)
+    
+    #spike_times_in_s = time_calib_utils.calibrate_neural_data_time(spike_times_in_s, raw_data_folder_path, ff_caught_T_sorted)
+    
+    offset_neural_txt = time_calib_utils.find_offset_neural_txt_const(raw_data_folder_path, ff_caught_T_sorted)
+    spike_times_in_s = spike_times_in_s - offset_neural_txt
+
 
     spike_clusters = _load_spike_clusters(sorted_neural_data_name)
 
