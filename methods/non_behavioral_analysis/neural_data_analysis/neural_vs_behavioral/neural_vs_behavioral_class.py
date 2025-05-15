@@ -71,8 +71,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def prep_behavioral_data_for_neural_data_modeling(self, max_lag_number=3):
         self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
             self.monkey_information, self.bin_width)
-        self.binned_features = prep_monkey_data._add_ff_info_to_binned_features(
-            self.binned_features, self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
+        self.binned_features = self._add_ff_info(self.binned_features)
         self._add_monkey_info()
         self._add_all_target_info()
         self._add_pattern_info_based_on_points_and_trials()
@@ -81,6 +80,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self._get_index_of_bins_in_valid_intervals()
         self._get_x_and_y_var()
         self._get_x_and_y_var_lags(max_lag_number=max_lag_number)
+
 
     def make_or_retrieve_y_var_lr_result_df(self, exists_ok=True):
         df_path = os.path.join(self.lr_result_df_path,
@@ -170,6 +170,17 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.monkey_info_in_bins, self.time_bins, self.ff_caught_T_new, self.convolve_pattern, self.window_width)
         self.binned_features = self.binned_features.merge(
             self.monkey_info_in_bins_ess, how='left', on='bin')
+
+
+    def _add_ff_info(self, binned_features):
+        self.ff_info = prep_monkey_data.get_ff_info_for_bins(
+            binned_features[['bin']], self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
+        # delete columns in ff_info that are duplicated in behav_data except for bin
+        columns_to_drop = [col for col in self.ff_info.columns if col in binned_features.columns and col != 'bin']
+        self.ff_info = self.ff_info.drop(columns=columns_to_drop)
+        binned_features = binned_features.merge(self.ff_info, on='bin', how='left')
+        return binned_features
+
 
     def _add_all_target_info(self):
         self._make_or_retrieve_target_df()

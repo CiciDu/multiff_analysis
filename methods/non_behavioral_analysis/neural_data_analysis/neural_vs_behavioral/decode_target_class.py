@@ -43,14 +43,14 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.behav_data = prep_monkey_data.bin_monkey_information(
             self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
 
-
-        self.behav_data = prep_monkey_data._add_ff_info_to_binned_features(
-            self.behav_data, self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
+        self.behav_data = self._add_ff_info(self.behav_data)
         self._add_all_target_info()
 
         # clip values in some columns
         for column in ['gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y']:
             self.behav_data.loc[:, column] = np.clip(self.behav_data.loc[:, column], -1000, 1000)
+
+
 
 
     def _add_all_target_info(self):

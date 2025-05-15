@@ -134,20 +134,20 @@ def add_pattern_info_based_on_trials(binned_features, ff_caught_T_new, all_trial
     return binned_features
 
 
-def _add_ff_info_to_binned_features(binned_features, ff_dataframe, ff_caught_T_new, time_bins):
+def get_ff_info_for_bins(bins_df, ff_dataframe, ff_caught_T_new, time_bins):
     ff_dataframe['bin'] = np.digitize(ff_dataframe.time, time_bins)-1
-    binned_features = _add_num_alive_ff(binned_features, ff_dataframe)
-    binned_features = _add_num_visible_ff(binned_features, ff_dataframe)
-    binned_features = _add_min_ff_info(binned_features, ff_dataframe)
-    binned_features = _add_min_visible_ff_info(binned_features, ff_dataframe)
-    binned_features = _mark_bin_where_ff_is_caught(
-        binned_features, ff_caught_T_new, time_bins)
-    binned_features = _add_whether_any_ff_is_visible(binned_features)
-    binned_features = binned_features.fillna(
+    bins_df = _add_num_alive_ff(bins_df, ff_dataframe)
+    bins_df = _add_num_visible_ff(bins_df, ff_dataframe)
+    bins_df = _add_min_ff_info(bins_df, ff_dataframe)
+    bins_df = _add_min_visible_ff_info(bins_df, ff_dataframe)
+    bins_df = _mark_bin_where_ff_is_caught(
+        bins_df, ff_caught_T_new, time_bins)
+    bins_df = _add_whether_any_ff_is_visible(bins_df)
+    bins_df = bins_df.fillna(
         method='ffill').reset_index(drop=True)
-    binned_features = binned_features.fillna(
+    bins_df = bins_df.fillna(
         method='bfill').reset_index(drop=True)
-    return binned_features
+    return bins_df
 
 
 def _make_final_behavioral_data(monkey_info_in_bins_essential, binned_features):
