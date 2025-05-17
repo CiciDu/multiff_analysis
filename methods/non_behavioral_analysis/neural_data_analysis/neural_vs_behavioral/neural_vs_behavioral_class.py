@@ -73,7 +73,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.monkey_information, self.bin_width)
         self.binned_features = self._add_ff_info(self.binned_features)
         self._add_monkey_info()
-        self._add_all_target_info()
+        self._add_all_target_and_target_cluster_info()
         self._add_pattern_info_based_on_points_and_trials()
         self._make_final_behavioral_data()
         self._match_binned_spikes_to_range_of_behavioral_data()
@@ -108,13 +108,11 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         # # manually dropped some more columns
         # self.y_var_reduced.drop(columns=['bin'], inplace=True, errors='ignore')
 
-
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True):
 
         # Call the function to iteratively drop lags with high correlation for each feature
-        self.y_var_lags_reduced0 = reduce_multicollinearity.drop_feature_lags_with_high_corr(self.y_var, self.y_var_lags, lag_numbers=self.lag_numbers, 
-                                                                                             corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, verbose=verbose)
-        
+        self.y_var_lags_reduced0 = reduce_multicollinearity.drop_columns_with_high_corr(self.y_var, self.y_var_lags, lag_numbers=self.lag_numbers,
+                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, verbose=verbose)
 
         print('\nDropping lags with high VIF in a specific subset of features...')
         y_var_lags_reduced01, dropped_columns = reduce_multicollinearity.filter_specific_subset_of_y_var_lags_by_vif(
@@ -126,7 +124,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, vif_threshold=vif_threshold,
             verbose=verbose, get_final_vif=False,
         )
-        
 
     def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
         df_path = os.path.join(self.y_var_lags_path,
@@ -184,7 +181,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.ff_info, on='bin', how='left')
         return binned_features
 
-    def _add_all_target_info(self):
+    def _add_all_target_and_target_cluster_info(self):
         self._make_or_retrieve_target_df()
         self._make_or_retrieve_target_cluster_df()
         self._make_cmb_target_df()

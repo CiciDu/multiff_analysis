@@ -51,52 +51,13 @@ def make_or_retrieve_vif_df(df, data_folder_path, vif_df_name='vif_df', exists_o
         vif_df.to_csv(df_path, index=False)
     return vif_df
 
-# get the 2nd maximum value in the correlation matrix
 
+def drop_columns_with_high_corr(y_var, y_var_lags, lag_numbers=np.array(range(-3, 4)), corr_threshold_for_lags=0.85, verbose=True):
 
-def get_second_largest_abs_r_for_each_feature(corr_matrix):
-    # Function to get the second maximum value in a row
-    def second_max_row(row):
-        return row.nlargest(2).iloc[-1]
-
-    # Apply the function to each row
-    features_2nd_largest_r = corr_matrix.apply(second_max_row, axis=1)
-    features_2nd_largest_r.sort_values(ascending=False, inplace=True)
-    features_2nd_largest_r = pd.DataFrame(
-        features_2nd_largest_r, columns=['2nd_largest_r'])
-    features_2nd_largest_r['2nd_largest_r'] = np.round(
-        features_2nd_largest_r['2nd_largest_r'], 4)
-    return features_2nd_largest_r
-
-
-def drop_features_with_high_correlation(df, corr_threshold=0.9):
-    # Calculate correlation matrix
-    corr_matrix = df.corr().abs()
-
-    # Select upper triangle of correlation matrix
-    upper = corr_matrix.where(
-        np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
-
-    # Find features with correlation greater than 0.9
-    to_drop = [column for column in upper.columns if any(
-        np.abs(upper[column]) > corr_threshold)]
-
-    # Drop highly correlated features
-    df_reduced = df.drop(columns=to_drop)
-
-    features_2nd_largest_r = get_second_largest_abs_r_for_each_feature(
-        corr_matrix)
-
-    dropped_columns_2nd_largest_r = features_2nd_largest_r.loc[to_drop]
-    dropped_columns_2nd_largest_r.sort_values(
-        by='2nd_largest_r', ascending=False, inplace=True)
-    return df_reduced, dropped_columns_2nd_largest_r
-
-
-def drop_feature_lags_with_high_corr(y_var, y_var_lags, lag_numbers=np.array(range(-3, 4)), corr_threshold_for_lags=0.85, verbose=True):
+    num_init_columns = y_var_lags.shape[1]
     # drop all columns in y_var_lags that has 'feature' but is not 'feature'
     print('\n====================Dropping lags of features with high correlation for each feature====================')
-    y_var_lags_reduced0, columns_dropped = iteratively_drop_lags_with_high_corr_for_each_feature(
+    y_var_lags_reduced0, columns_dropped = drop_lags_with_high_corr_for_each_feature(
         y_var, y_var_lags, lag_numbers=lag_numbers,
         corr_threshold=corr_threshold_for_lags,
         verbose=verbose
@@ -110,11 +71,14 @@ def drop_feature_lags_with_high_corr(y_var, y_var_lags, lag_numbers=np.array(ran
     y_var_lags_reduced0, columns_dropped = filter_specific_subset_of_y_var_lags_by_corr(
         y_var_lags_reduced0, corr_threshold=corr_threshold_for_lags, verbose=verbose, all_column_subsets=[y_var_lags_reduced0.columns])
 
+    num_final_columns = y_var_lags_reduced0.shape[1]
+    print(f'\n*Summary: {num_init_columns - num_final_columns} out of {num_init_columns} ({num_init_columns - num_final_columns / num_init_columns * 100:.2f}%) are dropped after calling drop_columns_with_high_corr*')
+
     return y_var_lags_reduced0
 
 
-def iteratively_drop_lags_with_high_corr_for_each_feature(df, df_with_lags, corr_threshold=0.85,
-                                                          lag_numbers=np.array(range(-3, 4)), verbose=True):
+def drop_lags_with_high_corr_for_each_feature(df, df_with_lags, corr_threshold=0.85,
+                                              lag_numbers=np.array(range(-3, 4)), verbose=True):
     """
     Iteratively drop lags with high correlation for each feature in the DataFrame.
 
@@ -131,7 +95,7 @@ def iteratively_drop_lags_with_high_corr_for_each_feature(df, df_with_lags, corr
         feature_columns_to_drop = []
 
         # Get the subset of df_with_lags for the current feature
-        df_with_lags_sub = _find_df_with_lags_sub_for_current_feature(
+        df_with_lags_sub = _find_subset_of_df_with_lags_for_current_feature(
             df_with_lags, feature, lag_numbers=lag_numbers)
 
         while len(df_with_lags_sub.columns) > 1:
@@ -163,7 +127,7 @@ def iteratively_drop_lags_with_high_corr_for_each_feature(df, df_with_lags, corr
 
     # print the total number of columns dropped
     print(
-        f'\n{len(columns_dropped)} out of {num_original_columns} ({len(columns_dropped) / num_original_columns * 100:.2f}%) are dropped after calling iteratively_drop_lags_with_high_corr_for_each_feature')
+        f'\n{len(columns_dropped)} out of {num_original_columns} ({len(columns_dropped) / num_original_columns * 100:.2f}%) are dropped after calling drop_lags_with_high_corr_for_each_feature')
 
     return df_reduced, columns_dropped
 
@@ -301,7 +265,7 @@ def filter_specific_subset_of_y_var_lags_by_vif(y_var_lags, vif_threshold=5, ver
     return df_reduced, dropped_columns
 
 
-def _find_df_with_lags_sub_for_current_feature(df_with_lags, feature, lag_numbers=np.array(range(-3, 4))):
+def _find_subset_of_df_with_lags_for_current_feature(df_with_lags, feature, lag_numbers=np.array(range(-3, 4))):
     # sort np.array(lag_numbers) by absolute value
     sorted_lag_numbers = lag_numbers[np.argsort(np.abs(lag_numbers))].tolist()
     column_names_w_lags = [feature + "_" +
@@ -310,199 +274,43 @@ def _find_df_with_lags_sub_for_current_feature(df_with_lags, feature, lag_number
     return df_with_lags_sub
 
 
-
-def get_ranked_correlations(df, verbose=True):
-    """
-    Get correlations between all pairs of variables and rank them.
-    
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        Input DataFrame
-    verbose : bool, default=True
-        Whether to print information about the correlations
-        
-    Returns:
-    --------
-    corr_df : pandas.DataFrame
-        DataFrame containing all pairs of variables and their correlations, ranked by absolute correlation
-    """
-    # Calculate correlation matrix
-    corr_matrix = df.corr()
-
-    # Convert to long format
-    corr_pairs = []
-    for i in range(len(corr_matrix.index)):
-        for j in range(i+1, len(corr_matrix.columns)):
-            var1 = corr_matrix.index[i]
-            var2 = corr_matrix.columns[j]
-            corr = corr_matrix.iloc[i, j]
-            corr_pairs.append({
-                'var1': var1,
-                'var2': var2,
-                'correlation': corr,
-                'abs_correlation': abs(corr)
-            })
-    
-    # Convert to DataFrame and sort by absolute correlation
-    corr_df = pd.DataFrame(corr_pairs)
-    corr_df = corr_df.sort_values('abs_correlation', ascending=False).reset_index(drop=True)
-    
-    if verbose:
-        print(f"\nFound {len(corr_df)} pairs of variables with correlations:")
-        print("\nTop 10 highest correlations:")
-        print(corr_df.head(10).to_string())
-        print("\nBottom 10 lowest correlations:")
-        print(corr_df.tail(10).to_string())
-    
-    return corr_df
-
-
-# def find_correlation_pairs(df, corr_threshold=0.9, verbose=False):
-#     # Get absolute correlation values
-#     corr_coeff = df.corr()
-#     abs_corr = np.abs(corr_coeff)
-
-#     # Find pairs of columns with correlation > 0.9 (excluding self-correlations)
-#     high_corr_pairs = np.where((abs_corr > corr_threshold) & (abs_corr < 1.0))
-
-#     corr_pairs = []
-
-#     # Print the pairs of columns with high correlation
-#     # Note: each pair will only appear twice because I gave the condition 'i < j'
-#     if verbose:
-#         if len(high_corr_pairs[0]) > 0:
-#             print(
-#                 f"\nHighly correlated pairs (correlation > {corr_threshold}), {int(len(high_corr_pairs[0]) / 2)} in total:")
-#     for i, j in zip(high_corr_pairs[0], high_corr_pairs[1]):
-#         if i < j:  # Only print each pair once
-#             col1 = corr_coeff.index[i]
-#             col2 = corr_coeff.columns[j]
-#             correlation = corr_coeff.iloc[i, j]
-
-#             corr_pairs.append({
-#                 'var1': col1,
-#                 'var2': col2,
-#                 'correlation': correlation,
-#                 'abs_correlation': abs(correlation)
-#             })
-
-#             if verbose:
-#                 print(f"{col1} -- {col2}: {correlation:.3f}")
-
-#     # Convert to DataFrame and sort by absolute correlation
-#     corr_df = pd.DataFrame(corr_pairs)
-#     corr_df = corr_df.sort_values(
-#         'abs_correlation', ascending=False).reset_index(drop=True)
-
-#     if verbose:
-#         print("\nTop 10 highest correlations:")
-#         print(corr_df.head(10).to_string())
-
-#     return corr_df
-
 def get_pairs_of_high_corr_features(df, corr_threshold=0.9, verbose=False):
-    corr_df = get_ranked_correlations(df, corr_threshold=corr_threshold, verbose=verbose)
-    high_corr_pair_df = corr_df[corr_df['abs_correlation'] > corr_threshold]
-    return high_corr_pair_df
-
-# def get_pairs_of_high_corr_features(df, corr_threshold=0.9, verbose=False):
-#     # Get absolute correlation values
-#     corr_coeff = df.corr()
-#     abs_corr = np.abs(corr_coeff)
-
-#     # Find pairs of columns with correlation > 0.9 (excluding self-correlations)
-#     high_corr_pairs = np.where((abs_corr > corr_threshold) & (abs_corr < 1.0))
-#     rows_to_keep = np.unique(high_corr_pairs[0])
-#     cols_to_keep = np.unique(high_corr_pairs[1])
-
-#     all_corr = []
-#     high_cor_var1 = []
-#     high_cor_var2 = []
-
-#     # Print the pairs of columns with high correlation
-#     # Note: each pair will only appear twice because I gave the condition 'i < j'
-#     if verbose:
-#         if len(high_corr_pairs[0]) > 0:
-#             print(
-#                 f"\nHighly correlated pairs (correlation > {corr_threshold}), {int(len(high_corr_pairs[0]) / 2)} in total:")
-#     for i, j in zip(high_corr_pairs[0], high_corr_pairs[1]):
-#         if i < j:  # Only print each pair once
-#             col1 = corr_coeff.index[i]
-#             col2 = corr_coeff.columns[j]
-#             correlation = corr_coeff.iloc[i, j]
-
-#             high_cor_var1.append(col1)
-#             high_cor_var2.append(col2)
-#             all_corr.append(correlation)
-
-#             if verbose:
-#                 print(f"{col1} -- {col2}: {correlation:.3f}")
-
-#     # Keep only the highly correlated rows and columns
-#     high_corr_pair_df = pd.DataFrame({'var_1': high_cor_var1,
-#                                      'var_2': high_cor_var2,
-#                                       'corr': all_corr})
-
-#     filtered_corr = corr_coeff.iloc[rows_to_keep, cols_to_keep]
-#     return high_corr_pair_df
-
-
-def find_and_drop_highly_correlated_pairs(df, corr_threshold=0.9, verbose=True):
-    """
-    Find pairs of highly correlated columns and drop one column from each pair.
-
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        Input DataFrame
-    corr_threshold : float, default=0.9
-        Correlation threshold above which columns are considered highly correlated
-    verbose : bool, default=True
-        Whether to print information about the dropped columns
-
-    Returns:
-    --------
-    df_reduced : pandas.DataFrame
-        DataFrame with one column from each highly correlated pair dropped
-    dropped_columns : list
-        List of column names that were dropped
-    """
-    # Calculate correlation matrix
+    # Get absolute correlation values
     corr_coeff = df.corr()
     abs_corr = np.abs(corr_coeff)
 
-    # Find pairs of columns with correlation > threshold (excluding self-correlations)
+    # Find pairs of columns with correlation > 0.9 (excluding self-correlations)
     high_corr_pairs = np.where((abs_corr > corr_threshold) & (abs_corr < 1.0))
 
-    # Create a set to store columns to drop
-    columns_to_drop = set()
+    all_corr = []
+    high_cor_var1 = []
+    high_cor_var2 = []
 
-    # Process each pair
+    # Print the pairs of columns with high correlation
+    # Note: each pair will only appear twice because I gave the condition 'i < j'
+    if verbose:
+        if len(high_corr_pairs[0]) > 0:
+            print(
+                f"\nHighly correlated pairs (correlation > {corr_threshold}), {int(len(high_corr_pairs[0]) / 2)} in total:")
     for i, j in zip(high_corr_pairs[0], high_corr_pairs[1]):
-        if i < j:  # Only process each pair once
+        if i < j:  # Only print each pair once
             col1 = corr_coeff.index[i]
             col2 = corr_coeff.columns[j]
             correlation = corr_coeff.iloc[i, j]
 
+            high_cor_var1.append(col1)
+            high_cor_var2.append(col2)
+            all_corr.append(correlation)
+
             if verbose:
-                print(
-                    f"Found highly correlated pair: {col1} -- {col2}: {correlation:.3f}")
+                print(f"{col1} -- {col2}: {correlation:.3f}")
 
-            # Add the second column to the drop list
-            columns_to_drop.add(col2)
+    # Keep only the highly correlated rows and columns
+    high_corr_pair_df = pd.DataFrame({'var_1': high_cor_var1,
+                                     'var_2': high_cor_var2,
+                                      'corr': all_corr})
 
-    # Convert set to list
-    columns_to_drop = list(columns_to_drop)
+    high_corr_pair_df['abs_corr'] = high_corr_pair_df['corr'].apply(abs)
+    high_corr_pair_df.sort_values(by='abs_corr', ascending=False, inplace=True)
 
-    # Drop the columns
-    df_reduced = df.drop(columns=columns_to_drop)
-
-    if verbose:
-        print(
-            f"\nDropped {len(columns_to_drop)} columns due to high correlation:")
-        for col in columns_to_drop:
-            print(f"- {col}")
-        print(f"\nReduced DataFrame shape: {df_reduced.shape}")
-
-    return df_reduced, columns_to_drop
+    return high_corr_pair_df
