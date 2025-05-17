@@ -71,9 +71,10 @@ def add_optimal_arc_measure_and_length(curvature_df,
 
     whether_ff_behind = (np.abs(curvature_df['ff_angle_boundary']) > math.pi/2)
 
-    if (abs(curvature_df['ff_angle_boundary']) > math.pi/4).sum() > 0:
-        raise ValueError(
-            "At least one ff has an angle to boundary larger than pi/4. This is invalid. Please check the input.")
+    if not ignore_error:
+        if (abs(curvature_df['ff_angle_boundary']) > math.pi/4).sum() > 0:
+            raise ValueError(
+                "At least one ff has an angle to boundary larger than pi/4. This is invalid. Please check the input.")
 
     center_x, center_y, arc_starting_angle, arc_ending_angle = find_cartesian_arc_center_and_angle_for_optimal_arc(arc_ff_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
                                                                                                                    arc_end_direction, whether_ff_behind=whether_ff_behind,
@@ -95,8 +96,12 @@ def add_optimal_arc_measure_and_length(curvature_df,
     arc_end_distance_to_ff_center = np.sqrt((curvature_df['optimal_arc_end_x'] - curvature_df['ff_x'])**2 + (
         curvature_df['optimal_arc_end_y'] - curvature_df['ff_y'])**2)
     if np.any(arc_end_distance_to_ff_center > 25):
-        raise ValueError(
-            "At least one arc end is outside the reward boundary. This is invalid. Please check the input.")
+        if not ignore_error:
+            raise ValueError(
+                "At least one arc end is outside the reward boundary. This is invalid. Please check the input.")
+        else:
+            print(
+                "Warning: At least one arc end is outside the reward boundary. This is invalid. We will adjust them by making them a little less than pi.")
 
 
 def find_cartesian_arc_center_and_angle_for_optimal_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction, whether_ff_behind=None,

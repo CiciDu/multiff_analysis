@@ -109,6 +109,7 @@ def calculate_window_parameters(window_width, bin_width):
     if num_bins_in_window % 2 == 0:
         num_bins_in_window += 1
         window_width = num_bins_in_window * bin_width
+    window_width = round(window_width, 3)
     convolve_pattern = np.ones(num_bins_in_window)
 
     if original_window_width != window_width:

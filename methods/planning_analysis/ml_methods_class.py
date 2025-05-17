@@ -122,25 +122,26 @@ class MlMethods():
         r_squared = r2_score(self.y_test, self.predictions)
         print("R-squared on test set:", r_squared)
 
-    def use_vif(self):
+    def use_vif(self, var_df):
         # Calculate VIF
-        self.vif = pd.DataFrame()
-        self.vif["features"] = self.x_var_df.columns
+        self.vif_df = pd.DataFrame()
+        self.vif_df["feature"] = var_df.columns
         vif_values = []
-        for i in range(self.x_var_df.shape[1]):
+        for i in range(var_df.shape[1]):
             vif_values.append(variance_inflation_factor(
-                self.x_var_df.values, i))
+                var_df.values, i))
             if i % 10 == 0:
                 print(
                     f'{i} out of {self.x_var_df.shape[1]} features are processed.')
-        self.vif["VIF"] = vif_values
-        self.vif = self.vif.sort_values(by='VIF', ascending=False).round(1)
-        print(self.vif)
+        self.vif_df['vif'] = vif_values
+        self.vif_df = self.vif_df.sort_values(
+            by='vif', ascending=False).round(1)
+        print(self.vif_df)
 
     def show_correlation_heatmap(self, specific_columns=None):
         if specific_columns is None:
-            specific_columns = self.vif[self.vif["VIF"]
-                                        > 5].features.values[:15]
+            specific_columns = self.vif_df[self.vif_df['vif']
+                                           > 5].feature.values[:15]
         # calculate the correlation coefficient among the columns with VIF > 5
         self.corr_coeff = self.x_var_df[specific_columns].corr()
         plt.figure(figsize=(15, 15))
@@ -158,7 +159,8 @@ class MlMethods():
                                                                                  ],
                                                           add_ref_interaction_choices=[
                                                               True],
-                                                          clusters_to_keep_choices=['cur_ff_cluster_100'],
+                                                          clusters_to_keep_choices=[
+                                                              'cur_ff_cluster_100'],
                                                           clusters_for_interaction_choices=[
                                                               'none', 'cur_ff_cluster_100'],
                                                           ref_columns_only_choices=[

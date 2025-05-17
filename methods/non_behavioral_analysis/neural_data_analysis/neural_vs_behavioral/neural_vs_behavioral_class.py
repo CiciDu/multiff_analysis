@@ -79,7 +79,8 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self._match_binned_spikes_to_range_of_behavioral_data()
         self._get_index_of_bins_in_valid_intervals()
         self._get_x_and_y_var()
-        self._get_x_and_y_var_lags(max_lag_number=max_lag_number)
+        self._get_y_var_lags(max_lag_number=max_lag_number,
+                             continuous_data=self.final_behavioral_data)
 
     def make_or_retrieve_y_var_lr_result_df(self, exists_ok=True):
         df_path = os.path.join(self.lr_result_df_path,
@@ -107,24 +108,25 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         # # manually dropped some more columns
         # self.y_var_reduced.drop(columns=['bin'], inplace=True, errors='ignore')
 
+
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True):
 
         # Call the function to iteratively drop lags with high correlation for each feature
-        y_var_lags_reduced0, all_r_of_dropped_features = reduce_multicollinearity.iteratively_drop_lags_with_high_corr_for_each_feature(
-            self.y_var, self.y_var_lags, lag_numbers=np.array(
-                self.lag_numbers),
-            corr_threshold=corr_threshold_for_lags_of_a_feature,
-        )
+        self.y_var_lags_reduced0 = reduce_multicollinearity.drop_feature_lags_with_high_corr(self.y_var, self.y_var_lags, lag_numbers=self.lag_numbers, 
+                                                                                             corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, verbose=verbose)
+        
 
+        print('\nDropping lags with high VIF in a specific subset of features...')
         y_var_lags_reduced01, dropped_columns = reduce_multicollinearity.filter_specific_subset_of_y_var_lags_by_vif(
-            y_var_lags_reduced0, vif_threshold=vif_threshold, verbose=True)
+            self.y_var_lags_reduced0, vif_threshold=vif_threshold, verbose=True)
 
-        verbose = True
+        print('\nIteratively dropping columns with the highest vif_df...')
         self.y_var_lags_reduced, dropped_columns_from_y_var_lags_reduced, vif_of_y_var_lags_reduced = reduce_multicollinearity.take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(
             y_var_lags_reduced01, initial_vif=None,
             vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, vif_threshold=vif_threshold,
             verbose=verbose, get_final_vif=False,
         )
+        
 
     def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
         df_path = os.path.join(self.y_var_lags_path,
@@ -133,7 +135,8 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.y_var_lags_reduced = pd.read_csv(df_path)
         else:
             if not hasattr(self, 'y_var_lags'):
-                self._get_x_and_y_var_lags(max_lag_number=self.max_lag_number)
+                self._get_y_var_lags(
+                    max_lag_number=self.max_lag_number, continuous_data=self.final_behavioral_data)
             self.reduce_y_var_lags()
             self.y_var_lags_reduced.to_csv(df_path, index=False)
 
@@ -292,12 +295,11 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.y_var = self.final_behavioral_data.set_index(
             'bin').loc[self.valid_bin_index].reset_index(drop=False)
 
-    def _get_x_and_y_var_lags(self, max_lag_number):
+    def _get_y_var_lags(self, max_lag_number, continuous_data):
         self.max_lag_number = max_lag_number
         self.lag_numbers = np.arange(-max_lag_number, max_lag_number+1)
-        if not hasattr(self, 'x_var'):
-            self._get_x_and_y_var()
         self.y_var_lags = neural_data_processing.add_lags_to_each_feature(
-            self.final_behavioral_data, self.lag_numbers)
-        self.y_var_lags = self.y_var_lags.set_index(
-            'bin_0').loc[self.valid_bin_index].reset_index(drop=False)
+            continuous_data, self.lag_numbers)
+        if hasattr(self, 'valid_bin_index'):
+            self.y_var_lags = self.y_var_lags.set_index(
+                'bin_0').loc[self.valid_bin_index].reset_index(drop=False)
