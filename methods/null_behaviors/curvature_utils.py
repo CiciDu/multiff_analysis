@@ -32,7 +32,8 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_optimal_a
                 -45*math.pi/180, 45*math.pi/180)]
         final_length = len(ff_dataframe_sub)
         if original_length != final_length:
-            print(f"Warning: {original_length - final_length} out of {original_length} ff are not within the valid ff_angle_boundary when using the function make_curvature_df.")
+            if not ignore_error:
+                print(f"Warning: {original_length - final_length} out of {original_length} ff are not within the valid ff_angle_boundary when using the function make_curvature_df.")
 
     if opt_arc_stop_first_vis_bdry & (len(ff_dataframe_sub) > 100000):
         print('Warning: The number of ff is larger than 100000, and opt_arc_stop_first_vis_bdry is set to True. This might take a long time to calculate the optimal arc.')

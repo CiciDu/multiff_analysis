@@ -80,7 +80,7 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
     return spike_times_in_s, spike_clusters
 
 
-def bin_spikes(spike_df, bin_width=0.02):
+def bin_spikes(spike_df, bin_width=0.1):
     """Bin spikes and stack bins for each spike cluster."""
     min_time = math.floor(spike_df.time.min())
     max_time = math.ceil(spike_df.time.max())
@@ -110,13 +110,14 @@ def calculate_window_parameters(window_width, bin_width):
         num_bins_in_window += 1
         window_width = num_bins_in_window * bin_width
     convolve_pattern = np.ones(num_bins_in_window)
-    
+
     if original_window_width != window_width:
-        print(f"Window width changed from {original_window_width} to {window_width} to make it odd")
+        print(
+            f"Window width changed from {original_window_width} to {window_width} to make it odd")
     return window_width, num_bins_in_window, convolve_pattern
 
 
-def prepare_binned_spikes_matrix_and_df(all_binned_spikes, max_bin):
+def prepare_binned_spikes_matrix_and_df(all_binned_spikes, max_bin=None):
     """
     Prepare the binned_spikes_df dataframe by extracting the maximum bin from final_behavioral_data,
     slicing all_binned_spikes, and creating column names.

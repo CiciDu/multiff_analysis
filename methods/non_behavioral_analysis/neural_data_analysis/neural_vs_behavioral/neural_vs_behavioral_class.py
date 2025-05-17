@@ -21,8 +21,8 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def __init__(self,
                  raw_data_folder_path=None,
-                 bin_width=0.02,
-                 window_width=0.1,
+                 bin_width=0.1,
+                 window_width=0.25,
                  one_behav_idx_per_bin=True):
 
         super().__init__(raw_data_folder_path=raw_data_folder_path)
@@ -80,7 +80,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self._get_index_of_bins_in_valid_intervals()
         self._get_x_and_y_var()
         self._get_x_and_y_var_lags(max_lag_number=max_lag_number)
-
 
     def make_or_retrieve_y_var_lr_result_df(self, exists_ok=True):
         df_path = os.path.join(self.lr_result_df_path,
@@ -166,21 +165,21 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def _add_monkey_info(self):
         self.monkey_info_in_bins = prep_monkey_data.bin_monkey_information(
             self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
-        self.monkey_info_in_bins_ess = prep_monkey_data.make_monkey_info_in_bins_ess(
+        self.monkey_info_in_bins_ess = prep_monkey_data.make_monkey_info_in_bins_essential(
             self.monkey_info_in_bins, self.time_bins, self.ff_caught_T_new, self.convolve_pattern, self.window_width)
         self.binned_features = self.binned_features.merge(
             self.monkey_info_in_bins_ess, how='left', on='bin')
-
 
     def _add_ff_info(self, binned_features):
         self.ff_info = prep_monkey_data.get_ff_info_for_bins(
             binned_features[['bin']], self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
         # delete columns in ff_info that are duplicated in behav_data except for bin
-        columns_to_drop = [col for col in self.ff_info.columns if col in binned_features.columns and col != 'bin']
+        columns_to_drop = [
+            col for col in self.ff_info.columns if col in binned_features.columns and col != 'bin']
         self.ff_info = self.ff_info.drop(columns=columns_to_drop)
-        binned_features = binned_features.merge(self.ff_info, on='bin', how='left')
+        binned_features = binned_features.merge(
+            self.ff_info, on='bin', how='left')
         return binned_features
-
 
     def _add_all_target_info(self):
         self._make_or_retrieve_target_df()
@@ -192,25 +191,26 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                 self.monkey_info_in_bins['point_index'].values)]
         else:
             self.target_df_to_use = self.cmb_target_df
-            
+
         self.target_average_info, self.target_min_info, self.target_max_info = prep_target_data.get_max_min_and_avg_info_from_target_df(
             self.target_df_to_use)
         for df in [self.target_average_info, self.target_min_info, self.target_max_info]:
             self.binned_features = self.binned_features.merge(
                 df, how='left', on='bin')
 
-
     def _make_cmb_target_df(self):
         # merge target df and target cluster df based on point_index; make sure no other columns are duplicated
-        columns_to_drop = [col for col in self.target_cluster_df.columns if col in self.target_df.columns]
+        columns_to_drop = [
+            col for col in self.target_cluster_df.columns if col in self.target_df.columns]
         columns_to_drop.remove('point_index')
-        target_cluster_df = self.target_cluster_df.drop(columns=columns_to_drop)
-        self.cmb_target_df = pd.merge(self.target_df, target_cluster_df, on='point_index', how='left')
-        
+        target_cluster_df = self.target_cluster_df.drop(
+            columns=columns_to_drop)
+        self.cmb_target_df = pd.merge(
+            self.target_df, target_cluster_df, on='point_index', how='left')
+
         # add bin column to the target_df
         self.cmb_target_df = self.cmb_target_df.merge(self.monkey_information[[
             'point_index', 'bin']].copy(), on='point_index', how='left')
-
 
     def _make_or_retrieve_target_df(self, exists_ok=True, include_frozen_info=True):
         target_df_filepath = os.path.join(
@@ -232,11 +232,11 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             print("Retrieved target_cluster_df")
         else:
             self.target_cluster_df = prep_target_data.make_target_cluster_df(
-                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe, 
+                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe,
                 self.ff_life_sorted, include_frozen_info=include_frozen_info)
-            self.target_cluster_df.to_csv(target_cluster_df_filepath, index=False)
+            self.target_cluster_df.to_csv(
+                target_cluster_df_filepath, index=False)
             print("Made new target_cluster_df")
-
 
     def _add_pattern_info_based_on_points_and_trials(self):
         self.binned_features = prep_monkey_data.add_pattern_info_base_on_points(self.binned_features, self.monkey_info_in_bins, self.monkey_information,
@@ -268,13 +268,14 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         """
         Calculate the midpoints of the time bins and get the indices of bins that fall within valid intervals.
         """
-        # Calculate the midpoints of the time bins
-        mid_bin_time = (self.time_bins[1:] + self.time_bins[:-1]) / 2
 
         self.valid_intervals_df = specific_utils.take_out_valid_intervals_based_on_ff_caught_time(
             self.ff_caught_T_new, gap_too_large_threshold=gap_too_large_threshold,
             min_combined_valid_interval_length=min_combined_valid_interval_length
         )
+
+        # Calculate the midpoints of the time bins
+        mid_bin_time = (self.time_bins[1:] + self.time_bins[:-1]) / 2
 
         # Get the indices of bins that fall within valid intervals
         self.valid_bin_mid_time, self.valid_bin_index = general_utils.take_out_data_points_in_valid_intervals(
