@@ -19,6 +19,7 @@ import logging
 from matplotlib import rc
 from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+import re
 
 
 class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
@@ -35,10 +36,11 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                          )
         self.get_basic_data()
 
-    def streamline_making_behav_data(self):
-        self.retrieve_neural_data()
+    def streamline_making_behav_and_neural_data(self):
         self.get_behav_data()
         self.get_pursuit_data()
+        self.max_bin = self.behav_data.bin.max()
+        self.retrieve_neural_data()
 
     def get_behav_data(self):
 
@@ -61,6 +63,35 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._find_single_vis_ff_targets()
         self._take_out_pursuit_data()
 
+    def get_x_and_y_var(self, max_x_lag_number=5, max_y_lag_number=5):
+        self._get_x_var()
+        self._get_y_var()
+        self._get_x_var_lags(max_x_lag_number=max_x_lag_number,
+                             continuous_data=self.binned_spikes_df)
+        self._get_y_var_lags(max_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
+            columns=['point_index'] + self.y_columns_to_drop))
+
+    def _get_x_var(self):
+        _, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_matrix_and_df(
+            self.all_binned_spikes, max_bin=self.max_bin)
+        self.binned_spikes_df['bin'] = np.arange(
+            self.binned_spikes_df.shape[0])
+        binned_spikes_sub = self.binned_spikes_df[self.binned_spikes_df['bin'].isin(
+            self.pursuit_data['bin'].values)]
+        self.x_var = binned_spikes_sub.drop(
+            columns=['bin']).reset_index(drop=True)
+
+    def _get_y_var(self):
+        self.y_var = self.pursuit_data.drop(
+            columns="point_index").reset_index(drop=True)
+        # Convert bool columns to int
+        bool_columns = self.y_var.select_dtypes(include=['bool']).columns
+        self.y_var[bool_columns] = self.y_var[bool_columns].astype(int)
+
+        # Drop the columns that cause multicollinearity
+        self.y_columns_to_drop = ['time', 'cum_distance', 'target_index']
+        self.y_var_reduced = self.y_var.drop(columns=self.y_columns_to_drop)
+
     def _process_na(self):
         # forward fill gaze columns
         gaze_columns = [
@@ -74,6 +105,11 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             [np.inf, -np.inf], np.nan)
         self.behav_data_all[gaze_columns] = self.behav_data_all[gaze_columns].ffill(
         )
+
+        # Check for any remaining NA values
+        sum_na = self.behav_data_all.isna().sum()
+        if len(sum_na[sum_na > 0]) > 0:
+            print('Warning: There are columns with NAs: ', sum_na[sum_na > 0])
         # drop rows with na in any column
 
     def _clip_values(self):
@@ -135,3 +171,19 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         org_len = len(self.pursuit_data)
         new_len = len(self.behav_data)
         print(f'{org_len} rows of {new_len} rows ({round(org_len/new_len * 100, 1)}%) of behav_data_all are preserved after taking out chunks between target last-seen time and capture time')
+
+    def _get_x_var_lags(self, max_x_lag_number=5, continuous_data=None):
+        # Find columns that start with 'bin_' and end with a single number (positive or negative)
+        bin_columns = [col for col in self.x_var.columns if re.match(
+            r'^bin_-?\d+(?!_\d+)$', col)]
+        # Sort by absolute value of the number after 'bin_'
+        bin_columns.sort(key=lambda x: abs(int(x.split('_')[1])))
+        self.bin_columns = bin_columns
+
+        # Get lagged features for each bin column
+        for feature in bin_columns:
+            feature_lags = [col for col in continuous_data.columns if re.match(
+                rf'^{feature}_\d+$', col)]
+            if len(feature_lags) > 0:
+                print(
+                    f'Found {len(feature_lags)} lagged columns for {feature}')
