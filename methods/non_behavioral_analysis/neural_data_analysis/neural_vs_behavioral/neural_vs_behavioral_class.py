@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, reduce_multicollinearity
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
@@ -97,7 +97,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         # delete columns with high VIF
         if not hasattr(self, 'vif_df'):
             self.make_or_retrieve_y_var_vif_df(exists_ok=vif_df_exists_ok)
-        self.y_var_reduced, self.dropped_columns_from_y_var, self.vif_of_y_var_reduced = reduce_multicollinearity.take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(
+        self.y_var_reduced, self.columns_dropped_from_y_var, self.vif_of_y_var_reduced = drop_high_vif_vars.take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(
             self.y_var,
             initial_vif=self.y_var_vif_df,
             vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
@@ -111,24 +111,20 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True):
 
         # Call the function to iteratively drop lags with high correlation for each feature
-        self.y_var_lags_reduced0 = reduce_multicollinearity.drop_columns_with_high_corr(self.y_var, self.y_var_lags,
-                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, verbose=verbose)
+        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var, self.y_var_lags,
+                                                                                    corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, 
+                                                                                    verbose=verbose,
+                                                                                    filter_by_feature=True,
+                                                                                    filter_by_subsets=True,
+                                                                                    filter_by_all_columns=True)
 
-        
-        self.y_var_lags_reduced = reduce_multicollinearity.drop_columns_with_high_vif(self.y_var, self.y_var_lags_reduced0,
-                                                                                        vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
-                                                                                        vif_threshold=vif_threshold,
-                                                                                        verbose=verbose)
-        # print('\nDropping lags with high VIF in a specific subset of features...')
-        # y_var_lags_reduced01, dropped_columns = reduce_multicollinearity.filter_specific_subset_of_y_var_lags_by_vif(
-        #     self.y_var_lags_reduced0, vif_threshold=vif_threshold, verbose=True)
-
-        # print('\nIteratively dropping columns with the highest vif_df...')
-        # self.y_var_lags_reduced, dropped_columns_from_y_var_lags_reduced, vif_of_y_var_lags_reduced = reduce_multicollinearity.take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(
-        #     y_var_lags_reduced01, initial_vif=None,
-        #     vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, vif_threshold=vif_threshold,
-        #     verbose=verbose, get_final_vif=False,
-        # )
+        self.y_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.y_var, self.y_var_lags_reduced_corr,
+                                                                                vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                                                                                vif_threshold=vif_threshold,
+                                                                                verbose=verbose,
+                                                                                filter_by_feature=True,
+                                                                                filter_by_subsets=True,
+                                                                                filter_by_all_columns=True)
 
     def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
         df_path = os.path.join(self.y_var_lags_path,
@@ -143,29 +139,29 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.y_var_lags_reduced.to_csv(df_path, index=False)
 
     def make_or_retrieve_x_var_vif_df(self, exists_ok=True):
-        self.x_var_vif_df = reduce_multicollinearity.make_or_retrieve_vif_df(self.x_var, self.vif_df_path,
-                                                                             vif_df_name='x_var_vif_df', exists_ok=exists_ok
-                                                                             )
+        self.x_var_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.x_var, self.vif_df_path,
+                                                                       vif_df_name='x_var_vif_df', exists_ok=exists_ok
+                                                                       )
 
     def make_or_retrieve_y_var_vif_df(self, exists_ok=True):
-        self.y_var_vif_df = reduce_multicollinearity.make_or_retrieve_vif_df(self.y_var, self.vif_df_path,
-                                                                             vif_df_name='y_var_vif_df', exists_ok=exists_ok
-                                                                             )
+        self.y_var_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.y_var, self.vif_df_path,
+                                                                       vif_df_name='y_var_vif_df', exists_ok=exists_ok
+                                                                       )
 
     def make_or_retrieve_y_var_reduced_vif_df(self, exists_ok=True):
-        self.y_var_reduced_vif_df = reduce_multicollinearity.make_or_retrieve_vif_df(self.y_var_reduced, self.vif_df_path,
-                                                                                     vif_df_name='y_var_reduced_vif_df', exists_ok=exists_ok
-                                                                                     )
+        self.y_var_reduced_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.y_var_reduced, self.vif_df_path,
+                                                                               vif_df_name='y_var_reduced_vif_df', exists_ok=exists_ok
+                                                                               )
 
     def make_or_retrieve_y_var_lags_vif_df(self, exists_ok=True):
-        self.y_var_lags_vif_df = reduce_multicollinearity.make_or_retrieve_vif_df(self.y_var_lags, self.vif_df_path,
-                                                                                  vif_df_name=f'y_var_lags_{self.max_lag_number}_vif_df', exists_ok=exists_ok
-                                                                                  )
+        self.y_var_lags_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.y_var_lags, self.vif_df_path,
+                                                                            vif_df_name=f'y_var_lags_{self.max_lag_number}_vif_df', exists_ok=exists_ok
+                                                                            )
 
     def make_or_retrieve_y_var_lags_reduced_vif_df(self, exists_ok=True):
-        self.y_var_lags_reduced_vif_df = reduce_multicollinearity.make_or_retrieve_vif_df(self.y_var_lags_reduced, self.vif_df_path,
-                                                                                          vif_df_name=f'y_var_lags_{self.max_lag_number}_reduced_vif_df', exists_ok=exists_ok
-                                                                                          )
+        self.y_var_lags_reduced_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.y_var_lags_reduced, self.vif_df_path,
+                                                                                    vif_df_name=f'y_var_lags_{self.max_lag_number}_reduced_vif_df', exists_ok=exists_ok
+                                                                                    )
 
     def _add_monkey_info(self):
         self.monkey_info_in_bins = prep_monkey_data.bin_monkey_information(
@@ -299,15 +295,17 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
 
     def _get_y_var_lags(self, max_lag_number, continuous_data):
         self.max_lag_number = max_lag_number
-        self.y_var_lags, self.lag_numbers = self._get_lags(max_lag_number, continuous_data)
+        self.y_var_lags, self.lag_numbers = self._get_lags(
+            max_lag_number, continuous_data)
 
     def _get_x_var_lags(self, max_x_lag_number, continuous_data):
         self.max_x_lag_number = max_x_lag_number
-        self.x_var_lags, self.x_lag_numbers = self._get_lags(max_x_lag_number, continuous_data)
+        self.x_var_lags, self.x_lag_numbers = self._get_lags(
+            max_x_lag_number, continuous_data)
         # drop all columns in x_var_lags that has bin_
-        self.x_var_lags = self.x_var_lags.drop(columns=[col for col in self.x_var_lags.columns if 'bin_' in col])
-            
-            
+        self.x_var_lags = self.x_var_lags.drop(
+            columns=[col for col in self.x_var_lags.columns if 'bin_' in col])
+
     def _get_lags(self, max_lag_number, continuous_data):
         lag_numbers = np.arange(-max_lag_number, max_lag_number+1)
         var_lags = neural_data_processing.add_lags_to_each_feature(

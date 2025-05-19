@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, reduce_multicollinearity
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
@@ -71,6 +71,24 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._get_y_var_lags(max_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
             columns=['point_index'] + self.y_columns_to_drop))
 
+    def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True):
+
+        # Call the function to iteratively drop lags with high correlation for each feature
+        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var, self.y_var_lags,
+                                                                                    corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, 
+                                                                                    verbose=verbose,
+                                                                                    filter_by_feature=True,
+                                                                                    filter_by_subsets=True,
+                                                                                    filter_by_all_columns=False)
+
+        self.y_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.y_var, self.y_var_lags_reduced_corr,
+                                                                                vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                                                                                vif_threshold=vif_threshold,
+                                                                                verbose=verbose,
+                                                                                filter_by_feature=True,
+                                                                                filter_by_subsets=False,
+                                                                                filter_by_all_columns=False)
+        
     def _get_x_var(self):
         _, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_matrix_and_df(
             self.all_binned_spikes, max_bin=self.max_bin)
