@@ -44,6 +44,8 @@ target_columns = [
     'target_distance',
     'target_angle',
     'target_angle_to_boundary',
+    'target_rel_x',
+    'target_rel_y',
     'target_last_seen_time',
     'target_last_seen_distance_frozen',
     'target_last_seen_angle_frozen',

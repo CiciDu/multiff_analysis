@@ -71,24 +71,29 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._get_y_var_lags(max_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
             columns=['point_index'] + self.y_columns_to_drop))
 
-    def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True):
+    def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
+                          vif_threshold_for_initial_subset=5,
+                          vif_threshold=5,
+                          verbose=True,
+                          filter_corr_by_feature=True,
+                          filter_corr_by_subsets=False,
+                          filter_corr_by_all_columns=True,
+                          filter_vif_by_feature=True,
+                          filter_vif_by_subsets=False,
+                          filter_vif_by_all_columns=False
+                          ):
 
-        # Call the function to iteratively drop lags with high correlation for each feature
-        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var, self.y_var_lags,
-                                                                                    corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature, 
-                                                                                    verbose=verbose,
-                                                                                    filter_by_feature=True,
-                                                                                    filter_by_subsets=True,
-                                                                                    filter_by_all_columns=False)
+        super().reduce_y_var_lags(corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                                  vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                                  vif_threshold=vif_threshold,
+                                  verbose=verbose,
+                                  filter_corr_by_feature=filter_corr_by_feature,
+                                  filter_corr_by_subsets=filter_corr_by_subsets,
+                                  filter_corr_by_all_columns=filter_corr_by_all_columns,
+                                  filter_vif_by_feature=filter_vif_by_feature,
+                                  filter_vif_by_subsets=filter_vif_by_subsets,
+                                  filter_vif_by_all_columns=filter_vif_by_all_columns)
 
-        self.y_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.y_var, self.y_var_lags_reduced_corr,
-                                                                                vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
-                                                                                vif_threshold=vif_threshold,
-                                                                                verbose=verbose,
-                                                                                filter_by_feature=True,
-                                                                                filter_by_subsets=False,
-                                                                                filter_by_all_columns=False)
-        
     def _get_x_var(self):
         _, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_matrix_and_df(
             self.all_binned_spikes, max_bin=self.max_bin)
@@ -163,6 +168,9 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self._make_or_retrieve_target_df()
 
+        self.target_df['target_rel_y'] = self.target_df['target_distance'] * np.cos(self.target_df['target_angle'])
+        self.target_df['target_rel_x'] = - self.target_df['target_distance'] * np.sin(self.target_df['target_angle'])
+
         # drop columns in target_df that are duplicated in behav_data_all
         columns_to_drop = [
             col for col in self.target_df.columns if col in self.behav_data_all.columns]
@@ -190,18 +198,14 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         new_len = len(self.behav_data)
         print(f'{org_len} rows of {new_len} rows ({round(org_len/new_len * 100, 1)}%) of behav_data_all are preserved after taking out chunks between target last-seen time and capture time')
 
-    def _get_x_var_lags(self, max_x_lag_number=5, continuous_data=None):
-        # Find columns that start with 'bin_' and end with a single number (positive or negative)
-        bin_columns = [col for col in self.x_var.columns if re.match(
-            r'^bin_-?\d+(?!_\d+)$', col)]
-        # Sort by absolute value of the number after 'bin_'
-        bin_columns.sort(key=lambda x: abs(int(x.split('_')[1])))
-        self.bin_columns = bin_columns
-
-        # Get lagged features for each bin column
-        for feature in bin_columns:
-            feature_lags = [col for col in continuous_data.columns if re.match(
-                rf'^{feature}_\d+$', col)]
-            if len(feature_lags) > 0:
-                print(
-                    f'Found {len(feature_lags)} lagged columns for {feature}')
+    @staticmethod
+    def get_subset_key_words_and_all_column_subsets(y_var_lags):
+        subset_key_words = ['_x', '_y', 'angle', 'ff_or_target']
+        all_column_subsets = [
+            [col for col in y_var_lags.columns if '_x' in col],
+            [col for col in y_var_lags.columns if '_y' in col],
+            [col for col in y_var_lags.columns if 'angle' in col],
+            [col for col in y_var_lags.columns if (
+                'ff' in col) or ('target' in col)]
+        ]
+        return subset_key_words, all_column_subsets

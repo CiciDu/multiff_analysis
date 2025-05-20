@@ -19,18 +19,25 @@ from sklearn.preprocessing import StandardScaler
 from os.path import exists
 import re
 
+
 def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold_for_initial_subset=5, verbose=True,
-                                filter_by_feature=True,
-                                filter_by_subsets=False,
-                                filter_by_all_columns=False):
+                               filter_by_feature=True,
+                               filter_by_subsets=False,
+                               filter_by_all_columns=False,
+                               get_column_subsets_func=None):
+    
+    if (not filter_by_feature) & (not filter_by_subsets) & (not filter_by_all_columns):
+        return y_var_lags
+    
 
     num_init_columns = y_var_lags.shape[1]
-    
+    y_var_lags_reduced = y_var_lags.copy()
+
     if filter_by_feature:
         # drop all columns in y_var_lags that has 'feature' but is not 'feature'
         print('\n====================Dropping lags of features with high VIF for each feature====================')
         y_var_lags_reduced, top_values_by_feature, columns_dropped = drop_high_corr_vars.drop_lags_with_high_corr_or_vif_for_each_feature(
-            y_var, y_var_lags,
+            y_var, y_var_lags_reduced,
             vif_threshold=vif_threshold,
             verbose=verbose,
             use_vif_instead_of_corr=True
@@ -38,8 +45,13 @@ def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold
 
     if filter_by_subsets:
         print('\n====================Dropping lags with high VIF in subsets of features in an iterative manner====================')
+        if get_column_subsets_func is not None:
+            subset_key_words, all_column_subsets = get_column_subsets_func(y_var_lags_reduced)
+        else:
+            subset_key_words = None
+            all_column_subsets = None
         y_var_lags_reduced, columns_dropped = filter_specific_subset_of_y_var_lags_by_vif(
-            y_var_lags_reduced, vif_threshold=vif_threshold, verbose=True)
+            y_var_lags_reduced, vif_threshold=vif_threshold, verbose=True, subset_key_words=subset_key_words, all_column_subsets=all_column_subsets)
 
     if filter_by_all_columns:
         print('\n====================Dropping columns with the highest VIF in an iterative manner====================')
@@ -50,9 +62,12 @@ def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold
         )
 
     num_final_columns = y_var_lags_reduced.shape[1]
-    print(f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} ({num_init_columns -
-          num_final_columns / num_init_columns * 100:.2f}%) are dropped after calling drop_columns_with_high_vif. **')
-
+    print(
+        f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} '
+        f'({(num_init_columns - num_final_columns) / num_init_columns * 100:.2f}%) '
+        f'are dropped after calling drop_columns_with_high_vif. {num_final_columns} features are left. **'
+    )
+    
     return y_var_lags_reduced
 
 
@@ -81,7 +96,7 @@ def get_vif_df(var_df, verbose=True):
         # else:
         #     if verbose:
         #         print('The dataframe is empty. No VIF to calculate')
-                
+
         vif_df['vif'] = 0
         return vif_df
 
@@ -105,7 +120,7 @@ def iteratively_drop_column_w_highest_vif(df, vif_threshold=5, verbose=True):
     while vif_df['vif'].max() > vif_threshold:
         column_to_drop = vif_df['feature'][0]
         if verbose:
-            #print(f'{column_to_drop} has the highest VIF: {vif_df["vif"].max()}')
+            # print(f'{column_to_drop} has the highest VIF: {vif_df["vif"].max()}')
             print('The top 5 columns with the highest VIF:')
             print(vif_df.head(5))
         df.drop(columns=column_to_drop, inplace=True)
@@ -157,30 +172,31 @@ def take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(df,
     return df_reduced, columns_dropped, final_vif_df
 
 
-def filter_specific_subset_of_y_var_lags_by_vif(y_var_lags, vif_threshold=5, verbose=True, all_column_subsets=None):
+def filter_specific_subset_of_y_var_lags_by_vif(y_var_lags, vif_threshold=5, verbose=True, subset_key_words=None, all_column_subsets=None):
 
-    subset_features = ['stop', 'speed_or_ddv', 'dw', 'LD_or_RD_or_gaze',
-                       'distance', 'angle', 'frozen', 'dummy', 'num_or_any_or_rate']
+    if all_column_subsets is None:
+        subset_key_words = ['stop', 'speed_or_ddv', 'dw', 'LD_or_RD_or_gaze',
+                            'distance', 'angle', 'frozen', 'dummy', 'num_or_any_or_rate']
 
-    all_column_subsets = [
-        [col for col in y_var_lags.columns if 'stop' in col],
-        [col for col in y_var_lags.columns if (
-            'speed' in col) or ('ddv' in col)],
-        [col for col in y_var_lags.columns if ('dw' in col)],
-        [col for col in y_var_lags.columns if (
-            'LD' in col) or ('RD' in col) or ('gaze' in col)],
-        [col for col in y_var_lags.columns if ('distance' in col)],
-        [col for col in y_var_lags.columns if ('angle' in col)],
-        [col for col in y_var_lags.columns if ('frozen' in col)],
-        [col for col in y_var_lags.columns if ('dummy' in col)],
-        [col for col in y_var_lags.columns if (
-            'num' in col) or ('any' in col) or ('rate' in col)],
-    ]
+        all_column_subsets = [
+            [col for col in y_var_lags.columns if 'stop' in col],
+            [col for col in y_var_lags.columns if (
+                'speed' in col) or ('ddv' in col)],
+            [col for col in y_var_lags.columns if ('dw' in col)],
+            [col for col in y_var_lags.columns if (
+                'LD' in col) or ('RD' in col) or ('gaze' in col)],
+            [col for col in y_var_lags.columns if ('distance' in col)],
+            [col for col in y_var_lags.columns if ('angle' in col)],
+            [col for col in y_var_lags.columns if ('frozen' in col)],
+            [col for col in y_var_lags.columns if ('dummy' in col)],
+            [col for col in y_var_lags.columns if (
+                'num' in col) or ('any' in col) or ('rate' in col)],
+        ]
 
-    df_reduced, columns_dropped = drop_high_corr_vars.filter_subsets_of_y_var_lags_by_corr_or_vif(
+    df_reduced, columns_dropped = drop_high_corr_vars.filter_subsets_of_var_df_lags_by_corr_or_vif(
         y_var_lags, use_vif_instead_of_corr=True,
         vif_threshold=vif_threshold, verbose=verbose,
-        subset_features=subset_features,
+        subset_key_words=subset_key_words,
         all_column_subsets=all_column_subsets
     )
 

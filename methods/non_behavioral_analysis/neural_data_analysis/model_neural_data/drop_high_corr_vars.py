@@ -20,36 +20,49 @@ from os.path import exists
 import re
 
 
-def drop_columns_with_high_corr(y_var, y_var_lags, corr_threshold_for_lags=0.85, verbose=True,
+def drop_columns_with_high_corr(var_df, var_df_lags, corr_threshold_for_lags=0.85, verbose=True,
                                 filter_by_feature=True,
                                 filter_by_subsets=False,
-                                filter_by_all_columns=False):
+                                filter_by_all_columns=False,
+                                get_column_subsets_func=None):
+    
+    if (not filter_by_feature) & (not filter_by_subsets) & (not filter_by_all_columns):
+        return var_df_lags
 
-    num_init_columns = y_var_lags.shape[1]
-    y_var_lags_reduced = y_var_lags.copy()
-    # drop all columns in y_var_lags that has 'feature' but is not 'feature'
+    num_init_columns = var_df_lags.shape[1]
+    var_df_lags_reduced = var_df_lags.copy()
+    # drop all columns in var_df_lags that has 'feature' but is not 'feature'
     if filter_by_feature:
         print('\n====================Dropping lags of features with high correlation for each feature====================')
-        y_var_lags_reduced, top_values_by_feature, columns_dropped = drop_lags_with_high_corr_or_vif_for_each_feature(
-            y_var, y_var_lags_reduced,
+        var_df_lags_reduced, top_values_by_feature, columns_dropped = drop_lags_with_high_corr_or_vif_for_each_feature(
+            var_df, var_df_lags_reduced,
             corr_threshold=corr_threshold_for_lags,
             verbose=verbose
         )
 
     if filter_by_subsets:
+        if get_column_subsets_func is not None:
+            subset_key_words, all_column_subsets = get_column_subsets_func(var_df_lags_reduced)
+        else:
+            subset_key_words = None
+            all_column_subsets = None
         print('====================Dropping lags of features with high correlation in specific subsets of features====================')
-        y_var_lags_reduced, columns_dropped = filter_subsets_of_y_var_lags_by_corr_or_vif(
-            y_var_lags_reduced, corr_threshold=corr_threshold_for_lags, verbose=verbose)
+        var_df_lags_reduced, columns_dropped = filter_subsets_of_var_df_lags_by_corr_or_vif(
+            var_df_lags_reduced, corr_threshold=corr_threshold_for_lags, verbose=verbose, subset_key_words=subset_key_words, all_column_subsets=all_column_subsets)
 
     if filter_by_all_columns:
         print('====================Dropping lags of features with high correlation in all columns====================')
-        y_var_lags_reduced, columns_dropped = filter_subsets_of_y_var_lags_by_corr_or_vif(
-            y_var_lags_reduced, corr_threshold=corr_threshold_for_lags, verbose=verbose, all_column_subsets=[y_var_lags_reduced.columns])
+        var_df_lags_reduced, columns_dropped = filter_subsets_of_var_df_lags_by_corr_or_vif(
+            var_df_lags_reduced, corr_threshold=corr_threshold_for_lags, verbose=verbose, all_column_subsets=[var_df_lags_reduced.columns])
 
-    num_final_columns = y_var_lags_reduced.shape[1]
-    print(f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} ({num_init_columns - num_final_columns / num_init_columns * 100:.2f}%) are dropped after calling drop_columns_with_high_corr. **')
+    num_final_columns = var_df_lags_reduced.shape[1]
+    print(
+        f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} '
+        f'({(num_init_columns - num_final_columns) / num_init_columns * 100:.2f}%) '
+        f'are dropped after calling drop_columns_with_high_corr. {num_final_columns} features are left. **'
+    )
 
-    return y_var_lags_reduced
+    return var_df_lags_reduced
 
 
 def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
@@ -72,22 +85,22 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
         if i % 10 == 0:
             print(f"Processing feature {i+1}/{len(df.columns)}")
 
-
         # Get the subset of df_with_lags for the current feature
         df_with_lags_sub = _find_subset_of_df_with_lags_for_current_feature(
             df_with_lags, feature)
 
         if df_with_lags_sub.shape[1] == 0:
-            #print(f'No lags for feature *{feature}* found. Skipping...')
+            # print(f'No lags for feature *{feature}* found. Skipping...')
             continue
 
         if not use_vif_instead_of_corr:
             # Find features with correlation above the threshold
             high_corr_pair_df, top_values_of_feature = get_pairs_of_columns_w_high_corr(
                 df_with_lags_sub, corr_threshold=corr_threshold)
-            
+
             # Drop features with correlation greater than the threshold
-            temp_columns_to_drop = np.unique(high_corr_pair_df['var_1'].values).tolist()
+            temp_columns_to_drop = np.unique(
+                high_corr_pair_df['var_1'].values).tolist()
 
             if show_top_values_of_each_feature:
                 # print top pairs of df_with_lags_sub
@@ -109,11 +122,14 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
         if verbose:
             if len(temp_columns_to_drop) > 0:
                 # take out only the sorted lag values to be dropped
-                lag_numbers_to_drop = [int(col.split('_')[-1]) for col in temp_columns_to_drop]
+                lag_numbers_to_drop = [int(col.split('_')[-1])
+                                       for col in temp_columns_to_drop]
                 lag_numbers_to_drop.sort()
-                
+
                 print(
                     f'{len(temp_columns_to_drop)} columns of *{feature}* dropped: {lag_numbers_to_drop}')
+    # get unique columns dropped
+    columns_dropped = list(set(columns_dropped))
 
     # Drop highly correlated features from the original DataFrame
     df_reduced = df_with_lags.drop(columns=columns_dropped)
@@ -131,52 +147,54 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
     return df_reduced, top_values_by_feature, columns_dropped
 
 
-def filter_subsets_of_y_var_lags_by_corr_or_vif(y_var_lags,
-                                                use_vif_instead_of_corr=False,
-                                                corr_threshold=0.9,
-                                                vif_threshold=5,
-                                                verbose=True,
-                                                subset_features=None,
-                                                all_column_subsets=None):
+def filter_subsets_of_var_df_lags_by_corr_or_vif(var_df_lags,
+                                                 use_vif_instead_of_corr=False,
+                                                 corr_threshold=0.9,
+                                                 vif_threshold=5,
+                                                 verbose=True,
+                                                 subset_key_words=None,
+                                                 all_column_subsets=None):
 
     if all_column_subsets is None:
-        subset_features = ['_x', '_y', 'angle']
+        subset_key_words = ['_x', '_y', 'angle']
         all_column_subsets = [
-            [col for col in y_var_lags.columns if '_x' in col],
-            [col for col in y_var_lags.columns if '_y' in col],
-            [col for col in y_var_lags.columns if 'angle' in col],
+            [col for col in var_df_lags.columns if '_x' in col],
+            [col for col in var_df_lags.columns if '_y' in col],
+            [col for col in var_df_lags.columns if 'angle' in col],
         ]
 
     columns_dropped = []
     num_subsets = len(all_column_subsets)
-    num_original_columns = len(y_var_lags.columns)
+    num_original_columns = len(var_df_lags.columns)
     for i, column_subset in enumerate(all_column_subsets):
 
         if verbose:
             if i != 0:
                 print('')
-            if subset_features is not None:
+            if subset_key_words is not None:
                 print(
-                    f'Processing subset {i+1} of {num_subsets} with features that contain "{subset_features[i]}", {len(column_subset)} features in total.')
+                    f'Processing subset {i+1} of {num_subsets} with features that contain "{subset_key_words[i]}", {len(column_subset)} features in total.')
             else:
                 print(
                     f'Processing subset {i+1} of {num_subsets}, {len(column_subset)} features in total.')
 
         if not use_vif_instead_of_corr:
             high_corr_pair_df, top_n_corr_df = get_pairs_of_columns_w_high_corr(
-                y_var_lags[column_subset], corr_threshold=corr_threshold)
+                var_df_lags[column_subset], corr_threshold=corr_threshold)
             temp_columns_to_drop = high_corr_pair_df['var_1'].values.tolist()
         else:
-            _, temp_columns_to_drop, _ = drop_high_vif_vars.iteratively_drop_column_w_highest_vif(y_var_lags[column_subset].copy(),
+            _, temp_columns_to_drop, _ = drop_high_vif_vars.iteratively_drop_column_w_highest_vif(var_df_lags[column_subset].copy(),
                                                                                                   vif_threshold=vif_threshold, verbose=verbose)
 
         if len(temp_columns_to_drop) > 0:
+            # get unique columns dropped
+            temp_columns_to_drop = list(set(temp_columns_to_drop))
             columns_dropped.extend(temp_columns_to_drop)
             if verbose:
                 print(
                     f'{len(temp_columns_to_drop)} columns out of {len(column_subset)} dropped: {temp_columns_to_drop}')
 
-    df_reduced = y_var_lags.drop(columns=columns_dropped)
+    df_reduced = var_df_lags.drop(columns=columns_dropped)
     if verbose:
         if len(columns_dropped) > 0:
             corr_or_vif = 'correlation' if not use_vif_instead_of_corr else 'VIF'
