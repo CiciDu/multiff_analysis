@@ -20,7 +20,7 @@ from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
-def find_single_vis_ff_targets(target_clust_last_vis_df, monkey_information, ff_caught_T_new):
+def find_single_vis_target_df(target_clust_last_vis_df, monkey_information, ff_caught_T_new):
     # check if target_clust_last_vis_df['nearby_vis_ff_indices'] is a string
     if isinstance(target_clust_last_vis_df['nearby_vis_ff_indices'].iloc[0], str):
         target_clust_last_vis_df['nearby_vis_ff_indices'] = target_clust_last_vis_df['nearby_vis_ff_indices'].apply(
@@ -34,12 +34,13 @@ def find_single_vis_ff_targets(target_clust_last_vis_df, monkey_information, ff_
     target_clust_last_vis_df['ff_caught_point_index'] = np.searchsorted(
         monkey_information['time'], target_clust_last_vis_df['ff_caught_time'].values)
 
-    single_vis_ff_targets = target_clust_last_vis_df[
+    single_vis_target_df = target_clust_last_vis_df[
         target_clust_last_vis_df['num_nearby_vis_ff'] == 1].copy()
-    
-    single_vis_ff_targets['last_vis_time'] = monkey_information.loc[single_vis_ff_targets['last_vis_point_index'].values, 'time'].values
 
-    # print percentage of single_vis_ff_targets
+    single_vis_target_df['last_vis_time'] = monkey_information.loc[
+        single_vis_target_df['last_vis_point_index'].values, 'time'].values
+
+    # print percentage of single_vis_target_df
     print("Percentage of targets not in a visible cluster out of all targets", len(
-        single_vis_ff_targets) / len(target_clust_last_vis_df) * 100)
-    return single_vis_ff_targets
+        single_vis_target_df) / len(target_clust_last_vis_df) * 100)
+    return single_vis_target_df

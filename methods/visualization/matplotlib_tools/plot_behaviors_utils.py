@@ -479,7 +479,8 @@ def find_one_pair_of_perpendicular_lines(perp_dict, j, x0, y0):
 
 def plot_horizontal_lines_to_show_ff_visible_segments(axes, ff_info, monkey_information, rotation_matrix, x0, y0, legend_markers=[], legend_names=[],
                                                       how_to_show_ff='square', unique_ff_indices=None,
-                                                      point_index_gap_threshold_to_sep_vis_intervals=12, #threshold for separating visible intervals
+                                                      # threshold for separating visible intervals
+                                                      point_index_gap_threshold_to_sep_vis_intervals=12,
                                                       ):
     """
     This function plots horizontal lines to show visible segments of fireflies (ff).
@@ -1162,3 +1163,86 @@ def plot_eye_positions(axes, monkey_information, duration, cum_mxy_rotated, x0, 
             monkey_sub, axes, x0, y0, player, sample_ratio=sample_ratio)
 
     return axes
+
+
+def plot_gpfa_traj_3d(trajectories, figsize=(15, 5), linewidth_single_trial=0.75,
+                      alpha_single_trial=0.3, linewidth_trial_average=2,
+                      title='Latent dynamics extracted by GPFA',
+                      view_azim=-5, view_elev=60):
+    """
+    Plot interactive 3D trajectories from GPFA analysis with temporal color gradients.
+
+    Parameters
+    ----------
+    trajectories : list of arrays
+        List of trajectory arrays, each of shape (3, n_timepoints)
+    figsize : tuple
+        Figure size (width, height)
+    linewidth_single_trial : float
+        Line width for individual trial trajectories
+    alpha_single_trial : float
+        Transparency for individual trial trajectories
+    linewidth_trial_average : float
+        Line width for average trajectory
+    title : str
+        Plot title
+    view_azim : float
+        Azimuth angle for 3D view
+    view_elev : float
+        Elevation angle for 3D view
+    """
+    # Enable interactive mode
+    plt.ion()
+
+    # Create figure and 3D axis
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Get number of time steps
+    T = trajectories[0].shape[1]
+    colors = cm.viridis(np.linspace(0, 1, T - 1))
+
+    # Plot each trial with temporal color gradient
+    for traj in trajectories:
+        for t in range(T - 1):
+            ax.plot(traj[0, t:t+2],
+                    traj[1, t:t+2],
+                    traj[2, t:t+2],
+                    color=colors[t],
+                    lw=linewidth_single_trial,
+                    alpha=alpha_single_trial)
+
+    # Plot trial-averaged trajectory with color gradient
+    avg_traj = np.mean(trajectories, axis=0)
+    for t in range(T - 1):
+        ax.plot(avg_traj[0, t:t+2],
+                avg_traj[1, t:t+2],
+                avg_traj[2, t:t+2],
+                color=colors[t],
+                lw=linewidth_trial_average)
+
+    # Add colorbar to show temporal progression
+    norm = plt.Normalize(0, T-1)
+    sm = plt.cm.ScalarMappable(cmap=cm.viridis, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, pad=0.1)
+    cbar.set_label('Time Step')
+
+    # Set labels and title
+    ax.set_xlabel('Dim 1')
+    ax.set_ylabel('Dim 2')
+    ax.set_zlabel('Dim 3')
+    ax.set_title(title)
+
+    # Manual legend entry
+    ax.plot([], [], [], lw=linewidth_trial_average,
+            color='C1', label='Trial averaged trajectory')
+    ax.legend()
+
+    # Set viewing angle
+    ax.view_init(azim=view_azim, elev=view_elev)
+
+    # Adjust layout
+    plt.tight_layout()
+
+    return fig, ax

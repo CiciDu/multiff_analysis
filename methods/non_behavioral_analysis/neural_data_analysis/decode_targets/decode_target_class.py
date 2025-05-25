@@ -60,7 +60,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
-        self._find_single_vis_ff_targets()
+        self._find_single_vis_target_df()
         self._take_out_pursuit_data()
 
     def get_x_and_y_var(self, max_x_lag_number=5, max_y_lag_number=5):
@@ -168,8 +168,10 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self._make_or_retrieve_target_df()
 
-        self.target_df['target_rel_y'] = self.target_df['target_distance'] * np.cos(self.target_df['target_angle'])
-        self.target_df['target_rel_x'] = - self.target_df['target_distance'] * np.sin(self.target_df['target_angle'])
+        self.target_df['target_rel_y'] = self.target_df['target_distance'] * \
+            np.cos(self.target_df['target_angle'])
+        self.target_df['target_rel_x'] = - self.target_df['target_distance'] * \
+            np.sin(self.target_df['target_angle'])
 
         # drop columns in target_df that are duplicated in behav_data_all
         columns_to_drop = [
@@ -180,15 +182,15 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.behav_data_all = self.behav_data_all.merge(
             target_df, on='point_index', how='left')
 
-    def _find_single_vis_ff_targets(self, target_clust_last_vis_df_exists_ok=True):
+    def _find_single_vis_target_df(self, target_clust_last_vis_df_exists_ok=True):
         self.make_or_retrieve_target_clust_last_vis_df(
             exists_ok=target_clust_last_vis_df_exists_ok)
-        self.single_vis_ff_targets = decode_target_utils.find_single_vis_ff_targets(
+        self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
             self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new)
 
     def _take_out_pursuit_data(self):
         point_index_list = []
-        for index, row in self.single_vis_ff_targets.iterrows():
+        for index, row in self.single_vis_target_df.iterrows():
             point_index_list.extend(
                 range(row['last_vis_point_index'], row['ff_caught_point_index']))
 
