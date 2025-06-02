@@ -26,7 +26,8 @@ def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted,
                    include_frozen_info=True):
     target_df = _initialize_target_df(monkey_information, ff_caught_T_new)
 
-    target_df = _calculate_target_distance_and_angle(target_df, ff_real_position_sorted)
+    target_df = _calculate_target_distance_and_angle(
+        target_df, ff_real_position_sorted)
 
     # Add target last seen info
     print("Calculating target-last-seen info.")
@@ -45,16 +46,17 @@ def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted,
 def make_target_cluster_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, ff_life_sorted, include_frozen_info=True):
     target_clust_df = _initialize_target_df(
         monkey_information, ff_caught_T_new)
-    
+
     target_clust_df, nearby_alive_ff_indices = _add_target_cluster_last_seen_info(
         target_clust_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, include_frozen_info=include_frozen_info)
-    
+
     target_clust_df = _add_target_cluster_disappeared_for_last_time_dummy(
         target_clust_df, ff_caught_T_new, ff_dataframe, nearby_alive_ff_indices)
-    
+
     target_clust_df = _add_target_cluster_visible_dummy(target_clust_df)
-    
-    target_clust_df = _add_while_last_seeing_target_cluster_dummy(target_clust_df)
+
+    target_clust_df = _add_while_last_seeing_target_cluster_dummy(
+        target_clust_df)
 
     return target_clust_df
 
@@ -66,12 +68,12 @@ def get_max_min_and_avg_info_from_target_df(target_df):
     return target_average_info, target_min_info, target_max_info
 
 
-
 def _initialize_target_df(monkey_information, ff_caught_T_new):
     """
     Create a DataFrame with target information.
     """
-    target_df = monkey_information[['point_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']].copy()
+    target_df = monkey_information[[
+        'point_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle', 'cum_distance']].copy()
     target_df['target_index'] = np.searchsorted(
         ff_caught_T_new, target_df['time'])
     return target_df
@@ -101,13 +103,18 @@ def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_ca
         print("Calculating target-cluster-last-seen info.")
         target_df = _add_target_last_seen_info(
             target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=include_frozen_info)
-        target_df = target_df.rename(columns={'target_last_seen_time': 'target_cluster_last_seen_time',
+        target_df = target_df.rename(columns={'time_since_target_last_seen': 'target_cluster_last_seen_time',
                                               'target_last_seen_distance': 'target_cluster_last_seen_distance',
                                               'target_last_seen_angle': 'target_cluster_last_seen_angle',
                                               'target_last_seen_angle_to_boundary': 'target_cluster_last_seen_angle_to_boundary',
                                               'target_last_seen_distance_frozen': 'target_cluster_last_seen_distance_frozen',
                                               'target_last_seen_angle_frozen': 'target_cluster_last_seen_angle_frozen',
-                                              'target_last_seen_angle_to_boundary_frozen': 'target_cluster_last_seen_angle_to_boundary_frozen'})
+                                              'target_last_seen_angle_to_boundary_frozen': 'target_cluster_last_seen_angle_to_boundary_frozen',
+                                              'monkey_x_target_last_seen_frozen': 'monkey_x_target_cluster_last_seen_frozen',
+                                              'monkey_y_target_last_seen_frozen': 'monkey_y_target_cluster_last_seen_frozen',
+                                              'monkey_angle_target_last_seen_frozen': 'monkey_angle_target_cluster_last_seen_frozen',
+                                              'cum_distance_target_last_seen_frozen': 'cum_distance_target_cluster_last_seen_frozen',
+                                              })
     return target_df, nearby_alive_ff_indices
 
 
@@ -143,7 +150,7 @@ def _add_target_visible_dummy(target_df):
     Add dummy variable of target being visible
     """
     target_df[['target_visible_dummy']] = 1
-    target_df.loc[target_df['target_last_seen_time']
+    target_df.loc[target_df['time_since_target_last_seen']
                   > 0, 'target_visible_dummy'] = 0
     return target_df
 
@@ -211,7 +218,7 @@ def _calculate_average_info(target_df):
     Calculate average information for each bin in target_df
     """
     target_average_info = target_df[['bin', 'target_distance', 'target_angle', 'target_angle_to_boundary',
-                                    'target_last_seen_time', 'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
+                                    'time_since_target_last_seen', 'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
                                      'target_last_seen_distance_frozen', 'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen',
                                      'target_cluster_last_seen_time', 'target_cluster_last_seen_distance', 'target_cluster_last_seen_angle', 'target_cluster_last_seen_angle_to_boundary',
                                      'target_cluster_last_seen_distance_frozen', 'target_cluster_last_seen_angle_frozen', 'target_cluster_last_seen_angle_to_boundary_frozen',]].copy()
@@ -221,7 +228,7 @@ def _calculate_average_info(target_df):
     target_average_info.rename(columns={'target_distance': 'avg_target_distance',
                                         'target_angle': 'avg_target_angle',
                                         'target_angle_to_boundary': 'avg_target_angle_to_boundary',
-                                        'target_last_seen_time': 'avg_target_last_seen_time',
+                                        'time_since_target_last_seen': 'avg_target_last_seen_time',
                                         'target_last_seen_distance': 'avg_target_last_seen_distance',
                                         'target_last_seen_angle': 'avg_target_last_seen_angle',
                                         'target_last_seen_angle_to_boundary': 'avg_target_last_seen_angle_to_boundary',
@@ -299,11 +306,12 @@ def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=
     for i in range(len(sorted_target_index)):
         target_index = sorted_target_index[i]
         if i < len(sorted_target_index) - 1:
-            print(f'Adding last seen info: target_index = {target_index}', end='\r')
+            print(
+                f'Adding last seen info: target_index = {target_index}', end='\r')
         else:
             print(f'Adding last seen info: target_index = {target_index}')
         target_df = _update_info_for_current_target_index(
-            target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info)
+            target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster=use_target_cluster, include_frozen_info=include_frozen_info)
 
     target_df['point_index'] = target_df['point_index'].astype(int)
 
@@ -314,7 +322,7 @@ def _add_placeholder_last_seen_values(target_df, last_seen_time, last_seen_dista
     """
     Initialize columns with default values and set their dtype to float.
     """
-    columns = ['target_last_seen_time', 'target_last_seen_distance',
+    columns = ['time_since_target_last_seen', 'target_last_seen_distance',
                'target_last_seen_angle', 'target_last_seen_angle_to_boundary']
     target_df[columns] = [last_seen_time,
                           last_seen_distance, last_seen_angle, last_seen_angle]
@@ -327,8 +335,11 @@ def _add_placeholder_last_seen_values(target_df, last_seen_time, last_seen_dista
             last_seen_distance, last_seen_angle, last_seen_angle]
         target_df[frozen_columns] = target_df[frozen_columns].astype(float)
 
+        target_df[['monkey_x_target_last_seen_frozen', 'monkey_y_target_last_seen_frozen',
+                   'monkey_angle_target_last_seen_frozen', 'cum_distance_target_last_seen_frozen']] = np.nan
 
-def _update_info_for_current_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster, include_frozen_info):
+
+def _update_info_for_current_target_index(target_df, ff_dataframe, target_index, nearby_alive_ff_indices, use_target_cluster=False, include_frozen_info=True):
     """
     Get target_visible_info for the current target index and update the target DataFrame with last seen information.
     """
@@ -344,7 +355,7 @@ def _update_info_for_current_target_index(target_df, ff_dataframe, target_index,
     if len(target_df_sub) > 0:
         # In case that target_df can contain multiple rows for each time point, we can take out unique time points
         unique_time_points = target_df_sub[['point_index', 'time', 'monkey_x',
-                                            'monkey_y', 'monkey_angle']].drop_duplicates().sort_values(by='point_index')
+                                            'monkey_y', 'monkey_angle', 'cum_distance']].drop_duplicates().sort_values(by='point_index')
         # Adjust the duration contained in unique_time_points
         unique_time_points, target_visible_info, target_df_sub, target_sub_row_indices = _adjust_duration_of_unique_time_points(
             unique_time_points, target_df_sub, target_visible_info, target_sub_row_indices)
@@ -352,7 +363,7 @@ def _update_info_for_current_target_index(target_df, ff_dataframe, target_index,
 
         if len(target_visible_info) > 0:
             unique_time_points = _get_last_seen_info(
-                unique_time_points, target_visible_info, include_frozen_info)
+                unique_time_points, target_visible_info, include_frozen_info=include_frozen_info)
             # put back the updated part of target_df
             target_df = _update_target_df_for_current_target_index(
                 target_df, target_df_sub, target_sub_row_indices, unique_time_points)
@@ -405,13 +416,14 @@ def _polish_target_info(target_visible_info):
     target_visible_info = target_visible_info.sort_values(
         by=['point_index', 'ff_index']).drop_duplicates(subset=['point_index'], keep='first')
     target_visible_info = target_visible_info[[
-        'point_index', 'time', 'ff_x', 'ff_y', 'monkey_x', 'monkey_y', 'monkey_angle']]
+        'point_index', 'time', 'ff_x', 'ff_y', 'monkey_x', 'monkey_y', 'monkey_angle', 'cum_distance']]
     target_visible_info = target_visible_info.rename(columns={'time': 'target_time', 'ff_x': 'target_x', 'ff_y': 'target_y',
-                                                              'monkey_x': 'frozen_monkey_x', 'monkey_y': 'frozen_monkey_y', 'monkey_angle': 'frozen_monkey_angle'})
+                                                              'monkey_x': 'frozen_monkey_x', 'monkey_y': 'frozen_monkey_y',
+                                                              'monkey_angle': 'frozen_monkey_angle', 'cum_distance': 'frozen_cum_distance'})
     return target_visible_info
 
 
-def _get_last_seen_info(unique_time_points, target_visible_info, include_frozen_info):
+def _get_last_seen_info(unique_time_points, target_visible_info, include_frozen_info=True):
     """
     Merge unique_time_points (which has one row per time point) with target_visible_info (which has multiple rows per time point) to get last seen information.
     """
@@ -425,7 +437,7 @@ def _get_last_seen_info(unique_time_points, target_visible_info, include_frozen_
         ff_x=target_x, ff_y=target_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
     target_distance = np.sqrt((target_x - monkey_x) **
                               2 + (target_y - monkey_y) ** 2)
-    unique_time_points['target_last_seen_time'] = unique_time_points.time - \
+    unique_time_points['time_since_target_last_seen'] = unique_time_points.time - \
         unique_time_points.target_time
     unique_time_points['target_last_seen_distance'] = target_distance
     unique_time_points['target_last_seen_angle'] = target_angle
@@ -442,11 +454,20 @@ def _get_last_seen_info(unique_time_points, target_visible_info, include_frozen_
         unique_time_points['target_last_seen_angle_frozen'] = target_angle
         unique_time_points['target_last_seen_angle_to_boundary_frozen'] = specific_utils.calculate_angles_to_ff_boundaries(
             angles_to_ff=target_angle, distances_to_ff=target_distance)
-        essential_columns = ['point_index', 'target_last_seen_time', 'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
-                             'target_last_seen_distance_frozen', 'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen']
+
+        unique_time_points['monkey_x_target_last_seen_frozen'] = unique_time_points.frozen_monkey_x
+        unique_time_points['monkey_y_target_last_seen_frozen'] = unique_time_points.frozen_monkey_y
+        unique_time_points['monkey_angle_target_last_seen_frozen'] = unique_time_points.frozen_monkey_angle
+        unique_time_points['cum_distance_target_last_seen_frozen'] = unique_time_points.frozen_cum_distance
+
+        essential_columns = ['point_index', 'time_since_target_last_seen', 'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
+                             'target_last_seen_distance_frozen', 'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen',
+                             'monkey_x_target_last_seen_frozen', 'monkey_y_target_last_seen_frozen', 'monkey_angle_target_last_seen_frozen', 'cum_distance_target_last_seen_frozen']
     else:
-        essential_columns = ['point_index', 'target_last_seen_time', 'target_last_seen_distance',
-                             'target_last_seen_angle', 'target_last_seen_angle_to_boundary']
+        essential_columns = ['point_index', 'time_since_target_last_seen', 'target_last_seen_distance',
+                             'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
+                             'monkey_x_target_last_seen', 'monkey_y_target_last_seen', 'monkey_angle_target_last_seen',
+                             ]
 
     unique_time_points = unique_time_points[essential_columns]
 
@@ -459,8 +480,15 @@ def _update_target_df_for_current_target_index(target_df, target_df_sub, target_
     """
     target_df_sub_new = target_df_sub[['point_index']].merge(
         unique_time_points, on='point_index', how='left')
-    target_df.iloc[target_sub_row_indices, target_df.columns.get_indexer(
-        target_df_sub_new.columns)] = target_df_sub_new.values
+    column_indexes = target_df.columns.get_indexer(
+        target_df_sub_new.columns)
+
+    if len(column_indexes[column_indexes < 0]) > 0:
+        raise ValueError(
+            "Some columns in target_df_sub_new do not exist in target_df; updating failed.")
+
+    target_df.iloc[target_sub_row_indices,
+                   column_indexes] = target_df_sub_new.values
     return target_df
 
 

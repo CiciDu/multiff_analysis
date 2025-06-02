@@ -6,6 +6,7 @@ from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import pr
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
 from non_behavioral_analysis.neural_data_analysis.decode_targets import decode_target_utils, behav_features_to_keep
 from null_behaviors import curvature_utils, curv_of_traj_utils
+from non_behavioral_analysis.neural_data_analysis.decode_targets import behav_features_to_keep, plot_gpfa_utils, decode_target_utils, fit_gpfa_utils, gpfa_regression_utils
 import warnings
 import os
 import numpy as np
@@ -20,12 +21,20 @@ from matplotlib import rc
 from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import re
+import quantities as pq
+import neo
+from elephant.spike_train_generation import inhomogeneous_poisson_process
+from elephant.gpfa import GPFA
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from elephant.gpfa import gpfa_core, gpfa_util
 
 
 class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
+
     def __init__(self,
                  raw_data_folder_path=None,
-                 bin_width=0.1,
+                 bin_width=0.02,
                  window_width=0.25,
                  one_behav_idx_per_bin=True):
 
@@ -35,6 +44,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                          one_behav_idx_per_bin=one_behav_idx_per_bin
                          )
         self.get_basic_data()
+        self.bin_width_w_unit = self.bin_width * pq.s
 
     def streamline_making_behav_and_neural_data(self):
         self.get_behav_data()
@@ -105,13 +115,15 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             columns=['bin']).reset_index(drop=True)
 
     def _get_y_var(self):
+        # note that this is for the continuous case (a.k.a. all selected time points are used together, instead of being separated into trials)
+
         self.y_var = self.pursuit_data.drop(
             columns="point_index").reset_index(drop=True)
         # Convert bool columns to int
         bool_columns = self.y_var.select_dtypes(include=['bool']).columns
         self.y_var[bool_columns] = self.y_var[bool_columns].astype(int)
 
-        # Drop the columns that cause multicollinearity
+        # To prevent multicollinearity, these columns need to be dropped from behavioral data
         self.y_columns_to_drop = ['time', 'cum_distance', 'target_index']
         self.y_var_reduced = self.y_var.drop(columns=self.y_columns_to_drop)
 
@@ -172,33 +184,42 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             np.cos(self.target_df['target_angle'])
         self.target_df['target_rel_x'] = - self.target_df['target_distance'] * \
             np.sin(self.target_df['target_angle'])
-
-        # drop columns in target_df that are duplicated in behav_data_all
-        columns_to_drop = [
-            col for col in self.target_df.columns if col in self.behav_data_all.columns]
-        columns_to_drop.remove('point_index')
-        target_df = self.target_df.drop(columns=columns_to_drop)
-
-        self.behav_data_all = self.behav_data_all.merge(
-            target_df, on='point_index', how='left')
+        self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
+            self.behav_data_all, self.target_df)
 
     def _find_single_vis_target_df(self, target_clust_last_vis_df_exists_ok=True):
         self.make_or_retrieve_target_clust_last_vis_df(
             exists_ok=target_clust_last_vis_df_exists_ok)
+
+        # in the function, we'll drop the rows where target is in a cluster, because we want to preserve cases where monkey is going toward a single target, not a cluster
         self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
             self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new)
 
     def _take_out_pursuit_data(self):
-        point_index_list = []
-        for index, row in self.single_vis_target_df.iterrows():
-            point_index_list.extend(
-                range(row['last_vis_point_index'], row['ff_caught_point_index']))
 
-        self.pursuit_data = self.behav_data[self.behav_data['point_index'].isin(
-            point_index_list)].copy()
-        org_len = len(self.pursuit_data)
-        new_len = len(self.behav_data)
-        print(f'{org_len} rows of {new_len} rows ({round(org_len/new_len * 100, 1)}%) of behav_data_all are preserved after taking out chunks between target last-seen time and capture time')
+        self.pursuit_data_all = decode_target_utils.make_pursuit_data_all(
+            self.single_vis_target_df, self.behav_data_all)
+
+        # add the segment info back to single_vis_target_df
+        self.single_vis_target_df['segment'] = np.arange(
+            len(self.single_vis_target_df))
+        self.single_vis_target_df = self.single_vis_target_df.merge(self.pursuit_data_all[[
+                                                                    'segment', 'seg_start_time', 'seg_end_time', 'seg_duration']].drop_duplicates(), on='segment', how='left')
+
+        # drop the segments with 0 duration from pursuit_data_all
+        num_segments_with_0_duration = len(
+            self.pursuit_data_all[self.pursuit_data_all['seg_duration'] == 0])
+        print(f'{num_segments_with_0_duration} segments ({round(num_segments_with_0_duration/len(self.single_vis_target_df) * 100, 1)}%) out of {len(self.single_vis_target_df)} segments have 0 duration. They are dropped from pursuit data')
+
+        # drop segments in pursuit data that has 0 duration
+        self.pursuit_data_all = self.pursuit_data_all[self.pursuit_data_all['seg_duration'] > 0].copy(
+        )
+
+        self.pursuit_data = self.pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
+                                                  behav_features_to_keep.extra_columns_for_concat_trials]
+
+        self.pursuit_data_by_trial = self.pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
+            'segment']]
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets(y_var_lags):
@@ -211,3 +232,40 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                 'ff' in col) or ('target' in col)]
         ]
         return subset_key_words, all_column_subsets
+
+    def prepare_spikes_for_gpfa(self, align_at_beginning=False):
+
+        self.align_at_beginning = align_at_beginning
+        self.spike_segs_df = fit_gpfa_utils.make_spike_segs_df(
+            self.spike_df, self.single_vis_target_df)
+
+        self.common_t_stop = max(
+            self.spike_segs_df['t_duration']) + self.bin_width
+        self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
+            self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
+
+    def get_gpfa_trahjectories(self, latent_dimensionality=10):
+
+        gpfa_3dim = GPFA(bin_width_w_unit=self.bin_width_w_unit,
+                         x_dim=latent_dimensionality)
+        self.trajectories = gpfa_3dim.fit_transform(self.spiketrains)
+
+    def get_latent_data_and_behav_data_for_all_trials(self):
+
+        self.behavior_trials = []
+        self.latent_trials = []
+
+        segments_behav = self.pursuit_data_by_trial['segment'].unique()
+        segments_neural = self.spiketrain_corr_segs
+        shared_segments = [seg for seg in segments_behav.tolist()
+                           if seg in segments_neural.tolist()]
+
+        for seg in shared_segments:
+            pursuit_sub = self.pursuit_data_by_trial[self.pursuit_data_by_trial['segment'] == seg]
+            behav_data_of_trial = pursuit_sub.drop(columns=['segment']).values
+            self.behavior_trials.append(behav_data_of_trial)
+
+            trial_length = behav_data_of_trial.shape[0]
+            latent_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
+                self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
+            self.latent_trials.append(latent_trial)

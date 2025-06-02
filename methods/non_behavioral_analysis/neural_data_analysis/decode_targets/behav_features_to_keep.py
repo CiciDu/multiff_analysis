@@ -46,7 +46,7 @@ target_columns = [
     'target_angle_to_boundary',
     'target_rel_x',
     'target_rel_y',
-    'target_last_seen_time',
+    'time_since_target_last_seen',
     'target_last_seen_distance_frozen',
     'target_last_seen_angle_frozen',
     'target_last_seen_angle_to_boundary_frozen',
@@ -54,6 +54,10 @@ target_columns = [
     'time_since_last_capture',
     'traj_curv',
     'target_opt_arc_dheading',
+    'target_last_seen_time_abs',
+    'distance_from_monkey_pos_target_last_seen',
+    'cum_distance_since_target_last_seen',
+    'd_heading_since_target_last_seen'
 ]
 
 # Combine all shared columns

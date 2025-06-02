@@ -42,6 +42,17 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
         monkey_info_in_bins = _rebin_monkey_info(
             monkey_information).reset_index(drop=True)
 
+    # make sure that every bin has info
+    all_bins = pd.DataFrame({'bin': range(max(monkey_information['bin']))})
+    monkey_info_in_bins = monkey_info_in_bins.merge(all_bins, on='bin', how='right')
+    monkey_info_in_bins = monkey_info_in_bins.fillna(
+        method='ffill').reset_index(drop=True)
+    monkey_info_in_bins = monkey_info_in_bins.fillna(
+        method='bfill').reset_index(drop=True)
+    
+    monkey_info_in_bins['bin_start_time'] = time_bins[monkey_info_in_bins['bin'].values]
+    monkey_info_in_bins['bin_end_time'] = time_bins[monkey_info_in_bins['bin'].values + 1]
+
     return monkey_info_in_bins
 
 
@@ -74,9 +85,8 @@ def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught
 
 
 def initialize_binned_features(monkey_information, bin_width):
-    min_time = monkey_information['time'].min()
     max_time = monkey_information['time'].max()
-    time_bins = np.arange(min_time, max_time, bin_width)
+    time_bins = np.arange(0, max_time + bin_width * 2, bin_width)
     monkey_information['bin'] = np.digitize(
         monkey_information['time'].values, time_bins)-1
     binned_features = pd.DataFrame({'bin': range(len(time_bins))})

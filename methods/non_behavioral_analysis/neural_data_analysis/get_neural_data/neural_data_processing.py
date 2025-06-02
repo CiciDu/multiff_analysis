@@ -80,11 +80,10 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
     return spike_times_in_s, spike_clusters
 
 
-def bin_spikes(spike_df, bin_width=0.1):
+def bin_spikes(spike_df, bin_width=0.02):
     """Bin spikes and stack bins for each spike cluster."""
-    min_time = math.floor(spike_df.time.min())
     max_time = math.ceil(spike_df.time.max())
-    time_bins = np.arange(min_time, max_time, bin_width)
+    time_bins = np.arange(0, max_time, bin_width)
     unique_clusters = np.sort(spike_df.cluster.unique())
     all_binned_spikes = np.zeros([len(time_bins)-1, len(unique_clusters)])
 

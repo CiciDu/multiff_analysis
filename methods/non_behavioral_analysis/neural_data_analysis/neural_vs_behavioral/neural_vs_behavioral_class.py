@@ -21,7 +21,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def __init__(self,
                  raw_data_folder_path=None,
-                 bin_width=0.1,
+                 bin_width=0.02,
                  window_width=0.25,
                  one_behav_idx_per_bin=True):
 
@@ -117,7 +117,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                           filter_vif_by_subsets=True,
                           filter_vif_by_all_columns=True,
                           ):
-
 
         # Call the function to iteratively drop lags with high correlation for each feature
         self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var, self.y_var_lags,
