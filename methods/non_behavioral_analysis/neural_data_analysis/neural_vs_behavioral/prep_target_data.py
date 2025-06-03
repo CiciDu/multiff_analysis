@@ -26,6 +26,12 @@ def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted,
                    include_frozen_info=True):
     target_df = _initialize_target_df(monkey_information, ff_caught_T_new)
 
+    target_df = _add_target_df_info(target_df, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, include_frozen_info=include_frozen_info)
+    
+    return target_df
+
+
+def _add_target_df_info(target_df, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, include_frozen_info=True):
     target_df = _calculate_target_distance_and_angle(
         target_df, ff_real_position_sorted)
 
@@ -40,9 +46,19 @@ def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted,
     target_df = _add_target_visible_dummy(target_df)
 
     target_df = _find_time_since_last_capture(target_df, ff_caught_T_new)
+    
+    target_df = _add_target_rel_x_and_y(target_df)
+    
     return target_df
 
 
+def _add_target_rel_x_and_y(target_df):
+    target_df['target_rel_y'] = target_df['target_distance'] * \
+        np.cos(target_df['target_angle'])
+    target_df['target_rel_x'] = - target_df['target_distance'] * \
+        np.sin(target_df['target_angle'])
+    return target_df     
+            
 def make_target_cluster_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, ff_life_sorted, include_frozen_info=True):
     target_clust_df = _initialize_target_df(
         monkey_information, ff_caught_T_new)

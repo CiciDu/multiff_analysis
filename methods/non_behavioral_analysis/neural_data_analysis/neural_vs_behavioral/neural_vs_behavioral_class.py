@@ -29,6 +29,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.bin_width = bin_width
         self.window_width = window_width
         self.one_behav_idx_per_bin = one_behav_idx_per_bin
+        self.max_bin = None
 
     def get_basic_data(self):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
@@ -51,22 +52,20 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.get_basic_data()
         self._prepare_to_find_patterns_and_features()
         self.make_df_related_to_patterns_and_features()
-        self.retrieve_neural_data()
         self.prep_behavioral_data_for_neural_data_modeling()
+        self.max_bin = self.final_behavioral_data['bin'].max()
+        self.retrieve_neural_data()
         self._get_x_and_y_var()
 
     def retrieve_neural_data(self):
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
-        self.spike_df = neural_data_processing.make_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
+        spike_df = neural_data_processing.make_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                              sampling_rate=self.sampling_rate)
-        self.time_bins, self.all_binned_spikes = neural_data_processing.bin_spikes(
-            self.spike_df, bin_width=self.bin_width)
-        self.num_bins = self.all_binned_spikes.shape[0]
-        self.unique_clusters = np.sort(self.spike_df.cluster.unique())
-
         # get convolution data
         self.window_width, self.num_bins_in_window, self.convolve_pattern = neural_data_processing.calculate_window_parameters(
             window_width=self.window_width, bin_width=self.bin_width)
+        self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
+
 
     def prep_behavioral_data_for_neural_data_modeling(self, max_lag_number=3):
         self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
@@ -76,7 +75,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self._add_all_target_and_target_cluster_info()
         self._add_pattern_info_based_on_points_and_trials()
         self._make_final_behavioral_data()
-        self._match_binned_spikes_to_range_of_behavioral_data()
         self._get_index_of_bins_in_valid_intervals()
         self._get_x_and_y_var()
         self._get_y_var_lags(max_lag_number=max_lag_number,
@@ -199,14 +197,14 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.monkey_info_in_bins_ess, how='left', on='bin')
 
     def _add_ff_info(self, binned_features):
-        self.ff_info = prep_monkey_data.get_ff_info_for_bins(
+        ff_info = prep_monkey_data.get_ff_info_for_bins(
             binned_features[['bin']], self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
         # delete columns in ff_info that are duplicated in behav_data except for bin
         columns_to_drop = [
-            col for col in self.ff_info.columns if col in binned_features.columns and col != 'bin']
-        self.ff_info = self.ff_info.drop(columns=columns_to_drop)
+            col for col in ff_info.columns if col in binned_features.columns and col != 'bin']
+        ff_info = ff_info.drop(columns=columns_to_drop)
         binned_features = binned_features.merge(
-            self.ff_info, on='bin', how='left')
+            ff_info, on='bin', how='left')
         return binned_features
 
     def _add_all_target_and_target_cluster_info(self):
@@ -287,10 +285,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.final_behavioral_data = self.final_behavioral_data.drop(
             columns=columns_to_drop)
 
-    def _match_binned_spikes_to_range_of_behavioral_data(self):
-        self.max_bin = self.final_behavioral_data['bin'].max()
-        self.binned_spikes_matrix, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_matrix_and_df(
-            self.all_binned_spikes, self.max_bin)
 
     def _get_index_of_bins_in_valid_intervals(self, gap_too_large_threshold=100, min_combined_valid_interval_length=50):
         """
@@ -324,14 +318,22 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.max_lag_number = max_lag_number
         self.y_var_lags, self.lag_numbers = self._get_lags(
             max_lag_number, continuous_data)
+        if 'bin_0' in self.y_var_lags.columns:
+            self.y_var_lags['bin'] = self.y_var_lags['bin_0'].astype(int)
+            self.y_var_lags = self.y_var_lags.drop(
+                columns=[col for col in self.y_var_lags.columns if 'bin_' in col])
 
     def _get_x_var_lags(self, max_x_lag_number, continuous_data):
         self.max_x_lag_number = max_x_lag_number
         self.x_var_lags, self.x_lag_numbers = self._get_lags(
             max_x_lag_number, continuous_data)
         # drop all columns in x_var_lags that has bin_
-        self.x_var_lags = self.x_var_lags.drop(
-            columns=[col for col in self.x_var_lags.columns if 'bin_' in col])
+        if 'bin_0' in self.x_var_lags.columns:  
+            self.x_var_lags['bin'] = self.x_var_lags['bin_0'].astype(int)
+            self.x_var_lags = self.x_var_lags.drop(
+                columns=[col for col in self.x_var_lags.columns if 'bin_' in col])
+        
+
 
     def _get_lags(self, max_lag_number, continuous_data):
         lag_numbers = np.arange(-max_lag_number, max_lag_number+1)

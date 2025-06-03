@@ -18,6 +18,7 @@ class PlanningAndNeural(plan_factors_class.PlanFactors):
         self.bin_width = bin_width
         self.window_width = window_width
         self.one_behav_idx_per_bin = one_behav_idx_per_bin
+        self.max_bin = None
 
     def retrieve_neural_data(self):
         neural_vs_behavioral_class.NeuralVsBehavioralClass.retrieve_neural_data(

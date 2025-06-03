@@ -23,11 +23,12 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-monkey_info_columns_of_interest = ['bin', 
- 'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
-  'monkey_speed', 'monkey_angle', 'monkey_dw', 'monkey_ddw', 'monkey_ddv', 
-  'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff',
-  ]
+monkey_info_columns_of_interest = ['bin',
+                                   'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
+                                   'monkey_speed', 'monkey_angle', 'monkey_dw', 'monkey_ddw', 'monkey_ddv',
+                                   'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff',
+                                   ]
+
 
 def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=True):
     monkey_information = monkey_information.copy()
@@ -44,14 +45,15 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
 
     # make sure that every bin has info
     all_bins = pd.DataFrame({'bin': range(max(monkey_information['bin']))})
-    monkey_info_in_bins = monkey_info_in_bins.merge(all_bins, on='bin', how='right')
-    monkey_info_in_bins = monkey_info_in_bins.fillna(
-        method='ffill').reset_index(drop=True)
-    monkey_info_in_bins = monkey_info_in_bins.fillna(
-        method='bfill').reset_index(drop=True)
-    
+    monkey_info_in_bins = monkey_info_in_bins.merge(
+        all_bins, on='bin', how='right')
+    monkey_info_in_bins = monkey_info_in_bins.ffill().reset_index(drop=True)
+    monkey_info_in_bins = monkey_info_in_bins.bfill().reset_index(drop=True)
+
     monkey_info_in_bins['bin_start_time'] = time_bins[monkey_info_in_bins['bin'].values]
     monkey_info_in_bins['bin_end_time'] = time_bins[monkey_info_in_bins['bin'].values + 1]
+    
+    monkey_info_in_bins['point_index'] = monkey_info_in_bins['point_index'].astype(int)
 
     return monkey_info_in_bins
 
@@ -120,10 +122,8 @@ def add_pattern_info_base_on_points(binned_features, monkey_info_in_bins, monkey
         'bin').max().reset_index(drop=False)
     binned_features = binned_features.merge(
         pattern_df_condensed, how='left', on='bin')
-    binned_features = binned_features.fillna(
-        method='ffill').reset_index(drop=True)
-    binned_features = binned_features.fillna(
-        method='bfill').reset_index(drop=True)
+    binned_features = binned_features.ffill().reset_index(drop=True)
+    binned_features = binned_features.bfill().reset_index(drop=True)
     return binned_features
 
 
@@ -137,10 +137,8 @@ def add_pattern_info_based_on_trials(binned_features, ff_caught_T_new, all_trial
                                                           'give_up_after_trying', 'cluster_around_target',
                                                           'waste_cluster_around_target']], on='bin', how='left')
 
-    binned_features = binned_features.fillna(
-        method='ffill').reset_index(drop=True)
-    binned_features = binned_features.fillna(
-        method='bfill').reset_index(drop=True)
+    binned_features = binned_features.ffill().reset_index(drop=True)
+    binned_features = binned_features.bfill().reset_index(drop=True)
     return binned_features
 
 
@@ -153,10 +151,8 @@ def get_ff_info_for_bins(bins_df, ff_dataframe, ff_caught_T_new, time_bins):
     bins_df = _mark_bin_where_ff_is_caught(
         bins_df, ff_caught_T_new, time_bins)
     bins_df = _add_whether_any_ff_is_visible(bins_df)
-    bins_df = bins_df.fillna(
-        method='ffill').reset_index(drop=True)
-    bins_df = bins_df.fillna(
-        method='bfill').reset_index(drop=True)
+    bins_df = bins_df.ffill().reset_index(drop=True)
+    bins_df = bins_df.bfill().reset_index(drop=True)
     return bins_df
 
 

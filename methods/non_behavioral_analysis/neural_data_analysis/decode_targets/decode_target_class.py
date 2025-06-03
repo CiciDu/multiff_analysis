@@ -43,7 +43,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                          window_width=window_width,
                          one_behav_idx_per_bin=one_behav_idx_per_bin
                          )
-        self.get_basic_data()
+
         self.bin_width_w_unit = self.bin_width * pq.s
 
     def streamline_making_behav_and_neural_data(self):
@@ -53,7 +53,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.retrieve_neural_data()
 
     def get_behav_data(self):
-
+        self.get_basic_data()
         _, self.time_bins = prep_monkey_data.initialize_binned_features(
             self.monkey_information, self.bin_width)
         self.behav_data_all = prep_monkey_data.bin_monkey_information(
@@ -67,19 +67,30 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._clip_values()
         self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
                                               behav_features_to_keep.extra_columns_for_concat_trials]
-
-    def get_pursuit_data(self):
-        # Extract behavioral data for periods between target last visibility and capture
         self._find_single_vis_target_df()
-        self._take_out_pursuit_data()
+
+        vars_deleted = []
+        for var in ['ff_dataframe', 'monkey_information', 'target_df', 'curv_of_traj_df', 'curv_df']:
+            if hasattr(self, var):
+                vars_deleted.append(var)
+                delattr(self, var)
+        print(f'Deleted {vars_deleted} to free up memory')
 
     def get_x_and_y_var(self, max_x_lag_number=5, max_y_lag_number=5):
         self._get_x_var()
         self._get_y_var()
+        self.get_x_and_y_var_lags(max_x_lag_number=max_x_lag_number,
+                                  max_y_lag_number=max_y_lag_number)
+
+    def get_x_and_y_var_lags(self, max_x_lag_number=5, max_y_lag_number=5):
         self._get_x_var_lags(max_x_lag_number=max_x_lag_number,
                              continuous_data=self.binned_spikes_df)
         self._get_y_var_lags(max_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
             columns=['point_index'] + self.y_columns_to_drop))
+        self.x_var_lags = self.x_var_lags[self.x_var_lags['bin'].isin(
+            self.pursuit_data['bin'].values)]
+        self.y_var_lags = self.y_var_lags[self.y_var_lags['bin'].isin(
+            self.pursuit_data['bin'].values)]
 
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
                           vif_threshold_for_initial_subset=5,
@@ -105,10 +116,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                                   filter_vif_by_all_columns=filter_vif_by_all_columns)
 
     def _get_x_var(self):
-        _, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_matrix_and_df(
-            self.all_binned_spikes, max_bin=self.max_bin)
-        self.binned_spikes_df['bin'] = np.arange(
-            self.binned_spikes_df.shape[0])
         binned_spikes_sub = self.binned_spikes_df[self.binned_spikes_df['bin'].isin(
             self.pursuit_data['bin'].values)]
         self.x_var = binned_spikes_sub.drop(
@@ -117,8 +124,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
     def _get_y_var(self):
         # note that this is for the continuous case (a.k.a. all selected time points are used together, instead of being separated into trials)
 
-        self.y_var = self.pursuit_data.drop(
-            columns="point_index").reset_index(drop=True)
+        self.y_var = self.pursuit_data.reset_index(drop=True)
         # Convert bool columns to int
         bool_columns = self.y_var.select_dtypes(include=['bool']).columns
         self.y_var[bool_columns] = self.y_var[bool_columns].astype(int)
@@ -172,7 +178,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                                                          monkey_information=self.monkey_information,
                                                          ff_caught_T_new=self.ff_caught_T_new)
         self.behav_data_all = self.behav_data_all.merge(self.curv_df[[
-            'point_index', 'curv_of_traj', 'optimal_arc_d_heading']], on='point_index', how='left')
+            'point_index', 'curv_of_traj', 'optimal_arc_d_heading']].drop_duplicates(), on='point_index', how='left')
         self.behav_data_all.rename(columns={
             'curv_of_traj': 'traj_curv', 'optimal_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
 
@@ -180,10 +186,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self._make_or_retrieve_target_df()
 
-        self.target_df['target_rel_y'] = self.target_df['target_distance'] * \
-            np.cos(self.target_df['target_angle'])
-        self.target_df['target_rel_x'] = - self.target_df['target_distance'] * \
-            np.sin(self.target_df['target_angle'])
         self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
 
@@ -195,30 +197,31 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
             self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new)
 
-    def _take_out_pursuit_data(self):
+    def get_pursuit_data(self):
+        # Extract behavioral data for periods between target last visibility and capture
 
-        self.pursuit_data_all = decode_target_utils.make_pursuit_data_all(
+        pursuit_data_all = decode_target_utils.make_pursuit_data_all(
             self.single_vis_target_df, self.behav_data_all)
 
         # add the segment info back to single_vis_target_df
         self.single_vis_target_df['segment'] = np.arange(
             len(self.single_vis_target_df))
-        self.single_vis_target_df = self.single_vis_target_df.merge(self.pursuit_data_all[[
+        self.single_vis_target_df = self.single_vis_target_df.merge(pursuit_data_all[[
                                                                     'segment', 'seg_start_time', 'seg_end_time', 'seg_duration']].drop_duplicates(), on='segment', how='left')
 
         # drop the segments with 0 duration from pursuit_data_all
         num_segments_with_0_duration = len(
-            self.pursuit_data_all[self.pursuit_data_all['seg_duration'] == 0])
+            pursuit_data_all[pursuit_data_all['seg_duration'] == 0])
         print(f'{num_segments_with_0_duration} segments ({round(num_segments_with_0_duration/len(self.single_vis_target_df) * 100, 1)}%) out of {len(self.single_vis_target_df)} segments have 0 duration. They are dropped from pursuit data')
 
         # drop segments in pursuit data that has 0 duration
-        self.pursuit_data_all = self.pursuit_data_all[self.pursuit_data_all['seg_duration'] > 0].copy(
+        pursuit_data_all = pursuit_data_all[pursuit_data_all['seg_duration'] > 0].copy(
         )
 
-        self.pursuit_data = self.pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                                  behav_features_to_keep.extra_columns_for_concat_trials]
+        self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
+                                             behav_features_to_keep.extra_columns_for_concat_trials]
 
-        self.pursuit_data_by_trial = self.pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
+        self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
             'segment']]
 
     @staticmethod
@@ -236,24 +239,28 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
     def prepare_spikes_for_gpfa(self, align_at_beginning=False):
 
         self.align_at_beginning = align_at_beginning
+
+        spike_df = neural_data_processing.make_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
+                                                        sampling_rate=self.sampling_rate)
+
         self.spike_segs_df = fit_gpfa_utils.make_spike_segs_df(
-            self.spike_df, self.single_vis_target_df)
+            spike_df, self.single_vis_target_df)
 
         self.common_t_stop = max(
             self.spike_segs_df['t_duration']) + self.bin_width
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
 
-    def get_gpfa_trahjectories(self, latent_dimensionality=10):
+    def get_gpfa_traj(self, latent_dimensionality=10):
 
         gpfa_3dim = GPFA(bin_width_w_unit=self.bin_width_w_unit,
                          x_dim=latent_dimensionality)
         self.trajectories = gpfa_3dim.fit_transform(self.spiketrains)
 
-    def get_latent_data_and_behav_data_for_all_trials(self):
+    def get_gpfa_and_behav_data_for_all_trials(self):
 
         self.behavior_trials = []
-        self.latent_trials = []
+        self.gpfa_trials = []
 
         segments_behav = self.pursuit_data_by_trial['segment'].unique()
         segments_neural = self.spiketrain_corr_segs
@@ -266,6 +273,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.behavior_trials.append(behav_data_of_trial)
 
             trial_length = behav_data_of_trial.shape[0]
-            latent_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
+            gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
                 self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
-            self.latent_trials.append(latent_trial)
+            self.gpfa_trials.append(gpfa_trial)

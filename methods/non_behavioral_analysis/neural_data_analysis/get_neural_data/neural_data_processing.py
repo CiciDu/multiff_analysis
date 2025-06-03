@@ -80,7 +80,8 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
     return spike_times_in_s, spike_clusters
 
 
-def bin_spikes(spike_df, bin_width=0.02):
+
+def _make_all_binned_spikes(spike_df, bin_width=0.02):
     """Bin spikes and stack bins for each spike cluster."""
     max_time = math.ceil(spike_df.time.max())
     time_bins = np.arange(0, max_time, bin_width)
@@ -100,6 +101,23 @@ def bin_spikes(spike_df, bin_width=0.02):
     return time_bins, all_binned_spikes
 
 
+def prepare_binned_spikes_df(spike_df, bin_width=0.02, max_bin=None):
+    """
+    Prepare the binned_spikes_df dataframe by extracting the maximum bin from final_behavioral_data,
+    slicing all_binned_spikes, and creating column names.
+    """
+    time_bins, all_binned_spikes = _make_all_binned_spikes(spike_df, bin_width)
+    
+    if max_bin is None:
+        max_bin = all_binned_spikes.shape[0] - 1
+    binned_spikes_matrix = all_binned_spikes[:max_bin + 1, :]
+    column_names = 'unit_' + \
+        pd.Series(range(binned_spikes_matrix.shape[1])).astype(str)
+    binned_spikes_df = pd.DataFrame(binned_spikes_matrix, columns=column_names)
+    binned_spikes_df['bin'] = np.arange(binned_spikes_matrix.shape[0])
+    return time_bins, binned_spikes_df
+
+
 def calculate_window_parameters(window_width, bin_width):
     """Calculate window parameters and ensure num_bins_in_window is odd."""
     original_window_width = window_width
@@ -115,21 +133,6 @@ def calculate_window_parameters(window_width, bin_width):
         print(
             f"Window width changed from {original_window_width} to {window_width} to make it odd")
     return window_width, num_bins_in_window, convolve_pattern
-
-
-def prepare_binned_spikes_matrix_and_df(all_binned_spikes, max_bin=None):
-    """
-    Prepare the binned_spikes_df dataframe by extracting the maximum bin from final_behavioral_data,
-    slicing all_binned_spikes, and creating column names.
-    """
-    if max_bin is None:
-        max_bin = all_binned_spikes.shape[0] - 1
-    binned_spikes_matrix = all_binned_spikes[:max_bin + 1, :]
-    column_names = 'unit_' + \
-        pd.Series(range(binned_spikes_matrix.shape[1])).astype(str)
-    binned_spikes_df = pd.DataFrame(binned_spikes_matrix, columns=column_names)
-    binned_spikes_df['bin'] = np.arange(binned_spikes_matrix.shape[0])
-    return binned_spikes_matrix, binned_spikes_df
 
 
 def convolve_neural_data(x_var, kernel_len=7):

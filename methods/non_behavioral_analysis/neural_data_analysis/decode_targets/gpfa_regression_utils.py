@@ -33,19 +33,18 @@ def get_latent_neural_data_for_trial(trajectories, current_seg, trial_length, sp
     traj_index = np.where(spiketrain_corr_segs == current_seg)[0][0]
 
     if align_at_beginning:
-        latent_trial = trajectories[traj_index].T[:trial_length, :]
+        gpfa_trial = trajectories[traj_index].T[:trial_length, :]
     else:
-        latent_trial = trajectories[traj_index].T[-trial_length:, :]
-    return latent_trial
+        gpfa_trial = trajectories[traj_index].T[-trial_length:, :]
+    return gpfa_trial
 
 
-
-def time_resolved_regression_variable_length(latent_trials, behavior_trials, time_step=0.02, cv_folds=5, max_timepoints=None):
+def time_resolved_regression_variable_length(gpfa_trials, behavior_trials, time_step=0.02, cv_folds=5, max_timepoints=None):
     """
     Perform time-resolved regression with variable-length trials.
 
     Parameters:
-    - latent_trials: list of arrays, each shape (trial_length, n_latent_dims)
+    - gpfa_trials: list of arrays, each shape (trial_length, n_latent_dims)
     - behavior_trials: list of arrays, each shape (trial_length, n_behaviors)
     - time_step: float, time bin size in seconds
     - cv_folds: int, cross-validation folds
@@ -55,11 +54,11 @@ def time_resolved_regression_variable_length(latent_trials, behavior_trials, tim
     - times: np.array, time vector for max trial length
     """
 
-    n_latent_dims = latent_trials[0].shape[1]
+    n_latent_dims = gpfa_trials[0].shape[1]
 
     # Find max trial length
     if max_timepoints is None:
-        max_timepoints = max(trial.shape[0] for trial in latent_trials)
+        max_timepoints = max(trial.shape[0] for trial in gpfa_trials)
     n_behaviors = behavior_trials[0].shape[1]
     scores_by_time = np.full((max_timepoints, n_behaviors), np.nan)
 
@@ -70,7 +69,7 @@ def time_resolved_regression_variable_length(latent_trials, behavior_trials, tim
 
         X_t = []
         Y_t = []
-        for latent, behavior in zip(latent_trials, behavior_trials):
+        for latent, behavior in zip(gpfa_trials, behavior_trials):
             if latent.shape[0] > t:  # trial has data at time t
                 X_t.append(latent[t])
                 Y_t.append(behavior[t])

@@ -34,6 +34,11 @@ ENV/
 env.bak/
 venv.bak/
 
+# Git
+.git/
+.gitignore
+
+
 # IDE
 .vscode/
 .idea/
@@ -62,6 +67,10 @@ log/
 all_monkey_data/
 raw_monkey_data/
 processed_data/
+RL_models/
+for_manual_annotation/
+data_backup/
+backups/
 
 # Temporary files
 *.tmp

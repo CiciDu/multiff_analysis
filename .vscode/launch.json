@@ -6,6 +6,9 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "2.0"
+              }
         },
         {
             "name": "Python: Attach to Jupyter Notebook",

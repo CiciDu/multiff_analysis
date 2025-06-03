@@ -162,11 +162,9 @@ def find_curv_of_traj_df_based_on_lower_and_upper_ends_of_point_index(curv_of_tr
     curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].replace(
         [np.inf, -np.inf], np.nan)
     # forward fill NA in curv_of_traj
-    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].fillna(
-        method='ffill')
+    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].ffill()
     # Backward fill NA in curv_of_traj to handle any remaining NA at the beginning
-    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].fillna(
-        method='bfill')
+    curv_of_traj_df['curv_of_traj'] = curv_of_traj_df['curv_of_traj'].bfill()
 
     curv_of_traj_df['curv_of_traj_deg_over_cm'] = curv_of_traj_df['curv_of_traj'] * \
         180/np.pi * 100  # so that the unit is degree/cm
