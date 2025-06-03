@@ -111,7 +111,7 @@ def add_target_info_to_behav_data_all(behav_data_all, target_df):
         target_df, on='point_index', how='left')
 
     # Add time since target last seen
-    behav_data_all['target_last_seen_time'] = behav_data_all['time'] + \
+    behav_data_all['time_target_last_seen'] = behav_data_all['time'] + \
         behav_data_all['time_since_target_last_seen']
 
     # Add distance from monkey position at target last seen

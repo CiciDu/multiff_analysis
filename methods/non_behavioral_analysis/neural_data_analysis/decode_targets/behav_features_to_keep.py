@@ -54,7 +54,7 @@ target_columns = [
     'time_since_last_capture',
     'traj_curv',
     'target_opt_arc_dheading',
-    'target_last_seen_time',
+    'time_target_last_seen',
     'distance_from_monkey_pos_target_last_seen',
     'cum_distance_since_target_last_seen',
     'd_heading_since_target_last_seen'

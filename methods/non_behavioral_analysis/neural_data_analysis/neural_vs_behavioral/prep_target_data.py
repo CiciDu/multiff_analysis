@@ -39,7 +39,8 @@ def _add_target_df_info(target_df, ff_real_position_sorted, ff_dataframe, ff_cau
 
     # Add target last seen info
     target_df = _add_target_last_seen_info(
-        target_df, ff_dataframe, include_frozen_info=include_frozen_info)
+        target_df, ff_dataframe, include_frozen_info=include_frozen_info,
+    )
 
     target_df = _add_target_disappeared_for_last_time_dummy(
         target_df, ff_caught_T_new, ff_dataframe)
@@ -161,6 +162,27 @@ def _calculate_target_distance_and_angle(target_df, ff_real_position_sorted):
     target_df['target_angle'] = target_angle
     target_df['target_angle_to_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(
         angles_to_ff=target_angle, distances_to_ff=target_distance)
+
+    # Check for warnings
+    left_ff_mask = target_df['target_angle'] > 90
+    if left_ff_mask.any():
+        max_angle = target_df.loc[left_ff_mask, 'target_angle'].max()
+        num_arcs = left_ff_mask.sum()
+        total_arcs = len(target_df)
+        percentage = (num_arcs / total_arcs) * 100
+
+        print("\n" + "="*80)
+        print("⚠️  Angle Analysis Warning")
+        print("="*80)
+        print(
+            f"Found {num_arcs:,} arcs ({percentage:.1f}%) where firefly is to the left of the monkey")
+        print(f"Maximum angle: {max_angle:.2f}°")
+        print("Action: Adjusting angles to be less than 90°")
+        print("="*80 + "\n")
+
+        # Adjust angles
+        target_df.loc[left_ff_mask, 'target_angle'] = 89.9
+
     return target_df
 
 
@@ -170,7 +192,7 @@ def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_ca
         nearby_alive_ff_indices = cluster_analysis.find_alive_target_clusters(
             ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=50)
         print("\n" + "="*80)
-        print("Calculating target-cluster-last-seen info...")
+        print("🔄 Calculating target-cluster-last-seen info...")
         print("="*80)
         target_df = _add_target_last_seen_info(
             target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=include_frozen_info)
@@ -183,6 +205,20 @@ def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_ca
                                               'monkey_angle_target_last_seen_frozen': 'monkey_angle_target_cluster_last_seen_frozen',
                                               'cum_distance_target_last_seen_frozen': 'cum_distance_target_cluster_last_seen_frozen',
                                               })
+
+        # Print warning about targets not in visible clusters
+        total_targets = len(target_df['target_index'].unique())
+        targets_not_in_cluster = total_targets - len(nearby_alive_ff_indices)
+        percentage = (targets_not_in_cluster / total_targets) * 100
+
+        print("\n" + "="*80)
+        print("📊 Target Cluster Visibility Analysis")
+        print("="*80)
+        print(f"Total targets: {total_targets:,}")
+        print(
+            f"Targets not in visible clusters: {targets_not_in_cluster:,} ({percentage:.1f}%)")
+        print("="*80 + "\n")
+
     return target_df, nearby_alive_ff_indices
 
 
@@ -207,7 +243,7 @@ def _add_target_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_d
     percentage = (preserved_rows / total_rows) * 100
 
     print("\n" + "="*80)
-    print("Target Visibility Analysis")
+    print("📈 Target Visibility Analysis")
     print("="*80)
     print(f"Total rows: {total_rows:,}")
     print(f"Preserved rows: {preserved_rows:,} ({percentage:.1f}%)")
@@ -253,7 +289,7 @@ def _add_target_cluster_disappeared_for_last_time_dummy(target_df, ff_caught_T_n
     percentage = (targets_not_in_cluster / total_targets) * 100
 
     print("\n" + "="*80)
-    print("Target Cluster Visibility Analysis")
+    print("📊 Target Cluster Visibility Analysis")
     print("="*80)
     print(f"Total targets: {total_targets:,}")
     print(
@@ -403,28 +439,22 @@ def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=
         })
         visible_mask = (ff_dataframe['ff_index'].isin(
             cluster_indices['ff_index'])) & (ff_dataframe['visible'] == 1)
-    else:
-        visible_mask = (ff_dataframe['visible'] == 1)
 
-    # Get visible firefly information and sort
-    visible_info = ff_dataframe[visible_mask].sort_values(
-        ['target_index', 'point_index'])
-
-    # Create a mapping of target_index to time for efficient lookup
-    target_times = target_df.groupby('target_index')['time'].first()
-
-    # Process all visible information at once
-    last_visible = visible_info.groupby(
-        ['target_index', 'point_index']).last().reset_index()
-
-    # Calculate time differences vectorized
-    last_visible['time_since_target_last_seen'] = last_visible.apply(
-        lambda x: x['time'] - target_times[x['target_index']], axis=1
-    )
-
-    # Create the base group_info DataFrame
-    group_info = last_visible[[
-        'point_index', 'target_index', 'time_since_target_last_seen']].copy()
+    # for each target, for each visible point, we only take out the relevant monkey info;
+    # we also drop duplicates because if use_target_cluster is True, there can be multiple rows for the same point index for the same target
+    visible_info = ff_dataframe.loc[visible_mask, ['point_index', 'target_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']].drop_duplicates()
+    visible_info.rename(columns={'monkey_x': 'monkey_x_target_last_seen', 'monkey_y': 'monkey_y_target_last_seen', 'monkey_angle': 'monkey_angle_target_last_seen',
+                                 'time': 'time_target_last_seen'}, inplace=True)
+    
+    # now we merge back visible info into target_df and use ffill to fill in the missing values (so that each row also has the last-visible info)
+    target_df_sub = target_df[['point_index', 'target_index', 'time', 'monkey_x',
+                              'monkey_y', 'monkey_angle', 'cum_distance']].drop_duplicates().sort_values(by='point_index')
+    target_df_sub = target_df_sub.merge(visible_info, on=['point_index', 'target_index'], how='left')
+    target_df_sub = target_df_sub.ffill().reset_index(drop=True)
+    
+    # now we calculate the time since last seen
+    target_df_sub['time_since_target_last_seen'] = target_df_sub['time'] - target_df_sub['time_target_last_seen']
+    
 
     if include_frozen_info:
         group_info = _add_frozen_info(last_visible, group_info)
@@ -439,6 +469,65 @@ def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=
     target_df['point_index'] = target_df['point_index'].astype(int)
 
     return target_df
+
+
+
+# def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=None, use_target_cluster=False, include_frozen_info=False,
+#                                ):
+
+#     target_df = _initialize_last_seen_columns(target_df, include_frozen_info)
+
+#     if use_target_cluster and nearby_alive_ff_indices is None:
+#         raise ValueError(
+#             "nearby_alive_ff_indices is None, but use_target_cluster is True")
+
+#     # Get unique target indices
+#     sorted_target_index = np.sort(ff_dataframe['target_index'].unique())
+
+#     # Create a mask for visible fireflies
+#     if use_target_cluster:
+#         # Create a mapping of target_index to cluster indices
+#         cluster_indices = pd.DataFrame({
+#             'target_index': np.repeat(range(len(sorted_target_index)),
+#                                       [len(indices) for indices in nearby_alive_ff_indices]),
+#             'ff_index': np.concatenate(nearby_alive_ff_indices)
+#         })
+#         visible_mask = (ff_dataframe['ff_index'].isin(
+#             cluster_indices['ff_index'])) & (ff_dataframe['visible'] == 1)
+
+#     # Get visible firefly information and sort
+#     visible_info = ff_dataframe[visible_mask].sort_values(
+#         ['target_index', 'point_index'])
+
+#     # Create a mapping of target_index to time for efficient lookup
+#     target_times = target_df.groupby('target_index')['time'].first()
+
+#     # Process all visible information at once
+#     last_visible = visible_info.groupby(
+#         ['target_index', 'point_index']).last().reset_index()
+
+#     # Calculate time differences vectorized
+#     last_visible['time_since_target_last_seen'] = last_visible.apply(
+#         lambda x: x['time'] - target_times[x['target_index']], axis=1
+#     )
+
+#     # Create the base group_info DataFrame
+#     group_info = last_visible[[
+#         'point_index', 'target_index', 'time_since_target_last_seen']].copy()
+
+#     if include_frozen_info:
+#         group_info = _add_frozen_info(last_visible, group_info)
+
+#     # update the original target_df with the group_info
+#     group_info.set_index(['point_index', 'target_index'], inplace=True)
+#     target_df.set_index(['point_index', 'target_index'], inplace=True)
+#     target_df.update(group_info)
+#     target_df.reset_index(inplace=True)
+
+#     # Convert point_index to integer
+#     target_df['point_index'] = target_df['point_index'].astype(int)
+
+#     return target_df
 
 
 def _update_target_df_for_current_target_index(target_df, target_df_sub, target_sub_row_indices, unique_time_points):
@@ -574,3 +663,113 @@ def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num
     target_last_vis_df.dropna(inplace=True)
     target_last_vis_df = target_last_vis_df[target_last_vis_df['last_vis_dist'] != 9999]
     return target_last_vis_df
+
+
+def _deal_with_delta_angles_greater_than_90_degrees(df, reward_boundary_radius=25, ignore_error=False):
+    """
+    Adjust arc angles that are greater than 90 degrees to be within valid bounds.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing arc information with columns:
+        - delta_angle: The angle between arc start and end
+        - ff_distance: Distance to the firefly
+        - arc_end_direction: Direction of the arc end
+        - arc_starting_angle: Starting angle of the arc
+        - arc_ending_angle: Ending angle of the arc
+    reward_boundary_radius : float, default=25
+        Maximum distance within which adjustments are made
+    ignore_error : bool, default=False
+        If True, prints warning instead of raising error for large angles
+
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with adjusted arc angles
+    """
+    # Constants
+    MAX_ANGLE = math.pi/2
+    ANGLE_ADJUSTMENT = 0.00001
+    CRITICAL_ANGLE = 150  # degrees
+
+    # Reset index for clean operations
+    df = df.copy()
+    df.reset_index(drop=True, inplace=True)
+
+    # Create masks for different conditions
+    too_big_angle = df['delta_angle'] > MAX_ANGLE
+    within_reward_boundary = df['ff_distance'] <= reward_boundary_radius
+    ff_at_left = df['arc_end_direction'] >= 0
+    ff_at_right = df['arc_end_direction'] < 0
+
+    if not too_big_angle.any():
+        return df
+
+    # First attempt: Adjust angles within reward boundary
+    left_mask = too_big_angle & ff_at_left & within_reward_boundary
+    right_mask = too_big_angle & ff_at_right & within_reward_boundary
+
+    df.loc[left_mask, 'arc_ending_angle'] = df.loc[left_mask,
+                                                   'arc_starting_angle'] + MAX_ANGLE - ANGLE_ADJUSTMENT
+    df.loc[right_mask, 'arc_ending_angle'] = df.loc[right_mask,
+                                                    'arc_starting_angle'] - (MAX_ANGLE - ANGLE_ADJUSTMENT)
+
+    # Recalculate delta angles and check if any are still too big
+    df['delta_angle'] = np.abs(
+        df['arc_ending_angle'] - df['arc_starting_angle'])
+    too_big_angle = df['delta_angle'] > MAX_ANGLE
+
+    if too_big_angle.any():
+        # Calculate statistics for both left and right
+        left_big_angles = too_big_angle & ff_at_left
+        right_big_angles = too_big_angle & ff_at_right
+
+        max_left_angle = df.loc[left_big_angles, 'delta_angle'].max(
+        ) * 180/math.pi if left_big_angles.any() else 0
+        max_right_angle = df.loc[right_big_angles, 'delta_angle'].max(
+        ) * 180/math.pi if right_big_angles.any() else 0
+        num_affected_arcs = too_big_angle.sum()
+        total_arcs = len(df)
+
+        # Print warning message
+        print("\n" + "="*80)
+        print("⚠️  Arc Angle Analysis Warning")
+        print("="*80)
+        print(
+            f"Found {num_affected_arcs:,} arcs ({num_affected_arcs/total_arcs*100:.1f}%) with angles > 90°")
+
+        if left_big_angles.any():
+            print(
+                f"FF at left side: {left_big_angles.sum():,} arcs, max angle: {max_left_angle:.2f}°")
+        if right_big_angles.any():
+            print(
+                f"FF at right side: {right_big_angles.sum():,} arcs, max angle: {max_right_angle:.2f}°")
+
+        # Handle critical angles for both sides
+        if max_left_angle > CRITICAL_ANGLE or max_right_angle > CRITICAL_ANGLE:
+            error_msg = "Critical angles detected:\n"
+            if max_left_angle > CRITICAL_ANGLE:
+                error_msg += f"- FF at left side: {max_left_angle:.2f}°\n"
+            if max_right_angle > CRITICAL_ANGLE:
+                error_msg += f"- FF at right side: {max_right_angle:.2f}°"
+
+            if ignore_error:
+                print(f"Warning: {error_msg}")
+                print("Action: Adjusting angles to be less than 90°")
+            else:
+                raise ValueError(error_msg)
+
+        # Second attempt: Adjust all remaining large angles
+        left_mask = too_big_angle & ff_at_left
+        right_mask = too_big_angle & ff_at_right
+
+        df.loc[left_mask, 'arc_ending_angle'] = df.loc[left_mask,
+                                                       'arc_starting_angle'] + MAX_ANGLE - ANGLE_ADJUSTMENT
+        df.loc[right_mask, 'arc_ending_angle'] = df.loc[right_mask,
+                                                        'arc_starting_angle'] - (MAX_ANGLE - ANGLE_ADJUSTMENT)
+
+        print("Action: Adjusted all angles to be less than 90°")
+        print("="*80 + "\n")
+
+    return df

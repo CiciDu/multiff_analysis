@@ -48,12 +48,14 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
     monkey_info_in_bins = monkey_info_in_bins.merge(
         all_bins, on='bin', how='right')
     monkey_info_in_bins = monkey_info_in_bins.ffill().reset_index(drop=True)
-    monkey_info_in_bins = monkey_info_in_bins.bfill().reset_index(drop=True)
+    monkey_info_in_bins = monkey_info_in_bins.bfill(
+    ).infer_objects(copy=False).reset_index(drop=True)
 
     monkey_info_in_bins['bin_start_time'] = time_bins[monkey_info_in_bins['bin'].values]
     monkey_info_in_bins['bin_end_time'] = time_bins[monkey_info_in_bins['bin'].values + 1]
-    
-    monkey_info_in_bins['point_index'] = monkey_info_in_bins['point_index'].astype(int)
+
+    monkey_info_in_bins['point_index'] = monkey_info_in_bins['point_index'].astype(
+        int)
 
     return monkey_info_in_bins
 
