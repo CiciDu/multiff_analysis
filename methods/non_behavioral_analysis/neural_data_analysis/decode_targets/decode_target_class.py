@@ -46,13 +46,13 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self.bin_width_w_unit = self.bin_width * pq.s
 
-    def streamline_making_behav_and_neural_data(self):
-        self.get_behav_data()
+    def streamline_making_behav_and_neural_data(self, free_up_memory=True):
+        self.get_behav_data(free_up_memory=free_up_memory)
         self.get_pursuit_data()
         self.max_bin = self.behav_data.bin.max()
         self.retrieve_neural_data()
 
-    def get_behav_data(self):
+    def get_behav_data(self, free_up_memory=True):
         self.get_basic_data()
         _, self.time_bins = prep_monkey_data.initialize_binned_features(
             self.monkey_information, self.bin_width)
@@ -69,12 +69,14 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                                               behav_features_to_keep.extra_columns_for_concat_trials]
         self._find_single_vis_target_df()
 
-        vars_deleted = []
-        for var in ['ff_dataframe', 'monkey_information', 'target_df', 'curv_of_traj_df', 'curv_df']:
-            if hasattr(self, var):
-                vars_deleted.append(var)
+        if free_up_memory:
+            vars_deleted = []
+            for var in ['ff_dataframe', 'monkey_information', 'target_df', 'curv_of_traj_df', 'curv_df']:
+                if hasattr(self, var):
+                    vars_deleted.append(var)
                 delattr(self, var)
-        print(f'Deleted {vars_deleted} to free up memory')
+            print(
+                f'Deleted instance attributes {vars_deleted} to free up memory')
 
     def get_x_and_y_var(self, max_x_lag_number=5, max_y_lag_number=5):
         self._get_x_var()
@@ -150,7 +152,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         # Check for any remaining NA values
         sum_na = self.behav_data_all.isna().sum()
         if len(sum_na[sum_na > 0]) > 0:
-            print('Warning: There are columns with NAs: ', sum_na[sum_na > 0])
+            print('Warning: There are columns with NAs in behav_data_all: ',
+                  sum_na[sum_na > 0])
         # drop rows with na in any column
 
     def _clip_values(self):
@@ -184,7 +187,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
     def _add_all_target_info(self):
 
-        self._make_or_retrieve_target_df()
+        self._make_or_retrieve_target_df(
+            na_fill_method_for_target_vars='bfill')
 
         self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
@@ -223,6 +227,13 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
             'segment']]
+        
+        # check for NA; if there is any, raise a warning
+        na_sum = self.pursuit_data.isna().sum()
+        if len(na_sum[na_sum > 0]) > 0:
+            print('Warning: There are columns with NAs in pursuit_data: ',
+                  na_sum[na_sum > 0])
+        
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets(y_var_lags):

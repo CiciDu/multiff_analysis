@@ -60,12 +60,12 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
     def retrieve_neural_data(self):
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
         spike_df = neural_data_processing.make_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
-                                                             sampling_rate=self.sampling_rate)
+                                                        sampling_rate=self.sampling_rate)
         # get convolution data
         self.window_width, self.num_bins_in_window, self.convolve_pattern = neural_data_processing.calculate_window_parameters(
             window_width=self.window_width, bin_width=self.bin_width)
-        self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
-
+        self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
+            spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
 
     def prep_behavioral_data_for_neural_data_modeling(self, max_lag_number=3):
         self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
@@ -238,7 +238,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.cmb_target_df = self.cmb_target_df.merge(self.monkey_information[[
             'point_index', 'bin']].copy(), on='point_index', how='left')
 
-    def _make_or_retrieve_target_df(self, exists_ok=True, include_frozen_info=True):
+    def _make_or_retrieve_target_df(self, exists_ok=True, include_frozen_info=True, na_fill_method_for_target_vars='ffill'):
         target_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_df.csv')
         if exists(target_df_filepath) & exists_ok:
@@ -249,6 +249,10 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                 self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe, include_frozen_info=include_frozen_info)
             self.target_df.to_csv(target_df_filepath, index=False)
             print("Made new target_df")
+
+        if na_fill_method_for_target_vars is not None:
+            self.target_df = prep_target_data.fill_na_in_target_df(
+                self.target_df, na_fill_method_for_target_vars='ffill')
 
     def _make_or_retrieve_target_cluster_df(self, exists_ok=True, include_frozen_info=True):
         target_cluster_df_filepath = os.path.join(
@@ -284,7 +288,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                            'avg_target_last_seen_distance', 'avg_target_last_seen_angle']
         self.final_behavioral_data = self.final_behavioral_data.drop(
             columns=columns_to_drop)
-
 
     def _get_index_of_bins_in_valid_intervals(self, gap_too_large_threshold=100, min_combined_valid_interval_length=50):
         """
@@ -328,12 +331,10 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.x_var_lags, self.x_lag_numbers = self._get_lags(
             max_x_lag_number, continuous_data)
         # drop all columns in x_var_lags that has bin_
-        if 'bin_0' in self.x_var_lags.columns:  
+        if 'bin_0' in self.x_var_lags.columns:
             self.x_var_lags['bin'] = self.x_var_lags['bin_0'].astype(int)
             self.x_var_lags = self.x_var_lags.drop(
                 columns=[col for col in self.x_var_lags.columns if 'bin_' in col])
-        
-
 
     def _get_lags(self, max_lag_number, continuous_data):
         lag_numbers = np.arange(-max_lag_number, max_lag_number+1)

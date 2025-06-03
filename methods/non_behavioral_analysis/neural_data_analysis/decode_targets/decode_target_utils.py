@@ -20,7 +20,6 @@ from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
-
 def process_target_columns_in_lags(y_var_lags, lag_number, monkey_information, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, include_frozen_info=True):
     """
     Process target columns in lagged data by matching with temp_target_df based on point_index and target_index.
@@ -28,44 +27,46 @@ def process_target_columns_in_lags(y_var_lags, lag_number, monkey_information, f
 
     # Get columns for this lag_number
     lag_suffix = f'_{lag_number}'
-    target_cols = [col for col in y_var_lags.columns if col.endswith(lag_suffix)]
+    target_cols = [
+        col for col in y_var_lags.columns if col.endswith(lag_suffix)]
     point_index_col = f'point_index{lag_suffix}'
     target_index_col = 'target_index'  # This is the original target_index
-    
+
     if point_index_col not in y_var_lags.columns:
         raise KeyError(f"Warning: {point_index_col} not found in columns")
-        
+
     # Get target columns for this lag_number (excluding point_index and target_index)
-    target_cols = [col for col in target_cols 
-                    if col != point_index_col and col != target_index_col]
-    
+    target_cols = [col for col in target_cols
+                   if col != point_index_col and col != target_index_col]
+
     if not target_cols:
         raise KeyError(f"No target columns found for lag_number {lag_number}")
-        
-    
+
     # strip target_cols of lag_suffix
     target_cols = [col.replace(lag_suffix, '') for col in target_cols]
-  
+
     # calculate target info anew
     temp_target_df = y_var_lags[[point_index_col, target_index_col]].copy()
-    temp_target_df.rename(columns={point_index_col: 'point_index', target_index_col: 'target_index'}, inplace=True)
+    temp_target_df.rename(columns={
+                          point_index_col: 'point_index', target_index_col: 'target_index'}, inplace=True)
     temp_target_df = temp_target_df.merge(monkey_information[['point_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle', 'cum_distance']],
-                              on='point_index', how='left')
-    temp_target_df = prep_target_data._add_target_df_info(temp_target_df, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, include_frozen_info=include_frozen_info)
+                                          on='point_index', how='left')
+    temp_target_df = prep_target_data._add_target_df_info(
+        temp_target_df, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, include_frozen_info=include_frozen_info)
 
     # take out y_var_lags's columns related to target from the new target_df; raise an error if any target_cols are not in temp_target_df
     try:
         temp_target_df = temp_target_df[target_cols]
     except KeyError:
-        raise KeyError(f"Target columns {target_cols} not found in temp_target_df")
-    
-    # Add lag_number suffix to all columns
-    rename_dict = {col: f"{col}{lag_suffix}" 
-                    for col in temp_target_df.columns}
-    temp_target_df = temp_target_df.rename(columns=rename_dict)
-    
-    return temp_target_df
+        raise KeyError(
+            f"Target columns {target_cols} not found in temp_target_df")
 
+    # Add lag_number suffix to all columns
+    rename_dict = {col: f"{col}{lag_suffix}"
+                   for col in temp_target_df.columns}
+    temp_target_df = temp_target_df.rename(columns=rename_dict)
+
+    return temp_target_df
 
 
 def find_single_vis_target_df(target_clust_last_vis_df, monkey_information, ff_caught_T_new):
@@ -110,7 +111,7 @@ def add_target_info_to_behav_data_all(behav_data_all, target_df):
         target_df, on='point_index', how='left')
 
     # Add time since target last seen
-    behav_data_all['target_last_seen_time_abs'] = behav_data_all['time'] + \
+    behav_data_all['target_last_seen_time'] = behav_data_all['time'] + \
         behav_data_all['time_since_target_last_seen']
 
     # Add distance from monkey position at target last seen
@@ -156,13 +157,13 @@ def make_pursuit_data_all(single_vis_target_df, behav_data_all):
 
     pursuit_data_all = pursuit_data_all.merge(
         point_index_df, on='point_index', how='left')
-    
-    # drop NA if any
-    if pursuit_data_all.isnull().any(axis=1).sum() > 0:
-        print(
-            f'Number of rows with NaN values in pursuit_data_all: {pursuit_data_all.isnull().any(axis=1).sum()} out of {pursuit_data_all.shape[0]} rows. The rows with NaN values will be dropped.')
-        # drop rows with NA in x_var_df
-        pursuit_data_all = pursuit_data_all.dropna()
+
+    # # drop NA if any
+    # if pursuit_data_all.isnull().any(axis=1).sum() > 0:
+    #     print(
+    #         f'Number of rows with NaN values in pursuit_data_all: {pursuit_data_all.isnull().any(axis=1).sum()} out of {pursuit_data_all.shape[0]} rows. The rows with NaN values will be dropped.')
+    #     # drop rows with NA in x_var_df
+    #     pursuit_data_all = pursuit_data_all.dropna()
 
     # add segment info
     org_len = len(behav_data_all)
