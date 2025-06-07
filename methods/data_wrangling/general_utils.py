@@ -153,3 +153,99 @@ def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
     fig = plt.figure(dpi=dpi)
     yield
     plt.show()
+
+
+def find_rows_with_na(df, df_name="DataFrame"):
+    """
+    Find and analyze rows with NA values in a DataFrame.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        The DataFrame to analyze
+    df_name : str, optional
+        Name of the DataFrame for display purposes, defaults to "DataFrame"
+
+    Returns:
+    --------
+    tuple
+        (na_rows, na_cols) where:
+        - na_rows: DataFrame containing rows with any NA values
+        - na_cols: Index of columns containing any NA values
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+
+    if df.empty:
+        print(f"\n{df_name} is empty")
+        return pd.DataFrame(), pd.Index([])
+
+    # Find rows and columns with NA values
+    na_rows = df[df.isna().any(axis=1)]
+    na_cols = df.columns[df.isna().any(axis=0)]
+
+    # Calculate NA statistics
+    na_sum = df.isna().sum()
+    na_df = na_sum[na_sum > 0]
+    total_rows = len(df)
+
+    # Print analysis if NA values exist
+    if len(na_rows) > 0:
+        # Print header
+        print("\n" + "="*80)
+        print(f"NA Values Analysis for {df_name} ({total_rows:,} rows)")
+        print("="*80)
+
+        # Print column-wise NA summary
+        print("\nColumns with NA values:")
+        print("-"*60)
+        for col, count in na_df.items():
+            percentage = (count / total_rows) * 100
+            print(f"{col:<40} {count:>8,} ({percentage:>6.1f}%)")
+        print("-"*60)
+
+        # # Print sample of rows with NA values
+        # if len(na_rows) > 0:
+        #     print("\nSample of rows with NA values (first 5):")
+        #     print("-"*60)
+        #     print(na_rows.head().to_string())
+        #     print("-"*60)
+    else:
+        print(f"\nNo NA values found in {df_name}")
+
+    return na_rows, na_cols
+
+
+def find_duplicate_rows(df, column_subset=None):
+    print("\n" + "="*80)
+    if column_subset is None:
+        column_subset = df.columns
+        print("🔍 Duplicate Rows Analysis:")
+    else:
+        print("🔍 Duplicate Rows Analysis for columns: ", column_subset)
+    print("="*80)
+    # Find duplicate rows
+    duplicates = df[column_subset].duplicated(keep=False)
+    duplicate_rows = df[duplicates]
+
+    if len(duplicate_rows) > 0:
+        # Show how many duplicates we found
+        num_duplicates = duplicates.sum()
+        print(f"\nFound {num_duplicates:,} duplicate rows")
+
+        # Show the duplicate rows
+        if num_duplicates > 0:
+            print("\nDuplicate rows:")
+            print("-"*60)
+            print(duplicate_rows.head())
+
+            # Show which combinations are duplicated
+            print("\nDuplicate combinations:")
+            print("-"*60)
+            duplicate_combinations = duplicate_rows.value_counts()
+            print(duplicate_combinations.head())
+        print("="*80)
+
+    else:
+        print("No duplicate rows found in the dataframe")
+    return duplicate_rows

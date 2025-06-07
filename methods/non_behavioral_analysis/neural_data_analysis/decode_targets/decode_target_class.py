@@ -45,10 +45,13 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                          )
 
         self.bin_width_w_unit = self.bin_width * pq.s
+        self.max_visibility_window = 10
 
     def streamline_making_behav_and_neural_data(self, free_up_memory=True):
+        stop
         self.get_behav_data(free_up_memory=free_up_memory)
         self.get_pursuit_data()
+        
         self.max_bin = self.behav_data.bin.max()
         self.retrieve_neural_data()
 
@@ -70,13 +73,16 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._find_single_vis_target_df()
 
         if free_up_memory:
-            vars_deleted = []
-            for var in ['ff_dataframe', 'monkey_information', 'target_df', 'curv_of_traj_df', 'curv_df']:
-                if hasattr(self, var):
-                    vars_deleted.append(var)
-                delattr(self, var)
-            print(
-                f'Deleted instance attributes {vars_deleted} to free up memory')
+            self._free_up_memory()
+
+    def _free_up_memory(self):
+        vars_deleted = []
+        for var in ['ff_dataframe', 'monkey_information', 'target_df', 'curv_of_traj_df', 'curv_df']:
+            if hasattr(self, var):
+                vars_deleted.append(var)
+            delattr(self, var)
+        print(
+            f'Deleted instance attributes {vars_deleted} to free up memory')
 
     def get_x_and_y_var(self, max_x_lag_number=5, max_y_lag_number=5):
         self._get_x_var()
@@ -87,8 +93,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
     def get_x_and_y_var_lags(self, max_x_lag_number=5, max_y_lag_number=5):
         self._get_x_var_lags(max_x_lag_number=max_x_lag_number,
                              continuous_data=self.binned_spikes_df)
-        self._get_y_var_lags(max_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
-            columns=['point_index'] + self.y_columns_to_drop))
+        self._get_y_var_lags(max_y_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
+            columns=self.y_columns_to_drop))
         self.x_var_lags = self.x_var_lags[self.x_var_lags['bin'].isin(
             self.pursuit_data['bin'].values)]
         self.y_var_lags = self.y_var_lags[self.y_var_lags['bin'].isin(
@@ -150,11 +156,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         )
 
         # Check for any remaining NA values
-        sum_na = self.behav_data_all.isna().sum()
-        if len(sum_na[sum_na > 0]) > 0:
-            print('Warning: There are columns with NAs in behav_data_all: ',
-                  sum_na[sum_na > 0])
-        # drop rows with na in any column
+        na_rows, na_cols = general_utils.find_rows_with_na(self.behav_data_all, 'behav_data_all')
+
 
     def _clip_values(self):
         # clip values in some columns
@@ -185,10 +188,11 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.behav_data_all.rename(columns={
             'curv_of_traj': 'traj_curv', 'optimal_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
 
-    def _add_all_target_info(self):
+    def _add_all_target_info(self, target_df_exists_ok=True):
 
         self._make_or_retrieve_target_df(
-            na_fill_method_for_target_vars='bfill')
+            exists_ok=target_df_exists_ok,
+            fill_na=False)
 
         self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
@@ -199,7 +203,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         # in the function, we'll drop the rows where target is in a cluster, because we want to preserve cases where monkey is going toward a single target, not a cluster
         self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
-            self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new)
+            self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new, max_visibility_window=self.max_visibility_window)
 
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
@@ -227,13 +231,10 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
             'segment']]
-        
+
+
         # check for NA; if there is any, raise a warning
-        na_sum = self.pursuit_data.isna().sum()
-        if len(na_sum[na_sum > 0]) > 0:
-            print('Warning: There are columns with NAs in pursuit_data: ',
-                  na_sum[na_sum > 0])
-        
+        na_rows, na_cols = general_utils.find_rows_with_na(self.pursuit_data, 'pursuit_data')
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets(y_var_lags):

@@ -22,34 +22,60 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe,
-                   include_frozen_info=True):
+def make_target_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, max_visibility_window=10):
     target_df = _initialize_target_df(monkey_information, ff_caught_T_new)
 
-    target_df = _add_target_df_info(target_df, ff_real_position_sorted,
-                                    ff_dataframe, ff_caught_T_new, include_frozen_info=include_frozen_info,
+    target_df = _add_target_df_info(target_df, monkey_information, ff_real_position_sorted,
+                                    ff_dataframe, ff_caught_T_new, max_visibility_window=max_visibility_window
                                     )
     return target_df
 
 
-def _add_target_df_info(target_df, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, include_frozen_info=True,
-                        ):
+def _add_target_df_info(target_df, monkey_information, ff_real_position_sorted, ff_dataframe, ff_caught_T_new,
+                        max_visibility_window=10):
     target_df = _calculate_target_distance_and_angle(
         target_df, ff_real_position_sorted)
 
-    # Add target last seen info
-    target_df = _add_target_last_seen_info(
-        target_df, ff_dataframe, include_frozen_info=include_frozen_info,
-    )
-
     target_df = _add_target_disappeared_for_last_time_dummy(
-        target_df, ff_caught_T_new, ff_dataframe)
+        target_df, ff_dataframe)
 
-    target_df = _add_target_visible_dummy(target_df)
+    target_df = _add_target_rel_x_and_y(target_df)
 
     target_df = _find_time_since_last_capture(target_df, ff_caught_T_new)
 
-    target_df = _add_target_rel_x_and_y(target_df)
+    # Add target last seen info
+    target_df = _add_target_last_seen_info(
+        target_df, ff_dataframe, ff_caught_T_new, monkey_information, max_visibility_window=max_visibility_window
+    )
+
+    target_df = _add_target_visible_dummy(target_df)
+
+    return target_df
+
+
+def add_columns_to_target_df(target_df):
+    # Add distance from monkey position at target last seen
+    target_df['distance_from_monkey_pos_target_last_seen'] = np.sqrt(
+        (target_df['monkey_x'] - target_df['monkey_x_target_last_seen'])**2 +
+        (target_df['monkey_y'] -
+         target_df['monkey_y_target_last_seen'])**2
+    )
+
+    # Add cumulative distance since target last seen
+    target_df['cum_distance_since_target_last_seen'] = target_df['cum_distance'] - \
+        target_df['cum_distance_when_target_last_seen']
+
+    # Add heading difference since target last seen
+    target_df['d_heading_since_target_last_seen'] = target_df['monkey_angle'] - \
+        target_df['monkey_angle_target_last_seen']
+
+    # make sure d_heading_since_target_last_seen is an acute angle
+    target_df['d_heading_since_target_last_seen'] = target_df['d_heading_since_target_last_seen'] % (
+        2 * np.pi)
+    target_df.loc[target_df['d_heading_since_target_last_seen']
+                  > np.pi, 'd_heading_since_target_last_seen'] -= 2 * np.pi
+    target_df.loc[target_df['d_heading_since_target_last_seen']
+                  < -np.pi, 'd_heading_since_target_last_seen'] += 2 * np.pi
 
     return target_df
 
@@ -62,64 +88,71 @@ def _add_target_rel_x_and_y(target_df):
     return target_df
 
 
-def fill_na_in_target_df(target_df, na_fill_method_for_target_vars='ffill'):
-    if na_fill_method_for_target_vars is not None:
+def fill_na_in_target_df(target_df):
+    na_sum = target_df.isna().sum()
+    na_df = na_sum[na_sum > 0]
+
+    if len(na_df) > 0:
+        # na_rows = target_df.loc[target_df.isna().any(axis=1), na_vars]
+        num_rows = len(target_df)
+
+        # Print header with separator
+        print("\n" + "="*80)
+        print(f"NA Values Analysis for target_df ({num_rows:,} rows)")
+        print("="*80)
+
+        # Print NA summary in a table format
+        print("\nColumns with NA values:")
+        print("-"*60)
+        for col, count in na_df.items():
+            percentage = (count / num_rows) * 100
+            print(f"{col:<40} {count:>8,} ({percentage:>6.1f}%)")
+        print("-"*60)
+
+        # find columns that are not 'last_seen'
+        na_cols = na_df.index.values
+        not_last_seen_cols = [col for col in na_cols if 'last_seen' not in col]
+        # if there's any such column, raise a warning
+        if len(not_last_seen_cols) > 0:
+            print('Warning: there are columns that are not "last_seen" but contain NA')
+            print('not_last_seen_cols', not_last_seen_cols)
+
+        # Sort the DataFrame
+        target_df.sort_values(by=['target_index', 'point_index'], inplace=True)
+
+        # Forward fill NA values within each target_index group
+        target_df[na_cols] = target_df.groupby(
+            'target_index')[na_cols].transform(lambda g: g.ffill())
+
+        # Backward fill any remaining NA values within each target_index group
+        target_df[na_cols] = target_df.groupby(
+            'target_index')[na_cols].transform(lambda g: g.bfill())
+
+        # Check and print results after filling
         na_sum = target_df.isna().sum()
         na_df = na_sum[na_sum > 0]
+        print(f"\nResults after fill NA:")
+        print("-"*60)
         if len(na_df) > 0:
-            na_vars = na_df.index
-            num_rows = len(target_df)
-
-            # Print header with separator
-            print("\n" + "="*80)
-            print(f"NA Values Analysis for target_df ({num_rows:,} rows)")
-            print("="*80)
-
-            # Print NA summary in a table format
-            print("\nColumns with NA values:")
-            print("-"*60)
+            print("Remaining NA values:")
             for col, count in na_df.items():
                 percentage = (count / num_rows) * 100
                 print(f"{col:<40} {count:>8,} ({percentage:>6.1f}%)")
-            print("-"*60)
-
-            # Print fill method
-            print(
-                f"\nFilling NA values using method: {na_fill_method_for_target_vars}")
-
-            # Apply fill method
-            if na_fill_method_for_target_vars == 'ffill':
-                target_df[na_vars] = target_df[na_vars].ffill()
-            elif na_fill_method_for_target_vars == 'bfill':
-                target_df[na_vars] = target_df[na_vars].bfill()
-            else:
-                raise ValueError(
-                    f"Invalid method to address NA: {na_fill_method_for_target_vars}")
-
-            # Check and print results after filling
-            na_sum = target_df.isna().sum()
-            na_df = na_sum[na_sum > 0]
-            print("\nResults after filling:")
-            print("-"*60)
-            if len(na_df) > 0:
-                print("Remaining NA values:")
-                for col, count in na_df.items():
-                    percentage = (count / num_rows) * 100
-                    print(f"{col:<40} {count:>8,} ({percentage:>6.1f}%)")
-            else:
-                print("✓ All NA values have been successfully filled")
-            print("="*80 + "\n")
+        else:
+            print("✓ All NA values have been successfully filled")
+        print("="*80 + "\n")
 
     return target_df
 
 
-def make_target_cluster_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, ff_life_sorted, include_frozen_info=True,
-                           ):
+def make_target_cluster_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, ff_life_sorted,
+                           max_visibility_window=10):
     target_clust_df = _initialize_target_df(
         monkey_information, ff_caught_T_new)
 
     target_clust_df, nearby_alive_ff_indices = _add_target_cluster_last_seen_info(
-        target_clust_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, include_frozen_info=include_frozen_info,
+        target_clust_df, monkey_information, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe,
+        max_visibility_window=max_visibility_window
     )
 
     target_clust_df = _add_target_cluster_disappeared_for_last_time_dummy(
@@ -186,8 +219,8 @@ def _calculate_target_distance_and_angle(target_df, ff_real_position_sorted):
     return target_df
 
 
-def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe, include_frozen_info=True,
-                                       ):
+def _add_target_cluster_last_seen_info(target_df, monkey_information, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe,
+                                       max_visibility_window=10):
     if 'target_cluster_last_seen_time' not in target_df.columns:
         nearby_alive_ff_indices = cluster_analysis.find_alive_target_clusters(
             ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=50)
@@ -195,15 +228,15 @@ def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_ca
         print("🔄 Calculating target-cluster-last-seen info...")
         print("="*80)
         target_df = _add_target_last_seen_info(
-            target_df, ff_dataframe, nearby_alive_ff_indices, use_target_cluster=True, include_frozen_info=include_frozen_info)
+            target_df, ff_dataframe, ff_caught_T_new, monkey_information, nearby_alive_ff_indices=nearby_alive_ff_indices, use_target_cluster=True, max_visibility_window=max_visibility_window)
         target_df = target_df.rename(columns={'time_since_target_last_seen': 'target_cluster_last_seen_time',
-                                              'target_last_seen_distance_frozen': 'target_cluster_last_seen_distance_frozen',
-                                              'target_last_seen_angle_frozen': 'target_cluster_last_seen_angle_frozen',
-                                              'target_last_seen_angle_to_boundary_frozen': 'target_cluster_last_seen_angle_to_boundary_frozen',
-                                              'monkey_x_target_last_seen_frozen': 'monkey_x_target_cluster_last_seen_frozen',
-                                              'monkey_y_target_last_seen_frozen': 'monkey_y_target_cluster_last_seen_frozen',
-                                              'monkey_angle_target_last_seen_frozen': 'monkey_angle_target_cluster_last_seen_frozen',
-                                              'cum_distance_target_last_seen_frozen': 'cum_distance_target_cluster_last_seen_frozen',
+                                              'target_last_seen_distance': 'target_cluster_last_seen_distance_frozen',
+                                              'target_last_seen_angle': 'target_cluster_last_seen_angle_frozen',
+                                              'target_last_seen_angle_to_boundary': 'target_cluster_last_seen_angle_to_boundary_frozen',
+                                              'monkey_x_target_last_seen': 'monkey_x_target_cluster_last_seen_frozen',
+                                              'monkey_y_target_last_seen': 'monkey_y_target_cluster_last_seen_frozen',
+                                              'monkey_angle_target_last_seen': 'monkey_angle_target_cluster_last_seen_frozen',
+                                              'cum_distance_when_target_last_seen': 'cum_distance_target_cluster_last_seen_frozen',
                                               })
 
         # Print warning about targets not in visible clusters
@@ -222,7 +255,7 @@ def _add_target_cluster_last_seen_info(target_df, ff_real_position_sorted, ff_ca
     return target_df, nearby_alive_ff_indices
 
 
-def _add_target_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_dataframe):
+def _add_target_disappeared_for_last_time_dummy(target_df, ff_dataframe):
     """
     Add target_has_disappeared_for_last_time_dummy to target_df
     """
@@ -235,19 +268,6 @@ def _add_target_disappeared_for_last_time_dummy(target_df, ff_caught_T_new, ff_d
         target_df['time'] > target_df['target_index'].map(
             target_last_vis_times)
     ).astype(int)
-
-    # Print warning about segments between last-seen time and capture time
-    total_rows = len(target_df)
-    preserved_rows = len(
-        target_df[target_df['target_has_disappeared_for_last_time_dummy'] == 0])
-    percentage = (preserved_rows / total_rows) * 100
-
-    print("\n" + "="*80)
-    print("📈 Target Visibility Analysis")
-    print("="*80)
-    print(f"Total rows: {total_rows:,}")
-    print(f"Preserved rows: {preserved_rows:,} ({percentage:.1f}%)")
-    print("="*80 + "\n")
 
     return target_df
 
@@ -345,7 +365,7 @@ def _calculate_average_info(target_df):
     """
     target_average_info = target_df[['bin', 'target_distance', 'target_angle', 'target_angle_to_boundary',
                                     'time_since_target_last_seen', 'target_cluster_last_seen_time',
-                                     'target_last_seen_distance_frozen', 'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen',
+                                     'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
                                      'target_cluster_last_seen_distance_frozen', 'target_cluster_last_seen_angle_frozen', 'target_cluster_last_seen_angle_to_boundary_frozen',]].copy()
 
     target_average_info = target_average_info.groupby(
@@ -354,9 +374,9 @@ def _calculate_average_info(target_df):
                                         'target_angle': 'avg_target_angle',
                                         'target_angle_to_boundary': 'avg_target_angle_to_boundary',
                                         'time_since_target_last_seen': 'avg_target_last_seen_time',
-                                        'target_last_seen_distance_frozen': 'avg_target_last_seen_distance_frozen',
-                                        'target_last_seen_angle_frozen': 'avg_target_last_seen_angle_frozen',
-                                        'target_last_seen_angle_to_boundary_frozen': 'avg_target_last_seen_angle_to_boundary_frozen',
+                                        'target_last_seen_distance': 'avg_target_last_seen_distance_frozen',
+                                        'target_last_seen_angle': 'avg_target_last_seen_angle_frozen',
+                                        'target_last_seen_angle_to_boundary': 'avg_target_last_seen_angle_to_boundary_frozen',
                                         'target_cluster_last_seen_time': 'avg_target_cluster_last_seen_time',
                                         'target_cluster_last_seen_distance_frozen': 'avg_target_cluster_last_seen_distance_frozen',
                                         'target_cluster_last_seen_angle_frozen': 'avg_target_cluster_last_seen_angle_frozen',
@@ -392,8 +412,8 @@ def _calculate_max_info(target_df):
     return target_max_info
 
 
-def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=None, use_target_cluster=False, include_frozen_info=False,
-                               ):
+def _add_target_last_seen_info(target_df, ff_dataframe, ff_caught_T_new, monkey_information, nearby_alive_ff_indices=None, use_target_cluster=False,
+                               max_visibility_window=10):
     """
     Add target last seen information to the target DataFrame using vectorized operations.
 
@@ -402,178 +422,274 @@ def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=
     - ff_dataframe: DataFrame containing firefly data.
     - nearby_alive_ff_indices: Indices of nearby alive fireflies (optional).
     - use_target_cluster: Boolean indicating whether to use target cluster information.
-    - include_frozen_info: Boolean indicating whether to include frozen information.
 
     Returns:
     - Updated target_df with last seen information.
     """
 
-    # ================================================
-    # Currently we decided not to use placeholder but instead use np.nan to initialize the last seen columns
-    # Define constants
-    # DEFAULT_LAST_SEEN_TIME = 100
-    # DEFAULT_LAST_SEEN_DISTANCE = 400
-    # DEFAULT_LAST_SEEN_ANGLE = 0
-
-    # Initialize columns with default values
-    # _add_placeholder_last_seen_values(target_df, DEFAULT_LAST_SEEN_TIME,
-    #                                   DEFAULT_LAST_SEEN_DISTANCE, DEFAULT_LAST_SEEN_ANGLE, include_frozen_info)
-    # ================================================
-
-    target_df = _initialize_last_seen_columns(target_df, include_frozen_info)
+    target_df = _initialize_last_seen_columns(target_df)
 
     if use_target_cluster and nearby_alive_ff_indices is None:
         raise ValueError(
             "nearby_alive_ff_indices is None, but use_target_cluster is True")
 
-    # Get unique target indices
-    sorted_target_index = np.sort(ff_dataframe['target_index'].unique())
+    target_long_df = get_target_long_df(
+        ff_dataframe, ff_caught_T_new, monkey_information, max_visibility_window=max_visibility_window,
+        nearby_alive_ff_indices=nearby_alive_ff_indices, use_target_cluster=use_target_cluster)
 
-    # Create a mask for visible fireflies
-    if use_target_cluster:
-        # Create a mapping of target_index to cluster indices
-        cluster_indices = pd.DataFrame({
-            'target_index': np.repeat(range(len(sorted_target_index)),
-                                      [len(indices) for indices in nearby_alive_ff_indices]),
-            'ff_index': np.concatenate(nearby_alive_ff_indices)
-        })
-        visible_mask = (ff_dataframe['ff_index'].isin(
-            cluster_indices['ff_index'])) & (ff_dataframe['visible'] == 1)
+    # Get the key columns in target_df
+    target_df2 = target_df[['point_index', 'target_index', 'time', 'monkey_x',
+                           'monkey_y', 'monkey_angle', 'cum_distance']].drop_duplicates()
 
-    # for each target, for each visible point, we only take out the relevant monkey info;
-    # we also drop duplicates because if use_target_cluster is True, there can be multiple rows for the same point index for the same target
-    visible_info = ff_dataframe.loc[visible_mask, ['point_index', 'target_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']].drop_duplicates()
-    visible_info.rename(columns={'monkey_x': 'monkey_x_target_last_seen', 'monkey_y': 'monkey_y_target_last_seen', 'monkey_angle': 'monkey_angle_target_last_seen',
-                                 'time': 'time_target_last_seen'}, inplace=True)
-    
-    # now we merge back visible info into target_df and use ffill to fill in the missing values (so that each row also has the last-visible info)
-    target_df_sub = target_df[['point_index', 'target_index', 'time', 'monkey_x',
-                              'monkey_y', 'monkey_angle', 'cum_distance']].drop_duplicates().sort_values(by='point_index')
-    target_df_sub = target_df_sub.merge(visible_info, on=['point_index', 'target_index'], how='left')
-    target_df_sub = target_df_sub.ffill().reset_index(drop=True)
-    
-    # now we calculate the time since last seen
-    target_df_sub['time_since_target_last_seen'] = target_df_sub['time'] - target_df_sub['time_target_last_seen']
-    
+    # Merge with target_long_df
+    target_df2 = target_df2.merge(
+        target_long_df, on=['point_index', 'target_index'], how='left')
 
-    if include_frozen_info:
-        group_info = _add_frozen_info(last_visible, group_info)
+    target_df2 = _calculate_last_seen_info(target_df2)
 
-    # update the original target_df with the group_info
-    group_info.set_index(['point_index', 'target_index'], inplace=True)
+    # forward fill last seen columns
+    last_seen_columns = [
+        col for col in target_df2.columns if 'last_seen' in col]
+    target_df2[last_seen_columns] = target_df2.groupby(
+        'target_index')[last_seen_columns].transform(lambda g: g.ffill())
+
+    # Calculate time since last seen
+    target_df2['time_since_target_last_seen'] = target_df2['time'] - \
+        target_df2['time_target_last_seen']
+
+    # if time_since_target_last_seen > max_visibility_window, then make all the last_seen columns NA
+    last_seen_columns.append('time_since_target_last_seen')
+    target_df2.loc[target_df2['time_since_target_last_seen'] >
+                   max_visibility_window, last_seen_columns] = np.nan
+
+    # Select essential columns for update
+    essential_columns = ['point_index', 'target_index', 'time_since_target_last_seen', 'time_target_last_seen',
+                         'target_last_seen_distance', 'target_last_seen_angle',
+                         'target_last_seen_angle_to_boundary',
+                         'monkey_x_target_last_seen', 'monkey_y_target_last_seen',
+                         'monkey_angle_target_last_seen', 'cum_distance_when_target_last_seen']
+
+    # Update the original target_df
+    target_df2 = target_df2[essential_columns].copy()
+    target_df2.set_index(['point_index', 'target_index'], inplace=True)
     target_df.set_index(['point_index', 'target_index'], inplace=True)
-    target_df.update(group_info)
+    target_df.update(target_df2)
     target_df.reset_index(inplace=True)
 
     # Convert point_index to integer
-    target_df['point_index'] = target_df['point_index'].astype(int)
+    target_df[['point_index', 'target_index']] = target_df[[
+        'point_index', 'target_index']].astype(int)
 
     return target_df
 
 
-
-# def _add_target_last_seen_info(target_df, ff_dataframe, nearby_alive_ff_indices=None, use_target_cluster=False, include_frozen_info=False,
-#                                ):
-
-#     target_df = _initialize_last_seen_columns(target_df, include_frozen_info)
-
-#     if use_target_cluster and nearby_alive_ff_indices is None:
-#         raise ValueError(
-#             "nearby_alive_ff_indices is None, but use_target_cluster is True")
-
-#     # Get unique target indices
-#     sorted_target_index = np.sort(ff_dataframe['target_index'].unique())
-
-#     # Create a mask for visible fireflies
-#     if use_target_cluster:
-#         # Create a mapping of target_index to cluster indices
-#         cluster_indices = pd.DataFrame({
-#             'target_index': np.repeat(range(len(sorted_target_index)),
-#                                       [len(indices) for indices in nearby_alive_ff_indices]),
-#             'ff_index': np.concatenate(nearby_alive_ff_indices)
-#         })
-#         visible_mask = (ff_dataframe['ff_index'].isin(
-#             cluster_indices['ff_index'])) & (ff_dataframe['visible'] == 1)
-
-#     # Get visible firefly information and sort
-#     visible_info = ff_dataframe[visible_mask].sort_values(
-#         ['target_index', 'point_index'])
-
-#     # Create a mapping of target_index to time for efficient lookup
-#     target_times = target_df.groupby('target_index')['time'].first()
-
-#     # Process all visible information at once
-#     last_visible = visible_info.groupby(
-#         ['target_index', 'point_index']).last().reset_index()
-
-#     # Calculate time differences vectorized
-#     last_visible['time_since_target_last_seen'] = last_visible.apply(
-#         lambda x: x['time'] - target_times[x['target_index']], axis=1
-#     )
-
-#     # Create the base group_info DataFrame
-#     group_info = last_visible[[
-#         'point_index', 'target_index', 'time_since_target_last_seen']].copy()
-
-#     if include_frozen_info:
-#         group_info = _add_frozen_info(last_visible, group_info)
-
-#     # update the original target_df with the group_info
-#     group_info.set_index(['point_index', 'target_index'], inplace=True)
-#     target_df.set_index(['point_index', 'target_index'], inplace=True)
-#     target_df.update(group_info)
-#     target_df.reset_index(inplace=True)
-
-#     # Convert point_index to integer
-#     target_df['point_index'] = target_df['point_index'].astype(int)
-
-#     return target_df
-
-
-def _update_target_df_for_current_target_index(target_df, target_df_sub, target_sub_row_indices, unique_time_points):
+def get_target_long_df(ff_dataframe, ff_caught_T_new, monkey_information, max_visibility_window=10,
+                       nearby_alive_ff_indices=None, use_target_cluster=False):
     """
-    Update the target DataFrame with the calculated values.
-    """
-    target_df_sub_new = target_df_sub[['point_index']].merge(
-        unique_time_points, on='point_index', how='left')
-    column_indexes = target_df.columns.get_indexer(
-        target_df_sub_new.columns)
+    Create a DataFrame containing target visibility information for each point index.
 
-    if len(column_indexes[column_indexes < 0]) > 0:
+    This function processes firefly data to create a mapping between target indices and
+    their visibility at different point indices. It handles both individual targets and
+    target clusters (groups of nearby fireflies).
+
+    If the target (cluster) is not visible at a particular point_index, then we use the info
+    at the last visible point through using ffill()
+
+    Parameters:
+    -----------
+    nearby_alive_ff_indices : list of lists, optional
+        List where each element is a list of firefly indices that form a cluster.
+        Required if use_target_cluster is True..
+
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame containing target visibility information with columns:
+        - point_index: Index of the time point
+        - target_index: Index of the target (or cluster)
+        - monkey_x_target_last_seen: Monkey's x position when target was last seen
+        - monkey_y_target_last_seen: Monkey's y position when target was last seen
+        - monkey_angle_target_last_seen: Monkey's angle when target was last seen
+        - cum_distance_when_target_last_seen: Cumulative distance when target was last seen
+        - time_target_last_seen: Time when target was last seen
+
+    Notes:
+    ------
+    - For target clusters (use_target_cluster=True), each target_index can have multiple ff index
+    - For individual targets (use_target_cluster=False), target_index equals ff_index.
+
+    """
+
+    # Create target_long_df based on whether we're using target clusters
+    if use_target_cluster:
+        # Create target_long_df from nearby_alive_ff_indices
+        target_long_df = pd.DataFrame({
+            'target_index': np.repeat(range(len(nearby_alive_ff_indices)),
+                                      [len(indices) for indices in nearby_alive_ff_indices]),
+            'ff_index': np.concatenate(nearby_alive_ff_indices)
+        })
+    else:
+        # If not using target clusters, ff_index equals target_index
+        unique_target_indices = ff_dataframe['target_index'].unique()
+        target_long_df = pd.DataFrame({
+            'target_index': unique_target_indices,
+            'ff_index': unique_target_indices
+        })
+
+    # Get visible firefly information
+    ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1]
+
+    # Merge to get point_index and ff_index combinations that are visible
+    target_long_df = target_long_df.merge(
+        ff_dataframe_visible[['point_index', 'ff_index', 'ff_x', 'ff_y', 'time', 'monkey_x', 'monkey_y', 'cum_distance',
+                              'monkey_angle']], on='ff_index', how='inner')
+
+    # We just only to preserve one row for each target_index & point_index,
+    # and the existence of the row indicates that target (cluster) is visible at that point_index
+    target_long_df = target_long_df.drop(columns=['ff_index']).drop_duplicates(
+        subset=['point_index', 'target_index'])
+
+    # rename columns; note: we use ff_x and ff_y instead of target_x and target_y; when we don't use target cluster, target_x and target_y are the same as ff_x and ff_y
+    target_long_df.rename(columns={'ff_x': 'target_x',
+                                   'ff_y': 'target_y',
+                                   'monkey_x': 'monkey_x_target_last_seen',
+                                   'monkey_y': 'monkey_y_target_last_seen',
+                                   'monkey_angle': 'monkey_angle_target_last_seen',
+                                   'cum_distance': 'cum_distance_when_target_last_seen',
+                                   'time': 'time_target_last_seen'}, inplace=True)
+
+    target_long_df = _furnish_target_long_df(
+        target_long_df, ff_caught_T_new, monkey_information, max_visibility_window=max_visibility_window)
+
+    return target_long_df
+
+
+def _furnish_target_long_df(target_long_df, ff_caught_T_new, monkey_information, max_visibility_window=10):
+    """
+    Furnish target_long_df with additional time points before capture for each target.
+
+    This function adds time points between (capture_time - max_visibility_window) 
+    and capture_time for each target, then forward fills the values for all columns.
+    Note that if the trial length is greater than max_visibility_window, then visible 
+    information from the whole trial is used
+
+    Purpose:
+    --------
+    This function ensures that every point index has last-seen information by:
+    1. Adding all time points between (capture_time - max_visibility_window) and capture_time
+    2. Forward-filling the last-seen information for each target/cluster
+
+    This creates a continuous record of last-seen information for each target up to its capture time,
+    making it easier to analyze target visibility patterns.
+
+    Parameters:
+    -----------
+    target_long_df : pandas.DataFrame
+        DataFrame containing target visibility information
+    ff_caught_T_new : numpy.ndarray
+        Array of capture times for each target
+    monkey_information : pandas.DataFrame
+        DataFrame containing monkey movement information with 'time' column
+    max_visibility_window : float, default=7
+        Number of time units to look back from capture time
+
+    Returns:
+    --------
+    pandas.DataFrame
+        Updated target_long_df with additional time points and forward-filled values
+
+    Raises:
+    -------
+    ValueError
+        If required columns are missing, if max_visibility_window is negative,
+        or if ff_caught_T_new is empty
+    """
+    # Input validation (streamlined)
+    if max_visibility_window < 0:
         raise ValueError(
-            "Some columns in target_df_sub_new do not exist in target_df; updating failed.")
+            "max_visibility_window must be non-negative")
 
-    target_df.iloc[target_sub_row_indices,
-                   column_indexes] = target_df_sub_new.values
-    return target_df
+    if len(ff_caught_T_new) == 0:
+        raise ValueError("ff_caught_T_new cannot be empty")
 
-
-def _update_target_df_for_current_target_index(target_df, target_df_sub, target_sub_row_indices, unique_time_points):
-    """
-    Update the target DataFrame with the calculated values.
-    """
-    target_df_sub_new = target_df_sub[['point_index']].merge(
-        unique_time_points, on='point_index', how='left')
-    column_indexes = target_df.columns.get_indexer(
-        target_df_sub_new.columns)
-
-    if len(column_indexes[column_indexes < 0]) > 0:
+    required_cols = {'target_index', 'point_index'}
+    if not required_cols.issubset(target_long_df.columns):
         raise ValueError(
-            "Some columns in target_df_sub_new do not exist in target_df; updating failed.")
+            f"target_long_df must contain columns: {list(required_cols)}")
 
-    target_df.iloc[target_sub_row_indices,
-                   column_indexes] = target_df_sub_new.values
-    return target_df
+    if 'time' not in monkey_information.columns:
+        raise ValueError("monkey_information must contain 'time' column")
+
+    # Vectorized operations for time windows
+    ff_caught_T_new = np.asarray(ff_caught_T_new)
+    start_times = ff_caught_T_new - max_visibility_window
+    end_times = ff_caught_T_new
+
+    # Pre-sort monkey_information by time for faster searching
+    monkey_times = monkey_information['time'].values
+    monkey_indices = monkey_information.index.values
+
+    # Use searchsorted for efficient range finding
+    target_indices_list = []
+    point_indices_list = []
+
+    for i, (start_time, end_time) in enumerate(zip(start_times, end_times)):
+        # Find indices within time range using binary search
+        left_idx = np.searchsorted(monkey_times, start_time, side='left')
+        right_idx = np.searchsorted(monkey_times, end_time, side='right')
+
+        # Get point indices in range
+        points_in_range = monkey_indices[left_idx:right_idx]
+        n_points = len(points_in_range)
+
+        if n_points > 0:
+            target_indices_list.append(np.full(n_points, i))
+            point_indices_list.append(points_in_range)
+
+    # Create new points DataFrame efficiently
+    if target_indices_list:
+        all_target_indices = np.concatenate(target_indices_list)
+        all_point_indices = np.concatenate(point_indices_list)
+
+        new_points_df = pd.DataFrame({
+            'target_index': all_target_indices,
+            'point_index': all_point_indices
+        })
+
+        # Use merge instead of concat for better memory efficiency
+        combined_df = target_long_df.merge(
+            new_points_df,
+            on=['target_index', 'point_index'],
+            how='outer'
+        )
+    else:
+        combined_df = target_long_df.copy()
+
+    # Sort and forward fill
+    combined_df.sort_values(['target_index', 'point_index'], inplace=True)
+
+    # Get fill columns once
+    fill_cols = combined_df.columns.difference(
+        ['target_index', 'point_index']).tolist()
+
+    if fill_cols:
+        # Forward fill within each target group
+        combined_df[fill_cols] = combined_df.groupby('target_index')[
+            fill_cols].ffill()
+
+    return combined_df.reset_index(drop=True)
 
 
-def _add_frozen_info(last_visible, group_info):
-    # Calculate frozen distances and angles vectorized
-    target_x, target_y = last_visible['ff_x'], last_visible['ff_y']
-    monkey_x, monkey_y = last_visible['monkey_x'], last_visible['monkey_y']
-    monkey_angle = last_visible['monkey_angle']
+def _calculate_last_seen_info(target_df2):
+
+    # Calculate last-seen distances and angles
+    target_x, target_y = target_df2['target_x'], target_df2['target_y']
+    monkey_x, monkey_y = target_df2['monkey_x_target_last_seen'], target_df2['monkey_y_target_last_seen']
+    monkey_angle = target_df2['monkey_angle_target_last_seen']
 
     target_distance = np.sqrt(
         (target_x - monkey_x)**2 + (target_y - monkey_y)**2)
+
     target_angle = specific_utils.calculate_angles_to_ff_centers(
         ff_x=target_x, ff_y=target_y,
         mx=monkey_x, my=monkey_y,
@@ -581,60 +697,27 @@ def _add_frozen_info(last_visible, group_info):
     )
 
     # Add frozen metrics
-    group_info['target_last_seen_distance_frozen'] = target_distance
-    group_info['target_last_seen_angle_frozen'] = target_angle
-    group_info['target_last_seen_angle_to_boundary_frozen'] = specific_utils.calculate_angles_to_ff_boundaries(
+    target_df2['target_last_seen_distance'] = target_distance
+    target_df2['target_last_seen_angle'] = target_angle
+    target_df2['target_last_seen_angle_to_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(
         angles_to_ff=target_angle,
         distances_to_ff=target_distance
     )
 
-    # Add frozen position information
-    frozen_cols = ['monkey_x', 'monkey_y', 'monkey_angle', 'cum_distance']
-    group_info = pd.concat([
-        group_info,
-        last_visible[frozen_cols].rename(columns={
-            'monkey_x': 'monkey_x_target_last_seen_frozen',
-            'monkey_y': 'monkey_y_target_last_seen_frozen',
-            'monkey_angle': 'monkey_angle_target_last_seen_frozen',
-            'cum_distance': 'cum_distance_target_last_seen_frozen'
-        })
-    ], axis=1)
-    return group_info
+    return target_df2
 
 
-def _initialize_last_seen_columns(target_df, include_frozen_info):
+def _initialize_last_seen_columns(target_df):
     """
     Initialize columns with default values and set their dtype to float.
     """
 
-    target_df['time_since_target_last_seen'] = np.nan
-
-    if include_frozen_info:
-        frozen_columns = ['target_last_seen_distance_frozen',
-                          'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen',
-                          'monkey_x_target_last_seen_frozen', 'monkey_y_target_last_seen_frozen',
-                          'monkey_angle_target_last_seen_frozen', 'cum_distance_target_last_seen_frozen']
-        target_df[frozen_columns] = np.nan
+    columns = ['time_since_target_last_seen', 'target_last_seen_distance', 'time_target_last_seen',
+               'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
+               'monkey_x_target_last_seen', 'monkey_y_target_last_seen',
+               'monkey_angle_target_last_seen', 'cum_distance_when_target_last_seen']
+    target_df[columns] = np.nan
     return target_df
-
-
-# def _add_placeholder_last_seen_values(target_df, last_seen_time, last_seen_distance, last_seen_angle, include_frozen_info):
-#     """
-#     Initialize columns with default values and set their dtype to float.
-#     """
-#     columns = ['time_since_target_last_seen']
-#     target_df[columns] = [last_seen_time]
-#     target_df[columns] = target_df[columns].astype(float)
-
-#     if include_frozen_info:
-#         frozen_columns = ['target_last_seen_distance_frozen',
-#                           'target_last_seen_angle_frozen', 'target_last_seen_angle_to_boundary_frozen']
-#         target_df[frozen_columns] = [
-#             last_seen_distance, last_seen_angle, last_seen_angle]
-#         target_df[frozen_columns] = target_df[frozen_columns].astype(float)
-
-#         target_df[['monkey_x_target_last_seen_frozen', 'monkey_y_target_last_seen_frozen',
-#                    'monkey_angle_target_last_seen_frozen', 'cum_distance_target_last_seen_frozen']] = np.nan
 
 
 def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num_stops, num_stops_near_target, num_stops_since_last_vis):

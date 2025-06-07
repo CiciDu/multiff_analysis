@@ -30,6 +30,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.window_width = window_width
         self.one_behav_idx_per_bin = one_behav_idx_per_bin
         self.max_bin = None
+        self.max_visibility_window = 10
 
     def get_basic_data(self):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
@@ -48,11 +49,12 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         os.makedirs(self.vif_df_path, exist_ok=True)
         os.makedirs(self.lr_result_df_path, exist_ok=True)
 
-    def streamline_preparing_neural_and_behavioral_data(self):
+    def streamline_preparing_neural_and_behavioral_data(self, max_y_lag_number=3):
         self.get_basic_data()
         self._prepare_to_find_patterns_and_features()
         self.make_df_related_to_patterns_and_features()
-        self.prep_behavioral_data_for_neural_data_modeling()
+        self.prep_behavioral_data_for_neural_data_modeling(
+            max_y_lag_number=max_y_lag_number)
         self.max_bin = self.final_behavioral_data['bin'].max()
         self.retrieve_neural_data()
         self._get_x_and_y_var()
@@ -67,7 +69,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
             spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
 
-    def prep_behavioral_data_for_neural_data_modeling(self, max_lag_number=3):
+    def prep_behavioral_data_for_neural_data_modeling(self, max_y_lag_number=3):
         self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
             self.monkey_information, self.bin_width)
         self.binned_features = self._add_ff_info(self.binned_features)
@@ -77,7 +79,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self._make_final_behavioral_data()
         self._get_index_of_bins_in_valid_intervals()
         self._get_x_and_y_var()
-        self._get_y_var_lags(max_lag_number=max_lag_number,
+        self._get_y_var_lags(max_y_lag_number=max_y_lag_number,
                              continuous_data=self.final_behavioral_data)
 
     def make_or_retrieve_y_var_lr_result_df(self, exists_ok=True):
@@ -153,13 +155,13 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
 
     def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
         df_path = os.path.join(self.y_var_lags_path,
-                               f'y_var_lags_{self.max_lag_number}_reduced.csv')
+                               f'y_var_lags_{self.max_y_lag_number}_reduced.csv')
         if exists(df_path) & exists_ok:
             self.y_var_lags_reduced = pd.read_csv(df_path)
         else:
             if not hasattr(self, 'y_var_lags'):
                 self._get_y_var_lags(
-                    max_lag_number=self.max_lag_number, continuous_data=self.final_behavioral_data)
+                    max_y_lag_number=self.max_y_lag_number, continuous_data=self.final_behavioral_data)
             self.reduce_y_var_lags()
             self.y_var_lags_reduced.to_csv(df_path, index=False)
 
@@ -180,12 +182,12 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
 
     def make_or_retrieve_y_var_lags_vif_df(self, exists_ok=True):
         self.y_var_lags_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.y_var_lags, self.vif_df_path,
-                                                                            vif_df_name=f'y_var_lags_{self.max_lag_number}_vif_df', exists_ok=exists_ok
+                                                                            vif_df_name=f'y_var_lags_{self.max_y_lag_number}_vif_df', exists_ok=exists_ok
                                                                             )
 
     def make_or_retrieve_y_var_lags_reduced_vif_df(self, exists_ok=True):
         self.y_var_lags_reduced_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.y_var_lags_reduced, self.vif_df_path,
-                                                                                    vif_df_name=f'y_var_lags_{self.max_lag_number}_reduced_vif_df', exists_ok=exists_ok
+                                                                                    vif_df_name=f'y_var_lags_{self.max_y_lag_number}_reduced_vif_df', exists_ok=exists_ok
                                                                                     )
 
     def _add_monkey_info(self):
@@ -238,7 +240,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.cmb_target_df = self.cmb_target_df.merge(self.monkey_information[[
             'point_index', 'bin']].copy(), on='point_index', how='left')
 
-    def _make_or_retrieve_target_df(self, exists_ok=True, include_frozen_info=True, na_fill_method_for_target_vars='ffill'):
+    def _make_or_retrieve_target_df(self, exists_ok=True, fill_na=False):
         target_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_df.csv')
         if exists(target_df_filepath) & exists_ok:
@@ -246,15 +248,19 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             print("Retrieved target_df")
         else:
             self.target_df = prep_target_data.make_target_df(
-                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe, include_frozen_info=include_frozen_info)
+                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, 
+                self.ff_dataframe, max_visibility_window=self.max_visibility_window)
             self.target_df.to_csv(target_df_filepath, index=False)
             print("Made new target_df")
 
-        if na_fill_method_for_target_vars is not None:
+        if fill_na:
             self.target_df = prep_target_data.fill_na_in_target_df(
-                self.target_df, na_fill_method_for_target_vars='ffill')
+                self.target_df)
 
-    def _make_or_retrieve_target_cluster_df(self, exists_ok=True, include_frozen_info=True):
+        self.target_df = prep_target_data.add_columns_to_target_df(
+            self.target_df)
+
+    def _make_or_retrieve_target_cluster_df(self, exists_ok=True):
         target_cluster_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_cluster_df.csv')
         if exists(target_cluster_df_filepath) & exists_ok:
@@ -263,7 +269,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         else:
             self.target_cluster_df = prep_target_data.make_target_cluster_df(
                 self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe,
-                self.ff_life_sorted, include_frozen_info=include_frozen_info)
+                self.ff_life_sorted, max_visibility_window=self.max_visibility_window)
             self.target_cluster_df.to_csv(
                 target_cluster_df_filepath, index=False)
             print("Made new target_cluster_df")
@@ -317,10 +323,10 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.y_var = self.final_behavioral_data.set_index(
             'bin').loc[self.valid_bin_index].reset_index(drop=False)
 
-    def _get_y_var_lags(self, max_lag_number, continuous_data):
-        self.max_lag_number = max_lag_number
+    def _get_y_var_lags(self, max_y_lag_number, continuous_data):
+        self.max_y_lag_number = max_y_lag_number
         self.y_var_lags, self.lag_numbers = self._get_lags(
-            max_lag_number, continuous_data)
+            max_y_lag_number, continuous_data)
         if 'bin_0' in self.y_var_lags.columns:
             self.y_var_lags['bin'] = self.y_var_lags['bin_0'].astype(int)
             self.y_var_lags = self.y_var_lags.drop(

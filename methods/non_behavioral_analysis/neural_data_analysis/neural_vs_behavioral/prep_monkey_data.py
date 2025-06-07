@@ -47,7 +47,8 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
     all_bins = pd.DataFrame({'bin': range(max(monkey_information['bin']))})
     monkey_info_in_bins = monkey_info_in_bins.merge(
         all_bins, on='bin', how='right')
-    monkey_info_in_bins = monkey_info_in_bins.ffill().reset_index(drop=True)
+    monkey_info_in_bins = monkey_info_in_bins.ffill(
+    ).infer_objects(copy=False).reset_index(drop=True)
     monkey_info_in_bins = monkey_info_in_bins.bfill(
     ).infer_objects(copy=False).reset_index(drop=True)
 

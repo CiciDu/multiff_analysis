@@ -246,7 +246,7 @@ def find_curvature_lower_and_upper_bound(ff_angle, ff_distance, ff_radius=10):
 
     # if the lower bound equals the upper bound for any ff, then there's a problem. One needs to raise an error.
     if np.any(all_ff_angle_lower_bound == all_ff_angle_upper_bound):
-        print("Warnings: At least one ff has a lower bound equal to the upper bound. Please check the input.")
+        print("Warnings: At least one ff has a lower bound of ff_angle_boundary equal to its upper bound after clipping, meaning that the ff's angle to boundary is greater than 90 degrees. Please check the input.")
 
     # get ff_distance respectively for the lower-bound and upper-bound angles
     # ff_distance_to_edge = np.abs(np.cos(theta)*ff_distance) # and this should be the same for both lower and upper bound
