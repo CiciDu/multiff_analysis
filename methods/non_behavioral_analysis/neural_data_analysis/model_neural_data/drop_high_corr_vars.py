@@ -25,7 +25,7 @@ def drop_columns_with_high_corr(var_df, var_df_lags, corr_threshold_for_lags=0.8
                                 filter_by_subsets=False,
                                 filter_by_all_columns=False,
                                 get_column_subsets_func=None):
-    
+
     if (not filter_by_feature) & (not filter_by_subsets) & (not filter_by_all_columns):
         return var_df_lags
 
@@ -42,7 +42,8 @@ def drop_columns_with_high_corr(var_df, var_df_lags, corr_threshold_for_lags=0.8
 
     if filter_by_subsets:
         if get_column_subsets_func is not None:
-            subset_key_words, all_column_subsets = get_column_subsets_func(var_df_lags_reduced)
+            subset_key_words, all_column_subsets = get_column_subsets_func(
+                var_df_lags_reduced)
         else:
             subset_key_words = None
             all_column_subsets = None
@@ -142,7 +143,11 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
     # print the total number of columns dropped
     corr_or_vif = 'correlation' if not use_vif_instead_of_corr else 'VIF'
     print(
-        f'\n{len(columns_dropped)} out of {num_original_columns} ({len(columns_dropped) / num_original_columns * 100:.2f}%) are dropped after dropping lags of features with high {corr_or_vif} for each feature')
+        f"\nDropped {len(columns_dropped)} out of {num_original_columns} columns "
+        f"({len(columns_dropped) / num_original_columns * 100:.2f}%) "
+        f"after removing lags of features with high {corr_or_vif}.\n"
+        f"Dropped columns: {columns_dropped}"
+    )
 
     return df_reduced, top_values_by_feature, columns_dropped
 
@@ -167,10 +172,7 @@ def filter_subsets_of_var_df_lags_by_corr_or_vif(var_df_lags,
     num_subsets = len(all_column_subsets)
     num_original_columns = len(var_df_lags.columns)
     for i, column_subset in enumerate(all_column_subsets):
-
         if verbose:
-            if i != 0:
-                print('')
             if subset_key_words is not None:
                 print(
                     f'Processing subset {i+1} of {num_subsets} with features that contain "{subset_key_words[i]}", {len(column_subset)} features in total.')

@@ -20,55 +20,65 @@ from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
-def process_target_columns_in_lags(y_var_lags, target_df_lags, max_y_lag_number):
+def add_lagged_target_columns(y_var_lags, target_df_lags, max_y_lag_number, target_columns=None):
     """
     Process target columns in lagged data by matching with temp_target_df based on point_index and target_index.
     """
 
+    if target_columns is None:
+        target_columns = [
+            col for col in target_df_lags.columns if 'target' in col]
+
+    # Create a list to store all the new columns
+    all_new_columns = []
+
     for lag_number in range(-max_y_lag_number, max_y_lag_number + 1):
         if lag_number == 0:
             continue
-        else:
-            lag_suffix = f'_{lag_number}'
-            point_index_col = f'point_index{lag_suffix}'
 
-            if point_index_col not in y_var_lags.columns:
-                raise KeyError(
-                    f"Warning: {point_index_col} not found in columns")
+        lag_suffix = f'_{lag_number}'
+        point_index_col = f'point_index{lag_suffix}'
 
-            # calculate target info anew
-            temp_target_df = y_var_lags[[
-                point_index_col, 'target_index', 'bin']].copy()
+        if point_index_col not in y_var_lags.columns:
+            raise KeyError(f"Warning: {point_index_col} not found in columns")
 
-            temp_target_df.rename(columns={
-                point_index_col: 'point_index'}, inplace=True)
+        # retrieve target info from target_df_lags
+        temp_target_df = y_var_lags[[
+            point_index_col, 'target_index', 'bin']].copy()
+        temp_target_df.rename(
+            columns={point_index_col: 'point_index'}, inplace=True)
 
-            temp_target_df = temp_target_df.merge(
-                target_df_lags, on=['point_index', 'target_index'], how='left')
+        temp_target_df = temp_target_df.merge(
+            target_df_lags, on=['point_index', 'target_index'], how='left')
 
-            # take out y_var_lags's columns related to target from the new target_df; raise an error if any target_cols are not in temp_target_df
-            target_cols = [
-                col for col in y_var_lags.columns if (col.endswith(lag_suffix) & ('target' in col))]
-            # strip off suffix
-            target_cols_stripped = [col.replace(
-                lag_suffix, '') for col in target_cols]
+        # take out y_var_lags's columns related to target from the new target_df
+        temp_target_df2 = temp_target_df[target_columns]
 
-            temp_target_df = temp_target_df[target_cols_stripped]
+        # Add lag_number suffix to all columns
+        rename_dict = {
+            col: f"{col}{lag_suffix}" for col in temp_target_df2.columns}
+        temp_target_df2 = temp_target_df2.rename(columns=rename_dict)
 
-            # Add lag_number suffix to all columns
-            rename_dict = {col: f"{col}{lag_suffix}"
-                           for col in temp_target_df.columns}
-            temp_target_df = temp_target_df.rename(columns=rename_dict)
+        # Add to our list of new columns
+        all_new_columns.append(temp_target_df2)
 
-            # update y_var_lags with the new temp_target_df
-            y_var_lags[target_cols_stripped] = temp_target_df[target_cols_stripped]
+    # Concatenate all
+    all_new_columns = pd.concat(all_new_columns, axis=1)
+    # Remove any columns from y_var_lags that are in all_new_columns
+    columns_for_y_var = [col for col in y_var_lags.columns if col not in all_new_columns.columns]
+    y_var_lags = y_var_lags[columns_for_y_var].copy()
+    
+    y_var_lags = pd.concat([y_var_lags, all_new_columns], axis=1).copy()
 
     return y_var_lags
 
 
-def make_target_df_lags(y_var, max_y_lag_number):
+def initialize_target_df_lags(y_var, max_y_lag_number, bin_width):
     # for each target index and its point index, get the point index between point_index_min - lag_number and point_index_max + lag_number
     # then get target info for all the 'target_index' & 'point_index' pair
+    point_duration = 0.017
+    # use times 1.5 here to make sure that all bins will be covered)
+    point_index_per_lag = math.ceil(bin_width / point_duration * 1.5)
 
     unique_targets = y_var['target_index'].unique()
     min_index = y_var.groupby('target_index').min()['point_index']
@@ -78,15 +88,30 @@ def make_target_df_lags(y_var, max_y_lag_number):
     target_list = []
     for target in unique_targets:
         current_point_index_list = list(range(
-            min_index[target] - max_y_lag_number, max_index[target] + max_y_lag_number + 1))
+            min_index[target] - max_y_lag_number * point_index_per_lag, max_index[target] + max_y_lag_number * point_index_per_lag + 1))
         point_index_list.extend(current_point_index_list)
         target_list.extend([target] * len(current_point_index_list))
 
     target_df_lags = pd.DataFrame(
         {'point_index': point_index_list, 'target_index': target_list})
+
     return target_df_lags
 
-# def process_target_columns_in_lags(y_var_lags, lag_number, monkey_information, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, curv_of_traj_df):
+
+def fill_na_in_last_seen_columns(target_df_lags):
+    # ffill and bfill on last_seen_columns in target_df_lags
+    last_seen_columns = [
+        col for col in target_df_lags.columns if 'last_seen' in col]
+    target_df_lags.sort_values(
+        by=['target_index', 'point_index'], inplace=True)
+    target_df_lags[last_seen_columns] = target_df_lags.groupby(
+        'target_index', as_index=False)[last_seen_columns].ffill()
+    target_df_lags[last_seen_columns] = target_df_lags.groupby(
+        'target_index', as_index=False)[last_seen_columns].bfill()
+    return target_df_lags
+
+
+# def add_lagged_target_columns(y_var_lags, lag_number, monkey_information, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, curv_of_traj_df):
 #     """
 #     Process target columns in lagged data by matching with temp_target_df based on point_index and target_index.
 #     """

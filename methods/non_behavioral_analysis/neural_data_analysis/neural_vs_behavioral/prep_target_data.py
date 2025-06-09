@@ -122,12 +122,12 @@ def fill_na_in_target_df(target_df):
 
         # Forward fill NA values within each target_index group
         target_df[na_cols] = target_df.groupby(
-            'target_index')[na_cols].transform(lambda g: g.ffill())
+            'target_index')[na_cols].ffill()
 
         # Backward fill any remaining NA values within each target_index group
         target_df[na_cols] = target_df.groupby(
-            'target_index')[na_cols].transform(lambda g: g.bfill())
-
+            'target_index')[na_cols].bfill()
+        
         # Check and print results after filling
         na_sum = target_df.isna().sum()
         na_df = na_sum[na_sum > 0]
@@ -451,7 +451,7 @@ def _add_target_last_seen_info(target_df, ff_dataframe, ff_caught_T_new, monkey_
     last_seen_columns = [
         col for col in target_df2.columns if 'last_seen' in col]
     target_df2[last_seen_columns] = target_df2.groupby(
-        'target_index')[last_seen_columns].transform(lambda g: g.ffill())
+        'target_index')[last_seen_columns].ffill()
 
     # Calculate time since last seen
     target_df2['time_since_target_last_seen'] = target_df2['time'] - \
@@ -676,7 +676,7 @@ def _furnish_target_long_df(target_long_df, ff_caught_T_new, monkey_information,
         # Forward fill within each target group
         combined_df[fill_cols] = combined_df.groupby('target_index')[
             fill_cols].ffill()
-
+        
     return combined_df.reset_index(drop=True)
 
 

@@ -47,22 +47,22 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.bin_width_w_unit = self.bin_width * pq.s
         self.max_visibility_window = 10
 
-    def streamline_making_behav_and_neural_data(self, free_up_memory=True):
-        stop
-        self.get_behav_data(free_up_memory=free_up_memory)
+    def streamline_making_behav_and_neural_data(self):
+        self.get_behav_data()
         self.get_pursuit_data()
-        
+
         self.max_bin = self.behav_data.bin.max()
         self.retrieve_neural_data()
 
-    def get_behav_data(self, free_up_memory=True):
+    def get_behav_data(self):
         self.get_basic_data()
         _, self.time_bins = prep_monkey_data.initialize_binned_features(
             self.monkey_information, self.bin_width)
         self.behav_data_all = prep_monkey_data.bin_monkey_information(
             self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
-        # drop 'stop_id' column
+        # drop unnecessary columns (manually found)
         self.behav_data_all = self.behav_data_all.drop(columns=['stop_id'])
+
         self.behav_data_all = self._add_ff_info(self.behav_data_all)
         self._add_all_target_info()
         self._add_curv_info()
@@ -70,10 +70,9 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._clip_values()
         self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
                                               behav_features_to_keep.extra_columns_for_concat_trials]
+
         self._find_single_vis_target_df()
 
-        if free_up_memory:
-            self._free_up_memory()
 
     def _free_up_memory(self):
         vars_deleted = []
@@ -93,19 +92,54 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
     def get_x_and_y_var_lags(self, max_x_lag_number=5, max_y_lag_number=5):
         self._get_x_var_lags(max_x_lag_number=max_x_lag_number,
                              continuous_data=self.binned_spikes_df)
-        self._get_y_var_lags(max_y_lag_number=max_y_lag_number, continuous_data=self.behav_data.drop(
-            columns=self.y_columns_to_drop))
+
+        self._get_y_var_lags_with_target_info(
+            max_y_lag_number=max_y_lag_number)
+
         self.x_var_lags = self.x_var_lags[self.x_var_lags['bin'].isin(
             self.pursuit_data['bin'].values)]
         self.y_var_lags = self.y_var_lags[self.y_var_lags['bin'].isin(
             self.pursuit_data['bin'].values)]
+
+    def _get_y_var_lags_with_target_info(self, max_y_lag_number=5):
+      # we'll drop columns on target for now because we'll make them separately
+        self.target_columns = [
+            col for col in self.y_var.columns if 'target' in col]
+        # make y_columns_to_drop to be the set of self.y_columns_to_drop and self.target_columns
+        y_columns_to_drop = list(
+            set(self.y_columns_to_drop + self.target_columns))
+        continuous_data = self.behav_data.drop(
+            columns=y_columns_to_drop)
+        self._get_y_var_lags(max_y_lag_number=max_y_lag_number,
+                             continuous_data=continuous_data)
+
+        self.y_var_lags = self.y_var_lags[self.y_var_lags['bin'].isin(
+            self.y_var['bin'].values)]
+
+        self._add_target_info_to_y_var_lags()
+
+    def _add_target_info_to_y_var_lags(self):
+        # first get info for pairs of target_index and point_index that the lagged columns will use
+        target_df_lags = decode_target_utils.initialize_target_df_lags(
+            self.y_var, self.max_y_lag_number, self.bin_width)
+        target_df_lags = decode_target_utils.add_target_info_based_on_target_index_and_point_index(target_df_lags, self.monkey_information, self.ff_real_position_sorted,
+                                                                                                   self.ff_dataframe, self.ff_caught_T_new, self.curv_of_traj_df)
+        target_df_lags = decode_target_utils.fill_na_in_last_seen_columns(
+            target_df_lags)
+
+        # Now, put the lagged target columns into y_var_lags
+        if 'target_index' not in self.y_var_lags.columns:
+            self.y_var_lags = self.y_var_lags.merge(
+                self.y_var[['bin', 'target_index']], on='bin', how='left')
+        self.y_var_lags = decode_target_utils.add_lagged_target_columns(
+            self.y_var_lags, target_df_lags, self.max_y_lag_number, target_columns=self.target_columns)
 
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
                           vif_threshold_for_initial_subset=5,
                           vif_threshold=5,
                           verbose=True,
                           filter_corr_by_feature=True,
-                          filter_corr_by_subsets=False,
+                          filter_corr_by_subsets=True,
                           filter_corr_by_all_columns=True,
                           filter_vif_by_feature=True,
                           filter_vif_by_subsets=False,
@@ -139,7 +173,12 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         # To prevent multicollinearity, these columns need to be dropped from behavioral data
         self.y_columns_to_drop = ['time', 'cum_distance', 'target_index']
+        # also drop columns with std less than 0.001
+        columns_w_small_std = self.y_var.std()[self.y_var.std() < 0.001].index.tolist()
+        self.y_columns_to_drop = list(set(self.y_columns_to_drop + columns_w_small_std))
+        
         self.y_var_reduced = self.y_var.drop(columns=self.y_columns_to_drop)
+        
 
     def _process_na(self):
         # forward fill gaze columns
@@ -156,8 +195,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         )
 
         # Check for any remaining NA values
-        na_rows, na_cols = general_utils.find_rows_with_na(self.behav_data_all, 'behav_data_all')
-
+        na_rows, na_cols = general_utils.find_rows_with_na(
+            self.behav_data_all, 'behav_data_all')
 
     def _clip_values(self):
         # clip values in some columns
@@ -232,9 +271,9 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
             'segment']]
 
-
         # check for NA; if there is any, raise a warning
-        na_rows, na_cols = general_utils.find_rows_with_na(self.pursuit_data, 'pursuit_data')
+        na_rows, na_cols = general_utils.find_rows_with_na(
+            self.pursuit_data, 'pursuit_data')
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets(y_var_lags):

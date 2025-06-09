@@ -25,10 +25,9 @@ def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold
                                filter_by_subsets=False,
                                filter_by_all_columns=False,
                                get_column_subsets_func=None):
-    
+
     if (not filter_by_feature) & (not filter_by_subsets) & (not filter_by_all_columns):
         return y_var_lags
-    
 
     num_init_columns = y_var_lags.shape[1]
     y_var_lags_reduced = y_var_lags.copy()
@@ -46,7 +45,8 @@ def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold
     if filter_by_subsets:
         print('\n====================Dropping lags with high VIF in subsets of features in an iterative manner====================')
         if get_column_subsets_func is not None:
-            subset_key_words, all_column_subsets = get_column_subsets_func(y_var_lags_reduced)
+            subset_key_words, all_column_subsets = get_column_subsets_func(
+                y_var_lags_reduced)
         else:
             subset_key_words = None
             all_column_subsets = None
@@ -67,7 +67,7 @@ def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold
         f'({(num_init_columns - num_final_columns) / num_init_columns * 100:.2f}%) '
         f'are dropped after calling drop_columns_with_high_vif. {num_final_columns} features are left. **'
     )
-    
+
     return y_var_lags_reduced
 
 
@@ -81,7 +81,7 @@ def get_vif_df(var_df, verbose=True):
             vif_values.append(variance_inflation_factor(
                 var_df.values, i))
             if verbose:
-                if num_total_features > 20:
+                if num_total_features > 50:
                     if i % 10 == 0:
                         print(
                             f'{i} out of {var_df.shape[1]} features are processed for VIF.')
@@ -117,16 +117,18 @@ def iteratively_drop_column_w_highest_vif(df, vif_threshold=5, verbose=True):
     columns_dropped = []
     vif_df = get_vif_df(df)
     initial_columns = df.columns
+    iteration_counter = 0
     while vif_df['vif'].max() > vif_threshold:
-        column_to_drop = vif_df['feature'][0]
-        if verbose:
-            # print(f'{column_to_drop} has the highest VIF: {vif_df["vif"].max()}')
-            print('The top 5 columns with the highest VIF:')
-            print(vif_df.head(5))
+        column_to_drop = vif_df['feature'].values[0]
+        iteration_counter += 1
+        print(
+            f'Iter {iteration_counter}: Dropped {column_to_drop} (VIF: {vif_df["vif"].max():.1f})')
         df.drop(columns=column_to_drop, inplace=True)
         columns_dropped.append(column_to_drop)
         vif_df = get_vif_df(df)
     final_vif_df = vif_df
+    print(
+        f'After iterative dropping, the column with the highest VIF of the dataframe or subset is {vif_df["feature"].values[0]} with VIF {vif_df["vif"].max()}')
     if verbose:
         if len(columns_dropped) > 0:
             # print('Examined columns: ', np.array(initial_columns))

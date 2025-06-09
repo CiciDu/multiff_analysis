@@ -80,7 +80,6 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
     return spike_times_in_s, spike_clusters
 
 
-
 def _make_all_binned_spikes(spike_df, bin_width=0.02):
     """Bin spikes and stack bins for each spike cluster."""
     max_time = math.ceil(spike_df.time.max())
@@ -107,7 +106,7 @@ def prepare_binned_spikes_df(spike_df, bin_width=0.02, max_bin=None):
     slicing all_binned_spikes, and creating column names.
     """
     time_bins, all_binned_spikes = _make_all_binned_spikes(spike_df, bin_width)
-    
+
     if max_bin is None:
         max_bin = all_binned_spikes.shape[0] - 1
     binned_spikes_matrix = all_binned_spikes[:max_bin + 1, :]
@@ -160,7 +159,7 @@ def add_lags_to_each_feature(var, lag_numbers, rearrange_lag_based_on_abs_value=
     Add lags to each feature in the given variable.
     """
     n_units = var.shape[1]
-    var_lags = np.zeros((var.shape[0], n_units * len(lag_numbers)))
+    var_lags = np.full((var.shape[0], n_units * len(lag_numbers)), np.nan)
     column_names = None
 
     if isinstance(var, pd.DataFrame):
@@ -185,6 +184,10 @@ def add_lags_to_each_feature(var, lag_numbers, rearrange_lag_based_on_abs_value=
 
     if column_names is not None:
         var_lags = pd.DataFrame(var_lags, columns=new_column_names)
+
+        # conduct ffill and bfill on var_lags
+        var_lags = var_lags.ffill().bfill()
+    
     return var_lags
 
 
