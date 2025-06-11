@@ -248,7 +248,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             print("Retrieved target_df")
         else:
             self.target_df = prep_target_data.make_target_df(
-                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, 
+                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted,
                 self.ff_dataframe, max_visibility_window=self.max_visibility_window)
             self.target_df.to_csv(target_df_filepath, index=False)
             print("Made new target_df")
@@ -351,7 +351,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                 'bin_0').loc[self.valid_bin_index].reset_index(drop=False)
         return var_lags, lag_numbers
 
-        
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
         subset_key_words = ['stop', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view',
@@ -359,8 +358,10 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
 
         all_column_subsets = [
             [col for col in y_var_lags.columns if 'stop' in col],
-            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
-            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)],
+            [col for col in y_var_lags.columns if ('speed' in col) or (
+                'ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or (
+                'RD' in col) or ('gaze' in col) or ('view' in col)],
             [col for col in y_var_lags.columns if ('distance' in col)],
             [col for col in y_var_lags.columns if ('angle' in col)],
             [col for col in y_var_lags.columns if ('frozen' in col)],
@@ -370,7 +371,6 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         ]
         return subset_key_words, all_column_subsets
 
-
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_vip(y_var_lags):
         # might want to modify this later
@@ -379,8 +379,10 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
 
         all_column_subsets = [
             [col for col in y_var_lags.columns if 'stop' in col],
-            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
-            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)],
+            [col for col in y_var_lags.columns if ('speed' in col) or (
+                'ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or (
+                'RD' in col) or ('gaze' in col) or ('view' in col)],
             [col for col in y_var_lags.columns if ('distance' in col)],
             [col for col in y_var_lags.columns if ('angle' in col)],
             [col for col in y_var_lags.columns if ('frozen' in col)],

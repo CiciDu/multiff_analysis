@@ -187,7 +187,7 @@ def add_lags_to_each_feature(var, lag_numbers, rearrange_lag_based_on_abs_value=
 
         # conduct ffill and bfill on var_lags
         var_lags = var_lags.ffill().bfill()
-    
+
     return var_lags
 
 

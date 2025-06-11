@@ -127,7 +127,7 @@ def fill_na_in_target_df(target_df):
         # Backward fill any remaining NA values within each target_index group
         target_df[na_cols] = target_df.groupby(
             'target_index')[na_cols].bfill()
-        
+
         # Check and print results after filling
         na_sum = target_df.isna().sum()
         na_df = na_sum[na_sum > 0]
@@ -629,19 +629,17 @@ def _furnish_target_long_df(target_long_df, ff_caught_T_new, monkey_information,
     monkey_times = monkey_information['time'].values
     monkey_indices = monkey_information.index.values
 
-    # Use searchsorted for efficient range finding
+    # Vectorized search for all time ranges at once
+    left_indices = np.searchsorted(monkey_times, start_times, side='left')
+    right_indices = np.searchsorted(monkey_times, end_times, side='right')
+
+    # Create arrays of target indices and point indices
     target_indices_list = []
     point_indices_list = []
 
-    for i, (start_time, end_time) in enumerate(zip(start_times, end_times)):
-        # Find indices within time range using binary search
-        left_idx = np.searchsorted(monkey_times, start_time, side='left')
-        right_idx = np.searchsorted(monkey_times, end_time, side='right')
-
-        # Get point indices in range
+    for i, (left_idx, right_idx) in enumerate(zip(left_indices, right_indices)):
         points_in_range = monkey_indices[left_idx:right_idx]
         n_points = len(points_in_range)
-
         if n_points > 0:
             target_indices_list.append(np.full(n_points, i))
             point_indices_list.append(points_in_range)
@@ -676,7 +674,7 @@ def _furnish_target_long_df(target_long_df, ff_caught_T_new, monkey_information,
         # Forward fill within each target group
         combined_df[fill_cols] = combined_df.groupby('target_index')[
             fill_cols].ffill()
-        
+
     return combined_df.reset_index(drop=True)
 
 

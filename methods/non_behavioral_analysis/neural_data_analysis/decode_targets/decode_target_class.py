@@ -46,32 +46,95 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self.bin_width_w_unit = self.bin_width * pq.s
         self.max_visibility_window = 10
+        
+        self.decoding_targets_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'decoding_targets')
+        os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
 
     def streamline_making_behav_and_neural_data(self):
+        self.get_basic_data()
         self.get_behav_data()
         self.get_pursuit_data()
 
         self.max_bin = self.behav_data.bin.max()
         self.retrieve_neural_data()
 
-    def get_behav_data(self):
-        self.get_basic_data()
-        _, self.time_bins = prep_monkey_data.initialize_binned_features(
-            self.monkey_information, self.bin_width)
-        self.behav_data_all = prep_monkey_data.bin_monkey_information(
-            self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
-        self._add_or_drop_columns()
-
-        self.behav_data_all = self._add_ff_info(self.behav_data_all)
-        self._add_all_target_info()
-        self._add_curv_info()
-        self._process_na()
-        self._clip_values()
-        self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                              behav_features_to_keep.extra_columns_for_concat_trials]
-
-        self._find_single_vis_target_df()
+    def get_behav_data(self, exists_ok=True, save_data=True):
+        behav_data_all_path = os.path.join(self.decoding_targets_folder_path, 'behav_data_all.csv')
         
+        self._get_curv_of_traj_df()
+        self._make_or_retrieve_target_df(
+            exists_ok=True,
+            fill_na=False)
+
+        
+        if exists_ok & os.path.exists(behav_data_all_path):
+            self.behav_data_all = pd.read_csv(behav_data_all_path)
+            print(f'Loaded behav_data_all from {behav_data_all_path}')
+        else:
+            _, self.time_bins = prep_monkey_data.initialize_binned_features(
+                self.monkey_information, self.bin_width)
+            self.behav_data_all = prep_monkey_data.bin_monkey_information(
+                self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
+            self._add_or_drop_columns()
+
+            self.behav_data_all = self._add_ff_info(self.behav_data_all)
+            self._add_all_target_info()
+            self._add_curv_info()
+            self._process_na()
+            self._clip_values()
+            
+            if save_data:
+                self.behav_data_all.to_csv(behav_data_all_path, index=False)
+                
+                
+        self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
+                                            behav_features_to_keep.extra_columns_for_concat_trials]
+        self._find_single_vis_target_df()
+    
+
+    def get_pursuit_data(self, exists_ok=True, save_data=True):
+        pursuit_data_all_path = os.path.join(self.decoding_targets_folder_path, 'pursuit_data_all.csv')
+        if exists_ok & os.path.exists(pursuit_data_all_path):
+            pursuit_data_all = pd.read_csv(pursuit_data_all_path)
+            print(f'Loaded pursuit_data_all from {pursuit_data_all_path}')
+        else:
+            # Extract behavioral data for periods between target last visibility and capture
+
+            pursuit_data_all = decode_target_utils.make_pursuit_data_all(
+                self.single_vis_target_df, self.behav_data_all)
+
+            # add the segment info back to single_vis_target_df
+            self.single_vis_target_df['segment'] = np.arange(
+                len(self.single_vis_target_df))
+            self.single_vis_target_df = self.single_vis_target_df.merge(pursuit_data_all[[
+                                                                        'segment', 'seg_start_time', 'seg_end_time', 'seg_duration']].drop_duplicates(), on='segment', how='left')
+
+            # drop the segments with 0 duration from pursuit_data_all
+            num_segments_with_0_duration = len(
+                pursuit_data_all[pursuit_data_all['seg_duration'] == 0])
+            print(f'{num_segments_with_0_duration} segments ({round(num_segments_with_0_duration/len(self.single_vis_target_df) * 100, 1)}%) out of {len(self.single_vis_target_df)} segments have 0 duration. They are dropped from pursuit data')
+
+            # drop segments in pursuit data that has 0 duration
+            pursuit_data_all = pursuit_data_all[pursuit_data_all['seg_duration'] > 0].copy(
+            )
+            
+            if save_data:
+                pursuit_data_all.to_csv(pursuit_data_all_path, index=False)
+                
+            
+
+        self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
+                                             behav_features_to_keep.extra_columns_for_concat_trials]
+
+        self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
+            'segment']]
+
+        # check for NA; if there is any, raise a warning
+        na_rows, na_cols = general_utils.find_rows_with_na(
+            self.pursuit_data, 'pursuit_data')
+
+    
     def _select_behav_features(self):
         self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
                                               behav_features_to_keep.extra_columns_for_concat_trials]
@@ -91,7 +154,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         for var in ['ff_dataframe', 'monkey_information', 'target_df', 'curv_of_traj_df', 'curv_df']:
             if hasattr(self, var):
                 vars_deleted.append(var)
-            delattr(self, var)
+                delattr(self, var)
         print(
             f'Deleted instance attributes {vars_deleted} to free up memory')
 
@@ -216,17 +279,18 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.behav_data_all.loc[:, column] = np.clip(
                 self.behav_data_all.loc[:, column], -1000, 1000)
 
-    def _add_curv_info(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
-        ff_df = self.behav_data_all[['point_index', 'target_index', 'monkey_x', 'monkey_y', 'monkey_angle',
-                                     'target_x', 'target_y', 'target_distance', 'target_angle', 'target_angle_to_boundary']]
-        ff_df = ff_df.rename(columns={'target_x': 'ff_x', 'target_y': 'ff_y', 'target_angle': 'ff_angle',
-                             'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
-
+    def _get_curv_of_traj_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
         self.curv_of_traj_df = self.get_curv_of_traj_df(
             window_for_curv_of_traj=window_for_curv_of_traj,
             curv_of_traj_mode=curv_of_traj_mode,
             truncate_curv_of_traj_by_time_of_capture=False
         )
+        
+    def _add_curv_info(self):
+        ff_df = self.behav_data_all[['point_index', 'target_index', 'monkey_x', 'monkey_y', 'monkey_angle',
+                                     'target_x', 'target_y', 'target_distance', 'target_angle', 'target_angle_to_boundary']]
+        ff_df = ff_df.rename(columns={'target_x': 'ff_x', 'target_y': 'ff_y', 'target_angle': 'ff_angle',
+                             'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
 
         self.curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
                                                          remove_invalid_rows=False,
@@ -239,11 +303,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.behav_data_all.rename(columns={
             'curv_of_traj': 'traj_curv', 'optimal_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
 
-    def _add_all_target_info(self, target_df_exists_ok=True):
-
-        self._make_or_retrieve_target_df(
-            exists_ok=target_df_exists_ok,
-            fill_na=False)
+    def _add_all_target_info(self):
 
         self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
@@ -256,70 +316,39 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
             self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new, max_visibility_window=self.max_visibility_window)
 
-    def get_pursuit_data(self):
-        # Extract behavioral data for periods between target last visibility and capture
 
-        pursuit_data_all = decode_target_utils.make_pursuit_data_all(
-            self.single_vis_target_df, self.behav_data_all)
-
-        # add the segment info back to single_vis_target_df
-        self.single_vis_target_df['segment'] = np.arange(
-            len(self.single_vis_target_df))
-        self.single_vis_target_df = self.single_vis_target_df.merge(pursuit_data_all[[
-                                                                    'segment', 'seg_start_time', 'seg_end_time', 'seg_duration']].drop_duplicates(), on='segment', how='left')
-
-        # drop the segments with 0 duration from pursuit_data_all
-        num_segments_with_0_duration = len(
-            pursuit_data_all[pursuit_data_all['seg_duration'] == 0])
-        print(f'{num_segments_with_0_duration} segments ({round(num_segments_with_0_duration/len(self.single_vis_target_df) * 100, 1)}%) out of {len(self.single_vis_target_df)} segments have 0 duration. They are dropped from pursuit data')
-
-        # drop segments in pursuit data that has 0 duration
-        pursuit_data_all = pursuit_data_all[pursuit_data_all['seg_duration'] > 0].copy(
-        )
-
-        self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                             behav_features_to_keep.extra_columns_for_concat_trials]
-
-        self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
-            'segment']]
-
-        # check for NA; if there is any, raise a warning
-        na_rows, na_cols = general_utils.find_rows_with_na(
-            self.pursuit_data, 'pursuit_data')
-
+    @staticmethod
+    def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
+        subset_key_words = ['_x', '_y', 'angle', 'distance', 'ff_or_target', 'speeddummy_OR_monkey_dw_OR_delta_OR_traj', 'LD_or_RD_or_gave_mky_view_angle']
+        all_column_subsets = [
+            [col for col in y_var_lags.columns if '_x' in col],
+            [col for col in y_var_lags.columns if '_y' in col],
+            [col for col in y_var_lags.columns if 'angle' in col],
+            [col for col in y_var_lags.columns if 'distance' in col],
+            [col for col in y_var_lags.columns if (
+                'ff' in col) or ('target' in col)],
+            [col for col in y_var_lags.columns if ('speeddummy' in col) or ('monkey_dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gave_mky_view_angle' in col)]
+        ]
+        return subset_key_words, all_column_subsets
 
         
     @staticmethod
-    def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
-        subset_key_words = ['_x', '_y', 'angle', 'distance', 'ff_or_target', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view']
-        all_column_subsets = [
-            [col for col in y_var_lags.columns if '_x' in col],
-            [col for col in y_var_lags.columns if '_y' in col],
-            [col for col in y_var_lags.columns if 'angle' in col],
-            [col for col in y_var_lags.columns if 'distance' in col],
-            [col for col in y_var_lags.columns if (
-                'ff' in col) or ('target' in col)],
-            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
-            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)]
-        ]
-        return subset_key_words, all_column_subsets
-
-
-    @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
-        subset_key_words = ['_x', '_y', 'angle', 'distance', 'ff_or_target', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view']
+        subset_key_words = ['target_x_OR_monkey_x', 'target_y_OR_monkey_y', 'target_angle_OR_monkey_angle_OR_ff_angle_OR_last_seen_angle', 
+                            'distance', 'speeddummy_OR_delta_OR_traj', 'LD_or_RD_or_gave_mky_view_angle', 'ff_or_target_Except_catching_ff']
         all_column_subsets = [
-            [col for col in y_var_lags.columns if '_x' in col],
-            [col for col in y_var_lags.columns if '_y' in col],
-            [col for col in y_var_lags.columns if 'angle' in col],
+            [col for col in y_var_lags.columns if ('target_x' in col) or ('monkey_x' in col)],
+            [col for col in y_var_lags.columns if ('target_y' in col) or ('monkey_y' in col)],
+            [col for col in y_var_lags.columns if ('target_angle' in col) or ('monkey_angle' in col) or ('ff_angle' in col) or ('last_seen_angle' in col)],
             [col for col in y_var_lags.columns if 'distance' in col],
-            [col for col in y_var_lags.columns if (
-                'ff' in col) or ('target' in col)],
-            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
-            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)]
+            [col for col in y_var_lags.columns if ('speeddummy' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gave_mky_view_angle' in col)],
+            [col for col in y_var_lags.columns if (('ff' in col) or ('target' in col)) and ('catching_ff' not in col)],
         ]
         return subset_key_words, all_column_subsets
-    
+
+
     def prepare_spikes_for_gpfa(self, align_at_beginning=False):
 
         self.align_at_beginning = align_at_beginning
