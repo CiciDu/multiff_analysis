@@ -119,34 +119,34 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                           ):
 
         # Call the function to iteratively drop lags with high correlation for each feature
-        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var, self.y_var_lags,
+        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var_lags,
                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
                                                                                        verbose=verbose,
                                                                                        filter_by_feature=filter_corr_by_feature,
                                                                                        filter_by_subsets=filter_corr_by_subsets,
                                                                                        filter_by_all_columns=filter_corr_by_all_columns,
-                                                                                       get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets)
+                                                                                       get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_corr)
 
-        self.y_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.y_var, self.y_var_lags_reduced_corr,
+        self.y_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.y_var_lags_reduced_corr,
                                                                                 vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
                                                                                 vif_threshold=vif_threshold,
                                                                                 verbose=verbose,
                                                                                 filter_by_feature=filter_vif_by_feature,
                                                                                 filter_by_subsets=filter_vif_by_subsets,
                                                                                 filter_by_all_columns=filter_vif_by_all_columns,
-                                                                                get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets)
+                                                                                get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vip)
 
     def reduce_x_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold=5, verbose=True):
 
         # Call the function to iteratively drop lags with high correlation for each feature
-        self.x_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.x_var, self.x_var_lags,
+        self.x_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.x_var_lags,
                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
                                                                                        verbose=verbose,
                                                                                        filter_by_feature=True,
                                                                                        filter_by_subsets=False,
                                                                                        filter_by_all_columns=False)
 
-        self.x_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.x_var, self.x_var_lags_reduced_corr,
+        self.x_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.x_var_lags_reduced_corr,
                                                                                 vif_threshold=vif_threshold,
                                                                                 verbose=verbose,
                                                                                 filter_by_feature=False,
@@ -351,18 +351,36 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                 'bin_0').loc[self.valid_bin_index].reset_index(drop=False)
         return var_lags, lag_numbers
 
+        
     @staticmethod
-    def get_subset_key_words_and_all_column_subsets(y_var_lags):
-        subset_key_words = ['stop', 'speed_or_ddv', 'dw', 'LD_or_RD_or_gaze',
+    def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
+        subset_key_words = ['stop', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view',
                             'distance', 'angle', 'frozen', 'dummy', 'num_or_any_or_rate']
 
         all_column_subsets = [
             [col for col in y_var_lags.columns if 'stop' in col],
+            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)],
+            [col for col in y_var_lags.columns if ('distance' in col)],
+            [col for col in y_var_lags.columns if ('angle' in col)],
+            [col for col in y_var_lags.columns if ('frozen' in col)],
+            [col for col in y_var_lags.columns if ('dummy' in col)],
             [col for col in y_var_lags.columns if (
-                'speed' in col) or ('ddv' in col)],
-            [col for col in y_var_lags.columns if ('dw' in col)],
-            [col for col in y_var_lags.columns if (
-                'LD' in col) or ('RD' in col) or ('gaze' in col)],
+                'num' in col) or ('any' in col) or ('rate' in col)],
+        ]
+        return subset_key_words, all_column_subsets
+
+
+    @staticmethod
+    def get_subset_key_words_and_all_column_subsets_for_vip(y_var_lags):
+        # might want to modify this later
+        subset_key_words = ['stop', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view',
+                            'distance', 'angle', 'frozen', 'dummy', 'num_or_any_or_rate']
+
+        all_column_subsets = [
+            [col for col in y_var_lags.columns if 'stop' in col],
+            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)],
             [col for col in y_var_lags.columns if ('distance' in col)],
             [col for col in y_var_lags.columns if ('angle' in col)],
             [col for col in y_var_lags.columns if ('frozen' in col)],

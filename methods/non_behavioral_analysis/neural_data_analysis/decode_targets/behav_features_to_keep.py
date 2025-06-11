@@ -14,6 +14,8 @@ monkey_movement_columns = [
     'monkey_speeddummy',
     'whether_new_distinct_stop',
     'delta_distance',
+    'monkey_x_target_last_seen',
+    'monkey_y_target_last_seen',
 ]
 
 # Eye tracking and gaze features
@@ -86,3 +88,29 @@ extra_columns_for_concat_trials = [
 
 # Additional columns for aligned trials
 extra_columns_for_aligned_trials = []
+
+
+behav_features_to_drop = [
+    'bin_end_time',
+    'bin_start_time',
+    'crossing_boundary',
+    'cum_distance_when_target_last_seen',
+    'current_target_caught_time',
+    'dt',
+    'gaze_mky_view_angle',
+    'gaze_mky_view_x',
+    'gaze_mky_view_y',
+    'gaze_world_x',
+    'gaze_world_y',
+    'last_target_caught_time',
+    'monkey_angle_target_last_seen',
+    'monkey_dw_smr',
+    'monkey_speed_smr',
+    'monkey_x_smr',
+    'monkey_y_smr',
+    'target_has_disappeared_for_last_time_dummy',
+    'target_visible_dummy',
+    'trial',
+    'turning_right',
+    'valid_view_point'
+    ]

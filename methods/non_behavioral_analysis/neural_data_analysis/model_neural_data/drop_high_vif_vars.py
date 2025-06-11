@@ -20,7 +20,7 @@ from os.path import exists
 import re
 
 
-def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold_for_initial_subset=5, verbose=True,
+def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_initial_subset=5, verbose=True,
                                filter_by_feature=True,
                                filter_by_subsets=False,
                                filter_by_all_columns=False,
@@ -36,7 +36,7 @@ def drop_columns_with_high_vif(y_var, y_var_lags, vif_threshold=5, vif_threshold
         # drop all columns in y_var_lags that has 'feature' but is not 'feature'
         print('\n====================Dropping lags of features with high VIF for each feature====================')
         y_var_lags_reduced, top_values_by_feature, columns_dropped = drop_high_corr_vars.drop_lags_with_high_corr_or_vif_for_each_feature(
-            y_var, y_var_lags_reduced,
+            y_var_lags_reduced,
             vif_threshold=vif_threshold,
             verbose=verbose,
             use_vif_instead_of_corr=True
@@ -78,8 +78,13 @@ def get_vif_df(var_df, verbose=True):
     num_total_features = var_df.shape[1]
     if num_total_features > 1:
         for i in range(var_df.shape[1]):
-            vif_values.append(variance_inflation_factor(
-                var_df.values, i))
+            # check for RuntimeWarning; print the column name that causes the warning
+            try:
+                vif_values.append(variance_inflation_factor(
+                    var_df.values, i))
+            except RuntimeWarning as e:
+                print(f'RuntimeWarning: {e}')
+                print(f'Column {var_df.columns[i]} causes the warning')
             if verbose:
                 if num_total_features > 50:
                     if i % 10 == 0:

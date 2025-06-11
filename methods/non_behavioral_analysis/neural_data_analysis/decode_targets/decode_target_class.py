@@ -60,8 +60,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.monkey_information, self.bin_width)
         self.behav_data_all = prep_monkey_data.bin_monkey_information(
             self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
-        # drop unnecessary columns (manually found)
-        self.behav_data_all = self.behav_data_all.drop(columns=['stop_id'])
+        self._add_or_drop_columns()
 
         self.behav_data_all = self._add_ff_info(self.behav_data_all)
         self._add_all_target_info()
@@ -72,6 +71,19 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                                               behav_features_to_keep.extra_columns_for_concat_trials]
 
         self._find_single_vis_target_df()
+        
+    def _select_behav_features(self):
+        self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
+                                              behav_features_to_keep.extra_columns_for_concat_trials]
+        
+        # Now, as a sanity check, see if the differences between behav_data and behav_data_all are all contained in 
+        # behav_features_to_keep.behav_features_to_drop. If not, raise a warning
+        diff_columns = set(self.behav_data_all.columns) - set(behav_features_to_keep.behav_features_to_drop)
+        if diff_columns:
+            print(f'The following columns are not accounted for in behav_features_to_keep: {diff_columns}.')
+
+    def _add_or_drop_columns(self):
+        self.behav_data_all = self.behav_data_all.drop(columns=['stop_id'])
 
 
     def _free_up_memory(self):
@@ -275,18 +287,39 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         na_rows, na_cols = general_utils.find_rows_with_na(
             self.pursuit_data, 'pursuit_data')
 
+
+        
     @staticmethod
-    def get_subset_key_words_and_all_column_subsets(y_var_lags):
-        subset_key_words = ['_x', '_y', 'angle', 'ff_or_target']
+    def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
+        subset_key_words = ['_x', '_y', 'angle', 'distance', 'ff_or_target', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view']
         all_column_subsets = [
             [col for col in y_var_lags.columns if '_x' in col],
             [col for col in y_var_lags.columns if '_y' in col],
             [col for col in y_var_lags.columns if 'angle' in col],
+            [col for col in y_var_lags.columns if 'distance' in col],
             [col for col in y_var_lags.columns if (
-                'ff' in col) or ('target' in col)]
+                'ff' in col) or ('target' in col)],
+            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)]
         ]
         return subset_key_words, all_column_subsets
 
+
+    @staticmethod
+    def get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
+        subset_key_words = ['_x', '_y', 'angle', 'distance', 'ff_or_target', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view']
+        all_column_subsets = [
+            [col for col in y_var_lags.columns if '_x' in col],
+            [col for col in y_var_lags.columns if '_y' in col],
+            [col for col in y_var_lags.columns if 'angle' in col],
+            [col for col in y_var_lags.columns if 'distance' in col],
+            [col for col in y_var_lags.columns if (
+                'ff' in col) or ('target' in col)],
+            [col for col in y_var_lags.columns if ('speed' in col) or ('ddv' in col) or ('dw' in col) or ('delta' in col) or ('traj' in col)],
+            [col for col in y_var_lags.columns if ('LD' in col) or ('RD' in col) or ('gaze' in col) or ('view' in col)]
+        ]
+        return subset_key_words, all_column_subsets
+    
     def prepare_spikes_for_gpfa(self, align_at_beginning=False):
 
         self.align_at_beginning = align_at_beginning

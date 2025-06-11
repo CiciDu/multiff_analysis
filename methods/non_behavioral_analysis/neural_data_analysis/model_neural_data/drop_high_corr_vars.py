@@ -20,7 +20,7 @@ from os.path import exists
 import re
 
 
-def drop_columns_with_high_corr(var_df, var_df_lags, corr_threshold_for_lags=0.85, verbose=True,
+def drop_columns_with_high_corr(var_df_lags, corr_threshold_for_lags=0.85, verbose=True,
                                 filter_by_feature=True,
                                 filter_by_subsets=False,
                                 filter_by_all_columns=False,
@@ -35,7 +35,7 @@ def drop_columns_with_high_corr(var_df, var_df_lags, corr_threshold_for_lags=0.8
     if filter_by_feature:
         print('\n====================Dropping lags of features with high correlation for each feature====================')
         var_df_lags_reduced, top_values_by_feature, columns_dropped = drop_lags_with_high_corr_or_vif_for_each_feature(
-            var_df, var_df_lags_reduced,
+            var_df_lags_reduced,
             corr_threshold=corr_threshold_for_lags,
             verbose=verbose
         )
@@ -66,7 +66,27 @@ def drop_columns_with_high_corr(var_df, var_df_lags, corr_threshold_for_lags=0.8
     return var_df_lags_reduced
 
 
-def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
+def get_base_feature_names(df_with_lags):
+    """
+    Extract base feature names by removing lag numbers from column names.
+    For example, 'feature_1' and 'feature_-1' will both return 'feature'.
+    
+    Args:
+        df_with_lags (pd.DataFrame): DataFrame with column names that may contain lag numbers
+        
+    Returns:
+        set: Set of unique base feature names without lag numbers
+    """
+    base_features = set()
+    for col in df_with_lags.columns:
+        # Match pattern of feature_name followed by _number or _-number
+        match = re.match(r'^(.*?)_-?\d+$', col)
+        if match:
+            base_features.add(match.group(1))
+    return base_features
+
+
+def drop_lags_with_high_corr_or_vif_for_each_feature(df_with_lags,
                                                      corr_threshold=0.85,
                                                      vif_threshold=5,
                                                      verbose=True,
@@ -78,13 +98,16 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(df, df_with_lags,
     Returns:
     - df_reduced: DataFrame with reduced features after dropping highly correlated lags.
     """
-    columns_dropped = []
+    
     num_original_columns = len(df_with_lags.columns)
+    base_features = get_base_feature_names(df_with_lags)
+    
+    columns_dropped = []
     top_values_by_feature = pd.DataFrame()
 
-    for i, feature in enumerate(df.columns):
+    for i, feature in enumerate(base_features):
         if i % 10 == 0:
-            print(f"Processing feature {i+1}/{len(df.columns)}")
+            print(f"Processing feature {i+1}/{len(base_features)}")
 
         # Get the subset of df_with_lags for the current feature
         df_with_lags_sub = _find_subset_of_df_with_lags_for_current_feature(
@@ -173,6 +196,9 @@ def filter_subsets_of_var_df_lags_by_corr_or_vif(var_df_lags,
     num_original_columns = len(var_df_lags.columns)
     for i, column_subset in enumerate(all_column_subsets):
         if verbose:
+            if i > 0:
+                print('-'*100)
+            
             if subset_key_words is not None:
                 print(
                     f'Processing subset {i+1} of {num_subsets} with features that contain "{subset_key_words[i]}", {len(column_subset)} features in total.')
@@ -221,8 +247,11 @@ def get_pairs_of_columns_w_high_corr(df, corr_threshold=0.9, verbose=False):
 def get_high_corr_pair_df(corr_coeff, corr_threshold=0.9, verbose=False):
     abs_corr = np.abs(corr_coeff)
 
-    # Find pairs of columns with correlation > 0.9 (excluding self-correlations)
-    high_corr_pairs = np.where((abs_corr > corr_threshold) & (abs_corr < 1.0))
+    # Find pairs of columns with correlation > corr_threshold
+    high_corr_pairs = np.array(np.where(abs_corr > corr_threshold)).T
+    
+    # excluding self-correlations
+    high_corr_pairs = high_corr_pairs[high_corr_pairs[:, 0] != high_corr_pairs[:, 1]]
 
     all_corr = []
     high_cor_var1 = []
@@ -231,10 +260,11 @@ def get_high_corr_pair_df(corr_coeff, corr_threshold=0.9, verbose=False):
     # Print the pairs of columns with high correlation
     # Note: each pair will only appear twice because I gave the condition 'i < j'
     if verbose:
-        if len(high_corr_pairs[0]) > 0:
+        if len(high_corr_pairs) > 0:
             print(
-                f"\nHighly correlated pairs (correlation > {corr_threshold}), {int(len(high_corr_pairs[0]) / 2)} in total:")
-    for i, j in zip(high_corr_pairs[0], high_corr_pairs[1]):
+                f"\nHighly correlated pairs (correlation > {corr_threshold}), {int(len(high_corr_pairs) / 2)} in total:")
+    for pair in high_corr_pairs:
+        i, j = pair
         if i < j:  # Only print each pair once
             col1 = corr_coeff.index[i]
             col2 = corr_coeff.columns[j]
