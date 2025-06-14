@@ -26,7 +26,8 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
                                                  keep_one_value_for_each_feature=False, 
                                                  max_plots_to_show=None,
                                                  max_features_to_show_per_plot=20, 
-                                                 horizontal_bars=True):
+                                                 horizontal_bars=True,
+                                                 squared=False):
     # Get the unique feature categories
     unique_feature_category = _get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot)
     # Generate a color dictionary for the unique feature categories
@@ -50,10 +51,11 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
         fig, ax = plt.subplots(figsize=(8, 6))
 
         # If horizontal bars are preferred
+        xlabel = "Squared Loading" if squared else "Loading"
         if horizontal_bars:
             # Create a horizontal bar plot with seaborn
             sns.barplot(data=loading_subset, x=variate, y='feature', dodge=False, ax=ax, hue='feature_category', palette=color_dict, orient='h')
-            plt.xlabel("Squared Loading", fontsize=14)
+            plt.xlabel(xlabel, fontsize=14)
             plt.ylabel("")
             ax.tick_params(axis='x', which='major', labelsize=14)
             ax.tick_params(axis='y', which='major', labelsize=14)
@@ -61,7 +63,7 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
             # Otherwise, create a vertical bar plot
             sns.barplot(data=loading_subset, x='feature', y=variate, dodge=False, ax=ax, hue='feature_category', palette=color_dict)
             plt.xticks(rotation=45, ha='right')
-            plt.ylabel("Squared Loading", fontsize=14)
+            plt.ylabel(xlabel, fontsize=14)
             ax.tick_params(axis='x', which='major', labelsize=14)
             ax.tick_params(axis='y', which='major', labelsize=14)
 

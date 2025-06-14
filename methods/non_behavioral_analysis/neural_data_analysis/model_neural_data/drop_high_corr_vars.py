@@ -58,9 +58,9 @@ def drop_columns_with_high_corr(var_df_lags, corr_threshold_for_lags=0.85, verbo
 
     num_final_columns = var_df_lags_reduced.shape[1]
     print(
-        f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} '
+        f'\nSummary: {num_init_columns - num_final_columns} out of {num_init_columns} '
         f'({(num_init_columns - num_final_columns) / num_init_columns * 100:.2f}%) '
-        f'are dropped after calling drop_columns_with_high_corr. {num_final_columns} features are left. **'
+        f'are dropped after calling drop_columns_with_high_corr. \n** {num_final_columns} features are left. **'
     )
 
     return var_df_lags_reduced
@@ -125,6 +125,12 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(df_with_lags,
             # Drop features with correlation greater than the threshold
             temp_columns_to_drop = np.unique(
                 high_corr_pair_df['var_1'].values).tolist()
+
+
+            # if len(temp_columns_to_drop) > 0:
+            #     print(high_corr_pair_df)
+            #     print('temp_columns_to_drop:', temp_columns_to_drop)
+            #     print('stop here')
 
             if show_top_values_of_each_feature:
                 # print top pairs of df_with_lags_sub
@@ -195,6 +201,9 @@ def filter_subsets_of_var_df_lags_by_corr_or_vif(var_df_lags,
     num_subsets = len(all_column_subsets)
     num_original_columns = len(var_df_lags.columns)
     for i, column_subset in enumerate(all_column_subsets):
+        # now, only keep columns in column_subset that are still in var_df_lags.columns
+        column_subset = [col for col in column_subset if col not in columns_dropped]
+        
         if verbose:
             if i > 0:
                 print('-'*100)
@@ -283,7 +292,7 @@ def get_high_corr_pair_df(corr_coeff, corr_threshold=0.9, verbose=False):
                                       'corr': all_corr})
 
     high_corr_pair_df['abs_corr'] = high_corr_pair_df['corr'].apply(abs)
-    high_corr_pair_df.sort_values(by='abs_corr', ascending=False, inplace=True)
+    # high_corr_pair_df.sort_values(by='abs_corr', ascending=False, inplace=True)
     return high_corr_pair_df
 
 
@@ -322,7 +331,7 @@ def _find_subset_of_df_with_lags_for_current_feature(df_with_lags, feature):
 
     column_names_w_lags = [
         col for col in df_with_lags.columns if re.match(rf'^{feature}_-?\d+$', col)]
-    column_names_w_lags.sort(key=lambda x: abs(int(x.split('_')[-1])))
+    column_names_w_lags.sort(key=lambda x: abs(int(x.split('_')[-1])), reverse=True)
     # column_names_w_lags = [feature + "_" +
     #                        str(lag) for lag in sorted_lag_numbers]
     df_with_lags_sub = df_with_lags[column_names_w_lags].copy()

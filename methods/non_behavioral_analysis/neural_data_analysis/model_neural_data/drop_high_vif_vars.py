@@ -17,6 +17,10 @@ import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.preprocessing import StandardScaler
 from os.path import exists
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+
 import re
 
 
@@ -65,7 +69,7 @@ def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_in
     print(
         f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} '
         f'({(num_init_columns - num_final_columns) / num_init_columns * 100:.2f}%) '
-        f'are dropped after calling drop_columns_with_high_vif. {num_final_columns} features are left. **'
+        f'are dropped after calling drop_columns_with_high_vif. \n** {num_final_columns} features are left. **'
     )
 
     return y_var_lags_reduced
@@ -106,6 +110,37 @@ def get_vif_df(var_df, verbose=True):
         return vif_df
 
 
+def check_vif_contribution(df, target_feature, top_n=15, standardize=True):
+    """
+    Identifies which features contribute most to high VIF for a given feature.
+
+    Parameters:
+    - df: DataFrame of features.
+    - target_feature: The name of the feature whose VIF contributors you want to check.
+    - top_n: Number of top contributing features to display.
+    - standardize: Whether to standardize features before analysis.
+
+    Returns:
+    - contributions: Series of absolute standardized regression coefficients sorted by importance.
+    """
+    if standardize:
+        scaler = StandardScaler()
+        df_scaled = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    else:
+        df_scaled = df.copy()
+
+    X_others = df_scaled.drop(columns=[target_feature])
+    y_target = df_scaled[target_feature]
+
+    reg = LinearRegression().fit(X_others, y_target)
+    contributions = pd.Series(reg.coef_, index=X_others.columns).abs().sort_values(ascending=False)
+
+    print(f"\nTop {top_n} contributors to multicollinearity for '{target_feature}':")
+    print(contributions.head(top_n))
+
+    return contributions
+
+
 def make_or_retrieve_vif_df(df, data_folder_path, vif_df_name='vif_df', exists_ok=True):
     df_path = os.path.join(data_folder_path, f'{vif_df_name}.csv')
     if exists(df_path) & exists_ok:
@@ -132,8 +167,11 @@ def iteratively_drop_column_w_highest_vif(df, vif_threshold=5, verbose=True):
         columns_dropped.append(column_to_drop)
         vif_df = get_vif_df(df)
     final_vif_df = vif_df
-    print(
-        f'After iterative dropping, the column with the highest VIF of the dataframe or subset is {vif_df["feature"].values[0]} with VIF {vif_df["vif"].max()}')
+    if len(vif_df) > 0:
+        print(
+            f'After iterative dropping, the column with the highest VIF of the dataframe or subset is {vif_df["feature"].values[0]} with VIF {vif_df["vif"].max()}')
+    else:
+        print('After iterative dropping, the dataframe is empty. No columns are dropped.')
     if verbose:
         if len(columns_dropped) > 0:
             # print('Examined columns: ', np.array(initial_columns))

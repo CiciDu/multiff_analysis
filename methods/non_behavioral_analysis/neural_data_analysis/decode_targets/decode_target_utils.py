@@ -33,9 +33,6 @@ def add_lagged_target_columns(y_var_lags, target_df_lags, max_y_lag_number, targ
     all_new_columns = []
 
     for lag_number in range(-max_y_lag_number, max_y_lag_number + 1):
-        if lag_number == 0:
-            continue
-
         lag_suffix = f'_{lag_number}'
         point_index_col = f'point_index{lag_suffix}'
 
@@ -208,6 +205,13 @@ def find_single_vis_target_df(target_clust_last_vis_df, monkey_information, ff_c
     # drop the rows where target is in a cluster (we want to preserve cases where monkey is going toward a single target, not a cluster)
     single_vis_target_df = target_clust_last_vis_df[
         target_clust_last_vis_df['num_nearby_vis_ff'] == 1]
+    
+    # also drop the rows where the ff_caught_time is within 5s of either the min or the max time in monkey_information, so that when getting lagged columns, there is enough information
+    max_time_in_ff_dataframe = monkey_information['time'].max()
+    min_time_in_ff_dataframe = monkey_information['time'].min()
+    single_vis_target_df = single_vis_target_df[(single_vis_target_df['ff_caught_time']
+                                                < max_time_in_ff_dataframe - 5) & (single_vis_target_df['ff_caught_time']
+                                                > min_time_in_ff_dataframe + 5)]
 
     # also drop the rows where the last visible ff in the target cluster is not the target itself
     single_vis_target_df = single_vis_target_df[single_vis_target_df['last_vis_ff_index']

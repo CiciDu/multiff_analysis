@@ -19,7 +19,7 @@ from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.cross_decomposition import CCA
 import rcca
-
+from sklearn.preprocessing import StandardScaler
 
 class CCAclass():
 
@@ -28,10 +28,15 @@ class CCAclass():
         self.X2 = X2
         self.lagging_included = lagging_included
 
+        # Scale data
+        self.scaler = StandardScaler()
+        self.X1_sc, self.X2_sc = self.scaler.fit_transform(self.X1), self.scaler.fit_transform(self.X2)
+
+
     def conduct_cca(self, n_components=10, plot_correlations=True):
         self.n_components = n_components
-        self.cca, self.X1_sc, self.X2_sc, self.X1_c, self.X2_c, self.canon_corr = neural_data_modeling.conduct_cca(
-            self.X1, self.X2, n_components=n_components, plot_correlations=plot_correlations)
+        self.cca, self.X1_c, self.X2_c, self.canon_corr = neural_data_modeling.conduct_cca(
+            self.X1_sc, self.X2_sc, n_components=n_components, plot_correlations=plot_correlations)
         self.X1_weights = self.cca.ws[0]
         self.X2_weights = self.cca.ws[1]
         self.X1_loading = neural_data_modeling.calculate_loadings(
@@ -65,16 +70,19 @@ class CCAclass():
             if not hasattr(self, 'X1_squared_loading_df'):
                 self.get_squared_loading_df()
             loading_df = self.X1_squared_loading_df if X1_or_X2 == 'X1' else self.X2_squared_loading_df
+            squared = True
         else:
             if not hasattr(self, 'X1_loading_df'):
                 self.get_loading_df()
             loading_df = self.X1_loading_df if X1_or_X2 == 'X1' else self.X2_loading_df
+            squared = False
         num_variates = self.X1_loading.shape[1] if X1_or_X2 == 'X1' else self.X2_loading.shape[1]
 
         plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(loading_df, self.canon_corr, num_variates,
                                                                                      max_plots_to_show=max_plots_to_show,
                                                                                      keep_one_value_for_each_feature=keep_one_value_for_each_feature,
-                                                                                     max_features_to_show_per_plot=max_features_to_show_per_plot
+                                                                                     max_features_to_show_per_plot=max_features_to_show_per_plot,
+                                                                                     squared=squared
                                                                                      )
 
     def plot_ranked_weights(self, keep_one_value_for_each_feature=False, max_plots_to_show=5, max_features_to_show_per_plot=10,

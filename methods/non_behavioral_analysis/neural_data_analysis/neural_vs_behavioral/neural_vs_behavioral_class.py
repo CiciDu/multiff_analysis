@@ -59,15 +59,28 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         self.retrieve_neural_data()
         self._get_x_and_y_var()
 
-    def retrieve_neural_data(self):
+    def retrieve_neural_data(self, binned_spikes_df_exists_ok=True):
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
         spike_df = neural_data_processing.make_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                         sampling_rate=self.sampling_rate)
         # get convolution data
         self.window_width, self.num_bins_in_window, self.convolve_pattern = neural_data_processing.calculate_window_parameters(
             window_width=self.window_width, bin_width=self.bin_width)
-        self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
-            spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
+
+        binned_spikes_df_path = os.path.join(
+            self.processed_neural_data_folder_path, 'binned_spikes_df.csv')
+
+        if binned_spikes_df_exists_ok & os.path.exists(binned_spikes_df_path):
+            self.binned_spikes_df = pd.read_csv(binned_spikes_df_path)
+            max_time = math.ceil(spike_df.time.max())
+            self.time_bins = np.arange(0, max_time, self.bin_width)
+            print(f'Loaded binned_spikes_df from {binned_spikes_df_path}')
+        else:
+            self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
+                spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
+            self.binned_spikes_df.to_csv(binned_spikes_df_path, index=False)
+            print(
+                f'Made new binned_spikes_df and saved to {binned_spikes_df_path}')
 
     def prep_behavioral_data_for_neural_data_modeling(self, max_y_lag_number=3):
         self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
@@ -115,7 +128,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                           filter_corr_by_all_columns=True,
                           filter_vif_by_feature=True,
                           filter_vif_by_subsets=True,
-                          filter_vif_by_all_columns=True,
+                          filter_vif_by_all_columns=False,
                           ):
 
         # Call the function to iteratively drop lags with high correlation for each feature
@@ -134,24 +147,32 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
                                                                                 filter_by_feature=filter_vif_by_feature,
                                                                                 filter_by_subsets=filter_vif_by_subsets,
                                                                                 filter_by_all_columns=filter_vif_by_all_columns,
-                                                                                get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vip)
+                                                                                get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vif)
 
-    def reduce_x_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85, vif_threshold=5, verbose=True):
-
+    def reduce_x_var_lags(self,  
+                          corr_threshold_for_lags_of_a_feature=0.85,
+                          vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
+                          filter_corr_by_feature=False,
+                          filter_corr_by_all_columns=True,
+                          filter_vif_by_feature=True,
+                          filter_vif_by_all_columns=False,
+                          ):
+        
         # Call the function to iteratively drop lags with high correlation for each feature
         self.x_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.x_var_lags,
                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
                                                                                        verbose=verbose,
-                                                                                       filter_by_feature=True,
+                                                                                       filter_by_feature=filter_corr_by_feature,
                                                                                        filter_by_subsets=False,
-                                                                                       filter_by_all_columns=False)
+                                                                                       filter_by_all_columns=filter_corr_by_all_columns)
 
         self.x_var_lags_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.x_var_lags_reduced_corr,
+                                                                                vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
                                                                                 vif_threshold=vif_threshold,
                                                                                 verbose=verbose,
-                                                                                filter_by_feature=False,
+                                                                                filter_by_feature=filter_vif_by_feature,
                                                                                 filter_by_subsets=False,
-                                                                                filter_by_all_columns=False)
+                                                                                filter_by_all_columns=filter_vif_by_all_columns)
 
     def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
         df_path = os.path.join(self.y_var_lags_path,
@@ -372,7 +393,7 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
         return subset_key_words, all_column_subsets
 
     @staticmethod
-    def get_subset_key_words_and_all_column_subsets_for_vip(y_var_lags):
+    def get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
         # might want to modify this later
         subset_key_words = ['stop', 'speed_OR_ddv_OR_dw_OR_delta_OR_traj', 'LD_or_RD_or_gaze_or_view',
                             'distance', 'angle', 'frozen', 'dummy', 'num_or_any_or_rate']

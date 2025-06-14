@@ -76,13 +76,7 @@ def get_y_var_lr_result_df(binned_spikes_matrix, final_behavioral_data):
     y_var_lr_result_df.sort_values(by='r_squared', ascending=False, inplace=True)
     return y_var_lr_result_df
 
-def conduct_cca(X1, X2, n_components=10, plot_correlations=True):
-    # Define data and scaler
-    scaler = StandardScaler()
-
-    # Scale data
-    X1_sc, X2_sc = scaler.fit_transform(X1), scaler.fit_transform(X2)
-
+def conduct_cca(X1_sc, X2_sc, n_components=10, plot_correlations=True):
     cca = rcca.CCA(kernelcca = False, reg = 0., numCC = n_components)
     cca.train([X1_sc, X2_sc])
     print('Canonical Correlation Per Component Pair:',cca.cancorrs)
@@ -104,7 +98,7 @@ def conduct_cca(X1, X2, n_components=10, plot_correlations=True):
             plt.text(i, val, f'{val:.2f}', ha='center', va='bottom')
 
         plt.show()
-    return cca, X1_sc, X2_sc, X1_c, X2_c, canon_corr
+    return cca, X1_c, X2_c, canon_corr
 
 def calculate_loadings(original_data, canonical_components):
     loadings = np.corrcoef(original_data.T, canonical_components.T)[:original_data.shape[1], original_data.shape[1]:]
