@@ -59,6 +59,11 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.max_bin = self.behav_data.bin.max()
         self.retrieve_neural_data()
 
+    def directly_retrieve_data_for_modeling(self, exists_ok=True):
+        self.get_x_and_y_var(exists_ok=exists_ok)
+        self.reduce_y_var_lags(exists_ok=exists_ok)
+
+
     def get_behav_data(self, exists_ok=True, save_data=True):
         behav_data_all_path = os.path.join(
             self.decoding_targets_folder_path, 'behav_data_all.csv')
@@ -89,7 +94,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
                                               behav_features_to_keep.extra_columns_for_concat_trials]
-        self._find_single_vis_target_df()
+        self._get_single_vis_target_df()
 
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
@@ -147,8 +152,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             f'Deleted instance attributes {vars_deleted} to free up memory')
 
     def get_x_and_y_var(self, max_x_lag_number=5, max_y_lag_number=5, exists_ok=True):
-        self._get_x_var()
-        self._get_y_var()
+        self._get_x_var(exists_ok=exists_ok)
+        self._get_y_var(exists_ok=exists_ok)
         self.get_x_and_y_var_lags(max_x_lag_number=max_x_lag_number,
                                   max_y_lag_number=max_y_lag_number,
                                   exists_ok=exists_ok)
@@ -241,7 +246,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                     self.y_var_lags_reduced = cached_data
                     if verbose:
                         print(
-                            f'Loaded cached y_var_lags_reduced from {df_path}')
+                            f'Loaded y_var_lags_reduced from {df_path}')
                     return
             except (pd.errors.EmptyDataError, ValueError) as e:
                 if verbose:
@@ -274,19 +279,38 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             if verbose:
                 print(f'Warning: Failed to cache results: {str(e)}')
 
-    def _get_x_var(self):
-        binned_spikes_sub = self.binned_spikes_df[self.binned_spikes_df['bin'].isin(
-            self.pursuit_data['bin'].values)]
-        self.x_var = binned_spikes_sub.drop(
-            columns=['bin']).reset_index(drop=True)
+    def _get_x_var(self, exists_ok=True):
+        x_var_path = os.path.join(
+            self.decoding_targets_folder_path, 'decode_target_x_var.csv')
+        if exists_ok and os.path.exists(x_var_path):
+            self.x_var = pd.read_csv(x_var_path)
+            print(f'Loaded x_var from {x_var_path}')
+        else:
+            binned_spikes_sub = self.binned_spikes_df[self.binned_spikes_df['bin'].isin(
+                self.pursuit_data['bin'].values)]
+            self.x_var = binned_spikes_sub.drop(
+                columns=['bin']).reset_index(drop=True)
+            self.x_var.to_csv(x_var_path, index=False)
+            print(f'Saved x_var to {x_var_path}')
 
-    def _get_y_var(self):
+    def _get_y_var(self, exists_ok=True):
         # note that this is for the continuous case (a.k.a. all selected time points are used together, instead of being separated into trials)
 
-        self.y_var = self.pursuit_data.reset_index(drop=True)
-        # Convert bool columns to int
-        bool_columns = self.y_var.select_dtypes(include=['bool']).columns
-        self.y_var[bool_columns] = self.y_var[bool_columns].astype(int)
+        y_var_path = os.path.join(
+            self.decoding_targets_folder_path, 'decode_target_y_var.csv')
+        if exists_ok and os.path.exists(y_var_path):
+            self.y_var = pd.read_csv(y_var_path)
+            print(f'Loaded y_var from {y_var_path}')
+        else:
+            self.y_var = self.pursuit_data.reset_index(drop=True)
+
+
+            self.y_var = self.pursuit_data.reset_index(drop=True)
+            # Convert bool columns to int
+            bool_columns = self.y_var.select_dtypes(include=['bool']).columns
+            self.y_var[bool_columns] = self.y_var[bool_columns].astype(int)
+            self.y_var.to_csv(y_var_path, index=False)
+            print(f'Saved y_var to {y_var_path}')
 
         # To prevent multicollinearity, these columns need to be dropped from behavioral data
         self.y_columns_to_drop = ['time', 'cum_distance', 'target_index']
@@ -298,6 +322,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self.y_var_reduced = self.y_var.drop(columns=self.y_columns_to_drop)
 
+            
     def _process_na(self):
         # forward fill gaze columns
         gaze_columns = [
@@ -351,13 +376,25 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
 
-    def _find_single_vis_target_df(self, target_clust_last_vis_df_exists_ok=True):
-        self.make_or_retrieve_target_clust_last_vis_df(
-            exists_ok=target_clust_last_vis_df_exists_ok)
+    def _get_single_vis_target_df(self, single_vis_target_df_exists_ok=True, target_clust_last_vis_df_exists_ok=True):
 
-        # in the function, we'll drop the rows where target is in a cluster, because we want to preserve cases where monkey is going toward a single target, not a cluster
-        self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
-            self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new, max_visibility_window=self.max_visibility_window)
+        df_path = os.path.join(
+            self.decoding_targets_folder_path, 'single_vis_target_df.csv')
+        if single_vis_target_df_exists_ok and os.path.exists(df_path):
+            try:
+                self.single_vis_target_df = pd.read_csv(df_path)
+                print(f'Loaded single_vis_target_df from {df_path}')
+            except (pd.errors.EmptyDataError, ValueError) as e:
+                print(f'Failed to load single_vis_target_df: {str(e)}')
+        else:
+            self.make_or_retrieve_target_clust_last_vis_df(
+                exists_ok=target_clust_last_vis_df_exists_ok)
+            # in the function, we'll drop the rows where target is in a cluster, because we want to preserve cases where monkey is going toward a single target, not a cluster
+            self.single_vis_target_df = decode_target_utils.find_single_vis_target_df(
+                self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new, max_visibility_window=self.max_visibility_window)
+            self.single_vis_target_df.to_csv(df_path, index=False)
+            print(f'Saved single_vis_target_df to {df_path}')
+
 
     # 'visible', 'rel_y', 'valid_view', 'time_since', 'gaze_world_y', 'Dz'
     @staticmethod

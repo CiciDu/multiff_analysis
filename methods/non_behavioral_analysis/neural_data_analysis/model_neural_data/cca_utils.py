@@ -23,7 +23,7 @@ from sklearn.preprocessing import StandardScaler
 from palettable.colorbrewer import qualitative
 
 
-def plot_cca_prediction_accuracy_scatter(testcorrsCV):
+def plot_cca_prediction_accuracy_w_scatter(testcorrsCV):
     # Plot correlations between actual test data and predictions
     # obtained by projecting the other test dataset via the CCA mapping for each dimension.
     plt.figure(figsize=(10, 6))
@@ -43,7 +43,7 @@ def plot_cca_prediction_accuracy_scatter(testcorrsCV):
     plt.show()
 
 
-def plot_cca_prediction_accuracy_bars(testcorrsCV):
+def plot_cca_prediction_accuracy_test_w_bars(testcorrsCV):
     plt.figure(figsize=(10, 6))
     # Plot canonical correlations
     plt.bar(range(len(testcorrsCV[0])),
@@ -57,36 +57,68 @@ def plot_cca_prediction_accuracy_bars(testcorrsCV):
 
 
 def plot_cca_prediction_accuracy_train_test_bars(traincorrs, testcorrs):
-    plt.figure(figsize=(10, 6))
-    plt.bar(range(len(testcorrs[0])), testcorrs[0], alpha=0.3, label='Test')
-    plt.bar(range(len(traincorrs[0])), traincorrs[0], alpha=0.3, label='Train')
-    plt.xlabel('Canonical component index')
-    plt.ylabel('Test canonical correlation')
-    plt.legend()
-    plt.show()
+    for i in range(2):
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(len(testcorrs[i])),
+                testcorrs[i], alpha=0.3, label='Test')
+        plt.bar(range(len(traincorrs[i])),
+                traincorrs[i], alpha=0.3, label='Train')
+        plt.xlabel('Canonical component index')
+        plt.ylabel('Prediction correlation')
+        plt.title(f'Test prediction accuracy for set {i+1}')
+        plt.legend()
+        plt.show()
 
 
 def plot_cca_prediction_accuracy_train_test_stacked_bars(traincorrs, testcorrs):
-    plt.figure(figsize=(10, 6))
-    # Assume testcorrs[0] and traincorrs[0] are lists or 1D arrays
-    train = traincorrs[0]
-    test = testcorrs[0]
-    n_components = len(train)
+    for i in range(2):
+        plt.figure(figsize=(10, 6))
+        train = traincorrs[i]
+        test = testcorrs[i]
+        n_components = len(train)
 
-    # Create a tidy DataFrame
-    df = pd.DataFrame({
-        'Component': list(range(n_components)) * 2,
-        'Correlation': train.tolist() + test.tolist(),
-        'Set': ['Train'] * n_components + ['Test'] * n_components
-    })
+        # Create a tidy DataFrame
+        df = pd.DataFrame({
+            'Component': list(range(n_components)) * 2,
+            'Correlation': train.tolist() + test.tolist(),
+            'Set': ['Train'] * n_components + ['Test'] * n_components
+        })
 
-    # Plot grouped bar chart
-    plt.figure(figsize=(10, 6))
-    sns.barplot(data=df, x='Component', y='Correlation', hue='Set', alpha=0.8)
+        # Plot grouped bar chart
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=df, x='Component',
+                    y='Correlation', hue='Set', alpha=0.8)
 
-    plt.xlabel('Canonical component index')
-    plt.ylabel('Canonical correlation')
-    plt.title('Train vs Test Canonical Correlations')
-    plt.legend(title='Set')
-    plt.tight_layout()
-    plt.show()
+        plt.xlabel('Canonical component index')
+        plt.ylabel('Prediction correlation')
+        plt.title(f'Test prediction accuracy for set {i+1}')
+        plt.legend(title='Set')
+        plt.tight_layout()
+        plt.show()
+
+
+def plot_cca_prediction_accuracy_train_test_bars_for_lags_and_no_lags(lags_testcorrs, lags_traincorrs, no_lags_testcorrs, no_lags_traincorrs):
+    for i in range(2):
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(
+            len(lags_testcorrs[i])), lags_testcorrs[i], alpha=0.3, label='Test with lags')
+        plt.bar(range(len(
+            no_lags_testcorrs[i])), no_lags_testcorrs[i], alpha=0.3, label='Test without lags')
+        plt.xlabel('Canonical component index')
+        plt.ylabel('Prediction correlation')
+        plt.title(f'Test prediction accuracy for set {i+1}')
+        plt.legend()
+        plt.show()
+
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(
+            len(lags_traincorrs[i])), lags_traincorrs[i], alpha=0.3, label='Train with lags')
+        plt.bar(range(len(
+            no_lags_traincorrs[i])), no_lags_traincorrs[i], alpha=0.3, label='Train without lags')
+        plt.xlabel('Canonical component index')
+        plt.ylabel('Prediction correlation')
+        plt.title(f'Test prediction accuracy for set {i+1}')
+        plt.legend()
+        plt.show()
+
+
