@@ -25,6 +25,32 @@ from palettable.colorbrewer import qualitative
 from sklearn.model_selection import KFold
 
 
+
+def plot_cca_prediction_accuracy_train_test_bars_for_lags_and_no_lags(lags_testcorrs, lags_traincorrs, no_lags_testcorrs, no_lags_traincorrs):
+    for i in range(2):
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(
+            len(lags_testcorrs[i])), lags_testcorrs[i], alpha=0.3, label='Test with lags')
+        plt.bar(range(len(
+            no_lags_testcorrs[i])), no_lags_testcorrs[i], alpha=0.3, label='Test without lags')
+        plt.xlabel('Canonical component index')
+        plt.ylabel('Prediction correlation')
+        plt.title(f'Test prediction accuracy for set {i+1}')
+        plt.legend()
+        plt.show()
+
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(
+            len(lags_traincorrs[i])), lags_traincorrs[i], alpha=0.3, label='Train with lags')
+        plt.bar(range(len(
+            no_lags_traincorrs[i])), no_lags_traincorrs[i], alpha=0.3, label='Train without lags')
+        plt.xlabel('Canonical component index')
+        plt.ylabel('Prediction correlation')
+        plt.title(f'Test prediction accuracy for set {i+1}')
+        plt.legend()
+        plt.show()
+
+
 def plot_lag_offset_train_test_overlap(
     df, dataset_name, chunk_size=30, alpha=0.8,
     base_width=0.35, narrower_width_ratio=0.4,
@@ -177,6 +203,7 @@ def _build_corr_df(corrs, x_cols, train_or_test, whether_lag, dataset):
     })
 
 
+
 def combine_data_to_compare_train_and_test(cca_no_lag, cca_lags):
     X1_dfs, X2_dfs = [], []
 
@@ -196,51 +223,3 @@ def combine_data_to_compare_train_and_test(cca_no_lag, cca_lags):
     combined_X2_df = combined_X2_df.sort_values(by='var')
 
     return combined_X1_df, combined_X2_df
-
-
-def crossvalidated_cca_analysis(
-    X1, X2, n_components=10, reg=0.1, n_splits=5, 
-    use_cross_view_corr=True, random_state=42
-):
-    """
-    Cross-validated CCA: compute either canonical correlations or 
-    cross-view variable-to-projection correlations.
-
-    Returns dict with mean and std stats across folds.
-    """
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    stats = {key: [] for key in ['X1_train', 'X1_test', 'X2_train', 'X2_test']}
-
-    for train_idx, test_idx in kf.split(X1):
-        X1_tr, X2_tr = X1[train_idx], X2[train_idx]
-        X1_te, X2_te = X1[test_idx], X2[test_idx]
-
-        cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
-        cca.train([X1_tr, X2_tr])
-
-        if use_cross_view_corr:
-            # Cross-view projections
-            U_tr, V_tr = cca.comps
-            U_te = X1_te @ cca.ws[0]
-            V_te = X2_te @ cca.ws[1]
-
-            stats['X1_train'].append(np.corrcoef(X1_tr.T, V_tr.T)[:X1.shape[1], X1.shape[1]:])
-            stats['X2_train'].append(np.corrcoef(X2_tr.T, U_tr.T)[:X2.shape[1], X2.shape[1]:])
-            stats['X1_test'].append(np.corrcoef(X1_te.T, V_te.T)[:X1.shape[1], X1.shape[1]:])
-            stats['X2_test'].append(np.corrcoef(X2_te.T, U_te.T)[:X2.shape[1], X2.shape[1]:])
-        else:
-            # Canonical correlations
-            tr_corrs, te_corrs = cca.validate([X1_tr, X2_tr]), cca.validate([X1_te, X2_te])
-            stats['X1_train'].append(tr_corrs[0].reshape(-1, 1))
-            stats['X2_train'].append(tr_corrs[1].reshape(-1, 1))
-            stats['X1_test'].append(te_corrs[0].reshape(-1, 1))
-            stats['X2_test'].append(te_corrs[1].reshape(-1, 1))
-
-    # Convert to arrays and summarize
-    return {
-        f"mean_{k}_corr": np.mean(v, axis=0)
-        for k, v in stats.items()
-    } | {
-        f"std_{k}_corr": np.std(v, axis=0)
-        for k, v in stats.items()
-    }

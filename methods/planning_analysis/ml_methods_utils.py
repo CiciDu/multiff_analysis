@@ -321,7 +321,7 @@ def plot_x_loadings(avg_x_loadings, avg_canon_corrs, X1):
     squared_loading['feature_category'] = squared_loading['feature']
 
     num_variates = avg_x_loadings.shape[1]
-    plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(
+    cca_plotting.make_a_series_of_barplots_of_ranked_loadings_or_weights(
         squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature=True, max_features_to_show_per_plot=20)
     return
 
@@ -333,6 +333,6 @@ def plot_y_loadings(avg_y_loadings, avg_canon_corrs, X2):
     squared_loading['feature_category'] = squared_loading['feature']
 
     num_variates = avg_y_loadings.shape[1]
-    plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(
+    cca_plotting.make_a_series_of_barplots_of_ranked_loadings_or_weights(
         squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature=True, max_features_to_show_per_plot=5)
     return

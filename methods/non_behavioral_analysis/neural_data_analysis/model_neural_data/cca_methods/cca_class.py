@@ -21,6 +21,7 @@ from sklearn.cross_decomposition import CCA
 import rcca
 from sklearn.preprocessing import StandardScaler
 
+
 class CCAclass():
 
     def __init__(self, X1, X2, lagging_included=False):
@@ -30,8 +31,8 @@ class CCAclass():
 
         # Scale data
         self.scaler = StandardScaler()
-        self.X1_sc, self.X2_sc = self.scaler.fit_transform(self.X1), self.scaler.fit_transform(self.X2)
-
+        self.X1_sc, self.X2_sc = self.scaler.fit_transform(
+            self.X1), self.scaler.fit_transform(self.X2)
 
     def conduct_cca(self, n_components=10, plot_correlations=True):
         self.n_components = n_components
@@ -78,12 +79,12 @@ class CCAclass():
             squared = False
         num_variates = self.X1_loading.shape[1] if X1_or_X2 == 'X1' else self.X2_loading.shape[1]
 
-        plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(loading_df, self.canon_corr, num_variates,
-                                                                                     max_plots_to_show=max_plots_to_show,
-                                                                                     keep_one_value_for_each_feature=keep_one_value_for_each_feature,
-                                                                                     max_features_to_show_per_plot=max_features_to_show_per_plot,
-                                                                                     squared=squared
-                                                                                     )
+        cca_plotting.make_a_series_of_barplots_of_ranked_loadings_or_weights(loading_df, self.canon_corr, num_variates,
+                                                                             max_plots_to_show=max_plots_to_show,
+                                                                             keep_one_value_for_each_feature=keep_one_value_for_each_feature,
+                                                                             max_features_to_show_per_plot=max_features_to_show_per_plot,
+                                                                             squared=squared
+                                                                             )
 
     def plot_ranked_weights(self, keep_one_value_for_each_feature=False, max_plots_to_show=5, max_features_to_show_per_plot=10,
                             X1_or_X2='X1', abs_value=True):
@@ -98,8 +99,8 @@ class CCAclass():
                 include=[np.number]).columns
             weight_df[numeric_columns] = weight_df[numeric_columns].abs()
 
-        plot_modeling_result.make_a_series_of_barplots_of_ranked_loadings_or_weights(weight_df, self.canon_corr, num_variates,
-                                                                                     max_plots_to_show=max_plots_to_show,
-                                                                                     keep_one_value_for_each_feature=keep_one_value_for_each_feature,
-                                                                                     max_features_to_show_per_plot=max_features_to_show_per_plot
-                                                                                     )
+        cca_plotting.make_a_series_of_barplots_of_ranked_loadings_or_weights(weight_df, self.canon_corr, num_variates,
+                                                                             max_plots_to_show=max_plots_to_show,
+                                                                             keep_one_value_for_each_feature=keep_one_value_for_each_feature,
+                                                                             max_features_to_show_per_plot=max_features_to_show_per_plot
+                                                                             )
