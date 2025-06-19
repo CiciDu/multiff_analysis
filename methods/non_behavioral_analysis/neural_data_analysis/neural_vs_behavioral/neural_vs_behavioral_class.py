@@ -106,20 +106,33 @@ class NeuralVsBehavioralClass(further_processing_class.FurtherProcessing):
             self.y_var_lr_result_df.to_csv(df_path, index=False)
             print('Made new y_var_lr_result_df')
 
-    def reduce_y_var(self, vif_df_exists_ok=True, vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True):
-        # delete columns with high VIF
-        if not hasattr(self, 'vif_df'):
-            self.make_or_retrieve_y_var_vif_df(exists_ok=vif_df_exists_ok)
-        self.y_var_reduced, self.columns_dropped_from_y_var, self.vif_of_y_var_reduced = drop_high_vif_vars.take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(
-            self.y_var,
-            initial_vif=self.y_var_vif_df,
-            vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
-            vif_threshold=vif_threshold,
-            verbose=verbose,
-            get_final_vif=True,
-        )
-        # # manually dropped some more columns
-        # self.y_var_reduced.drop(columns=['bin'], inplace=True, errors='ignore')
+
+
+    def _reduce_y_var(self, y_var, corr_threshold_for_lags_of_a_feature=0.85,
+                          vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
+                          filter_corr_by_all_columns=True,
+                          filter_vif_by_subsets=True,
+                          filter_vif_by_all_columns=True,
+                          ):
+
+        # Call the function to iteratively drop lags with high correlation for each feature
+        self.y_var_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var,
+                                                                                       corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
+                                                                                       verbose=verbose,
+                                                                                       filter_by_feature=False,
+                                                                                       filter_by_subsets=False,
+                                                                                       filter_by_all_columns=filter_corr_by_all_columns)
+
+        self.y_var_reduced = drop_high_vif_vars.drop_columns_with_high_vif(self.y_var_reduced_corr,
+                                                                                vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                                                                                vif_threshold=vif_threshold,
+                                                                                verbose=verbose,
+                                                                                filter_by_feature=False,
+                                                                                filter_by_subsets=filter_vif_by_subsets,
+                                                                                filter_by_all_columns=filter_vif_by_all_columns,
+                                                                                get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vif)
+
+
 
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
                           vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,

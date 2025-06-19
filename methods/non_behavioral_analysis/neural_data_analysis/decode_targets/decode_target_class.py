@@ -63,7 +63,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.get_x_and_y_var(exists_ok=exists_ok)
         self.reduce_y_var_lags(exists_ok=exists_ok)
 
-
     def get_behav_data(self, exists_ok=True, save_data=True):
         behav_data_all_path = os.path.join(
             self.decoding_targets_folder_path, 'behav_data_all.csv')
@@ -77,6 +76,10 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.behav_data_all = pd.read_csv(behav_data_all_path)
             print(f'Loaded behav_data_all from {behav_data_all_path}')
         else:
+            basic_data_present = hasattr(self, 'monkey_information')
+            # check if basic data is present
+            if not basic_data_present:
+                self.get_basic_data()
             _, self.time_bins = prep_monkey_data.initialize_binned_features(
                 self.monkey_information, self.bin_width)
             self.behav_data_all = prep_monkey_data.bin_monkey_information(
@@ -88,6 +91,9 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self._add_curv_info()
             self._process_na()
             self._clip_values()
+            
+            if not basic_data_present:
+                self._free_up_memory() # free up memory if basic data is not present before calling the function
 
             if save_data:
                 self.behav_data_all.to_csv(behav_data_all_path, index=False)
@@ -118,10 +124,11 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         )
 
         self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                             behav_features_to_keep.extra_columns_for_concat_trials]
+                                             behav_features_to_keep.extra_columns_for_concat_trials +
+                                             ['segment_start_dummy', 'segment_end_dummy']]
 
         self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
-            'segment']]
+            'segment', 'segment_start_dummy', 'segment_end_dummy']]
 
         # check for NA; if there is any, raise a warning
         na_rows, na_cols = general_utils.find_rows_with_na(
@@ -191,10 +198,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.target_columns = [
             col for col in self.y_var.columns if 'target' in col]
         # make y_columns_to_drop to be the set of self.y_columns_to_drop and self.target_columns
-        y_columns_to_drop = list(
-            set(self.y_columns_to_drop + self.target_columns))
         continuous_data = self.behav_data.drop(
-            columns=y_columns_to_drop)
+            columns=self.target_columns)
         self._get_y_var_lags(max_y_lag_number=max_y_lag_number,
                              continuous_data=continuous_data)
 
@@ -204,6 +209,12 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._add_target_info_to_y_var_lags()
 
     def _add_target_info_to_y_var_lags(self):
+        
+        basic_data_present = hasattr(self, 'monkey_information')
+        if not basic_data_present:
+            self.get_basic_data()
+            self._get_curv_of_traj_df()
+            
         # first get info for pairs of target_index and point_index that the lagged columns will use
         target_df_lags = decode_target_utils.initialize_target_df_lags(
             self.y_var, self.max_y_lag_number, self.bin_width)
@@ -218,6 +229,39 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                 self.y_var[['bin', 'target_index']], on='bin', how='left')
         self.y_var_lags = decode_target_utils.add_lagged_target_columns(
             self.y_var_lags, target_df_lags, self.max_y_lag_number, target_columns=self.target_columns)
+
+        if not basic_data_present:
+            self._free_up_memory() # free up memory if basic data is not present before calling the function
+
+    def reduce_y_var(self, corr_threshold_for_lags_of_a_feature=0.98,
+                          vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
+                          filter_corr_by_all_columns=False,
+                          filter_vif_by_subsets=True,
+                          filter_vif_by_all_columns=True,
+                          exists_ok=True,
+                          ):
+        df_path = os.path.join(
+            self.decoding_targets_folder_path, 'decode_target_y_var_reduced.csv')
+        if exists_ok and os.path.exists(df_path):
+            self.y_var_reduced = pd.read_csv(df_path)
+            print(f'Loaded y_var_reduced from {df_path}')
+        else:
+            # drop columns with std less than 0.001
+            columns_w_small_std = self.y_var.std(
+            )[self.y_var.std() < 0.001].index.tolist()
+
+            self.y_var_reduced = self.y_var.drop(columns=columns_w_small_std)
+            self._reduce_y_var(self.y_var_reduced, 
+                               filter_corr_by_all_columns=filter_corr_by_all_columns,
+                               corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                               vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, 
+                               vif_threshold=vif_threshold, 
+                               verbose=verbose,
+                               filter_vif_by_subsets=filter_vif_by_subsets, 
+                               filter_vif_by_all_columns=filter_vif_by_all_columns)
+            self.y_var_reduced.to_csv(df_path, index=False)
+            print(f'Saved y_var_reduced to {df_path}')
+
 
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
                           vif_threshold_for_initial_subset=5,
@@ -304,7 +348,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         else:
             self.y_var = self.pursuit_data.reset_index(drop=True)
 
-
             self.y_var = self.pursuit_data.reset_index(drop=True)
             # Convert bool columns to int
             bool_columns = self.y_var.select_dtypes(include=['bool']).columns
@@ -312,17 +355,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.y_var.to_csv(y_var_path, index=False)
             print(f'Saved y_var to {y_var_path}')
 
-        # To prevent multicollinearity, these columns need to be dropped from behavioral data
-        self.y_columns_to_drop = ['time', 'cum_distance', 'target_index']
-        # also drop columns with std less than 0.001
-        columns_w_small_std = self.y_var.std(
-        )[self.y_var.std() < 0.001].index.tolist()
-        self.y_columns_to_drop = list(
-            set(self.y_columns_to_drop + columns_w_small_std))
+        self.reduce_y_var(exists_ok=exists_ok)
 
-        self.y_var_reduced = self.y_var.drop(columns=self.y_columns_to_drop)
-
-            
     def _process_na(self):
         # forward fill gaze columns
         gaze_columns = [
@@ -395,8 +429,8 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.single_vis_target_df.to_csv(df_path, index=False)
             print(f'Saved single_vis_target_df to {df_path}')
 
-
     # 'visible', 'rel_y', 'valid_view', 'time_since', 'gaze_world_y', 'Dz'
+
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
         subset_key_words = ['_x',

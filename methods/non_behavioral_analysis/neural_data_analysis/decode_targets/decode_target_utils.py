@@ -247,17 +247,24 @@ def make_pursuit_data_all(single_vis_target_df, behav_data_all):
     point_index_list = []
     segment_list = []
     target_list = []
+    segment_start_dummy_list = []
+    segment_end_dummy_list = []
     for index, row in single_vis_target_df.iterrows():
         point_index = range(row['last_vis_point_index'],
                             row['ff_caught_point_index'])
         point_index_list.extend(point_index)
         segment_list.extend([index] * len(point_index))
         target_list.extend([row['target_index']] * len(point_index))
+        if len(point_index) >= 1:
+            segment_start_dummy_list.extend([1] + [0] * (len(point_index) - 1))
+            segment_end_dummy_list.extend([0] * (len(point_index) - 1) + [1])
 
     point_index_df = pd.DataFrame(
         {'point_index': point_index_list,
          'segment': segment_list,
-         'target_index': target_list
+         'target_index': target_list,
+         'segment_start_dummy': segment_start_dummy_list,
+         'segment_end_dummy': segment_end_dummy_list
          })
 
     pursuit_data_all = behav_data_all[behav_data_all['point_index'].isin(

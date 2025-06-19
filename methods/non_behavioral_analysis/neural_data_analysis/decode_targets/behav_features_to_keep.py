@@ -110,6 +110,7 @@ behav_features_to_drop = [
     'monkey_y_smr',
     'target_has_disappeared_for_last_time_dummy',
     'target_visible_dummy',
+    'capture_target_dummy',
     'trial',
     'turning_right',
     'valid_view_point'

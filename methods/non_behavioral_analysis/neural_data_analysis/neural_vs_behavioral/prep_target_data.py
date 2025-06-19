@@ -49,9 +49,20 @@ def _add_target_df_info(target_df, monkey_information, ff_real_position_sorted, 
     )
 
     target_df = _add_target_visible_dummy(target_df)
+    
+    target_df = add_capture_target_dummy(target_df, ff_caught_T_new)
 
     return target_df
 
+
+def add_capture_target_dummy(target_df, ff_caught_T_new):
+    target_capture_point = np.searchsorted(target_df['time'], ff_caught_T_new)
+    target_df.reset_index(drop=True, inplace=True)
+    target_df['capture_target_dummy'] = 0
+    # make sure target_capture_point is not out of bounds
+    target_capture_point = target_capture_point[target_capture_point < len(target_df)]
+    target_df.loc[target_capture_point, 'capture_target_dummy'] = 1
+    return target_df
 
 def add_columns_to_target_df(target_df):
     # Add distance from monkey position at target last seen

@@ -182,7 +182,7 @@ class BaseProcessing:
         outside_boundary_points = np.where(
             self.closest_stop_to_capture_df['whether_stop_inside_boundary'].values == 0)[0]
         if len(outside_boundary_points) > 0:
-            print(f"Warning: ff_closest_stop_time_sorted has {len(outside_boundary_points)} points out of {len(self.ff_caught_T_sorted)} points that are outside of the reward boundary, "
+            print(f"Warning: ff_closest_stop_time_sorted has {len(outside_boundary_points)} points where monkey is outside of {len(self.ff_caught_T_sorted)} points that are outside of the reward boundary, "
                   f"which is {len(outside_boundary_points)/len(self.ff_caught_T_sorted)*100:.2f}% of the points. "
                   f"They are replaced with the original ff_caught_T in ff_caught_T_new.")
             prev_ff_caught_T = np.insert(self.ff_caught_T_new[:-1], 0, 0)

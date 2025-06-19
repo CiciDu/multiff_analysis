@@ -38,7 +38,7 @@ def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_in
 
     if filter_by_feature:
         # drop all columns in y_var_lags that has 'feature' but is not 'feature'
-        print('\n====================Dropping lags of features with high VIF for each feature====================')
+        print('\n====================Dropping features with high VIF for each feature====================')
         y_var_lags_reduced, top_values_by_feature, columns_dropped = drop_high_corr_vars.drop_lags_with_high_corr_or_vif_for_each_feature(
             y_var_lags_reduced,
             vif_threshold=vif_threshold,
@@ -47,7 +47,7 @@ def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_in
         )
 
     if filter_by_subsets:
-        print('\n====================Dropping lags with high VIF in subsets of features in an iterative manner====================')
+        print('\n====================Dropping features with high VIF in subsets of features in an iterative manner====================')
         if get_column_subsets_func is not None:
             subset_key_words, all_column_subsets = get_column_subsets_func(
                 y_var_lags_reduced)
@@ -69,7 +69,7 @@ def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_in
     print(
         f'\n** Summary: {num_init_columns - num_final_columns} out of {num_init_columns} '
         f'({(num_init_columns - num_final_columns) / num_init_columns * 100:.2f}%) '
-        f'are dropped after calling drop_columns_with_high_vif. \n** {num_final_columns} features are left. **'
+        f'are dropped after calling drop_columns_with_high_vif. \n** {num_final_columns} features are left **'
     )
 
     return y_var_lags_reduced
@@ -133,9 +133,11 @@ def check_vif_contribution(df, target_feature, top_n=15, standardize=True):
     y_target = df_scaled[target_feature]
 
     reg = LinearRegression().fit(X_others, y_target)
-    contributions = pd.Series(reg.coef_, index=X_others.columns).abs().sort_values(ascending=False)
+    contributions = pd.Series(
+        reg.coef_, index=X_others.columns).abs().sort_values(ascending=False)
 
-    print(f"\nTop {top_n} contributors to multicollinearity for '{target_feature}':")
+    print(
+        f"\nTop {top_n} contributors to multicollinearity for '{target_feature}':")
     print(contributions.head(top_n))
 
     return contributions
@@ -195,7 +197,7 @@ def take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(df,
     # after calculating vif, take out the subset of features with vif greater than threshold and iterate over them
     vif_df_subset = vif_df.loc[vif_df['vif']
                                > vif_threshold_for_initial_subset]
-    column_subset = vif_df_subset['var'].values
+    column_subset = vif_df_subset['feature'].values
     if verbose:
         print(
             f"Initial subset of columns with VIF > {vif_threshold_for_initial_subset}")
