@@ -413,3 +413,4 @@ def ensure_boolean_dtype(df):
     for col in bool_columns.index[bool_columns]:
         df[col] = df[col].astype(bool)
     return df
+

@@ -5,6 +5,8 @@ from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import p
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
+from non_behavioral_analysis.neural_data_analysis.model_neural_data.cca_methods import cca_utils, cca_plotting, cca_lag_vs_no_lag_plotting, cca_cv_utils, cca_cv_plotting
+
 import os
 import numpy as np
 import matplotlib
@@ -33,6 +35,9 @@ class CCAclass():
         self.scaler = StandardScaler()
         self.X1_sc, self.X2_sc = self.scaler.fit_transform(
             self.X1), self.scaler.fit_transform(self.X2)
+        
+        self.X1_sc_df = pd.DataFrame(self.X1_sc, columns=self.X1.columns)
+        self.X2_sc_df = pd.DataFrame(self.X2_sc, columns=self.X2.columns)
 
     def conduct_cca(self, n_components=10, plot_correlations=True):
         self.n_components = n_components

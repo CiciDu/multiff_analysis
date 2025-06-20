@@ -249,3 +249,69 @@ def find_duplicate_rows(df, column_subset=None):
     else:
         print("No duplicate rows found in the dataframe")
     return duplicate_rows
+
+
+def check_array_integrity(X, name="Array", top_n=10, verbose=True):
+    """
+    Checks for NaN and infinite values in a NumPy array, and prints summary stats.
+    
+    Parameters:
+    - X: np.ndarray
+    - name: str, name of the array (for display)
+    - top_n: int, how many top rows/columns with most NaNs to show
+    - verbose: bool, if False, suppress detailed row/column breakdown
+    """
+    print(f"\n=== Checking: {name} ===")
+    print(f"Shape: {X.shape}")
+
+    has_nan = np.isnan(X)
+    total_nan = np.sum(has_nan)
+
+    if total_nan > 0:
+        percent_nan = 100 * total_nan / X.size
+        print(f"❗ Total NaN values: {total_nan} ({percent_nan:.4f}%)")
+
+        rows_with_nan = np.any(has_nan, axis=1)
+        cols_with_nan = np.any(has_nan, axis=0)
+
+        print(f"Rows with ≥1 NaN: {np.sum(rows_with_nan)}")
+        print(f"Cols with ≥1 NaN: {np.sum(cols_with_nan)}")
+
+        if verbose:
+            nan_indices = np.where(has_nan)
+            print(f"First {top_n} NaN positions (row, col): {list(zip(nan_indices[0][:top_n], nan_indices[1][:top_n]))}")
+
+            # Columns with most NaNs
+            nan_per_col = np.sum(has_nan, axis=0)
+            top_cols = np.argsort(nan_per_col)[::-1][:top_n]
+            print("Columns with most NaNs:")
+            for idx in top_cols:
+                if nan_per_col[idx] > 0:
+                    print(f"  Column {idx}: {nan_per_col[idx]} NaNs")
+
+            # Rows with most NaNs
+            nan_per_row = np.sum(has_nan, axis=1)
+            top_rows = np.argsort(nan_per_row)[::-1][:top_n]
+            print("Rows with most NaNs:")
+            for idx in top_rows:
+                if nan_per_row[idx] > 0:
+                    print(f"  Row {idx}: {nan_per_row[idx]} NaNs")
+    else:
+        print("✅ No NaN values found.")
+
+    # Infinite values
+    has_inf = np.isinf(X)
+    total_inf = np.sum(has_inf)
+
+    if total_inf > 0:
+        percent_inf = 100 * total_inf / X.size
+        print(f"❗ Total infinite values: {total_inf} ({percent_inf:.4f}%)")
+    else:
+        print("✅ No infinite values found.")
+
+    # Summary statistics
+    print("\n--- Summary statistics (excluding NaNs) ---")
+    print(f"Min: {np.nanmin(X):.6f}")
+    print(f"Max: {np.nanmax(X):.6f}")
+    print(f"Mean: {np.nanmean(X):.6f}")
+    print(f"Std: {np.nanstd(X):.6f}")

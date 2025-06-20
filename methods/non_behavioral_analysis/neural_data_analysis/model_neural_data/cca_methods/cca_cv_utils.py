@@ -47,7 +47,7 @@ def crossvalidated_cca_analysis(
         cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
         cca.train([X1_tr, X2_tr])
 
-        if use_cross_view_corr:
+        if not use_cross_view_corr:
             # Cross-view projections
             U_tr, V_tr = cca.comps
             U_te = X1_te @ cca.ws[0]

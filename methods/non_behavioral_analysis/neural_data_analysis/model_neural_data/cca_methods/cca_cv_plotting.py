@@ -24,3 +24,123 @@ from palettable.colorbrewer import qualitative
 
 from sklearn.model_selection import KFold
 
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def plot_cca_cv_results(
+    stats, labels, data_type='X1', component=0,
+    use_cross_view_corr=True, filter_significant=False, sort_by_significance=False,
+    significance_threshold=2, title_prefix=""
+):
+    """
+    Plot results from cross-validated CCA:
+    - If use_cross_view_corr is True: plot correlation between variables and canonical projections
+    - Else: plot canonical correlations
+
+    Parameters:
+        stats: dict from crossvalidated_cca_analysis
+        labels: list of variable names
+        data_type: 'X1' or 'X2'
+        component: canonical component index
+        use_cross_view_corr: toggle between loading-style and canonical correlation plots
+        filter_significant: show only significant variables (|mean| > threshold * std)
+        significance_threshold: std multiplier for significance
+        title_prefix: optional string to prepend to title
+    """
+    values_train, values_test, errors_train, errors_test, final_labels = _extract_plot_data(
+        stats, labels, data_type, component, use_cross_view_corr,
+        filter_significant, significance_threshold, sort_by_significance
+    )
+
+    _plot_bars(
+        values_train, values_test, errors_train, errors_test, final_labels,
+        ylabel='Cross-View Variable–Component Corr' if use_cross_view_corr else 'Canonical Correlation',
+        title=f"{title_prefix}{data_type} - Component {component + 1}"
+    )
+
+
+def _extract_plot_data(
+    stats, labels, data_type, component,
+    use_cross_view_corr, filter_significant, significance_threshold, sort_by_significance
+):
+    """
+    Extract data to be plotted, apply filtering if requested.
+    """
+    mean_train = stats[f'mean_{data_type}_train_corr']
+    std_train = stats[f'std_{data_type}_train_corr']
+    mean_test = stats[f'mean_{data_type}_test_corr']
+    std_test = stats[f'std_{data_type}_test_corr']
+
+
+    if use_cross_view_corr:
+        values_train = mean_train.reshape(-1)
+        values_test = mean_test.reshape(-1)
+        errors_train = std_train.reshape(-1)
+        errors_test = std_test.reshape(-1)
+    else:
+        values_train = mean_train[:, component]
+        values_test = mean_test[:, component]
+        errors_train = std_train[:, component]
+        errors_test = std_test[:, component]
+        
+    # if use_cross_view_corr:
+    #     values_train = mean_train[:, component]
+    #     values_test = mean_test[:, component]
+    #     errors_train = std_train[:, component]
+    #     errors_test = std_test[:, component]
+    # else:
+    #     # Just canonical correlation for the component
+    #     values_train = [mean_train[component, 0]]
+    #     values_test = [mean_test[component, 0]]
+    #     errors_train = [std_train[component, 0]]
+    #     errors_test = [std_test[component, 0]]
+    #     labels = [f"Component {component + 1}"]
+
+    if filter_significant:
+        mask = np.abs(values_test) > significance_threshold * errors_test
+        if not np.any(mask):
+            print(
+                f"No significant {data_type} variables for component {component + 1}.")
+            return [], [], [], [], []
+        labels = labels[mask]
+        values_train = values_train[mask]
+        values_test = values_test[mask]
+        errors_train = errors_train[mask]
+        errors_test = errors_test[mask]
+        
+    if sort_by_significance:
+        # sig_score = np.abs(values_test) / errors_test
+        sig_score = np.abs(values_test)
+        sorted_idx = np.argsort(-sig_score)
+        labels = np.array(labels)[sorted_idx]
+        values_train = values_train[sorted_idx]
+        values_test = values_test[sorted_idx]
+        errors_train = errors_train[sorted_idx]
+        errors_test = errors_test[sorted_idx]
+        
+    return values_train, values_test, errors_train, errors_test, labels
+
+
+def _plot_bars(values_train, values_test, errors_train, errors_test, labels, ylabel, title):
+    """
+    Bar plot with train/test mean ± std.
+    """
+    if len(labels) == 0:
+        return
+
+    x = np.arange(len(labels))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(max(10, len(labels) * 0.4), 5))
+    ax.bar(x - width/2, values_train, width, yerr=errors_train,
+           label='Train', alpha=0.7, capsize=4)
+    ax.bar(x + width/2, values_test, width, yerr=errors_test,
+           label='Test', alpha=0.7, capsize=4)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=90)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
