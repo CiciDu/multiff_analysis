@@ -29,7 +29,7 @@ from sklearn.model_selection import KFold
 
 def crossvalidated_cca_analysis(
     X1, X2, n_components=10, reg=0.1, n_splits=5, 
-    use_cross_view_corr=True, random_state=42
+    random_state=42
 ):
     """
     Cross-validated CCA: compute either canonical correlations or 
@@ -38,7 +38,8 @@ def crossvalidated_cca_analysis(
     Returns dict with mean and std stats across folds.
     """
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    stats = {key: [] for key in ['X1_train', 'X1_test', 'X2_train', 'X2_test']}
+    canon_corr_stats = {key: [] for key in ['X1_train', 'X1_test', 'X2_train', 'X2_test']}
+    cross_view_corr_stats = {key: [] for key in ['X1_train', 'X1_test', 'X2_train', 'X2_test']}
 
     for train_idx, test_idx in kf.split(X1):
         X1_tr, X2_tr = X1[train_idx], X2[train_idx]
@@ -47,29 +48,37 @@ def crossvalidated_cca_analysis(
         cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
         cca.train([X1_tr, X2_tr])
 
-        if not use_cross_view_corr:
-            # Cross-view projections
-            U_tr, V_tr = cca.comps
-            U_te = X1_te @ cca.ws[0]
-            V_te = X2_te @ cca.ws[1]
+        # Cross-view projections
+        U_tr, V_tr = cca.comps
+        U_te = X1_te @ cca.ws[0]
+        V_te = X2_te @ cca.ws[1]
+        canon_corr_stats['X1_train'].append(np.corrcoef(X1_tr.T, V_tr.T)[:X1.shape[1], X1.shape[1]:])
+        canon_corr_stats['X2_train'].append(np.corrcoef(X2_tr.T, U_tr.T)[:X2.shape[1], X2.shape[1]:])
+        canon_corr_stats['X1_test'].append(np.corrcoef(X1_te.T, V_te.T)[:X1.shape[1], X1.shape[1]:])
+        canon_corr_stats['X2_test'].append(np.corrcoef(X2_te.T, U_te.T)[:X2.shape[1], X2.shape[1]:])
 
-            stats['X1_train'].append(np.corrcoef(X1_tr.T, V_tr.T)[:X1.shape[1], X1.shape[1]:])
-            stats['X2_train'].append(np.corrcoef(X2_tr.T, U_tr.T)[:X2.shape[1], X2.shape[1]:])
-            stats['X1_test'].append(np.corrcoef(X1_te.T, V_te.T)[:X1.shape[1], X1.shape[1]:])
-            stats['X2_test'].append(np.corrcoef(X2_te.T, U_te.T)[:X2.shape[1], X2.shape[1]:])
-        else:
-            # Canonical correlations
-            tr_corrs, te_corrs = cca.validate([X1_tr, X2_tr]), cca.validate([X1_te, X2_te])
-            stats['X1_train'].append(tr_corrs[0].reshape(-1, 1))
-            stats['X2_train'].append(tr_corrs[1].reshape(-1, 1))
-            stats['X1_test'].append(te_corrs[0].reshape(-1, 1))
-            stats['X2_test'].append(te_corrs[1].reshape(-1, 1))
-
-    # Convert to arrays and summarize
-    return {
+        # Canonical correlations
+        tr_corrs, te_corrs = cca.validate([X1_tr, X2_tr]), cca.validate([X1_te, X2_te])
+        cross_view_corr_stats['X1_train'].append(tr_corrs[0].reshape(-1, 1))
+        cross_view_corr_stats['X2_train'].append(tr_corrs[1].reshape(-1, 1))
+        cross_view_corr_stats['X1_test'].append(te_corrs[0].reshape(-1, 1))
+        cross_view_corr_stats['X2_test'].append(te_corrs[1].reshape(-1, 1))
+            
+    canon_corr_stats = {
         f"mean_{k}_corr": np.mean(v, axis=0)
-        for k, v in stats.items()
+        for k, v in canon_corr_stats.items()
     } | {
         f"std_{k}_corr": np.std(v, axis=0)
-        for k, v in stats.items()
+        for k, v in canon_corr_stats.items()
     }
+
+    cross_view_corr_stats = {
+        f"mean_{k}_corr": np.mean(v, axis=0)
+        for k, v in cross_view_corr_stats.items()
+    } | {
+        f"std_{k}_corr": np.std(v, axis=0)
+        for k, v in cross_view_corr_stats.items()
+    }
+
+    # Convert to arrays and summarize
+    return canon_corr_stats, cross_view_corr_stats
