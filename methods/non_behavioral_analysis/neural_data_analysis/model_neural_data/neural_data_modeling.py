@@ -76,6 +76,7 @@ def get_y_var_lr_result_df(binned_spikes_matrix, final_behavioral_data):
     y_var_lr_result_df.sort_values(by='r_squared', ascending=False, inplace=True)
     return y_var_lr_result_df
 
+
 def conduct_cca(X1_sc, X2_sc, n_components=10, plot_correlations=True):
     cca = rcca.CCA(kernelcca = False, reg = 0., numCC = n_components)
     cca.train([X1_sc, X2_sc])

@@ -1,4 +1,4 @@
-from planning_analysis import ml_methods_class, ml_methods_utils
+from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, test_vs_control_utils
@@ -277,7 +277,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         for column in ['d_from_cur_ff_to_nxt_ff', 'time_between_two_stops']:
             if column in x_df.columns:
                 x_df.drop(columns=[column], inplace=True)
-        self.x_var_df, self.y_var_df = ml_methods_utils.make_x_and_y_var_df(
+        self.x_var_df, self.y_var_df = prep_ml_data_utils.make_x_and_y_var_df(
             x_df, y_df, scale_x_var=scale_x_var, use_pca=use_pca)
 
     def get_x_and_y_for_lr(self, test_or_control='test', scale_x_var=True, use_pca=False):

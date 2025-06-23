@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import combine_info_utils, base_processing_class
-from planning_analysis import ml_methods_class, ml_methods_utils
+from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_class, test_vs_control_utils, monkey_plan_factors_x_sess_class
@@ -60,7 +60,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
         self.ml_inst = ml_methods_class.MlMethods()
         self._update_optimal_arc_type_and_related_paths(
             optimal_arc_type=optimal_arc_type)
-        
+
         self.ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
     def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
@@ -154,8 +154,8 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
             if column in x_features_df_temp.columns:
                 x_features_df_temp.drop(columns=[column], inplace=True)
         self.original_x_var_df = self.x_var_df.copy()
-        self.x_var_df, self.y_var_df = ml_methods_utils.make_x_and_y_var_df(x_features_df_temp, self.only_cur_ff_df, scale_x_var=scale_x_var,
-                                                                            use_pca=use_pca, n_components_for_pca=n_components_for_pca)
+        self.x_var_df, self.y_var_df = prep_ml_data_utils.make_x_and_y_var_df(x_features_df_temp, self.only_cur_ff_df, scale_x_var=scale_x_var,
+                                                                              use_pca=use_pca, n_components_for_pca=n_components_for_pca)
 
     def use_ref_columns_only(self):
         self.x_features_df = self.x_features_df[[
@@ -207,15 +207,15 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
         self.prepare_only_cur_ff_data_for_ml()
 
-        self.x_var_df, self.y_var_df = ml_methods_utils.streamline_preparing_for_ml(self.x_features_df_for_ml,
-                                                                                    self.only_cur_ff_df_for_ml,
-                                                                                    y_var_column,
-                                                                                    ref_columns_only=ref_columns_only,
-                                                                                    cluster_to_keep=cluster_to_keep,
-                                                                                    cluster_for_interaction=cluster_for_interaction,
-                                                                                    add_ref_interaction=add_ref_interaction,
-                                                                                    winsorize_angle_features=winsorize_angle_features,
-                                                                                    using_lasso=using_lasso,
-                                                                                    ensure_cur_ff_at_front=ensure_cur_ff_at_front,
-                                                                                    use_pca=use_pca,
-                                                                                    use_combd_features_for_cluster_only=use_combd_features_for_cluster_only)
+        self.x_var_df, self.y_var_df = ml_for_planning_utils.streamline_preparing_for_ml(self.x_features_df_for_ml,
+                                                                                         self.only_cur_ff_df_for_ml,
+                                                                                         y_var_column,
+                                                                                         ref_columns_only=ref_columns_only,
+                                                                                         cluster_to_keep=cluster_to_keep,
+                                                                                         cluster_for_interaction=cluster_for_interaction,
+                                                                                         add_ref_interaction=add_ref_interaction,
+                                                                                         winsorize_angle_features=winsorize_angle_features,
+                                                                                         using_lasso=using_lasso,
+                                                                                         ensure_cur_ff_at_front=ensure_cur_ff_at_front,
+                                                                                         use_pca=use_pca,
+                                                                                         use_combd_features_for_cluster_only=use_combd_features_for_cluster_only)

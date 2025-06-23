@@ -23,6 +23,37 @@ from sklearn.preprocessing import StandardScaler
 from palettable.colorbrewer import qualitative
 
 
+def plot_cca_results(cca_results):
+
+    # Plot canonical correlations
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Canonical correlations
+    axes[0].bar(range(len(cca_results['canon_corr'])),
+                    cca_results['canon_corr'])
+    axes[0].set_title('Canonical Correlations')
+    axes[0].set_xlabel('Component')
+    axes[0].set_ylabel('Correlation')
+
+    # Canonical variables scatter plot
+    axes[1].scatter(cca_results['X1_canon_vars'][:, 0],
+                        cca_results['X2_canon_vars'][:, 0], alpha=0.5, color='blue')
+    axes[1].set_title('First Canonical Variables')
+    axes[1].set_xlabel('Neural CV1')
+    axes[1].set_ylabel('Behavioral CV1')
+    # add a line of y=x (45 degrees)
+    axes[1].plot([cca_results['X1_canon_vars'][:, 0].min(), cca_results['X1_canon_vars'][:, 0].max()],
+                    [cca_results['X1_canon_vars'][:, 0].min(), cca_results['X1_canon_vars'][:, 0].max()],
+                    color='red', linestyle='--')
+    # add R & R2
+    axes[1].text(0.05, 0.95, f'R={cca_results["canon_corr"][0]:.2f}, R2={cca_results["canon_corr"][0]**2:.2f}',
+                    transform=axes[1].transAxes, fontsize=12, verticalalignment='top')
+
+    plt.tight_layout()
+    plt.show()
+    
+
+
 
 # Function to make a series of bar plots of ranked loadings
 def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, canon_corr, num_variates, 
@@ -122,13 +153,6 @@ def _get_color_dict (unique_feature_category):
 
 
 
-
-
-
-
-
-
-
 def plot_cca_prediction_accuracy_w_scatter(testcorrsCV):
     # Plot correlations between actual test data and predictions
     # obtained by projecting the other test dataset via the CCA mapping for each dimension.
@@ -203,3 +227,40 @@ def plot_cca_prediction_accuracy_train_test_stacked_bars(traincorrs, testcorrs):
         plt.show()
 
 
+def plot_correlation_coefficients(avg_canon_corrs):
+    # Plot average canonical correlations
+    bar_names = [f'CC {i+1}' for i in range(len(avg_canon_corrs))]
+    plt.bar(bar_names, avg_canon_corrs,
+            color='lightgrey', width=0.8, edgecolor='k')
+
+    # Label y value on each bar
+    for i, val in enumerate(avg_canon_corrs):
+        plt.text(i, val, f'{val:.2f}', ha='center', va='bottom')
+
+    plt.title('Average Canonical Correlations Across Folds')
+    plt.show()
+    return
+
+
+def plot_x_loadings(avg_x_loadings, avg_canon_corrs, X1):
+
+    squared_loading = pd.DataFrame(np.round(avg_x_loadings**2, 3))
+    squared_loading['feature'] = X1.columns
+    squared_loading['feature_category'] = squared_loading['feature']
+
+    num_variates = avg_x_loadings.shape[1]
+    make_a_series_of_barplots_of_ranked_loadings_or_weights(
+        squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature=True, max_features_to_show_per_plot=20)
+    return
+
+
+def plot_y_loadings(avg_y_loadings, avg_canon_corrs, X2):
+
+    squared_loading = pd.DataFrame(np.round(avg_y_loadings**2, 3))
+    squared_loading['feature'] = X2.columns
+    squared_loading['feature_category'] = squared_loading['feature']
+
+    num_variates = avg_y_loadings.shape[1]
+    make_a_series_of_barplots_of_ranked_loadings_or_weights(
+        squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature=True, max_features_to_show_per_plot=5)
+    return

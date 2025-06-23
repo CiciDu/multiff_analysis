@@ -1,8 +1,9 @@
 import sys
 from planning_analysis.plan_factors import plan_factors_utils, plan_factors_class, test_vs_control_utils
 from planning_analysis.show_planning import show_planning_utils
-from planning_analysis import ml_methods_utils
-from machine_learning import machine_learning_utils
+from planning_analysis import ml_for_planning_class, ml_for_planning_utils
+from machine_learning.ml_methods import classification_utils, regression_utils, prep_ml_data_utils, ml_methods_class, hyperparam_tuning_class
+from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -26,128 +27,13 @@ from sklearn.metrics import accuracy_score
 import warnings
 
 
-class MlMethods():
+class MlMethods(ml_methods_class.MlMethods):
 
     def __init__(self,
                  x_var_df=None,
                  y_var_df=None,
                  ):
-        if x_var_df is not None:
-            self.x_var_df = x_var_df
-        if y_var_df is not None:
-            self.y_var_df = y_var_df
-
-    def use_train_test_split(self, x_var_df, y_var_df, y_var_column='d_monkey_angle_since_cur_ff_first_seen', remove_outliers=True):
-        self.x_var_prepared, self.y_var_prepared = ml_methods_utils.further_prepare_x_var_and_y_var(
-            x_var_df, y_var_df, y_var_column=y_var_column, remove_outliers=remove_outliers)
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            self.x_var_prepared, self.y_var_prepared, test_size=0.2)
-
-    def use_ml(self, model_names=['linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'], use_cv=False):
-        self.model_comparison_df, self.chosen_model_info = machine_learning_utils.use_ml_model_for_regression(self.X_train, self.y_train, self.X_test, self.y_test,
-                                                                                                              model_names=model_names, use_cv=use_cv)
-
-    def use_ml_with_plots(self, models=None):
-        # Define the models
-        if models is None:
-            models = {
-                "Bagging": BaggingRegressor(random_state=42),
-                "Boosting": AdaBoostRegressor(random_state=42),
-                "Random Forest": RandomForestRegressor(random_state=42)
-            }
-
-        # Fit the models and make predictions
-        for name, model in models.items():
-            model.fit(self.X_train, self.y_train)
-            y_pred = model.predict(self.X_test)
-
-            # Plot the predicted results against actual values
-            plt.figure(figsize=(8, 6))
-            plt.scatter(self.y_test, y_pred)
-            plt.xlabel('Actual Values')
-            plt.ylabel('Predicted Values')
-            plt.title(f'{name}: Actual vs Predicted Values')
-            # also plot a line of y=x
-            plt.plot([self.y_test.min(), self.y_test.max()], [
-                     self.y_test.min(), self.y_test.max()], 'k--', lw=4)
-            plt.show()
-
-            # Print the mean squared error
-            mse = mean_squared_error(self.y_test, y_pred)
-            print(f'{name} Mean Squared Error: {mse}')
-
-            # Print feature importances for RandomForestRegressor
-            if name == 'Random Forest':
-                feature_results_df = pd.DataFrame(
-                    {'feature': self.X_train.columns, 'importance': model.feature_importances_})
-                feature_results_df.sort_values(
-                    by='importance', ascending=False, inplace=True)
-                self.feature_results_df = feature_results_df
-
-    def process_summary_df(self, summary_df):
-        self.summary_df_all = summary_df.copy()
-        self.summary_df = summary_df[summary_df['p_value'] <= 0.05].copy()
-        self.summary_df['rank_by_abs_coeff'] = self.summary_df['abs_coeff'].rank(
-            ascending=False, method='first').astype(int)
-        self.summary_df.reset_index(drop=False, inplace=True)
-
-    def use_linear_regression(self, show_plot=True):
-        summary_df, self.y_pred, self.results, self.r_squared_on_test = machine_learning_utils.use_linear_regression(
-            self.X_train, self.X_test, self.y_train,                                                                                               self.y_test, show_plot=show_plot)
-        self.process_summary_df(summary_df)
-
-    def use_logistic_regression(self, x_var_df, y_var_df):
-        # suppress warnings
-
-        warnings.filterwarnings("ignore")
-        self.summary_df, self.average_accuracy, self.train_avg_accuracy, self.num_selected_features = machine_learning_utils.use_logistic_regression(
-            x_var_df, y_var_df)
-
-        # self.coeff = self.results.params
-        # self.pvalues = self.results.pvalues
-        self.process_summary_df(self.summary_df)
-
-    def use_ml_model_for_classification(self, x_var_df, y_var_df, model=None):
-        y_var_df = np.array(y_var_df)
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            x_var_df, y_var_df, test_size=0.2)  # random_state=42
-        self.model, self.y_pred, self.model_comparison_df = machine_learning_utils.use_ml_model_for_classification(
-            self.X_train, self.y_train, self.X_test, self.y_test, model=model,
-        )
-
-    def use_neural_network(self):
-        self.model, self.predictions = machine_learning_utils.use_neural_network_on_linear_regression_func(self.X_train.values, self.y_train.values,
-                                                                                                           self.X_test.values, self.y_test.values)
-
-        r_squared = r2_score(self.y_test, self.predictions)
-        print("R-squared on test set:", r_squared)
-
-    def use_vif(self, var_df):
-        # Calculate VIF
-        self.vif_df = pd.DataFrame()
-        self.vif_df["feature"] = var_df.columns
-        vif_values = []
-        for i in range(var_df.shape[1]):
-            vif_values.append(variance_inflation_factor(
-                var_df.values, i))
-            if i % 10 == 0:
-                print(
-                    f'{i} out of {self.x_var_df.shape[1]} features are processed.')
-        self.vif_df['vif'] = vif_values
-        self.vif_df = self.vif_df.sort_values(
-            by='vif', ascending=False).round(1)
-        print(self.vif_df)
-
-    def show_correlation_heatmap(self, specific_columns=None):
-        if specific_columns is None:
-            specific_columns = self.vif_df[self.vif_df['vif']
-                                           > 5].feature.values[:15]
-        # calculate the correlation coefficient among the columns with VIF > 5
-        self.corr_coeff = self.x_var_df[specific_columns].corr()
-        plt.figure(figsize=(15, 15))
-        sns.heatmap(self.corr_coeff, cmap='coolwarm',
-                    annot=True, linewidths=1, vmin=-1)
-        plt.show()
+        super().__init__(x_var_df=x_var_df, y_var_df=y_var_df)
 
     def try_different_combinations_for_linear_regressions(self, data_source,
                                                           y_columns_of_interest=['diff_in_d_heading_of_traj_from_null',
@@ -267,10 +153,10 @@ class MlMethods():
         self.use_linear_regression(show_plot=False)
         print('num_features:', self.X_train.shape[1])
 
-        temp_info = ml_methods_utils.get_significant_features_in_one_row(
+        temp_info = regression_utils.get_significant_features_in_one_row(
             self.summary_df, max_features_to_save=max_features_to_save, add_coeff=add_coeff)
 
-        avg_r_squared, std_r_squared = machine_learning_utils.use_linear_regression_cv(
+        avg_r_squared, std_r_squared = regression_utils.use_linear_regression_cv(
             self.x_var_prepared, self.y_var_prepared)
         temp_info['avg_r_squared'] = round(avg_r_squared, 4)
         temp_info['std_r_squared'] = round(std_r_squared, 4)
@@ -320,7 +206,7 @@ class MlMethods():
 
         self.use_logistic_regression(
             self.data_source.x_var_df, self.data_source.y_var_df)
-        temp_info = ml_methods_utils.get_significant_features_in_one_row(
+        temp_info = regression_utils.get_significant_features_in_one_row(
             self.summary_df, max_features_to_save=max_features_to_save, add_coeff=add_coeff)
 
         print('num_features:', self.data_source.x_var_df.shape[1])

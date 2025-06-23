@@ -4,7 +4,8 @@ from planning_analysis.variations_of_factors_vs_results import make_variations_u
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_utils
-from planning_analysis import ml_methods_utils, ml_methods_class
+from planning_analysis import ml_for_planning_class, ml_for_planning_utils
+from machine_learning.ml_methods import classification_utils, regression_utils, prep_ml_data_utils, ml_methods_class, hyperparam_tuning_class
 import os
 import numpy as np
 import matplotlib
@@ -211,8 +212,8 @@ class _PredictYValues:
                              clusters_for_interaction_choices=[],
                              max_features_to_save=None,
                              use_combd_features_for_cluster_only_choices=[False],)
- 
-        self.ml_inst = ml_methods_class.MlMethods()
+
+        self.ml_inst = ml_for_planning_class.MlForPlanning()
 
         regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_xy_test, plan_xy_ctrl,
                                                                                     self.ml_inst.try_different_combinations_for_linear_regressions,
@@ -242,15 +243,15 @@ class _PredictYValues:
 
         print('test_or_control:', self.test_or_control)
 
-        self.x_var_df, self.y_var_df = ml_methods_utils.streamline_preparing_for_ml(self.plan_x,
-                                                                                    self.plan_y,
-                                                                                    y_var_column,
-                                                                                    ref_columns_only=ref_columns_only,
-                                                                                    cluster_to_keep=cluster_to_keep,
-                                                                                    cluster_for_interaction=cluster_for_interaction,
-                                                                                    add_ref_interaction=add_ref_interaction,
-                                                                                    winsorize_angle_features=winsorize_angle_features,
-                                                                                    using_lasso=using_lasso,
-                                                                                    ensure_cur_ff_at_front=False,
-                                                                                    use_combd_features_for_cluster_only=use_combd_features_for_cluster_only,
-                                                                                    for_classification=for_classification)
+        self.x_var_df, self.y_var_df = ml_for_planning_utils.streamline_preparing_for_ml(self.plan_x,
+                                                                                         self.plan_y,
+                                                                                         y_var_column,
+                                                                                         ref_columns_only=ref_columns_only,
+                                                                                         cluster_to_keep=cluster_to_keep,
+                                                                                         cluster_for_interaction=cluster_for_interaction,
+                                                                                         add_ref_interaction=add_ref_interaction,
+                                                                                         winsorize_angle_features=winsorize_angle_features,
+                                                                                         using_lasso=using_lasso,
+                                                                                         ensure_cur_ff_at_front=False,
+                                                                                         use_combd_features_for_cluster_only=use_combd_features_for_cluster_only,
+                                                                                         for_classification=for_classification)

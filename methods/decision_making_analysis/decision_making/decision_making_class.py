@@ -3,7 +3,7 @@ from decision_making_analysis.cluster_replacement import cluster_replacement_uti
 from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
 from decision_making_analysis import free_selection, replacement, trajectory_info
 from visualization.matplotlib_tools import plot_trials, monkey_heading_functions
-from machine_learning import machine_learning_utils
+from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
 from data_wrangling import base_processing_class
 
 import warnings
@@ -408,7 +408,7 @@ class DecisionMaking():
 
     def use_machine_learning_model(self, model=None):
 
-        self.model, self.y_pred, self.model_comparison_df = machine_learning_utils.use_ml_model_for_classification(
+        self.model, self.y_pred, self.model_comparison_df = classification_utils.use_ml_model_for_classification(
             self.X_train, self.y_train, self.X_test, self.y_test, model=model,
         )
 
@@ -421,7 +421,7 @@ class DecisionMaking():
             self.split_data_to_train_and_test(
                 scaling_data=self.scaling_data, keep_whole_chunks=self.keep_whole_chunks, test_size=self.test_size)
             print("The y label has been converted to multi-class format, and allow_multi_label was set to be False. If it needs to be True, call the method turn_y_label_into_multi_class manually.")
-        self.nn_model, self.y_pred = machine_learning_utils.use_neural_network_on_classification_func(
+        self.nn_model, self.y_pred = classification_utils.use_neural_network_on_classification_func(
             self.X_train, self.y_train, self.X_test, self.y_test, n_epochs=n_epochs, batch_size=batch_size)
 
     def use_knn(self):

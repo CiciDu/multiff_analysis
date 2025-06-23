@@ -1,6 +1,7 @@
 import sys
 from data_wrangling import combine_info_utils, base_processing_class, specific_utils
-from planning_analysis import ml_methods_class, ml_methods_utils
+from planning_analysis import ml_for_planning_class, ml_for_planning_utils
+from machine_learning.ml_methods import classification_utils, regression_utils, prep_ml_data_utils, ml_methods_class, hyperparam_tuning_class
 from planning_analysis.only_cur_ff import only_cur_ff_class
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
@@ -52,7 +53,7 @@ class OnlyStopFFAcrossSessions():
         self.ref_point_value = None
         self.monkey_name = monkey_name
 
-        self.ml_inst = ml_methods_class.MlMethods()
+        self.ml_inst = ml_for_planning_class.MlForPlanning()
         self._update_optimal_arc_type_and_related_paths(
             optimal_arc_type=optimal_arc_type)
         self.ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode

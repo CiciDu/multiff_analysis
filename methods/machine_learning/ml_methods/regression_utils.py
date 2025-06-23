@@ -1,0 +1,324 @@
+import sys
+from machine_learning.ml_methods import ml_methods_class
+import pandas as pd
+from plotly.subplots import make_subplots
+import plotly.graph_objs as go
+import pprint
+from scipy import stats
+import torch
+import torch.optim as optim
+import torch.nn as nn
+from sklearn.metrics import accuracy_score
+import numpy as np
+import matplotlib.pyplot as plt
+import copy
+import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.model_selection import cross_validate
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier, BaggingClassifier, GradientBoostingClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
+from sklearn.metrics import r2_score
+import math
+from sklearn.metrics import make_scorer
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from sklearn.metrics import accuracy_score, confusion_matrix
+import numpy as np
+from sklearn.linear_model import Lasso, LogisticRegression
+from sklearn.model_selection import KFold, train_test_split
+
+
+def use_ml_model_for_regression(X_train, y_train, X_test, y_test,
+                                model_names=[
+                                    'linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'],
+                                use_cv=False):
+
+    models = {'linreg': LinearRegression(),
+              'svr': SVR(),
+              'dt': DecisionTreeRegressor(),
+              'bagging': BaggingRegressor(n_estimators=100, max_samples=0.5, bootstrap_features=True, bootstrap=True, random_state=42),
+              'boosting': AdaBoostRegressor(n_estimators=100, learning_rate=0.05),
+              'grad_boosting': GradientBoostingRegressor(min_samples_split=50,
+                                                         min_samples_leaf=10,
+                                                         max_depth=5,
+                                                         max_features=0.3,
+                                                         n_iter_no_change=10,
+                                                         ),
+              'rf': RandomForestRegressor(random_state=42,
+                                          min_samples_split=50,
+                                          min_samples_leaf=10,
+                                          max_features=0.3,
+                                          n_jobs=-1,
+                                          ),
+              }
+
+    model_comparison_df, model_list, mse_list = _get_model_comparison_df(
+        X_train, y_train, X_test, y_test, model_names, models, use_cv)
+
+    # find the model with the lowest mean squared error
+    model = model_list[np.argmin(mse_list)]
+    model_name = model_names[np.argmin(mse_list)]
+    # compile into chosen_model_info
+    chosen_model_info = _choose_best_model(
+        model, model_name, X_train, X_test, y_test)
+
+    return model_comparison_df, chosen_model_info
+
+
+def _get_model_comparison_df(X_train, y_train, X_test, y_test, model_names, models, use_cv=False):
+    # find the model with the lowest mean squared error
+    model_list = []
+    mse_list = []
+    r_squared_list = []
+    avg_r_squared_list = []
+    std_r_squared_list = []
+
+    for model_name in model_names:
+        model = models[model_name]
+        model_list.append(model)
+        print("model:", model_name)
+
+        if use_cv:
+            print('Running Cross Validation...')
+            x_var = pd.concat([X_train, X_test])
+            y_var = pd.concat([y_train, y_test])
+            cv_scores = cross_val_score(
+                model, x_var, y_var, cv=5, scoring=make_scorer(r2_score))
+            # Calculate the average R-squared across all folds
+            avg_r_squared_list.append(cv_scores.mean())
+            std_r_squared_list.append(cv_scores.std())
+
+        # fit the model in the normal way
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        mse_list.append(mean_squared_error(y_test, y_pred))
+        r_squared_list.append(r2_score(y_test, y_pred))
+
+    # make a table to compare the results of all the models in model_list
+    model_comparison_df = pd.DataFrame({'model': model_names,
+                                        'mse': mse_list,
+                                        'r_squared_test': r_squared_list})
+    if len(avg_r_squared_list) > 0:
+        model_comparison_df['avg_r_squared'] = avg_r_squared_list
+        model_comparison_df['std_r_squared'] = std_r_squared_list
+
+    model_comparison_df.sort_values(by='mse', ascending=True, inplace=True)
+    return model_comparison_df, model_list, mse_list
+
+
+def _choose_best_model(model, model_name, X_train, X_test, y_test):
+
+    print("\n")
+    print("The model with the lowest mean squared error is:", model, '.')
+    # predict
+    y_pred = model.predict(X_test)
+    # evaluate
+    mse = mean_squared_error(y_test, y_pred)
+    print("chosen model mse:", mse)
+
+    chosen_model_info = {'model': model,
+                         'y_pred': y_pred,
+                         'mse': mse,
+                         'r_squared_test': r2_score(y_test, y_pred),
+                         }
+
+    if model_name == 'rf':
+        chosen_model_info['sorted_features_and_importances'] = _get_rf_feature_importances(
+            model, X_train)
+
+    return chosen_model_info
+
+
+def _get_rf_feature_importances(model, X_train):
+    feature_importances = model.feature_importances_
+    # Assuming you have the feature names in a list called feature_names
+    feature_names = X_train.columns
+    # Combine feature names and their importances
+    features_and_importances = zip(feature_names, feature_importances)
+    sorted_features_and_importances = sorted(
+        features_and_importances, key=lambda x: x[1], reverse=True)
+    return sorted_features_and_importances
+
+
+def use_linear_regression(X_train, X_test, y_train, y_test,
+                          show_plot=True):
+
+    X_train = sm.add_constant(X_train)
+    X_test = sm.add_constant(X_test)
+
+    model = sm.OLS(y_train, X_train)
+    results = model.fit()
+
+    summary_df = pd.DataFrame(
+        {'p_value': results.pvalues, 'Coefficient': results.params, 'Std Err': results.bse, 't': results.tvalues})
+
+    # print(results.summary())
+    print("R-squared: ", round(results.rsquared, 4))
+    print("Adjusted R-squared: ", round(results.rsquared_adj, 4))
+
+    y_pred = results.predict(X_test)
+
+    r_squared_on_test = r2_score(y_test, y_pred)
+    print("R-squared on test set:", round(r_squared_on_test, 4))
+
+    # Calculate MSE
+    mse = mean_squared_error(y_test, y_pred)
+
+    # Create a scatter plot
+    if show_plot:
+        plt.scatter(y_test, y_pred)
+        # draw a line of y = x
+        plt.plot([y_test.min(), y_test.max()], [
+                 y_test.min(), y_test.max()], 'k--', lw=4)
+        plt.xlabel('Real Values')
+        plt.ylabel('Predicted Values')
+        plt.title(
+            f'Real vs Predicted Values with RMSE on test set: {math.sqrt(mse)}')
+        plt.show()
+
+    # If you want the summary statistics of the coefficients, you can do:
+    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
+    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
+    return summary_df, y_pred, results, r_squared_on_test
+
+
+def use_linear_regression_cv(x_var, y_var, num_folds=10):
+    # also try cross validation
+    model = LinearRegression()
+
+    # Perform cross-validation
+    # cv specifies the number of folds in K-Fold cross-validation
+    # You can adjust the scoring parameter based on your requirements
+    cv_results = cross_validate(
+        model,
+        x_var,
+        y_var,
+        cv=num_folds,
+        scoring='r2',
+        return_train_score=True
+    )
+
+    test_scores = cv_results['test_score']
+    train_scores = cv_results['train_score']
+
+    # Calculate the average R-squared across all folds
+    test_avg_r_squared = test_scores.mean()
+    train_avg_r_squared = train_scores.mean()
+
+    # You can also calculate other statistics like standard deviation to assess variability
+    test_std_r_squared = test_scores.std()
+    train_std_r_squared = train_scores.std()
+
+    print(
+        f"Average R-squared on train set ({num_folds}-fold CV): {round(train_avg_r_squared, 4)}")
+    print(
+        f"Average R-squared on test set ({num_folds}-fold CV): {round(test_avg_r_squared, 4)}")
+
+    return test_avg_r_squared, test_std_r_squared, train_avg_r_squared, train_std_r_squared
+
+
+class MultiLayerRegression(nn.Module):
+    def __init__(self, input_size, hidden_layers=[128]):
+        super(MultiLayerRegression, self).__init__()
+        self.layers = nn.ModuleList()
+
+        # Input layer
+        self.layers.append(nn.Linear(input_size, hidden_layers[0]))
+        self.relu = nn.ReLU()
+
+        # Hidden layers
+        for i in range(1, len(hidden_layers)):
+            self.layers.append(nn.Linear(hidden_layers[i-1], hidden_layers[i]))
+
+        # Output layer
+        self.output_layer = nn.Linear(hidden_layers[-1], 1)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = self.relu(layer(x))
+        x = self.output_layer(x)
+        return x
+
+
+def use_neural_network_on_linear_regression_func(X_train, y_train, X_test, y_test, learning_rate=0.0005, epochs=200):
+    # Convert data to tensors
+    X_train = torch.tensor(X_train, dtype=torch.float32)
+    y_train = torch.tensor(y_train, dtype=torch.float32).view(-1, 1)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.float32).view(-1, 1)
+
+    # Initialize the model
+    input_size = X_train.shape[1]
+    model = MultiLayerRegression(input_size)
+
+    # Loss and optimizer
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Training loop
+    for epoch in range(epochs):
+        # Forward pass
+        outputs = model(X_train)
+        loss = criterion(outputs, y_train)
+
+        # Backward and optimize
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if (epoch+1) % 10 == 0:
+            print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+
+    # Test the model
+    model.eval()
+    with torch.no_grad():
+        predictions = model(X_test)
+        test_loss = criterion(predictions, y_test)
+    print(f'Test Loss: {test_loss.item():.4f}')
+
+    # plot test results
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_test, predictions)
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.title('Actual vs Predicted Values')
+    # also plot a line of y=x
+    plt.plot([y_test.min(), y_test.max()], [
+             y_test.min(), y_test.max()], 'k--', lw=4)
+    plt.show()
+
+    return model, predictions
+
+
+def get_significant_features_in_one_row(summary_df, max_features_to_save=None, add_coeff=True):
+    summary_df = summary_df.copy()
+    summary_df.rename(columns={'index': 'feature'}, inplace=True)
+    if max_features_to_save is not None:
+        summary_df = summary_df.set_index(
+            'rank_by_abs_coeff').iloc[:max_features_to_save].copy()
+    summary_df.index = summary_df.index.astype(str)
+    temp_info = summary_df[['feature']].T.reset_index(drop=True).copy()
+    if add_coeff:
+        temp_info2 = summary_df[['Coefficient']].copy()
+        temp_info2.index = 'coeff_' + np.array(summary_df.index.astype(str))
+        temp_info2 = temp_info2.T.reset_index(drop=True)
+        temp_info = pd.concat([temp_info, temp_info2], axis=1)
+
+    if temp_info.shape[0] > 1:
+        raise ValueError('temp_info should only have one row')
+    temp_info.columns.name = ''
+    return temp_info

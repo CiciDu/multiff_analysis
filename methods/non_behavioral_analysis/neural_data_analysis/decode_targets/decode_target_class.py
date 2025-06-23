@@ -28,6 +28,7 @@ from elephant.gpfa import GPFA
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from elephant.gpfa import gpfa_core, gpfa_util
+from .ml_decoder_class import MLTargetDecoder
 
 
 class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
@@ -50,6 +51,9 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.decoding_targets_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'decoding_targets')
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
+
+        # Initialize ML decoder
+        self.ml_decoder = MLTargetDecoder()
 
     def streamline_making_behav_and_neural_data(self, exists_ok=True):
         self.get_basic_data()
@@ -91,9 +95,10 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self._add_curv_info()
             self._process_na()
             self._clip_values()
-            
+
             if not basic_data_present:
-                self._free_up_memory() # free up memory if basic data is not present before calling the function
+                # free up memory if basic data is not present before calling the function
+                self._free_up_memory()
 
             if save_data:
                 self.behav_data_all.to_csv(behav_data_all_path, index=False)
@@ -209,12 +214,12 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self._add_target_info_to_y_var_lags()
 
     def _add_target_info_to_y_var_lags(self):
-        
+
         basic_data_present = hasattr(self, 'monkey_information')
         if not basic_data_present:
             self.get_basic_data()
             self._get_curv_of_traj_df()
-            
+
         # first get info for pairs of target_index and point_index that the lagged columns will use
         target_df_lags = decode_target_utils.initialize_target_df_lags(
             self.y_var, self.max_y_lag_number, self.bin_width)
@@ -231,15 +236,16 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.y_var_lags, target_df_lags, self.max_y_lag_number, target_columns=self.target_columns)
 
         if not basic_data_present:
-            self._free_up_memory() # free up memory if basic data is not present before calling the function
+            # free up memory if basic data is not present before calling the function
+            self._free_up_memory()
 
     def reduce_y_var(self, corr_threshold_for_lags_of_a_feature=0.98,
-                          vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
-                          filter_corr_by_all_columns=False,
-                          filter_vif_by_subsets=True,
-                          filter_vif_by_all_columns=True,
-                          exists_ok=True,
-                          ):
+                     vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
+                     filter_corr_by_all_columns=False,
+                     filter_vif_by_subsets=True,
+                     filter_vif_by_all_columns=True,
+                     exists_ok=True,
+                     ):
         df_path = os.path.join(
             self.decoding_targets_folder_path, 'decode_target_y_var_reduced.csv')
         if exists_ok and os.path.exists(df_path):
@@ -251,17 +257,16 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             )[self.y_var.std() < 0.001].index.tolist()
 
             self.y_var_reduced = self.y_var.drop(columns=columns_w_small_std)
-            self._reduce_y_var(self.y_var_reduced, 
+            self._reduce_y_var(self.y_var_reduced,
                                filter_corr_by_all_columns=filter_corr_by_all_columns,
                                corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
-                               vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, 
-                               vif_threshold=vif_threshold, 
+                               vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                               vif_threshold=vif_threshold,
                                verbose=verbose,
-                               filter_vif_by_subsets=filter_vif_by_subsets, 
+                               filter_vif_by_subsets=filter_vif_by_subsets,
                                filter_vif_by_all_columns=filter_vif_by_all_columns)
             self.y_var_reduced.to_csv(df_path, index=False)
             print(f'Saved y_var_reduced to {df_path}')
-
 
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
                           vif_threshold_for_initial_subset=5,
@@ -543,3 +548,40 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
                 self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
             self.gpfa_trials.append(gpfa_trial)
+
+    def decode_one_var_with_ml(self, target_variable='target_distance', test_size=0.2,
+                               models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
+        """
+        Decode target representation using machine learning approaches.
+
+        Parameters:
+        -----------
+        target_variable : str or list
+            Target variable(s) to predict
+        test_size : float
+            Proportion of data to use for testing
+        models_to_use : list
+            List of models to use: 'rf', 'svm', 'nn', 'lr'
+        cv_folds : int
+            Number of cross-validation folds
+
+        Returns:
+        --------
+        dict : ML results including model performance and predictions
+        """
+        # Use the ML decoder to perform the decoding
+        ml_results = self.ml_decoder.decode_targets(
+            neural_data=self.neural_data,
+            target_data=self.target_data,
+            target_variable=target_variable,
+            test_size=test_size,
+            models_to_use=models_to_use,
+            cv_folds=cv_folds
+        )
+
+        # Store results in main class for compatibility
+        if ml_results is not None:
+            self.models[f'ml_{target_variable}'] = ml_results
+            self.results[f'ml_{target_variable}'] = ml_results
+
+        return ml_results

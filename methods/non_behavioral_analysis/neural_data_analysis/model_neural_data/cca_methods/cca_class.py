@@ -51,6 +51,17 @@ class CCAclass():
             self.X2_sc, self.X2_c)
         self.get_weight_df()
         self.get_loading_df()
+        
+        # also put the results into one dict
+        self.results = {
+            'X1_canon_vars': self.X1_c,
+            'X2_canon_vars': self.X2_c,
+            'canon_corr': self.canon_corr,
+            'X1_weights': self.X1_weights,
+            'X2_weights': self.X2_weights,
+            'X1_loading': self.X1_loading,
+            'X2_loading': self.X2_loading,
+        }
 
     def get_loading_df(self):
         self.X1_loading_df = neural_data_modeling.make_loading_or_weight_df(

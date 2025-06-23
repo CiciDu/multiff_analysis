@@ -4,7 +4,7 @@ from planning_analysis.variations_of_factors_vs_results import make_variations_u
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_utils
-from planning_analysis import ml_methods_utils, ml_methods_class
+from planning_analysis import prep_ml_data_utils, ml_methods_class
 import os
 import numpy as np
 import matplotlib
@@ -23,13 +23,11 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-    
-    
 class _VariationsBase(_predict_y_values_class._PredictYValues,
                       _compare_y_values_class._CompareYValues,
                       _plot_variations_class._PlotVariations):
-    
-# class _VariationsBase:
+
+    # class _VariationsBase:
 
     x_columns = ['time_when_cur_ff_last_seen_rel_to_stop',
                  'left_eye_cur_ff_time_perc',
@@ -110,7 +108,6 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         # for name, method in _plot_variations_class._PlotVariations.__dict__.items():
         #     if callable(method):
         #         setattr(self, name, MethodType(method, self))
-
 
     def make_key_paths(self):
         self.cur_and_nxt_data_comparison_path = os.path.join(
