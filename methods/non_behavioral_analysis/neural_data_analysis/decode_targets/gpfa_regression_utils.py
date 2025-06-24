@@ -39,13 +39,13 @@ def get_latent_neural_data_for_trial(trajectories, current_seg, trial_length, sp
     return gpfa_trial
 
 
-def time_resolved_regression_variable_length(gpfa_trials, behavior_trials, time_step=0.02, cv_folds=5, max_timepoints=None):
+def time_resolved_regression_variable_length(gpfa_trials, behav_trials, time_step=0.02, cv_folds=5, max_timepoints=None):
     """
     Perform time-resolved regression with variable-length trials.
 
     Parameters:
     - gpfa_trials: list of arrays, each shape (trial_length, n_latent_dims)
-    - behavior_trials: list of arrays, each shape (trial_length, n_behaviors)
+    - behav_trials: list of arrays, each shape (trial_length, n_behaviors)
     - time_step: float, time bin size in seconds
     - cv_folds: int, cross-validation folds
 
@@ -59,7 +59,7 @@ def time_resolved_regression_variable_length(gpfa_trials, behavior_trials, time_
     # Find max trial length
     if max_timepoints is None:
         max_timepoints = max(trial.shape[0] for trial in gpfa_trials)
-    n_behaviors = behavior_trials[0].shape[1]
+    n_behaviors = behav_trials[0].shape[1]
     scores_by_time = np.full((max_timepoints, n_behaviors), np.nan)
 
     kf = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
@@ -69,7 +69,7 @@ def time_resolved_regression_variable_length(gpfa_trials, behavior_trials, time_
 
         X_t = []
         Y_t = []
-        for latent, behavior in zip(gpfa_trials, behavior_trials):
+        for latent, behavior in zip(gpfa_trials, behav_trials):
             if latent.shape[0] > t:  # trial has data at time t
                 X_t.append(latent[t])
                 Y_t.append(behavior[t])

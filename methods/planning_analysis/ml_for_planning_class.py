@@ -1,33 +1,11 @@
-import sys
-from planning_analysis.plan_factors import plan_factors_utils, plan_factors_class, test_vs_control_utils
-from planning_analysis.show_planning import show_planning_utils
-from planning_analysis import ml_for_planning_class, ml_for_planning_utils
-from machine_learning.ml_methods import classification_utils, regression_utils, prep_ml_data_utils, ml_methods_class, hyperparam_tuning_class
-from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
-import matplotlib.pyplot as plt
+from machine_learning.ml_methods import regression_utils, ml_methods_class
+from machine_learning.ml_methods import regression_utils
 import pandas as pd
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import BaggingRegressor, AdaBoostRegressor, RandomForestRegressor
-from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
-import statsmodels.api as sm
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from sklearn.decomposition import PCA
-import numpy as np
-from sklearn.metrics import r2_score
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_score
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-import math
 import gc
-from sklearn.metrics import accuracy_score
-import warnings
 
 
-class MlMethods(ml_methods_class.MlMethods):
+class MlForPlanning(ml_methods_class.MlMethods):
 
     def __init__(self,
                  x_var_df=None,

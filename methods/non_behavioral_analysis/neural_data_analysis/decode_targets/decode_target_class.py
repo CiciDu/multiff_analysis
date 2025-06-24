@@ -4,7 +4,7 @@ from non_behavioral_analysis.neural_data_analysis.model_neural_data import neura
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
-from non_behavioral_analysis.neural_data_analysis.decode_targets import decode_target_utils, behav_features_to_keep
+from non_behavioral_analysis.neural_data_analysis.decode_targets import decode_target_utils, behav_features_to_keep, ml_decoder_class
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from non_behavioral_analysis.neural_data_analysis.decode_targets import behav_features_to_keep, plot_gpfa_utils, decode_target_utils, fit_gpfa_utils, gpfa_regression_utils
 import warnings
@@ -28,7 +28,6 @@ from elephant.gpfa import GPFA
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from elephant.gpfa import gpfa_core, gpfa_util
-from .ml_decoder_class import MLTargetDecoder
 
 
 class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
@@ -53,7 +52,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
 
         # Initialize ML decoder
-        self.ml_decoder = MLTargetDecoder()
+        self.ml_decoder = ml_decoder_class.MLTargetDecoder()
 
     def streamline_making_behav_and_neural_data(self, exists_ok=True):
         self.get_basic_data()
@@ -525,13 +524,13 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
     def get_gpfa_traj(self, latent_dimensionality=10):
 
-        gpfa_3dim = GPFA(bin_width_w_unit=self.bin_width_w_unit,
+        gpfa_3dim = GPFA(bin_size=self.bin_width_w_unit,
                          x_dim=latent_dimensionality)
         self.trajectories = gpfa_3dim.fit_transform(self.spiketrains)
 
     def get_gpfa_and_behav_data_for_all_trials(self):
 
-        self.behavior_trials = []
+        self.behav_trials = []
         self.gpfa_trials = []
 
         segments_behav = self.pursuit_data_by_trial['segment'].unique()
@@ -542,7 +541,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         for seg in shared_segments:
             pursuit_sub = self.pursuit_data_by_trial[self.pursuit_data_by_trial['segment'] == seg]
             behav_data_of_trial = pursuit_sub.drop(columns=['segment']).values
-            self.behavior_trials.append(behav_data_of_trial)
+            self.behav_trials.append(behav_data_of_trial)
 
             trial_length = behav_data_of_trial.shape[0]
             gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(

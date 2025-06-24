@@ -1,11 +1,7 @@
 
-from planning_analysis.plan_factors import test_vs_control_utils, test_vs_control_utils
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, process_variations_utils
-from planning_analysis.show_planning import show_planning_class
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.variations_of_factors_vs_results import make_variations_utils
 from planning_analysis import ml_for_planning_class, ml_for_planning_utils
-from machine_learning.ml_methods import classification_utils, regression_utils, prep_ml_data_utils, ml_methods_class, hyperparam_tuning_class
+from machine_learning.ml_methods import ml_methods_class
 import os
 import numpy as np
 import matplotlib

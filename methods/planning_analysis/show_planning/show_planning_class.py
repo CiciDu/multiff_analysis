@@ -1,7 +1,7 @@
 
 import sys
 from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_utils, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils
 
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils

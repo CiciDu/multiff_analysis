@@ -2,7 +2,6 @@
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.plan_factors import plan_factors_utils
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
 from data_wrangling import specific_utils
 import seaborn as sns
 import pandas as pd

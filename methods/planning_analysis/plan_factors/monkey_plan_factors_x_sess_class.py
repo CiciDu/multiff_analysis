@@ -2,7 +2,7 @@ from planning_analysis.variations_of_factors_vs_results import make_variations_u
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.variations_of_factors_vs_results import _plot_variations_class, _variations_base_class
+from planning_analysis.variations_of_factors_vs_results import _variations_base_class
 from data_wrangling import specific_utils, combine_info_utils, base_processing_class
 import os
 import numpy as np

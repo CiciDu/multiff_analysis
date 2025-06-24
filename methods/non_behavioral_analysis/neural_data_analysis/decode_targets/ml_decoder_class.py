@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.svm import SVC, SVR
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.linear_model import LogisticRegression, Ridge
+import matplotlib.pyplot as plt
 
 
 class MLTargetDecoder:
@@ -295,3 +296,36 @@ class MLTargetDecoder:
         predictions = model.predict(X_scaled)
 
         return predictions
+
+    def plot_ml_results(self, target_variable, model_name='rf'):
+        """Plot ML decoding results."""
+        ml_key = f'ml_{target_variable}'
+        if ml_key not in self.results or model_name not in self.results[ml_key]:
+            print(
+                f"No ML results available for {target_variable} with {model_name}")
+            return
+
+        results = self.results[ml_key][model_name]
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Predicted vs True values
+        axes[0].scatter(results['true_values'],
+                        results['predictions'], alpha=0.6)
+        axes[0].plot([results['true_values'].min(), results['true_values'].max()],
+                     [results['true_values'].min(), results['true_values'].max()], 'r--')
+        axes[0].set_xlabel('True Values')
+        axes[0].set_ylabel('Predicted Values')
+        axes[0].set_title(
+            f'Predicted vs True: {target_variable} ({model_name})')
+
+        # Residuals
+        residuals = results['true_values'] - results['predictions']
+        axes[1].scatter(results['predictions'], residuals, alpha=0.6)
+        axes[1].axhline(y=0, color='r', linestyle='--')
+        axes[1].set_xlabel('Predicted Values')
+        axes[1].set_ylabel('Residuals')
+        axes[1].set_title('Residuals Plot')
+
+        plt.tight_layout()
+        plt.show()

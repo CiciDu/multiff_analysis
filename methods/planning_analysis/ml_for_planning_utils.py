@@ -1,38 +1,10 @@
-import sys
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling
-from planning_analysis.plan_factors import plan_factors_utils, plan_factors_class, test_vs_control_utils
-from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.only_cur_ff import features_to_keep_utils, only_cur_ff_utils
-from planning_analysis import prep_ml_data_utils
-from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
-from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
-from non_behavioral_analysis.neural_data_analysis.model_neural_data.cca_methods import cca_class, cca_plotting
+from planning_analysis.only_cur_ff import features_to_keep_utils
+from machine_learning.ml_methods import prep_ml_data_utils
+from machine_learning.ml_methods import prep_ml_data_utils
 import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import BaggingRegressor, AdaBoostRegressor, RandomForestRegressor
-from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
-import statsmodels.api as sm
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from sklearn.decomposition import PCA
-import numpy as np
-from sklearn.metrics import r2_score
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_score
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
 import math
-import gc
-from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import PolynomialFeatures
 from scipy.stats.mstats import winsorize
 from sklearn.linear_model import LassoCV
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
-from sklearn.cross_decomposition import CCA
 import numpy as np
 import matplotlib.pyplot as plt
 

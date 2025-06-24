@@ -1,20 +1,14 @@
 from non_behavioral_analysis.neural_data_analysis.model_neural_data.cca_methods import cca_class, cca_plotting
 from non_behavioral_analysis.neural_data_analysis.decode_targets.decode_target_class import DecodeTargetClass
+from non_behavioral_analysis.neural_data_analysis.decode_targets.ml_decoder_class import MLTargetDecoder
 import sys
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
-from sklearn.svm import SVR, SVC
-from sklearn.neural_network import MLPRegressor, MLPClassifier
-from sklearn.metrics import mean_squared_error, r2_score, accuracy_score, classification_report
-from sklearn.model_selection import GridSearchCV
 import pickle
 import warnings
 warnings.filterwarnings('ignore')
@@ -70,12 +64,15 @@ class TargetDecoder:
         self.results = {}
         self.scalers = {}
 
+        # Initialize ML decoder
+        self.ml_decoder = MLTargetDecoder()
+
         # Data containers
         self.neural_data = None
         self.behavioral_data = None
         self.target_data = None
 
-    def load_and_prepare_data(self, exists_ok=True, use_lags=True):
+    def prepare_data(self, exists_ok=True, use_lags=True):
         """
         Prepare neural and behavioral data for decoding.
 
@@ -221,10 +218,6 @@ class TargetDecoder:
         ax.set_xticklabels(behavioral_columns, rotation=90, ha='right')
         plt.colorbar(im2, ax=ax)
 
-
-
-
-
     def decode_one_var_with_ml(self, target_variable='target_distance', test_size=0.2,
                                models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
         """
@@ -245,181 +238,32 @@ class TargetDecoder:
         --------
         dict : ML results including model performance and predictions
         """
-        print(f"Performing ML-based decoding for target: {target_variable}")
-
-        # Prepare data
-        X = self.neural_data.fillna(0).values
-
-        if isinstance(target_variable, str):
-            if target_variable not in self.target_data.columns:
-                available_cols = [col for col in self.target_data.columns
-                                  if target_variable.lower() in col.lower()]
-                if available_cols:
-                    target_variable = available_cols[0]
-                    print(f"Using {target_variable} as target variable")
-                else:
-                    print(
-                        f"Target variable {target_variable} not found. Available columns:")
-                    print(self.target_data.columns.tolist())
-                    return None
-
-            y = self.target_data[target_variable].fillna(0).values
-        else:
-            # Multiple target variables
-            y = self.target_data[target_variable].fillna(0).values
-
-        # Determine if this is a classification or regression problem
-        is_classification = len(
-            np.unique(y)) <= 10 and np.all(y == y.astype(int))
-
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42, stratify=y if is_classification else None
+        # Use the ML decoder to perform the decoding
+        ml_results = self.ml_decoder.decode_targets(
+            neural_data=self.neural_data,
+            target_data=self.target_data,
+            target_variable=target_variable,
+            test_size=test_size,
+            models_to_use=models_to_use,
+            cv_folds=cv_folds
         )
 
-        # Scale features
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
-
-        self.scalers[f'ml_{target_variable}'] = scaler
-
-        # Initialize models
-        if is_classification:
-            model_dict = {
-                'rf': RandomForestClassifier(n_estimators=100, random_state=42),
-                'svm': SVC(kernel='linear', random_state=42),
-                'nn': MLPClassifier(hidden_layer_sizes=(100, 50), random_state=42, max_iter=1000),
-                'lr': LogisticRegression(random_state=42, max_iter=1000)
-            }
-            scoring = 'accuracy'
-        else:
-            model_dict = {
-                'rf': RandomForestRegressor(n_estimators=100, random_state=42),
-                'svm': SVR(kernel='linear'),
-                'nn': MLPRegressor(hidden_layer_sizes=(100, 50), random_state=42, max_iter=1000),
-                'lr': Ridge(random_state=42)
-            }
-            scoring = 'r2'
-
-        # Train and evaluate models
-        ml_results = {}
-
-        for model_name in models_to_use:
-            if model_name not in model_dict:
-                print(f"Model {model_name} not available. Skipping...")
-                continue
-
-            print(f"Training {model_name}...")
-
-            model = model_dict[model_name]
-
-            # Cross-validation
-            cv_scores = cross_val_score(model, X_train_scaled, y_train,
-                                        cv=cv_folds, scoring=scoring)
-
-            # Train on full training set
-            model.fit(X_train_scaled, y_train)
-
-            # Predictions
-            y_pred_train = model.predict(X_train_scaled)
-            y_pred_test = model.predict(X_test_scaled)
-
-            # Evaluation
-            if is_classification:
-                train_acc = accuracy_score(y_train, y_pred_train)
-                test_acc = accuracy_score(y_test, y_pred_test)
-
-                ml_results[model_name] = {
-                    'model': model,
-                    'cv_scores': cv_scores,
-                    'cv_mean': cv_scores.mean(),
-                    'cv_std': cv_scores.std(),
-                    'train_accuracy': train_acc,
-                    'test_accuracy': test_acc,
-                    'predictions': y_pred_test,
-                    'true_values': y_test
-                }
-            else:
-                train_r2 = r2_score(y_train, y_pred_train)
-                test_r2 = r2_score(y_test, y_pred_test)
-                train_mse = mean_squared_error(y_train, y_pred_train)
-                test_mse = mean_squared_error(y_test, y_pred_test)
-
-                ml_results[model_name] = {
-                    'model': model,
-                    'cv_scores': cv_scores,
-                    'cv_mean': cv_scores.mean(),
-                    'cv_std': cv_scores.std(),
-                    'train_r2': train_r2,
-                    'test_r2': test_r2,
-                    'train_mse': train_mse,
-                    'test_mse': test_mse,
-                    'predictions': y_pred_test,
-                    'true_values': y_test
-                }
-
-        self.models[f'ml_{target_variable}'] = ml_results
-        self.results[f'ml_{target_variable}'] = ml_results
-
-        # Print summary
-        self._print_ml_summary(ml_results, is_classification)
+        # Store results in main class for compatibility
+        if ml_results is not None:
+            self.models[f'ml_{target_variable}'] = ml_results
+            self.results[f'ml_{target_variable}'] = ml_results
 
         return ml_results
 
+    def get_best_model(self, target_variable, metric='test_accuracy'):
+        return self.ml_decoder.get_best_model(target_variable, metric)
 
-    def _print_ml_summary(self, ml_results, is_classification):
-        """Print summary of ML results."""
-        print("\n" + "="*50)
-        print("ML DECODING RESULTS SUMMARY")
-        print("="*50)
-
-        for model_name, results in ml_results.items():
-            print(f"\n{model_name.upper()}:")
-            print(
-                f"  CV Score: {results['cv_mean']:.4f} ± {results['cv_std']:.4f}")
-
-            if is_classification:
-                print(f"  Train Accuracy: {results['train_accuracy']:.4f}")
-                print(f"  Test Accuracy: {results['test_accuracy']:.4f}")
-            else:
-                print(f"  Train R²: {results['train_r2']:.4f}")
-                print(f"  Test R²: {results['test_r2']:.4f}")
-                print(f"  Test MSE: {results['test_mse']:.4f}")
-
+    def predict_new_data(self, neural_data, target_variable, model_name=None):
+        return self.ml_decoder.predict_new_data(neural_data, target_variable, model_name)
 
     def plot_ml_results(self, target_variable, model_name='rf'):
-        """Plot ML decoding results."""
-        ml_key = f'ml_{target_variable}'
-        if ml_key not in self.results or model_name not in self.results[ml_key]:
-            print(
-                f"No ML results available for {target_variable} with {model_name}")
-            return
-
-        results = self.results[ml_key][model_name]
-
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-        # Predicted vs True values
-        axes[0].scatter(results['true_values'],
-                        results['predictions'], alpha=0.6)
-        axes[0].plot([results['true_values'].min(), results['true_values'].max()],
-                     [results['true_values'].min(), results['true_values'].max()], 'r--')
-        axes[0].set_xlabel('True Values')
-        axes[0].set_ylabel('Predicted Values')
-        axes[0].set_title(
-            f'Predicted vs True: {target_variable} ({model_name})')
-
-        # Residuals
-        residuals = results['true_values'] - results['predictions']
-        axes[1].scatter(results['predictions'], residuals, alpha=0.6)
-        axes[1].axhline(y=0, color='r', linestyle='--')
-        axes[1].set_xlabel('Predicted Values')
-        axes[1].set_ylabel('Residuals')
-        axes[1].set_title('Residuals Plot')
-
-        plt.tight_layout()
-        plt.show()
+        return self.ml_decoder.plot_ml_results(target_variable, model_name)
+        
 
     def save_results(self, save_path):
         """Save all results to a file."""
@@ -439,6 +283,8 @@ class TargetDecoder:
             pickle.dump(results_to_save, f)
 
         print(f"Results saved to {save_path}")
+
+
 
 
 def create_example_decoder(raw_data_folder_path):
