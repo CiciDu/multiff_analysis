@@ -20,11 +20,15 @@ from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
-def add_lagged_target_columns(y_var_lags, target_df_lags, max_y_lag_number, target_columns=None):
+def add_lagged_target_columns(y_var_lags, y_var, target_df_lags, max_y_lag_number, target_columns=None):
     """
     Process target columns in lagged data by matching with temp_target_df based on point_index and target_index.
     """
 
+    if 'target_index' not in y_var_lags.columns:
+        y_var_lags = y_var_lags.merge(
+            y_var[['bin', 'target_index']], on='bin', how='left')
+            
     if target_columns is None:
         target_columns = [
             col for col in target_df_lags.columns if 'target' in col]
@@ -106,43 +110,6 @@ def fill_na_in_last_seen_columns(target_df_lags):
     target_df_lags[last_seen_columns] = target_df_lags.groupby(
         'target_index', as_index=False)[last_seen_columns].bfill()
     return target_df_lags
-
-
-# def add_lagged_target_columns(y_var_lags, lag_number, monkey_information, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, curv_of_traj_df):
-#     """
-#     Process target columns in lagged data by matching with temp_target_df based on point_index and target_index.
-#     """
-
-#     # Get columns for this lag_number
-#     lag_suffix = f'_{lag_number}'
-#     point_index_col = f'point_index{lag_suffix}'
-
-#     if point_index_col not in y_var_lags.columns:
-#         raise KeyError(f"Warning: {point_index_col} not found in columns")
-
-#     # calculate target info anew
-#     temp_target_df = y_var_lags[[
-#         point_index_col, 'target_index', 'bin']].copy()
-#     temp_target_df.rename(columns={
-#                           point_index_col: 'point_index'}, inplace=True)
-
-#     temp_target_df = add_target_info_based_on_target_index_and_point_index(temp_target_df, monkey_information, ff_real_position_sorted,
-#                                                                            ff_dataframe, ff_caught_T_new, curv_of_traj_df)
-
-#     # take out y_var_lags's columns related to target from the new target_df; raise an error if any target_cols are not in temp_target_df
-#     target_cols = [
-#         col for col in y_var_lags.columns if (col.endswith(lag_suffix) & ('target' in col))]
-#     # strip off suffix
-#     target_cols = [col.replace(lag_suffix, '') for col in target_cols]
-
-#     temp_target_df = temp_target_df[target_cols]
-
-#     # Add lag_number suffix to all columns
-#     rename_dict = {col: f"{col}{lag_suffix}"
-#                    for col in temp_target_df.columns}
-#     temp_target_df = temp_target_df.rename(columns=rename_dict)
-
-#     return temp_target_df
 
 
 def add_target_info_based_on_target_index_and_point_index(target_df, monkey_information, ff_real_position_sorted, ff_dataframe, ff_caught_T_new, curv_of_traj_df):
@@ -304,3 +271,113 @@ def add_seg_info_to_pursuit_data_all_col(pursuit_data_all):
         pursuit_data_all['seg_start_time']
 
     return pursuit_data_all
+
+def _add_curv_info_to_behav_data_all(behav_data_all, curv_of_traj_df, monkey_information, ff_caught_T_new):
+    ff_df = behav_data_all[['point_index', 'target_index', 'monkey_x', 'monkey_y', 'monkey_angle',
+                                    'target_x', 'target_y', 'target_distance', 'target_angle', 'target_angle_to_boundary']]
+    ff_df = ff_df.rename(columns={'target_x': 'ff_x', 'target_y': 'ff_y', 'target_angle': 'ff_angle',
+                            'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
+
+    curv_df = curvature_utils.make_curvature_df(ff_df, curv_of_traj_df, clean=False,
+                                                        remove_invalid_rows=False,
+                                                        invalid_curvature_ok=True,
+                                                        ignore_error=True,
+                                                        monkey_information=monkey_information,
+                                                        ff_caught_T_new=ff_caught_T_new)
+    behav_data_all = behav_data_all.merge(curv_df[[
+        'point_index', 'curv_of_traj', 'optimal_arc_d_heading']].drop_duplicates(), on='point_index', how='left')
+    behav_data_all.rename(columns={
+        'curv_of_traj': 'traj_curv', 'optimal_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
+
+    return behav_data_all
+
+
+def _process_na(behav_data_all):
+    # forward fill gaze columns
+    gaze_columns = [
+        'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_mky_view_angle', 'gaze_world_x', 'gaze_world_y',
+        'gaze_mky_view_x_l', 'gaze_mky_view_y_l', 'gaze_mky_view_angle_l',
+        'gaze_mky_view_x_r', 'gaze_mky_view_y_r', 'gaze_mky_view_angle_r',
+        'gaze_world_x_l', 'gaze_world_y_l', 'gaze_world_x_r', 'gaze_world_y_r'
+    ]
+    # Convert inf values to NA for gaze columns
+    behav_data_all[gaze_columns] = behav_data_all[gaze_columns].replace(
+        [np.inf, -np.inf], np.nan)
+    behav_data_all[gaze_columns] = behav_data_all[gaze_columns].ffill(
+    )
+
+    # Check for any remaining NA values
+    na_rows, na_cols = general_utils.find_rows_with_na(
+        behav_data_all, 'behav_data_all')
+    return na_rows, na_cols
+        
+def _get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
+    subset_key_words = ['_x',
+                        '_y',
+                        'angle_OR_curv_OR_dw',
+                        'distance_OR_dv_OR_visible_OR_rel_y_OR_valid_view_OR_time_since_OR_gaze_world_y_OR_Dz',
+                        'speed_OR_dw_OR_delta_OR_traj_OR_dv_OR_stop_OR_catching_ff',
+                        'x_r_OR_x_l_OR_y_r_OR_y_l',
+                        'LD_or_RD_or_gaze_or_view',
+                        'ff_or_target']
+    all_column_subsets = [
+        [col for col in y_var_lags.columns if '_x' in col],
+        [col for col in y_var_lags.columns if '_y' in col],
+        [col for col in y_var_lags.columns if (
+            'angle' in col) or ('curv' in col) or ('dw' in col)],
+        [col for col in y_var_lags.columns if ('distance' in col) or ('dv' in col) or ('visible' in col) or (
+            'rel_y' in col) or ('valid_view' in col) or ('time_since' in col) or ('gaze_world_y' in col) or ('Dz' in col)],
+        [col for col in y_var_lags.columns if ('speed' in col) or (
+            'dw' in col) or ('delta' in col) or ('traj' in col) or ('dv' in col) or ('stop' in col) or ('catching_ff' in col)],
+        [col for col in y_var_lags.columns if ('x_r' in col) or (
+            'y_r' in col) or ('x_l' in col) or ('y_l' in col)],
+        [col for col in y_var_lags.columns if ('LD' in col) or (
+            'RD' in col) or ('gaze' in col) or ('view' in col)],
+        [col for col in y_var_lags.columns if ('ff' in col) or (
+            'target' in col)],
+    ]
+    return subset_key_words, all_column_subsets
+
+
+def _get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
+    subset_key_words = ['target_x_OR_monkey_x',
+                        'target_y_OR_monkey_y',
+                        'distance_OR_visible_OR_rel_y_OR_valid_view_OR_time_since_OR_gaze_world_y_OR_Dz',
+                        'target_angle_OR_monkey_angle_OR_ff_angle_OR_last_seen_angle',
+                        'dw',
+                        'curv_or_dw_or_heading',
+                        'speeddummy_OR_delta_OR_traj_OR_catching_ff',
+                        'speed_OR_ddv_OR_dw_OR_stop',
+                        'gaze_mky_view_angle',
+                        'LD_or_RD_or_gaze_mky_view_angle',
+                        'x_r_or_y_r_or_RD',
+                        'x_l_or_y_l_or_LD',
+                        'ff_or_target_Except_catching_ff']
+    all_column_subsets = [
+        [col for col in y_var_lags.columns if (
+            'target_x' in col) or ('monkey_x' in col)],
+        [col for col in y_var_lags.columns if (
+            'target_y' in col) or ('monkey_y' in col)],
+        [col for col in y_var_lags.columns if ('distance' in col) or ('visible' in col) or (
+            'rel_y' in col) or ('valid_view' in col) or ('time_since' in col) or ('gaze_world_y' in col) or ('Dz' in col)],
+        [col for col in y_var_lags.columns if ('target_angle' in col) or (
+            'monkey_angle' in col) or ('ff_angle' in col) or ('last_seen_angle' in col)],
+        [col for col in y_var_lags.columns if ('dw' in col)],
+        [col for col in y_var_lags.columns if ('curv' in col) or (
+            'dw' in col) or ('heading' in col)],
+        [col for col in y_var_lags.columns if ('speeddummy' in col) or (
+            'delta' in col) or ('traj' in col) or ('catching_ff' in col)],
+        [col for col in y_var_lags.columns if ('speed' in col) or (
+            'ddv' in col) or ('dw' in col) or ('stop' in col)],
+        [col for col in y_var_lags.columns if (
+            'gaze_mky_view_angle' in col)],
+        [col for col in y_var_lags.columns if ('LD' in col) or (
+            'RD' in col) or ('gaze_mky_view_angle' in col)],
+        [col for col in y_var_lags.columns if (
+            'x_r' in col) or ('y_r' in col) or ('RD' in col)],
+        [col for col in y_var_lags.columns if (
+            'x_l' in col) or ('y_l' in col) or ('LD' in col)],
+        [col for col in y_var_lags.columns if (('ff' in col) or (
+            'target' in col)) and ('catching_ff' not in col)],
+    ]
+    return subset_key_words, all_column_subsets
