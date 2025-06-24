@@ -1,6 +1,6 @@
 from non_behavioral_analysis.neural_data_analysis.model_neural_data.cca_methods import cca_class, cca_plotting
 from non_behavioral_analysis.neural_data_analysis.decode_targets.decode_target_class import DecodeTargetClass
-from non_behavioral_analysis.neural_data_analysis.decode_targets.ml_decoder_class import MLTargetDecoder
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import ml_decoder_class
 import sys
 import os
 import numpy as np
@@ -65,7 +65,7 @@ class TargetDecoder:
         self.scalers = {}
 
         # Initialize ML decoder
-        self.ml_decoder = MLTargetDecoder()
+        self.ml_decoder = ml_decoder_class.MLBehavioralDecoder()
 
         # Data containers
         self.neural_data = None
@@ -263,7 +263,6 @@ class TargetDecoder:
 
     def plot_ml_results(self, target_variable, model_name='rf'):
         return self.ml_decoder.plot_ml_results(target_variable, model_name)
-        
 
     def save_results(self, save_path):
         """Save all results to a file."""
@@ -283,8 +282,6 @@ class TargetDecoder:
             pickle.dump(results_to_save, f)
 
         print(f"Results saved to {save_path}")
-
-
 
 
 def create_example_decoder(raw_data_folder_path):

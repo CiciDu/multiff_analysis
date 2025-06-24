@@ -10,12 +10,14 @@ from sklearn.linear_model import LogisticRegression, Ridge
 import matplotlib.pyplot as plt
 
 
-class MLTargetDecoder:
+class MLBehavioralDecoder:
     """
-    A class for machine learning-based target decoding from neural data.
+    A class for machine learning-based behavioral variable decoding from neural data.
 
     This class handles the training and evaluation of various ML models
-    for both classification and regression tasks in neural decoding.
+    for both classification and regression tasks in neural decoding of behavioral variables.
+    Can be used to decode any behavioral variable including target properties, movement variables,
+    eye position, velocity, etc.
     """
 
     def __init__(self):
@@ -24,19 +26,19 @@ class MLTargetDecoder:
         self.scalers = {}
         self.results = {}
 
-    def decode_targets(self, neural_data, target_data, target_variable='target_distance',
-                       test_size=0.2, models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
+    def decode_variable(self, neural_data, behavioral_data, variable='target_distance',
+                        test_size=0.2, models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
         """
-        Decode target representation using machine learning approaches.
+        Decode behavioral variable using machine learning approaches.
 
         Parameters:
         -----------
         neural_data : pd.DataFrame
             Neural activity data (features)
-        target_data : pd.DataFrame  
-            Target behavioral data
-        target_variable : str or list
-            Target variable(s) to predict
+        behavioral_data : pd.DataFrame  
+            Behavioral data containing the variable to predict
+        variable : str or list
+            Behavioral variable(s) to predict (e.g., 'target_distance', 'velocity_x', 'eye_position')
         test_size : float
             Proportion of data to use for testing
         models_to_use : list
@@ -48,11 +50,11 @@ class MLTargetDecoder:
         --------
         dict : ML results including model performance and predictions
         """
-        print(f"Performing ML-based decoding for target: {target_variable}")
+        print(f"Performing ML-based decoding for variable: {variable}")
 
         # Prepare data
         X_train_scaled, X_test_scaled, y_train, y_test, is_classification = self._prepare_ml_data(
-            neural_data, target_data, target_variable, test_size)
+            neural_data, behavioral_data, variable, test_size)
 
         if X_train_scaled is None:
             return None
@@ -66,35 +68,35 @@ class MLTargetDecoder:
             model_dict, models_to_use, cv_folds, scoring, is_classification)
 
         # Store results
-        self.models[f'ml_{target_variable}'] = ml_results
-        self.results[f'ml_{target_variable}'] = ml_results
+        self.models[f'ml_{variable}'] = ml_results
+        self.results[f'ml_{variable}'] = ml_results
 
         # Print summary
         self._print_ml_summary(ml_results, is_classification)
 
         return ml_results
 
-    def _prepare_ml_data(self, neural_data, target_data, target_variable, test_size):
+    def _prepare_ml_data(self, neural_data, behavioral_data, variable, test_size):
         """Prepare and preprocess data for ML training."""
         X = neural_data.fillna(0).values
 
-        # Handle target variable selection
-        if isinstance(target_variable, str):
-            if target_variable not in target_data.columns:
-                available_cols = [col for col in target_data.columns
-                                  if target_variable.lower() in col.lower()]
+        # Handle variable selection
+        if isinstance(variable, str):
+            if variable not in behavioral_data.columns:
+                available_cols = [col for col in behavioral_data.columns
+                                  if variable.lower() in col.lower()]
                 if available_cols:
-                    target_variable = available_cols[0]
-                    print(f"Using {target_variable} as target variable")
+                    variable = available_cols[0]
+                    print(f"Using {variable} as behavioral variable")
                 else:
                     print(
-                        f"Target variable {target_variable} not found. Available columns:")
-                    print(target_data.columns.tolist())
+                        f"Behavioral variable {variable} not found. Available columns:")
+                    print(behavioral_data.columns.tolist())
                     return None, None, None, None, None
 
-            y = target_data[target_variable].fillna(0).values
+            y = behavioral_data[variable].fillna(0).values
         else:
-            y = target_data[target_variable].fillna(0).values
+            y = behavioral_data[variable].fillna(0).values
 
         # Determine problem type
         is_classification = len(
@@ -109,7 +111,7 @@ class MLTargetDecoder:
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
 
-        self.scalers[f'ml_{target_variable}'] = scaler
+        self.scalers[f'ml_{variable}'] = scaler
 
         return X_train_scaled, X_test_scaled, y_train, y_test, is_classification
 
@@ -213,14 +215,14 @@ class MLTargetDecoder:
 
         print("\n" + "="*50)
 
-    def get_best_model(self, target_variable, metric='test_accuracy'):
+    def get_best_model(self, variable, metric='test_accuracy'):
         """
-        Get the best performing model for a given target variable.
+        Get the best performing model for a given behavioral variable.
 
         Parameters:
         -----------
-        target_variable : str
-            Target variable name
+        variable : str
+            Behavioral variable name
         metric : str
             Metric to use for comparison ('test_accuracy', 'test_r2', etc.)
 
@@ -228,11 +230,11 @@ class MLTargetDecoder:
         --------
         tuple : (model_name, model_results)
         """
-        if f'ml_{target_variable}' not in self.results:
-            print(f"No results found for target variable: {target_variable}")
+        if f'ml_{variable}' not in self.results:
+            print(f"No results found for behavioral variable: {variable}")
             return None, None
 
-        results = self.results[f'ml_{target_variable}']
+        results = self.results[f'ml_{variable}']
 
         best_score = -np.inf
         best_model_name = None
@@ -248,7 +250,7 @@ class MLTargetDecoder:
 
         return best_model_name, best_results
 
-    def predict_new_data(self, neural_data, target_variable, model_name=None):
+    def predict_new_data(self, neural_data, variable, model_name=None):
         """
         Make predictions on new neural data using a trained model.
 
@@ -256,8 +258,8 @@ class MLTargetDecoder:
         -----------
         neural_data : pd.DataFrame or np.array
             New neural data to make predictions on
-        target_variable : str
-            Target variable name (to identify the correct model/scaler)
+        variable : str
+            Behavioral variable name (to identify the correct model/scaler)
         model_name : str, optional
             Specific model to use. If None, uses the best performing model.
 
@@ -265,20 +267,20 @@ class MLTargetDecoder:
         --------
         np.array : Predictions
         """
-        if f'ml_{target_variable}' not in self.models:
+        if f'ml_{variable}' not in self.models:
             print(
-                f"No trained models found for target variable: {target_variable}")
+                f"No trained models found for behavioral variable: {variable}")
             return None
 
         # Get the model to use
         if model_name is None:
-            model_name, _ = self.get_best_model(target_variable, 'cv_mean')
+            model_name, _ = self.get_best_model(variable, 'cv_mean')
             if model_name is None:
                 return None
 
-        if model_name not in self.models[f'ml_{target_variable}']:
+        if model_name not in self.models[f'ml_{variable}']:
             print(
-                f"Model {model_name} not found for target variable: {target_variable}")
+                f"Model {model_name} not found for behavioral variable: {variable}")
             return None
 
         # Prepare data
@@ -288,21 +290,21 @@ class MLTargetDecoder:
             X = neural_data
 
         # Scale data using the saved scaler
-        scaler = self.scalers[f'ml_{target_variable}']
+        scaler = self.scalers[f'ml_{variable}']
         X_scaled = scaler.transform(X)
 
         # Make predictions
-        model = self.models[f'ml_{target_variable}'][model_name]['model']
+        model = self.models[f'ml_{variable}'][model_name]['model']
         predictions = model.predict(X_scaled)
 
         return predictions
 
-    def plot_ml_results(self, target_variable, model_name='rf'):
+    def plot_ml_results(self, variable, model_name='rf'):
         """Plot ML decoding results."""
-        ml_key = f'ml_{target_variable}'
+        ml_key = f'ml_{variable}'
         if ml_key not in self.results or model_name not in self.results[ml_key]:
             print(
-                f"No ML results available for {target_variable} with {model_name}")
+                f"No ML results available for {variable} with {model_name}")
             return
 
         results = self.results[ml_key][model_name]
@@ -317,7 +319,7 @@ class MLTargetDecoder:
         axes[0].set_xlabel('True Values')
         axes[0].set_ylabel('Predicted Values')
         axes[0].set_title(
-            f'Predicted vs True: {target_variable} ({model_name})')
+            f'Predicted vs True: {variable} ({model_name})')
 
         # Residuals
         residuals = results['true_values'] - results['predictions']
@@ -329,3 +331,13 @@ class MLTargetDecoder:
 
         plt.tight_layout()
         plt.show()
+
+    # Backward compatibility methods
+    def decode_targets(self, neural_data, target_data, target_variable='target_distance',
+                       test_size=0.2, models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
+        """
+        Backward compatibility method for decode_targets.
+        Redirects to decode_variable with appropriate parameter names.
+        """
+        return self.decode_variable(neural_data, target_data, target_variable,
+                                    test_size, models_to_use, cv_folds)

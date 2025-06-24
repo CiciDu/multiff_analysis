@@ -1,12 +1,14 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import ml_decoder_class
 from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
-from non_behavioral_analysis.neural_data_analysis.decode_targets import decode_target_utils, behav_features_to_keep, ml_decoder_class
+from non_behavioral_analysis.neural_data_analysis.decode_targets import decode_target_utils, behav_features_to_keep
 from null_behaviors import curvature_utils, curv_of_traj_utils
-from non_behavioral_analysis.neural_data_analysis.decode_targets import behav_features_to_keep, plot_gpfa_utils, decode_target_utils, fit_gpfa_utils, gpfa_regression_utils
+from non_behavioral_analysis.neural_data_analysis.gpfa_methods import elephant_utils, fit_gpfa_utils, gpfa_regression_utils, plot_gpfa_utils
+from non_behavioral_analysis.neural_data_analysis.decode_targets import behav_features_to_keep, decode_target_utils
 import warnings
 import os
 import numpy as np
@@ -52,15 +54,24 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
 
         # Initialize ML decoder
-        self.ml_decoder = ml_decoder_class.MLTargetDecoder()
+        self.ml_decoder = ml_decoder_class.MLBehavioralDecoder()
 
     def streamline_making_behav_and_neural_data(self, exists_ok=True):
+        self.get_all_behav_data(exists_ok=exists_ok)
+        self.max_bin = self.behav_data.bin.max()
+        self.retrieve_neural_data()
+
+    def get_all_behav_data(self, exists_ok=True):
         self.get_basic_data()
         self.get_behav_data(exists_ok=exists_ok)
         self.get_pursuit_data()
 
-        self.max_bin = self.behav_data.bin.max()
-        self.retrieve_neural_data()
+    def get_basic_data(self):
+        super().get_basic_data()
+        self._get_curv_of_traj_df()
+        self._make_or_retrieve_target_df(
+            exists_ok=True,
+            fill_na=False)
 
     def directly_retrieve_data_for_modeling(self, exists_ok=True):
         self.get_x_and_y_var(exists_ok=exists_ok)
@@ -69,11 +80,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
     def get_behav_data(self, exists_ok=True, save_data=True):
         behav_data_all_path = os.path.join(
             self.decoding_targets_folder_path, 'behav_data_all.csv')
-
-        self._get_curv_of_traj_df()
-        self._make_or_retrieve_target_df(
-            exists_ok=True,
-            fill_na=False)
 
         if exists_ok & os.path.exists(behav_data_all_path):
             self.behav_data_all = pd.read_csv(behav_data_all_path)
@@ -108,7 +114,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
-
         pursuit_data_all = decode_target_utils.make_pursuit_data_all(
             self.single_vis_target_df, self.behav_data_all)
 
@@ -127,12 +132,12 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         pursuit_data_all = pursuit_data_all[pursuit_data_all['seg_duration'] > 0].copy(
         )
 
-        self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                             behav_features_to_keep.extra_columns_for_concat_trials +
-                                             ['segment_start_dummy', 'segment_end_dummy']]
+        seg_vars = ['segment', 'segment_start_dummy', 'segment_end_dummy']
 
-        self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + [
-            'segment', 'segment_start_dummy', 'segment_end_dummy']]
+        self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
+                                             behav_features_to_keep.extra_columns_for_concat_trials + seg_vars]
+
+        self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + seg_vars]
 
         # check for NA; if there is any, raise a warning
         na_rows, na_cols = general_utils.find_rows_with_na(
@@ -334,6 +339,13 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.x_var = pd.read_csv(x_var_path)
             print(f'Loaded x_var from {x_var_path}')
         else:
+            neural_data_present = hasattr(self, 'binned_spikes_df')
+            # check if basic data is present
+            if not neural_data_present:
+                self.get_all_behav_data()
+                self.max_bin = self.behav_data.bin.max()
+                self.retrieve_neural_data()
+                # self._free_up_memory()
             binned_spikes_sub = self.binned_spikes_df[self.binned_spikes_df['bin'].isin(
                 self.pursuit_data['bin'].values)]
             self.x_var = binned_spikes_sub.drop(
@@ -350,8 +362,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.y_var = pd.read_csv(y_var_path)
             print(f'Loaded y_var from {y_var_path}')
         else:
-            self.y_var = self.pursuit_data.reset_index(drop=True)
-
             self.y_var = self.pursuit_data.reset_index(drop=True)
             # Convert bool columns to int
             bool_columns = self.y_var.select_dtypes(include=['bool']).columns
@@ -522,31 +532,101 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
 
-    def get_gpfa_traj(self, latent_dimensionality=10):
+    def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True):
+        """
+        Compute or load GPFA trajectories.
 
+        Parameters:
+        -----------
+        latent_dimensionality : int
+            Number of latent dimensions for GPFA
+        exists_ok : bool
+            Whether to load existing trajectories if available
+        """
+        import pickle
+
+        alignment = 'segStart' if self.align_at_beginning else 'segEnd'
+        file_name = f'gpfa_neural_aligned_{alignment}_d{latent_dimensionality}.pkl'
+
+        # Create filename with latent dimensionality to avoid conflicts
+        trajectories_path = os.path.join(
+            self.decoding_targets_folder_path, file_name)
+
+        if exists_ok and os.path.exists(trajectories_path):
+            try:
+                with open(trajectories_path, 'rb') as f:
+                    self.trajectories = pickle.load(f)
+                print(f'Loaded GPFA trajectories from {trajectories_path}')
+                return
+            except Exception as e:
+                print(f'Failed to load trajectories: {str(e)}. Recomputing...')
+
+        # Compute trajectories if not loaded
+        print(
+            f'Computing GPFA trajectories with {latent_dimensionality} dimensions...')
         gpfa_3dim = GPFA(bin_size=self.bin_width_w_unit,
                          x_dim=latent_dimensionality)
         self.trajectories = gpfa_3dim.fit_transform(self.spiketrains)
 
-    def get_gpfa_and_behav_data_for_all_trials(self):
+        # Save trajectories
+        try:
+            with open(trajectories_path, 'wb') as f:
+                pickle.dump(self.trajectories, f)
+            print(f'Saved GPFA trajectories to {trajectories_path}')
+        except Exception as e:
+            print(f'Warning: Failed to save trajectories: {str(e)}')
+
+
+    def get_gpfa_and_behav_data_for_all_trials(self, use_lags=False):
 
         self.behav_trials = []
         self.gpfa_trials = []
 
-        segments_behav = self.pursuit_data_by_trial['segment'].unique()
+        if use_lags:
+            y_var = self.y_var_lags_reduced
+            if 'segment_0' in y_var.columns:
+                y_var.drop(columns=['segment_0'], inplace=True)
+        else:
+            y_var = self.y_var_reduced
+        
+        y_var['segment'] = self.y_var['segment'].values
+
+        segments_behav = y_var['segment'].unique()
+        segments_behav = segments_behav[segments_behav != '']
         segments_neural = self.spiketrain_corr_segs
         shared_segments = [seg for seg in segments_behav.tolist()
                            if seg in segments_neural.tolist()]
 
         for seg in shared_segments:
-            pursuit_sub = self.pursuit_data_by_trial[self.pursuit_data_by_trial['segment'] == seg]
-            behav_data_of_trial = pursuit_sub.drop(columns=['segment']).values
+            y_var_sub = y_var[y_var['segment'] == seg]
+            behav_data_of_trial = y_var_sub.drop(columns=['segment']).values
             self.behav_trials.append(behav_data_of_trial)
 
             trial_length = behav_data_of_trial.shape[0]
             gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
                 self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
             self.gpfa_trials.append(gpfa_trial)
+            
+            
+    # def get_gpfa_and_behav_data_for_all_trials(self):
+
+    #     self.behav_trials = []
+    #     self.gpfa_trials = []
+
+    #     segments_behav = self.pursuit_data_by_trial['segment'].unique()
+    #     segments_neural = self.spiketrain_corr_segs
+    #     shared_segments = [seg for seg in segments_behav.tolist()
+    #                        if seg in segments_neural.tolist()]
+
+    #     for seg in shared_segments:
+    #         pursuit_sub = self.pursuit_data_by_trial[self.pursuit_data_by_trial['segment'] == seg]
+    #         behav_data_of_trial = pursuit_sub.drop(columns=['segment']).values
+    #         self.behav_trials.append(behav_data_of_trial)
+
+    #         trial_length = behav_data_of_trial.shape[0]
+    #         gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
+    #             self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
+    #         self.gpfa_trials.append(gpfa_trial)
 
     def decode_one_var_with_ml(self, target_variable='target_distance', test_size=0.2,
                                models_to_use=['rf', 'nn', 'lr'], cv_folds=5):

@@ -21,7 +21,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
 # Assuming you've run:
-# scores_by_time, times = time_resolved_regression_variable_length(...)
+# scores_by_time, times = run_time_resolved_regression_variable_length_trials(...)
 
 import numpy as np
 from sklearn.linear_model import RidgeCV
@@ -39,7 +39,7 @@ def get_latent_neural_data_for_trial(trajectories, current_seg, trial_length, sp
     return gpfa_trial
 
 
-def time_resolved_regression_variable_length(gpfa_trials, behav_trials, time_step=0.02, cv_folds=5, max_timepoints=None):
+def run_time_resolved_regression_variable_length_trials(gpfa_trials, behav_trials, time_step=0.02, cv_folds=5, max_timepoints=None):
     """
     Perform time-resolved regression with variable-length trials.
 
