@@ -19,25 +19,21 @@ import logging
 from matplotlib import rc
 from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
-
-
-import numpy as np
+from elephant.gpfa import GPFA
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import Normalize
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
-
-import numpy as np
 import plotly.graph_objects as go
 import quantities as pq
 import neo
+from sklearn.decomposition import PCA
 from elephant.spike_train_generation import inhomogeneous_poisson_process
 
 
 class GPFAHelperClass():
     def __init__(self):
         pass
-    
 
     def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True):
         """
@@ -83,7 +79,6 @@ class GPFAHelperClass():
         except Exception as e:
             print(f'Warning: Failed to save trajectories: {str(e)}')
 
-
     def prepare_spikes_for_gpfa(self, align_at_beginning=False):
 
         self.align_at_beginning = align_at_beginning
@@ -99,56 +94,75 @@ class GPFAHelperClass():
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
 
+    def _find_shared_segments(self):
+        if not hasattr(self, 'shared_segments'):
+            segments_neural = self.spiketrain_corr_segs
+            segments_behav = self.gpfa_behav_data['segment'].unique()
+            segments_behav = segments_behav[segments_behav != '']
+            self.shared_segments = [seg for seg in segments_behav.tolist()
+                                    if seg in segments_neural.tolist()]
 
-    def get_gpfa_and_behav_data_for_all_trials(self, use_lags=False):
+    def _get_behav_data_for_all_trials(self):
+        self.raw_trajectories = self.trajectories
 
         self.behav_trials = []
-        self.gpfa_trials = []
 
-        if use_lags:
-            self.gpfa_y_var = self.y_var_lags_reduced
-            if 'segment_0' in self.gpfa_y_var.columns:
-                self.gpfa_y_var.drop(columns=['segment_0'], inplace=True)
+        self._find_shared_segments()
+
+        for seg in self.shared_segments:
+            gpfa_behav_data_sub_mask = self.gpfa_behav_data['segment'] == seg
+            gpfa_behav_data_sub = self.gpfa_behav_data[gpfa_behav_data_sub_mask]
+            self.behav_trials.append(gpfa_behav_data_sub.values)
+
+        self.gpfa_behav_data_columns = gpfa_behav_data_sub.columns
+
+    def _get_raw_neural_data_for_all_trials(self,
+                                            apply_pca_on_raw_spike_data=True,
+                                            use_lagged_raw_spike_data=True,
+                                            num_pca_components=7,
+                                            ):
+        self.use_raw_spike_data_instead_of_gpfa = True
+        self.apply_pca_on_raw_spike_data = apply_pca_on_raw_spike_data
+        self.use_lagged_raw_spike_data = use_lagged_raw_spike_data
+        self.num_pca_components = num_pca_components
+
+        self.gpfa_neural_trials = []
+
+        self._find_shared_segments()
+
+        if use_lagged_raw_spike_data:
+            x_var = self.x_var_lags_reduced.reset_index(drop=True)
         else:
-            self.gpfa_y_var = self.y_var_reduced
-        
-        self.gpfa_y_var['segment'] = self.y_var['segment'].values
+            x_var = self.x_var.reset_index(drop=True)
 
-        segments_behav = self.gpfa_y_var['segment'].unique()
-        segments_behav = segments_behav[segments_behav != '']
-        segments_neural = self.spiketrain_corr_segs
-        shared_segments = [seg for seg in segments_behav.tolist()
-                           if seg in segments_neural.tolist()]
+        if apply_pca_on_raw_spike_data:
+            pca = PCA(n_components=num_pca_components)
+            x_var = pca.fit_transform(x_var)
 
-        for seg in shared_segments:
-            gpfa_y_var_sub = self.gpfa_y_var[self.gpfa_y_var['segment'] == seg]
-            self.behav_trials.append(gpfa_y_var_sub.values)
+        for seg in self.shared_segments:
+            gpfa_behav_data_sub_mask = self.gpfa_behav_data['segment'] == seg
+            gpfa_trial = x_var[gpfa_behav_data_sub_mask].values
+            self.gpfa_neural_trials.append(gpfa_trial)
 
-            trial_length = gpfa_y_var_sub.shape[0]
+    def _get_gpfa_neural_data_for_all_trials(self):
+        self.apply_pca_on_raw_spike_data = False
+
+        self.gpfa_neural_trials = []
+
+        self._find_shared_segments()
+
+        for seg in self.shared_segments:
+            gpfa_behav_data_sub_mask = self.gpfa_behav_data['segment'] == seg
+            trial_length = gpfa_behav_data_sub_mask.shape[0]
+            traj_data = self.trajectories
             gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
-                self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
-            self.gpfa_trials.append(gpfa_trial)
-            
-        self.gpfa_y_var_columns = gpfa_y_var_sub.columns
+                traj_data, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
+            self.gpfa_neural_trials.append(gpfa_trial)
 
-           
-    # def get_gpfa_and_behav_data_for_all_trials(self):
+    def get_gpfa_and_behav_data_for_all_trials(self, use_lags=False,
+                                               use_raw_spike_data_instead=False,
+                                               use_lagged_raw_spike_data=False,
+                                               apply_pca_on_raw_spike_data=False,
+                                               num_pca_components=7):
 
-    #     self.behav_trials = []
-    #     self.gpfa_trials = []
-
-    #     segments_behav = self.pursuit_data_by_trial['segment'].unique()
-    #     segments_neural = self.spiketrain_corr_segs
-    #     shared_segments = [seg for seg in segments_behav.tolist()
-    #                        if seg in segments_neural.tolist()]
-
-    #     for seg in shared_segments:
-    #         pursuit_sub = self.pursuit_data_by_trial[self.pursuit_data_by_trial['segment'] == seg]
-    #         behav_data_of_trial = pursuit_sub.drop(columns=['segment']).values
-    #         self.behav_trials.append(behav_data_of_trial)
-
-    #         trial_length = behav_data_of_trial.shape[0]
-    #         gpfa_trial = gpfa_regression_utils.get_latent_neural_data_for_trial(
-    #             self.trajectories, seg, trial_length, self.spiketrain_corr_segs, align_at_beginning=self.align_at_beginning)
-    #         self.gpfa_trials.append(gpfa_trial)
-
+        pass

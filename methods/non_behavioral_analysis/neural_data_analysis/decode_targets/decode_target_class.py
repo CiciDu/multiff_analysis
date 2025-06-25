@@ -461,12 +461,25 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         gpfa_helper_class.GPFAHelperClass.get_gpfa_traj(self, 
             latent_dimensionality=latent_dimensionality, exists_ok=exists_ok)
 
-    def get_gpfa_and_behav_data_for_all_trials(self, use_lags=False):
-        gpfa_helper_class.GPFAHelperClass.get_gpfa_and_behav_data_for_all_trials(self, use_lags=use_lags)
+    def get_gpfa_and_behav_data_for_all_trials(self, **kwargs):
+        gpfa_helper_class.GPFAHelperClass.get_gpfa_and_behav_data_for_all_trials(self, **kwargs)
 
     def prepare_spikes_for_gpfa(self, align_at_beginning=False):
         gpfa_helper_class.GPFAHelperClass.prepare_spikes_for_gpfa(
             self, align_at_beginning=align_at_beginning)
+        
+    def _find_shared_segments(self):
+        gpfa_helper_class.GPFAHelperClass._find_shared_segments(self)
+        
+    def _get_behav_data_for_all_trials(self):
+        gpfa_helper_class.GPFAHelperClass._get_behav_data_for_all_trials(self)
+        
+    def _get_raw_neural_data_for_all_trials(self, **kwargs):
+        gpfa_helper_class.GPFAHelperClass._get_raw_neural_data_for_all_trials(self, **kwargs)
+        
+    def _get_gpfa_neural_data_for_all_trials(self, **kwargs):
+        gpfa_helper_class.GPFAHelperClass._get_gpfa_neural_data_for_all_trials(self, **kwargs)
+
         
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
