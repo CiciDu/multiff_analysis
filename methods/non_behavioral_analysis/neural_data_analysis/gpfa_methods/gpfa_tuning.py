@@ -106,7 +106,7 @@ def run_gpfa_experiment_time_resolved(
         }
     # GPFA pipeline
     dec.get_gpfa_traj(latent_dimensionality=gpfa_dim, exists_ok=False)
-    dec.get_gpfa_and_behav_data_for_all_trials()
+    dec.get_trialwise_gpfa_and_behav_data()
     X_trials_gpfa = [StandardScaler().fit_transform(trial)
                      for trial in dec.gpfa_neural_trials]
     Y_trials_gpfa = [StandardScaler().fit_transform(trial)

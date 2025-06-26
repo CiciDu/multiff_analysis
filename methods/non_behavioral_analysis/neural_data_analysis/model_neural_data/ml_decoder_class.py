@@ -146,7 +146,7 @@ class MLBehavioralDecoder:
                 print(f"Model {model_name} not available. Skipping...")
                 continue
 
-            print(f"Training {model_name}...")
+            print(f"Training and evaluating {model_name} using {cv_folds} folds")
             model = model_dict[model_name]
 
             # Cross-validation
@@ -332,12 +332,3 @@ class MLBehavioralDecoder:
         plt.tight_layout()
         plt.show()
 
-    # Backward compatibility methods
-    def decode_targets(self, neural_data, target_data, target_variable='target_distance',
-                       test_size=0.2, models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
-        """
-        Backward compatibility method for decode_targets.
-        Redirects to decode_variable with appropriate parameter names.
-        """
-        return self.decode_variable(neural_data, target_data, target_variable,
-                                    test_size, models_to_use, cv_folds)

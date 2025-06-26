@@ -214,7 +214,7 @@ def try_multiple_latent_dims_and_plot(dec, behav_trials, dims=[3, 5, 10, 15], ti
     results = {}
     for d in dims:
         dec.get_gpfa_traj(latent_dimensionality=d, exists_ok=False)
-        dec.get_gpfa_and_behav_data_for_all_trials()
+        dec.get_trialwise_gpfa_and_behav_data()
         scores_by_time, times = run_time_resolved_regression_variable_length_trials(
             dec.gpfa_neural_trials, behav_trials, time_step=time_step, cv_folds=cv_folds, max_timepoints=max_timepoints)
         results[d] = (scores_by_time, times)

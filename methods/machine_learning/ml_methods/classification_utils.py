@@ -39,74 +39,65 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
 from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import cross_val_score
 
 
-def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None):
+def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None, cv=None):
+    """
+    If cv is None, use the original train/test split.
+    If cv is an integer, use k-fold cross-validation on the training set to select the best model.
+    """
     if model is not None:
-        model = model
         model.fit(X_train, y_train)
         model_comparison_df = None
-
     else:
-        # try all model options and then choose the one with the highest accuracy
-        gnb = GaussianNB()
-        logreg = LogisticRegression()
-        svm = SVC(probability=True)
-        dt = DecisionTreeClassifier()
-        bagging = BaggingClassifier(n_estimators=200, max_features=0.9,
-                                    bootstrap_features=True, bootstrap=True, random_state=42)
-        boosting = AdaBoostClassifier(n_estimators=500, learning_rate=0.05)
-        grad_boosting = GradientBoostingClassifier(learning_rate=0.05, max_depth=7, n_estimators=500, subsample=0.5, max_features='sqrt',
-                                                   min_samples_split=7, min_samples_leaf=2)
-        rf = RandomForestClassifier(
-            n_estimators=40, max_depth=10, random_state=0)
-        # voting = VotingClassifier(estimators=[('logreg', logreg), ('svm', svm), ('dt', dt), ('bagging', bagging), ('boosting', boosting), ('rf', rf)],
-        #                                        #voting='hard' # based on majority vote
-        #                                         voting='soft' # based on sum of probability
-        # )
-        # mlp = MLPClassifier(hidden_layer_sizes=(100, 100, 100), max_iter=1000)
-
-        model_list = [gnb, logreg, dt, bagging, boosting,
-                      grad_boosting, rf]  # can add voting, mlp
-        model_names = ['gnb', 'logreg', 'dt', 'bagging', 'boosting',
-                       'grad_boosting', 'rf']  # can add voting, 'mlp' too
-
-        # find the model with the highest accuracy
+        models = [
+            ('gnb', GaussianNB()),
+            ('logreg', LogisticRegression()),
+            ('dt', DecisionTreeClassifier()),
+            ('bagging', BaggingClassifier(n_estimators=200, max_features=0.9,
+             bootstrap_features=True, bootstrap=True, random_state=42)),
+            ('boosting', AdaBoostClassifier(n_estimators=500, learning_rate=0.05)),
+            ('grad_boosting', GradientBoostingClassifier(learning_rate=0.05, max_depth=7, n_estimators=500,
+             subsample=0.5, max_features='sqrt', min_samples_split=7, min_samples_leaf=2)),
+            ('rf', RandomForestClassifier(
+                n_estimators=40, max_depth=10, random_state=0))
+        ]
         if len(X_train) < 10000:
-            model_list.append(svm)
-            model_names.append('svm')
-        accuracy_list = []
-        for i in range(len(model_list)):
-            model = model_list[i]
-            model_name = model_names[i]
-            print("model:", model_name)
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            accuracy_list.append(accuracy)
-            # print("model:", model)
-            # print("accuracy:", accuracy)
-            # print("confusion matrix:", confusion_matrix(y_test, y_pred))
+            models.append(('svm', SVC(probability=True)))
 
-        # make a table to compare the results of all the models in model_list
-        model_comparison_df = pd.DataFrame(
-            {'model': model_names, 'accuracy': accuracy_list})
-        model_comparison_df.sort_values(
-            by='accuracy', ascending=False, inplace=True)
+        accuracy_list, cv_results = [], []
+        for name, mdl in models:
+            print("model:", name)
+            if cv:
+                scores = cross_val_score(
+                    mdl, X_train, y_train, cv=cv, scoring='accuracy')
+                accuracy_list.append(scores.mean())
+                cv_results.append(scores)
+                print(
+                    f"CV mean accuracy: {scores.mean():.4f}, scores: {scores}")
+            else:
+                mdl.fit(X_train, y_train)
+                y_pred = mdl.predict(X_test)
+                accuracy_list.append(accuracy_score(y_test, y_pred))
+                cv_results.append(None)
+
+        model_comparison_df = pd.DataFrame({
+            'model': [name for name, _ in models],
+            'accuracy': accuracy_list,
+            'cv_scores': cv_results if cv else None
+        }).sort_values(by='accuracy', ascending=False)
         print(model_comparison_df)
 
-        model = model_list[np.argmax(accuracy_list)]
-        print("\n")
-        print("The model with the highest accuracy is:", model, '!!')
+        best_idx = np.argmax(accuracy_list)
+        model = models[best_idx][1]
+        print("\nThe model with the highest accuracy is:", model, '!!')
+        model.fit(X_train, y_train)
 
-    # predict
     y_pred = model.predict(X_test)
-    # evaluate
     accuracy = accuracy_score(y_test, y_pred)
     print("chosen model accuracy:", accuracy)
-    # confusion matrix
     print("chosen model confusion matrix:", confusion_matrix(y_test, y_pred))
-    # make the confusion matrix into a table
     confusion_matrix_df = pd.DataFrame(confusion_matrix(y_test, y_pred))
     confusion_matrix_df.columns = [
         f'Predicted {num}' for num in range(1, confusion_matrix_df.shape[1]+1)]

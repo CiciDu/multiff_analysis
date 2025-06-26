@@ -138,21 +138,34 @@ def _choose_best_model(model, model_name, X_train, X_test, y_test):
 
     if model_name == 'rf':
         chosen_model_info['sorted_features_and_importances'] = _get_rf_feature_importances(
-            model, X_train)
+            model, X_train, feature_names=X_train.columns)
 
     return chosen_model_info
 
 
-def _get_rf_feature_importances(model, X_train):
+def _get_rf_feature_importances(model, feature_names=None):
     feature_importances = model.feature_importances_
-    # Assuming you have the feature names in a list called feature_names
-    feature_names = X_train.columns
+    if feature_names is None:
+        feature_names = [f"Neuron_{i}" for i in range(len(feature_importances))]
     # Combine feature names and their importances
-    features_and_importances = zip(feature_names, feature_importances)
-    sorted_features_and_importances = sorted(
-        features_and_importances, key=lambda x: x[1], reverse=True)
-    return sorted_features_and_importances
+    importance_df = pd.DataFrame({
+        'feature': feature_names,
+        'importance': feature_importances
+    }).sort_values('importance', ascending=False)
+    
+    return importance_df
 
+def plot_feature_importance(importance_df, predictor_var):
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(min(15, len(importance_df))), 
+            importance_df['importance'].head(15))
+    plt.title(f'Feature Importance: {predictor_var}')
+    plt.xlabel('Neuron Index (sorted by importance)')
+    plt.ylabel('Importance')
+    plt.xticks(range(min(15, len(importance_df))), 
+                importance_df['feature'].head(15), rotation=45)
+    plt.tight_layout()
+    plt.show()
 
 def use_linear_regression(X_train, X_test, y_train, y_test,
                           show_plot=True):

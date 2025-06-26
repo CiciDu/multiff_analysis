@@ -34,7 +34,7 @@ from null_behaviors import curvature_utils, curv_of_traj_utils
 from non_behavioral_analysis.neural_data_analysis.gpfa_methods import elephant_utils, fit_gpfa_utils, gpfa_regression_utils, plot_gpfa_utils, gpfa_helper_class
 
 
-class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
+class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass, gpfa_helper_class.GPFAHelperClass):
 
     def __init__(self,
                  raw_data_folder_path=None,
@@ -96,7 +96,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             self.behav_data_all = prep_monkey_data.bin_monkey_information(
                 self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
             self.behav_data_all = self._add_ff_info(self.behav_data_all)
-            
+
             self._add_or_drop_columns()
             self._add_all_target_info()
             self._add_curv_info()
@@ -109,7 +109,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
             if save_data:
                 self.behav_data_all.to_csv(behav_data_all_path, index=False)
-                
 
         self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
                                               behav_features_to_keep.extra_columns_for_concat_trials]
@@ -220,7 +219,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         self._add_target_info_to_y_var_lags()
 
-
     def _add_target_info_to_y_var_lags(self):
 
         basic_data_present = hasattr(self, 'monkey_information')
@@ -243,7 +241,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         if not basic_data_present:
             # free up memory if basic data is not present before calling the function
             self._free_up_memory()
-            
 
     def reduce_y_var(self, corr_threshold_for_lags_of_a_feature=0.98,
                      vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
@@ -273,7 +270,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                                filter_vif_by_all_columns=filter_vif_by_all_columns)
             self.y_var_reduced.to_csv(df_path, index=False)
             print(f'Saved y_var_reduced to {df_path}')
-
 
     def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
                           vif_threshold_for_initial_subset=5,
@@ -335,7 +331,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
             if verbose:
                 print(f'Warning: Failed to cache results: {str(e)}')
 
-
     def _get_x_var(self, exists_ok=True):
         x_var_path = os.path.join(
             self.decoding_targets_folder_path, 'decode_target_x_var.csv')
@@ -356,7 +351,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                 columns=['bin']).reset_index(drop=True)
             self.x_var.to_csv(x_var_path, index=False)
             print(f'Saved x_var to {x_var_path}')
-
 
     def _get_y_var(self, exists_ok=True):
         # note that this is for the continuous case (a.k.a. all selected time points are used together, instead of being separated into trials)
@@ -392,8 +386,9 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
         )
 
     def _add_curv_info(self):
-        self.behav_data_all = decode_target_utils._add_curv_info_to_behav_data_all(self.behav_data_all, self.curv_of_traj_df, self.monkey_information, self.ff_caught_T_new)
-    
+        self.behav_data_all = decode_target_utils._add_curv_info_to_behav_data_all(
+            self.behav_data_all, self.curv_of_traj_df, self.monkey_information, self.ff_caught_T_new)
+
     def _add_all_target_info(self):
 
         self.behav_data_all = decode_target_utils.add_target_info_to_behav_data_all(
@@ -417,7 +412,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
                 self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new, max_visibility_window=self.max_visibility_window)
             self.single_vis_target_df.to_csv(df_path, index=False)
             print(f'Saved single_vis_target_df to {df_path}')
-
 
     def decode_one_var_with_ml(self, target_variable='target_distance', test_size=0.2,
                                models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
@@ -456,37 +450,45 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
         return ml_results
 
+    # def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True):
+    #     gpfa_helper_class.GPFAHelperClass.get_gpfa_traj(self,
+    #                                                     latent_dimensionality=latent_dimensionality, exists_ok=exists_ok)
 
-    def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True):
-        gpfa_helper_class.GPFAHelperClass.get_gpfa_traj(self, 
-            latent_dimensionality=latent_dimensionality, exists_ok=exists_ok)
+    # def get_trialwise_gpfa_and_behav_data(self, **kwargs):
+    #     gpfa_helper_class.GPFAHelperClass.get_trialwise_gpfa_and_behav_data(
+    #         self, **kwargs)
 
-    def get_gpfa_and_behav_data_for_all_trials(self, **kwargs):
-        gpfa_helper_class.GPFAHelperClass.get_gpfa_and_behav_data_for_all_trials(self, **kwargs)
+    # def prepare_spikes_for_gpfa(self, align_at_beginning=False):
+    #     gpfa_helper_class.GPFAHelperClass.prepare_spikes_for_gpfa(
+    #         self, align_at_beginning=align_at_beginning)
 
-    def prepare_spikes_for_gpfa(self, align_at_beginning=False):
-        gpfa_helper_class.GPFAHelperClass.prepare_spikes_for_gpfa(
-            self, align_at_beginning=align_at_beginning)
-        
-    def _find_shared_segments(self):
-        gpfa_helper_class.GPFAHelperClass._find_shared_segments(self)
-        
-    def _get_behav_data_for_all_trials(self):
-        gpfa_helper_class.GPFAHelperClass._get_behav_data_for_all_trials(self)
-        
-    def _get_raw_neural_data_for_all_trials(self, **kwargs):
-        gpfa_helper_class.GPFAHelperClass._get_raw_neural_data_for_all_trials(self, **kwargs)
-        
-    def _get_gpfa_neural_data_for_all_trials(self, **kwargs):
-        gpfa_helper_class.GPFAHelperClass._get_gpfa_neural_data_for_all_trials(self, **kwargs)
+    # def _find_shared_segments(self):
+    #     gpfa_helper_class.GPFAHelperClass._find_shared_segments(self)
 
+    # def _get_trialwise_behav_data(self, use_lagged_behav_data=False):
+    #     gpfa_helper_class.GPFAHelperClass._get_trialwise_behav_data(
+    #         self, use_lagged_behav_data=use_lagged_behav_data)
+
+    # def _get_trialwise_spike_neural_data(self, **kwargs):
+    #     gpfa_helper_class.GPFAHelperClass._get_trialwise_spike_neural_data(
+    #         self, **kwargs)
+
+    # def _get_trialwise_gpfa_neural_data(self, **kwargs):
+    #     gpfa_helper_class.GPFAHelperClass._get_trialwise_gpfa_neural_data(
+    #         self, **kwargs)
         
+    # def get_concatenated_gpfa_and_behav_data_for_all_trials(self, **kwargs):
+    #     gpfa_helper_class.GPFAHelperClass.get_concatenated_gpfa_and_behav_data_for_all_trials(
+    #         self, **kwargs)
+
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
-        subset_key_words, all_column_subsets = decode_target_utils._get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags)
+        subset_key_words, all_column_subsets = decode_target_utils._get_subset_key_words_and_all_column_subsets_for_corr(
+            y_var_lags)
         return subset_key_words, all_column_subsets
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
-        subset_key_words, all_column_subsets = decode_target_utils._get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags)
+        subset_key_words, all_column_subsets = decode_target_utils._get_subset_key_words_and_all_column_subsets_for_vif(
+            y_var_lags)
         return subset_key_words, all_column_subsets
