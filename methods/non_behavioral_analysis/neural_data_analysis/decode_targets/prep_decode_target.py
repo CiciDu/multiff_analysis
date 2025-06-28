@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
@@ -28,7 +28,7 @@ def add_lagged_target_columns(y_var_lags, y_var, target_df_lags, max_y_lag_numbe
     if 'target_index' not in y_var_lags.columns:
         y_var_lags = y_var_lags.merge(
             y_var[['bin', 'target_index']], on='bin', how='left')
-            
+
     if target_columns is None:
         target_columns = [
             col for col in target_df_lags.columns if 'target' in col]
@@ -66,9 +66,10 @@ def add_lagged_target_columns(y_var_lags, y_var, target_df_lags, max_y_lag_numbe
     # Concatenate all
     all_new_columns = pd.concat(all_new_columns, axis=1)
     # Remove any columns from y_var_lags that are in all_new_columns
-    columns_for_y_var = [col for col in y_var_lags.columns if col not in all_new_columns.columns]
+    columns_for_y_var = [
+        col for col in y_var_lags.columns if col not in all_new_columns.columns]
     y_var_lags = y_var_lags[columns_for_y_var].copy()
-    
+
     y_var_lags = pd.concat([y_var_lags, all_new_columns], axis=1).copy()
 
     return y_var_lags
@@ -172,7 +173,7 @@ def find_single_vis_target_df(target_clust_last_vis_df, monkey_information, ff_c
     # drop the rows where target is in a cluster (we want to preserve cases where monkey is going toward a single target, not a cluster)
     single_vis_target_df = target_clust_last_vis_df[
         target_clust_last_vis_df['num_nearby_vis_ff'] == 1]
-    
+
     # also drop the rows where the ff_caught_time is within 5s of either the min or the max time in monkey_information, so that when getting lagged columns, there is enough information
     max_time_in_ff_dataframe = monkey_information['time'].max()
     min_time_in_ff_dataframe = monkey_information['time'].min()
@@ -272,18 +273,19 @@ def add_seg_info_to_pursuit_data_all_col(pursuit_data_all):
 
     return pursuit_data_all
 
+
 def _add_curv_info_to_behav_data_all(behav_data_all, curv_of_traj_df, monkey_information, ff_caught_T_new):
     ff_df = behav_data_all[['point_index', 'target_index', 'monkey_x', 'monkey_y', 'monkey_angle',
-                                    'target_x', 'target_y', 'target_distance', 'target_angle', 'target_angle_to_boundary']]
+                            'target_x', 'target_y', 'target_distance', 'target_angle', 'target_angle_to_boundary']]
     ff_df = ff_df.rename(columns={'target_x': 'ff_x', 'target_y': 'ff_y', 'target_angle': 'ff_angle',
-                            'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
+                                  'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
 
     curv_df = curvature_utils.make_curvature_df(ff_df, curv_of_traj_df, clean=False,
-                                                        remove_invalid_rows=False,
-                                                        invalid_curvature_ok=True,
-                                                        ignore_error=True,
-                                                        monkey_information=monkey_information,
-                                                        ff_caught_T_new=ff_caught_T_new)
+                                                remove_invalid_rows=False,
+                                                invalid_curvature_ok=True,
+                                                ignore_error=True,
+                                                monkey_information=monkey_information,
+                                                ff_caught_T_new=ff_caught_T_new)
     behav_data_all = behav_data_all.merge(curv_df[[
         'point_index', 'curv_of_traj', 'optimal_arc_d_heading']].drop_duplicates(), on='point_index', how='left')
     behav_data_all.rename(columns={
@@ -310,7 +312,8 @@ def _process_na(behav_data_all):
     na_rows, na_cols = general_utils.find_rows_with_na(
         behav_data_all, 'behav_data_all')
     return na_rows, na_cols
-        
+
+
 def _get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
     subset_key_words = ['_x',
                         '_y',
@@ -381,3 +384,23 @@ def _get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
             'target' in col)) and ('catching_ff' not in col)],
     ]
     return subset_key_words, all_column_subsets
+
+
+def remove_zero_var_cols(data):
+    # if data is a df, remove columns with zero variance
+    if isinstance(data, pd.DataFrame):
+        zero_var_cols = data.columns[data.var() == 0]
+        if len(zero_var_cols) > 0:
+            print(
+                f"Removing {len(zero_var_cols)} columns with zero variance: {zero_var_cols.tolist()}")
+            data = data.drop(columns=zero_var_cols)
+    elif isinstance(data, np.ndarray):
+        zero_var_cols = np.where(np.var(data, axis=0) == 0)[0]
+        if len(zero_var_cols) > 0:
+            print(
+                f"Removing {len(zero_var_cols)} columns with zero variance: {zero_var_cols.tolist()}")
+            data = np.delete(data, zero_var_cols, axis=1)
+    else:
+        raise ValueError(f"Data is not a pandas DataFrame or numpy array: {type(data)}")
+    
+    return data

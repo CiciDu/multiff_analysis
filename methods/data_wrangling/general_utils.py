@@ -315,3 +315,43 @@ def check_array_integrity(X, name="Array", top_n=10, verbose=True):
     print(f"Max: {np.nanmax(X):.6f}")
     print(f"Mean: {np.nanmean(X):.6f}")
     print(f"Std: {np.nanstd(X):.6f}")
+
+
+def ensure_boolean_dtype(df):
+    """
+    Ensure that all object-dtype columns with boolean values are cast to boolean dtype.
+    """
+    bool_columns = df.select_dtypes(include='object').applymap(
+        lambda x: x in [True, False]).all()
+    for col in bool_columns.index[bool_columns]:
+        df[col] = df[col].astype(bool)
+    return df
+
+
+def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
+    """
+    data: 2D NumPy array or pandas DataFrame (samples x features)
+    threshold: correlation magnitude to look for (default = 1.0)
+    tol: numerical tolerance to allow for floating point error
+    """
+    if isinstance(data, np.ndarray):
+        data = pd.DataFrame(data)
+
+    corr_matrix = data.corr()
+    n = corr_matrix.shape[0]
+
+    perfect_pairs = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            corr_ij = corr_matrix.iloc[i, j]
+            if np.abs(np.abs(corr_ij) - threshold) < tol:
+                perfect_pairs.append((data.columns[i], data.columns[j], corr_ij))
+
+    if len(perfect_pairs) > 0:
+        print(f"Found {len(perfect_pairs)} perfect correlations:")
+        for pair in perfect_pairs:
+            print(f"  {pair[0]} and {pair[1]}: {pair[2]:.6f}")
+    else:
+        print("No perfect correlations found.")
+
+    return perfect_pairs

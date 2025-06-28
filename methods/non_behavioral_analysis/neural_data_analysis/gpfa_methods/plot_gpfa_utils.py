@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
@@ -98,17 +98,14 @@ def plot_gpfa_traj_3d(trajectories, figsize=(15, 5), linewidth_single_trial=0.75
     return fig, ax
 
 
-
-
-
 def plot_gpfa_traj_3d_slow(trajectories, figsize=(15, 5), linewidth_single_trial=0.75,
-                                         alpha_single_trial=0.3, linewidth_trial_average=2,
-                                         title='Latent dynamics extracted by GPFA',
-                                         num_traj_to_plot=30,
-                                         view_azim=-5, view_elev=60):
+                           alpha_single_trial=0.3, linewidth_trial_average=2,
+                           title='Latent dynamics extracted by GPFA',
+                           num_traj_to_plot=30,
+                           view_azim=-5, view_elev=60):
     """
     Plot interactive 3D trajectories from GPFA analysis with temporal color gradients.
-    
+
     Parameters
     ----------
     trajectories : list of arrays
@@ -129,15 +126,15 @@ def plot_gpfa_traj_3d_slow(trajectories, figsize=(15, 5), linewidth_single_trial
         Elevation angle for 3D view
     """
     # Enable interactive mode
-    
+
     # Create figure and 3D axis
     fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection='3d')
-    
+
     # Get number of time steps
     T = trajectories[0].shape[1]
     colors = cm.viridis(np.linspace(0, 1, T - 1))
-    
+
     # Plot each trial with temporal color gradient
     for traj in trajectories[:num_traj_to_plot]:
         for t in range(T - 1):
@@ -147,7 +144,7 @@ def plot_gpfa_traj_3d_slow(trajectories, figsize=(15, 5), linewidth_single_trial
                     color=colors[t],
                     lw=linewidth_single_trial,
                     alpha=alpha_single_trial)
-    
+
     # Plot trial-averaged trajectory with color gradient
     avg_traj = np.mean(trajectories, axis=0)
     for t in range(T - 1):
@@ -156,42 +153,43 @@ def plot_gpfa_traj_3d_slow(trajectories, figsize=(15, 5), linewidth_single_trial
                 avg_traj[2, t:t+2],
                 color=colors[t],
                 lw=linewidth_trial_average)
-    
+
     # Add colorbar to show temporal progression
     norm = plt.Normalize(0, T-1)
     sm = plt.cm.ScalarMappable(cmap=cm.viridis, norm=norm)
     sm.set_array([])
     cbar = plt.colorbar(sm, ax=ax, pad=0.1)
     cbar.set_label('Time Step')
-    
+
     # Set labels and title
     ax.set_xlabel('Dim 1')
     ax.set_ylabel('Dim 2')
     ax.set_zlabel('Dim 3')
     ax.set_title(title)
-    
+
     # Manual legend entry
-    ax.plot([], [], [], lw=linewidth_trial_average, color='C1', label='Trial averaged trajectory')
+    ax.plot([], [], [], lw=linewidth_trial_average,
+            color='C1', label='Trial averaged trajectory')
     ax.legend()
-    
+
     # # Set viewing angle
     ax.view_init(azim=view_azim, elev=view_elev)
-    
+
     # Adjust layout
     plt.tight_layout()
-    
+
     return fig, ax
 
 
 def plot_gpfa_traj_3d_uniform_color(trajectories,
-                                     linewidth_single_trial=0.5,
-                                     color_single_trial='C0',
-                                     alpha_single_trial=0.5,
-                                     linewidth_trial_average=2,
-                                     color_trial_average='C1',
-                                     view_azim=-5,
-                                     view_elev=60,
-                                     title='Latent dynamics extracted by GPFA'):
+                                    linewidth_single_trial=0.5,
+                                    color_single_trial='C0',
+                                    alpha_single_trial=0.5,
+                                    linewidth_trial_average=2,
+                                    color_trial_average='C1',
+                                    view_azim=-5,
+                                    view_elev=60,
+                                    title='Latent dynamics extracted by GPFA'):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -217,20 +215,18 @@ def plot_gpfa_traj_3d_uniform_color(trajectories,
     return fig, ax
 
 
-
-
 def plot_gpfa_traj_3d_plotly(trajectories,
-                                     alpha_single_trial=0.1,
-                                     linewidth_single_trial=2,
-                                     linewidth_avg=4,
-                                     stride=2,
-                                     colorscale='Viridis',
-                                     num_trials_to_plot=30,
-                                     title='Latent dynamics extracted by GPFA'):
+                             alpha_single_trial=0.1,
+                             linewidth_single_trial=2,
+                             linewidth_avg=4,
+                             stride=2,
+                             colorscale='Viridis',
+                             num_trials_to_plot=30,
+                             title='Latent dynamics extracted by GPFA'):
     """
     Interactive 3D Plotly plot of GPFA trajectories with color gradient over time.
     """
-    
+
     T = trajectories[0].shape[1]
     color_vals = np.linspace(0, 1, T // stride)
 

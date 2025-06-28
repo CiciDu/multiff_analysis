@@ -1,5 +1,5 @@
 import sys
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import drop_high_corr_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, drop_high_corr_vars
 import os
 import numpy as np
 import matplotlib

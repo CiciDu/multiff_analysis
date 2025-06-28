@@ -12,7 +12,7 @@ import colorcet
 import logging
 from matplotlib import rc
 import warnings
-
+from scipy.signal import gaussian
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -61,7 +61,7 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
     return monkey_info_in_bins
 
 
-def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught_T_new, convolve_pattern, window_width):
+def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught_T_new, window_width):
     """Prepare behavioral data."""
 
     monkey_info_in_bins_ess = monkey_info_in_bins.copy()
@@ -84,7 +84,7 @@ def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught
     monkey_info_in_bins_essential = _select_monkey_info_columns_of_interest(
         monkey_info_in_bins_ess)
     monkey_info_in_bins_essential = _add_stop_rate_and_success_rate(
-        monkey_info_in_bins_essential, convolve_pattern, window_width)
+        monkey_info_in_bins_essential, window_width)
 
     return monkey_info_in_bins_essential
 
@@ -201,6 +201,9 @@ def _add_num_caught_ff(monkey_info_in_bins_ess, ff_caught_T_new, time_bins):
         time_bins)-1]
     counts = counts[:len(catching_target_bins_unique)]
     monkey_info_in_bins_ess['num_caught_ff'] = 0
+    # make sure catching_target_bins_unique doesn't exceed bound
+    point_index_max = monkey_info_in_bins_ess.index.max()
+    catching_target_bins_unique[catching_target_bins_unique > point_index_max] = point_index_max
     monkey_info_in_bins_ess.loc[catching_target_bins_unique,
                                 'num_caught_ff'] = counts
     return monkey_info_in_bins_ess
@@ -234,12 +237,19 @@ def _select_monkey_info_columns_of_interest(monkey_info_in_bins_ess):
     return monkey_info_in_bins_essential
 
 
-def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, convolve_pattern, window_width):
+def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, window_width, 
+                                    kernel_size=7, std_dev=2):
     """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
+    
+    # Create a Gaussian kernel
+    gaussian_kernel = gaussian(kernel_size, std_dev)
+    # Normalize the kernel so it sums to 1
+    gaussian_kernel /= gaussian_kernel.sum()
+    
     num_distinct_stops_convolved = np.convolve(
-        monkey_info_in_bins_essential['num_distinct_stops'], convolve_pattern, 'same')
+        monkey_info_in_bins_essential['num_distinct_stops'], gaussian_kernel, 'same')
     num_caught_ff_convolved = np.convolve(
-        monkey_info_in_bins_essential['num_caught_ff'], convolve_pattern, 'same')
+        monkey_info_in_bins_essential['num_caught_ff'], gaussian_kernel, 'same')
     monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved/window_width
     # suppress the warning for the line below
     with warnings.catch_warnings():
@@ -250,6 +260,24 @@ def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, convolve_patt
     monkey_info_in_bins_essential['stop_success_rate'] = monkey_info_in_bins_essential['stop_success_rate'].replace([
         np.inf, -np.inf], np.nan).fillna(0)
     return monkey_info_in_bins_essential
+
+
+# def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, convolve_pattern, window_width):
+#     """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
+#     num_distinct_stops_convolved = np.convolve(
+#         monkey_info_in_bins_essential['num_distinct_stops'], convolve_pattern, 'same')
+#     num_caught_ff_convolved = np.convolve(
+#         monkey_info_in_bins_essential['num_caught_ff'], convolve_pattern, 'same')
+#     monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved/window_width
+#     # suppress the warning for the line below
+#     with warnings.catch_warnings():
+#         warnings.filterwarnings('ignore', category=RuntimeWarning)
+#         monkey_info_in_bins_essential['stop_success_rate'] = num_caught_ff_convolved / \
+#             num_distinct_stops_convolved
+#     # if there's na or inf in monkey_info_in_bins_essential['stop_success_rate'], replace it with 0
+#     monkey_info_in_bins_essential['stop_success_rate'] = monkey_info_in_bins_essential['stop_success_rate'].replace([
+#         np.inf, -np.inf], np.nan).fillna(0)
+#     return monkey_info_in_bins_essential
 
 
 def _prepare_bin_midlines(time_bins, ff_caught_T_new, all_trial_patterns):

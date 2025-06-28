@@ -1,6 +1,6 @@
 from non_behavioral_analysis.neural_data_analysis.model_neural_data.cca_methods import cca_class, cca_plotting
 from non_behavioral_analysis.neural_data_analysis.decode_targets.decode_target_class import DecodeTargetClass
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import ml_decoder_class
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, ml_decoder_class
 import sys
 import os
 import numpy as np
@@ -218,43 +218,6 @@ class TargetDecoder:
         ax.set_xticklabels(behavioral_columns, rotation=90, ha='right')
         plt.colorbar(im2, ax=ax)
 
-    def decode_one_var_with_ml(self, target_variable='target_distance', test_size=0.2,
-                               models_to_use=['rf', 'nn', 'lr'], cv_folds=5):
-        """
-        Decode target representation using machine learning approaches.
-
-        Parameters:
-        -----------
-        target_variable : str or list
-            Target variable(s) to predict
-        test_size : float
-            Proportion of data to use for testing
-        models_to_use : list
-            List of models to use: 'rf', 'svm', 'nn', 'lr'
-        cv_folds : int
-            Number of cross-validation folds
-
-        Returns:
-        --------
-        dict : ML results including model performance and predictions
-        """
-        # Use the ML decoder to perform the decoding
-        ml_results = self.ml_decoder.decode_targets(
-            neural_data=self.neural_data,
-            target_data=self.target_data,
-            target_variable=target_variable,
-            test_size=test_size,
-            models_to_use=models_to_use,
-            cv_folds=cv_folds
-        )
-
-        # Store results in main class for compatibility
-        if ml_results is not None:
-            self.models[f'ml_{target_variable}'] = ml_results
-            self.results[f'ml_{target_variable}'] = ml_results
-
-        return ml_results
-
     def get_best_model(self, target_variable, metric='test_accuracy'):
         return self.ml_decoder.get_best_model(target_variable, metric)
 
@@ -282,53 +245,3 @@ class TargetDecoder:
             pickle.dump(results_to_save, f)
 
         print(f"Results saved to {save_path}")
-
-
-def create_example_decoder(raw_data_folder_path):
-    """
-    Create an example target decoder with all methods.
-
-    Parameters:
-    -----------
-    raw_data_folder_path : str
-        Path to the raw monkey data folder
-
-    Returns:
-    --------
-    TargetDecoder : Configured decoder instance
-    """
-    # Initialize decoder
-    decoder = TargetDecoder(raw_data_folder_path)
-
-    # Prepare data
-    decoder.prepare_data(exists_ok=True, use_lags=True)
-
-    # Run CCA decoding
-    cca_results = decoder.decode_with_cca(n_components=10)
-
-    # Run ML decoding for common target variables
-    target_vars = ['target_distance', 'target_angle']
-    for target_var in target_vars:
-        try:
-            decoder.decode_one_var_with_ml(target_variable=target_var,
-                                           models_to_use=['rf', 'svm'],
-                                           cv_folds=3)
-        except Exception as e:
-            print(f"ML decoding failed for {target_var}: {e}")
-
-    return decoder
-
-
-if __name__ == "__main__":
-    # Example usage
-    raw_data_path = "all_monkey_data/raw_monkey_data/monkey_Bruno/data_0328"
-
-    # Create and run decoder
-    decoder = create_example_decoder(raw_data_path)
-
-    # Plot results
-    if 'cca' in decoder.results:
-        decoder.plot_cca_results()
-
-    # Save results
-    decoder.save_results("target_decoding_results.pkl")

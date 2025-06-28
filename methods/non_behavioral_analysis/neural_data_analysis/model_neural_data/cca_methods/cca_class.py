@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
@@ -35,7 +35,7 @@ class CCAclass():
         self.scaler = StandardScaler()
         self.X1_sc, self.X2_sc = self.scaler.fit_transform(
             self.X1), self.scaler.fit_transform(self.X2)
-        
+
         self.X1_sc_df = pd.DataFrame(self.X1_sc, columns=self.X1.columns)
         self.X2_sc_df = pd.DataFrame(self.X2_sc, columns=self.X2.columns)
 
@@ -51,7 +51,7 @@ class CCAclass():
             self.X2_sc, self.X2_c)
         self.get_weight_df()
         self.get_loading_df()
-        
+
         # also put the results into one dict
         self.results = {
             'X1_canon_vars': self.X1_c,
@@ -106,7 +106,7 @@ class CCAclass():
                             X1_or_X2='X1', abs_value=True):
         if not hasattr(self, 'X1_weight_df'):
             self.get_weight_df()
-        weight_df = self.X1_weight_df if X1_or_X2 == 'X1' else self.X2_weight_df
+        weight_df = self.X1_weight_df.copy() if X1_or_X2 == 'X1' else self.X2_weight_df.copy()
         num_variates = self.X1_weights.shape[1] if X1_or_X2 == 'X1' else self.X2_weights.shape[1]
 
         if abs_value:

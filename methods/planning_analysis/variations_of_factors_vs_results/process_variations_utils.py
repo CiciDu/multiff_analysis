@@ -4,7 +4,7 @@ from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils
-from data_wrangling import specific_utils
+from data_wrangling import specific_utils, general_utils
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
@@ -73,8 +73,8 @@ def _supply_info_to_ref_column_subset_to_match_more_columns_subset(overall_df):
         )
     more_sub = overall_df[overall_df['ref_columns_only'] == False].copy()
 
-    more_sub = specific_utils.ensure_boolean_dtype(more_sub)
-    ref_sub = specific_utils.ensure_boolean_dtype(ref_sub)
+    more_sub = general_utils.ensure_boolean_dtype(more_sub)
+    ref_sub = general_utils.ensure_boolean_dtype(ref_sub)
 
     columns_to_match = ['cluster_to_keep', 'cluster_for_interaction',
                         'use_combd_features_for_cluster_only']

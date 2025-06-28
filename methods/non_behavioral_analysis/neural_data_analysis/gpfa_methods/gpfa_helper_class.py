@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_data_processing
@@ -126,7 +126,6 @@ class GPFAHelperClass():
 
         self.gpfa_behav_data_columns = gpfa_behav_data_sub.columns
 
-
     def _get_spike_neural_data(self, use_lagged_raw_spike_data=False,
                                apply_pca_on_raw_spike_data=False,
                                num_pca_components=7):
@@ -145,28 +144,31 @@ class GPFAHelperClass():
 
         if apply_pca_on_raw_spike_data:
             pca = PCA(n_components=num_pca_components)
-            x_var_df.drop(columns=['segment', 'bin'], inplace=True, errors='ignore')
+            x_var_df.drop(columns=['segment', 'bin'],
+                          inplace=True, errors='ignore')
             x_var = pca.fit_transform(x_var_df)
-            x_var_df = pd.DataFrame(x_var, columns=['pca_'+str(i) for i in range(num_pca_components)])
-            
-        return x_var_df  
-            
+            x_var_df = pd.DataFrame(
+                x_var, columns=['pca_'+str(i) for i in range(num_pca_components)])
+
+        return x_var_df
+
     def _get_trialwise_spike_neural_data(self,
                                          apply_pca_on_raw_spike_data=True,
                                          use_lagged_raw_spike_data=True,
                                          num_pca_components=7,
                                          ):
         x_var_df = self._get_spike_neural_data(use_lagged_raw_spike_data=use_lagged_raw_spike_data,
-                                            apply_pca_on_raw_spike_data=apply_pca_on_raw_spike_data,
-                                            num_pca_components=num_pca_components)
+                                               apply_pca_on_raw_spike_data=apply_pca_on_raw_spike_data,
+                                               num_pca_components=num_pca_components)
 
         if not hasattr(self, 'gpfa_behav_data'):
             if not hasattr(self, 'use_lagged_behav_data'):
                 self.use_lagged_behav_data = False
-            self._get_gpfa_behav_data(use_lagged_behav_data=self.use_lagged_behav_data)
+            self._get_gpfa_behav_data(
+                use_lagged_behav_data=self.use_lagged_behav_data)
 
         self._find_shared_segments()
-        
+
         for seg in self.shared_segments:
             gpfa_behav_data_sub_mask = self.gpfa_behav_data['segment'] == seg
             gpfa_trial = x_var_df[gpfa_behav_data_sub_mask]
@@ -175,12 +177,13 @@ class GPFAHelperClass():
     def _get_trialwise_gpfa_neural_data(self):
         self.apply_pca_on_raw_spike_data = False
         self.gpfa_neural_trials = []
-        
+
         if not hasattr(self, 'gpfa_behav_data'):
             if not hasattr(self, 'use_lagged_behav_data'):
                 self.use_lagged_behav_data = False
-            self._get_gpfa_behav_data(use_lagged_behav_data=self.use_lagged_behav_data)
-        
+            self._get_gpfa_behav_data(
+                use_lagged_behav_data=self.use_lagged_behav_data)
+
         self._find_shared_segments()
 
         for seg in self.shared_segments:
@@ -206,7 +209,6 @@ class GPFAHelperClass():
         else:
             self._get_trialwise_gpfa_neural_data()
 
-
     def get_concatenated_gpfa_and_behav_data_for_all_trials(self, use_lagged_behav_data=False,
                                                             use_raw_spike_data_instead=False,
                                                             use_lagged_raw_spike_data=False,
@@ -218,15 +220,18 @@ class GPFAHelperClass():
 
         self.concat_behav_trials = self.gpfa_behav_data[self.gpfa_behav_data['segment'].isin(
             self.shared_segments)]
-        
+
         if use_raw_spike_data_instead:
             x_var_df = self._get_spike_neural_data(use_lagged_raw_spike_data=use_lagged_raw_spike_data,
-                                                apply_pca_on_raw_spike_data=apply_pca_on_raw_spike_data,
-                                                num_pca_components=num_pca_components)
+                                                   apply_pca_on_raw_spike_data=apply_pca_on_raw_spike_data,
+                                                   num_pca_components=num_pca_components)
             x_var_df['segment'] = self.gpfa_behav_data['segment'].values
-            self.concat_neural_trials = x_var_df[x_var_df['segment'].isin(self.shared_segments)].copy()
-            self.concat_neural_trials.drop(columns=['segment', 'bin'], inplace=True, errors='ignore')
+            self.concat_neural_trials = x_var_df[x_var_df['segment'].isin(
+                self.shared_segments)].copy()
+            self.concat_neural_trials.drop(
+                columns=['segment', 'bin'], inplace=True, errors='ignore')
         else:
             if not hasattr(self, 'gpfa_neural_trials'):
                 self._get_trialwise_gpfa_neural_data()
-            self.concat_neural_trials = np.concatenate(self.gpfa_neural_trials, axis=0)
+            self.concat_neural_trials = np.concatenate(
+                self.gpfa_neural_trials, axis=0)

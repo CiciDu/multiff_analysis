@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
@@ -30,42 +30,42 @@ def plot_cca_results(cca_results):
 
     # Canonical correlations
     axes[0].bar(range(len(cca_results['canon_corr'])),
-                    cca_results['canon_corr'])
+                cca_results['canon_corr'])
     axes[0].set_title('Canonical Correlations')
     axes[0].set_xlabel('Component')
     axes[0].set_ylabel('Correlation')
 
     # Canonical variables scatter plot
     axes[1].scatter(cca_results['X1_canon_vars'][:, 0],
-                        cca_results['X2_canon_vars'][:, 0], alpha=0.5, color='blue')
+                    cca_results['X2_canon_vars'][:, 0], alpha=0.5, color='blue')
     axes[1].set_title('First Canonical Variables')
     axes[1].set_xlabel('Neural CV1')
     axes[1].set_ylabel('Behavioral CV1')
     # add a line of y=x (45 degrees)
     axes[1].plot([cca_results['X1_canon_vars'][:, 0].min(), cca_results['X1_canon_vars'][:, 0].max()],
-                    [cca_results['X1_canon_vars'][:, 0].min(), cca_results['X1_canon_vars'][:, 0].max()],
-                    color='red', linestyle='--')
+                 [cca_results['X1_canon_vars'][:, 0].min(
+                 ), cca_results['X1_canon_vars'][:, 0].max()],
+                 color='red', linestyle='--')
     # add R & R2
     axes[1].text(0.05, 0.95, f'R={cca_results["canon_corr"][0]:.2f}, R2={cca_results["canon_corr"][0]**2:.2f}',
-                    transform=axes[1].transAxes, fontsize=12, verticalalignment='top')
+                 transform=axes[1].transAxes, fontsize=12, verticalalignment='top')
 
     plt.tight_layout()
     plt.show()
-    
-
 
 
 # Function to make a series of bar plots of ranked loadings
-def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, canon_corr, num_variates, 
-                                                 keep_one_value_for_each_feature=False, 
-                                                 max_plots_to_show=None,
-                                                 max_features_to_show_per_plot=20, 
-                                                 horizontal_bars=True,
-                                                 squared=False):
+def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, canon_corr, num_variates,
+                                                            keep_one_value_for_each_feature=False,
+                                                            max_plots_to_show=None,
+                                                            max_features_to_show_per_plot=20,
+                                                            horizontal_bars=True,
+                                                            squared=False):
     # Get the unique feature categories
-    unique_feature_category = _get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot)
+    unique_feature_category = _get_unique_feature_category(
+        squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot)
     # Generate a color dictionary for the unique feature categories
-    color_dict = _get_color_dict (unique_feature_category)
+    color_dict = _get_color_dict(unique_feature_category)
 
     if max_plots_to_show is None:
         max_plots_to_show = num_variates
@@ -74,12 +74,14 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
         # If the flag is set to keep one value for each feature
         if keep_one_value_for_each_feature:
             # Sort the squared loadings, group by feature category, and keep the first (max) value
-            loading_subset = squared_loading.sort_values(variate, ascending=False, key=abs).groupby('feature_category').first().reset_index(drop=False)
+            loading_subset = squared_loading.sort_values(variate, ascending=False, key=abs).groupby(
+                'feature_category').first().reset_index(drop=False)
         else:
             # Otherwise, just copy the squared loadings
             loading_subset = squared_loading.copy()
         # Sort the subset by the variate and keep the top features up to the max limit
-        loading_subset = loading_subset.sort_values(by=variate, ascending=False, key=abs).iloc[:max_features_to_show_per_plot]
+        loading_subset = loading_subset.sort_values(
+            by=variate, ascending=False, key=abs).iloc[:max_features_to_show_per_plot]
 
         # Create a new plot
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -88,14 +90,16 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
         xlabel = "Squared Loading" if squared else "Loading"
         if horizontal_bars:
             # Create a horizontal bar plot with seaborn
-            sns.barplot(data=loading_subset, x=variate, y='feature', dodge=False, ax=ax, hue='feature_category', palette=color_dict, orient='h')
+            sns.barplot(data=loading_subset, x=variate, y='feature', dodge=False,
+                        ax=ax, hue='feature_category', palette=color_dict, orient='h')
             plt.xlabel(xlabel, fontsize=14)
             plt.ylabel("")
             ax.tick_params(axis='x', which='major', labelsize=14)
             ax.tick_params(axis='y', which='major', labelsize=14)
         else:
             # Otherwise, create a vertical bar plot
-            sns.barplot(data=loading_subset, x='feature', y=variate, dodge=False, ax=ax, hue='feature_category', palette=color_dict)
+            sns.barplot(data=loading_subset, x='feature', y=variate,
+                        dodge=False, ax=ax, hue='feature_category', palette=color_dict)
             plt.xticks(rotation=45, ha='right')
             plt.ylabel(xlabel, fontsize=14)
             ax.tick_params(axis='x', which='major', labelsize=14)
@@ -108,16 +112,17 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
 
         # Draw a vertical line at x=0
         plt.axvline(x=0, color='black', linestyle='--')
-        
+
         # Calculate the coefficient and set the title of the plot
         coefficient = np.around(np.array(canon_corr), 2)[variate]
-        plt.title(f'Variate: {variate + 1}; canonical correlation coefficient: {coefficient}', fontsize=18)
-        
+        plt.title(
+            f'Variate: {variate + 1}; canonical correlation coefficient: {coefficient}', fontsize=18)
+
         # Display the plot
         plt.show()
-        
+
         # Close the plot to free up memory
-        
+
 
 # Function to get unique feature categories based on the given parameters
 def _get_unique_feature_category(squared_loading, num_variates, keep_one_value_for_each_feature, max_features_to_show_per_plot):
@@ -126,31 +131,36 @@ def _get_unique_feature_category(squared_loading, num_variates, keep_one_value_f
         # If the flag is set to keep one value for each feature
         if keep_one_value_for_each_feature:
             # Sort the squared loadings, group by feature category, and keep the first (max) value
-            loading_subset = squared_loading.sort_values(variate, ascending=False, key=abs).groupby('feature_category').first().reset_index(drop=False)
+            loading_subset = squared_loading.sort_values(variate, ascending=False, key=abs).groupby(
+                'feature_category').first().reset_index(drop=False)
         else:
             # Otherwise, just copy the squared loadings
             loading_subset = squared_loading.copy()
         # Sort the subset by the variate and keep the top features up to the max limit
-        loading_subset = loading_subset.sort_values(by=variate, ascending=False, key=abs).iloc[:max_features_to_show_per_plot]
+        loading_subset = loading_subset.sort_values(
+            by=variate, ascending=False, key=abs).iloc[:max_features_to_show_per_plot]
         # Update the unique feature categories
-        unique_feature_category = np.unique(np.concatenate([unique_feature_category, loading_subset.feature_category]))
+        unique_feature_category = np.unique(np.concatenate(
+            [unique_feature_category, loading_subset.feature_category]))
     # Log the number of unique feature categories included in the plot
-    logging.info(f"{len(unique_feature_category)} out of {len(squared_loading.feature_category.unique())} feature categories are included in the plot")
+    logging.info(
+        f"{len(unique_feature_category)} out of {len(squared_loading.feature_category.unique())} feature categories are included in the plot")
     return unique_feature_category
 
 
 # Function to generate a color dictionary for the unique feature categories
-def _get_color_dict (unique_feature_category):
+def _get_color_dict(unique_feature_category):
     # Get the first 10 colors from the Set3 palette
     qualitative_colors = sns.color_palette("Set3", 10)
     # Get the remaining colors from the Glasbey palette
-    qualitative_colors_2 = sns.color_palette(colorcet.glasbey, n_colors=len(unique_feature_category)-10)
+    qualitative_colors_2 = sns.color_palette(
+        colorcet.glasbey, n_colors=len(unique_feature_category)-10)
     # Combine the two color palettes
     qualitative_colors.extend(qualitative_colors_2)
     # Create a dictionary mapping each feature category to a color
-    color_dict = {unique_feature_category[i]: qualitative_colors[i] for i in range(len(unique_feature_category))}
+    color_dict = {unique_feature_category[i]: qualitative_colors[i] for i in range(
+        len(unique_feature_category))}
     return color_dict
-
 
 
 def plot_cca_prediction_accuracy_w_scatter(testcorrsCV):

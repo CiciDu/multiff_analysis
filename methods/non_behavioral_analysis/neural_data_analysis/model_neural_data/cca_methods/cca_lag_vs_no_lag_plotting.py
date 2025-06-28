@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
@@ -23,7 +23,6 @@ from sklearn.preprocessing import StandardScaler
 from palettable.colorbrewer import qualitative
 
 from sklearn.model_selection import KFold
-
 
 
 def plot_cca_prediction_accuracy_train_test_bars_for_lags_and_no_lags(lags_testcorrs, lags_traincorrs, no_lags_testcorrs, no_lags_traincorrs):
@@ -49,24 +48,36 @@ def plot_cca_prediction_accuracy_train_test_bars_for_lags_and_no_lags(lags_testc
         plt.title(f'Test prediction accuracy for set {i+1}')
         plt.legend()
         plt.show()
-
-
-def plot_lag_offset_train_test_overlap(
+        
+        
+def plot_train_vs_test_overlap(
     df, dataset_name, chunk_size=30, alpha=0.8,
     base_width=0.35, narrower_width_ratio=0.4,
     width_per_var=0.6, height=6,
     mode='train_offset'
 ):
+    pass
+
+
+def plot_cca_lag_vs_nolag_and_train_vs_test(
+    df, dataset_name, chunk_size=30, alpha=0.8,
+    base_width=0.35, narrower_width_ratio=0.4,
+    width_per_var=0.6, height=6,
+    mode='train_offset'
+):
+
     vars_unique = df['var'].unique()
     num_chunks = int(np.ceil(len(vars_unique) / chunk_size))
     train_test_statuses = ['train', 'test']
     lag_statuses = sorted(df['whether_lag'].unique())
 
-    offset_groups, width_groups, colors = get_plot_config(mode, train_test_statuses, lag_statuses)
+    offset_groups, width_groups, colors = get_plot_config(
+        mode, train_test_statuses, lag_statuses)
 
     for i in range(num_chunks):
         chunk_vars, chunk_df = get_chunk_data(df, vars_unique, i, chunk_size)
-        fig, ax = create_plot_axes(chunk_vars, chunk_size, width_per_var, height)
+        fig, ax = create_plot_axes(
+            chunk_vars, chunk_size, width_per_var, height)
         x = np.arange(len(chunk_vars))
 
         draw_bars(
@@ -109,9 +120,11 @@ def get_plot_config(mode, train_test_statuses, lag_statuses):
 
 
 def get_chunk_data(df, vars_unique, chunk_idx, chunk_size):
-    chunk_vars = vars_unique[chunk_idx * chunk_size:(chunk_idx + 1) * chunk_size]
+    chunk_vars = vars_unique[chunk_idx *
+                             chunk_size:(chunk_idx + 1) * chunk_size]
     chunk_df = df[df['var'].isin(chunk_vars)].copy()
-    chunk_df['var'] = pd.Categorical(chunk_df['var'], categories=chunk_vars, ordered=True)
+    chunk_df['var'] = pd.Categorical(
+        chunk_df['var'], categories=chunk_vars, ordered=True)
     return chunk_vars, chunk_df
 
 
@@ -164,7 +177,7 @@ def get_bar_attributes(
         ]
         width = base_width if width_group == 'train' else base_width * narrower_width_ratio
         alpha_adj = alpha
-        #alpha_adj = alpha if width_group == 'train' else alpha * 0.7
+        # alpha_adj = alpha if width_group == 'train' else alpha * 0.7
         key = (offset_group, width_group)
 
     subset_df = subset_df.set_index('var').reindex(chunk_vars)
@@ -174,7 +187,8 @@ def get_bar_attributes(
 
 
 def finalize_plot(ax, x, chunk_vars, dataset_name, chunk_idx, chunk_size):
-    ax.set_title(f"{dataset_name} - Variables {chunk_idx * chunk_size + 1} to {(chunk_idx + 1) * chunk_size}")
+    ax.set_title(
+        f"{dataset_name} - Variables {chunk_idx * chunk_size + 1} to {(chunk_idx + 1) * chunk_size}")
     ax.set_xticks(x)
     ax.set_xticklabels(chunk_vars, rotation=45, ha='right')
     ax.set_xlabel("Variable")
@@ -183,7 +197,8 @@ def finalize_plot(ax, x, chunk_vars, dataset_name, chunk_idx, chunk_size):
     ax.axhline(0.1, color='purple', linestyle='--', linewidth=2, alpha=0.5)
 
     for grid_pos in x[:-1] + 0.5:
-        ax.axvline(grid_pos, color='gray', linestyle='--', linewidth=0.7, alpha=0.5)
+        ax.axvline(grid_pos, color='gray', linestyle='--',
+                   linewidth=0.7, alpha=0.5)
 
     ax.grid(False)
     ax.yaxis.grid(True, linestyle=':', alpha=0.7)
@@ -203,23 +218,28 @@ def _build_corr_df(corrs, x_cols, train_or_test, whether_lag, dataset):
     })
 
 
-
 def combine_data_to_compare_train_and_test(cca_no_lag, cca_lags):
     X1_dfs, X2_dfs = [], []
 
     for cca_obj, lag_label in [(cca_no_lag, 'no_lag'), (cca_lags, 'lag')]:
-        X1_dfs.append(_build_corr_df(cca_obj.traincorrs[0], cca_obj.X1.columns, 'train', lag_label, 'X1'))
-        X1_dfs.append(_build_corr_df(cca_obj.testcorrs[0], cca_obj.X1.columns, 'test', lag_label, 'X1'))
-        X2_dfs.append(_build_corr_df(cca_obj.traincorrs[1], cca_obj.X2.columns, 'train', lag_label, 'X2'))
-        X2_dfs.append(_build_corr_df(cca_obj.testcorrs[1], cca_obj.X2.columns, 'test', lag_label, 'X2'))
+        X1_dfs.append(_build_corr_df(
+            cca_obj.traincorrs[0], cca_obj.X1.columns, 'train', lag_label, 'X1'))
+        X1_dfs.append(_build_corr_df(
+            cca_obj.testcorrs[0], cca_obj.X1.columns, 'test', lag_label, 'X1'))
+        X2_dfs.append(_build_corr_df(
+            cca_obj.traincorrs[1], cca_obj.X2.columns, 'train', lag_label, 'X2'))
+        X2_dfs.append(_build_corr_df(
+            cca_obj.testcorrs[1], cca_obj.X2.columns, 'test', lag_label, 'X2'))
 
     # Combine and sort, rename all _0 to the original name
     combined_X1_df = pd.concat(X1_dfs)
-    combined_X1_df['var'] = combined_X1_df['var'].str.replace(r'_0$', '', regex=True)
+    combined_X1_df['var'] = combined_X1_df['var'].str.replace(
+        r'_0$', '', regex=True)
     combined_X1_df = combined_X1_df.sort_values(by='var')
 
     combined_X2_df = pd.concat(X2_dfs)
-    combined_X2_df['var'] = combined_X2_df['var'].str.replace(r'_0$', '', regex=True)
+    combined_X2_df['var'] = combined_X2_df['var'].str.replace(
+        r'_0$', '', regex=True)
     combined_X2_df = combined_X2_df.sort_values(by='var')
 
     return combined_X1_df, combined_X2_df

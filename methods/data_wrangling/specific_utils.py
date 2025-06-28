@@ -403,14 +403,3 @@ def take_out_valid_cluster_intervals(cluster_caught_T_new,
     """
     return _process_valid_intervals(cluster_caught_T_new, gap_too_large_threshold, min_combined_valid_interval_length)
 
-
-def ensure_boolean_dtype(df):
-    """
-    Ensure that all object-dtype columns with boolean values are cast to boolean dtype.
-    """
-    bool_columns = df.select_dtypes(include='object').applymap(
-        lambda x: x in [True, False]).all()
-    for col in bool_columns.index[bool_columns]:
-        df[col] = df[col].astype(bool)
-    return df
-

@@ -1,6 +1,6 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class
-from non_behavioral_analysis.neural_data_analysis.model_neural_data import neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from non_behavioral_analysis.neural_data_analysis.visualize_neural_data import plot_modeling_result
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 
 
 def plot_cca_cv_results(
-    stats, labels, data_type='X1', component=0,
+    stats, data_type='X1', component=0,
     use_cross_view_corr=True, filter_significant=False, sort_by_significance=False,
     significance_threshold=2, title_prefix=""
 ):
@@ -50,7 +50,7 @@ def plot_cca_cv_results(
         title_prefix: optional string to prepend to title
     """
     values_train, values_test, errors_train, errors_test, final_labels = _extract_plot_data(
-        stats, labels, data_type, component, use_cross_view_corr,
+        stats, data_type, component, use_cross_view_corr,
         filter_significant, significance_threshold, sort_by_significance
     )
 
@@ -62,7 +62,7 @@ def plot_cca_cv_results(
 
 
 def _extract_plot_data(
-    stats, labels, data_type, component,
+    stats, data_type, component,
     use_cross_view_corr, filter_significant, significance_threshold, sort_by_significance
 ):
     """
@@ -72,7 +72,8 @@ def _extract_plot_data(
     std_train = stats[f'std_{data_type}_train_corr']
     mean_test = stats[f'mean_{data_type}_test_corr']
     std_test = stats[f'std_{data_type}_test_corr']
-
+    
+    labels = stats['X1_labels'] if data_type == 'X1' else stats['X2_labels']
 
     if use_cross_view_corr:
         values_train = mean_train.reshape(-1)
@@ -84,19 +85,6 @@ def _extract_plot_data(
         values_test = mean_test[:, component]
         errors_train = std_train[:, component]
         errors_test = std_test[:, component]
-        
-    # if use_cross_view_corr:
-    #     values_train = mean_train[:, component]
-    #     values_test = mean_test[:, component]
-    #     errors_train = std_train[:, component]
-    #     errors_test = std_test[:, component]
-    # else:
-    #     # Just canonical correlation for the component
-    #     values_train = [mean_train[component, 0]]
-    #     values_test = [mean_test[component, 0]]
-    #     errors_train = [std_train[component, 0]]
-    #     errors_test = [std_test[component, 0]]
-    #     labels = [f"Component {component + 1}"]
 
     if filter_significant:
         mask = np.abs(values_test) > significance_threshold * errors_test
@@ -109,7 +97,7 @@ def _extract_plot_data(
         values_test = values_test[mask]
         errors_train = errors_train[mask]
         errors_test = errors_test[mask]
-        
+
     if sort_by_significance:
         # sig_score = np.abs(values_test) / errors_test
         sig_score = np.abs(values_test)
@@ -119,7 +107,7 @@ def _extract_plot_data(
         values_test = values_test[sorted_idx]
         errors_train = errors_train[sorted_idx]
         errors_test = errors_test[sorted_idx]
-        
+
     return values_train, values_test, errors_train, errors_test, labels
 
 
