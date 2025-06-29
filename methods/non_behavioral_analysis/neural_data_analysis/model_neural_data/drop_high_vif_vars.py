@@ -190,32 +190,18 @@ def take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(df,
                                                                           verbose=True):
     if verbose:
         print(f'Getting VIF for all {df.shape[1]} features...')
-    if initial_vif is None:
-        vif_df = get_vif_df(df)
-    else:
-        vif_df = initial_vif
-    # after calculating vif, take out the subset of features with vif greater than threshold and iterate over them
-    vif_df_subset = vif_df.loc[vif_df['vif']
-                               > vif_threshold_for_initial_subset]
-    column_subset = vif_df_subset['feature'].values
-    if verbose:
-        print(
-            f"Initial subset of columns with VIF > {vif_threshold_for_initial_subset}")
-        print(vif_df_subset)
-    _, columns_dropped, _ = iteratively_drop_column_w_highest_vif(
-        df[column_subset].copy(), verbose=verbose, vif_threshold=vif_threshold)
+    _, columns_dropped, final_vif_df = iteratively_drop_column_w_highest_vif(
+        df.copy(), verbose=verbose, vif_threshold=vif_threshold)
     df_reduced = df.drop(columns=columns_dropped)
     print(f'The shape of the reduced dataframe is {df_reduced.shape}')
-    if get_final_vif:
-        final_vif_df = get_vif_df(df_reduced)
-        if verbose:
-            print(f"Final number of columns {df_reduced.shape[1]}")
-            subset_above_threshold = final_vif_df.loc[final_vif_df['vif']
-                                                      > vif_threshold_for_initial_subset]
-            print(f"Columns still above threshold: ")
-            print(subset_above_threshold)
-    else:
-        final_vif_df = None
+
+    if verbose:
+        print(f"Final number of columns {df_reduced.shape[1]}")
+        subset_above_threshold = final_vif_df.loc[final_vif_df['vif']
+                                                    > vif_threshold_for_initial_subset]
+        print(f"Columns still above threshold: ")
+        print(subset_above_threshold)
+
     return df_reduced, columns_dropped, final_vif_df
 
 

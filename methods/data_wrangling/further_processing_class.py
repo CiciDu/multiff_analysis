@@ -47,6 +47,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                     f"raw_data_folder_path {raw_data_folder_path} does not exist.")
             self.extract_info_from_raw_data_folder_path(raw_data_folder_path)
             self.cluster_around_target_indices = None
+        else:
+            print("Warning: raw_data_folder_path is None")
 
     def make_df_related_to_patterns_and_features(self, exists_ok=True):
 

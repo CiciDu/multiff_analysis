@@ -32,9 +32,10 @@ from non_behavioral_analysis.neural_data_analysis.get_neural_data import neural_
 from non_behavioral_analysis.neural_data_analysis.decode_targets import prep_decode_target, behav_features_to_keep
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from non_behavioral_analysis.neural_data_analysis.gpfa_methods import elephant_utils, fit_gpfa_utils, gpfa_regression_utils, plot_gpfa_utils, gpfa_helper_class
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
 
 
-class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass, gpfa_helper_class.GPFAHelperClass):
+class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPFAHelperClass):
 
     def __init__(self,
                  raw_data_folder_path=None,
@@ -77,7 +78,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass, gpfa
 
     def get_x_and_y_data_for_modeling(self, exists_ok=True):
         self.get_x_and_y_var(exists_ok=exists_ok)
-        self.reduce_x_var_lags()
+        self._reduce_x_var_lags()
         self.reduce_y_var_lags(exists_ok=exists_ok)
 
     def get_behav_data(self, exists_ok=True, save_data=True):
@@ -145,6 +146,66 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass, gpfa
         # check for NA; if there is any, raise a warning
         na_rows, na_cols = general_utils.find_rows_with_na(
             self.pursuit_data, 'pursuit_data')
+
+    def reduce_y_var(self, 
+                     save_data=True,
+                     corr_threshold_for_lags_of_a_feature=0.98,
+                     vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
+                     filter_corr_by_all_columns=False,
+                     filter_vif_by_subsets=True,
+                     filter_vif_by_all_columns=True,
+                     exists_ok=True,
+                     ):
+        df_path = os.path.join(
+            self.decoding_targets_folder_path, 'decode_target_y_var_reduced.csv')
+        
+        self._reduce_y_var(df_path=df_path,
+                          save_data=save_data,
+                          corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                          vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                          vif_threshold=vif_threshold,
+                          verbose=verbose,
+                          filter_corr_by_all_columns=filter_corr_by_all_columns,
+                          filter_vif_by_subsets=filter_vif_by_subsets,
+                          filter_vif_by_all_columns=filter_vif_by_all_columns,
+                          exists_ok=exists_ok)
+
+    def reduce_y_var_lags(self, 
+                          df_path=None,
+                          save_data=True,
+                          corr_threshold_for_lags_of_a_feature=0.85,
+                          vif_threshold_for_initial_subset=5,
+                          vif_threshold=5,
+                          verbose=True,
+                          filter_corr_by_feature=True,
+                          filter_corr_by_subsets=True,
+                          filter_corr_by_all_columns=True,
+                          filter_vif_by_feature=True,
+                          filter_vif_by_subsets=True,
+                          filter_vif_by_all_columns=False,
+                          exists_ok=True):
+        """Reduce y_var_lags by removing highly correlated and high VIF features.
+
+        Parameters are passed to the parent class's reduce_y_var_lags method.
+        Results are cached to avoid recomputation.
+        """
+        df_path = os.path.join(
+            self.decoding_targets_folder_path, 'decode_target_y_var_lags_reduced.csv')
+        self._reduce_y_var_lags(df_path=df_path,
+                               save_data=save_data,
+                               corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                               vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                               vif_threshold=vif_threshold,
+                               verbose=verbose,
+                               filter_corr_by_feature=filter_corr_by_feature,
+                               filter_corr_by_subsets=filter_corr_by_subsets,
+                               filter_corr_by_all_columns=filter_corr_by_all_columns,
+                               filter_vif_by_feature=filter_vif_by_feature,
+                               filter_vif_by_subsets=filter_vif_by_subsets,
+                               filter_vif_by_all_columns=filter_vif_by_all_columns,
+                               exists_ok=exists_ok)
+
+
 
     def _select_behav_features(self):
         self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
@@ -243,105 +304,6 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass, gpfa
             # free up memory if basic data is not present before calling the function
             self._free_up_memory()
 
-    def reduce_x_var(self):
-        self.x_var_reduced = prep_decode_target.remove_zero_var_cols(
-            self.x_var)
-
-    def reduce_x_var_lags(self):
-        self.x_var_lags_reduced = prep_decode_target.remove_zero_var_cols(
-            self.x_var_lags)
-
-    def reduce_y_var(self, corr_threshold_for_lags_of_a_feature=0.98,
-                     vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
-                     filter_corr_by_all_columns=False,
-                     filter_vif_by_subsets=True,
-                     filter_vif_by_all_columns=True,
-                     exists_ok=True,
-                     ):
-        df_path = os.path.join(
-            self.decoding_targets_folder_path, 'decode_target_y_var_reduced.csv')
-        if exists_ok and os.path.exists(df_path):
-            self.y_var_reduced = pd.read_csv(df_path)
-            print(f'Loaded y_var_reduced from {df_path}')
-        else:
-            # drop columns with std less than 0.001
-            columns_w_small_std = self.y_var.std(
-            )[self.y_var.std() < 0.001].index.tolist()
-
-            self.y_var_reduced = self.y_var.drop(columns=columns_w_small_std)
-            self._reduce_y_var(self.y_var_reduced,
-                               filter_corr_by_all_columns=filter_corr_by_all_columns,
-                               corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
-                               vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
-                               vif_threshold=vif_threshold,
-                               verbose=verbose,
-                               filter_vif_by_subsets=filter_vif_by_subsets,
-                               filter_vif_by_all_columns=filter_vif_by_all_columns)
-            self.y_var_reduced.to_csv(df_path, index=False)
-            print(f'Saved y_var_reduced to {df_path}')
-
-    def reduce_y_var_lags(self, corr_threshold_for_lags_of_a_feature=0.85,
-                          vif_threshold_for_initial_subset=5,
-                          vif_threshold=5,
-                          verbose=True,
-                          filter_corr_by_feature=True,
-                          filter_corr_by_subsets=True,
-                          filter_corr_by_all_columns=True,
-                          filter_vif_by_feature=True,
-                          filter_vif_by_subsets=True,
-                          filter_vif_by_all_columns=False,
-                          exists_ok=True):
-        """Reduce y_var_lags by removing highly correlated and high VIF features.
-
-        Parameters are passed to the parent class's reduce_y_var_lags method.
-        Results are cached to avoid recomputation.
-        """
-        df_path = os.path.join(
-            self.decoding_targets_folder_path, 'decode_target_y_var_lags_reduced.csv')
-
-        # Try to load cached results if allowed
-        if exists_ok and os.path.exists(df_path):
-            try:
-                cached_data = pd.read_csv(df_path)
-                if len(cached_data) == len(self.y_var_lags):
-                    self.y_var_lags_reduced = cached_data
-                    if verbose:
-                        print(
-                            f'Loaded y_var_lags_reduced from {df_path}')
-                    return
-            except (pd.errors.EmptyDataError, ValueError) as e:
-                if verbose:
-                    print(f'Failed to load cached data: {str(e)}')
-
-        # If we get here, we need to recompute
-        if verbose:
-            print('Computing reduced y_var_lags...')
-
-        # Call parent class method to do the actual reduction
-        super().reduce_y_var_lags(
-            corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
-            vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
-            vif_threshold=vif_threshold,
-            verbose=verbose,
-            filter_corr_by_feature=filter_corr_by_feature,
-            filter_corr_by_subsets=filter_corr_by_subsets,
-            filter_corr_by_all_columns=filter_corr_by_all_columns,
-            filter_vif_by_feature=filter_vif_by_feature,
-            filter_vif_by_subsets=filter_vif_by_subsets,
-            filter_vif_by_all_columns=filter_vif_by_all_columns
-        )
-
-        # Cache the results
-        try:
-            self.y_var_lags_reduced.to_csv(df_path, index=False)
-            if verbose:
-                print(f'Saved reduced y_var_lags to {df_path}')
-        except Exception as e:
-            if verbose:
-                print(f'Warning: Failed to cache results: {str(e)}')
-
-
-
     def _get_x_var(self, exists_ok=True):
         x_var_path = os.path.join(
             self.decoding_targets_folder_path, 'decode_target_x_var.csv')
@@ -363,7 +325,7 @@ class DecodeTargetClass(neural_vs_behavioral_class.NeuralVsBehavioralClass, gpfa
             self.x_var.to_csv(x_var_path, index=False)
             print(f'Saved x_var to {x_var_path}')
 
-        self.reduce_x_var()
+        self._reduce_x_var()
 
     def _get_y_var(self, exists_ok=True):
         # note that this is for the continuous case (a.k.a. all selected time points are used together, instead of being separated into trials)

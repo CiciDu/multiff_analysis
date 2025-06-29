@@ -138,42 +138,43 @@ def plot_regression(final_behavioral_data, column, x_var, bins_to_plot=None, min
     y_var = final_behavioral_data[column].values
     slope, intercept, r_value, r_squared, p_values, f_p_value, y_pred = neural_data_modeling.conduct_linear_regression(
         x_var, y_var)
-    title_str = f"{column}, R: {round(r_value, 2)}, R^2: {round(r_squared, 3)}, overall_p: {f_p_value}"
+    title_str = f"{column}, R: {round(r_value, 2)}, R^2: {round(r_squared, 3)}, overall_p: {round(f_p_value, 3)}"
 
     # if r_squared < min_r_squared_to_plot:
     #     print(title_str)
     #     return
-    if f_p_value < 0.05:
-        print(title_str)
-        return
+    if f_p_value > 0.05:
+        print(f"Warning: {column} is not significant")
 
-    # plot fit
-    plt.figure()
-    plt.title(title_str, fontsize=20)
-    plt.scatter(range(len(bins_to_plot)),
+    # Create subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
+    # Plot 1: Fit plot
+    ax1.scatter(range(len(bins_to_plot)),
                 y_var[bins_to_plot], s=3, label='true')
-    plt.plot(range(len(bins_to_plot)),
+    ax1.plot(range(len(bins_to_plot)),
              y_pred[bins_to_plot], color='red', linewidth=0.3, alpha=0.8, label='fit')
-    plt.xlabel("bin", fontsize=14)
-    plt.ylabel(column, fontsize=14)
-    plt.legend(loc='upper left', fontsize=14)
-    plt.show()
 
-    # plot pred against true
-    plt.figure()
-    plt.scatter(y_var[bins_to_plot], y_pred[bins_to_plot], s=5, label='pred')
-    plt.title(
-        f"{column}, R: {round(r_value, 2)}, R^2: {round(r_squared, 3)}", fontsize=20)
+    ax1.set_title(title_str, fontsize=13)
+    ax1.set_xlabel("bin", fontsize=14)
+    ax1.set_ylabel(column, fontsize=12)
+    ax1.legend(loc='upper left', fontsize=14)
+
+    # Plot 2: Pred vs True plot
+    ax2.scatter(y_var[bins_to_plot], y_pred[bins_to_plot], s=5, label='pred')
     min_val = min(min(y_var[bins_to_plot]), min(y_pred[bins_to_plot]))
     max_val = max(max(y_var[bins_to_plot]), max(y_pred[bins_to_plot]))
-    plt.plot([min_val, max_val], [min_val, max_val],
+    ax2.plot([min_val, max_val], [min_val, max_val],
              color='red', linewidth=1, label='y = x line')
-    plt.xlabel("True value", fontsize=14)
-    plt.ylabel("Pred value", fontsize=14)
+
+    ax2.set_title(
+        f"{column}, R: {round(r_value, 2)}, R^2: {round(r_squared, 3)}", fontsize=14)
+    ax2.set_xlabel("True value", fontsize=14)
+    ax2.set_ylabel("Pred value", fontsize=14)
+    ax2.legend(loc='upper left', fontsize=14)
+
     if column in ['gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y']:
-        plt.xlim(-1000, 1000)
+        ax2.set_xlim(-1000, 1000)
 
-    # add a legend
-    plt.legend(loc='upper left', fontsize=14)
-
+    plt.tight_layout()
     plt.show()

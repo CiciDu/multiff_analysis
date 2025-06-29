@@ -72,8 +72,11 @@ def get_y_var_lr_result_df(binned_spikes_matrix, final_behavioral_data):
         all_r.append(r_value)
         all_r_squared.append(r_squared)
         all_p_values.append(f_p_value)
-    y_var_lr_result_df = pd.DataFrame({'var': final_behavioral_data.columns, 'r': all_r, 'r_squared': all_r_squared, 'p_values': all_p_values})
+    y_var_lr_result_df = pd.DataFrame({'feature': final_behavioral_data.columns, 'r': all_r, 'r_squared': all_r_squared, 'p_values': all_p_values})
+    y_var_lr_result_df['significant'] = y_var_lr_result_df['p_values'] < 0.05
     y_var_lr_result_df.sort_values(by='r_squared', ascending=False, inplace=True)
+    y_var_lr_result_df.reset_index(drop=True, inplace=True)
+    
     return y_var_lr_result_df
 
 

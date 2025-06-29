@@ -4,13 +4,13 @@ from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff
 from null_behaviors import curvature_utils
 from non_behavioral_analysis.neural_data_analysis.planning_neural import planning_neural_utils
 from non_behavioral_analysis.neural_data_analysis.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
+from non_behavioral_analysis.neural_data_analysis.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
 import numpy as np
 import pandas as pd
 import os
 
 
 class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
-    # class PlanningAndNeural(neural_vs_behavioral_class.NeuralVsBehavioralClass):
 
     def __init__(self, raw_data_folder_path=None, bin_width=0.02, window_width=0.25,
                  one_behav_idx_per_bin=True):
@@ -25,8 +25,30 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
 
 
+    def prep_behav_data_to_analyze_planning(self,
+                                        ref_point_mode='time after cur ff visible',
+                                        ref_point_value=0.1,
+                                        eliminate_outliers=False,
+                                        use_curvature_to_ff_center=False,
+                                        curv_of_traj_mode='distance',
+                                        window_for_curv_of_traj=[-25, 25],
+                                        truncate_curv_of_traj_by_time_of_capture=True):
+        
+        self.streamline_organizing_info(ref_point_mode=ref_point_mode,
+                                        ref_point_value=ref_point_value,
+                                        curv_of_traj_mode=curv_of_traj_mode,
+                                        window_for_curv_of_traj=window_for_curv_of_traj,
+                                        truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture,
+                                        use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                        eliminate_outliers=eliminate_outliers)
+
+        self.retrieve_neural_data()
+        self.get_all_planning_info()
+
+
+
     def retrieve_neural_data(self):
-        neural_vs_behavioral_class.NeuralVsBehavioralClass.retrieve_neural_data(
+        base_neural_class.NeuralBaseClass.retrieve_neural_data(
             self)
 
     def get_all_planning_info(self, both_ff_across_time_df_exists_ok=True):
