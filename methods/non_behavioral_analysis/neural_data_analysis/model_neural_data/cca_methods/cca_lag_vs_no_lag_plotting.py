@@ -24,39 +24,7 @@ from palettable.colorbrewer import qualitative
 
 from sklearn.model_selection import KFold
 
-
-def plot_cca_prediction_accuracy_train_test_bars_for_lags_and_no_lags(lags_testcorrs, lags_traincorrs, no_lags_testcorrs, no_lags_traincorrs):
-    for i in range(2):
-        plt.figure(figsize=(10, 6))
-        plt.bar(range(
-            len(lags_testcorrs[i])), lags_testcorrs[i], alpha=0.3, label='Test with lags')
-        plt.bar(range(len(
-            no_lags_testcorrs[i])), no_lags_testcorrs[i], alpha=0.3, label='Test without lags')
-        plt.xlabel('Canonical component index')
-        plt.ylabel('Prediction correlation')
-        plt.title(f'Test prediction accuracy for set {i+1}')
-        plt.legend()
-        plt.show()
-
-        plt.figure(figsize=(10, 6))
-        plt.bar(range(
-            len(lags_traincorrs[i])), lags_traincorrs[i], alpha=0.3, label='Train with lags')
-        plt.bar(range(len(
-            no_lags_traincorrs[i])), no_lags_traincorrs[i], alpha=0.3, label='Train without lags')
-        plt.xlabel('Canonical component index')
-        plt.ylabel('Prediction correlation')
-        plt.title(f'Test prediction accuracy for set {i+1}')
-        plt.legend()
-        plt.show()
-        
-        
-def plot_train_vs_test_overlap(
-    df, dataset_name, chunk_size=30, alpha=0.8,
-    base_width=0.35, narrower_width_ratio=0.4,
-    width_per_var=0.6, height=6,
-    mode='train_offset'
-):
-    pass
+from non_behavioral_analysis.neural_data_analysis.model_neural_data.cca_methods import cca_cv_utils
 
 
 def plot_cca_lag_vs_nolag_and_train_vs_test(
@@ -66,7 +34,7 @@ def plot_cca_lag_vs_nolag_and_train_vs_test(
     mode='train_offset'
 ):
 
-    vars_unique = df['var'].unique()
+    vars_unique = df['variable'].unique()
     num_chunks = int(np.ceil(len(vars_unique) / chunk_size))
     train_test_statuses = ['train', 'test']
     lag_statuses = sorted(df['whether_lag'].unique())
@@ -122,9 +90,9 @@ def get_plot_config(mode, train_test_statuses, lag_statuses):
 def get_chunk_data(df, vars_unique, chunk_idx, chunk_size):
     chunk_vars = vars_unique[chunk_idx *
                              chunk_size:(chunk_idx + 1) * chunk_size]
-    chunk_df = df[df['var'].isin(chunk_vars)].copy()
-    chunk_df['var'] = pd.Categorical(
-        chunk_df['var'], categories=chunk_vars, ordered=True)
+    chunk_df = df[df['variable'].isin(chunk_vars)].copy()
+    chunk_df['variable'] = pd.Categorical(
+        chunk_df['variable'], categories=chunk_vars, ordered=True)
     return chunk_vars, chunk_df
 
 
@@ -138,6 +106,9 @@ def draw_bars(
     ax, chunk_df, chunk_vars, x, offset_groups, width_groups,
     mode, base_width, narrower_width_ratio, alpha, colors
 ):
+
+    corr_var = 'corr' if 'corr' in chunk_df.columns else 'mean_corr'
+
     n_offsets = len(offset_groups)
     offset_width = base_width * 1.5
 
@@ -151,7 +122,7 @@ def draw_bars(
             )
 
             ax.bar(
-                x + offset, subset_df['corr'],
+                x + offset, subset_df[corr_var],
                 width=width, alpha=alpha_adj,
                 label=f'{offset_group.capitalize()} - {width_group}',
                 color=color
@@ -180,7 +151,7 @@ def get_bar_attributes(
         # alpha_adj = alpha if width_group == 'train' else alpha * 0.7
         key = (offset_group, width_group)
 
-    subset_df = subset_df.set_index('var').reindex(chunk_vars)
+    subset_df = subset_df.set_index('variable').reindex(chunk_vars)
     color = colors.get(key, 'gray')
 
     return subset_df, width, color, alpha_adj
@@ -210,11 +181,11 @@ def finalize_plot(ax, x, chunk_vars, dataset_name, chunk_idx, chunk_size):
 
 def _build_corr_df(corrs, x_cols, train_or_test, whether_lag, dataset):
     return pd.DataFrame({
-        'corr': corrs,
+        'dataset': dataset,
         'train_or_test': train_or_test,
+        'corr': corrs,
         'whether_lag': whether_lag,
-        'var': x_cols,
-        'dataset': dataset
+        'variable': x_cols,
     })
 
 
@@ -231,15 +202,15 @@ def combine_data_to_compare_train_and_test(cca_no_lag, cca_lags):
         X2_dfs.append(_build_corr_df(
             cca_obj.testcorrs[1], cca_obj.X2.columns, 'test', lag_label, 'X2'))
 
-    # Combine and sort, rename all _0 to the original name
+    # Combine and sort, rename all _0 to the original name (but not if ending with _0_0)
     combined_X1_df = pd.concat(X1_dfs)
-    combined_X1_df['var'] = combined_X1_df['var'].str.replace(
-        r'_0$', '', regex=True)
-    combined_X1_df = combined_X1_df.sort_values(by='var')
+    combined_X1_df['variable'] = cca_cv_utils.conditional_replace_suffix(
+        combined_X1_df['variable'])
+    combined_X1_df = combined_X1_df.sort_values(by='variable')
 
     combined_X2_df = pd.concat(X2_dfs)
-    combined_X2_df['var'] = combined_X2_df['var'].str.replace(
-        r'_0$', '', regex=True)
-    combined_X2_df = combined_X2_df.sort_values(by='var')
+    combined_X2_df['variable'] = cca_cv_utils.conditional_replace_suffix(
+        combined_X2_df['variable'])
+    combined_X2_df = combined_X2_df.sort_values(by='variable')
 
     return combined_X1_df, combined_X2_df
