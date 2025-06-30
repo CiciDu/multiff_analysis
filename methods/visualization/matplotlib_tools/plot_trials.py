@@ -2,7 +2,7 @@ import sys
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_behaviors_utils
 from null_behaviors import show_null_trajectory, find_best_arc
-from non_behavioral_analysis import eye_positions
+from eye_position_analysis import eye_positions
 
 import os
 import seaborn as sns
@@ -219,10 +219,10 @@ def PlotTrials(duration,
     currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
         ff_caught_T_new, currentTrial, num_trials, duration)
     print('currentTrial:', currentTrial, 'num_trials:', num_trials)
-    
+
     if duration[1] <= duration[0]:
         raise ValueError("duration[1] must be greater than duration[0]")
-    
+
     cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(
         duration, monkey_information)
     monkey_subset_df = monkey_information.loc[cum_pos_index]

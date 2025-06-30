@@ -1,6 +1,6 @@
 from data_wrangling import specific_utils, process_monkey_information, retrieve_raw_data, time_calib_utils
 from pattern_discovery import make_ff_dataframe
-from non_behavioral_analysis import eye_positions
+from eye_position_analysis import eye_positions
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.test_params_for_planning import params_utils
 from planning_analysis.show_planning import nxt_ff_utils

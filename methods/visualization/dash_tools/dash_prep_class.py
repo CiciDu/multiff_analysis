@@ -5,7 +5,7 @@ from visualization.dash_tools import dash_utils, dash_utils
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
 from visualization.matplotlib_tools import monkey_heading_functions
-from non_behavioral_analysis import eye_positions
+from eye_position_analysis import eye_positions
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
 
 

@@ -1,7 +1,7 @@
 import sys
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_polar, plot_trials
-from non_behavioral_analysis import eye_positions
+from eye_position_analysis import eye_positions
 
 import os
 import math
@@ -1163,4 +1163,3 @@ def plot_eye_positions(axes, monkey_information, duration, cum_mxy_rotated, x0, 
             monkey_sub, axes, x0, y0, player, sample_ratio=sample_ratio)
 
     return axes
-

@@ -8,7 +8,7 @@ from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, pl
 from visualization.dash_tools import dash_utils
 from visualization.matplotlib_tools import monkey_heading_functions, plot_behaviors_utils
 from planning_analysis.test_params_for_planning import params_utils
-from non_behavioral_analysis import eye_positions
+from eye_position_analysis import eye_positions
 from matplotlib.lines import Line2D
 import numpy as np
 import matplotlib.pyplot as plt
