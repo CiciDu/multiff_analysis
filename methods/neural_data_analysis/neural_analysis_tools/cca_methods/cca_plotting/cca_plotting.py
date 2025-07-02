@@ -25,6 +25,92 @@ import matplotlib.gridspec as gridspec
 from scipy.stats import pearsonr
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+
+
+def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X', 
+                         max_components=20, features_per_fig=30, base_width=0.75, base_height=0.3,
+                         annotation_threshold=0.3, pval_threshold=0.05):
+    """
+    Plots a heatmap of canonical loadings with features on y-axis and components on x-axis,
+    split across multiple figures if needed. Adds asterisk for significant p-values and annotates
+    loadings greater than a threshold.
+
+    Parameters:
+    - loadings (np.ndarray): Feature × Component matrix (n_features × n_components)
+    - feature_names (list or np.ndarray): Names of the features (length = n_features)
+    - canonical_corrs (list or np.ndarray, optional): Canonical correlations for each component
+    - p_values (list or np.ndarray, optional): P-values for each canonical correlation (length = n_components)
+    - matrix_label (str): Label prefix for figure titles (e.g., 'X1' or 'X2')
+    - max_components (int): Max number of components (columns) to plot
+    - features_per_fig (int): Max number of features (rows) per figure
+    - base_width (float): Width in inches per component (x-axis)
+    - base_height (float): Height in inches per feature (y-axis)
+    - annotation_threshold (float): Threshold above which values will be annotated on heatmap
+    - pval_threshold (float): Threshold below which p-values are considered significant
+    """
+    max_components = min(max_components, loadings.shape[1])
+    num_features = loadings.shape[0]
+    feature_names = np.asarray(feature_names)
+
+    # Determine shared color scale
+    vmin = np.min(loadings[:, :max_components])
+    vmax = np.max(loadings[:, :max_components])
+
+    num_figs = math.ceil(num_features / features_per_fig)
+    max_label_len = max(len(str(label)) for label in feature_names)
+
+    for i in range(num_figs):
+        start = i * features_per_fig
+        end = min((i + 1) * features_per_fig, num_features)
+        num_rows = end - start  # number of features (rows)
+
+        fig_height = max(base_height * num_rows, 3)
+        left_margin = 0.3 + 0.01 * max_label_len
+        fig_width = max(base_width * max_components, 3) + left_margin
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        submatrix = loadings[start:end, :max_components]
+        im = ax.imshow(submatrix, aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+
+        ax.set_title(f'{matrix_label} Loadings (Features {start}-{end})')
+
+        # X-axis labels
+        ax.set_xticks(range(max_components))
+        if canonical_corrs is not None:
+            labels = []
+            for idx in range(max_components):
+                if p_values is not None and p_values[idx] < pval_threshold:
+                    label = f"{idx+1}*\n({canonical_corrs[idx]:.2f})"
+                else:
+                    label = f"{idx+1}\n({canonical_corrs[idx]:.2f})"
+                labels.append(label)
+        else:
+            labels = [str(i) for i in range(1, max_components + 1)]
+        ax.set_xticklabels(labels, fontsize=10)
+
+        # Y-axis labels
+        ax.set_yticks(range(num_rows))
+        ax.set_yticklabels(feature_names[start:end], fontsize=8)
+
+        # Annotate values greater than threshold
+        for row in range(num_rows):
+            for col in range(max_components):
+                val = submatrix[row, col]
+                if abs(val) >= annotation_threshold:
+                    bg_color = im.cmap((val - vmin) / (vmax - vmin))  # RGBA tuple
+                    brightness = 0.299*bg_color[0] + 0.587*bg_color[1] + 0.114*bg_color[2]  # luminance
+                    text_color = 'white' if brightness < 0.3 else 'black'
+                    ax.text(col, row, f"{val:.2f}", ha='center', va='center', fontsize=7, color=text_color)
+
+        plt.colorbar(im, ax=ax)
+        plt.subplots_adjust(left=left_margin)
+        plt.tight_layout()
+        plt.show()
+
+
 def plot_cca_results(cca_results):
 
     # Plot canonical correlations
@@ -56,75 +142,7 @@ def plot_cca_results(cca_results):
     plt.show()
     
     
-def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, matrix_label='X', max_components=20,
-                         features_per_fig=30, base_width=0.75, base_height=0.3):
-    """
-    Plots a heatmap of canonical loadings with features on y-axis and components on x-axis,
-    split across multiple figures if needed.
 
-    Parameters:
-    - loadings (np.ndarray): Feature × Component matrix (shape: n_features × n_components)
-    - feature_names (list or np.ndarray): Names of the features (length = n_features)
-    - canonical_corrs (list or np.ndarray, optional): Canonical correlations for each component
-    - matrix_label (str): Label prefix for figure titles (e.g., 'X1' or 'X2')
-    - max_components (int): Max number of components (columns) to plot
-    - features_per_fig (int): Max number of features (rows) per figure
-    - base_width (float): Width in inches per component (x-axis)
-    - base_height (float): Height in inches per feature (y-axis)
-    """
-    max_components = min(max_components, loadings.shape[1])
-    num_features = loadings.shape[0]
-    feature_names = np.asarray(feature_names)
-
-    # Determine shared color scale
-    vmin = np.min(loadings[:, :max_components])
-    vmax = np.max(loadings[:, :max_components])
-
-    num_figs = math.ceil(num_features / features_per_fig)
-    max_label_len = max(len(str(label)) for label in feature_names)
-
-    for i in range(num_figs):
-        start = i * features_per_fig
-        end = min((i + 1) * features_per_fig, num_features)
-        num_rows = end - start  # number of features (rows)
-
-        
-        fig_height = max(base_height * num_rows, 3)      # height depends on features
-        left_margin = 0.3 + 0.01 * max_label_len  # adjust left margin for y-labels
-        fig_width = max(base_width * max_components, 3) + left_margin  # width depends on components and left margin
-
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        im = ax.imshow(loadings[start:end, :max_components],
-                       aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
-
-        ax.set_title(f'{matrix_label} Loadings (Features {start}-{end})')
-        if canonical_corrs is not None:
-            ax.set_xlabel('Components (with canonical correlation)')
-        else:
-            ax.set_xlabel('Components')
-        ax.set_ylabel('')
-
-        # Components on x-axis
-        ax.set_xticks(range(max_components))
-        if canonical_corrs is not None:
-            # Format labels with component index and correlation, e.g. "1\n(0.85)"
-            labels = [
-                f"{idx+1}\n({canonical_corrs[idx]:.2f})"
-                for idx in range(max_components)
-            ]
-        else:
-            labels = [str(i) for i in range(1, max_components + 1)]
-
-        ax.set_xticklabels(labels, fontsize=10)
-
-        # Features on y-axis
-        ax.set_yticks(range(num_rows))
-        ax.set_yticklabels(feature_names[start:end], fontsize=8)
-
-        plt.colorbar(im, ax=ax)
-        plt.subplots_adjust(left=left_margin)
-        plt.tight_layout()
-        plt.show()
 
 
 def plot_cca_component_scatter(X1_c, X2_c, components, show_y_eq_x=True):

@@ -51,7 +51,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
 
         self.bin_width_w_unit = self.bin_width * pq.s
         self.max_visibility_window = 10
-
+        
         self.decoding_targets_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'decoding_targets')
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
@@ -67,12 +67,16 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
     def get_all_behav_data(self, exists_ok=True):
         self.get_basic_data()
         self.get_behav_data(exists_ok=exists_ok)
+        self._get_single_vis_target_df()
         self.get_pursuit_data()
 
     def get_basic_data(self):
         super().get_basic_data()
         self._get_curv_of_traj_df()
         self._make_or_retrieve_target_df(
+            exists_ok=True,
+            fill_na=False)
+        self._make_or_retrieve_target_cluster_df(
             exists_ok=True,
             fill_na=False)
 
@@ -82,39 +86,58 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
         self.reduce_y_var_lags(exists_ok=exists_ok)
 
     def get_behav_data(self, exists_ok=True, save_data=True):
+        # Construct path to cached behavioral data
+        bin_width_str = str(self.bin_width).replace('.', 'p')
         behav_data_all_path = os.path.join(
-            self.decoding_targets_folder_path, 'behav_data_all.csv')
+            self.decoding_targets_folder_path, f"behav_data_all_{bin_width_str}.csv"
+        )
 
-        if exists_ok & os.path.exists(behav_data_all_path):
+        # Load cached data if available and allowed
+        if exists_ok and os.path.exists(behav_data_all_path):
             self.behav_data_all = pd.read_csv(behav_data_all_path)
-            print(f'Loaded behav_data_all from {behav_data_all_path}')
+            print(f"Loaded behav_data_all from {behav_data_all_path}")
         else:
-            basic_data_present = hasattr(self, 'monkey_information')
-            # check if basic data is present
-            if not basic_data_present:
+            # Ensure basic data is available
+            if not hasattr(self, 'monkey_information') or self.monkey_information is None:
                 self.get_basic_data()
+                basic_data_present = False
+            else:
+                basic_data_present = True
+
+            # Bin and process behavioral data
             _, self.time_bins = prep_monkey_data.initialize_binned_features(
-                self.monkey_information, self.bin_width)
+                self.monkey_information, self.bin_width
+            )
             self.behav_data_all = prep_monkey_data.bin_monkey_information(
-                self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
+                self.monkey_information,
+                self.time_bins,
+                one_behav_idx_per_bin=self.one_behav_idx_per_bin
+            )
             self.behav_data_all = self._add_ff_info(self.behav_data_all)
 
+            # Post-processing
             self._add_or_drop_columns()
             self._add_all_target_info()
             self._add_curv_info()
             self._process_na()
             self._clip_values()
 
+            # Free memory if basic data was not originally present
             if not basic_data_present:
-                # free up memory if basic data is not present before calling the function
                 self._free_up_memory()
 
+            # Optionally save processed data
             if save_data:
                 self.behav_data_all.to_csv(behav_data_all_path, index=False)
+                print(f"Saved behav_data_all to {behav_data_all_path}")
 
-        self.behav_data = self.behav_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                              behav_features_to_keep.extra_columns_for_concat_trials]
-        self._get_single_vis_target_df()
+        # Filter for relevant features
+        self.behav_data = self.behav_data_all[
+            behav_features_to_keep.shared_columns_to_keep +
+            behav_features_to_keep.extra_columns_for_concat_trials
+        ]
+
+
 
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
@@ -191,6 +214,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
         """
         df_path = os.path.join(
             self.decoding_targets_folder_path, 'decode_target_y_var_lags_reduced.csv')
+        
         self._reduce_y_var_lags(df_path=df_path,
                                 save_data=save_data,
                                 corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
@@ -364,10 +388,11 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
             self.behav_data_all, self.curv_of_traj_df, self.monkey_information, self.ff_caught_T_new)
 
     def _add_all_target_info(self):
-
         self.behav_data_all = prep_target_decoder.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
-
+        self.behav_data_all = prep_target_decoder.add_target_info_to_behav_data_all(
+            self.behav_data_all, self.target_cluster_df)
+        
     def _get_single_vis_target_df(self, single_vis_target_df_exists_ok=True, target_clust_last_vis_df_exists_ok=True):
 
         df_path = os.path.join(

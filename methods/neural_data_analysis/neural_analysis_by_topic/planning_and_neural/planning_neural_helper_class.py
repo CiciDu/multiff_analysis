@@ -1,4 +1,5 @@
 import sys
+from data_wrangling import process_monkey_information, specific_utils
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from null_behaviors import curvature_utils
@@ -22,6 +23,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
         self.decoding_targets_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'decoding_targets')
+        self.planning_neural_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'planning_and_neural')
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
 
     def prep_behav_data_to_analyze_planning(self,
@@ -31,7 +34,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                             use_curvature_to_ff_center=False,
                                             curv_of_traj_mode='distance',
                                             window_for_curv_of_traj=[-25, 25],
-                                            truncate_curv_of_traj_by_time_of_capture=True):
+                                            truncate_curv_of_traj_by_time_of_capture=True,
+                                            both_ff_across_time_df_exists_ok=True,
+                                            ):
 
         self.streamline_organizing_info(ref_point_mode=ref_point_mode,
                                         ref_point_value=ref_point_value,
@@ -42,7 +47,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                         eliminate_outliers=eliminate_outliers)
 
         self.retrieve_neural_data()
-        self.get_all_planning_info()
+        self.get_all_planning_info(
+            both_ff_across_time_df_exists_ok=both_ff_across_time_df_exists_ok)
 
     def retrieve_neural_data(self):
         base_neural_class.NeuralBaseClass.retrieve_neural_data(
@@ -77,10 +83,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
     def _get_both_ff_across_time_df(self, exists_ok=True):
         # This contains the planning-related information for each time bin
-        folder_path = os.path.join(
-            self.planning_data_folder_path, 'planning_for_neural')
-        os.makedirs(folder_path, exist_ok=True)
-        df_path = os.path.join(folder_path, 'both_ff_across_time_df.csv')
+
+        os.makedirs(self.planning_neural_folder_path, exist_ok=True)
+        df_path = os.path.join(self.planning_neural_folder_path, 'both_ff_across_time_df.csv')
         if exists_ok and os.path.exists(df_path):
             self.both_ff_across_time_df = pd.read_csv(df_path)
         else:
@@ -92,12 +97,33 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                     print(
                         f'Having processed {i} rows out of {len(self.stops_near_ff_df)} of the stops_near_ff_df for both_ff_across_time_df.')
                 info_to_add = self._get_info_to_add(row)
+                # if info_to_add is empty, then skip
+                if info_to_add.empty:
+                    continue
+                info_to_add['segment'] = i
+                info_to_add['target_index'] = row['cur_ff_index']
                 self.both_ff_across_time_df = pd.concat(
                     [self.both_ff_across_time_df, info_to_add], axis=0)
+
+            self._add_rel_x_and_y_to_both_ff_across_time_df()
             self._check_for_duplicate_bins()
+
             self.both_ff_across_time_df.reset_index(drop=False, inplace=True)
             self.both_ff_across_time_df.to_csv(df_path, index=False)
         return self.both_ff_across_time_df
+
+    def _add_rel_x_and_y_to_both_ff_across_time_df(self):
+        # Add relative x/y for cur_ff and nxt_ff
+        if 'cur_ff_angle' in self.both_ff_across_time_df.columns and 'cur_ff_distance' in self.both_ff_across_time_df.columns:
+            rel_x, rel_y = specific_utils.calculate_ff_rel_x_and_y(
+                self.both_ff_across_time_df['cur_ff_distance'], self.both_ff_across_time_df['cur_ff_angle'])
+            self.both_ff_across_time_df['cur_ff_rel_x'] = rel_x
+            self.both_ff_across_time_df['cur_ff_rel_y'] = rel_y
+        if 'nxt_ff_angle' in self.both_ff_across_time_df.columns and 'nxt_ff_distance' in self.both_ff_across_time_df.columns:
+            rel_x, rel_y = specific_utils.calculate_ff_rel_x_and_y(
+                self.both_ff_across_time_df['nxt_ff_distance'], self.both_ff_across_time_df['nxt_ff_angle'])
+            self.both_ff_across_time_df['nxt_ff_rel_x'] = rel_x
+            self.both_ff_across_time_df['nxt_ff_rel_y'] = rel_y
 
     def _get_point_index_based_on_some_time_before_stop(self, n_seconds_before_stop=2):
         self.stops_near_ff_df['some_time_before_stop'] = self.stops_near_ff_df['stop_time'] - \
@@ -110,14 +136,13 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             row['point_index_in_the_past'], row['next_stop_point_index'])].copy()
         info_to_add['stop_point_index'] = row['stop_point_index']
         all_point_index = info_to_add['point_index'].values
-        info_to_add.set_index('point_index', inplace=True)
         self._find_ff_info(row, all_point_index)
         columns_to_keep = []
         for which_ff_info in ['nxt_', 'cur_']:
             info_to_add, columns_added = self._add_ff_info_to_info_to_add(
                 info_to_add, row, which_ff_info)
             columns_to_keep.extend(columns_added)
-        columns_to_keep.extend(['stop_point_index', 'bin'])
+        columns_to_keep.extend(['stop_point_index', 'point_index', 'bin'])
         info_to_add = info_to_add[columns_to_keep]
         return info_to_add
 
@@ -143,13 +168,15 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                                          monkey_information=self.monkey_information,
                                                          ff_caught_T_new=self.ff_caught_T_new)
         # self.curv_df['point_index'] = self.curv_df.index
-        info_to_add, columns_added = planning_neural_utils.add_curv_info_to_info_to_add(
+        info_to_add, columns_added = planning_neural_utils.add_curv_info(
             info_to_add, self.curv_df, which_ff_info)
 
         if which_ff_info == 'nxt_':
             # --- Merge firefly timing info ---
-            ff_extra = ff_df[['point_index', 'time', 'stop_time']].drop_duplicates()
-            ff_extra['time_rel_to_stop'] = ff_extra['time'] - ff_extra['stop_time']
+            ff_extra = ff_df[['point_index', 'time',
+                              'stop_time']].drop_duplicates()
+            ff_extra['time_rel_to_stop'] = ff_extra['time'] - \
+                ff_extra['stop_time']
             info_to_add = info_to_add.merge(
                 ff_extra[['point_index', 'time_rel_to_stop']],
                 on='point_index', how='left'
@@ -157,8 +184,10 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             columns_added.append('time_rel_to_stop')
 
             # --- Merge curvature info separately ---
-            curv_extra = self.curv_df[['point_index', 'curv_of_traj']].drop_duplicates()
-            curv_extra.rename(columns={'curv_of_traj': 'traj_curv'}, inplace=True)
+            curv_extra = self.curv_df[['point_index',
+                                       'curv_of_traj']].drop_duplicates()
+            curv_extra.rename(
+                columns={'curv_of_traj': 'traj_curv'}, inplace=True)
             info_to_add = info_to_add.merge(
                 curv_extra,
                 on='point_index', how='left'

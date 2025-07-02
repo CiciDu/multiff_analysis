@@ -33,7 +33,7 @@ def drop_columns_with_high_corr(var_df_lags, corr_threshold_for_lags=0.85, verbo
     var_df_lags_reduced = var_df_lags.copy()
     # drop all columns in var_df_lags that has 'feature' but is not 'feature'
     if filter_by_feature:
-        print('\n====================Dropping features with high correlation for each feature====================')
+        print(f'\n====================Dropping features with high correlation for each feature based on threshold {corr_threshold_for_lags}====================')
         var_df_lags_reduced, top_values_by_feature, columns_dropped = drop_lags_with_high_corr_or_vif_for_each_feature(
             var_df_lags_reduced,
             corr_threshold=corr_threshold_for_lags,
@@ -47,12 +47,12 @@ def drop_columns_with_high_corr(var_df_lags, corr_threshold_for_lags=0.85, verbo
         else:
             subset_key_words = None
             all_column_subsets = None
-        print('====================Dropping features with high correlation in specific subsets of features====================')
+        print(f'====================Dropping features with high correlation in specific subsets of features based on threshold {corr_threshold_for_lags}====================')
         var_df_lags_reduced, columns_dropped = filter_subsets_of_var_df_lags_by_corr_or_vif(
             var_df_lags_reduced, corr_threshold=corr_threshold_for_lags, verbose=verbose, subset_key_words=subset_key_words, all_column_subsets=all_column_subsets)
 
     if filter_by_all_columns:
-        print('====================Dropping features with high correlation in all columns====================')
+        print(f'====================Dropping features with high correlation in all columns based on threshold {corr_threshold_for_lags}====================')
         var_df_lags_reduced, columns_dropped = filter_subsets_of_var_df_lags_by_corr_or_vif(
             var_df_lags_reduced, corr_threshold=corr_threshold_for_lags, verbose=verbose, all_column_subsets=[var_df_lags_reduced.columns])
 

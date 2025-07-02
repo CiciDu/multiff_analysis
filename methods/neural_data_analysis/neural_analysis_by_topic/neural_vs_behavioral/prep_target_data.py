@@ -92,10 +92,10 @@ def add_columns_to_target_df(target_df):
 
 
 def _add_target_rel_x_and_y(target_df):
-    target_df['target_rel_y'] = target_df['target_distance'] * \
-        np.cos(target_df['target_angle'])
-    target_df['target_rel_x'] = - target_df['target_distance'] * \
-        np.sin(target_df['target_angle'])
+    rel_x, rel_y = specific_utils.calculate_ff_rel_x_and_y(
+        target_df['target_distance'], target_df['target_angle'])
+    target_df['target_rel_x'] = rel_x
+    target_df['target_rel_y'] = rel_y
     return target_df
 
 
@@ -241,13 +241,13 @@ def _add_target_cluster_last_seen_info(target_df, monkey_information, ff_real_po
         target_df = _add_target_last_seen_info(
             target_df, ff_dataframe, ff_caught_T_new, monkey_information, nearby_alive_ff_indices=nearby_alive_ff_indices, use_target_cluster=True, max_visibility_window=max_visibility_window)
         target_df = target_df.rename(columns={'time_since_target_last_seen': 'target_cluster_last_seen_time',
-                                              'target_last_seen_distance': 'target_cluster_last_seen_distance_frozen',
-                                              'target_last_seen_angle': 'target_cluster_last_seen_angle_frozen',
-                                              'target_last_seen_angle_to_boundary': 'target_cluster_last_seen_angle_to_boundary_frozen',
-                                              'monkey_x_target_last_seen': 'monkey_x_target_cluster_last_seen_frozen',
-                                              'monkey_y_target_last_seen': 'monkey_y_target_cluster_last_seen_frozen',
-                                              'monkey_angle_target_last_seen': 'monkey_angle_target_cluster_last_seen_frozen',
-                                              'cum_distance_when_target_last_seen': 'cum_distance_target_cluster_last_seen_frozen',
+                                              'target_last_seen_distance': 'target_cluster_last_seen_distance',
+                                              'target_last_seen_angle': 'target_cluster_last_seen_angle',
+                                              'target_last_seen_angle_to_boundary': 'target_cluster_last_seen_angle_to_boundary',
+                                              'monkey_x_target_last_seen': 'monkey_x_target_cluster_last_seen',
+                                              'monkey_y_target_last_seen': 'monkey_y_target_cluster_last_seen',
+                                              'monkey_angle_target_last_seen': 'monkey_angle_target_cluster_last_seen',
+                                              'cum_distance_when_target_last_seen': 'cum_distance_target_cluster_last_seen',
                                               })
 
         # Print warning about targets not in visible clusters
@@ -377,7 +377,7 @@ def _calculate_average_info(target_df):
     target_average_info = target_df[['bin', 'target_distance', 'target_angle', 'target_angle_to_boundary',
                                     'time_since_target_last_seen', 'target_cluster_last_seen_time',
                                      'target_last_seen_distance', 'target_last_seen_angle', 'target_last_seen_angle_to_boundary',
-                                     'target_cluster_last_seen_distance_frozen', 'target_cluster_last_seen_angle_frozen', 'target_cluster_last_seen_angle_to_boundary_frozen',]].copy()
+                                     'target_cluster_last_seen_distance', 'target_cluster_last_seen_angle', 'target_cluster_last_seen_angle_to_boundary',]].copy()
 
     target_average_info = target_average_info.groupby(
         'bin').mean().reset_index(drop=False)
@@ -385,13 +385,13 @@ def _calculate_average_info(target_df):
                                         'target_angle': 'avg_bin_target_angle',
                                         'target_angle_to_boundary': 'avg_bin_target_angle_to_boundary',
                                         'time_since_target_last_seen': 'avg_bin_target_last_seen_time',
-                                        'target_last_seen_distance': 'avg_bin_target_last_seen_distance_frozen',
-                                        'target_last_seen_angle': 'avg_bin_target_last_seen_angle_frozen',
-                                        'target_last_seen_angle_to_boundary': 'avg_bin_target_last_seen_angle_to_boundary_frozen',
+                                        'target_last_seen_distance': 'avg_bin_target_last_seen_distance',
+                                        'target_last_seen_angle': 'avg_bin_target_last_seen_angle',
+                                        'target_last_seen_angle_to_boundary': 'avg_bin_target_last_seen_angle_to_boundary',
                                         'target_cluster_last_seen_time': 'avg_bin_target_cluster_last_seen_time',
-                                        'target_cluster_last_seen_distance_frozen': 'avg_bin_target_cluster_last_seen_distance_frozen',
-                                        'target_cluster_last_seen_angle_frozen': 'avg_bin_target_cluster_last_seen_angle_frozen',
-                                        'target_cluster_last_seen_angle_to_boundary_frozen': 'avg_bin_target_cluster_last_seen_angle_to_boundary_frozen'
+                                        'target_cluster_last_seen_distance': 'avg_bin_target_cluster_last_seen_distance',
+                                        'target_cluster_last_seen_angle': 'avg_bin_target_cluster_last_seen_angle',
+                                        'target_cluster_last_seen_angle_to_boundary': 'avg_bin_target_cluster_last_seen_angle_to_boundary'
                                         }, inplace=True)
     return target_average_info
 

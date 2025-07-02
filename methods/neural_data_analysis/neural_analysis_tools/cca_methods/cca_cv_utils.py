@@ -21,8 +21,36 @@ from sklearn.cross_decomposition import CCA
 import rcca
 from sklearn.preprocessing import StandardScaler
 from palettable.colorbrewer import qualitative
-
 from sklearn.model_selection import KFold
+
+
+def combine_cv_results(cca_no_lag, cca_lags, n_components=7, reg=0.1, n_splits=10):
+    
+    combined_cross_view_df = pd.DataFrame()
+    combined_can_load_df = pd.DataFrame()
+
+    for whether_lag, _cca_inst in [('no_lag', cca_no_lag), ('lag', cca_lags)]:
+        X1_df = _cca_inst.X1_sc_df
+        X2_df = _cca_inst.X2_sc_df
+        #X2_df = _cca_inst.X2_tf_df
+        can_load_df, cross_view_df, can_corr_stats = crossvalidated_cca_analysis(X1_df, X2_df, n_components=n_components, reg=reg, n_splits=n_splits)
+        
+        cross_view_df['whether_lag'] = whether_lag
+        can_load_df['whether_lag'] = whether_lag
+        
+        combined_cross_view_df = pd.concat([combined_cross_view_df, cross_view_df])
+        combined_can_load_df = pd.concat([combined_can_load_df, can_load_df])
+
+    # rename all _0 to the original name
+    combined_cross_view_df['variable'] = conditional_replace_suffix(combined_cross_view_df['variable'])
+    combined_cross_view_df = combined_cross_view_df.sort_values(by='variable').reset_index(drop=True)
+
+    combined_can_load_df['variable'] = conditional_replace_suffix(combined_can_load_df['variable'])
+    combined_can_load_df = combined_can_load_df.sort_values(by='variable').reset_index(drop=True)
+    
+    return combined_cross_view_df, combined_can_load_df
+
+
 
 
 def crossvalidated_cca_analysis(

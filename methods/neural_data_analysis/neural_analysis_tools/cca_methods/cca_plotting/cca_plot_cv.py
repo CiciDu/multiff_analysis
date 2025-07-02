@@ -149,7 +149,7 @@ def _plot_bars(values_train, values_test, errors_train, errors_test, labels, tit
         )
     else:
         # Multiple subplots case
-        fig, axes = plt.subplots(n_plots, 1, figsize=(12, 5 * n_plots))
+        fig, axes = plt.subplots(n_plots, 1, figsize=(7, (max(5, len(labels) * 0.2)) * n_plots))
         if n_plots == 1:
             axes = [axes]
 
@@ -182,35 +182,51 @@ def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_tes
 
     if ax is None:
         # Single plot case
-        fig, ax = plt.subplots(figsize=(max(10, len(labels) * 0.4), 5))
+        fig, ax = plt.subplots(figsize=(7, max(5, len(labels) * 0.25)))
         single_plot = True
     else:
         single_plot = False
 
-    x = np.arange(len(labels))
-    width = 0.35
+    y = np.arange(len(labels))
+    bar_width = 0.35
 
     if np.all(errors_train == 0) and np.all(errors_test == 0):
         errors_train = None
         errors_test = None
-    ax.bar(x - width/2, values_train, width, yerr=errors_train,
-            label='Train', alpha=0.7, capsize=4)
-    ax.bar(x + width/2, values_test, width, yerr=errors_test,
-        label='Test', alpha=0.7, capsize=4)
+    ax.barh(y - bar_width/2, values_train, bar_width, xerr=errors_train,
+            label='Train', alpha=0.7, capsize=3.5)
+    ax.barh(y + bar_width/2, values_test, bar_width, xerr=errors_test,
+            label='Test', alpha=0.7, capsize=3.5)
 
-    # add horizontal line at 0.1
-    ax.axhline(y=0.1, color='gray', linestyle='--', linewidth=1.2)
+    ax = _add_lines(ax, y, use_cross_view_corr)
 
-    if not use_cross_view_corr:
-        # also add a line at y = -0.1
-        ax.axhline(y=-0.1, color='gray', linestyle='--', linewidth=1.2)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=90)
-    ax.set_ylabel(ylabel, fontsize=14)
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel(ylabel, fontsize=14)
     ax.set_title(title, fontsize=14)
     ax.legend()
 
     if single_plot:
         plt.tight_layout()
         plt.show()
+
+
+def _add_lines(ax, y, use_cross_view_corr=True):
+    # add grid lines
+    for grid_pos in y[:-1] + 0.5:
+        ax.axhline(grid_pos, color='gray', linestyle='--',
+                   linewidth=0.7, alpha=0.5)
+        
+    ax.grid(False)
+    ax.xaxis.grid(True, linestyle=':', alpha=0.7)
+    
+    # add vertical line at 0.1
+    ax.axvline(0, color='black', linestyle='-', linewidth=1, alpha=0.7)
+
+    ax.axvline(0.1, color='gray', linestyle='--', linewidth=1.5, alpha=0.7)
+
+    if not use_cross_view_corr:
+        # also add a line at x = -0.1
+        ax.axvline(x=-0.1, color='gray', linestyle='--', linewidth=1.5, alpha=0.7)
+    
+    return ax

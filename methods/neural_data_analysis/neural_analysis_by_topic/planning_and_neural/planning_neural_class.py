@@ -2,7 +2,7 @@ import sys
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from null_behaviors import curvature_utils
-from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_target_decoder, behav_features_to_keep
+from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_target_decoder, behav_features_to_keep, target_decoder_class
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import planning_neural_utils, planning_neural_helper_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
@@ -11,7 +11,7 @@ import pandas as pd
 import os
 
 
-class PlanningAndNeural(base_neural_class.NeuralBaseClass):
+class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
 
     def __init__(self, raw_data_folder_path=None, bin_width=0.02, window_width=0.25,
                  one_behav_idx_per_bin=True):
@@ -30,7 +30,8 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
                                       use_curvature_to_ff_center=False,
                                       curv_of_traj_mode='distance',
                                       window_for_curv_of_traj=[-25, 25],
-                                      truncate_curv_of_traj_by_time_of_capture=True
+                                      truncate_curv_of_traj_by_time_of_capture=True,
+                                      both_ff_across_time_df_exists_ok=True,
                                       ):
 
         # get neural data
@@ -48,12 +49,43 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
                                                             window_for_curv_of_traj=window_for_curv_of_traj,
                                                             truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture,
                                                             use_curvature_to_ff_center=use_curvature_to_ff_center,
-                                                            eliminate_outliers=eliminate_outliers)
+                                                            eliminate_outliers=eliminate_outliers,
+                                                            both_ff_across_time_df_exists_ok=both_ff_across_time_df_exists_ok)
 
         for attr in ['all_planning_info', 'both_ff_across_time_df']:
             setattr(self, attr, getattr(planning_helper, attr))
 
         # del planning_helper
+        del planning_helper
+        
+        self._add_data_from_behav_data_all(exists_ok=True)
+
+    
+    def _add_data_from_behav_data_all(self, exists_ok=True):
+        # Merge in columns from pn.behav_data_all that are not already present
+        # (Assume pn is available in the current scope, or pass as argument if needed)
+        try:
+            self.get_behav_data(exists_ok=exists_ok)
+            missing_cols = list(set(self.behav_data_all.columns) -
+                                set(self.all_planning_info.columns))
+            if 'point_index' in self.all_planning_info.columns and 'point_index' in self.behav_data_all.columns:
+                # Check for missing point_index
+                missing_point_indices = set(
+                    self.all_planning_info['point_index']) - set(self.behav_data_all['point_index'])
+                if missing_point_indices:
+                    import warnings
+                    warnings.warn(
+                        f"There are {len(missing_point_indices)} point_index values in all_planning_info not present in pn.behav_data_all. Example: {list(missing_point_indices)[:5]}")
+                # Merge only the missing columns
+                self.all_planning_info = self.all_planning_info.merge(
+                    self.behav_data_all[['point_index'] + missing_cols],
+                    on='point_index', how='left')
+            else:
+                raise ValueError("point_index is not in all_planning_info or behav_data_all")
+        except Exception as e:
+            print(
+                f"[WARN] Could not merge extra columns from pn.behav_data_all: {e}")
+
 
     def get_x_and_y_data_for_modeling(self, max_x_lag_number=5, max_y_lag_number=5, exists_ok=True):
         self.get_x_and_y_var(exists_ok=exists_ok)
@@ -132,6 +164,17 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
         """
         df_path = os.path.join(
             self.planning_neural_folder_path, 'pn_y_var_lags_reduced.csv')
+        
+        
+        num_cols = len(self.y_var_lags.columns)
+        if num_cols > 50:
+            filter_corr_by_feature = True
+            filter_corr_by_subsets = True
+            filter_corr_by_all_columns = True
+            filter_vif_by_feature = True
+            filter_vif_by_subsets = True
+            filter_vif_by_all_columns = True
+            
         self._reduce_y_var_lags(df_path=df_path,
                                 save_data=save_data,
                                 corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,

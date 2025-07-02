@@ -5,6 +5,7 @@ from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plo
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
+from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plotting, cca_plot_cv
 import os
 import numpy as np
 import matplotlib
@@ -27,14 +28,13 @@ from sklearn.model_selection import KFold
 from neural_data_analysis.neural_analysis_tools.cca_methods import cca_cv_utils
 
 
-
 def plot_cca_lag_vs_nolag_and_train_vs_test(
     df, dataset_name, chunk_size=30, alpha=0.8,
     base_width=0.35, narrower_width_ratio=0.4,
-    width_per_var=0.6, height=6,
+    width_per_var=0.2, fig_width=8,
     mode='train_offset'
 ):
-    
+
     use_cross_view_corr = False if 'canonical_component' in df.columns else True
 
     vars_unique = df['variable'].unique()
@@ -48,15 +48,16 @@ def plot_cca_lag_vs_nolag_and_train_vs_test(
     for i in range(num_chunks):
         chunk_vars, chunk_df = get_chunk_data(df, vars_unique, i, chunk_size)
         fig, ax = create_plot_axes(
-            chunk_vars, chunk_size, width_per_var, height)
-        x = np.arange(len(chunk_vars))
+            chunk_vars, chunk_size, width_per_var, fig_width)
+        y = np.arange(len(chunk_vars))
 
         draw_bars(
-            ax, chunk_df, chunk_vars, x, offset_groups, width_groups,
+            ax, chunk_df, chunk_vars, y, offset_groups, width_groups,
             mode, base_width, narrower_width_ratio, alpha, colors
         )
 
-        finalize_plot(ax, x, chunk_vars, dataset_name, i, chunk_size, use_cross_view_corr)
+        finalize_plot(ax, y, chunk_vars, dataset_name,
+                      i, chunk_size, use_cross_view_corr)
         plt.tight_layout()
         plt.show()
         # print("=" * 150)
@@ -99,14 +100,14 @@ def get_chunk_data(df, vars_unique, chunk_idx, chunk_size):
     return chunk_vars, chunk_df
 
 
-def create_plot_axes(chunk_vars, chunk_size, width_per_var, height):
-    fig_width = max(chunk_size * width_per_var, 10)
-    fig, ax = plt.subplots(figsize=(fig_width, height))
+def create_plot_axes(chunk_vars, chunk_size, width_per_var, fig_width):
+    fig_height = max(chunk_size * width_per_var, 3)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     return fig, ax
 
 
 def draw_bars(
-    ax, chunk_df, chunk_vars, x, offset_groups, width_groups,
+    ax, chunk_df, chunk_vars, y, offset_groups, width_groups,
     mode, base_width, narrower_width_ratio, alpha, colors
 ):
 
@@ -124,9 +125,9 @@ def draw_bars(
                 mode, base_width, narrower_width_ratio, alpha, colors
             )
 
-            ax.bar(
-                x + offset, subset_df[corr_var],
-                width=width, alpha=alpha_adj,
+            ax.barh(
+                y + offset, subset_df[corr_var],
+                height=width, alpha=alpha_adj,
                 label=f'{offset_group.capitalize()} - {width_group}',
                 color=color
             )
@@ -160,30 +161,20 @@ def get_bar_attributes(
     return subset_df, width, color, alpha_adj
 
 
-def finalize_plot(ax, x, chunk_vars, dataset_name, chunk_idx, chunk_size, use_cross_view_corr):
+def finalize_plot(ax, y, chunk_vars, dataset_name, chunk_idx, chunk_size, use_cross_view_corr):
     ax.set_title(
         f"{dataset_name} - Variables {chunk_idx * chunk_size + 1} to {(chunk_idx + 1) * chunk_size}")
-    ax.set_xticks(x)
-    ax.set_xticklabels(chunk_vars, rotation=60, ha='right')
-    ax.set_xlabel("Variable")
-    ax.set_ylabel("Canonical Correlation")
+    ax.set_yticks(y)
+    ax.set_yticklabels(chunk_vars, ha='right')
+    ax.set_ylabel("Variable")
+    ax.set_xlabel("Canonical Correlation")
 
-    ax.axhline(0.1, color='gray', linestyle='--', linewidth=2, alpha=0.5)
-    
-    # if loading is plotted, then also plot y=-0.1
-    if not use_cross_view_corr:
-        ax.axhline(-0.1, color='gray', linestyle='--', linewidth=2, alpha=0.5)
-    
-    for grid_pos in x[:-1] + 0.5:
-        ax.axvline(grid_pos, color='gray', linestyle='--',
-                   linewidth=0.7, alpha=0.5)
-
-    ax.grid(False)
-    ax.yaxis.grid(True, linestyle=':', alpha=0.7)
+    ax = cca_plot_cv._add_lines(ax, y, use_cross_view_corr)
 
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), title='Groups', loc='best')
+    ax.legend(by_label.values(), by_label.keys(), title='Groups',
+              loc='center left', bbox_to_anchor=(1.02, 0.5))
 
 
 def _build_corr_df(corrs, x_cols, train_or_test, whether_lag, dataset):

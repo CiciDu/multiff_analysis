@@ -403,3 +403,11 @@ def take_out_valid_cluster_intervals(cluster_caught_T_new,
     """
     return _process_valid_intervals(cluster_caught_T_new, gap_too_large_threshold, min_combined_valid_interval_length)
 
+
+def calculate_ff_rel_x_and_y(distance, angle):
+    rel_y = distance * np.cos(angle)
+    rel_x = - distance * np.sin(angle)
+    return rel_x, rel_y
+        
+        
+        

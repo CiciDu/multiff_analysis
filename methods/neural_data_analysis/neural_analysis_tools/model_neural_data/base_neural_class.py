@@ -82,7 +82,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.target_df = prep_target_data.add_columns_to_target_df(
             self.target_df)
 
-    def _make_or_retrieve_target_cluster_df(self, exists_ok=True):
+    def _make_or_retrieve_target_cluster_df(self, exists_ok=True, fill_na=False):
         target_cluster_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_cluster_df.csv')
         if exists(target_cluster_df_filepath) & exists_ok:
@@ -95,7 +95,11 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             self.target_cluster_df.to_csv(
                 target_cluster_df_filepath, index=False)
             print("Made new target_cluster_df")
-
+            
+        if fill_na:
+            self.target_df = prep_target_data.fill_na_in_target_df(
+                self.target_df)
+            
     def _add_ff_info(self, binned_features):
         ff_info = prep_monkey_data.get_ff_info_for_bins(
             binned_features[['bin']], self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
@@ -114,8 +118,12 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                            filter_vif_by_all_columns=True,
                            ):
 
+
+        y_var_reduced = prep_target_decoder.remove_zero_var_cols(
+            y_var)
+
         # Call the function to iteratively drop lags with high correlation for each feature
-        self.y_var_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var,
+        self.y_var_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var_reduced,
                                                                                   corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
                                                                                   verbose=verbose,
                                                                                   filter_by_feature=False,
@@ -141,8 +149,11 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                                 filter_vif_by_all_columns=False,
                                 ):
 
+        y_var_lags_reduced = prep_target_decoder.remove_zero_var_cols(
+            self.y_var_lags)
+        
         # Call the function to iteratively drop lags with high correlation for each feature
-        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.y_var_lags,
+        self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var_lags_reduced,
                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
                                                                                        verbose=verbose,
                                                                                        filter_by_feature=filter_corr_by_feature,
@@ -241,6 +252,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                 'bin_0').loc[self.valid_bin_index].reset_index(drop=False)
         return var_lags, lag_numbers
 
+          
     def _reduce_x_var(self):
         self.x_var_reduced = prep_target_decoder.remove_zero_var_cols(
             self.x_var)
