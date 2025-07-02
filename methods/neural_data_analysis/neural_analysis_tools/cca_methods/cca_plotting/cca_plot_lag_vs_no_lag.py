@@ -27,12 +27,15 @@ from sklearn.model_selection import KFold
 from neural_data_analysis.neural_analysis_tools.cca_methods import cca_cv_utils
 
 
+
 def plot_cca_lag_vs_nolag_and_train_vs_test(
     df, dataset_name, chunk_size=30, alpha=0.8,
     base_width=0.35, narrower_width_ratio=0.4,
     width_per_var=0.6, height=6,
     mode='train_offset'
 ):
+    
+    use_cross_view_corr = False if 'canonical_component' in df.columns else True
 
     vars_unique = df['variable'].unique()
     num_chunks = int(np.ceil(len(vars_unique) / chunk_size))
@@ -53,7 +56,7 @@ def plot_cca_lag_vs_nolag_and_train_vs_test(
             mode, base_width, narrower_width_ratio, alpha, colors
         )
 
-        finalize_plot(ax, x, chunk_vars, dataset_name, i, chunk_size)
+        finalize_plot(ax, x, chunk_vars, dataset_name, i, chunk_size, use_cross_view_corr)
         plt.tight_layout()
         plt.show()
         # print("=" * 150)
@@ -157,16 +160,20 @@ def get_bar_attributes(
     return subset_df, width, color, alpha_adj
 
 
-def finalize_plot(ax, x, chunk_vars, dataset_name, chunk_idx, chunk_size):
+def finalize_plot(ax, x, chunk_vars, dataset_name, chunk_idx, chunk_size, use_cross_view_corr):
     ax.set_title(
         f"{dataset_name} - Variables {chunk_idx * chunk_size + 1} to {(chunk_idx + 1) * chunk_size}")
     ax.set_xticks(x)
-    ax.set_xticklabels(chunk_vars, rotation=45, ha='right')
+    ax.set_xticklabels(chunk_vars, rotation=60, ha='right')
     ax.set_xlabel("Variable")
     ax.set_ylabel("Canonical Correlation")
 
-    ax.axhline(0.1, color='purple', linestyle='--', linewidth=2, alpha=0.5)
-
+    ax.axhline(0.1, color='gray', linestyle='--', linewidth=2, alpha=0.5)
+    
+    # if loading is plotted, then also plot y=-0.1
+    if not use_cross_view_corr:
+        ax.axhline(-0.1, color='gray', linestyle='--', linewidth=2, alpha=0.5)
+    
     for grid_pos in x[:-1] + 0.5:
         ax.axvline(grid_pos, color='gray', linestyle='--',
                    linewidth=0.7, alpha=0.5)
@@ -187,30 +194,3 @@ def _build_corr_df(corrs, x_cols, train_or_test, whether_lag, dataset):
         'whether_lag': whether_lag,
         'variable': x_cols,
     })
-
-
-def combine_data_to_compare_train_and_test(cca_no_lag, cca_lags):
-    X1_dfs, X2_dfs = [], []
-
-    for cca_obj, lag_label in [(cca_no_lag, 'no_lag'), (cca_lags, 'lag')]:
-        X1_dfs.append(_build_corr_df(
-            cca_obj.traincorrs[0], cca_obj.X1.columns, 'train', lag_label, 'X1'))
-        X1_dfs.append(_build_corr_df(
-            cca_obj.testcorrs[0], cca_obj.X1.columns, 'test', lag_label, 'X1'))
-        X2_dfs.append(_build_corr_df(
-            cca_obj.traincorrs[1], cca_obj.X2.columns, 'train', lag_label, 'X2'))
-        X2_dfs.append(_build_corr_df(
-            cca_obj.testcorrs[1], cca_obj.X2.columns, 'test', lag_label, 'X2'))
-
-    # Combine and sort, rename all _0 to the original name (but not if ending with _0_0)
-    combined_X1_df = pd.concat(X1_dfs)
-    combined_X1_df['variable'] = cca_cv_utils.conditional_replace_suffix(
-        combined_X1_df['variable'])
-    combined_X1_df = combined_X1_df.sort_values(by='variable')
-
-    combined_X2_df = pd.concat(X2_dfs)
-    combined_X2_df['variable'] = cca_cv_utils.conditional_replace_suffix(
-        combined_X2_df['variable'])
-    combined_X2_df = combined_X2_df.sort_values(by='variable')
-
-    return combined_X1_df, combined_X2_df

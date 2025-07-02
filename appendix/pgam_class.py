@@ -7,7 +7,7 @@ from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_da
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
-from neural_data_analysis.planning_and_neural import planning_neural_class, planning_neural_utils
+from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import planning_neural_class, planning_neural_utils
 
 import os
 import numpy as np

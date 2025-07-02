@@ -29,13 +29,13 @@ from neural_data_analysis.neural_analysis_tools.model_neural_data import transfo
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, cluster_analysis, organize_patterns_and_features, category_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_decode_target, behav_features_to_keep
+from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_target_decoder, behav_features_to_keep
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from neural_data_analysis.neural_analysis_tools.gpfa_methods import elephant_utils, fit_gpfa_utils, gpfa_regression_utils, plot_gpfa_utils, gpfa_helper_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
 
 
-class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPFAHelperClass):
+class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPFAHelperClass):
 
     def __init__(self,
                  raw_data_folder_path=None,
@@ -118,7 +118,7 @@ class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPF
 
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
-        pursuit_data_all = prep_decode_target.make_pursuit_data_all(
+        pursuit_data_all = prep_target_decoder.make_pursuit_data_all(
             self.single_vis_target_df, self.behav_data_all)
 
         # add the segment info back to single_vis_target_df
@@ -287,15 +287,15 @@ class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPF
             self._get_curv_of_traj_df()
 
         # first get info for pairs of target_index and point_index that the lagged columns will use
-        target_df_lags = prep_decode_target.initialize_target_df_lags(
+        target_df_lags = prep_target_decoder.initialize_target_df_lags(
             self.y_var, self.max_y_lag_number, self.bin_width)
-        target_df_lags = prep_decode_target.add_target_info_based_on_target_index_and_point_index(target_df_lags, self.monkey_information, self.ff_real_position_sorted,
-                                                                                                  self.ff_dataframe, self.ff_caught_T_new, self.curv_of_traj_df)
-        target_df_lags = prep_decode_target.fill_na_in_last_seen_columns(
+        target_df_lags = prep_target_decoder.add_target_info_based_on_target_index_and_point_index(target_df_lags, self.monkey_information, self.ff_real_position_sorted,
+                                                                                                   self.ff_dataframe, self.ff_caught_T_new, self.curv_of_traj_df)
+        target_df_lags = prep_target_decoder.fill_na_in_last_seen_columns(
             target_df_lags)
 
         # Now, put the lagged target columns into y_var_lags
-        self.y_var_lags = prep_decode_target.add_lagged_target_columns(
+        self.y_var_lags = prep_target_decoder.add_lagged_target_columns(
             self.y_var_lags, self.y_var, target_df_lags, self.max_y_lag_number, target_columns=self.target_columns)
 
         if not basic_data_present:
@@ -343,7 +343,7 @@ class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPF
         self.reduce_y_var(exists_ok=exists_ok)
 
     def _process_na(self):
-        na_rows, na_cols = prep_decode_target._process_na(
+        na_rows, na_cols = prep_target_decoder._process_na(
             self.behav_data_all)
 
     def _clip_values(self):
@@ -360,12 +360,12 @@ class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPF
         )
 
     def _add_curv_info(self):
-        self.behav_data_all = prep_decode_target._add_curv_info_to_behav_data_all(
+        self.behav_data_all = prep_target_decoder._add_curv_info_to_behav_data_all(
             self.behav_data_all, self.curv_of_traj_df, self.monkey_information, self.ff_caught_T_new)
 
     def _add_all_target_info(self):
 
-        self.behav_data_all = prep_decode_target.add_target_info_to_behav_data_all(
+        self.behav_data_all = prep_target_decoder.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_df)
 
     def _get_single_vis_target_df(self, single_vis_target_df_exists_ok=True, target_clust_last_vis_df_exists_ok=True):
@@ -382,19 +382,19 @@ class DecodeTargetClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GPF
             self.make_or_retrieve_target_clust_last_vis_df(
                 exists_ok=target_clust_last_vis_df_exists_ok)
             # in the function, we'll drop the rows where target is in a cluster, because we want to preserve cases where monkey is going toward a single target, not a cluster
-            self.single_vis_target_df = prep_decode_target.find_single_vis_target_df(
+            self.single_vis_target_df = prep_target_decoder.find_single_vis_target_df(
                 self.target_clust_last_vis_df, self.monkey_information, self.ff_caught_T_new, max_visibility_window=self.max_visibility_window)
             self.single_vis_target_df.to_csv(df_path, index=False)
             print(f'Saved single_vis_target_df to {df_path}')
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_corr(y_var_lags):
-        subset_key_words, all_column_subsets = prep_decode_target._get_subset_key_words_and_all_column_subsets_for_corr(
+        subset_key_words, all_column_subsets = prep_target_decoder._get_subset_key_words_and_all_column_subsets_for_corr(
             y_var_lags)
         return subset_key_words, all_column_subsets
 
     @staticmethod
     def get_subset_key_words_and_all_column_subsets_for_vif(y_var_lags):
-        subset_key_words, all_column_subsets = prep_decode_target._get_subset_key_words_and_all_column_subsets_for_vif(
+        subset_key_words, all_column_subsets = prep_target_decoder._get_subset_key_words_and_all_column_subsets_for_vif(
             y_var_lags)
         return subset_key_words, all_column_subsets

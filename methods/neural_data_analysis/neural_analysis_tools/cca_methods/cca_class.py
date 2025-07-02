@@ -6,7 +6,7 @@ from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_data
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from neural_data_analysis.neural_analysis_tools.cca_methods import cca_utils, cca_cv_utils
-from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plotting, cca_lag_vs_no_lag_plotting, cca_cv_plotting
+from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plotting, cca_plot_lag_vs_no_lag, cca_plot_cv
 
 import os
 import numpy as np
@@ -81,6 +81,29 @@ class CCAclass():
             self.X1_loading**2, self.X1.columns, lagging_included=False)
         self.X2_squared_loading_df = neural_data_modeling.make_loading_or_weight_df(
             self.X2_loading**2, self.X2.columns, lagging_included=self.lagging_included)
+
+
+    def plot_X1_loadings(self, max_components=20, features_per_fig=30):
+        cca_plotting.plot_loading_heatmap(
+            loadings=self.X1_loading,
+            feature_names=self.X1_loading_df.feature.values,
+            matrix_label='X1',
+            max_components=max_components,
+            features_per_fig=features_per_fig,
+            canonical_corrs = self.canon_corr
+        )
+        
+
+    def plot_X2_loadings(self, max_components=20, features_per_fig=30):
+        cca_plotting.plot_loading_heatmap(
+            loadings=self.X2_loading,
+            feature_names=self.X2_loading_df.feature.values,
+            matrix_label='X2',
+            max_components=max_components,
+            features_per_fig=features_per_fig,
+            canonical_corrs = self.canon_corr
+        )
+        
 
     def plot_ranked_loadings(self, keep_one_value_for_each_feature=False, max_plots_to_show=5, max_features_to_show_per_plot=10,
                              X1_or_X2='X1', squared=True):

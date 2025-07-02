@@ -51,13 +51,15 @@ def plot_cca_cv_results(
     """
 
     use_cross_view_corr = False if 'canonical_component' in stats_df.columns else True
+    if component < 1:
+        raise ValueError("Component must be greater than 0")
 
     values_train, values_test, errors_train, errors_test, final_labels = _extract_plot_data(
         stats_df, data_type, component, use_cross_view_corr,
         filter_significant, significance_threshold, sort_by_significance
     )
 
-    title = f"Canonical Correlation - {data_type} - Component {component}" if not use_cross_view_corr else f"Cross-View Correlation - {data_type}"
+    title = f"Canonical Loading - {data_type} - Component {component}" if not use_cross_view_corr else f"Cross-View Correlation - {data_type}"
 
     _plot_bars(
         values_train, values_test, errors_train, errors_test, final_labels,
@@ -92,8 +94,12 @@ def _extract_plot_data(
     # Get values and errors
     values_train = train_data['mean_corr'].values
     values_test = test_data['mean_corr'].values
-    errors_train = train_data['std_corr'].values
-    errors_test = test_data['std_corr'].values
+    if 'std_corr' in train_data.columns:
+        errors_train = train_data['std_corr'].values
+        errors_test = test_data['std_corr'].values
+    else:
+        errors_train = np.zeros_like(values_train)
+        errors_test = np.zeros_like(values_test)
 
     # Get labels (variables)
     labels = train_data['variable'].values
@@ -184,10 +190,13 @@ def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_tes
     x = np.arange(len(labels))
     width = 0.35
 
+    if np.all(errors_train == 0) and np.all(errors_test == 0):
+        errors_train = None
+        errors_test = None
     ax.bar(x - width/2, values_train, width, yerr=errors_train,
-           label='Train', alpha=0.7, capsize=4)
+            label='Train', alpha=0.7, capsize=4)
     ax.bar(x + width/2, values_test, width, yerr=errors_test,
-           label='Test', alpha=0.7, capsize=4)
+        label='Test', alpha=0.7, capsize=4)
 
     # add horizontal line at 0.1
     ax.axhline(y=0.1, color='gray', linestyle='--', linewidth=1.2)

@@ -2,7 +2,7 @@ import sys
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from null_behaviors import curvature_utils
-from neural_data_analysis.planning_and_neural import planning_neural_utils
+from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import planning_neural_utils
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
 import numpy as np
@@ -142,16 +142,28 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                                          remove_invalid_rows=True,
                                                          monkey_information=self.monkey_information,
                                                          ff_caught_T_new=self.ff_caught_T_new)
-        self.curv_df.set_index('point_index', inplace=True)
         # self.curv_df['point_index'] = self.curv_df.index
         info_to_add, columns_added = planning_neural_utils.add_curv_info_to_info_to_add(
             info_to_add, self.curv_df, which_ff_info)
-        if which_ff_info == 'nxt_':  # because we only have to do it once, we choose one kind of which_ff_info to do it
-            ff_df.set_index('point_index', inplace=True)
-            info_to_add['time_rel_to_stop'] = ff_df['time'] - \
-                ff_df['stop_time']
-            info_to_add['traj_curv'] = self.curv_df['curv_of_traj']
-            columns_added.extend(['time_rel_to_stop', 'traj_curv'])
+
+        if which_ff_info == 'nxt_':
+            # --- Merge firefly timing info ---
+            ff_extra = ff_df[['point_index', 'time', 'stop_time']].drop_duplicates()
+            ff_extra['time_rel_to_stop'] = ff_extra['time'] - ff_extra['stop_time']
+            info_to_add = info_to_add.merge(
+                ff_extra[['point_index', 'time_rel_to_stop']],
+                on='point_index', how='left'
+            )
+            columns_added.append('time_rel_to_stop')
+
+            # --- Merge curvature info separately ---
+            curv_extra = self.curv_df[['point_index', 'curv_of_traj']].drop_duplicates()
+            curv_extra.rename(columns={'curv_of_traj': 'traj_curv'}, inplace=True)
+            info_to_add = info_to_add.merge(
+                curv_extra,
+                on='point_index', how='left'
+            )
+            columns_added.append('traj_curv')
         return info_to_add, columns_added
 
     def _get_ff_df_and_add_time_info(self, row, which_ff_info):

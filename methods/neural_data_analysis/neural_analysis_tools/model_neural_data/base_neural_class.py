@@ -4,7 +4,7 @@ from neural_data_analysis.neural_analysis_tools.model_neural_data import transfo
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_target_data
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_decode_target, behav_features_to_keep
+from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_target_decoder, behav_features_to_keep
 import os
 import numpy as np
 import matplotlib
@@ -46,8 +46,9 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.window_width, self.num_bins_in_window, self.convolve_pattern = neural_data_processing.calculate_window_parameters(
             window_width=self.window_width, bin_width=self.bin_width)
 
+        bin_width_str = str(self.bin_width).replace('.', 'p')
         binned_spikes_df_path = os.path.join(
-            self.processed_neural_data_folder_path, 'binned_spikes_df.csv')
+            self.processed_neural_data_folder_path, f"binned_spikes_df_{bin_width_str}.csv")
 
         if binned_spikes_df_exists_ok & os.path.exists(binned_spikes_df_path):
             self.binned_spikes_df = pd.read_csv(binned_spikes_df_path)
@@ -158,6 +159,12 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                                                                                 filter_by_all_columns=filter_vif_by_all_columns,
                                                                                 get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vif)
 
+
+        # sort y_var_lags_reduced by column name
+        self.y_var_lags_reduced = self.y_var_lags_reduced.reindex(
+            sorted(self.y_var_lags_reduced.columns), axis=1)
+
+
     def _reduce_x_var_lags(self,
                            corr_threshold_for_lags_of_a_feature=0.85,
                            vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
@@ -182,6 +189,11 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                                                                                 filter_by_feature=filter_vif_by_feature,
                                                                                 filter_by_subsets=False,
                                                                                 filter_by_all_columns=filter_vif_by_all_columns)
+
+        # sort x_var_lags_reduced by column name
+        self.x_var_lags_reduced = self.x_var_lags_reduced.reindex(
+            sorted(self.x_var_lags_reduced.columns), axis=1)
+
 
     def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
         df_path = os.path.join(self.y_var_lags_path,
@@ -230,12 +242,13 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         return var_lags, lag_numbers
 
     def _reduce_x_var(self):
-        self.x_var_reduced = prep_decode_target.remove_zero_var_cols(
+        self.x_var_reduced = prep_target_decoder.remove_zero_var_cols(
             self.x_var)
 
     def _reduce_x_var_lags(self):
-        self.x_var_lags_reduced = prep_decode_target.remove_zero_var_cols(
+        self.x_var_lags_reduced = prep_target_decoder.remove_zero_var_cols(
             self.x_var_lags)
+        
 
     def _reduce_y_var(self,
                       df_path=None,

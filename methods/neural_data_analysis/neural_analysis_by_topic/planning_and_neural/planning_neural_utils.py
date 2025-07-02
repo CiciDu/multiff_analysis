@@ -12,7 +12,14 @@ def add_curv_info_to_info_to_add(info_to_add, curv_df, which_ff_info):
 
     columns_added = list(columns_to_rename.values())
     
+    curv_df_sub = curv_df[columns_added + ['point_index']].drop_duplicates()
+    
+    info_to_add.drop(columns=columns_added, inplace=True, errors='ignore')
+    info_to_add = info_to_add.merge(curv_df_sub, on='point_index', how='left')
+    
     info_to_add[columns_added] = curv_df[columns_added]
+    
+    
 
     return info_to_add, columns_added
 

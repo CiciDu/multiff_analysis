@@ -2,8 +2,8 @@ import sys
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from null_behaviors import curvature_utils
-from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_decode_target, behav_features_to_keep
-from neural_data_analysis.planning_and_neural import planning_neural_utils, planning_neural_helper_class
+from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_target_decoder, behav_features_to_keep
+from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import planning_neural_utils, planning_neural_helper_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
 import numpy as np
@@ -65,7 +65,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
     def get_x_and_y_var(self, exists_ok=True):
         original_len = len(self.all_planning_info)
         self.y_var = self.all_planning_info.dropna().drop(
-            columns={'stop_point_index', 'point_index'})
+            columns={'stop_point_index', 'point_index'}, errors='ignore')
         print(f"{round(1 - len(self.y_var) / original_len, 2)}% of rows are dropped in all_planning_info due to having missing values")
         self.x_var = self.binned_spikes_df[self.binned_spikes_df['bin'].isin(
             self.y_var['bin'].values)].drop(columns=['bin'])
@@ -114,15 +114,15 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
     def reduce_y_var_lags(self,
                           df_path=None,
                           save_data=True,
-                          corr_threshold_for_lags_of_a_feature=0.85,
+                          corr_threshold_for_lags_of_a_feature=0.97,
                           vif_threshold_for_initial_subset=5,
                           vif_threshold=5,
                           verbose=True,
-                          filter_corr_by_feature=True,
-                          filter_corr_by_subsets=True,
-                          filter_corr_by_all_columns=True,
+                          filter_corr_by_feature=False,
+                          filter_corr_by_subsets=False,
+                          filter_corr_by_all_columns=False,
                           filter_vif_by_feature=True,
-                          filter_vif_by_subsets=True,
+                          filter_vif_by_subsets=False,
                           filter_vif_by_all_columns=True,
                           exists_ok=True):
         """Reduce y_var_lags by removing highly correlated and high VIF features.

@@ -47,11 +47,11 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
             self.processed_neural_data_folder_path, 'y_var_lags')
         self.vif_df_path = os.path.join(
             self.processed_neural_data_folder_path, 'vif_df')
-        self.lr_result_df_path = os.path.join(
-            self.processed_neural_data_folder_path, 'lr_result_df')
+        self.lr_df_path = os.path.join(
+            self.processed_neural_data_folder_path, 'lr_df')
         os.makedirs(self.y_var_lags_path, exist_ok=True)
         os.makedirs(self.vif_df_path, exist_ok=True)
-        os.makedirs(self.lr_result_df_path, exist_ok=True)
+        os.makedirs(self.lr_df_path, exist_ok=True)
 
     def prep_behavioral_data_for_neural_data_modeling(self):
         self.binned_features, self.time_bins = prep_monkey_data.initialize_binned_features(
@@ -63,16 +63,16 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
         self._make_final_behavioral_data()
         self._get_index_of_bins_in_valid_intervals()
 
-    def make_or_retrieve_y_var_lr_result_df(self, exists_ok=True):
-        df_path = os.path.join(self.lr_result_df_path,
-                               'y_var_lr_result_df.csv')
+    def make_or_retrieve_y_var_lr_df(self, exists_ok=True):
+        df_path = os.path.join(self.lr_df_path,
+                               'y_var_lr_df.csv')
         if exists_ok & exists(df_path):
-            self.y_var_lr_result_df = pd.read_csv(df_path)
+            self.y_var_lr_df = pd.read_csv(df_path)
         else:
-            self.y_var_lr_result_df = neural_data_modeling.get_y_var_lr_result_df(
+            self.y_var_lr_df = neural_data_modeling.get_y_var_lr_df(
                 self.x_var, self.y_var)
-            self.y_var_lr_result_df.to_csv(df_path, index=False)
-            print('Made new y_var_lr_result_df')
+            self.y_var_lr_df.to_csv(df_path, index=False)
+            print('Made new y_var_lr_df')
 
     def make_or_retrieve_x_var_vif_df(self, exists_ok=True):
         self.x_var_vif_df = drop_high_vif_vars.make_or_retrieve_vif_df(self.x_var, self.vif_df_path,

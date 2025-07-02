@@ -86,7 +86,7 @@ def get_base_feature_names(df_with_lags):
     return base_features
 
 
-def _drop_lags_for_feature(df_with_lags, feature, corr_threshold, vif_threshold, use_vif_instead_of_corr):
+def _drop_lags_for_feature(df_with_lags, feature, corr_threshold, vif_threshold, use_vif_instead_of_corr, drop_lag_0_last_in_vif=False):
     """
     Drop lags for a single feature based on correlation or VIF.
     Returns: columns_to_drop, top_values_of_feature
@@ -102,7 +102,7 @@ def _drop_lags_for_feature(df_with_lags, feature, corr_threshold, vif_threshold,
         columns_to_drop = np.unique(high_corr_pair_df['var_1'].values).tolist()
     else:
         _, columns_to_drop, top_values_of_feature = drop_high_vif_vars.iteratively_drop_column_w_highest_vif(
-            df_with_lags_sub.copy(), vif_threshold=vif_threshold, verbose=False)
+            df_with_lags_sub.copy(), vif_threshold=vif_threshold, drop_lag_0_last=drop_lag_0_last_in_vif, verbose=False)
     return columns_to_drop, top_values_of_feature
 
 
@@ -120,7 +120,8 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(
     vif_threshold=5,
     verbose=True,
     show_top_values_of_each_feature=False,
-    use_vif_instead_of_corr=False
+    use_vif_instead_of_corr=False,
+    drop_lag_0_last_in_vif=False,
 ):
     """
     Iteratively drop lags with high correlation or VIF for each feature in the DataFrame.
@@ -139,7 +140,7 @@ def drop_lags_with_high_corr_or_vif_for_each_feature(
         df_with_lags_sub = _find_subset_of_df_with_lags_for_current_feature(
             df_with_lags, feature)
         temp_columns_to_drop, top_values_of_feature = _drop_lags_for_feature(
-            df_with_lags, feature, corr_threshold, vif_threshold, use_vif_instead_of_corr)
+            df_with_lags, feature, corr_threshold, vif_threshold, use_vif_instead_of_corr, drop_lag_0_last_in_vif)
         if show_top_values_of_each_feature and not top_values_of_feature.empty:
             print(top_values_of_feature.head(3))
         if not top_values_of_feature.empty:
@@ -171,7 +172,8 @@ def filter_subsets_of_var_df_lags_by_corr_or_vif(var_df_lags,
                                                  vif_threshold=5,
                                                  verbose=True,
                                                  subset_key_words=None,
-                                                 all_column_subsets=None):
+                                                 all_column_subsets=None,
+                                                 drop_lag_0_last_in_vif=False):
 
     if all_column_subsets is None:
         subset_key_words = ['_x', '_y', 'angle']
@@ -205,8 +207,12 @@ def filter_subsets_of_var_df_lags_by_corr_or_vif(var_df_lags,
                 var_df_lags[column_subset], corr_threshold=corr_threshold)
             temp_columns_to_drop = high_corr_pair_df['var_1'].values.tolist()
         else:
-            _, temp_columns_to_drop, _ = drop_high_vif_vars.iteratively_drop_column_w_highest_vif(var_df_lags[column_subset].copy(),
-                                                                                                  vif_threshold=vif_threshold, verbose=verbose)
+            _, temp_columns_to_drop, _ = drop_high_vif_vars.iteratively_drop_column_w_highest_vif(
+                var_df_lags[column_subset].copy(),
+                vif_threshold=vif_threshold,
+                drop_lag_0_last=drop_lag_0_last_in_vif,
+                verbose=verbose
+            )
 
         if len(temp_columns_to_drop) > 0:
             # get unique columns dropped

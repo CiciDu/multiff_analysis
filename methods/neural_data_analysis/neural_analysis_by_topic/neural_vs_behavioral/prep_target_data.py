@@ -381,17 +381,17 @@ def _calculate_average_info(target_df):
 
     target_average_info = target_average_info.groupby(
         'bin').mean().reset_index(drop=False)
-    target_average_info.rename(columns={'target_distance': 'avg_target_distance',
-                                        'target_angle': 'avg_target_angle',
-                                        'target_angle_to_boundary': 'avg_target_angle_to_boundary',
-                                        'time_since_target_last_seen': 'avg_target_last_seen_time',
-                                        'target_last_seen_distance': 'avg_target_last_seen_distance_frozen',
-                                        'target_last_seen_angle': 'avg_target_last_seen_angle_frozen',
-                                        'target_last_seen_angle_to_boundary': 'avg_target_last_seen_angle_to_boundary_frozen',
-                                        'target_cluster_last_seen_time': 'avg_target_cluster_last_seen_time',
-                                        'target_cluster_last_seen_distance_frozen': 'avg_target_cluster_last_seen_distance_frozen',
-                                        'target_cluster_last_seen_angle_frozen': 'avg_target_cluster_last_seen_angle_frozen',
-                                        'target_cluster_last_seen_angle_to_boundary_frozen': 'avg_target_cluster_last_seen_angle_to_boundary_frozen'
+    target_average_info.rename(columns={'target_distance': 'avg_bin_target_distance',
+                                        'target_angle': 'avg_bin_target_angle',
+                                        'target_angle_to_boundary': 'avg_bin_target_angle_to_boundary',
+                                        'time_since_target_last_seen': 'avg_bin_target_last_seen_time',
+                                        'target_last_seen_distance': 'avg_bin_target_last_seen_distance_frozen',
+                                        'target_last_seen_angle': 'avg_bin_target_last_seen_angle_frozen',
+                                        'target_last_seen_angle_to_boundary': 'avg_bin_target_last_seen_angle_to_boundary_frozen',
+                                        'target_cluster_last_seen_time': 'avg_bin_target_cluster_last_seen_time',
+                                        'target_cluster_last_seen_distance_frozen': 'avg_bin_target_cluster_last_seen_distance_frozen',
+                                        'target_cluster_last_seen_angle_frozen': 'avg_bin_target_cluster_last_seen_angle_frozen',
+                                        'target_cluster_last_seen_angle_to_boundary_frozen': 'avg_bin_target_cluster_last_seen_angle_to_boundary_frozen'
                                         }, inplace=True)
     return target_average_info
 
