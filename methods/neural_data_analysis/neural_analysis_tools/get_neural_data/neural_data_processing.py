@@ -154,39 +154,63 @@ def convolve_neural_data(x_var, kernel_len=7):
     return modelX
 
 
-def add_lags_to_each_feature(var, lag_numbers, rearrange_lag_based_on_abs_value=True):
+def add_lags_to_each_feature(var, lag_numbers, trial_vector=None, rearrange_lag_based_on_abs_value=True):
     """
-    Add lags to each feature in the given variable.
+    Add lags to each feature in var, separately within each trial (if provided),
+    minimizing explicit Python loops for better performance.
     """
-    n_units = var.shape[1]
-    var_lags = np.full((var.shape[0], n_units * len(lag_numbers)), np.nan)
-    column_names = None
-
-    if isinstance(var, pd.DataFrame):
-        column_names = var.columns.astype(str)
-        var = var.values
-        new_column_names = np.tile(column_names, len(lag_numbers))
-
     if rearrange_lag_based_on_abs_value:
         lag_numbers = sorted(lag_numbers, key=lambda x: abs(x))
 
-    for idx, lag in enumerate(lag_numbers):
-        columns_numbers = range(idx*n_units, (idx+1)*n_units)
-        if column_names is not None:
-            new_column_names[columns_numbers] = column_names + "_" + str(lag)
+    if isinstance(var, pd.DataFrame):
+        column_names = var.columns.astype(str)
+    else:
+        column_names = [f"feat{i}" for i in range(var.shape[1])]
+        var = pd.DataFrame(var, columns=column_names)
 
-        if lag < 0:
-            var_lags[:lag, columns_numbers] = var[-lag:, :]
-        elif lag > 0:
-            var_lags[lag:, columns_numbers] = var[:-lag, :]
-        else:
-            var_lags[:, columns_numbers] = var[:, :]
+    n_units = var.shape[1]
 
-    if column_names is not None:
-        var_lags = pd.DataFrame(var_lags, columns=new_column_names)
+    # Helper function: create lagged matrix for one trial group
+    def lag_group(df):
+        n = df.shape[0]
+        # Create empty array for all lags: rows=n, cols=n_units*len(lag_numbers)
+        lagged_data = np.full((n, n_units * len(lag_numbers)), np.nan)
 
-        # conduct ffill and bfill on var_lags
+        # Convert to numpy for fast slicing
+        arr = df.drop(columns=['trial']).values
+
+        # For each lag, fill corresponding columns with shifted data
+        for idx, lag in enumerate(lag_numbers):
+            col_start = idx * n_units
+            col_end = col_start + n_units
+            if lag < 0:
+                lagged_data[:lag, col_start:col_end] = arr[-lag:, :]
+            elif lag > 0:
+                lagged_data[lag:, col_start:col_end] = arr[:-lag, :]
+            else:
+                lagged_data[:, col_start:col_end] = arr
+
+        # Return as DataFrame with proper columns
+        new_cols = []
+        for lag in lag_numbers:
+            new_cols.extend([f"{c}_{lag}" for c in column_names])
+        return pd.DataFrame(lagged_data, columns=new_cols, index=df.index)
+
+    if trial_vector is None:
+        # Single "trial": just apply lag_group on all data at once
+        var_lags = lag_group(var)
+        # Fill NaNs forward/backward globally
         var_lags = var_lags.ffill().bfill()
+    else:
+        # Use groupby-apply: pandas efficiently handles groups
+        trial_vector = pd.Series(trial_vector, index=var.index if isinstance(var, pd.DataFrame) else None)
+        var['trial'] = trial_vector
+        var_lags = var.groupby('trial', group_keys=False).apply(lag_group)
+        # Fill NaNs forward/backward within each trial group
+        var_lags = var_lags.groupby(trial_vector).apply(lambda df: df.ffill().bfill())
+
+        # Clean up temp column
+        var.drop(columns=['trial'], inplace=True)
 
     return var_lags
 

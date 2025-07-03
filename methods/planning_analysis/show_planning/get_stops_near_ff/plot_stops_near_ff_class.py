@@ -17,13 +17,6 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
 
     default_overall_params = {'heading_instead_of_curv': True}
 
-    default_monkey_plot_params = {'eliminate_irrelevant_points_beyond_boundaries': True,
-                                  'show_reward_boundary': True,
-                                  'rotation_matrix': None,
-                                  'hoverdata_multi_columns': ['rel_time'],
-                                  'show_null_arcs_to_ff': True,
-                                  }
-
     def __init__(self,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
                  optimal_arc_type='norm_opt_arc',
@@ -31,6 +24,7 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
         super().__init__()
         self._update_optimal_arc_type_and_related_paths(
             optimal_arc_type=optimal_arc_type)
+        self.default_monkey_plot_params = plotly_plot_class.PlotlyPlotter.default_monkey_plot_params
 
     def prepare_to_plot_stops_near_ff(self, use_fixed_arc_length=False, fixed_arc_length=None):
         # self.slope, self.intercept, self.r_value, self.p_value, self.std_err = stats.linregress(self.traj_curv_counted, self.nxt_curv_counted)

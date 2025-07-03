@@ -1,10 +1,11 @@
-
 import sys
 from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot
-from visualization.dash_tools import dash_prep_class, dash_utils, dash_utils
+from visualization.dash_tools import dash_prep_class, dash_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_monkey_heading_helper_class
 from visualization.matplotlib_tools import monkey_heading_functions
 from visualization.plotly_tools import plotly_for_monkey
+from null_behaviors import show_null_trajectory
+from visualization.plotly_tools import plotly_for_null_arcs
 
 import os
 import numpy as np
@@ -17,6 +18,7 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 from dash import dcc
 import plotly.graph_objects as go
+import copy
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -50,8 +52,14 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         self.ref_point_params = ref_point_params
         self.curv_of_traj_params = curv_of_traj_params
-        self.overall_params = overall_params
-        self.monkey_plot_params = monkey_plot_params
+        self.overall_params = {
+            **copy.deepcopy(self.default_overall_params),
+            **overall_params
+        }
+        self.monkey_plot_params = {
+            **copy.deepcopy(self.default_monkey_plot_params),
+            **monkey_plot_params
+        }
         self.scatter_plot_params = scatter_plot_params
 
         self.snf_streamline_organizing_info_kwargs = find_stops_near_ff_utils.organize_snf_streamline_organizing_info_kwargs(
@@ -394,7 +402,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.ref_point_descr = 'based on %d cm into past' % ref_point_value
             self.ref_point_column = 'rel_distance'
         elif ref_point_mode == 'time':
-            self.ref_point_descr = 'based on %d seconds into past' % ref_point_value
+            self.ref_point_descr = 'based on %d s into past' % ref_point_value
             self.ref_point_column = 'rel_time'
         else:
             print('Warnings: ref_point_mode is not recognized, so no update is made')
@@ -413,8 +421,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             raise PreventUpdate
         self._prepare_static_main_plots()
 
-        print('update all plots based on new reference point description: ',
-              self.ref_point_descr, '. Note: it might take a few seconds to update the plots.')
+        print(
+            f'update all plots based on new reference point description: {self.ref_point_descr}.')
         return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
 
     def _find_point_index_to_show_traj_curv(self):
@@ -492,7 +500,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                                                   self.stop_point_index, 'angle_from_m_before_stop_to_nxt_ff'].item() * (180/np.pi), decimals)
             current_ang_cur_nxt = round(self.heading_info_df.loc[self.heading_info_df['stop_point_index'] ==
                                                                  self.stop_point_index, 'angle_from_cur_ff_landing_to_nxt_ff'].item() * (180/np.pi), decimals)
-            self.other_messages = f"Angle to Alt FF from Traj: {current_ang_traj_nxt}, \n     Angle to Alt FF from cur ff: {current_ang_cur_nxt}"
+            self.other_messages = f"Angle to Nxt FF from Traj: {current_ang_traj_nxt}, \n     Angle to Nxt FF from cur ff: {current_ang_cur_nxt}"
         else:
             current_traj_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
                                       == self.stop_point_index, 'traj_curv_counted'].item() * (180/np.pi) * 100, decimals)
@@ -508,7 +516,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         # Also get nxt ff angle at ref point
         nxt_ff_angle_at_ref_point = self.nxt_ff_df2.loc[self.nxt_ff_df2['stop_point_index']
                                                         == self.stop_point_index, 'ff_angle'].item() * (180/np.pi)
-        self.other_messages += ", \n Alt FF angle at ref point: " + \
+        self.other_messages += ", \n Nxt FF angle at ref point: " + \
             str(round(nxt_ff_angle_at_ref_point, decimals))
         return self.other_messages
 

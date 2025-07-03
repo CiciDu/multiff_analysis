@@ -20,14 +20,15 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         self._init_empty_vars()
         self.update_optimal_arc_type(optimal_arc_type=optimal_arc_type)
 
-        default_overall_params = copy.deepcopy(self.default_overall_params)
-        default_overall_params.update(self.overall_params)
-        self.overall_params = default_overall_params
-
-        default_monkey_plot_params = copy.deepcopy(
-            self.default_monkey_plot_params)
-        default_monkey_plot_params.update(self.monkey_plot_params)
-        self.monkey_plot_params = default_monkey_plot_params
+        self.overall_params = {
+            **copy.deepcopy(self.default_overall_params),
+            **self.overall_params
+        }
+        
+        self.monkey_plot_params = {
+            **copy.deepcopy(self.default_monkey_plot_params),
+            **self.monkey_plot_params
+        }
 
         if raw_data_folder_path is not None:
             self.load_raw_data(
@@ -206,7 +207,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             if ref_point_value >= 0:
                 raise ValueError(
                     'ref_point_value must be negative for ref_point_mode = "time"')
-            self.ref_point_descr = 'based on %d seconds into past' % ref_point_value
+            self.ref_point_descr = 'based on %d s into past' % ref_point_value
             self.ref_point_column = 'rel_time'
             self.used_points_n_seconds_or_cm_ago = True
         elif ref_point_mode == 'distance':
@@ -217,7 +218,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             self.ref_point_column = 'rel_distance'
             self.used_points_n_seconds_or_cm_ago = True
         elif ref_point_mode == 'time after cur ff visible':
-            self.ref_point_descr = 'based on %d seconds' % ref_point_value + \
+            self.ref_point_descr = 'based on %d s ' % ref_point_value + \
                 ref_point_mode[5:]
             self.ref_point_column = 'rel_time'
             self.used_points_n_seconds_or_cm_ago = True

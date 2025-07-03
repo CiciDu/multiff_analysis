@@ -54,10 +54,10 @@ def make_correlation_plot_in_plotly(curv_for_correlation_df=None, change_units_t
     if title is None:
         title = traj_curv_descr + "<br>" + ref_point_descr
     customdata = curv_for_correlation_df['stop_point_index'].values
-    hovertemplate = ('<b>Alt ff curv - cur ff curv: %{x:.2f} <br>Traj curv - cur ff curv: %{y:.2f}</b><BR><BR>Stop point index:<BR>' +
+    hovertemplate = ('<b>nxt ff curv - cur ff curv: %{x:.2f} <br>Traj curv - cur ff curv: %{y:.2f}</b><BR><BR>Stop point index:<BR>' +
                      '%{customdata}' +
                      '<extra></extra>')
-    xaxis_title = 'Curv to Alt ff - Curv to cur ff (cm)'
+    xaxis_title = 'Curv to nxt ff - Curv to cur ff (cm)'
     yaxis_title = 'Traj Curv - Curv to cur ff (cm)'
     fig_corr = plot_relationship_in_plotly(nxt_curv_counted, traj_curv_counted, show_plot=False, title=title, current_position_index_to_mark=current_position_index_to_mark,
                                            hovertemplate=hovertemplate, customdata=customdata, xaxis_title=xaxis_title, yaxis_title=yaxis_title)
@@ -133,11 +133,11 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
 
     # Set default title if not provided
     if title is None:
-        title = "Angle to Alt FF from Traj vs From cur ff" + "<br>" + ref_point_descr
+        title = "Angle to Nxt FF from Traj vs From Cur FF" + "<br>" + ref_point_descr
 
     # Prepare custom data and hover template for the plot
     customdata = heading_info_df['stop_point_index'].values
-    hovertemplate = ('<b>Angle to Alt FF from Traj: %{x:.2f} <br>Angle to Alt FF from cur ff: %{y:.2}</b><BR><BR>Stop point index:<BR>' +
+    hovertemplate = ('<b>Angle to Nxt FF from Traj: %{x:.2f} <br>Angle to Nxt FF from cur ff: %{y:.2}</b><BR><BR>Stop point index:<BR>' +
                      '%{customdata}' + '<extra></extra>')
 
     # Set axis titles
@@ -198,7 +198,7 @@ def find_curv_of_traj_counted_from_curv_of_traj_df(curv_of_traj_df, point_index_
 def plot_relationship_in_plotly(x_array, y_array, slope=None, show_plot=True,
                                 title="Traj Curv: From Current Point to Right Before Stop <br> At -1 Sec",
                                 xaxis_title='Traj Curv - Curv to cur ff (cm)',
-                                yaxis_title='Curv to Alt ff - Curv to cur ff (cm)',
+                                yaxis_title='Curv to nxt ff - Curv to cur ff (cm)',
                                 customdata=None,
                                 hovertemplate=None,
                                 current_position_index_to_mark=None,

@@ -290,9 +290,13 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         else:
             self.make_x_and_y_var_df(scale_x_var=scale_x_var, use_pca=use_pca)
 
-    def _run_lr(self, y_var_column):
+    def _run_lr(self, y_var_column, x_var_df=None, y_var_df=None):
+        if x_var_df is None:
+            x_var_df = self.x_var_df
+        if y_var_df is None:
+            y_var_df = self.y_var_df
         self.ml_inst.use_train_test_split(
-            self.x_var_df, self.y_var_df, y_var_column=y_var_column)
+            x_var_df, y_var_df, y_var_column=y_var_column)
         self.ml_inst.use_linear_regression()
         self.summary_df = self.ml_inst.summary_df
 
@@ -301,21 +305,18 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
             test_or_control=test_or_control, use_pca=use_pca)
         self._run_lr(y_var_column)
 
-    def use_lr_on_specific_columns(self, specific_columns=None, test_or_control='test', y_var_column='d_monkey_angle2'):
-        if specific_columns is None:
-            self.specific_columns = self.summary_df[self.summary_df['p_value']
-                                                    < 0.05].index.values
+    def use_lr_on_specific_x_columns(self, specific_x_columns=None, test_or_control='test', y_var_column='d_monkey_angle2'):
+        if specific_x_columns is None:
+            self.specific_x_columns = self.summary_df[self.summary_df['p_value']
+                                                      < 0.05].index.values
         else:
-            self.specific_columns = specific_columns
+            self.specific_x_columns = specific_x_columns
         self.get_x_and_y_for_lr(test_or_control=test_or_control)
-        self.x_var_df = self.x_var_df[self.specific_columns].copy()
-        self._run_lr(y_var_column)
-
-    def use_lr_on_one_column(self, column=None, test_or_control='test', y_var_column='d_monkey_angle2'):
-        self.get_x_and_y_for_lr(test_or_control=test_or_control)
-        if column is None:
-            column = 'cur_ff_angle_at_ref'
-        self.x_var_df = self.x_var_df[column].copy()
+        try:
+            self.x_var_df = self.x_var_df[self.specific_x_columns].copy()
+        except KeyError as e:
+            print(e)
+            return
         self._run_lr(y_var_column)
 
     def get_nxt_ff_at_stop_df(self):

@@ -86,6 +86,10 @@ def make_x_and_y_var_df(x_df, y_df, drop_na=True, scale_x_var=True, use_pca=Fals
 
 def further_prepare_x_var_and_y_var(x_var_df, y_var_df, y_var_column='d_monkey_angle_since_cur_ff_first_seen', remove_outliers=True):
 
+    if y_var_column not in y_var_df.columns:
+        raise ValueError(
+            f'{y_var_column} is not in the y_var_df.columns. Please check the y_var_column.')
+
     x_var_df = x_var_df.reset_index(drop=True)
     y_var_df = y_var_df.reset_index(drop=True)
     y_var = y_var_df[y_var_column].copy()

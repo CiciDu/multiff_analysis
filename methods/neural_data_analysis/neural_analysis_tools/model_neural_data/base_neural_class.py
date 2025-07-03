@@ -224,29 +224,29 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.y_var = self.final_behavioral_data.set_index(
             'bin').loc[self.valid_bin_index].reset_index(drop=False)
 
-    def _get_y_var_lags(self, max_y_lag_number, continuous_data):
+    def _get_y_var_lags(self, max_y_lag_number, continuous_data, trial_vector=None):
         self.max_y_lag_number = max_y_lag_number
         self.y_var_lags, self.lag_numbers = self._get_lags(
-            max_y_lag_number, continuous_data)
+            max_y_lag_number, continuous_data, trial_vector=trial_vector)
         if 'bin_0' in self.y_var_lags.columns:
             self.y_var_lags['bin'] = self.y_var_lags['bin_0'].astype(int)
             self.y_var_lags = self.y_var_lags.drop(
                 columns=[col for col in self.y_var_lags.columns if 'bin_' in col])
 
-    def _get_x_var_lags(self, max_x_lag_number, continuous_data):
+    def _get_x_var_lags(self, max_x_lag_number, continuous_data, trial_vector=None):
         self.max_x_lag_number = max_x_lag_number
         self.x_var_lags, self.x_lag_numbers = self._get_lags(
-            max_x_lag_number, continuous_data)
+            max_x_lag_number, continuous_data, trial_vector=trial_vector)
         # drop all columns in x_var_lags that has bin_
         if 'bin_0' in self.x_var_lags.columns:
             self.x_var_lags['bin'] = self.x_var_lags['bin_0'].astype(int)
             self.x_var_lags = self.x_var_lags.drop(
                 columns=[col for col in self.x_var_lags.columns if 'bin_' in col])
 
-    def _get_lags(self, max_lag_number, continuous_data):
+    def _get_lags(self, max_lag_number, continuous_data, trial_vector=None):
         lag_numbers = np.arange(-max_lag_number, max_lag_number+1)
         var_lags = neural_data_processing.add_lags_to_each_feature(
-            continuous_data, lag_numbers)
+            continuous_data, lag_numbers, trial_vector=trial_vector)
         if hasattr(self, 'valid_bin_index'):
             var_lags = var_lags.set_index(
                 'bin_0').loc[self.valid_bin_index].reset_index(drop=False)

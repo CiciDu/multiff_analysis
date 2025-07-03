@@ -79,7 +79,7 @@ class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
                 # Merge only the missing columns
                 self.all_planning_info = self.all_planning_info.merge(
                     self.behav_data_all[['point_index'] + missing_cols],
-                    on='point_index', how='left')
+                    on=['point_index', 'bin'], how='left')
             else:
                 raise ValueError("point_index is not in all_planning_info or behav_data_all")
         except Exception as e:
@@ -113,10 +113,11 @@ class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
 
     def get_x_and_y_var_lags(self, max_x_lag_number=5, max_y_lag_number=5):
 
+        trial_vector = self.y_var['segment'].values
         self._get_x_var_lags(max_x_lag_number=max_x_lag_number,
-                             continuous_data=self.x_var)
+                             continuous_data=self.x_var, trial_vector=trial_vector)
         self._get_y_var_lags(max_y_lag_number=max_y_lag_number,
-                             continuous_data=self.y_var)
+                             continuous_data=self.y_var, trial_vector=trial_vector)
 
     # ================================================
 

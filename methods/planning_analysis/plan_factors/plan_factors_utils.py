@@ -343,7 +343,9 @@ def get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df2, ff_dataframe_visible,
 def add_d_monkey_angle(plan_y_df, cur_ff_df2, stops_near_ff_df):
     plan_y_df = plan_y_df.merge(stops_near_ff_df[[
                                 'stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left')
-    plan_y_df['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df2['monkey_angle'].values * 180 / math.pi
+    cur_ff_df2['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df2['monkey_angle'] * 180 / math.pi
+    if 'monkey_angle_when_cur_ff_first_seen' not in plan_y_df.columns:
+        plan_y_df = plan_y_df.merge(cur_ff_df2[['ff_index', 'monkey_angle_when_cur_ff_first_seen']], left_on='cur_ff_index', right_on='ff_index', how='left')
     plan_y_df['stop_monkey_angle'] = plan_y_df['stop_monkey_angle'] * 180/math.pi
     plan_y_df['monkey_angle_before_stop'] = plan_y_df['monkey_angle_before_stop'] * 180/math.pi
     plan_y_df['d_monkey_angle_since_cur_ff_first_seen'] = plan_y_df['stop_monkey_angle'] - \

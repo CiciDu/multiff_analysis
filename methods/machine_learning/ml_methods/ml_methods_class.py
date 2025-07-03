@@ -80,10 +80,15 @@ class MlMethods():
             ascending=False, method='first').astype(int)
         self.summary_df.reset_index(drop=False, inplace=True)
 
-    def use_linear_regression(self, show_plot=True):
+    def use_linear_regression(self, show_plot=True, y_var_name=None):
         summary_df, self.y_pred, self.results, self.r_squared_on_test = regression_utils.use_linear_regression(
-            self.X_train, self.X_test, self.y_train,                                                                                               self.y_test, show_plot=show_plot)
+            self.X_train, self.X_test, self.y_train, self.y_test, show_plot=show_plot, y_var_name=y_var_name)
         self.process_summary_df(summary_df)
+
+    def split_and_use_linear_regression(self, x_var_df, y_var_df, y_var_column, test_size=0.2):
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            x_var_df, y_var_df, test_size=test_size)
+        self.use_linear_regression(show_plot=True, y_var_name=y_var_column)
 
     def use_logistic_regression(self, x_var_df, y_var_df, select_features=True, lasso_alpha=0.01):
 

@@ -180,6 +180,7 @@ def find_eye_positions_rotated_in_world_coordinates(monkey_information, duration
     gaze_world_xy_rotated = np.matmul(rotation_matrix, gaze_world_xy)
     monkey_sub['gaze_world_x_rotated'] = gaze_world_xy_rotated[0, :]
     monkey_sub['gaze_world_y_rotated'] = gaze_world_xy_rotated[1, :]
+    monkey_sub['valid_view_point'] = monkey_sub['valid_view_point'+eye_col_suffix]
 
     return monkey_sub
 

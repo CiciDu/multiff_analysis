@@ -80,10 +80,11 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                           plot_counter_i=None,
                                           ):
 
-        default_params = copy.deepcopy(self.default_monkey_plot_params)
-        default_params.update(self.monkey_plot_params)
-        default_params.update(monkey_plot_params)
-        self.monkey_plot_params = default_params
+        self.monkey_plot_params = {
+            **copy.deepcopy(self.default_monkey_plot_params),
+            **self.monkey_plot_params,
+            **monkey_plot_params
+        }
 
         self.current_plotly_key_comp = plotly_preparation.prepare_to_plot_a_planning_instance_in_plotly(self.stops_near_ff_row, self.PlotTrials_args,
                                                                                                         self.monkey_plot_params)
@@ -100,8 +101,14 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                 self)
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
-            self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
-
+            #self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
+            ## run code directly instead of calling function so that the method can be accessed by other classes
+            rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
+            self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
+                                                                    color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=4)
+            self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
+                                                                    color=self.cur_ff_color, trace_name='cur null arc', linewidth=3)
+            
         self.fig.update_layout(
             autosize=False,
             width=900,  # Set the desired width
@@ -112,12 +119,12 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         return self.current_plotly_key_comp, self.fig
 
     def make_one_monkey_plotly_plot(self,
-                                    monkey_plot_params={},
-                                    point_index_gap_threshold_to_sep_vis_intervals=12):
+                                    monkey_plot_params={}):
 
-        default_params = copy.deepcopy(self.default_monkey_plot_params)
-        default_params.update(monkey_plot_params)
-        m_params = default_params
+        m_params = {
+            **copy.deepcopy(self.default_monkey_plot_params),
+            **monkey_plot_params
+        }
 
         self.fig = plotly_for_monkey.plot_fireflies(
             None, self.current_plotly_key_comp['ff_df'])
@@ -139,8 +146,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                                                   self.current_plotly_key_comp[
                                                                                                       'rotation_matrix'], 0, 0,
                                                                                                   how_to_show_ff='square',
-                                                                                                  unique_ff_indices=None,
-                                                                                                  point_index_gap_threshold_to_sep_vis_intervals=point_index_gap_threshold_to_sep_vis_intervals)
+                                                                                                  unique_ff_indices=None)
 
         if m_params['traj_portion'] is not None:
             self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_the_scope_for_curv(self.fig, m_params['traj_portion'],
@@ -169,7 +175,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             self._show_nxt_ff()
 
         if m_params['show_stops'] | (m_params['show_stop_point_indices'] is not None):
-            show_stop_point_indices = self.find_show_stop_point_indices()
+            show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(self.monkey_plot_params, self.current_plotly_key_comp)
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
@@ -183,6 +189,15 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                               scaleratio=1)
 
         return self.fig
+
+    def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
+        rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
+        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
+                                                                 color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=4)
+        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
+                                                                 color=self.cur_ff_color, trace_name='cur null arc', linewidth=3)
+        return self.fig
+
 
     def find_show_stop_point_indices(self):
         show_stop_point_indices = self.monkey_plot_params.get(
@@ -198,13 +213,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         return show_stop_point_indices
 
-    def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
-        rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
-        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                 color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=4)
-        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                 color=self.cur_ff_color, trace_name='cur null arc', linewidth=3)
-        return self.fig
 
     def _show_cur_ff(self):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index

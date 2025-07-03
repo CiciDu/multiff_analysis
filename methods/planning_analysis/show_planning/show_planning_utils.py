@@ -584,7 +584,7 @@ def retrieve_df_based_on_ref_point(ref_point_mode, ref_point_value, test_or_cont
     os.makedirs(df_path, exist_ok=True)
     df_name = find_stops_near_ff_utils.get_df_name_by_ref(
         monkey_name, ref_point_mode, ref_point_value)
-    retrieved_df = pd.read_csv(os.path.join(df_path, df_name))
+    retrieved_df = pd.read_csv(os.path.join(df_path, df_name), index_col=0)
     print(
         f'Retrieving {df_name} from {os.path.join(df_path, df_name)} succeeded')
     return retrieved_df

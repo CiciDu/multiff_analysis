@@ -168,7 +168,7 @@ def plot_feature_importance(importance_df, predictor_var):
     plt.show()
 
 def use_linear_regression(X_train, X_test, y_train, y_test,
-                          show_plot=True):
+                          show_plot=True, y_var_name=None):
 
     X_train = sm.add_constant(X_train)
     X_test = sm.add_constant(X_test)
@@ -199,8 +199,12 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
                  y_test.min(), y_test.max()], 'k--', lw=4)
         plt.xlabel('Real Values')
         plt.ylabel('Predicted Values')
-        plt.title(
-            f'Real vs Predicted Values with RMSE on test set: {math.sqrt(mse)}')
+        if y_var_name is not None:
+            plt.title(
+                f'{y_var_name} -- R: {round(math.sqrt(r_squared_on_test), 3)}, R^2: {round(r_squared_on_test, 3)}')
+        else:
+            plt.title(
+                f'R: {round(math.sqrt(r_squared_on_test), 3)}, R^2: {round(r_squared_on_test, 3)}')
         plt.show()
 
     # If you want the summary statistics of the coefficients, you can do:

@@ -234,7 +234,7 @@ def add_new_curv_of_traj_to_fig_scatter(fig_scatter, curv_of_traj_df_in_duration
                                                  color=random_color, symbol=symbol)
     return fig_scatter_updated
 
-
+    
 def add_new_curv_of_traj_to_fig_scatter_combd(fig_scatter_combd, curv_of_traj_df_in_duration, curv_of_traj_mode, lower_end, upper_end):
     random_color = random.choice(hex_colors)
     window_for_curv_of_traj = [lower_end, upper_end]

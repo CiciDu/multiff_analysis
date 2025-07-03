@@ -44,8 +44,11 @@ def prepare_to_plot_a_planning_instance_in_plotly(row, PlotTrials_args, monkey_p
     }
 
     # Update default parameters with provided parameters
-    default_params.update(monkey_plot_params)
-    monkey_plot_params = default_params
+    monkey_plot_params = {
+            **default_params,
+            **monkey_plot_params
+        }
+            
     rotation_matrix = monkey_plot_params['rotation_matrix']
 
     # Unpack PlotTrials arguments
@@ -70,7 +73,7 @@ def prepare_to_plot_a_planning_instance_in_plotly(row, PlotTrials_args, monkey_p
     show_connect_path_ff_specific_indices = [int(row.cur_ff_index), int(row.nxt_ff_index)]
     if monkey_plot_params['show_connect_path_ff']:
         connect_path_ff_df, shown_ff_indices = _make_connect_path_ff_df(
-            row, shown_ff_indices, show_connect_path_ff_specific_indices, ff_dataframe_in_duration_visible, 
+            row, monkey_plot_params['show_connect_path_ff_specific_indices'], show_connect_path_ff_specific_indices, ff_dataframe_in_duration_visible, 
             rotation_matrix, connect_path_ff_max_distance=monkey_plot_params['connect_path_ff_max_distance']
         )
     else:
@@ -90,6 +93,10 @@ def prepare_to_plot_a_planning_instance_in_plotly(row, PlotTrials_args, monkey_p
         [show_connect_path_ff_specific_indices, ff_dataframe_in_duration_visible.ff_index.unique()])
     ).astype(int)
     ff_df, ff_number_df = _add_ff_number_to_ff_df(ff_df, show_visible_segments_ff_specific_indices)
+    
+    # make sure row is a Series
+    if isinstance(row, pd.DataFrame) and row.shape[0] == 1:
+        row = row.iloc[0]
 
     # Create current plotly key components
     current_plotly_key_comp = {
@@ -114,6 +121,9 @@ def prepare_to_plot_a_planning_instance_in_plotly(row, PlotTrials_args, monkey_p
 
 
 def _find_duration_to_plot(row, monkey_information, eliminate_irrelevant_points_beyond_boundaries=False):
+    # if row is a one-row df, then make it a series
+    if isinstance(row, pd.DataFrame) and row.shape[0] == 1:
+        row = row.iloc[0]
     time = row.stop_time
     duration_to_plot = [time-4, max(time+2.5, row.next_stop_time+1.5)]
     if eliminate_irrelevant_points_beyond_boundaries:
@@ -149,6 +159,8 @@ def _make_trajectory_df(PlotTrials_args,
     trajectory_df = _add_eye_positions_columns(trajectory_df, monkey_information)
 
     if row is not None:
+        if isinstance(row, pd.DataFrame) and row.shape[0] == 1:
+            row = row.iloc[0]
         rel_time = np.round(cum_t - row.stop_time, 2)
         rel_distance = np.round(cum_distance - row.stop_cum_distance, 2)
         trajectory_df['rel_distance'] = rel_distance
@@ -159,10 +171,10 @@ def _make_trajectory_df(PlotTrials_args,
 def _add_eye_positions_columns(trajectory_df, monkey_information):
     # in case we need to plot eye positions later
     eye_positions_columns = ['point_index', 'gaze_world_x', 'gaze_world_y',
-                             'gaze_mky_view_x', 'gaze_mky_view_y', 'LDz', 'RDz']
+                             'gaze_mky_view_x', 'gaze_mky_view_y', 'LDz', 'RDz', 'valid_view_point']
     if 'gaze_world_x_l' in monkey_information.columns:
-        eye_positions_columns.extend(['gaze_world_x_l', 'gaze_world_y_l', 'gaze_mky_view_x_l', 'gaze_mky_view_y_l',
-                                      'gaze_world_x_r', 'gaze_world_y_r', 'gaze_mky_view_x_r', 'gaze_mky_view_y_r'])
+        eye_positions_columns.extend(['gaze_world_x_l', 'gaze_world_y_l', 'gaze_mky_view_x_l', 'gaze_mky_view_y_l', 'valid_view_point_l',
+                                      'gaze_world_x_r', 'gaze_world_y_r', 'gaze_mky_view_x_r', 'gaze_mky_view_y_r', 'valid_view_point_r'])
     try:
         trajectory_df = trajectory_df.merge(
             monkey_information[eye_positions_columns], on='point_index', how='left')
@@ -275,4 +287,17 @@ def _modify_current_plotly_key_comp_based_on_whether_show_visible_segments(show_
     return current_plotly_key_comp
 
 
+def find_show_stop_point_indices(monkey_plot_params, current_plotly_key_comp):
+    show_stop_point_indices = monkey_plot_params.get(
+        'show_stop_point_indices')
+
+    if show_stop_point_indices is None:
+        if monkey_plot_params['show_stops']:
+            trajectory_df = current_plotly_key_comp['trajectory_df']
+            show_stop_point_indices = trajectory_df[
+                trajectory_df['monkey_speeddummy'] == 0]['point_index'].values
+
+    show_stop_point_indices = np.array(show_stop_point_indices).reshape(-1)
+
+    return show_stop_point_indices
 

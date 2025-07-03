@@ -151,7 +151,7 @@ def _plot_or_update_eye_positions_in_plotly(fig, x0, y0, monkey_subset, all_rel_
     fig: updated Plotly figure
     gaze_world_xy_rotated_valid: valid rotated gaze world coordinates
     """
-    monkey_subset_valid = monkey_subset[monkey_subset['eye_position_overall_valid'] == True].copy(
+    monkey_subset_valid = monkey_subset[monkey_subset['valid_view_point'] == True].copy(
     )
     all_rel_time_in_duration = monkey_subset['rel_time'].unique()
 
@@ -213,7 +213,7 @@ def _plot_or_update_arrow_to_eye_positions_in_plotly(fig, x0, y0, monkey_subset,
     gaze_world_xy_rotated_valid: valid rotated gaze world coordinates
     """
 
-    monkey_subset_meaningful = monkey_subset[monkey_subset['eye_position_meaningful'] == True].copy(
+    monkey_subset_meaningful = monkey_subset[monkey_subset['valid_view_point'] == True].copy(
     )
 
     if monkey_subset_meaningful.shape[0] == 0:

@@ -25,15 +25,20 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_optimal_a
         ff_dataframe_sub = ff_dataframe_sub.copy()
         original_length = len(ff_dataframe_sub)
         if include_curv_to_ff_center:
-            ff_dataframe_sub = ff_dataframe_sub[ff_dataframe_sub.ff_angle.between(
-                -45*math.pi/180, 45*math.pi/180)]
+            mask = ff_dataframe_sub.ff_angle.between(
+                -45*math.pi/180, 45*math.pi/180)
         elif include_optimal_curvature:
-            ff_dataframe_sub = ff_dataframe_sub[ff_dataframe_sub.ff_angle_boundary.between(
-                -45*math.pi/180, 45*math.pi/180)]
-        final_length = len(ff_dataframe_sub)
-        if original_length != final_length:
+            mask = ff_dataframe_sub.ff_angle_boundary.between(
+                -45*math.pi/180, 45*math.pi/180)
+        # if mask is empty, then we don't need to drop any rows
+        if not mask.all():
+            dropped_rows = ff_dataframe_sub[~mask]
+            ff_dataframe_sub = ff_dataframe_sub[mask]
             if not ignore_error:
-                print(f"Warning: {original_length - final_length} out of {original_length} ff are not within the valid ff_angle_boundary when using the function make_curvature_df.")
+                print(f"Warning: when making curvature_df, {original_length - len(ff_dataframe_sub)} out of {original_length} rows are not within the valid ff_angle_boundary when using the function make_curvature_df.")
+                # also get number of unique ff in the dropped rows of ff_dataframe_sub
+                unique_ff_in_dropped_rows = dropped_rows.ff_index.unique()
+                print(f"Number of unique ff in the dropped rows: {len(unique_ff_in_dropped_rows)}")
 
     if opt_arc_stop_first_vis_bdry & (len(ff_dataframe_sub) > 100000):
         print('Warning: The number of ff is larger than 100000, and opt_arc_stop_first_vis_bdry is set to True. This might take a long time to calculate the optimal arc.')

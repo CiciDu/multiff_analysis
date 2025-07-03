@@ -32,7 +32,7 @@ np.set_printoptions(suppress=True)
 # https://dash.plotly.com/interactive-graphing
 
 
-class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
+class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef, plotly_plot_class.PlotlyPlotter):
 
     def __init__(self,
                  raw_data_folder_path=None):
@@ -151,6 +151,9 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         else:
             self.visible_segments_info = None
 
+        self.curv_of_traj_trace_name = curv_of_traj_utils.get_curv_of_traj_trace_name(
+            self.curv_of_traj_params['curv_of_traj_mode'], self.curv_of_traj_params['window_for_curv_of_traj'])
+
         self.fig_scatter_s = plotly_for_scatterplot.make_the_initial_fig_scatter(self.curv_of_traj_df_in_duration, self.monkey_hoverdata_value_s, self.cur_ff_color, self.nxt_ff_color, trajectory_ref_row=self.trajectory_ref_row,
                                                                                  use_two_y_axes=use_two_y_axes, x_column_name='rel_time', curv_of_traj_trace_name=self.curv_of_traj_trace_name,
                                                                                  show_visible_segments=self.current_plotly_key_comp[
@@ -188,9 +191,9 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         self.nxt_ff_curv_df = dash_utils._find_nxt_ff_curv_df(
             self.current_plotly_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
         self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
-            self.fig_scatter_s, self.nxt_ff_curv_df, name='Alt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-down')
+            self.fig_scatter_s, self.nxt_ff_curv_df, name='Nxt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-down')
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
-            self.fig_scatter_cm, self.nxt_ff_curv_df, name='Alt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-down')
+            self.fig_scatter_cm, self.nxt_ff_curv_df, name='Nxt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-down')
 
     def _show_cur_ff_curv_in_scatterplot_func(self, y_column_name='curv_to_ff_center'):
         self.cur_ff_curv_df = dash_utils._find_cur_ff_curv_df(
@@ -237,10 +240,10 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
                 self.kwargs_for_correlation_plot_2['current_stop_point_index_to_mark'] = None
 
                 self.fig_corr_2 = plotly_for_correlation.make_correlation_plot_in_plotly(
-                    **self.kwargs_for_correlation_plot_2, title="After Shuffling Alt FF Curvature")
+                    **self.kwargs_for_correlation_plot_2, title="After Shuffling Nxt FF Curvature")
 
                 # # update title
-                # self.fig_corr_2.update_layout(title="After Shuffling Alt FF Curvature")
+                # self.fig_corr_2.update_layout(title="After Shuffling Nxt FF Curvature")
 
         return self.fig_corr_2
 
@@ -262,8 +265,8 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         # self.kwargs_for_heading_plot_2['rel_heading_df']['rel_heading_alt'] = rel_heading_alt
         # self.kwargs_for_heading_plot_2['current_stop_point_index_to_mark'] = None
 
-        # self.fig_heading_2 = plotly_for_correlation.make_heading_plot_in_plotly(**self.kwargs_for_heading_plot_2, title="After Shuffling Alt FF Curvature")
-        # # self.fig_heading_2.update_layout(title="After Shuffling Alt FF Curvature")
+        # self.fig_heading_2 = plotly_for_correlation.make_heading_plot_in_plotly(**self.kwargs_for_heading_plot_2, title="After Shuffling Nxt FF Curvature")
+        # # self.fig_heading_2.update_layout(title="After Shuffling Nxt FF Curvature")
 
         # return self.fig_heading_2
 
@@ -336,8 +339,10 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
             monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
                 trajectory_df, duration, rotation_matrix=rotation_matrix, eye_col_suffix=suffix
             )
+            columns_to_merge = [col for col in [
+                'rel_time', 'monkey_x', 'monkey_y'] if col not in monkey_subset.columns]
             monkey_subset = monkey_subset.merge(trajectory_df[[
-                                                'point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')
+                'point_index'] + columns_to_merge], on='point_index', how='left')
             monkey_subset.set_index('point_index', inplace=True)
             monkey_subset['point_index'] = monkey_subset.index
             self.both_eyes_info[left_or_right] = monkey_subset
@@ -345,17 +350,20 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         # for non-both-eye cases
         self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
             trajectory_df, duration, rotation_matrix=rotation_matrix)
+        # use merge, but first make sure no duplicate column
+        columns_to_merge = [col for col in [
+            'rel_time', 'monkey_x', 'monkey_y'] if col not in self.monkey_subset.columns]
         self.monkey_subset = self.monkey_subset.merge(trajectory_df[[
-                                                      'point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left')
+                                                      'point_index'] + columns_to_merge], on='point_index', how='left')
         self.monkey_subset.index = self.monkey_subset['point_index'].values
 
     def _produce_fig_for_dash(self, mark_reference_point=True):
 
-        self.monkey_plot_params = self.monkey_plot_params.update({'show_reward_boundary': True,
-                                                                  'show_traj_points_when_making_lines': True,
-                                                                  'eye_positions_trace_name': 'all_eye_positions',
-                                                                  'hoverdata_multi_columns': self.hoverdata_multi_columns,
-                                                                  })
+        self.monkey_plot_params.update({'show_reward_boundary': True,
+                                        'show_traj_points_when_making_lines': True,
+                                        'eye_positions_trace_name': 'all_eye_positions',
+                                        'hoverdata_multi_columns': self.hoverdata_multi_columns,
+                                        })
 
         self.monkey_plot_params['traj_portion'] = self.traj_portion if self.monkey_plot_params['show_traj_portion'] else None
 
@@ -374,7 +382,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
-            self.fig = plotly_plot_class._show_null_arcs_for_cur_and_nxt_ff_in_plotly(
+            self.fig = plotly_plot_class.PlotlyPlotter._show_null_arcs_for_cur_and_nxt_ff_in_plotly(
                 self)
 
         if mark_reference_point:
