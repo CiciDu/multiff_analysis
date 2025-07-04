@@ -1,4 +1,5 @@
 from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -86,8 +87,11 @@ class MlMethods():
         self.process_summary_df(summary_df)
 
     def split_and_use_linear_regression(self, x_var_df, y_var_df, y_var_column, test_size=0.2):
+        self.temp_x_var_df, self.temp_y_var_df = prep_ml_data_utils.drop_na_in_x_and_y_var(
+            x_var_df, y_var_df)        
+        
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            x_var_df, y_var_df, test_size=test_size)
+            self.temp_x_var_df, self.temp_y_var_df, test_size=test_size)
         self.use_linear_regression(show_plot=True, y_var_name=y_var_column)
 
     def use_logistic_regression(self, x_var_df, y_var_df, select_features=True, lasso_alpha=0.01):

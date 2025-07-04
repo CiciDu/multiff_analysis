@@ -27,6 +27,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             'raw_monkey_data', 'planning_and_neural')
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
 
+
     def prep_behav_data_to_analyze_planning(self,
                                             ref_point_mode='time after cur ff visible',
                                             ref_point_value=0.1,
@@ -36,7 +37,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                             window_for_curv_of_traj=[-25, 25],
                                             truncate_curv_of_traj_by_time_of_capture=True,
                                             both_ff_across_time_df_exists_ok=True,
+                                            test_or_control='test',
                                             ):
+        self.test_or_control = test_or_control
 
         self.streamline_organizing_info(ref_point_mode=ref_point_mode,
                                         ref_point_value=ref_point_value,
@@ -44,7 +47,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                         window_for_curv_of_traj=window_for_curv_of_traj,
                                         truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture,
                                         use_curvature_to_ff_center=use_curvature_to_ff_center,
-                                        eliminate_outliers=eliminate_outliers)
+                                        eliminate_outliers=eliminate_outliers,
+                                        test_or_control=test_or_control
+                                        )
 
         self.retrieve_neural_data()
         self.get_all_planning_info(
@@ -211,3 +216,54 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     #     # self.both_ff_when_seen_df[f'{which_ff_info}opt_arc_dheading_{when_which_ff}_{first_or_last}_seen'] = curv_df['optimal_arc_d_heading']
     #     self.both_ff_when_seen_df[f'time_{when_which_ff}_{first_or_last}_seen_rel_to_stop'] = ff_df[f'time_ff_{first_or_last}_seen'].values - ff_df['stop_time'].values
     #     self.both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_of_traj']
+
+    def get_both_ff_when_seen_df(self, crossing_ff=False, deal_with_rows_with_big_ff_angles=False):
+        # This contains the planning-related information at specific time (such as when cur_ff was last visibl)
+        # If crossing_ff is true, we'll get nxt_ff_info when cur_ff was first/last seen, and vice versa
+
+        print('Making both_ff_when_seen_df...')
+        self.both_ff_when_seen_df = self.nxt_ff_df[[
+            'stop_point_index']].copy().set_index('stop_point_index')
+        for first_or_last in ['first', 'last']:
+            for when_which_ff, ff_df in [('when_nxt_ff', self.nxt_ff_df),
+                                         ('when_cur_ff', self.cur_ff_df)]:
+                all_point_index = ff_df[f'point_index_ff_{first_or_last}_seen'].values
+                self._find_nxt_ff_df_2_and_cur_ff_df_2_based_on_specific_point_index(
+                    all_point_index=all_point_index)
+                if deal_with_rows_with_big_ff_angles:
+                    self._deal_with_rows_with_big_ff_angles(
+                        remove_i_o_modify_rows_with_big_ff_angles=True, delete_the_same_rows=True)
+
+                for which_ff_info in ['nxt_', 'cur_']:
+                    if (when_which_ff == 'when_cur_ff') & (first_or_last == 'first') & (which_ff_info == 'cur_'):
+                        continue  # because the information is already contained in cur ff info at ref point
+
+                    if not crossing_ff:
+                        if (which_ff_info == 'nxt_') & (when_which_ff == 'when_cur_ff'):
+                            continue
+                        if (which_ff_info == 'cur_') & (when_which_ff == 'when_nxt_ff'):
+                            continue
+                    if deal_with_rows_with_big_ff_angles:
+                        ff_df_modified = self.nxt_ff_df_modified if which_ff_info == 'nxt_' else self.cur_ff_df_modified
+                    else:
+                        ff_df_modified = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
+
+                    opt_arc_stop_first_vis_bdry = True if (
+                        self.optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
+
+                    curv_df = curvature_utils.make_curvature_df(ff_df_modified, self.curv_of_traj_df, clean=False,
+                                                                monkey_information=self.monkey_information,
+                                                                ff_caught_T_new=self.ff_caught_T_new,
+                                                                remove_invalid_rows=False,
+                                                                opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+                    if len(curv_df) != len(ff_df_modified):
+                        raise ValueError(
+                            'The length of curv_df is not the same as the length of ff_df_modified')
+                    curv_df = pd.concat([ff_df_modified.drop(columns='point_index').reset_index(
+                        drop=True), curv_df.reset_index(drop=True)], axis=1)
+                    # for duplicated columns in curv_df, preserve only one
+                    curv_df = curv_df.loc[:, ~curv_df.columns.duplicated()]
+                    planning_neural_utils.add_to_both_ff_when_seen_df(
+                        self.both_ff_when_seen_df, which_ff_info, when_which_ff, first_or_last, curv_df, ff_df)
+        self.both_ff_when_seen_df.reset_index(drop=False, inplace=True)
+        return self.both_ff_when_seen_df

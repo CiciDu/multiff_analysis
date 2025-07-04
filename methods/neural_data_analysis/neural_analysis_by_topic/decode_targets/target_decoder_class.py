@@ -51,7 +51,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
 
         self.bin_width_w_unit = self.bin_width * pq.s
         self.max_visibility_window = 10
-        
+
         self.decoding_targets_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'decoding_targets')
         os.makedirs(self.decoding_targets_folder_path, exist_ok=True)
@@ -137,8 +137,6 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
             behav_features_to_keep.extra_columns_for_concat_trials
         ]
 
-
-
     def get_pursuit_data(self):
         # Extract behavioral data for periods between target last visibility and capture
         pursuit_data_all = prep_target_decoder.make_pursuit_data_all(
@@ -167,7 +165,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
         self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + seg_vars]
 
         # check for NA; if there is any, raise a warning
-        na_rows, na_cols = general_utils.find_rows_with_na(
+        na_rows, na_cols = general_utils.check_na_in_df(
             self.pursuit_data, 'pursuit_data')
 
     def reduce_y_var(self,
@@ -214,7 +212,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
         """
         df_path = os.path.join(
             self.decoding_targets_folder_path, 'decode_target_y_var_lags_reduced.csv')
-        
+
         self._reduce_y_var_lags(df_path=df_path,
                                 save_data=save_data,
                                 corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
@@ -392,7 +390,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass, gpfa_helper_class.GP
             self.behav_data_all, self.target_df)
         self.behav_data_all = prep_target_decoder.add_target_info_to_behav_data_all(
             self.behav_data_all, self.target_cluster_df)
-        
+
     def _get_single_vis_target_df(self, single_vis_target_df_exists_ok=True, target_clust_last_vis_df_exists_ok=True):
 
         df_path = os.path.join(

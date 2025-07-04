@@ -309,7 +309,7 @@ def _process_na(behav_data_all):
     )
 
     # Check for any remaining NA values
-    na_rows, na_cols = general_utils.find_rows_with_na(
+    na_rows, na_cols = general_utils.check_na_in_df(
         behav_data_all, 'behav_data_all')
     return na_rows, na_cols
 

@@ -1,4 +1,4 @@
-from planning_analysis.plan_factors import plan_factors_utils
+from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
 from planning_analysis.show_planning import show_planning_utils
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -59,14 +59,18 @@ def make_x_and_y_var_df(x_df, y_df, drop_na=True, scale_x_var=True, use_pca=Fals
     if drop_na:
         if len(y_var_df.shape) > 1:
             if y_var_df.shape[1] > 1:
-                x_var_df, y_var_df = plan_factors_utils.drop_na_in_x_var(
+                x_var_df, y_var_df = prep_ml_data_utils.drop_na_in_x_var(
                     x_var_df, y_var_df)
+                print(
+                    'Dropped rows with NA only in x_var_df (and the corresponding rows in y_var_df).')
             else:
-                x_var_df, y_var_df = plan_factors_utils.drop_na_in_x_and_y_var(
+                x_var_df, y_var_df = prep_ml_data_utils.drop_na_in_x_and_y_var(
                     x_var_df, y_var_df)
+                print('Dropped rows with NA in both x_var_df and y_var_df.')
         else:
-            x_var_df, y_var_df = plan_factors_utils.drop_na_in_x_and_y_var(
+            x_var_df, y_var_df = prep_ml_data_utils.drop_na_in_x_and_y_var(
                 x_var_df, y_var_df)
+            print('Dropped rows with NA in y_var_df.')
 
     if use_pca:
         if n_components_for_pca is None:
@@ -100,3 +104,40 @@ def further_prepare_x_var_and_y_var(x_var_df, y_var_df, y_var_column='d_monkey_a
         x_var, y_var = show_planning_utils.remove_outliers(x_var, y_var)
 
     return x_var, y_var
+
+def drop_na_in_x_var(x_var_df, y_var_df):
+    x_var_df.reset_index(drop=True, inplace=True)
+    y_var_df.reset_index(drop=True, inplace=True)
+
+    if x_var_df.isnull().any(axis=1).sum() > 0:
+        print(
+            f'Number of rows with NaN values in x_var_df: {x_var_df.isnull().any(axis=1).sum()} out of {x_var_df.shape[0]} rows. The rows with NaN values will be dropped.')
+        # drop rows with NA in x_var_df
+        x_var_df = x_var_df.dropna()
+        y_var_df = y_var_df.loc[x_var_df.index].copy()
+
+    x_var_df.reset_index(drop=True, inplace=True)
+    y_var_df.reset_index(drop=True, inplace=True)
+    return x_var_df, y_var_df
+
+
+def drop_na_in_x_and_y_var(x_var_df, y_var_df):
+    x_var_df.reset_index(drop=True, inplace=True)
+    y_var_df.reset_index(drop=True, inplace=True)
+
+    if x_var_df.isnull().any(axis=1).sum() > 0:
+        print(
+            f'Number of rows with NaN values in x_var_df: {x_var_df.isnull().any(axis=1).sum()} out of {x_var_df.shape[0]} rows. The rows with NaN values will be dropped.')
+        # drop rows with NA in x_var_df
+        x_var_df = x_var_df.dropna()
+        y_var_df = y_var_df.loc[x_var_df.index].copy()
+    if y_var_df.isnull().any(axis=1).sum() > 0:
+        print(
+            f'Number of rows with NaN values in y_var_df (after cleaning x_var_df and the corresponding rows in y_var_df): {y_var_df.isnull().any(axis=1).sum()} out of {y_var_df.shape[0]} rows. The rows with NaN values will be dropped.')
+        # drop rows with NA in y_var_df
+        y_var_df = y_var_df.dropna()
+        x_var_df = x_var_df.loc[y_var_df.index].copy()
+
+    x_var_df.reset_index(drop=True, inplace=True)
+    y_var_df.reset_index(drop=True, inplace=True)
+    return x_var_df, y_var_df

@@ -441,7 +441,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             'stop_point_index').loc[self.stop_point_index_modified].reset_index()
 
     def _make_curv_of_traj_df_if_not_already_made(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
-        if self.curv_of_traj_df is None:
+        if getattr(self, 'curv_of_traj_df', None) is None:
             self.curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new,
                                                                                                          curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
 

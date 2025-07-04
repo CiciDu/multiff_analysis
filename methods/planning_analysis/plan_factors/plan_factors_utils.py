@@ -8,44 +8,18 @@ import pandas as pd
 import math
 
 
-def drop_na_in_x_var(x_var_df, y_var_df):
-    x_var_df.reset_index(drop=True, inplace=True)
-    y_var_df.reset_index(drop=True, inplace=True)
+def _drop_columns_that_contain_both_nxt_and_bbas(plan_y_tc):
+    # Drop columns in self.plan_y_tc that contain both 'nxt'/'NXT' and 'bbas'
+    columns_to_drop = [
+        col for col in plan_y_tc.columns
+        if 'bbas' in col.lower() and ('nxt' in col.lower())
+    ]
 
-    if x_var_df.isnull().any(axis=1).sum() > 0:
-        print(
-            f'Number of rows with NaN values in x_var_df: {x_var_df.isnull().any(axis=1).sum()} out of {x_var_df.shape[0]} rows. The rows with NaN values will be dropped.')
-        # drop rows with NA in x_var_df
-        x_var_df = x_var_df.dropna()
-        y_var_df = y_var_df.loc[x_var_df.index].copy()
-
-    x_var_df.reset_index(drop=True, inplace=True)
-    y_var_df.reset_index(drop=True, inplace=True)
-    return x_var_df, y_var_df
-
-
-def drop_na_in_x_and_y_var(x_var_df, y_var_df):
-    x_var_df.reset_index(drop=True, inplace=True)
-    y_var_df.reset_index(drop=True, inplace=True)
-
-    if x_var_df.isnull().any(axis=1).sum() > 0:
-        print(
-            f'Number of rows with NaN values in x_var_df: {x_var_df.isnull().any(axis=1).sum()} out of {x_var_df.shape[0]} rows. The rows with NaN values will be dropped.')
-        # drop rows with NA in x_var_df
-        x_var_df = x_var_df.dropna()
-        y_var_df = y_var_df.loc[x_var_df.index].copy()
-    if y_var_df.isnull().any(axis=1).sum() > 0:
-        print(
-            f'Number of rows with NaN values in y_var_df (after cleaning x_var_df and the corresponding rows in y_var_df): {y_var_df.isnull().any(axis=1).sum()} out of {y_var_df.shape[0]} rows. The rows with NaN values will be dropped.')
-        # drop rows with NA in y_var_df
-        y_var_df = y_var_df.dropna()
-        x_var_df = x_var_df.loc[y_var_df.index].copy()
-
-    x_var_df.reset_index(drop=True, inplace=True)
-    y_var_df.reset_index(drop=True, inplace=True)
-    return x_var_df, y_var_df
-
-
+    if columns_to_drop:
+        plan_y_tc.drop(columns=columns_to_drop, inplace=True)
+        print(f"Dropped {len(columns_to_drop)} columns containing both 'nxt'/'NXT' and 'bbas': {columns_to_drop}")
+    
+    
 def find_curv_of_traj_stat_df(df_to_iter, curv_of_traj_df, start_time_column='stop_time',
                               end_time_column='next_stop_time', add_to_df_to_iter=True,
                               ):

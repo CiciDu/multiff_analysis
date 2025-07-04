@@ -1,5 +1,5 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils
-from planning_analysis.plan_factors import plan_factors_class
+from planning_analysis.plan_factors import plan_factors_class, plan_factors_helper_class
 from planning_analysis.only_cur_ff import only_cur_ff_utils, features_to_keep_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
@@ -99,7 +99,7 @@ class HelperGUATavsTAFTclass():
         setattr(self, f'{test_or_ctrl}_heading_info_df', self.heading_info_df)
         stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef._make_curv_of_traj_df_if_not_already_made(
             self)
-        plan_factors_class.PlanFactors._make_curv_of_traj_df_w_one_sided_window_if_not_already_made(
+        plan_factors_helper_class.PlanFactorsHelpClass._make_curv_of_traj_df_w_one_sided_window_if_not_already_made(
             self)
 
         self.plan_y_df = plan_factors_utils.make_plan_y_df(
@@ -128,8 +128,6 @@ class HelperGUATavsTAFTclass():
 
         self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
         self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df2['stop_point_index'].values
-        # self.nxt_ff_at_stop_df = self.get_nxt_ff_at_stop_df()
-        # self.both_ff_when_seen_df = self.get_both_ff_when_seen_df(deal_with_rows_with_big_ff_angles=False)
 
         if self.ff_dataframe is None:
             stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef.get_more_monkey_data(
@@ -357,3 +355,4 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'max_time_since_last_vis': 2.5,
              'duration_into_future': 0.5,
              }
+

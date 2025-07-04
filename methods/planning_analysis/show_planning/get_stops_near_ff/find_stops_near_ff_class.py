@@ -38,49 +38,49 @@ class _FindStopsNearFF(base_processing_class.BaseProcessing):
                                                           stop_period_duration=2,
                                                           already_made_ok=True, exists_ok=True, save_data=True):
 
-        if not already_made_ok:
-            self.shared_stops_near_ff_df = None
+        if already_made_ok & (getattr(self, 'shared_stops_near_ff_df', None) is not None):
+            return
 
-        if self.shared_stops_near_ff_df is None:
-            if exists_ok:
-                try:
-                    self.shared_stops_near_ff_df = pd.read_csv(os.path.join(
-                        self.planning_data_folder_path, 'shared_stops_near_ff_df.csv')).drop(["Unnamed: 0"], axis=1)
-                    self.shared_stops_near_ff_df = find_stops_near_ff_utils.process_shared_stops_near_ff_df(
-                        self.shared_stops_near_ff_df)
+        if exists_ok:
+            try:
+                self.shared_stops_near_ff_df = pd.read_csv(os.path.join(
+                    self.planning_data_folder_path, 'shared_stops_near_ff_df.csv')).drop(["Unnamed: 0"], axis=1)
+                self.shared_stops_near_ff_df = find_stops_near_ff_utils.process_shared_stops_near_ff_df(
+                    self.shared_stops_near_ff_df)
 
-                    print('Retrieving shared_stops_near_ff_df succeeded')
-                    return
-                except Exception as e:
-                    print(
-                        'Failed to retrieve shared_stops_near_ff_df; will make new shared_stops_near_ff_df')
-
-            if self.monkey_information is None:
-                self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True,
-                                   curv_of_traj_mode=self.curv_of_traj_params['curv_of_traj_mode'],
-                                   window_for_curv_of_traj=self.curv_of_traj_params[
-                                       'window_for_curv_of_traj'],
-                                   truncate_curv_of_traj_by_time_of_capture=self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'])
-
-            if self.ff_dataframe is None:
-                self.get_more_monkey_data()
-
-            self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1].copy(
-            )
-            self.shared_stops_near_ff_df, self.all_nxt_ff_df = find_stops_near_ff_utils.make_shared_stops_near_ff_df(self.monkey_information, self.ff_dataframe_visible, self.closest_stop_to_capture_df, self.ff_real_position_sorted,
-                                                                                                                     self.ff_caught_T_new, self.ff_flash_sorted, self.ff_life_sorted, min_distance_between_cur_and_nxt_ff=min_distance_between_cur_and_nxt_ff,
-                                                                                                                     max_distance_between_cur_and_nxt_ff=max_distance_between_cur_and_nxt_ff, stop_period_duration=stop_period_duration,
-                                                                                                                     remove_cases_where_monkey_too_close_to_edge=remove_cases_where_monkey_too_close_to_edge
-                                                                                                                     )
-
-            self.shared_stops_near_ff_df = find_stops_near_ff_utils.process_shared_stops_near_ff_df(
-                self.shared_stops_near_ff_df)
-            self._add_curv_of_traj_stat_df()
-            if save_data:
-                self.shared_stops_near_ff_df.to_csv(os.path.join(
-                    self.planning_data_folder_path, 'shared_stops_near_ff_df.csv'))
+                print('Retrieving shared_stops_near_ff_df succeeded')
+                return
+            except Exception as e:
                 print(
-                    f'Stored shared_stops_near_ff_df ({len(self.shared_stops_near_ff_df)} rows) in {os.path.join(self.planning_data_folder_path, "shared_stops_near_ff_df.csv")}')
+                    'Failed to retrieve shared_stops_near_ff_df; will make new shared_stops_near_ff_df')
+
+        if self.monkey_information is None:
+            self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True,
+                                curv_of_traj_mode=self.curv_of_traj_params['curv_of_traj_mode'],
+                                window_for_curv_of_traj=self.curv_of_traj_params[
+                                    'window_for_curv_of_traj'],
+                                truncate_curv_of_traj_by_time_of_capture=self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'])
+
+        if self.ff_dataframe is None:
+            self.get_more_monkey_data()
+
+        self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1].copy(
+        )
+        self.shared_stops_near_ff_df, self.all_nxt_ff_df = find_stops_near_ff_utils.make_shared_stops_near_ff_df(self.monkey_information, self.ff_dataframe_visible, self.closest_stop_to_capture_df, self.ff_real_position_sorted,
+                                                                                                                    self.ff_caught_T_new, self.ff_flash_sorted, self.ff_life_sorted, min_distance_between_cur_and_nxt_ff=min_distance_between_cur_and_nxt_ff,
+                                                                                                                    max_distance_between_cur_and_nxt_ff=max_distance_between_cur_and_nxt_ff, stop_period_duration=stop_period_duration,
+                                                                                                                    remove_cases_where_monkey_too_close_to_edge=remove_cases_where_monkey_too_close_to_edge
+                                                                                                                    )
+
+        self.shared_stops_near_ff_df = find_stops_near_ff_utils.process_shared_stops_near_ff_df(
+            self.shared_stops_near_ff_df)
+        self._add_curv_of_traj_stat_df()
+        if save_data:
+            self.shared_stops_near_ff_df.to_csv(os.path.join(
+                self.planning_data_folder_path, 'shared_stops_near_ff_df.csv'))
+            print(
+                f'Stored shared_stops_near_ff_df ({len(self.shared_stops_near_ff_df)} rows) in {os.path.join(self.planning_data_folder_path, "shared_stops_near_ff_df.csv")}')
+
 
     def _make_stops_near_ff_df_test_or_ctrl(self, test_or_control='test', shared_stops_near_ff_df_already_made_ok=True, exists_ok=True, save_data=True):
         if (test_or_control != 'test') and (test_or_control != 'control'):
