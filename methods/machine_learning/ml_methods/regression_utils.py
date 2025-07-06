@@ -42,6 +42,79 @@ from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.model_selection import KFold, train_test_split
 
 
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+def use_linear_regression(X_train, X_test, y_train, y_test,
+                          show_plot=True, y_var_name=None):
+    # Ensure y is 1-dimensional
+    y_train = np.ravel(y_train)
+    y_test = np.ravel(y_test)
+
+    # Add constant to X for intercept
+    X_train_const = sm.add_constant(X_train)
+    X_test_const = sm.add_constant(X_test)
+
+    # Fit model
+    model = sm.OLS(y_train, X_train_const)
+    results = model.fit()
+
+    # Predict
+    y_pred = results.predict(X_test_const)
+
+    # Metrics
+    r2_train = results.rsquared
+    r2_adj = results.rsquared_adj
+    r2_test = round(1 - sum((y_test - y_pred) ** 2) / sum((y_test - np.mean(y_test)) ** 2), 4)
+    pearson_corr = np.corrcoef(y_test, y_pred)[0, 1]
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(y_test, y_pred)
+
+    # Detect regression type
+    reg_type = "Simple" if X_train.shape[1] == 1 else "Multiple"
+
+    # Print metrics
+    print(f"\n--- {reg_type} Linear Regression ---")
+    print(f"R-squared (train):        {r2_train:.4f}")
+    print(f"Adjusted R-squared:       {r2_adj:.4f}")
+    print(f"R-squared (test):         {r2_test:.4f}")
+    print(f"Pearson Corr (test):      {pearson_corr:.4f}")
+    print(f"MAE (test):               {mae:.4f}")
+    print(f"MSE (test):               {mse:.4f}")
+    print(f"RMSE (test):              {rmse:.4f}")
+
+    # Plot
+    if show_plot:
+        plt.figure(figsize=(6, 6))
+        plt.scatter(y_test, y_pred, alpha=0.7)
+        plt.plot([y_test.min(), y_test.max()],
+                 [y_test.min(), y_test.max()], 'k--', lw=2)
+        plt.xlabel("Actual Values")
+        plt.ylabel("Predicted Values")
+        title = f"{y_var_name + ' — ' if y_var_name else ''}{reg_type} Linear Regression\n"
+        title += f"Test $R^2$: {r2_test:.3f}   |   Pearson $R$: {pearson_corr:.3f}"
+        plt.title(title)
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    # Coefficient summary
+    summary_df = pd.DataFrame({
+        'Coefficient': results.params,
+        'Std Err': results.bse,
+        't': results.tvalues,
+        'p_value': results.pvalues
+    })
+    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
+    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
+
+    return summary_df, y_pred, results, r2_test
+
+
 def use_ml_model_for_regression(X_train, y_train, X_test, y_test,
                                 model_names=[
                                     'linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'],
@@ -166,51 +239,6 @@ def plot_feature_importance(importance_df, predictor_var):
                 importance_df['feature'].head(15), rotation=45)
     plt.tight_layout()
     plt.show()
-
-def use_linear_regression(X_train, X_test, y_train, y_test,
-                          show_plot=True, y_var_name=None):
-
-    X_train = sm.add_constant(X_train)
-    X_test = sm.add_constant(X_test)
-
-    model = sm.OLS(y_train, X_train)
-    results = model.fit()
-
-    summary_df = pd.DataFrame(
-        {'p_value': results.pvalues, 'Coefficient': results.params, 'Std Err': results.bse, 't': results.tvalues})
-
-    # print(results.summary())
-    print("R-squared: ", round(results.rsquared, 4))
-    print("Adjusted R-squared: ", round(results.rsquared_adj, 4))
-
-    y_pred = results.predict(X_test)
-
-    r_squared_on_test = r2_score(y_test, y_pred)
-    print("R-squared on test set:", round(r_squared_on_test, 4))
-
-    # Calculate MSE
-    mse = mean_squared_error(y_test, y_pred)
-
-    # Create a scatter plot
-    if show_plot:
-        plt.scatter(y_test, y_pred)
-        # draw a line of y = x
-        plt.plot([y_test.min(), y_test.max()], [
-                 y_test.min(), y_test.max()], 'k--', lw=4)
-        plt.xlabel('Real Values')
-        plt.ylabel('Predicted Values')
-        if y_var_name is not None:
-            plt.title(
-                f'{y_var_name} -- R: {round(math.sqrt(r_squared_on_test), 3)}, R^2: {round(r_squared_on_test, 3)}')
-        else:
-            plt.title(
-                f'R: {round(math.sqrt(r_squared_on_test), 3)}, R^2: {round(r_squared_on_test, 3)}')
-        plt.show()
-
-    # If you want the summary statistics of the coefficients, you can do:
-    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
-    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
-    return summary_df, y_pred, results, r_squared_on_test
 
 
 def use_linear_regression_cv(x_var, y_var, num_folds=10):

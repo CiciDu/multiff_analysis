@@ -1,7 +1,7 @@
 import sys
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.matplotlib_tools import plot_behaviors_utils
 from visualization import base_plot_class
@@ -22,8 +22,10 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
     default_monkey_plot_params = {
         "show_reward_boundary": True,
         "show_alive_fireflies": False,
-        "show_visible_fireflies": False, # only meaningful when show_alive_fireflies is False
-        "show_in_memory_fireflies": False, # only meaningful when show_alive_fireflies is False
+        # only meaningful when show_alive_fireflies is False
+        "show_visible_fireflies": False,
+        # only meaningful when show_alive_fireflies is False
+        "show_in_memory_fireflies": False,
         "show_visible_segments": True,
         "show_stops": True,
         "show_all_eye_positions": False,
@@ -58,7 +60,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         for i in range(len(self.stops_near_ff_df_counted))[current_i: current_i+max_num_plot_to_make]:
             self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[i]
 
-            diff_in_abs = self.heading_info_df_counted.iloc[i]['diff_in_abs_d_heading']
+            diff_in_abs = self.heading_info_df_counted.iloc[i]['diff_in_abs_angle_to_nxt_ff']
             print(f'diff_in_abs: {diff_in_abs}')
 
             if self.monkey_plot_params['show_null_arcs_to_ff']:
@@ -101,14 +103,14 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                 self)
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
-            #self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
-            ## run code directly instead of calling function so that the method can be accessed by other classes
+            # self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
+            # run code directly instead of calling function so that the method can be accessed by other classes
             rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
             self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                    color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=4)
+                                                                     color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=4)
             self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                    color=self.cur_ff_color, trace_name='cur null arc', linewidth=3)
-            
+                                                                     color=self.cur_ff_color, trace_name='cur null arc', linewidth=3)
+
         self.fig.update_layout(
             autosize=False,
             width=900,  # Set the desired width
@@ -175,7 +177,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             self._show_nxt_ff()
 
         if m_params['show_stops'] | (m_params['show_stop_point_indices'] is not None):
-            show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(self.monkey_plot_params, self.current_plotly_key_comp)
+            show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(
+                self.monkey_plot_params, self.current_plotly_key_comp)
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
@@ -198,7 +201,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                  color=self.cur_ff_color, trace_name='cur null arc', linewidth=3)
         return self.fig
 
-
     def find_show_stop_point_indices(self):
         show_stop_point_indices = self.monkey_plot_params.get(
             'show_stop_point_indices')
@@ -212,7 +214,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         show_stop_point_indices = np.array(show_stop_point_indices).reshape(-1)
 
         return show_stop_point_indices
-
 
     def _show_cur_ff(self):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index

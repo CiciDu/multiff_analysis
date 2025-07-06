@@ -1,7 +1,7 @@
 import sys
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.matplotlib_tools import plot_behaviors_utils
 from visualization import base_plot_class
@@ -22,7 +22,7 @@ class MatplotlibPlotter(base_plot_class.BasePlotter):
         for i in range(len(self.stops_near_ff_df_counted))[current_i:current_i+max_num_plot_to_make]:
             stops_near_ff_row = self.stops_near_ff_df_counted.iloc[i]
             heading_row = self.heading_info_df_counted.iloc[i]
-            diff_in_abs = heading_row['diff_in_abs_d_heading']
+            diff_in_abs = heading_row['diff_in_abs_angle_to_nxt_ff']
             print(f'diff_in_abs: {diff_in_abs}')
 
             print('nxt_ff_index:', stops_near_ff_row.nxt_ff_index)

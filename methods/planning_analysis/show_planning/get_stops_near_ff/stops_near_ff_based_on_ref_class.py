@@ -24,7 +24,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             **copy.deepcopy(self.default_overall_params),
             **self.overall_params
         }
-        
+
         self.monkey_plot_params = {
             **copy.deepcopy(self.default_monkey_plot_params),
             **self.monkey_plot_params
@@ -384,7 +384,6 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                 method='first')
             self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['rank_by_angle_to_nxt_ff'].astype(
                 'int')
-            # self.curv_of_traj_stat_df, self.heading_info_df = plan_factors_utils.find_curv_of_traj_stat_df(self.heading_info_df, self.curv_of_traj_df)
             # add the column rank_by_angle_to_nxt_ff to stops_near_ff_df
             if 'rank_by_angle_to_nxt_ff' not in self.stops_near_ff_df.columns:
                 self.stops_near_ff_df = self.stops_near_ff_df.merge(self.heading_info_df[[

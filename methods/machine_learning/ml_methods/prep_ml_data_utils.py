@@ -105,6 +105,7 @@ def further_prepare_x_var_and_y_var(x_var_df, y_var_df, y_var_column='d_monkey_a
 
     return x_var, y_var
 
+
 def drop_na_in_x_var(x_var_df, y_var_df):
     x_var_df.reset_index(drop=True, inplace=True)
     y_var_df.reset_index(drop=True, inplace=True)
@@ -124,6 +125,10 @@ def drop_na_in_x_var(x_var_df, y_var_df):
 def drop_na_in_x_and_y_var(x_var_df, y_var_df):
     x_var_df.reset_index(drop=True, inplace=True)
     y_var_df.reset_index(drop=True, inplace=True)
+    
+    # if y_var_df is one dimensional, convert it to a dataframe
+    if len(y_var_df.shape) == 1:
+        y_var_df = pd.DataFrame(y_var_df)
 
     if x_var_df.isnull().any(axis=1).sum() > 0:
         print(

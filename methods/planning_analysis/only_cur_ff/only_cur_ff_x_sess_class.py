@@ -217,7 +217,7 @@ class OnlyStopFFAcrossSessions():
                 self,
                 y_columns_of_interest=[
                     'd_heading_of_traj',
-                    'diff_in_d_heading_of_traj_from_null',
+                    'diff_in_d_heading_to_cur_ff',
                     'curv_of_traj_before_stop',
                     'dir_from_cur_ff_to_stop'
                 ]
@@ -254,7 +254,7 @@ class OnlyStopFFAcrossSessions():
             only_cur_ml_df = self.ml_inst.try_different_combinations_for_ml(self, model_names=['grad_boosting', 'rf'],
                                                                             y_columns_of_interest=[
                 'd_heading_of_traj',
-                'diff_in_d_heading_of_traj_from_null',
+                'diff_in_d_heading_to_cur_ff',
                 'curv_of_traj_before_stop',
                 'dir_from_cur_ff_to_stop'])
             all_only_cur_ml_df = pd.concat(

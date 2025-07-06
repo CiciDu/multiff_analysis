@@ -3,7 +3,7 @@ from data_wrangling import specific_utils, base_processing_class
 from null_behaviors import show_null_trajectory, curvature_utils, curv_of_traj_utils
 from planning_analysis.show_planning import show_planning_utils, nxt_ff_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_stops_near_ff_utils
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.dash_tools import dash_utils
 from visualization.matplotlib_tools import monkey_heading_functions, plot_behaviors_utils

@@ -41,6 +41,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                             ):
         self.test_or_control = test_or_control
 
+        self.load_raw_data()
         self.streamline_organizing_info(ref_point_mode=ref_point_mode,
                                         ref_point_value=ref_point_value,
                                         curv_of_traj_mode=curv_of_traj_mode,

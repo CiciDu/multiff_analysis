@@ -155,7 +155,6 @@ def initiate_plot(dimx=24, dimy=9, dpi=100, fontweight='normal'):
     plt.show()
 
 
-
 def find_duplicate_rows(df, column_subset=None):
     print("\n" + "="*80)
     if column_subset is None:
@@ -194,7 +193,7 @@ def find_duplicate_rows(df, column_subset=None):
 def check_array_integrity(X, name="Array", top_n=10, verbose=True):
     """
     Checks for NaN and infinite values in a NumPy array, and prints summary stats.
-    
+
     Parameters:
     - X: np.ndarray
     - name: str, name of the array (for display)
@@ -219,7 +218,8 @@ def check_array_integrity(X, name="Array", top_n=10, verbose=True):
 
         if verbose:
             nan_indices = np.where(has_nan)
-            print(f"First {top_n} NaN positions (row, col): {list(zip(nan_indices[0][:top_n], nan_indices[1][:top_n]))}")
+            print(
+                f"First {top_n} NaN positions (row, col): {list(zip(nan_indices[0][:top_n], nan_indices[1][:top_n]))}")
 
             # Columns with most NaNs
             nan_per_col = np.sum(has_nan, axis=0)
@@ -285,7 +285,8 @@ def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
         for j in range(i + 1, n):
             corr_ij = corr_matrix.iloc[i, j]
             if np.abs(np.abs(corr_ij) - threshold) < tol:
-                perfect_pairs.append((data.columns[i], data.columns[j], corr_ij))
+                perfect_pairs.append(
+                    (data.columns[i], data.columns[j], corr_ij))
 
     if len(perfect_pairs) > 0:
         print(f"Found {len(perfect_pairs)} perfect correlations:")
@@ -295,6 +296,7 @@ def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
         print("No perfect correlations found.")
 
     return perfect_pairs
+
 
 def check_na_in_df(df, df_name="DataFrame"):
     """
@@ -350,3 +352,11 @@ def check_na_in_df(df, df_name="DataFrame"):
         print(f"\nNo NA values found in {df_name}")
 
     return na_rows, na_cols
+
+def convert_bool_to_int(df):
+    """
+    Convert all boolean columns to integer type.
+    """
+    bool_cols = df.select_dtypes(include=['bool']).columns
+    df[bool_cols] = df[bool_cols].astype(int)
+    return df

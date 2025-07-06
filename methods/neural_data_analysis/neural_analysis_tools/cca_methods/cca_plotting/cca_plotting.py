@@ -239,6 +239,8 @@ def make_a_series_of_barplots_of_ranked_loadings_or_weights(squared_loading, can
 
     if max_plots_to_show is None:
         max_plots_to_show = num_variates
+    else:
+        max_plots_to_show = min(max_plots_to_show, num_variates)
     # Iterate over the number of variates
     for variate in range(max_plots_to_show):
         # If the flag is set to keep one value for each feature

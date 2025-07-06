@@ -1,6 +1,6 @@
 
 from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
 from data_wrangling import specific_utils
 import seaborn as sns
@@ -148,9 +148,9 @@ def make_all_median_info_from_test_and_ctrl_heading_info_df(test_heading_info_df
                                                                 200],
                                                             ):
 
-    test_heading_info_df = plan_factors_utils.process_heading_info_df(
+    test_heading_info_df = build_factor_comp.process_heading_info_df(
         test_heading_info_df)
-    ctrl_heading_info_df = plan_factors_utils.process_heading_info_df(
+    ctrl_heading_info_df = build_factor_comp.process_heading_info_df(
         ctrl_heading_info_df)
     all_median_info = make_regrouped_info(test_heading_info_df,
                                           ctrl_heading_info_df,
@@ -187,9 +187,9 @@ def make_all_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
                                                               200],
                                                           ):
 
-    test_heading_info_df = plan_factors_utils.process_heading_info_df(
+    test_heading_info_df = build_factor_comp.process_heading_info_df(
         test_heading_info_df)
-    ctrl_heading_info_df = plan_factors_utils.process_heading_info_df(
+    ctrl_heading_info_df = build_factor_comp.process_heading_info_df(
         ctrl_heading_info_df)
 
     test_heading_info_df['dir_from_cur_ff_to_stop'] = np.sign(
@@ -228,11 +228,13 @@ def extract_key_info_from_stat_df(stat_df, metrics=['Q1', 'median', 'Q3']):
 
 def get_rows_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df,
                                 columns_to_get_metrics=[
-                                    'diff_in_d_heading', 'diff_in_abs_d_heading', 'diff_in_abs_d_curv'],
+                                    'diff_in_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'],
                                 metrics=['Q1', 'median', 'Q3']):
-    
-    test_stat = test_heading_info_df[columns_to_get_metrics].describe().rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
-    ctrl_stat = ctrl_heading_info_df[columns_to_get_metrics].describe().rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+
+    test_stat = test_heading_info_df[columns_to_get_metrics].describe().rename(
+        index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    ctrl_stat = ctrl_heading_info_df[columns_to_get_metrics].describe().rename(
+        index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
 
     row_from_test = extract_key_info_from_stat_df(test_stat, metrics=metrics)
     row_from_ctrl = extract_key_info_from_stat_df(ctrl_stat, metrics=metrics)
@@ -309,7 +311,7 @@ def make_temp_median_info_func(test_heading_info_df, ctrl_heading_info_df):
         test_heading_info_df, ctrl_heading_info_df)
     row_from_test, row_from_ctrl = add_boostrap_median_std_to_df(test_heading_info_df, ctrl_heading_info_df,
                                                                  row_from_test, row_from_ctrl,
-                                                                 columns=['diff_in_abs_d_heading', 'diff_in_abs_d_curv'])
+                                                                 columns=['diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'])
 
     delta_row = get_delta_values_between_test_and_control(
         test_heading_info_df, ctrl_heading_info_df)

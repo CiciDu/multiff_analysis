@@ -1,9 +1,9 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils
-from planning_analysis.plan_factors import plan_factors_class, plan_factors_helper_class
+from planning_analysis.plan_factors import plan_factors_class, plan_factors_helper_class, build_factor_comp_utils, build_factor_comp
 from planning_analysis.only_cur_ff import only_cur_ff_utils, features_to_keep_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from null_behaviors import curv_of_traj_utils
 
 import os
@@ -244,8 +244,10 @@ class HelperGUATavsTAFTclass():
         if self.curv_of_traj_df is None:
             self.curv_of_traj_df, self.traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new,
                                                                                                                             curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False)
-        self.curv_of_traj_stat_df, self.stops_near_ff_df = plan_factors_utils.find_curv_of_traj_stat_df(
+        self.curv_of_traj_stat_df = build_factor_comp.find_curv_of_traj_stat_df(
             self.stops_near_ff_df, self.curv_of_traj_df)
+        self.stops_near_ff_df = build_factor_comp_utils._add_stat_columns_to_df(
+            self.curv_of_traj_stat_df, self.stops_near_ff_df, ['curv'], 'stop_point_index')
 
     def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self):
         self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
@@ -355,4 +357,3 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'max_time_since_last_vis': 2.5,
              'duration_into_future': 0.5,
              }
-

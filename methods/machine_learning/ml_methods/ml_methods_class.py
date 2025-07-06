@@ -76,23 +76,35 @@ class MlMethods():
 
     def process_summary_df(self, summary_df):
         self.summary_df_all = summary_df.copy()
-        self.summary_df = summary_df[summary_df['p_value'] <= 0.05].copy()
+        # self.summary_df = summary_df[summary_df['p_value'] <= 0.05].copy()
+        self.summary_df['significant'] = self.summary_df['p_value'] <= 0.05
         self.summary_df['rank_by_abs_coeff'] = self.summary_df['abs_coeff'].rank(
             ascending=False, method='first').astype(int)
-        self.summary_df.reset_index(drop=False, inplace=True)
+        #self.summary_df.reset_index(drop=False, inplace=True)
 
     def use_linear_regression(self, show_plot=True, y_var_name=None):
-        summary_df, self.y_pred, self.results, self.r_squared_on_test = regression_utils.use_linear_regression(
+        self.summary_df, y_pred, results, r2_test = regression_utils.use_linear_regression(
             self.X_train, self.X_test, self.y_train, self.y_test, show_plot=show_plot, y_var_name=y_var_name)
-        self.process_summary_df(summary_df)
+        self.process_summary_df(self.summary_df)
 
-    def split_and_use_linear_regression(self, x_var_df, y_var_df, y_var_column, test_size=0.2):
+    def split_and_use_linear_regression(self, x_var_df, y_var_df, test_size=0.2):
+        # if y_var_df is a series, convert it to a dataframe
+        if isinstance(y_var_df, pd.Series):
+            y_var_df = pd.DataFrame(y_var_df) 
+        elif isinstance(y_var_df, pd.DataFrame):
+            if y_var_df.shape[1] > 1:
+                raise ValueError('y_var_df should contain only one column.')
+        else:
+            raise ValueError('y_var_df should be a series or a dataframe.')
+        
+        y_var_name = y_var_df.columns[0]
+        
         self.temp_x_var_df, self.temp_y_var_df = prep_ml_data_utils.drop_na_in_x_and_y_var(
             x_var_df, y_var_df)        
         
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             self.temp_x_var_df, self.temp_y_var_df, test_size=test_size)
-        self.use_linear_regression(show_plot=True, y_var_name=y_var_column)
+        self.use_linear_regression(show_plot=True, y_var_name=y_var_name)
 
     def use_logistic_regression(self, x_var_df, y_var_df, select_features=True, lasso_alpha=0.01):
 

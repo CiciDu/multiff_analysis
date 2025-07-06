@@ -163,14 +163,14 @@ class _PredictYValues:
 
     def use_lr_to_predict_monkey_info(self, plan_xy_test, plan_xy_ctrl):
 
-        method_kwargs = dict(y_columns_of_interest=['diff_in_d_heading_of_traj_from_null',
-                                                    'diff_in_abs_d_heading',
+        method_kwargs = dict(y_columns_of_interest=['diff_in_d_heading_to_cur_ff',
+                                                    'diff_in_abs_angle_to_nxt_ff',
                                                     'diff_in_abs_d_curv',
                                                     'dir_from_cur_ff_to_stop',  # this one is classification though
                                                     'd_heading_of_traj',
                                                     'curv_of_traj_before_stop',
                                                     # 'dir_from_cur_ff_same_side',
-                                                    # 'diff_in_d_heading'
+                                                    # 'diff_in_angle_to_nxt_ff'
                                                     ],
                              clusters_for_interaction_choices=[
             'cur_ff_cluster_100',

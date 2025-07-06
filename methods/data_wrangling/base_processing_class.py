@@ -36,7 +36,13 @@ class BaseProcessing:
         self.ff_dataframe = None
         self.curv_of_traj_params = {}
 
-    def load_raw_data(self, raw_data_folder_path, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
+    def load_raw_data(self, raw_data_folder_path=None, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
+        if raw_data_folder_path is None:
+            try:
+                raw_data_folder_path = self.raw_data_folder_path
+            except AttributeError:
+                raise Exception("raw_data_folder_path is not provided and self.raw_data_folder_path is not set")
+
         self.extract_info_from_raw_data_folder_path(raw_data_folder_path)
         self.retrieve_or_make_monkey_data(exists_ok=monkey_data_exists_ok)
         if curv_of_traj_mode is not None:
@@ -44,6 +50,9 @@ class BaseProcessing:
                                                             truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
 
     def extract_info_from_raw_data_folder_path(self, raw_data_folder_path):
+        if raw_data_folder_path is None:
+            raise Exception("raw_data_folder_path is None")
+
         self.get_related_folder_names_from_raw_data_folder_path(
             raw_data_folder_path)
         self.monkey_name = raw_data_folder_path.split('/')[2]

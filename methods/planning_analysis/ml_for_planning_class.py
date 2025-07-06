@@ -14,8 +14,8 @@ class MlForPlanning(ml_methods_class.MlMethods):
         super().__init__(x_var_df=x_var_df, y_var_df=y_var_df)
 
     def try_different_combinations_for_linear_regressions(self, data_source,
-                                                          y_columns_of_interest=['diff_in_d_heading_of_traj_from_null',
-                                                                                 'diff_in_abs_d_heading',
+                                                          y_columns_of_interest=['diff_in_d_heading_to_cur_ff',
+                                                                                 'diff_in_abs_angle_to_nxt_ff',
                                                                                  'diff_in_abs_d_curv',
                                                                                  'dir_from_cur_ff_to_stop',
                                                                                  'd_heading_of_traj',
@@ -53,8 +53,8 @@ class MlForPlanning(ml_methods_class.MlMethods):
         return self.lr_variations_df
 
     def try_different_combinations_for_ml(self, data_source,
-                                          y_columns_of_interest=['diff_in_d_heading_of_traj_from_null',
-                                                                 'diff_in_abs_d_heading',
+                                          y_columns_of_interest=['diff_in_d_heading_to_cur_ff',
+                                                                 'diff_in_abs_angle_to_nxt_ff',
                                                                  'diff_in_abs_d_curv',
                                                                  'd_heading_of_traj',
                                                                  'dir_from_cur_ff_to_stop',
@@ -207,8 +207,8 @@ class MlForPlanning(ml_methods_class.MlMethods):
 
     def _try_different_combinations_for_learning(self, data_source,
                                                  process_combination_func,
-                                                 y_columns_of_interest=['diff_in_d_heading_of_traj_from_null',
-                                                                        'diff_in_abs_d_heading',
+                                                 y_columns_of_interest=['diff_in_d_heading_to_cur_ff',
+                                                                        'diff_in_abs_angle_to_nxt_ff',
                                                                         'diff_in_abs_d_curv',
                                                                         'dir_from_cur_ff_to_stop',
                                                                         'd_heading_of_traj',

@@ -133,7 +133,7 @@ def _find_rest_of_x_for_hoverdata(sub_df, x_var_column, y_var_column, var_to_det
     rest_of_x_for_hoverdata = []
     for column in sub_df.columns:
         if len(sub_df[column].unique()) > 1:
-            if ('sample_size' not in column) & ('diff_in_d_heading' not in column) & ('unique_combination' not in column) & \
+            if ('sample_size' not in column) & ('diff_in_angle_to_nxt_ff' not in column) & ('unique_combination' not in column) & \
                 (column not in ['pair_id', 'y1_or_y2', 'line_color', 'x_value_numeric', 'x_value_numeric_with_offset',
                                 'var_to_split_value', 'se_upper', 'se_lower', x_var_column, y_var_column, var_to_determine_x_offset_direction]):
                 rest_of_x_for_hoverdata.append(column)
@@ -535,14 +535,14 @@ def _add_line_type_legends(fig, sub_df,
 def compare_diff_in_abs_in_overall_median_info(sub_df, x, plotly=True):
     if plotly:
         make_plotly_plots_for_test_and_control_data_comparison(
-            sub_df, x, 'test_diff_in_abs_d_heading', 'ctrl_diff_in_abs_d_heading', title='test vs ctrl diff_in_abs_d_heading')
+            sub_df, x, 'test_diff_in_abs_d_heading', 'ctrl_diff_in_abs_d_heading', title='test vs ctrl diff_in_abs_angle_to_nxt_ff')
         make_plotly_plots_for_test_and_control_data_comparison(
-            sub_df, x, 'delta_diff_in_abs_d_heading', 'delta_diff_in_d_heading',  title='delta diff_in_abs vs delta diff_in_d_heading')
+            sub_df, x, 'delta_diff_in_abs_d_heading', 'delta_diff_in_d_heading',  title='delta diff_in_abs vs delta diff_in_angle_to_nxt_ff')
     else:
         _compare_y1_and_y2_in_overall_regrouped_info(
-            sub_df, x, 'test_diff_in_abs_d_heading', 'ctrl_diff_in_abs_d_heading', title='test vs ctrl diff_in_abs_d_heading')
+            sub_df, x, 'test_diff_in_abs_d_heading', 'ctrl_diff_in_abs_d_heading', title='test vs ctrl diff_in_abs_angle_to_nxt_ff')
         _compare_y1_and_y2_in_overall_regrouped_info(
-            sub_df, x, 'delta_diff_in_abs_d_heading', 'delta_diff_in_d_heading',  title='delta diff_in_abs vs delta diff_in_d_heading')
+            sub_df, x, 'delta_diff_in_abs_d_heading', 'delta_diff_in_d_heading',  title='delta diff_in_abs vs delta diff_in_angle_to_nxt_ff')
     return
 
 

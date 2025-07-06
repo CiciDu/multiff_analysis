@@ -1,10 +1,10 @@
 from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
-from planning_analysis.plan_factors import plan_factors_utils, test_vs_control_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import planning_neural_utils
-from data_wrangling import base_processing_class
+from data_wrangling import base_processing_class, general_utils
 from planning_analysis.plan_factors import plan_factors_helper_class
 import pandas as pd
 import os
@@ -186,9 +186,10 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         self.plan_y_tc = pd.concat(
             [self.plan_y_test, self.plan_y_ctrl], ignore_index=True)
 
-        plan_factors_utils.add_dir_from_cur_ff_same_side(self.plan_y_tc)
-        plan_factors_utils._drop_columns_that_contain_both_nxt_and_bbas(self.plan_y_tc)
-
+        build_factor_comp.add_dir_from_cur_ff_same_side(self.plan_y_tc)
+        plan_factors_utils.drop_columns_that_contain_both_nxt_and_bbas(
+            self.plan_y_tc)
+        general_utils.convert_bool_to_int(self.plan_y_tc)
 
     def change_control_data_to_conform_to_test_data(self):
         self.plan_x_ctrl, self.plan_y_ctrl = test_vs_control_utils.change_control_data_to_conform_to_test_data(
@@ -247,22 +248,21 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         else:
             self.make_x_and_y_var_df(scale_x_var=scale_x_var, use_pca=use_pca)
 
-    def _run_lr(self, y_var_column, x_var_df=None, y_var_df=None):
+    def run_lr(self, y_var_column, x_var_df=None, y_var_df=None, test_size=0.2):
         if x_var_df is None:
             x_var_df = self.x_var_df
         if y_var_df is None:
             y_var_df = self.y_var_df
-        self.ml_inst.use_train_test_split(
-            x_var_df, y_var_df, y_var_column=y_var_column)
-        self.ml_inst.use_linear_regression()
+        self.ml_inst.split_and_use_linear_regression(
+            x_var_df, y_var_df[y_var_column], test_size=test_size)
         self.summary_df = self.ml_inst.summary_df
 
-    def use_lr_on_all(self, test_or_control='test', y_var_column='d_monkey_angle2', use_pca=False):
+    def use_lr_on_all(self, test_or_control='test', y_var_column='d_monkey_angle_since_cur_ff_first_seen2', use_pca=False):
         self.get_x_and_y_for_lr(
             test_or_control=test_or_control, use_pca=use_pca)
-        self._run_lr(y_var_column)
+        self.run_lr(y_var_column)
 
-    def use_lr_on_specific_x_columns(self, specific_x_columns=None, test_or_control='test', y_var_column='d_monkey_angle2'):
+    def use_lr_on_specific_x_columns(self, specific_x_columns=None, test_or_control='test', y_var_column='d_monkey_angle_since_cur_ff_first_seen2'):
         if specific_x_columns is None:
             self.specific_x_columns = self.summary_df[self.summary_df['p_value']
                                                       < 0.05].index.values
@@ -274,4 +274,4 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         except KeyError as e:
             print(e)
             return
-        self._run_lr(y_var_column)
+        self.run_lr(y_var_column)

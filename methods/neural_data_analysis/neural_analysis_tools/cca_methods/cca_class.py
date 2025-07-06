@@ -41,10 +41,14 @@ class CCAclass():
         self.X1_sc_df = pd.DataFrame(self.X1_sc, columns=self.X1.columns)
         self.X2_sc_df = pd.DataFrame(self.X2_sc, columns=self.X2.columns)
 
-    def conduct_cca(self, n_components=10, plot_correlations=True):
+    def conduct_cca(self, n_components=10, plot_correlations=True, reg=0.0):
+        # make sure components are not more than the number of features
+        n_components = min(n_components, len(self.X1.columns), len(self.X2.columns))
+        
         self.n_components = n_components
+        
         self.cca, self.X1_c, self.X2_c, self.canon_corr = neural_data_modeling.conduct_cca(
-            self.X1_sc, self.X2_sc, n_components=n_components, plot_correlations=plot_correlations)
+            self.X1_sc, self.X2_sc, n_components=n_components, plot_correlations=plot_correlations, reg=reg)
         self.X1_weights = self.cca.ws[0]
         self.X2_weights = self.cca.ws[1]
         self.X1_loading = neural_data_modeling.calculate_loadings(

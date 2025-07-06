@@ -1,7 +1,7 @@
 import sys
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.matplotlib_tools import plot_behaviors_utils
 from matplotlib.lines import Line2D
@@ -33,7 +33,6 @@ class BasePlotter():
                                  'zoom_in': False,
                                  'truncate_part_before_crossing_arena_edge': True}
 
-
     def __init__(self, PlotTrials_args):
 
         self.PlotTrials_args = PlotTrials_args
@@ -42,12 +41,10 @@ class BasePlotter():
             self.ff_believed_position_sorted, _, self.ff_caught_T_new \
             = PlotTrials_args
 
-
     def add_additional_info_for_plotting(self, **kwargs):
         # put each element of kargs into self
         for key, value in kwargs.items():
             setattr(self, key, value)
-
 
     def prepare_to_plot_stops_near_ff(self, use_fixed_arc_length=False, fixed_arc_length=None):
         # self.slope, self.intercept, self.r_value, self.p_value, self.std_err = stats.linregress(self.traj_curv_counted, self.nxt_curv_counted)
@@ -72,7 +69,6 @@ class BasePlotter():
         if use_fixed_arc_length:
             self._update_null_arc_info_using_fixed_arc_length(fixed_arc_length)
 
-
     def _update_null_arc_info_using_fixed_arc_length(self, fixed_arc_length):
         if fixed_arc_length is not None:
             self.cur_null_arc_info_for_counted_points = show_null_trajectory.update_null_arc_info_based_on_fixed_arc_length(
@@ -88,10 +84,11 @@ class BasePlotter():
             self.nxt_null_arc_info_for_counted_points = show_null_trajectory.update_null_arc_info_based_on_fixed_arc_length(
                 fixed_arc_length, self.nxt_null_arc_info_for_counted_points)
 
-
     def _find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_counted_points(self, i):
-        self.cur_null_arc_info_for_the_point = self.cur_null_arc_info_for_counted_points.iloc[[i]].copy()
-        self.nxt_null_arc_info_for_the_point = self.nxt_null_arc_info_for_counted_points.iloc[[i]].copy()
+        self.cur_null_arc_info_for_the_point = self.cur_null_arc_info_for_counted_points.iloc[[
+            i]].copy()
+        self.nxt_null_arc_info_for_the_point = self.nxt_null_arc_info_for_counted_points.iloc[[
+            i]].copy()
         if len(self.cur_null_arc_info_for_the_point) > 1:
             raise ValueError('More than one cur null arc found for the point')
         if len(self.nxt_null_arc_info_for_the_point) > 1:

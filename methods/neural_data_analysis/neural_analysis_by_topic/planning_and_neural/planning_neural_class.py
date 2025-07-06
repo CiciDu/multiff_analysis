@@ -50,7 +50,9 @@ class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
                                                             truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture,
                                                             use_curvature_to_ff_center=use_curvature_to_ff_center,
                                                             eliminate_outliers=eliminate_outliers,
-                                                            both_ff_across_time_df_exists_ok=both_ff_across_time_df_exists_ok)
+                                                            both_ff_across_time_df_exists_ok=both_ff_across_time_df_exists_ok,
+                                                            test_or_control='test'
+                                                            )
 
         for attr in ['all_planning_info', 'both_ff_across_time_df']:
             setattr(self, attr, getattr(planning_helper, attr))

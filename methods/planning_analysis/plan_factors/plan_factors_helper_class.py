@@ -2,7 +2,7 @@ from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from null_behaviors import curv_of_traj_utils
 
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
-from planning_analysis.plan_factors import plan_factors_utils, test_vs_control_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import planning_neural_utils
 from data_wrangling import base_processing_class
@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # note, one class instance is either for test or control, but not both
+
 
 class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
 
@@ -37,16 +38,15 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(
             self, raw_data_folder_path)
 
-
-    def _make_plan_x(self, stops_near_ff_df_exists_ok=True, save_stops_near_ff_df=True, use_eye_data=True, 
+    def _make_plan_x(self, stops_near_ff_df_exists_ok=True, save_stops_near_ff_df=True, use_eye_data=True,
                      use_speed_data=True, stop_period_duration=2, ff_radius=10,
                      list_of_cur_ff_cluster_radius=[100, 200, 300],
                      list_of_nxt_ff_cluster_radius=[100, 200, 300]):
-        
+
         if getattr(self, 'monkey_dataframe', None) is None:
             self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=self.curv_of_traj_mode,
                                window_for_curv_of_traj=self.window_for_curv_of_traj)
-            
+
         self.get_stops_near_ff_df(test_or_control=self.test_or_control,
                                   exists_ok=stops_near_ff_df_exists_ok, save_data=save_stops_near_ff_df)
 
@@ -61,18 +61,18 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
                                                            curv_traj_window_before_stop=self.curv_traj_window_before_stop, use_curvature_to_ff_center=self.use_curvature_to_ff_center)
 
         plan_x = plan_factors_utils.make_plan_x_df(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
-                                                           stop_period_duration=stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
-                                                           list_of_cur_ff_cluster_radius=list_of_cur_ff_cluster_radius, list_of_nxt_ff_cluster_radius=list_of_nxt_ff_cluster_radius,
-                                                           use_speed_data=use_speed_data, use_eye_data=use_eye_data)
+                                                   stop_period_duration=stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
+                                                   list_of_cur_ff_cluster_radius=list_of_cur_ff_cluster_radius, list_of_nxt_ff_cluster_radius=list_of_nxt_ff_cluster_radius,
+                                                   use_speed_data=use_speed_data, use_eye_data=use_eye_data)
 
         return plan_x
 
     def _make_plan_y(self, heading_info_df_exists_ok=False, stops_near_ff_df_exists_ok=False, save_data=False):
-        
+
         if getattr(self, 'monkey_dataframe', None) is None:
             self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=self.curv_of_traj_mode,
-                               window_for_curv_of_traj=self.window_for_curv_of_traj)        
-        
+                               window_for_curv_of_traj=self.window_for_curv_of_traj)
+
         self.make_heading_info_df_without_long_process(
             test_or_control=self.test_or_control, ref_point_mode=self.ref_point_mode,
             curv_traj_window_before_stop=self.curv_traj_window_before_stop,
@@ -94,7 +94,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         plan_y = plan_factors_utils.make_plan_y_df(
             self.heading_info_df, self.curv_of_traj_df, self.curv_of_traj_df_w_one_sided_window)
 
-        plan_y = plan_factors_utils.add_d_monkey_angle(
+        plan_y = build_factor_comp.add_d_monkey_angle(
             plan_y, self.cur_ff_df_temp, self.stops_near_ff_df)
 
         return plan_y
@@ -121,7 +121,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
     def make_plan_x(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
         df_name, csv_path = self._get_file_names_for_plan_x_or_y('plan_x')
         attr_name = f'plan_x_{self.test_or_ctrl}'
-        
+
         if already_made_ok & (getattr(self, attr_name, None) is not None):
             return getattr(self, attr_name)
 
@@ -137,7 +137,6 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         setattr(self, attr_name, plan_data)
         return plan_data
 
-
     def make_plan_y(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
 
         df_name, csv_path = self._get_file_names_for_plan_x_or_y('plan_y')
@@ -145,7 +144,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
 
         if already_made_ok & (getattr(self, attr_name, None) is not None):
             return getattr(self, attr_name)
-            
+
         if exists_ok and os.path.exists(csv_path):
             plan_data = pd.read_csv(csv_path).reset_index(drop=True)
             print(f'Successfully retrieved {attr_name} ({df_name})')
@@ -158,8 +157,8 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         setattr(self, attr_name, plan_data)
         return plan_data
 
-
     def _make_curv_of_traj_df_w_one_sided_window_if_not_already_made(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance'):
+        # One-sided window: Unlike the regular curv_of_traj_df which uses a symmetric window (e.g., [-25, 25] cm), this uses an asymmetric window that only looks backward from the current point (e.g., [-25, 0] cm).
         if getattr(self, 'curv_of_traj_df_w_one_sided_window', None) is None:
             self.curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new,
                                                                                                                             curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False)

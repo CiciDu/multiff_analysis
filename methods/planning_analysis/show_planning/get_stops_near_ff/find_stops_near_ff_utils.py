@@ -566,10 +566,10 @@ def _get_important_df_for_polar_plot(stops_near_ff_df, nxt_ff_df2, monkey_inform
 def _get_monkey_sub_for_polar_plot(monkey_information, row, nxt_ff_df2, start, end):
     point_index_dict = {'stop_point_index': row['stop_point_index'],
                         'next_stop_point_index': row['next_stop_point_index'],
-                        'ref_point_index': nxt_ff_df2.loc[nxt_ff_df2['stop_point_index'] == row['stop_point_index'], 'point_index'].item()
+                        'ref_point_index': nxt_ff_df2.loc[nxt_ff_df2['ff_index'] == row['nxt_ff_index'], 'point_index'].item()
                         }
 
-    monkey_sub = monkey_information.loc[point_index_dict[start]                                        : point_index_dict[end] + 1].copy()
+    monkey_sub = monkey_information.loc[point_index_dict[start]: point_index_dict[end] + 1].copy()
 
     # rotated monkey_x and monkey_y in reference to monkey angle at the reference point
     monkey_ref_xy = monkey_sub.loc[point_index_dict[start], [
@@ -584,20 +584,29 @@ def _get_monkey_sub_for_polar_plot(monkey_information, row, nxt_ff_df2, start, e
 
 
 def check_ff_vs_cluster(df, ff_column, cluster_column):
+    # check for na in both columns
+    print(f'There are {df[ff_column].isnull().sum()} rows where {ff_column} is null')
+    print(f'There are {df[cluster_column].isnull().sum()} rows where {cluster_column} is null')
+    print('===============================================')
+
     len_subset = len(df[df[ff_column] < df[cluster_column]])
     print(
-        f'There are {len_subset} rows where {ff_column} < {cluster_column} out of {len(df)} rows')
+        f'There are {len_subset} rows where {ff_column} < {cluster_column} (out of {len(df)} rows)')
     len_subset = len(df[df[ff_column] > df[cluster_column]])
     print(
-        f'There are {len_subset} rows where {ff_column} > {cluster_column} out of {len(df)} rows')
+        f'There are {len_subset} rows where {ff_column} > {cluster_column} (out of {len(df)} rows)')
+    len_subset = len(df[df[ff_column] == df[cluster_column]])
+    print(
+        f'There are {len_subset} rows where {ff_column} == {cluster_column} (out of {len(df)} rows)')
+    print('===============================================')
     len_subset = len(df[(df[ff_column].isnull()) &
                      (~df[cluster_column].isnull())])
     print(
-        f'There are {len_subset} rows where {ff_column} is null but {cluster_column} is not null out of {len(df)} rows')
+        f'There are {len_subset} rows where {ff_column} is null but {cluster_column} is not null (out of {len(df)} rows)')
     len_subset = len(df[(~df[ff_column].isnull()) &
                      (df[cluster_column].isnull())])
     print(
-        f'There are {len_subset} rows where {ff_column} is not null but {cluster_column} is null out of {len(df)} rows')
+        f'There are {len_subset} rows where {ff_column} is not null but {cluster_column} is null (out of {len(df)} rows)')
 
 
 def get_df_name_by_ref(monkey_name, ref_point_mode, ref_point_value):

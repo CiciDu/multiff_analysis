@@ -404,19 +404,22 @@ def conduct_linear_regression_to_show_planning(ang_traj_nxt, ang_cur_nxt, use_ab
 
 def make_diff_and_ratio_stat_df(test_df, ctrl_df):
 
-    columns_to_describe = ['diff_in_d_heading', 'ratio', 'diff_in_abs_d_heading', 'diff_in_abs_d_curv']
+    columns_to_describe = ['diff_in_angle_to_nxt_ff',
+                           'ratio_of_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv']
 
-    test_stat = test_df[columns_to_describe].describe().rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    test_stat = test_df[columns_to_describe].describe().rename(
+        index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
     test_stat.columns = ['test_' + col for col in test_stat.columns]
-    
-    ctrl_stat = ctrl_df[columns_to_describe].describe().rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+
+    ctrl_stat = ctrl_df[columns_to_describe].describe().rename(
+        index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
     ctrl_stat.columns = ['ctrl_' + col for col in ctrl_stat.columns]
 
     diff_and_ratio_stat_df = pd.concat([test_stat, ctrl_stat], axis=1)
 
     return diff_and_ratio_stat_df
 
-    
+
 def remove_outliers(x_var_df, y_var):
     mean_y = y_var.mean()
     std_y = y_var.std()

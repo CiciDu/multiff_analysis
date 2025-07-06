@@ -1,7 +1,7 @@
 import sys
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs, plotly_plot_class
 from visualization.matplotlib_tools import plot_behaviors_utils, matplotlib_plot_class
 from visualization import base_plot_class
@@ -33,7 +33,7 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
         self.stop_point_index_counted = self.stops_near_ff_df_counted['stop_point_index'].values
         self.heading_info_df_counted = self.heading_info_df.set_index(
             'stop_point_index').loc[self.stop_point_index_counted].reset_index()
-        self.heading_info_df_counted = plan_factors_utils.process_heading_info_df(
+        self.heading_info_df_counted = build_factor_comp.process_heading_info_df(
             self.heading_info_df_counted)
         self.make_PlotTrials_args()
 
@@ -48,35 +48,39 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
             'overall_params': self.overall_params,
             'monkey_plot_params': self.monkey_plot_params,
         }
-        
+
         # if traj_curv_counted or nxt_curv_counted are in self, then add them
         if hasattr(self, 'traj_curv_counted'):
             data_to_add['traj_curv_counted'] = self.traj_curv_counted
         if hasattr(self, 'nxt_curv_counted'):
             data_to_add['nxt_curv_counted'] = self.nxt_curv_counted
 
-        self.plotly_inst = plotly_plot_class.PlotlyPlotter(self.PlotTrials_args)
+        self.plotly_inst = plotly_plot_class.PlotlyPlotter(
+            self.PlotTrials_args)
         self.plotly_inst.add_additional_info_for_plotting(**data_to_add)
-        self.plotly_inst.prepare_to_plot_stops_near_ff(use_fixed_arc_length=use_fixed_arc_length, fixed_arc_length=fixed_arc_length)
+        self.plotly_inst.prepare_to_plot_stops_near_ff(
+            use_fixed_arc_length=use_fixed_arc_length, fixed_arc_length=fixed_arc_length)
 
-    
-        self.mpl_inst = matplotlib_plot_class.MatplotlibPlotter(self.PlotTrials_args)
+        self.mpl_inst = matplotlib_plot_class.MatplotlibPlotter(
+            self.PlotTrials_args)
         self.mpl_inst.add_additional_info_for_plotting(**data_to_add)
-        self.mpl_inst.prepare_to_plot_stops_near_ff(use_fixed_arc_length=use_fixed_arc_length, fixed_arc_length=fixed_arc_length)
+        self.mpl_inst.prepare_to_plot_stops_near_ff(
+            use_fixed_arc_length=use_fixed_arc_length, fixed_arc_length=fixed_arc_length)
 
     def make_individual_plots_for_stops_near_ff_in_mpl(self, current_i, max_num_plot_to_make=5, additional_plotting_kwargs={'show_connect_path_ff_specific_indices': None, 'show_ff_indices': True},
                                                        show_position_in_scatter_plot=True, show_monkey_heading=True, show_null_arcs=True):
         current_i = self.mpl_inst.make_individual_plots_for_stops_near_ff_in_mpl(current_i, max_num_plot_to_make, additional_plotting_kwargs,
-            show_position_in_scatter_plot, show_monkey_heading, show_null_arcs
-        )
-        
+                                                                                 show_position_in_scatter_plot, show_monkey_heading, show_null_arcs
+                                                                                 )
+
         return current_i
-    
+
     def make_individual_plots_for_stops_near_ff_in_plotly(self, current_i, max_num_plot_to_make=5,
                                                           **additional_plotting_kwargs):
-        current_i = self.plotly_inst.make_individual_plots_for_stops_near_ff_in_plotly(current_i, max_num_plot_to_make, **additional_plotting_kwargs)
+        current_i = self.plotly_inst.make_individual_plots_for_stops_near_ff_in_plotly(
+            current_i, max_num_plot_to_make, **additional_plotting_kwargs)
         return current_i
-    
+
     def compare_test_and_control_in_polar_plots(self, max_instances_each=10, test_color='green', ctrl_color='purple',
                                                 start='stop_point_index', end='next_stop_point_index', rmax=400):
 

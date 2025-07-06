@@ -2,7 +2,7 @@ import sys
 from data_wrangling import specific_utils
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
-from planning_analysis.plan_factors import plan_factors_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, build_factor_comp_utils, build_factor_comp
 from data_wrangling import specific_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils, optimal_arc_utils
 import numpy as np
@@ -76,16 +76,14 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
     only_cur_ff_df['d_heading_of_traj'] = only_cur_ff_df['d_heading_of_traj'] % 360
     only_cur_ff_df.loc[only_cur_ff_df['d_heading_of_traj'] > 180,
                        'd_heading_of_traj'] = only_cur_ff_df.loc[only_cur_ff_df['d_heading_of_traj'] > 180, 'd_heading_of_traj'] - 360
-    only_cur_ff_df['diff_in_d_heading_of_traj_from_null'] = only_cur_ff_df['d_heading_of_traj'] - \
+    only_cur_ff_df['diff_in_d_heading_to_cur_ff'] = only_cur_ff_df['d_heading_of_traj'] - \
         only_cur_ff_df['cur_d_heading_of_arc']
 
     # get curv range info etc
-    curv_of_traj_stat_df, only_cur_ff_df = plan_factors_utils.find_curv_of_traj_stat_df(only_cur_ff_df, curv_of_traj_df, start_time_column='beginning_time',
-                                                                                        end_time_column='stop_time', add_to_df_to_iter=False)
-    columns_to_add = ['curv_mean', 'curv_std', 'curv_min', 'curv_Q1', 'curv_median', 'curv_Q3',
-                      'curv_max', 'curv_iqr', 'curv_range']
-    only_cur_ff_df = only_cur_ff_df.merge(
-        curv_of_traj_stat_df[columns_to_add + ['stop_point_index']], on='stop_point_index', how='left')
+    curv_of_traj_stat_df = build_factor_comp.find_curv_of_traj_stat_df(only_cur_ff_df, curv_of_traj_df, start_time_column='beginning_time',
+                                                                                       end_time_column='stop_time')
+    only_cur_ff_df = build_factor_comp_utils._add_stat_columns_to_df(
+            curv_of_traj_stat_df, only_cur_ff_df, ['curv'], 'stop_point_index')
 
     # add angle_from_cur_ff_to_stop
     only_cur_ff_df['stop_x'], only_cur_ff_df['stop_y'] = monkey_information.loc[only_cur_ff_df['stop_point_index'], [
@@ -99,7 +97,7 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
 
     curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode([-25, 0], monkey_information, ff_caught_T_new,
                                                                                                                curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
-    only_cur_ff_df = plan_factors_utils._add_column_curv_of_traj_before_stop(
+    only_cur_ff_df = build_factor_comp.add_column_curv_of_traj_before_stop(
         only_cur_ff_df, curv_of_traj_df_w_one_sided_window)
 
     only_cur_ff_df = only_cur_ff_df.sort_values(
@@ -200,12 +198,13 @@ def furnish_ff_info_at_start_df(ff_info_at_start_df):
     return ff_info_at_start_df
 
 
-def find_monkey_info_in_all_stop_periods(all_start_time, all_end_time, all_group_id, monkey_information):
+def find_monkey_info_in_all_stop_periods(all_start_time, all_end_time, all_segment_id, monkey_information):
 
     monkey_info_in_all_stop_periods = monkey_information[[
         'time', 'point_index', 'monkey_x', 'monkey_y', 'monkey_angle', 'dt']].copy()
-    monkey_info_in_all_stop_periods = plan_factors_utils.extend_df_based_on_groups(
-        monkey_info_in_all_stop_periods, all_start_time, all_end_time, all_group_id, group_id='stop_point_index')
+
+    monkey_info_in_all_stop_periods = build_factor_comp_utils._take_out_info_of_all_segments(
+        monkey_info_in_all_stop_periods, all_start_time, all_end_time, all_segment_id, group_id='stop_point_index')
 
     return monkey_info_in_all_stop_periods
 
@@ -619,9 +618,9 @@ def make_monkey_info_in_all_stop_periods(closest_stop_to_capture_df, monkey_info
     if all_start_time is None:
         all_start_time = closest_stop_to_capture_df['time'].values - \
             stop_period_duration
-    all_group_id = closest_stop_to_capture_df['stop_point_index'].values
+    all_segment_id = closest_stop_to_capture_df['stop_point_index'].values
     monkey_info_in_all_stop_periods = find_monkey_info_in_all_stop_periods(
-        all_start_time, all_end_time, all_group_id, monkey_information)
+        all_start_time, all_end_time, all_segment_id, monkey_information)
     if 'stop_time' not in closest_stop_to_capture_df.columns:
         closest_stop_to_capture_df['stop_time'] = closest_stop_to_capture_df['time']
     if 'beginning_time' not in closest_stop_to_capture_df.columns:
