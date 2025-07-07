@@ -38,7 +38,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
     def __init__(self, monkey_name='monkey_Bruno',
                  raw_data_folder_path=None,
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
                  truncate_curv_of_traj_by_time_of_capture=False):
@@ -58,19 +58,19 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
                                window_for_curv_of_traj=window_for_curv_of_traj, curv_of_traj_mode=curv_of_traj_mode)
 
         self.ml_inst = ml_methods_class.MlMethods()
-        self._update_optimal_arc_type_and_related_paths(
-            optimal_arc_type=optimal_arc_type)
+        self._update_opt_arc_type_and_related_paths(
+            opt_arc_type=opt_arc_type)
 
         self.ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
-    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='opt_arc_stop_closest'):
-        self.optimal_arc_type = optimal_arc_type
+    def _update_opt_arc_type_and_related_paths(self, opt_arc_type='opt_arc_stop_closest'):
+        self.opt_arc_type = opt_arc_type
         self.planning_data_folder_path = self.raw_data_folder_path.replace(
             'raw_monkey_data', 'planning')
         self.only_cur_ff_folder_path = os.path.join(
-            self.planning_data_folder_path, f'only_cur_ff/only_cur_ff_df/{self.optimal_arc_type}')
+            self.planning_data_folder_path, f'only_cur_ff/only_cur_ff_df/{self.opt_arc_type}')
         self.x_features_folder_path = os.path.join(
-            self.planning_data_folder_path, f'only_cur_ff/x_features_df/{self.optimal_arc_type}')
+            self.planning_data_folder_path, f'only_cur_ff/x_features_df/{self.opt_arc_type}')
         os.makedirs(self.only_cur_ff_folder_path, exist_ok=True)
         os.makedirs(self.x_features_folder_path, exist_ok=True)
 
@@ -98,7 +98,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
         self.only_cur_ff_df = only_cur_ff_utils.get_only_cur_ff_df(self.closest_stop_to_capture_df, self.ff_real_position_sorted, self.ff_caught_T_new, self.monkey_information,
                                                                    self.curv_of_traj_df, self.ff_dataframe_visible, stop_period_duration=stop_period_duration,
                                                                    ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                                   optimal_arc_type=self.optimal_arc_type)
+                                                                   opt_arc_type=self.opt_arc_type)
         self.only_cur_ff_df.to_csv(df_path)
         print(f'New only_cur_ff_df was stored in {df_path}.')
 

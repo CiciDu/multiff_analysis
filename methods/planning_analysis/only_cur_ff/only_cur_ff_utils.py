@@ -4,7 +4,7 @@ from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, build_factor_comp_utils, build_factor_comp
 from data_wrangling import specific_utils
-from null_behaviors import curvature_utils, curv_of_traj_utils, optimal_arc_utils
+from null_behaviors import curvature_utils, curv_of_traj_utils, opt_arc_utils
 import numpy as np
 import pandas as pd
 import math
@@ -20,7 +20,7 @@ import math
 # try replacing ff_dataframe_visible with ff_info_at_start_df
 def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_new, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
                        ref_point_mode='distance', ref_point_value=-150,
-                       optimal_arc_type='opt_arc_stop_closest'):
+                       opt_arc_type='opt_arc_stop_closest'):
 
     if ref_point_mode == 'time after cur ff visible':
         drop_na = True
@@ -42,17 +42,17 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
         monkey_information, ff_info2)
 
     opt_arc_stop_first_vis_bdry = True if (
-        optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
+        opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
     curv_df = curvature_utils.make_curvature_df(ff_info2, curv_of_traj_df, clean=False, monkey_information=monkey_information,
                                                 opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
 
-    if optimal_arc_type == 'opt_arc_stop_closest':
-        curv_df = optimal_arc_utils.update_curvature_df_to_let_optimal_arc_stop_at_closest_point_to_monkey_stop(curv_df, ff_info2, ff_info,
-                                                                                                                ff_real_position_sorted, monkey_information)
+    if opt_arc_type == 'opt_arc_stop_closest':
+        curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curv_df, ff_info2, ff_info,
+                                                                                                        ff_real_position_sorted, monkey_information)
 
     # use merge to add curvature_info
-    shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'optimal_arc_measure', 'optimal_arc_radius', 'optimal_arc_end_direction', 'curv_to_ff_center',
-                      'arc_radius_to_ff_center', 'd_heading_to_center', 'optimal_arc_d_heading', 'optimal_arc_end_x', 'optimal_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
+    shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction', 'curv_to_ff_center',
+                      'arc_radius_to_ff_center', 'd_heading_to_center', 'opt_arc_d_heading', 'opt_arc_end_x', 'opt_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
     only_cur_ff_df = ff_info2.merge(curv_df[shared_columns], on=[
                                     'ff_index', 'point_index'], how='left')
     only_cur_ff_df = only_cur_ff_df.merge(
@@ -63,7 +63,7 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
     only_cur_ff_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
         only_cur_ff_df['d_heading_of_traj'].values)
     only_cur_ff_df[['cur_d_heading_of_arc', 'd_heading_of_traj']
-                   ] = only_cur_ff_df[['optimal_arc_d_heading', 'd_heading_of_traj']]
+                   ] = only_cur_ff_df[['opt_arc_d_heading', 'd_heading_of_traj']]
     only_cur_ff_df[['cur_d_heading_of_arc', 'd_heading_of_traj']] = only_cur_ff_df[[
         'cur_d_heading_of_arc', 'd_heading_of_traj']]*180/math.pi
     only_cur_ff_df['ref_time'] = monkey_information.loc[only_cur_ff_df['point_index'].values, 'time'].values

@@ -69,7 +69,7 @@ class _CompareYValues:
 
         self.overall_median_info.reset_index(drop=True, inplace=True)
         self.overall_median_info['monkey_name'] = self.monkey_name
-        self.overall_median_info['optimal_arc_type'] = self.optimal_arc_type
+        self.overall_median_info['opt_arc_type'] = self.opt_arc_type
         self.overall_median_info.to_csv(self.overall_median_info_path)
         print(
             f'Saved overall_median_info_path to {self.overall_median_info_path}')
@@ -96,7 +96,7 @@ class _CompareYValues:
             print('Stored new all_perc_info in ', self.all_perc_info_path)
 
         self.all_perc_info['monkey_name'] = self.monkey_name
-        self.all_perc_info['optimal_arc_type'] = self.optimal_arc_type
+        self.all_perc_info['opt_arc_type'] = self.opt_arc_type
 
         if process_info_for_plotting:
             self.process_all_perc_info_to_plot_direction()

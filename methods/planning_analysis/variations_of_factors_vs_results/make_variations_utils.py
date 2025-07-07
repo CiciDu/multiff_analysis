@@ -410,15 +410,15 @@ def make_combd_only_cur_ff_path(monkey_name):
     return combd_only_cur_ff_path
 
 
-def combine_overall_median_info_across_monkeys_and_optimal_arc_types(overall_median_info_exists_ok=True,
-                                                                     all_median_info_exists_ok=True):
+def combine_overall_median_info_across_monkeys_and_opt_arc_types(overall_median_info_exists_ok=True,
+                                                                 all_median_info_exists_ok=True):
     overall_median_info = pd.DataFrame([])
     for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
-        for optimal_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
+        for opt_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
             # suppress printed output
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                         optimal_arc_type=optimal_arc_type)
+                                                                         opt_arc_type=opt_arc_type)
                 temp_overall_median_info = ps.make_or_retrieve_overall_median_info(exists_ok=overall_median_info_exists_ok,
                                                                                    all_median_info_exists_ok=all_median_info_exists_ok,
                                                                                    process_info_for_plotting=False
@@ -432,11 +432,11 @@ def combine_overall_median_info_across_monkeys_and_optimal_arc_types(overall_med
 def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):
     all_perc_info = pd.DataFrame([])
     curv_traj_window_before_stop = [-50, 0]
-    optimal_arc_type = 'norm_opt_arc'
+    opt_arc_type = 'norm_opt_arc'
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
         with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
             ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                     optimal_arc_type=optimal_arc_type
+                                                                     opt_arc_type=opt_arc_type
                                                                      )
             temp_all_perc_info = ps.make_or_retrieve_all_perc_info(exists_ok=all_perc_info_exists_ok,
                                                                    process_info_for_plotting=False)

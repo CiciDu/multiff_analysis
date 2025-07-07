@@ -1,5 +1,5 @@
 import sys
-from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, optimal_arc_utils
+from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, opt_arc_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_class
 from visualization.matplotlib_tools import monkey_heading_functions
@@ -13,12 +13,12 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def __init__(self,
                  raw_data_folder_path=None,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  ):
         super().__init__()
 
         self._init_empty_vars()
-        self.update_optimal_arc_type(optimal_arc_type=optimal_arc_type)
+        self.update_opt_arc_type(opt_arc_type=opt_arc_type)
 
         self.overall_params = {
             **copy.deepcopy(self.default_overall_params),
@@ -36,9 +36,9 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         else:
             self.monkey_information = None
 
-    def update_optimal_arc_type(self, optimal_arc_type='opt_arc_stop_closest'):
+    def update_opt_arc_type(self, opt_arc_type='opt_arc_stop_closest'):
         # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-        super()._update_optimal_arc_type_and_related_paths(optimal_arc_type)
+        super()._update_opt_arc_type_and_related_paths(opt_arc_type)
 
     def streamline_organizing_info(self,
                                    # ref_point_mode can be 'time', 'distance', or 'time after cur ff visible'
@@ -450,7 +450,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             **self.curv_of_traj_params)
 
         opt_arc_stop_first_vis_bdry = True if (
-            self.optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
+            self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
 
         self.nxt_curv_df = curvature_utils.make_curvature_df(self.nxt_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information,
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
@@ -459,13 +459,13 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
                                                              invalid_curvature_ok=False, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
 
-        if self.optimal_arc_type == 'opt_arc_stop_closest':
-            self.cur_curv_df = optimal_arc_utils.update_curvature_df_to_let_optimal_arc_stop_at_closest_point_to_monkey_stop(self.cur_curv_df, self.cur_ff_df_modified, self.stops_near_ff_df_modified,
-                                                                                                                             self.ff_real_position_sorted, self.monkey_information)
+        if self.opt_arc_type == 'opt_arc_stop_closest':
+            self.cur_curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(self.cur_curv_df, self.cur_ff_df_modified, self.stops_near_ff_df_modified,
+                                                                                                                     self.ff_real_position_sorted, self.monkey_information)
 
         # use merge to add curvature_info
-        shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'optimal_arc_measure', 'optimal_arc_radius', 'optimal_arc_end_direction', 'curv_of_traj', 'curv_to_ff_center',
-                          'arc_radius_to_ff_center', 'd_heading_to_center', 'optimal_arc_d_heading', 'optimal_arc_end_x', 'optimal_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
+        shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction', 'curv_of_traj', 'curv_to_ff_center',
+                          'arc_radius_to_ff_center', 'd_heading_to_center', 'opt_arc_d_heading', 'opt_arc_end_x', 'opt_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
         self.nxt_ff_final_df = self.nxt_ff_df_modified.merge(
             self.nxt_curv_df[shared_columns], on=['ff_index', 'point_index'], how='left')
         self.cur_ff_final_df = self.cur_ff_df_modified.merge(
@@ -481,25 +481,25 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
             self.cur_ff_final_df[['arc_end_x', 'arc_end_y']] = self.cur_ff_final_df[[
                 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']]
         else:
-            self.nxt_ff_final_df['d_heading_of_arc'] = self.nxt_ff_final_df['optimal_arc_d_heading']
-            self.cur_ff_final_df['d_heading_of_arc'] = self.cur_ff_final_df['optimal_arc_d_heading']
+            self.nxt_ff_final_df['d_heading_of_arc'] = self.nxt_ff_final_df['opt_arc_d_heading']
+            self.cur_ff_final_df['d_heading_of_arc'] = self.cur_ff_final_df['opt_arc_d_heading']
             self.nxt_ff_final_df[['arc_end_x', 'arc_end_y']] = self.nxt_ff_final_df[[
-                'optimal_arc_end_x', 'optimal_arc_end_y']]
+                'opt_arc_end_x', 'opt_arc_end_y']]
             self.cur_ff_final_df[['arc_end_x', 'arc_end_y']] = self.cur_ff_final_df[[
-                'optimal_arc_end_x', 'optimal_arc_end_y']]
+                'opt_arc_end_x', 'opt_arc_end_y']]
 
-        self.nxt_ff_final_df = self.nxt_ff_final_df.merge(
-            self.stops_near_ff_df[['stop_point_index', 'monkey_angle_before_stop']], how='left')
-        self.nxt_ff_final_df['d_heading_of_traj'] = self.nxt_ff_final_df['monkey_angle_before_stop'] - \
-            self.nxt_ff_final_df['monkey_angle']
-        self.nxt_ff_final_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
-            self.nxt_ff_final_df['d_heading_of_traj'].values)
-        self.cur_ff_final_df = self.cur_ff_final_df.merge(
-            self.stops_near_ff_df[['stop_point_index', 'monkey_angle_before_stop']], how='left')
-        self.cur_ff_final_df['d_heading_of_traj'] = self.cur_ff_final_df['monkey_angle_before_stop'] - \
-            self.cur_ff_final_df['monkey_angle']
-        self.cur_ff_final_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
-            self.cur_ff_final_df['d_heading_of_traj'].values)
+        self.nxt_ff_final_df = self.add_d_heading_of_traj_to_df(
+            self.nxt_ff_final_df)
+        self.cur_ff_final_df = self.add_d_heading_of_traj_to_df(
+            self.cur_ff_final_df)
+
+    def add_d_heading_of_traj_to_df(self, df):
+        df = df.merge(self.stops_near_ff_df[[
+                      'stop_point_index', 'monkey_angle_before_stop']], on='stop_point_index', how='left')
+        df['d_heading_of_traj'] = df['monkey_angle_before_stop'] - df['monkey_angle']
+        df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+            df['d_heading_of_traj'].values)
+        return df
 
     def _take_out_info_counted(self):
         # before eliminating outliers, the counted rows are just the same as the original ones

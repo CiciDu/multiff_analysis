@@ -145,8 +145,8 @@ def combine_relevant_features(x_features_df, only_cur_ff_df, plan_x_df, plan_y_d
 
 
 columns_to_keep_from_only_cur_ff_df = ['optimal_curvature',
-                                       'optimal_arc_measure',
-                                       'optimal_arc_d_heading',
+                                       'opt_arc_measure',
+                                       'opt_arc_d_heading',
                                        'curv_to_ff_center',
                                        # 'd_heading_to_center', # this is perfectly correlated with cur_ff_angle_at_ref
                                        # 'diff_in_d_heading_to_cur_ff',

@@ -18,9 +18,9 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
     def __init__(self, raw_data_folder_path=None, curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  ):
-        super().__init__(optimal_arc_type=optimal_arc_type,
+        super().__init__(opt_arc_type=opt_arc_type,
                          raw_data_folder_path=None)
 
         self.curv_of_traj_mode = curv_of_traj_mode
@@ -37,13 +37,13 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         if not hasattr(self, 'test_inst'):
             self.test_inst = plan_factors_helper_class.PlanFactorsHelpClass(
                 'test', self.raw_data_folder_path,
-                optimal_arc_type=self.optimal_arc_type,
+                opt_arc_type=self.opt_arc_type,
                 curv_of_traj_mode=self.curv_of_traj_mode,
                 window_for_curv_of_traj=self.window_for_curv_of_traj)
         if not hasattr(self, 'ctrl_inst'):
             self.ctrl_inst = plan_factors_helper_class.PlanFactorsHelpClass(
                 'control', self.raw_data_folder_path,
-                optimal_arc_type=self.optimal_arc_type,
+                opt_arc_type=self.opt_arc_type,
                 curv_of_traj_mode=self.curv_of_traj_mode,
                 window_for_curv_of_traj=self.window_for_curv_of_traj)
 

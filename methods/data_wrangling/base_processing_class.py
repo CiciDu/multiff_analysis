@@ -319,10 +319,10 @@ class BaseProcessing:
             self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted,
                                     self.ff_real_position_sorted, self.ff_believed_position_sorted, None, self.ff_caught_T_new)
 
-    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='opt_arc_stop_closest'):
+    def _update_opt_arc_type_and_related_paths(self, opt_arc_type='opt_arc_stop_closest'):
         # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-        self.optimal_arc_type = optimal_arc_type
-        self.heading_info_partial_path = f'heading_info_df/{optimal_arc_type}'
-        self.diff_in_curv_partial_path = f'diff_in_curv_df/{optimal_arc_type}'
-        self.plan_x_partial_path = f'plan_x_df/{optimal_arc_type}'
-        self.plan_y_partial_path = f'plan_y_df/{optimal_arc_type}'
+        self.opt_arc_type = opt_arc_type
+        self.heading_info_partial_path = f'heading_info_df/{opt_arc_type}'
+        self.diff_in_curv_partial_path = f'diff_in_curv_df/{opt_arc_type}'
+        self.plan_x_partial_path = f'plan_x_df/{opt_arc_type}'
+        self.plan_y_partial_path = f'plan_y_df/{opt_arc_type}'

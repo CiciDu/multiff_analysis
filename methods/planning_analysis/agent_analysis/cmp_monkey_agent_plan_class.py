@@ -16,7 +16,7 @@ class CompareMonkeyAgentPlan(_variations_base_class._VariationsBase):
             model_folder_name=self.model_folder_name)
 
     def get_monkey_and_agent_overall_median_info(self):
-        self.monkey_overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_optimal_arc_types()
+        self.monkey_overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_opt_arc_types()
         self.agent_overall_median_info = self.pfas.make_or_retrieve_overall_median_info(
             process_info_for_plotting=False)
 

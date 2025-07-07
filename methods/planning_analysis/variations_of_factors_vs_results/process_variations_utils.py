@@ -41,7 +41,7 @@ all_x_vars_of_interest = ['test_or_control',
                           'dw_cost_factor',
                           'w_cost_factor',
                           'monkey_name',
-                          'optimal_arc_type',
+                          'opt_arc_type',
                           'curv_traj_window_before_stop',
                           ]
 

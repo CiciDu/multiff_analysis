@@ -88,8 +88,8 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                     'curv_Q3',
                     'curv_max']
 
-    def __init__(self, optimal_arc_type='opt_arc_stop_closest'):
-        self.optimal_arc_type = optimal_arc_type
+    def __init__(self, opt_arc_type='opt_arc_stop_closest'):
+        self.opt_arc_type = opt_arc_type
 
         # # Bind methods from _PredictYValues
         # for name, method in _predict_y_values_class._PredictYValues.__dict__.items():
@@ -110,17 +110,17 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         self.cur_and_nxt_data_comparison_path = os.path.join(
             self.combd_cur_and_nxt_folder_path, 'data_comparison')
         self.all_perc_info_path = os.path.join(
-            self.cur_and_nxt_data_comparison_path, f'{self.optimal_arc_type}/all_perc_info.csv')
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/all_perc_info.csv')
         self.all_median_info_folder_path = os.path.join(
-            self.cur_and_nxt_data_comparison_path, f'{self.optimal_arc_type}/all_median_info')
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/all_median_info')
         self.overall_median_info_path = os.path.join(
-            self.cur_and_nxt_data_comparison_path, f'{self.optimal_arc_type}/overall_median_info.csv')
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/overall_median_info.csv')
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
 
         self.cur_and_nxt_lr_df_path = os.path.join(
-            self.combd_cur_and_nxt_folder_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_cur_and_nxt_lr_df.csv')
+            self.combd_cur_and_nxt_folder_path, f'ml_results/lr_variations/{self.opt_arc_type}/all_cur_and_nxt_lr_df.csv')
         self.cur_and_nxt_lr_pred_ff_df_path = os.path.join(
-            self.combd_cur_and_nxt_folder_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_cur_and_nxt_lr_pred_ff_df.csv')
+            self.combd_cur_and_nxt_folder_path, f'ml_results/lr_variations/{self.opt_arc_type}/all_cur_and_nxt_lr_pred_ff_df.csv')
         os.makedirs(os.path.dirname(
             self.cur_and_nxt_lr_df_path), exist_ok=True)
         os.makedirs(os.path.dirname(
@@ -132,7 +132,7 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                                                               -50, 0],
                                                           heading_info_df_exists_ok=True, combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, save_data=True):
         self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name,
-                                                   optimal_arc_type=self.optimal_arc_type)
+                                                   opt_arc_type=self.opt_arc_type)
         self.test_heading_info_df, self.ctrl_heading_info_df = self.sp.make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(ref_point_mode, ref_point_value,
                                                                                                                                                curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                                                                                combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,

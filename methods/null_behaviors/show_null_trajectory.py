@@ -6,7 +6,7 @@ import sys
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
 from visualization.animation import animation_func, animation_utils
-from null_behaviors import find_best_arc, curvature_utils, optimal_arc_utils
+from null_behaviors import find_best_arc, curvature_utils, opt_arc_utils
 from pattern_discovery import ff_dataframe_utils
 
 import os
@@ -112,16 +112,16 @@ def find_arc_length_and_radius(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ver
     return ff_xy, ff_distance, ff_angle, ff_angle_boundary, arc_length, arc_radius
 
 
-def find_and_package_optimal_arc_info_for_plotting(best_arc_df, monkey_information=None, column_for_color=None, mode='cartesian',
-                                                   ignore_error=False):
-    arc_radius = best_arc_df.optimal_arc_radius.values
-    arc_end_direction = best_arc_df.optimal_arc_end_direction.values
+def find_and_package_opt_arc_info_for_plotting(best_arc_df, monkey_information=None, column_for_color=None, mode='cartesian',
+                                               ignore_error=False):
+    arc_radius = best_arc_df.opt_arc_radius.values
+    arc_end_direction = best_arc_df.opt_arc_end_direction.values
     arc_point_index = best_arc_df.point_index.values
-    arc_measure = best_arc_df.optimal_arc_measure.values
+    arc_measure = best_arc_df.opt_arc_measure.values
     arc_ff_index = best_arc_df.ff_index.values
     # Note, here arc_ff_xy is replaced by arc ending xy, which produces the same result if the normal optimal arc is used;
     # but if opt_arc_stop_closest was True (optimal arc stop at closest point to monkey stop), then arc ending xy has to be used to mimic a new ff center
-    arc_end_xy = best_arc_df[['optimal_arc_end_x', 'optimal_arc_end_y']].values
+    arc_end_xy = best_arc_df[['opt_arc_end_x', 'opt_arc_end_y']].values
     ff_distance = best_arc_df.ff_distance.values
     ff_angle = best_arc_df.ff_angle.values
     # arc_ff_xy = ff_real_position_sorted[arc_ff_index] # the same arc ff xy can be used to calculate arc center and angle for both optimal arc and arc to ff center
@@ -134,9 +134,9 @@ def find_and_package_optimal_arc_info_for_plotting(best_arc_df, monkey_informati
             'monkey_x', 'monkey_y']].values
         monkey_angle = monkey_information.loc[arc_point_index,
                                               'monkey_angle'].values
-        center_x, center_y, arc_starting_angle, arc_ending_angle = optimal_arc_utils.find_cartesian_arc_center_and_angle_for_optimal_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
-                                                                                                                                                    arc_end_direction, whether_ff_behind=whether_ff_behind,
-                                                                                                                                                    ignore_error=ignore_error)
+        center_x, center_y, arc_starting_angle, arc_ending_angle = opt_arc_utils.find_cartesian_arc_center_and_angle_for_opt_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
+                                                                                                                                            arc_end_direction, whether_ff_behind=whether_ff_behind,
+                                                                                                                                            ignore_error=ignore_error)
     elif mode == 'polar':
         center_x, center_y, arc_starting_angle, arc_ending_angle = curvature_utils.find_polar_arc_center_and_angle(
             arc_radius, arc_measure, arc_end_direction)

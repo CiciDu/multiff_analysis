@@ -19,11 +19,11 @@ class _PlotStopsNearFF(find_stops_near_ff_class._FindStopsNearFF):
 
     def __init__(self,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  ):
         super().__init__()
-        self._update_optimal_arc_type_and_related_paths(
-            optimal_arc_type=optimal_arc_type)
+        self._update_opt_arc_type_and_related_paths(
+            opt_arc_type=opt_arc_type)
         self.default_monkey_plot_params = plotly_plot_class.PlotlyPlotter.default_monkey_plot_params
 
     def prepare_to_plot_stops_near_ff(self, use_fixed_arc_length=False, fixed_arc_length=None):

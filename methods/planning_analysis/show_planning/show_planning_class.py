@@ -54,7 +54,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def __init__(self, monkey_name='monkey_Bruno',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  test_or_control='test',
                  raw_data_folder_path=None):
         super().__init__()
@@ -68,29 +68,29 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             self.load_raw_data(
                 raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=None)
 
-        self.update_optimal_arc_type(optimal_arc_type=optimal_arc_type)
+        self.update_opt_arc_type(opt_arc_type=opt_arc_type)
 
-    def update_optimal_arc_type(self, optimal_arc_type='opt_arc_stop_closest'):
+    def update_opt_arc_type(self, opt_arc_type='opt_arc_stop_closest'):
         # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-        super()._update_optimal_arc_type_and_related_paths(
-            optimal_arc_type=optimal_arc_type)
+        super()._update_opt_arc_type_and_related_paths(
+            opt_arc_type=opt_arc_type)
         self.combd_cur_and_nxt_folder_path = make_variations_utils.make_combd_cur_and_nxt_folder_path(
             self.monkey_name)
         self.get_combd_info_folder_paths()
 
     def get_combd_info_folder_paths(self):
 
-        self.dict_of_combd_heading_info_folder_path = {'test': self.combd_cur_and_nxt_folder_path + f'/data/combd_heading_info/{self.optimal_arc_type}/test',
-                                                       'control': self.combd_cur_and_nxt_folder_path + f'/data/combd_heading_info/{self.optimal_arc_type}/control/'}
+        self.dict_of_combd_heading_info_folder_path = {'test': self.combd_cur_and_nxt_folder_path + f'/data/combd_heading_info/{self.opt_arc_type}/test',
+                                                       'control': self.combd_cur_and_nxt_folder_path + f'/data/combd_heading_info/{self.opt_arc_type}/control/'}
 
-        self.dict_of_combd_diff_in_curv_folder_path = {'test': self.combd_cur_and_nxt_folder_path + f'/data/combd_diff_in_curv/{self.optimal_arc_type}/test',
-                                                       'control': self.combd_cur_and_nxt_folder_path + f'/data/combd_diff_in_curv/{self.optimal_arc_type}/control'}
+        self.dict_of_combd_diff_in_curv_folder_path = {'test': self.combd_cur_and_nxt_folder_path + f'/data/combd_diff_in_curv/{self.opt_arc_type}/test',
+                                                       'control': self.combd_cur_and_nxt_folder_path + f'/data/combd_diff_in_curv/{self.opt_arc_type}/control'}
 
         self.combd_plan_x_tc_folder_path = self.combd_cur_and_nxt_folder_path + \
-            f'/data/combd_plan_x_tc/{self.optimal_arc_type}'
+            f'/data/combd_plan_x_tc/{self.opt_arc_type}'
 
         self.combd_plan_y_tc_folder_path = self.combd_cur_and_nxt_folder_path + \
-            f'/data/combd_plan_y_tc/{self.optimal_arc_type}'
+            f'/data/combd_plan_y_tc/{self.opt_arc_type}'
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
                                              curv_traj_window_before_stop=[
@@ -307,7 +307,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                 raise FileNotFoundError(
                     'Force the creation of heading_info_df')
             self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(
-                raw_data_folder_path=None, optimal_arc_type=self.optimal_arc_type)
+                raw_data_folder_path=None, opt_arc_type=self.opt_arc_type)
 
             self.snf.extract_info_from_raw_data_folder_path(
                 raw_data_folder_path)
@@ -317,7 +317,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         except FileNotFoundError:
             print('Making new heading_info_df ...')
             self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(
-                raw_data_folder_path=raw_data_folder_path, optimal_arc_type=self.optimal_arc_type)
+                raw_data_folder_path=raw_data_folder_path, opt_arc_type=self.opt_arc_type)
 
             self.snf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode,
                                                                ref_point_value=ref_point_value, curv_traj_window_before_stop=curv_traj_window_before_stop,

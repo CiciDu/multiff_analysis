@@ -575,12 +575,12 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 np.array([self.nxt_ff_index]), len(all_point_index)), self.monkey_information, self.ff_real_position_sorted, verbose=False)
         else:
             opt_arc_stop_first_vis_bdry = True if (
-                self.optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
+                self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
             self.cur_ff_best_arc_df = plotly_for_null_arcs.find_best_arc_df_for_ff_in_duration([self.cur_ff_index], duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
                                                                                                opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
-            self.cur_null_arc_info_for_duration = show_null_trajectory.find_and_package_optimal_arc_info_for_plotting(
+            self.cur_null_arc_info_for_duration = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
                 self.cur_ff_best_arc_df, self.monkey_information)
             self.nxt_ff_best_arc_df = plotly_for_null_arcs.find_best_arc_df_for_ff_in_duration([self.nxt_ff_index], duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
                                                                                                opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
-            self.nxt_null_arc_info_for_duration = show_null_trajectory.find_and_package_optimal_arc_info_for_plotting(
+            self.nxt_null_arc_info_for_duration = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
                 self.nxt_ff_best_arc_df, self.monkey_information)

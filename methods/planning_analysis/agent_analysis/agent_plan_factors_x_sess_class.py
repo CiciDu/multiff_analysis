@@ -20,13 +20,13 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
     def __init__(self,
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  num_steps_per_dataset=100000,
                  ):
 
-        super().__init__(optimal_arc_type=optimal_arc_type)
+        super().__init__(opt_arc_type=opt_arc_type)
         self.model_folder_name = model_folder_name
-        self.optimal_arc_type = optimal_arc_type
+        self.opt_arc_type = opt_arc_type
         self.num_steps_per_dataset = num_steps_per_dataset
         rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name)
@@ -64,7 +64,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
             print('data_name:', data_name)
             self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=model_folder_name,
                                                                    data_name=data_name,
-                                                                   optimal_arc_type=self.optimal_arc_type,
+                                                                   opt_arc_type=self.opt_arc_type,
                                                                    )
 
             # check to see if data exists:
@@ -158,7 +158,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                 print('data_name:', data_name)
                 self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=self.model_folder_name,
                                                                        data_name=data_name,
-                                                                       optimal_arc_type=self.optimal_arc_type,
+                                                                       opt_arc_type=self.opt_arc_type,
                                                                        )
                 print(' ')
                 print('Getting plan x and plan y data ......')
@@ -209,7 +209,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
             print('data_name:', data_name)
             self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=self.model_folder_name,
                                                                    data_name=data_name,
-                                                                   optimal_arc_type=self.optimal_arc_type,
+                                                                   opt_arc_type=self.opt_arc_type,
                                                                    )
             print(' ')
             print('Getting test heading info control heading info ......')

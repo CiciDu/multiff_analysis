@@ -35,10 +35,10 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
     def __init__(self,
                  monkey_name='monkey_Bruno',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  ):
 
-        super().__init__(optimal_arc_type=optimal_arc_type)
+        super().__init__(opt_arc_type=opt_arc_type)
         self.monkey_name = monkey_name
         self.sessions_df = None
         self.sessions_df_for_one_monkey = None
@@ -150,7 +150,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                     print(e)
                     print('Will recreate the plan_x and plan_y data for this session')
                     self.pf = plan_factors_class.PlanFactors(raw_data_folder_path=raw_data_folder_path,
-                                                             optimal_arc_type=self.optimal_arc_type,
+                                                             opt_arc_type=self.opt_arc_type,
                                                              curv_of_traj_mode=self.curv_of_traj_mode, window_for_curv_of_traj=self.window_for_curv_of_traj)
                     gc.collect()
                     self.pf.make_plan_x_and_y_for_both_test_and_ctrl(plan_x_exists_ok=plan_x_exists_ok, plan_y_exists_ok=plan_y_exists_ok,
@@ -183,7 +183,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                                                         exists_ok=True, save_data=True):
 
         self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name,
-                                                   optimal_arc_type=self.optimal_arc_type,
+                                                   opt_arc_type=self.opt_arc_type,
                                                    )
         self.combd_heading_df_x_sessions_test, self.combd_heading_df_x_sessions_ctrl = self.sp.make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(ref_point_mode, ref_point_value,
                                                                                                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
@@ -201,8 +201,8 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.sessions_df_for_one_monkey.loc[self.sessions_df_for_one_monkey['data_name']
                                             == data_name, 'finished'] = True
 
-    def combine_overall_median_info_across_monkeys_and_optimal_arc_types(self):
-        self.overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_optimal_arc_types()
+    def combine_overall_median_info_across_monkeys_and_opt_arc_types(self):
+        self.overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_opt_arc_types()
         self.process_overall_median_info_to_plot_heading_and_curv()
         return self.overall_median_info
 

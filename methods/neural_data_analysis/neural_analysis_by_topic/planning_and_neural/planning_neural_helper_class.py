@@ -65,7 +65,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             return self.both_ff_across_time_df
 
         self._get_point_index_based_on_some_time_before_stop(
-                n_seconds_before_stop=n_seconds_before_stop)
+            n_seconds_before_stop=n_seconds_before_stop)
         all_info_to_add = pd.DataFrame([])
         for i, row in self.stops_near_ff_df.iterrows():
             if i % 10 == 0:
@@ -81,12 +81,15 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                 [all_info_to_add, info_to_add], axis=0)
         all_info_to_add['time'] = self.monkey_information.loc[all_info_to_add['point_index'].values, 'time'].values
         all_info_to_add['stop_time'] = self.monkey_information.loc[all_info_to_add['stop_point_index'].values, 'time'].values
-        all_info_to_add['time_rel_to_stop'] = all_info_to_add['time'] - all_info_to_add['stop_time']
-        all_info_to_add = all_info_to_add.merge(self.curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
-        all_info_to_add.rename(columns={'curv_of_traj': 'traj_curv'}, inplace=True)  
-              
+        all_info_to_add['time_rel_to_stop'] = all_info_to_add['time'] - \
+            all_info_to_add['stop_time']
+        all_info_to_add = all_info_to_add.merge(
+            self.curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
+        all_info_to_add.rename(
+            columns={'curv_of_traj': 'traj_curv'}, inplace=True)
+
         self._find_ff_info(all_info_to_add)
-        
+
         print(all_info_to_add.columns)
 
         columns_to_keep = []
@@ -94,21 +97,23 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             all_info_to_add, columns_added = self._add_ff_info_to_df(
                 all_info_to_add, which_ff_info)
             columns_to_keep.extend(columns_added)
-        columns_to_keep.extend(['stop_point_index', 'point_index', 'traj_curv'])
+        columns_to_keep.extend(
+            ['stop_point_index', 'point_index', 'traj_curv'])
         self.both_ff_across_time_df = all_info_to_add[columns_to_keep].copy()
 
         self._add_rel_x_and_y_to_both_ff_across_time_df()
-        
+
         # merge to get 'target_index', and 'segment'
-        self.both_ff_across_time_df[['target_index', 'segment']] = all_info_to_add[['target_index', 'segment']].values
+        self.both_ff_across_time_df[['target_index', 'segment']] = all_info_to_add[[
+            'target_index', 'segment']].values
 
         self.both_ff_across_time_df.reset_index(drop=True, inplace=True)
-        
+
         if save_data:
             self.both_ff_across_time_df.to_csv(df_path, index=False)
 
         return self.both_ff_across_time_df
-    
+
     def retrieve_neural_data(self):
         base_neural_class.NeuralBaseClass.retrieve_neural_data(
             self)
@@ -130,7 +135,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             exists_ok=both_ff_across_time_df_exists_ok)
 
         # self.both_ff_when_seen_df = self.get_both_ff_when_seen_df()
-        self.all_planning_info = self.bin_info[['point_index', 'bin']].merge(self.both_ff_across_time_df, on='point_index', how='left')
+        self.all_planning_info = self.bin_info[['point_index', 'bin']].merge(
+            self.both_ff_across_time_df, on='point_index', how='left')
 
         self._check_for_duplicate_bins()
 
@@ -154,18 +160,16 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             self.both_ff_across_time_df['nxt_ff_rel_x'] = rel_x
             self.both_ff_across_time_df['nxt_ff_rel_y'] = rel_y
 
-
     def _get_point_index_based_on_some_time_before_stop(self, n_seconds_before_stop=2):
         self.stops_near_ff_df['some_time_before_stop'] = self.stops_near_ff_df['stop_time'] - \
             n_seconds_before_stop
         self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(
             self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values)
 
-
     def _add_ff_info_to_df(self, df, which_ff_info):
         ff_df = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
         ff_df2 = ff_df.copy()
-        
+
         ff_df = ff_df[ff_df['ff_angle'].between(-np.pi/4, np.pi/4)].copy()
 
         self.curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
@@ -175,12 +179,14 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         # self.curv_df['point_index'] = self.curv_df.index
         df, columns_added = planning_neural_utils.add_curv_info(
             df, self.curv_df, which_ff_info)
-        
+
         ff_df2.rename(columns={'ff_index': f'{which_ff_info}ff_index',
-                              'ff_angle': f'{which_ff_info}ff_angle',
-                              'ff_distance': f'{which_ff_info}ff_distance'}, inplace=True)
-        df = df.merge(ff_df2[['point_index', f'{which_ff_info}ff_index', f'{which_ff_info}ff_angle', f'{which_ff_info}ff_distance']], on=['point_index', f'{which_ff_info}ff_index'], how='left')
-        columns_added.extend([f'{which_ff_info}ff_angle', f'{which_ff_info}ff_distance'])
+                               'ff_angle': f'{which_ff_info}ff_angle',
+                               'ff_distance': f'{which_ff_info}ff_distance'}, inplace=True)
+        df = df.merge(ff_df2[['point_index', f'{which_ff_info}ff_index', f'{which_ff_info}ff_angle', f'{which_ff_info}ff_distance']], on=[
+                      'point_index', f'{which_ff_info}ff_index'], how='left')
+        columns_added.extend(
+            [f'{which_ff_info}ff_angle', f'{which_ff_info}ff_distance'])
         return df, columns_added
 
     def _get_info_to_add(self, row):
@@ -205,10 +211,12 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             self.monkey_information,
             self.ff_real_position_sorted)
         # self._deal_with_rows_with_big_ff_angles(remove_i_o_modify_rows_with_big_ff_angles=True, delete_the_same_rows=True)
-        
-        self.nxt_ff_df2[['stop_point_index', 'time', 'stop_time']] = info_to_add[['stop_point_index', 'time', 'stop_time']].values
-        self.cur_ff_df2[['stop_point_index', 'time', 'stop_time']] = info_to_add[['stop_point_index', 'time', 'stop_time']].values
-        
+
+        self.nxt_ff_df2[['stop_point_index', 'time', 'stop_time']] = info_to_add[[
+            'stop_point_index', 'time', 'stop_time']].values
+        self.cur_ff_df2[['stop_point_index', 'time', 'stop_time']] = info_to_add[[
+            'stop_point_index', 'time', 'stop_time']].values
+
         return info_to_add
 
     def _check_for_duplicate_bins(self):
@@ -223,7 +231,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     #     self.both_ff_when_seen_df[f'{which_ff_info}ff_distance_{when_which_ff}_{first_or_last}_seen'] = curv_df['ff_distance']
     #     # self.both_ff_when_seen_df[f'{which_ff_info}arc_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_to_ff_center']
     #     # self.both_ff_when_seen_df[f'{which_ff_info}opt_arc_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['optimal_curvature']
-    #     # self.both_ff_when_seen_df[f'{which_ff_info}opt_arc_dheading_{when_which_ff}_{first_or_last}_seen'] = curv_df['optimal_arc_d_heading']
+    #     # self.both_ff_when_seen_df[f'{which_ff_info}opt_arc_dheading_{when_which_ff}_{first_or_last}_seen'] = curv_df['opt_arc_d_heading']
     #     self.both_ff_when_seen_df[f'time_{when_which_ff}_{first_or_last}_seen_rel_to_stop'] = ff_df[f'time_ff_{first_or_last}_seen'].values - ff_df['stop_time'].values
     #     self.both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_of_traj']
 
@@ -259,7 +267,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                         ff_df_modified = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
 
                     opt_arc_stop_first_vis_bdry = True if (
-                        self.optimal_arc_type == 'opt_arc_stop_first_vis_bdry') else False
+                        self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
 
                     curv_df = curvature_utils.make_curvature_df(ff_df_modified, self.curv_of_traj_df, clean=False,
                                                                 monkey_information=self.monkey_information,

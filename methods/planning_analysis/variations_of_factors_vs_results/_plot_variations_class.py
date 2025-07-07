@@ -64,7 +64,7 @@ class _PlotVariations:
 
     def plot_heading_in_overall_median_info_across_monkeys_and_arc_types(self,
                                                                          x_var_column_list=[
-                                                                             'optimal_arc_type'],
+                                                                             'opt_arc_type'],
                                                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                                        'key_for_split': 'ff_seen',
                                                                                                        'whether_even_out_dist': False,
@@ -86,7 +86,7 @@ class _PlotVariations:
 
     def plot_curv_in_overall_median_info_across_monkeys_and_arc_types(self,
                                                                       x_var_column_list=[
-                                                                          'optimal_arc_type'],
+                                                                          'opt_arc_type'],
                                                                       fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                                     'key_for_split': 'ff_seen',
                                                                                                     'whether_even_out_dist': False,

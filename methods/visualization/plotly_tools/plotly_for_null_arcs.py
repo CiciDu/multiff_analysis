@@ -34,7 +34,7 @@ np.set_printoptions(suppress=True)
 def find_best_arc_df_for_ff_in_duration(ff_indices, duration, curv_of_traj_df, monkey_information, ff_real_position_sorted, opt_arc_stop_first_vis_bdry=True):
     mini_ff_dataframe = make_mini_ff_dataframe(
         ff_indices, duration, monkey_information, ff_real_position_sorted, ff_radius=10, max_distance=400)
-    temp_curvature_df = curvature_utils.make_curvature_df(mini_ff_dataframe, curv_of_traj_df, ff_radius_for_optimal_arc=15, clean=True,
+    temp_curvature_df = curvature_utils.make_curvature_df(mini_ff_dataframe, curv_of_traj_df, ff_radius_for_opt_arc=15, clean=True,
                                                           opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
     ff_best_arc_df, best_arc_original_columns = find_best_arc.make_best_arc_df(
         temp_curvature_df, monkey_information, ff_real_position_sorted)

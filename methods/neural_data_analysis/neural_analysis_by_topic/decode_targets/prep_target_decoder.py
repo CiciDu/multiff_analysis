@@ -148,7 +148,7 @@ def add_target_opt_arc_dheading_to_target_df(target_df, curv_of_traj_df, monkey_
                                                     monkey_information=monkey_information,
                                                     ff_caught_T_new=ff_caught_T_new)
 
-        curv_df = curv_df.rename(columns={'optimal_arc_d_heading': 'target_opt_arc_dheading',
+        curv_df = curv_df.rename(columns={'opt_arc_d_heading': 'target_opt_arc_dheading',
                                           'ff_index': 'target_index'})
 
         target_df = target_df.merge(curv_df[['point_index', 'target_index', 'target_opt_arc_dheading']],
@@ -287,9 +287,9 @@ def _add_curv_info_to_behav_data_all(behav_data_all, curv_of_traj_df, monkey_inf
                                                 monkey_information=monkey_information,
                                                 ff_caught_T_new=ff_caught_T_new)
     behav_data_all = behav_data_all.merge(curv_df[[
-        'point_index', 'curv_of_traj', 'optimal_arc_d_heading']].drop_duplicates(), on='point_index', how='left')
+        'point_index', 'curv_of_traj', 'opt_arc_d_heading']].drop_duplicates(), on='point_index', how='left')
     behav_data_all.rename(columns={
-        'curv_of_traj': 'traj_curv', 'optimal_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
+        'curv_of_traj': 'traj_curv', 'opt_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
 
     return behav_data_all
 

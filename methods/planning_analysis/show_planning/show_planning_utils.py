@@ -69,10 +69,9 @@ def get_points_on_each_arc(null_arc_info, num_points_on_each_arc=2000, extend_ar
     return arc_df
 
 
-def get_optimal_arc_landing_points_closest_to_stop(null_arc_info, stops_near_ff_df, reward_boundary_radius=25):
+def get_opt_arc_landing_points_closest_to_stop(null_arc_info, stops_near_ff_df, reward_boundary_radius=25):
     if len(null_arc_info) != len(stops_near_ff_df):
-        raise ValueError(
-            'The number of rows in null_arc_info and stops_near_ff_df do not match.')
+        print('Warning: The number of rows in null_arc_info and stops_near_ff_df do not match.')
 
     null_arc_info = null_arc_info.merge(stops_near_ff_df[[
                                         'cur_ff_index', 'cur_ff_x', 'cur_ff_y']], left_on='arc_ff_index', right_on='cur_ff_index', how='left')
@@ -99,9 +98,9 @@ def get_optimal_arc_landing_points_closest_to_stop(null_arc_info, stops_near_ff_
     return arc_rows_closest_to_stop
 
 
-def get_optimal_arc_landing_points_when_first_reaching_visible_boundary(null_arc_info,
-                                                                        visible_boundary_radius=10,
-                                                                        reward_boundary_radius=25):
+def get_opt_arc_landing_points_when_first_reaching_visible_boundary(null_arc_info,
+                                                                    visible_boundary_radius=10,
+                                                                    reward_boundary_radius=25):
 
     for i in range(2):  # do the following twice, just in case
         # Adjust 'arc_ending_angle' to ensure it is within 180 degrees of 'arc_starting_angle'
@@ -130,7 +129,7 @@ def get_optimal_arc_landing_points_when_first_reaching_visible_boundary(null_arc
     too_big_angle_rows = arc_rows_to_first_reach_boundary[
         arc_rows_to_first_reach_boundary['delta_angle_from_starting_angle'] > math.pi/2].copy()
     if len(too_big_angle_rows) > 0:
-        print(f'Note: When calling get_optimal_arc_landing_points_when_first_reaching_visible_boundary, there are {len(too_big_angle_rows)} points that are more than 90 degrees away from the starting angle of the arc.' +
+        print(f'Note: When calling get_opt_arc_landing_points_when_first_reaching_visible_boundary, there are {len(too_big_angle_rows)} points that are more than 90 degrees away from the starting angle of the arc.' +
               'They will be changed to the closest point to the ff center that are still within the reward boundary.')
         arc_df_sub = arc_df_original[arc_df_original['cur_ff_index'].isin(
             too_big_angle_rows['cur_ff_index'])].copy()
@@ -185,7 +184,7 @@ def _get_missed_arc_info(null_arc_info, arc_df_original, arc_rows_to_first_reach
 
 
 def _add_info_to_arc_rows_to_first_reach_boundary(arc_rows_to_first_reach_boundary, missed_arc, null_arc_info):
-    print(f'Note: When calling get_optimal_arc_landing_points_when_first_reaching_visible_boundary, there are {len(null_arc_info) - len(arc_rows_to_first_reach_boundary)} points out of {len(null_arc_info)} points that are not within the visible boundary of the firefly.' +
+    print(f'Note: When calling get_opt_arc_landing_points_when_first_reaching_visible_boundary, there are {len(null_arc_info) - len(arc_rows_to_first_reach_boundary)} points out of {len(null_arc_info)} points that are not within the visible boundary of the firefly.' +
           'They will be changed to the closest point to the ff center that are still within the reward boundary.')
 
     missed_arc.sort_values(by=['cur_ff_index', 'distance_to_ff'], ascending=[
@@ -222,7 +221,7 @@ def make_cur_and_nxt_ff_df(nxt_ff_final_df, cur_ff_final_df):
                       'stop_point_index', 'monkey_angle_before_stop', 'd_heading_of_traj']
 
     relevant_columns = ['ff_index', 'ff_x', 'ff_y', 'ff_distance', 'ff_angle', 'ff_angle_boundary',
-                        'optimal_curvature', 'optimal_arc_measure', 'optimal_arc_radius', 'optimal_arc_end_direction',
+                        'optimal_curvature', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction',
                         'curv_to_ff_center', 'arc_radius_to_ff_center', 'd_heading_of_arc', 'arc_end_x', 'arc_end_y']
 
     # Create a copy of the shared columns from nxt_ff_final_df and rename them
@@ -521,7 +520,7 @@ def make_diff_in_curv_df(nxt_ff_info_for_monkey, nxt_ff_info_for_null_arc):
     null_arc_curv_df = curvature_utils._make_curvature_df(
         nxt_ff_info_for_null_arc_cleaned,
         nxt_ff_info_for_null_arc_cleaned['curv_of_traj'].values,
-        ff_radius_for_optimal_arc=15,
+        ff_radius_for_opt_arc=15,
         clean=False,
         invalid_curvature_ok=False,
         include_curv_to_ff_center=False,
@@ -532,7 +531,7 @@ def make_diff_in_curv_df(nxt_ff_info_for_monkey, nxt_ff_info_for_null_arc):
     monkey_curv_df = curvature_utils._make_curvature_df(
         nxt_ff_info_for_monkey_cleaned,
         nxt_ff_info_for_monkey_cleaned['curv_of_traj'].values,
-        ff_radius_for_optimal_arc=15,
+        ff_radius_for_opt_arc=15,
         clean=False,
         invalid_curvature_ok=True,
         include_curv_to_ff_center=False,

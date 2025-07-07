@@ -61,9 +61,9 @@ class BasePlotter():
             self.nxt_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(
                 self.ref_point_index_counted, self.nxt_ff_counted_df.ff_index.values, self.monkey_information, self.ff_real_position_sorted)
         else:
-            self.cur_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_optimal_arc_info_for_plotting(
+            self.cur_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
                 self.cur_ff_counted_df, self.monkey_information)
-            self.nxt_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_optimal_arc_info_for_plotting(
+            self.nxt_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
                 self.nxt_ff_counted_df, self.monkey_information)
 
         if use_fixed_arc_length:

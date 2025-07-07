@@ -10,14 +10,14 @@ class PlanFactorsOfAgent():
                  data_name='data_0',
                  use_curvature_to_ff_center=False,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  ):
 
         self.monkey_name = None
         self.model_folder_name = model_folder_name
         self.data_name = data_name
         self.use_curvature_to_ff_center = use_curvature_to_ff_center
-        self.optimal_arc_type = optimal_arc_type
+        self.opt_arc_type = opt_arc_type
         rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name, data_name=data_name)
 
@@ -69,7 +69,7 @@ class PlanFactorsOfAgent():
     def _initialize_pf(self, **kwargs):
 
         self.pf = plan_factors_class.PlanFactors(raw_data_folder_path=None,
-                                                 optimal_arc_type=self.optimal_arc_type,
+                                                 opt_arc_type=self.opt_arc_type,
                                                  **kwargs)
 
         self.pf.processed_data_folder_path = self.processed_data_folder_path

@@ -40,7 +40,7 @@ class OnlyStopFFAcrossSessions():
     }
 
     def __init__(self, monkey_name='monkey_Bruno',
-                 optimal_arc_type='opt_arc_stop_closest',
+                 opt_arc_type='opt_arc_stop_closest',
                  curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
                  truncate_curv_of_traj_by_time_of_capture=False):
@@ -54,25 +54,25 @@ class OnlyStopFFAcrossSessions():
         self.monkey_name = monkey_name
 
         self.ml_inst = ml_for_planning_class.MlForPlanning()
-        self._update_optimal_arc_type_and_related_paths(
-            optimal_arc_type=optimal_arc_type)
+        self._update_opt_arc_type_and_related_paths(
+            opt_arc_type=opt_arc_type)
         self.ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
-    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='opt_arc_stop_closest'):
-        self.optimal_arc_type = optimal_arc_type
+    def _update_opt_arc_type_and_related_paths(self, opt_arc_type='opt_arc_stop_closest'):
+        self.opt_arc_type = opt_arc_type
         self.combd_only_cur_ff_path = make_variations_utils.make_combd_only_cur_ff_path(
             self.monkey_name)
         self.combd_only_cur_ff_df_folder_path = os.path.join(
-            self.combd_only_cur_ff_path, f'data/combd_only_cur_ff_df/{self.optimal_arc_type}')
+            self.combd_only_cur_ff_path, f'data/combd_only_cur_ff_df/{self.opt_arc_type}')
         self.combd_x_features_folder_path = os.path.join(
-            self.combd_only_cur_ff_path, f'data/combd_x_features_df/{self.optimal_arc_type}')
+            self.combd_only_cur_ff_path, f'data/combd_x_features_df/{self.opt_arc_type}')
         os.makedirs(self.combd_only_cur_ff_df_folder_path, exist_ok=True)
         os.makedirs(self.combd_x_features_folder_path, exist_ok=True)
 
         self.only_cur_ff_lr_df_path = os.path.join(
-            self.combd_only_cur_ff_path, f'ml_results/lr_variations/{self.optimal_arc_type}/all_only_cur_lr_df.csv')
+            self.combd_only_cur_ff_path, f'ml_results/lr_variations/{self.opt_arc_type}/all_only_cur_lr_df.csv')
         self.only_cur_ff_ml_df_path = os.path.join(
-            self.combd_only_cur_ff_path, f'ml_results/ml_variations/{self.optimal_arc_type}/all_only_cur_ml_df.csv')
+            self.combd_only_cur_ff_path, f'ml_results/ml_variations/{self.opt_arc_type}/all_only_cur_ml_df.csv')
         os.makedirs(os.path.dirname(
             self.only_cur_ff_lr_df_path), exist_ok=True)
         os.makedirs(os.path.dirname(
@@ -113,7 +113,7 @@ class OnlyStopFFAcrossSessions():
             print(raw_data_folder_path)
 
             self.osf = only_cur_ff_class.OnlyStopFF(monkey_name=self.monkey_name, raw_data_folder_path=raw_data_folder_path,
-                                                    optimal_arc_type=self.optimal_arc_type, curv_of_traj_mode=self.curv_of_traj_mode,
+                                                    opt_arc_type=self.opt_arc_type, curv_of_traj_mode=self.curv_of_traj_mode,
                                                     window_for_curv_of_traj=self.window_for_curv_of_traj,
                                                     truncate_curv_of_traj_by_time_of_capture=self.truncate_curv_of_traj_by_time_of_capture)
 
