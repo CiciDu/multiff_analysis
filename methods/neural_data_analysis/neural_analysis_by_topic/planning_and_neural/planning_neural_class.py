@@ -39,11 +39,11 @@ class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
         self.retrieve_neural_data()
 
         # get behavioral_data
-        planning_helper = planning_neural_helper_class.PlanningAndNeuralHelper(raw_data_folder_path=self.raw_data_folder_path,
+        self.planning_helper = planning_neural_helper_class.PlanningAndNeuralHelper(raw_data_folder_path=self.raw_data_folder_path,
                                                                                bin_width=self.bin_width,
                                                                                window_width=self.window_width,
                                                                                one_behav_idx_per_bin=self.one_behav_idx_per_bin)
-        planning_helper.prep_behav_data_to_analyze_planning(ref_point_mode=ref_point_mode,
+        self.planning_helper.prep_behav_data_to_analyze_planning(ref_point_mode=ref_point_mode,
                                                             ref_point_value=ref_point_value,
                                                             curv_of_traj_mode=curv_of_traj_mode,
                                                             window_for_curv_of_traj=window_for_curv_of_traj,
@@ -55,10 +55,9 @@ class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
                                                             )
 
         for attr in ['all_planning_info', 'both_ff_across_time_df']:
-            setattr(self, attr, getattr(planning_helper, attr))
+            setattr(self, attr, getattr(self.planning_helper, attr))
 
-        # del planning_helper
-        del planning_helper
+        # del self.planning_helper
         
         self._add_data_from_behav_data_all(exists_ok=True)
 
@@ -95,6 +94,16 @@ class PlanningAndNeural(target_decoder_class.TargetDecoderClass):
             max_x_lag_number=max_x_lag_number, max_y_lag_number=max_y_lag_number)
         self._reduce_x_var_lags()
         self.reduce_y_var_lags(exists_ok=exists_ok)
+
+        print('x_var.shape:', self.x_var.shape)
+        print('y_var.shape:', self.y_var.shape)
+        print('x_var_reduced.shape:', self.x_var_reduced.shape)
+        print('y_var_reduced.shape:', self.y_var_reduced.shape)
+        print('========================================')
+        print('x_var_lags.shape:', self.x_var_lags.shape)
+        print('y_var_lags.shape:', self.y_var_lags.shape)
+        print('x_var_lags_reduced.shape:', self.x_var_lags_reduced.shape)
+        print('y_var_lags_reduced.shape:', self.y_var_lags_reduced.shape)
 
     def get_x_and_y_var(self, exists_ok=True):
         original_len = len(self.all_planning_info)

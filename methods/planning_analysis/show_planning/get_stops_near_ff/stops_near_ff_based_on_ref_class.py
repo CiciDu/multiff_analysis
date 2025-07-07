@@ -13,7 +13,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def __init__(self,
                  raw_data_folder_path=None,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  ):
         super().__init__()
 
@@ -36,7 +36,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         else:
             self.monkey_information = None
 
-    def update_optimal_arc_type(self, optimal_arc_type='norm_opt_arc'):
+    def update_optimal_arc_type(self, optimal_arc_type='opt_arc_stop_closest'):
         # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
         super()._update_optimal_arc_type_and_related_paths(optimal_arc_type)
 

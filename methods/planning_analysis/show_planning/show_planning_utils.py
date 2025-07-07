@@ -236,8 +236,7 @@ def make_cur_and_nxt_ff_df(nxt_ff_final_df, cur_ff_final_df):
                                       'monkey_x': 'ref_monkey_x',
                                       'monkey_y': 'ref_monkey_y',
                                       'monkey_angle': 'ref_monkey_angle',
-                                      'curv_of_traj': 'ref_curv_of_traj',
-                                      'd_heading_of_traj': 'd_heading_of_traj'}, inplace=True)
+                                      'curv_of_traj': 'ref_curv_of_traj'}, inplace=True)
 
     relevant_columns = [
         col for col in relevant_columns if col in nxt_ff_final_df.columns]

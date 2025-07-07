@@ -88,7 +88,7 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                     'curv_Q3',
                     'curv_max']
 
-    def __init__(self, optimal_arc_type='norm_opt_arc'):
+    def __init__(self, optimal_arc_type='opt_arc_stop_closest'):
         self.optimal_arc_type = optimal_arc_type
 
         # # Bind methods from _PredictYValues

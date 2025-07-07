@@ -40,7 +40,7 @@ class OnlyStopFFAcrossSessions():
     }
 
     def __init__(self, monkey_name='monkey_Bruno',
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
                  truncate_curv_of_traj_by_time_of_capture=False):
@@ -58,7 +58,7 @@ class OnlyStopFFAcrossSessions():
             optimal_arc_type=optimal_arc_type)
         self.ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
-    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
+    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='opt_arc_stop_closest'):
         self.optimal_arc_type = optimal_arc_type
         self.combd_only_cur_ff_path = make_variations_utils.make_combd_only_cur_ff_path(
             self.monkey_name)

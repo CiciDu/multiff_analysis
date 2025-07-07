@@ -38,7 +38,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
     def __init__(self, monkey_name='monkey_Bruno',
                  raw_data_folder_path=None,
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
                  truncate_curv_of_traj_by_time_of_capture=False):
@@ -63,7 +63,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
 
         self.ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
-    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
+    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='opt_arc_stop_closest'):
         self.optimal_arc_type = optimal_arc_type
         self.planning_data_folder_path = self.raw_data_folder_path.replace(
             'raw_monkey_data', 'planning')

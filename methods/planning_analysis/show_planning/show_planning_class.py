@@ -54,7 +54,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def __init__(self, monkey_name='monkey_Bruno',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  test_or_control='test',
                  raw_data_folder_path=None):
         super().__init__()
@@ -70,7 +70,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
         self.update_optimal_arc_type(optimal_arc_type=optimal_arc_type)
 
-    def update_optimal_arc_type(self, optimal_arc_type='norm_opt_arc'):
+    def update_optimal_arc_type(self, optimal_arc_type='opt_arc_stop_closest'):
         # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
         super()._update_optimal_arc_type_and_related_paths(
             optimal_arc_type=optimal_arc_type)
@@ -267,7 +267,8 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             for index, row in self.sessions_df_for_one_monkey.iterrows():
                 if row['finished'] is True:
                     continue
-                print(f'Making heading_info_df for: {row["monkey_name"]} {row["data_name"]}')
+                print(
+                    f'Making heading_info_df for: {row["monkey_name"]} {row["data_name"]}')
                 self.heading_info_df = self._make_heading_info_df_for_a_data_session(row['monkey_name'], row['data_name'], ref_point_mode=ref_point_mode,
                                                                                      ref_point_value=ref_point_value, test_or_control=test_or_control,
                                                                                      curv_traj_window_before_stop=curv_traj_window_before_stop,

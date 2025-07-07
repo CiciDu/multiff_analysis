@@ -41,7 +41,8 @@ class BaseProcessing:
             try:
                 raw_data_folder_path = self.raw_data_folder_path
             except AttributeError:
-                raise Exception("raw_data_folder_path is not provided and self.raw_data_folder_path is not set")
+                raise Exception(
+                    "raw_data_folder_path is not provided and self.raw_data_folder_path is not set")
 
         self.extract_info_from_raw_data_folder_path(raw_data_folder_path)
         self.retrieve_or_make_monkey_data(exists_ok=monkey_data_exists_ok)
@@ -318,7 +319,7 @@ class BaseProcessing:
             self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted,
                                     self.ff_real_position_sorted, self.ff_believed_position_sorted, None, self.ff_caught_T_new)
 
-    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='norm_opt_arc'):
+    def _update_optimal_arc_type_and_related_paths(self, optimal_arc_type='opt_arc_stop_closest'):
         # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest
         self.optimal_arc_type = optimal_arc_type
         self.heading_info_partial_path = f'heading_info_df/{optimal_arc_type}'

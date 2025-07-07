@@ -20,7 +20,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
     def __init__(self,
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  num_steps_per_dataset=100000,
                  ):
 

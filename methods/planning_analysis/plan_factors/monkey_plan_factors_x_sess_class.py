@@ -35,7 +35,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
     def __init__(self,
                  monkey_name='monkey_Bruno',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  ):
 
         super().__init__(optimal_arc_type=optimal_arc_type)
@@ -54,7 +54,8 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.pf.monkey_name = self.monkey_name
         base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(
             self.pf, raw_data_folder_path)
-        self.pf.retrieve_all_plan_data_for_one_session(ref_point_mode, ref_point_value, curv_traj_window_before_stop)
+        self.pf.retrieve_all_plan_data_for_one_session(
+            ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         self.pf.get_plan_x_and_y_tc()
         print('Successfully retrieved plan_x and plan_y data for session: ',
               raw_data_folder_path)

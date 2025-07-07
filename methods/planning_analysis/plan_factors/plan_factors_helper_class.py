@@ -20,7 +20,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
     def __init__(self, test_or_control, raw_data_folder_path, curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
-                 optimal_arc_type='norm_opt_arc',
+                 optimal_arc_type='opt_arc_stop_closest',
                  ):
         super().__init__(optimal_arc_type=optimal_arc_type,
                          raw_data_folder_path=None)

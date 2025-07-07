@@ -21,6 +21,9 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_optimal_a
                       opt_arc_stop_first_vis_bdry=False,  # whether optimal arc stop at visible boundary
                       ignore_error=False):
 
+    # it needs ff_dataframe_sub to have the following columns:
+    # point_index, ff_index, monkey_x, monkey_y, monkey_angle, ff_x, ff_y, ff_distance, ff_angle, ff_angle_boundary
+
     if remove_invalid_rows:
         ff_dataframe_sub = ff_dataframe_sub.copy()
         original_length = len(ff_dataframe_sub)
@@ -56,6 +59,9 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_optimal_arc
                        invalid_curvature_ok=False,
                        include_curv_to_ff_center=True, include_optimal_curvature=True,
                        opt_arc_stop_first_vis_bdry=True, ignore_error=False):
+
+    # it needs ff_dataframe_sub to have the following columns:
+    # point_index, ff_index, monkey_x, monkey_y, monkey_angle, ff_x, ff_y, ff_distance, ff_angle, ff_angle_boundary
 
     if (not include_curv_to_ff_center) and (not include_optimal_curvature):
         raise ValueError(

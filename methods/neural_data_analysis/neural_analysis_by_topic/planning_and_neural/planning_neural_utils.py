@@ -3,8 +3,9 @@ import sys
 
 def add_curv_info(info_to_add, curv_df, which_ff_info):
     curv_df = curv_df.copy()
-    columns_to_rename = {'ff_angle': f'{which_ff_info}ff_angle',
-                         'ff_distance': f'{which_ff_info}ff_distance',
+    columns_to_rename = {'ff_index': f'{which_ff_info}ff_index',
+                        #  'ff_angle': f'{which_ff_info}ff_angle',
+                        #  'ff_distance': f'{which_ff_info}ff_distance',
                          'curv_to_ff_center': f'{which_ff_info}arc_curv',
                          'optimal_curvature': f'{which_ff_info}opt_arc_curv',
                          'optimal_arc_d_heading': f'{which_ff_info}opt_arc_dheading', }
@@ -12,13 +13,13 @@ def add_curv_info(info_to_add, curv_df, which_ff_info):
     curv_df.rename(columns=columns_to_rename, inplace=True)
 
     columns_added = list(columns_to_rename.values())
+    # delete f'{which_ff_info}ff_index' from columns_added
+    columns_added.remove(f'{which_ff_info}ff_index')
 
-    curv_df_sub = curv_df[columns_added + ['point_index']].drop_duplicates()
+    curv_df_sub = curv_df[columns_added + [f'{which_ff_info}ff_index', 'point_index']].drop_duplicates()
 
     info_to_add.drop(columns=columns_added, inplace=True, errors='ignore')
-    info_to_add = info_to_add.merge(curv_df_sub, on='point_index', how='left')
-
-    info_to_add[columns_added] = curv_df[columns_added]
+    info_to_add = info_to_add.merge(curv_df_sub, on=['point_index', f'{which_ff_info}ff_index'], how='left')
 
     return info_to_add, columns_added
 

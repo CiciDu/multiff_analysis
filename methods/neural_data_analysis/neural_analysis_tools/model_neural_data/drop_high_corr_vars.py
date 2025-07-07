@@ -91,7 +91,7 @@ def _drop_lags_for_feature(df_with_lags, feature, corr_threshold, vif_threshold,
     Drop lags for a single feature based on correlation or VIF.
     Returns: columns_to_drop, top_values_of_feature
     """
-    from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, drop_high_vif_vars
+    
     df_with_lags_sub = _find_subset_of_df_with_lags_for_current_feature(
         df_with_lags, feature)
     if df_with_lags_sub.shape[1] == 0:

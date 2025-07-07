@@ -20,7 +20,7 @@ import math
 # try replacing ff_dataframe_visible with ff_info_at_start_df
 def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_new, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
                        ref_point_mode='distance', ref_point_value=-150,
-                       optimal_arc_type='norm_opt_arc'):
+                       optimal_arc_type='opt_arc_stop_closest'):
 
     if ref_point_mode == 'time after cur ff visible':
         drop_na = True
@@ -81,9 +81,9 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
 
     # get curv range info etc
     curv_of_traj_stat_df = build_factor_comp.find_curv_of_traj_stat_df(only_cur_ff_df, curv_of_traj_df, start_time_column='beginning_time',
-                                                                                       end_time_column='stop_time')
+                                                                       end_time_column='stop_time')
     only_cur_ff_df = build_factor_comp_utils._add_stat_columns_to_df(
-            curv_of_traj_stat_df, only_cur_ff_df, ['curv'], 'stop_point_index')
+        curv_of_traj_stat_df, only_cur_ff_df, ['curv'], 'stop_point_index')
 
     # add angle_from_cur_ff_to_stop
     only_cur_ff_df['stop_x'], only_cur_ff_df['stop_y'] = monkey_information.loc[only_cur_ff_df['stop_point_index'], [

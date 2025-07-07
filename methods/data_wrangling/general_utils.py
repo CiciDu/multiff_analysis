@@ -298,7 +298,7 @@ def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
     return perfect_pairs
 
 
-def check_na_in_df(df, df_name="DataFrame"):
+def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=False):
     """
     Find and analyze rows with NA values in a DataFrame.
 
@@ -351,7 +351,11 @@ def check_na_in_df(df, df_name="DataFrame"):
     else:
         print(f"\nNo NA values found in {df_name}")
 
-    return na_rows, na_cols
+    if return_rows_and_columns:
+        return na_rows, na_cols
+    else:
+        return
+
 
 def convert_bool_to_int(df):
     """

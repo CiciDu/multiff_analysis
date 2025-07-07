@@ -208,10 +208,45 @@ def add_lags_to_each_feature(var, lag_numbers, trial_vector=None, rearrange_lag_
         var_lags = var.groupby('trial', group_keys=False).apply(lag_group)
         # Fill NaNs forward/backward within each trial group
         var_lags = var_lags.groupby(trial_vector).apply(lambda df: df.ffill().bfill())
+        var_lags.reset_index(drop=True, inplace=True)
 
         # Clean up temp column
         var.drop(columns=['trial'], inplace=True)
+        
 
+    # ------------------------------------------------------------------
+    # fill any residual NaNs from the next‑nearest lag
+    # ------------------------------------------------------------------
+    pos_lags = sorted(l for l in lag_numbers if l >= 0)
+    neg_lags = sorted((l for l in lag_numbers if l <= 0), key=abs)  # e.g. −1, −2, −3…
+
+    def fill_from_neighbour(curr, prev):
+        """Copy values row-wise from *prev* lag into *curr* lag where NA."""
+        curr_cols = [f"{c}_{curr}" for c in column_names]
+        
+        # check if there are any NaNs in var_lags[curr_cols]
+        if var_lags[curr_cols].isna().any(axis=1).sum() > 0:
+            print(f"NaNs found in {curr_cols}")
+            for feat in column_names:
+                curr_col = f"{feat}_{curr}"
+                prev_col = f"{feat}_{prev}"
+                na_mask = var_lags[curr_col].isna()
+                var_lags.loc[na_mask, curr_col] = var_lags.loc[na_mask, prev_col]
+        
+            ## This is another approach, but it works on all columns with the same lag at once. 
+            ## The potential problem is that if there are NaNs in the same row for some lag_N columns, it will fill the NaNs in the same row for all lag_N columns.
+            # prev_cols = [f"{c}_{prev}" for c in column_names]
+            # var_lags.loc[var_lags[curr_cols].isna().any(axis=1), curr_cols] = var_lags.loc[var_lags[curr_cols].isna().any(axis=1), prev_cols]
+
+
+    # positive direction: 1 ← 0 already done, so start at index 1
+    for i in range(1, len(pos_lags)):
+        fill_from_neighbour(pos_lags[i], pos_lags[i - 1])
+
+    # negative direction: −1 already handled, so start at index 1
+    for i in range(1, len(neg_lags)):
+        fill_from_neighbour(neg_lags[i], neg_lags[i - 1])
+        
     return var_lags
 
 
