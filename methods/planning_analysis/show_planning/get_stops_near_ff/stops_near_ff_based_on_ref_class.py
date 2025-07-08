@@ -2,6 +2,7 @@ import sys
 from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, opt_arc_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_stops_near_ff_class
+from planning_analysis.plan_factors import plan_factors_utils
 from visualization.matplotlib_tools import monkey_heading_functions
 import pandas as pd
 import os
@@ -460,7 +461,12 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                                                              invalid_curvature_ok=False, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
 
         if self.opt_arc_type == 'opt_arc_stop_closest':
-            self.cur_curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(self.cur_curv_df, self.cur_ff_df_modified, self.stops_near_ff_df_modified,
+            stop_and_ref_point_info = self.cur_ff_df_modified[['stop_point_index', 'point_index', 'ff_index', 'stop_x', 'stop_y', 'ff_x', 'ff_y', 'monkey_x', 'monkey_y']].copy()
+            # if stop_x and stop_y don't exist
+            # stop_and_ref_point_info['stop_x'], stop_and_ref_point_info['stop_y'] = self.monkey_information.loc[stop_and_ref_point_info['stop_point_index'], [
+            #     'monkey_x', 'monkey_y']].values.T
+            
+            self.cur_curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(self.cur_curv_df, stop_and_ref_point_info,
                                                                                                                      self.ff_real_position_sorted, self.monkey_information)
 
         # use merge to add curvature_info
@@ -496,9 +502,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def add_d_heading_of_traj_to_df(self, df):
         df = df.merge(self.stops_near_ff_df[[
                       'stop_point_index', 'monkey_angle_before_stop']], on='stop_point_index', how='left')
-        df['d_heading_of_traj'] = df['monkey_angle_before_stop'] - df['monkey_angle']
-        df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
-            df['d_heading_of_traj'].values)
+        df = plan_factors_utils.add_d_heading_of_traj_to_df(df)
         return df
 
     def _take_out_info_counted(self):

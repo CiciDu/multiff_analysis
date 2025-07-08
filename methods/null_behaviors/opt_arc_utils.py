@@ -10,10 +10,19 @@ from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
-def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curvature_df, cur_ff_df, stops_near_ff_df,
+def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curvature_df, stop_and_ref_point_info,
                                                                             ff_real_position_sorted, monkey_information):
     # The idea is to find the closest point on optimal arc to the stop that's also within ff, and then
     # treat that point as the new ff location. From there we can use the code for calculation of arc to center.
+
+    if 'cur_ff_index' not in stop_and_ref_point_info.columns:
+        try:
+            stop_and_ref_point_info = stop_and_ref_point_info.rename(columns={'ff_index': 'cur_ff_index',
+                                                                            'ff_x': 'cur_ff_x',
+                                                                            'ff_y': 'cur_ff_y',
+                                                                            })
+        except:
+            raise ValueError('cur_ff_index, cur_ff_x, cur_ff_y must exist in update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop. If not, at least ff_index, ff_x, ff_y must exist.')
 
     # Extract new firefly coordinates
     old_cur_null_arc_info = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
@@ -22,24 +31,29 @@ def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curv
 
     # Get the optimal arc landing points closest to the stop
     arc_rows_closest_to_stop = show_planning_utils.get_opt_arc_landing_points_closest_to_stop(
-        old_cur_null_arc_info, stops_near_ff_df
+        old_cur_null_arc_info, stop_and_ref_point_info
     )
+    
+    # add some columns to arc_rows_closest_to_stop
+    columns_to_add = ['monkey_x', 'monkey_y', 'point_index']
+    arc_rows_closest_to_stop.drop(columns=columns_to_add, inplace=True, errors='ignore')
+    arc_rows_closest_to_stop = arc_rows_closest_to_stop.merge(stop_and_ref_point_info[columns_to_add + ['cur_ff_index']], on='cur_ff_index', how='left')
 
     # Extract new firefly x and y coordinates
     new_ff_x, new_ff_y = arc_rows_closest_to_stop['x'].values, arc_rows_closest_to_stop['y'].values
 
-    if len(new_ff_x) != len(cur_ff_df):
+    if len(new_ff_x) != len(old_cur_null_arc_info):
         raise ValueError(
             'Number of new firefly x coordinates must match the number of stops')
 
     # calculate the distance between "new ff" and monkey xy. If the distance is within 1 cm, make it so that new ff is at the monkey xy
     new_ff_x, new_ff_y = show_planning_utils.make_new_ff_at_monkey_xy_if_within_1_cm(new_ff_x, new_ff_y,
-                                                                                     cur_ff_df['monkey_x'].values, cur_ff_df['monkey_y'].values
+                                                                                     arc_rows_closest_to_stop['monkey_x'].values, arc_rows_closest_to_stop['monkey_y'].values
                                                                                      )
 
     # Find and package arc to center info for plotting
     cur_null_arc_info = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(
-        cur_ff_df.point_index.values, cur_ff_df.ff_index.values, monkey_information,
+        arc_rows_closest_to_stop.point_index.values, arc_rows_closest_to_stop.cur_ff_index.values, monkey_information,
         ff_real_position_sorted, ff_x=new_ff_x, ff_y=new_ff_y, ignore_error=True
     )
 

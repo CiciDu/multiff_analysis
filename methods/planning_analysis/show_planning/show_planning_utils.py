@@ -69,11 +69,21 @@ def get_points_on_each_arc(null_arc_info, num_points_on_each_arc=2000, extend_ar
     return arc_df
 
 
-def get_opt_arc_landing_points_closest_to_stop(null_arc_info, stops_near_ff_df, reward_boundary_radius=25):
-    if len(null_arc_info) != len(stops_near_ff_df):
-        print('Warning: The number of rows in null_arc_info and stops_near_ff_df do not match.')
-
-    null_arc_info = null_arc_info.merge(stops_near_ff_df[[
+def get_opt_arc_landing_points_closest_to_stop(null_arc_info, stop_and_ref_point_info, reward_boundary_radius=25):
+    if len(null_arc_info) != len(stop_and_ref_point_info):
+        print('Warning: The number of rows in null_arc_info and stop_and_ref_point_info do not match.')
+        
+    # if cur_ff_index don't exist, then try renaming ff_index, ff_x, ff_y; if the latter don't exist, raise an error
+    if 'cur_ff_index' not in stop_and_ref_point_info.columns:
+        try:    
+            stop_and_ref_point_info.rename(columns={'ff_index': 'cur_ff_index',
+                                                                   'ff_x': 'cur_ff_x',
+                                                                   'ff_y': 'cur_ff_y'}, inplace=True)
+        except:
+            raise ValueError('cur_ff_index, cur_ff_x, cur_ff_y must exist in get_opt_arc_landing_points_closest_to_stop. If not, at least ff_index, ff_x, ff_y must exist.')
+                                                                   
+                                                                   
+    null_arc_info = null_arc_info.merge(stop_and_ref_point_info[[
                                         'cur_ff_index', 'cur_ff_x', 'cur_ff_y']], left_on='arc_ff_index', right_on='cur_ff_index', how='left')
     null_arc_info.rename(
         columns={'cur_ff_x': 'arc_ff_x', 'cur_ff_y': 'arc_ff_y'}, inplace=True)
@@ -83,7 +93,7 @@ def get_opt_arc_landing_points_closest_to_stop(null_arc_info, stops_near_ff_df, 
     arc_df = arc_df[arc_df['distance_to_ff'] <= reward_boundary_radius].copy()
 
     # Merge with stops data
-    arc_df = arc_df.merge(stops_near_ff_df[[
+    arc_df = arc_df.merge(stop_and_ref_point_info[[
                           'cur_ff_index', 'stop_x', 'stop_y']], on='cur_ff_index', how='left')
     # Calculate distance to stop
     arc_df['distance_to_stop'] = np.sqrt(

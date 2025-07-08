@@ -78,7 +78,10 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
     reg_type = "Simple" if X_train.shape[1] == 1 else "Multiple"
 
     # Print metrics
-    print(f"\n--- {reg_type} Linear Regression ---")
+    if y_var_name is not None:
+        print(f"\n--- {reg_type} Linear Regression: {y_var_name} ---")
+    else:
+        print(f"\n--- {reg_type} Linear Regression ---")
     print(f"R-squared (train):        {r2_train:.4f}")
     print(f"Adjusted R-squared:       {r2_adj:.4f}")
     print(f"R-squared (test):         {r2_test:.4f}")
@@ -348,13 +351,14 @@ def use_neural_network_on_linear_regression_func(X_train, y_train, X_test, y_tes
 
     return model, predictions
 
-
 def get_significant_features_in_one_row(summary_df, max_features_to_save=None, add_coeff=True):
     summary_df = summary_df.copy()
+    summary_df = summary_df.reset_index(drop=False).copy()
     summary_df.rename(columns={'index': 'feature'}, inplace=True)
     if max_features_to_save is not None:
         summary_df = summary_df.set_index(
             'rank_by_abs_coeff').iloc[:max_features_to_save].copy()
+    
     summary_df.index = summary_df.index.astype(str)
     temp_info = summary_df[['feature']].T.reset_index(drop=True).copy()
     if add_coeff:
@@ -367,3 +371,23 @@ def get_significant_features_in_one_row(summary_df, max_features_to_save=None, a
         raise ValueError('temp_info should only have one row')
     temp_info.columns.name = ''
     return temp_info
+    
+
+# def get_significant_features_in_one_row(summary_df, max_features_to_save=None, add_coeff=True):
+#     summary_df = summary_df.copy()
+#     summary_df.rename(columns={'index': 'feature'}, inplace=True)
+#     if max_features_to_save is not None:
+#         summary_df = summary_df.set_index(
+#             'rank_by_abs_coeff').iloc[:max_features_to_save].copy()
+#     summary_df.index = summary_df.index.astype(str)
+#     temp_info = summary_df[['feature']].T.reset_index(drop=True).copy()
+#     if add_coeff:
+#         temp_info2 = summary_df[['Coefficient']].copy()
+#         temp_info2.index = 'coeff_' + np.array(summary_df.index.astype(str))
+#         temp_info2 = temp_info2.T.reset_index(drop=True)
+#         temp_info = pd.concat([temp_info, temp_info2], axis=1)
+
+#     if temp_info.shape[0] > 1:
+#         raise ValueError('temp_info should only have one row')
+#     temp_info.columns.name = ''
+#     return temp_info

@@ -187,3 +187,10 @@ def quickly_process_plan_xy_test_and_ctrl(plan_xy_test, plan_xy_ctrl, column_for
             test_df, ctrl_df, **finalized_params)
 
     return test_df, ctrl_df
+
+
+def add_d_heading_of_traj_to_df(df):
+    df['d_heading_of_traj'] = df['monkey_angle_before_stop'] - df['monkey_angle']
+    df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+        df['d_heading_of_traj'].values)
+    return df

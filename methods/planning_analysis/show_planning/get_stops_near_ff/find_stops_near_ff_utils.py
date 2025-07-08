@@ -445,6 +445,7 @@ def find_outliers_in_a_column(df, column, outlier_z_score_threshold=2):
 
 
 def confine_angle_to_within_one_pie(angle_array):
+    angle_array = angle_array % (2*math.pi)
     while np.any(angle_array > math.pi):
         angle_array[angle_array >
                     math.pi] = angle_array[angle_array > math.pi] - 2*math.pi
@@ -455,6 +456,7 @@ def confine_angle_to_within_one_pie(angle_array):
 
 
 def confine_angle_to_within_180(angle_array):
+    angle_array = angle_array % 360
     while np.any(angle_array > 180):
         angle_array[angle_array > 180] = angle_array[angle_array > 180] - 2*180
     while np.any(angle_array < -180):

@@ -128,25 +128,25 @@ class MlForPlanning(ml_methods_class.MlMethods):
                                     add_coeff=True,
                                     param_info_to_record={}):
 
-        self.use_linear_regression(show_plot=False)
+        # also work simply on train and test set
+        self.use_linear_regression(show_plot=False, y_var_name=self.y_test.name)
         print('num_features:', self.X_train.shape[1])
 
-        temp_info = regression_utils.get_significant_features_in_one_row(
+        temp_info = {'num_features': [self.X_train.shape[1]],
+                     'num_significant_features': len(self.summary_df),
+                     'sample_size': [self.X_train.shape[0]],
+                     'rsquared': [round(self.results.rsquared, 4)],
+                     'adj_rsquared': [round(self.results.rsquared_adj, 4)],
+                     'r2_test': [round(self.r2_test, 4)]}
+        temp_info.update(param_info_to_record)
+        temp_info = pd.DataFrame(temp_info, index=[0])
+
+        more_temp_info = regression_utils.get_significant_features_in_one_row(
             self.summary_df, max_features_to_save=max_features_to_save, add_coeff=add_coeff)
-
-        avg_r_squared, std_r_squared = regression_utils.use_linear_regression_cv(
+        test_avg_r_squared, test_std_r_squared, train_avg_r_squared, train_std_r_squared = regression_utils.use_linear_regression_cv(
             self.x_var_prepared, self.y_var_prepared)
-        temp_info['avg_r_squared'] = round(avg_r_squared, 4)
-        temp_info['std_r_squared'] = round(std_r_squared, 4)
-
-        more_temp_info = {'num_features': [self.X_train.shape[1]],
-                          'num_significant_features': len(self.summary_df),
-                          'sample_size': [self.X_train.shape[0]],
-                          'rsquared': [round(self.results.rsquared, 4)],
-                          'adj_rsquared': [round(self.results.rsquared_adj, 4)],
-                          'r_squared_on_test': [round(self.r_squared_on_test, 4)]}
-        more_temp_info.update(param_info_to_record)
-        more_temp_info = pd.DataFrame(more_temp_info, index=[0])
+        more_temp_info['avg_r_squared'] = round(test_avg_r_squared, 4)
+        more_temp_info['std_r_squared'] = round(test_std_r_squared, 4)
 
         temp_info = pd.concat([temp_info, more_temp_info], axis=1)
         self.lr_variations_df = pd.concat(

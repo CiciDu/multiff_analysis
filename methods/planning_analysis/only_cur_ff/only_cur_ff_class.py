@@ -6,6 +6,7 @@ from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff
 from planning_analysis.plan_factors import plan_factors_class, test_vs_control_utils, monkey_plan_factors_x_sess_class
 from planning_analysis.only_cur_ff import only_cur_ff_utils, only_cur_ff_utils, features_to_keep_utils
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
+from planning_analysis import ml_for_planning_class, ml_for_planning_utils
 from sklearn.decomposition import PCA
 import numpy as np
 import pandas as pd

@@ -83,7 +83,7 @@ class MlMethods():
         #self.summary_df.reset_index(drop=False, inplace=True)
 
     def use_linear_regression(self, show_plot=True, y_var_name=None):
-        self.summary_df, y_pred, results, r2_test = regression_utils.use_linear_regression(
+        self.summary_df, self.y_pred, self.results, self.r2_test = regression_utils.use_linear_regression(
             self.X_train, self.X_test, self.y_train, self.y_test, show_plot=show_plot, y_var_name=y_var_name)
         self.process_summary_df(self.summary_df)
 

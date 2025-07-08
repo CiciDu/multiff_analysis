@@ -18,92 +18,101 @@ import math
 
 
 # try replacing ff_dataframe_visible with ff_info_at_start_df
-def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_new, monkey_information, curv_of_traj_df, ff_dataframe_visible, stop_period_duration=2,
-                       ref_point_mode='distance', ref_point_value=-150,
-                       opt_arc_type='opt_arc_stop_closest'):
+def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_caught_T_new,
+                       monkey_information, curv_of_traj_df, ff_dataframe_visible,
+                       stop_period_duration=2, ref_point_mode='distance',
+                       ref_point_value=-150, opt_arc_type='opt_arc_stop_closest',
+                       curv_of_traj_mode='distance',
+                       window_for_curv_of_traj=[-25, 0]):
 
-    if ref_point_mode == 'time after cur ff visible':
-        drop_na = True
-    else:
-        drop_na = False
-    ff_info = nxt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(closest_stop_to_capture_df, stop_period_duration, ff_dataframe_visible, monkey_information,
-                                                                             drop_na=drop_na)
-    ff_info['stop_time'] = monkey_information.loc[ff_info['stop_point_index'].values, 'time'].values
-    ff_info['time_since_ff_last_seen'] = ff_info['stop_time'].values - \
-        ff_info['time_ff_last_seen'].values
-    ff_info.sort_values(by=['stop_point_index', 'time_since_ff_last_seen'], ascending=[
-                        True, True], inplace=True)
-    # if there are duplicated stop point index, the row with bigger ff_index will be kept
-    ff_info = ff_info.groupby(
-        'stop_point_index').first().reset_index(drop=False)
-    ff_info2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(
-        ff_info, monkey_information, ff_real_position_sorted, ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
-    ff_info2 = find_stops_near_ff_utils.add_monkey_info_before_stop(
-        monkey_information, ff_info2)
+    # Determine if NA rows should be dropped based on reference mode
+    drop_na = ref_point_mode == 'time after cur ff visible'
 
-    opt_arc_stop_first_vis_bdry = True if (
-        opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
-    curv_df = curvature_utils.make_curvature_df(ff_info2, curv_of_traj_df, clean=False, monkey_information=monkey_information,
-                                                opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+    # Extract info for each ff: when it was first/last seen and where the stop was
+    ff_info = nxt_ff_utils.get_all_captured_ff_first_seen_and_last_seen_info(
+        closest_stop_to_capture_df, stop_period_duration, ff_dataframe_visible,
+        monkey_information, drop_na=drop_na
+    )
+    ff_info['stop_time'] = monkey_information.loc[ff_info['stop_point_index'], 'time'].values
+    ff_info['time_since_ff_last_seen'] = ff_info['stop_time'] - ff_info['time_ff_last_seen']
 
+    # Sort by stop index and time since last seen, keep first (most recent) per stop
+    ff_info.sort_values(['stop_point_index', 'time_since_ff_last_seen'], inplace=True)
+    ff_info = ff_info.groupby('stop_point_index').first().reset_index()
+
+    # Determine reference points for curvature estimation
+    ff_info = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(
+        ff_info, monkey_information, ff_real_position_sorted,
+        ref_point_mode=ref_point_mode, ref_point_value=ref_point_value
+    )
+    ff_info = find_stops_near_ff_utils.add_monkey_info_before_stop(
+        monkey_information, ff_info
+    )
+
+    opt_arc_stop_first_vis_bdry = (opt_arc_type == 'opt_arc_stop_first_vis_bdry')
+
+    # Compute curvature features
+    curv_df = curvature_utils.make_curvature_df(
+        ff_info, curv_of_traj_df, clean=False,
+        monkey_information=monkey_information,
+        opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry
+    )
+
+    # Adjust curvature arc to stop at closest point to monkey
     if opt_arc_type == 'opt_arc_stop_closest':
-        curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curv_df, ff_info2, ff_info,
-                                                                                                        ff_real_position_sorted, monkey_information)
+        stop_and_ref = ff_info[['stop_point_index', 'point_index', 'ff_index', 'ff_x', 'ff_y', 'monkey_x', 'monkey_y']].copy()
+        stop_and_ref[['stop_x', 'stop_y']] = monkey_information.loc[stop_and_ref['stop_point_index'], ['monkey_x', 'monkey_y']].values
+        curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(
+            curv_df, stop_and_ref, ff_real_position_sorted, monkey_information
+        )
 
-    # use merge to add curvature_info
-    shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction', 'curv_to_ff_center',
-                      'arc_radius_to_ff_center', 'd_heading_to_center', 'opt_arc_d_heading', 'opt_arc_end_x', 'opt_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
-    only_cur_ff_df = ff_info2.merge(curv_df[shared_columns], on=[
-                                    'ff_index', 'point_index'], how='left')
-    only_cur_ff_df = only_cur_ff_df.merge(
-        curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
+    # Merge curvature info
+    shared_cols = [
+        'ff_index', 'point_index', 'optimal_curvature', 'opt_arc_measure', 'opt_arc_radius',
+        'opt_arc_end_direction', 'curv_to_ff_center', 'arc_radius_to_ff_center',
+        'd_heading_to_center', 'opt_arc_d_heading', 'opt_arc_end_x', 'opt_arc_end_y',
+        'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center'
+    ]
+    df = ff_info.merge(curv_df[shared_cols], on=['ff_index', 'point_index'], how='left')
+    df = df.merge(curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
-    only_cur_ff_df['d_heading_of_traj'] = only_cur_ff_df['monkey_angle_before_stop'] - \
-        only_cur_ff_df['monkey_angle']
-    only_cur_ff_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
-        only_cur_ff_df['d_heading_of_traj'].values)
-    only_cur_ff_df[['cur_d_heading_of_arc', 'd_heading_of_traj']
-                   ] = only_cur_ff_df[['opt_arc_d_heading', 'd_heading_of_traj']]
-    only_cur_ff_df[['cur_d_heading_of_arc', 'd_heading_of_traj']] = only_cur_ff_df[[
-        'cur_d_heading_of_arc', 'd_heading_of_traj']]*180/math.pi
-    only_cur_ff_df['ref_time'] = monkey_information.loc[only_cur_ff_df['point_index'].values, 'time'].values
-    only_cur_ff_df['stop_time'] = monkey_information.loc[only_cur_ff_df['stop_point_index'].values, 'time'].values
-    only_cur_ff_df.rename(
-        columns={'point_index': 'ref_point_index'}, inplace=True)
-    only_cur_ff_df['beginning_time'] = only_cur_ff_df['stop_time'] - \
-        stop_period_duration
+    # Add d_heading info
+    df = plan_factors_utils.add_d_heading_of_traj_to_df(df)
+    df[['cur_d_heading_of_arc', 'd_heading_of_traj']] *= 180 / math.pi
+    df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_180(df['d_heading_of_traj'].values)
+    df['diff_in_d_heading_to_cur_ff'] = df['d_heading_of_traj'] - df['cur_d_heading_of_arc']
 
-    only_cur_ff_df['d_heading_of_traj'] = only_cur_ff_df['d_heading_of_traj'] % 360
-    only_cur_ff_df.loc[only_cur_ff_df['d_heading_of_traj'] > 180,
-                       'd_heading_of_traj'] = only_cur_ff_df.loc[only_cur_ff_df['d_heading_of_traj'] > 180, 'd_heading_of_traj'] - 360
-    only_cur_ff_df['diff_in_d_heading_to_cur_ff'] = only_cur_ff_df['d_heading_of_traj'] - \
-        only_cur_ff_df['cur_d_heading_of_arc']
+    # Add time-related columns
+    df['ref_time'] = monkey_information.loc[df['point_index'], 'time'].values
+    df['stop_time'] = monkey_information.loc[df['stop_point_index'], 'time'].values
+    df['beginning_time'] = df['stop_time'] - stop_period_duration
+    df.rename(columns={'point_index': 'ref_point_index'}, inplace=True)
 
-    # get curv range info etc
-    curv_of_traj_stat_df = build_factor_comp.find_curv_of_traj_stat_df(only_cur_ff_df, curv_of_traj_df, start_time_column='beginning_time',
-                                                                       end_time_column='stop_time')
-    only_cur_ff_df = build_factor_comp_utils._add_stat_columns_to_df(
-        curv_of_traj_stat_df, only_cur_ff_df, ['curv'], 'stop_point_index')
+    # Add curvature statistics between beginning_time and stop_time
+    curv_stat = build_factor_comp.find_curv_of_traj_stat_df(
+        df, curv_of_traj_df, start_time_column='beginning_time', end_time_column='stop_time'
+    )
+    df = build_factor_comp_utils._add_stat_columns_to_df(
+        curv_stat, df, ['curv'], 'stop_point_index'
+    )
 
-    # add angle_from_cur_ff_to_stop
-    only_cur_ff_df['stop_x'], only_cur_ff_df['stop_y'] = monkey_information.loc[only_cur_ff_df['stop_point_index'], [
-        'monkey_x', 'monkey_y']].values.T
-    only_cur_ff_df['angle_from_cur_ff_to_stop'] = specific_utils.calculate_angles_to_ff_centers(ff_x=only_cur_ff_df['stop_x'].values, ff_y=only_cur_ff_df['stop_y'],
-                                                                                                mx=only_cur_ff_df[
-                                                                                                    'ff_x'].values, my=only_cur_ff_df['ff_y'],
-                                                                                                m_angle=only_cur_ff_df['monkey_angle_before_stop'])
-    only_cur_ff_df['dir_from_cur_ff_to_stop'] = np.sign(
-        only_cur_ff_df['angle_from_cur_ff_to_stop'])
+    # Add angle from ff to stop
+    df[['stop_x', 'stop_y']] = monkey_information.loc[df['stop_point_index'], ['monkey_x', 'monkey_y']].values
+    df['angle_from_cur_ff_to_stop'] = specific_utils.calculate_angles_to_ff_centers(
+        ff_x=df['stop_x'].values, ff_y=df['stop_y'],
+        mx=df['ff_x'].values, my=df['ff_y'],
+        m_angle=df['monkey_angle_before_stop']
+    )
+    df['dir_from_cur_ff_to_stop'] = np.sign(df['angle_from_cur_ff_to_stop'])
 
-    curv_of_traj_df_w_one_sided_window, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode([-25, 0], monkey_information, ff_caught_T_new,
-                                                                                                               curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
-    only_cur_ff_df = build_factor_comp.add_column_curv_of_traj_before_stop(
-        only_cur_ff_df, curv_of_traj_df_w_one_sided_window)
+    # Add curvature-of-trajectory before stop
+    curv_window_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(
+        window_for_curv_of_traj, monkey_information, ff_caught_T_new,
+        curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False
+    )
+    df = build_factor_comp.add_column_curv_of_traj_before_stop(df, curv_window_df)
 
-    only_cur_ff_df = only_cur_ff_df.sort_values(
-        by='stop_point_index').reset_index(drop=True)
-
-    return only_cur_ff_df
+    return df.sort_values(by='stop_point_index').reset_index(drop=True)
 
 
 def find_ff_info_and_cur_ff_info_at_start_df(only_cur_ff_df, monkey_info_in_all_stop_periods, ff_flash_sorted,
