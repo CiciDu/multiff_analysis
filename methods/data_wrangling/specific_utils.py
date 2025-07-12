@@ -49,7 +49,7 @@ def calculate_angles_to_ff_centers(ff_x, ff_y, mx, my, m_angle):
         distances_to_ff = LA.norm(np.array([ff_x-mx, ff_y-my]), axis=0)
     if np.any(distances_to_ff < 0.001):
         print(
-            f'Note: {np.sum(distances_to_ff < 0.001)} fireflies are too close to the monkey/agent. Their angles are set to 0.')
+            f'Note: when calculating angles to ff centers, {np.sum(distances_to_ff < 0.001)} rows are too close to the monkey/agent: less than 0.001 m. Their angles are set to 0.')
         angles_to_ff[distances_to_ff < 0.001] = 0
 
     try:

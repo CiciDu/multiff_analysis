@@ -77,10 +77,10 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                  'value': 'truncate_curv_of_traj_by_time_of_capture'},
                              {'label': 'eliminate outliers',
                                  'value': 'eliminate_outliers'},
-                             {'label': 'use curvature to ff center', 'value': 'use_curvature_to_ff_center'}]
+                             {'label': 'use curvature to ff center', 'value': 'use_curv_to_ff_center'}]
 
         checklist_params = ['heading_instead_of_curv',
-                            'eliminate_outliers', 'use_curvature_to_ff_center']
+                            'eliminate_outliers', 'use_curv_to_ff_center']
         checklist_values = [
             key for key in checklist_params if self.overall_params[key] is True]
         if self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] is True:
@@ -227,7 +227,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         old_checklist_params = {'heading_instead_of_curv': self.overall_params['heading_instead_of_curv'],  # We update based on this variable elsewhere
                                 'truncate_curv_of_traj_by_time_of_capture': self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'],
                                 'eliminate_outliers': self.overall_params['eliminate_outliers'],
-                                'use_curvature_to_ff_center': self.overall_params['use_curvature_to_ff_center'],
+                                'use_curv_to_ff_center': self.overall_params['use_curv_to_ff_center'],
                                 }
 
         # update checklist_params into the instance
@@ -236,7 +236,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         else:
             self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] = False
 
-        for param in ['eliminate_outliers', 'use_curvature_to_ff_center', 'heading_instead_of_curv']:
+        for param in ['eliminate_outliers', 'use_curv_to_ff_center', 'heading_instead_of_curv']:
             if param in checklist_for_all_plots:
                 self.overall_params[param] = True
             else:
@@ -244,7 +244,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         # update the plots based on the new checklist_params
         if ((self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] != old_checklist_params['truncate_curv_of_traj_by_time_of_capture'])
-                or (self.overall_params['use_curvature_to_ff_center'] != old_checklist_params['use_curvature_to_ff_center'])):
+                or (self.overall_params['use_curv_to_ff_center'] != old_checklist_params['use_curv_to_ff_center'])):
             self. _rerun_after_changing_curv_of_traj_params()
             self._prepare_static_main_plots()
         elif self.overall_params['eliminate_outliers'] != old_checklist_params['eliminate_outliers']:
@@ -498,8 +498,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if self.overall_params['heading_instead_of_curv']:
             current_ang_traj_nxt = round(self.heading_info_df.loc[self.heading_info_df['stop_point_index'] ==
                                                                   self.stop_point_index, 'angle_from_m_before_stop_to_nxt_ff'].item() * (180/np.pi), decimals)
+
+            angle_var = 'angle_cntr_arc_from_cur_end_to_nxt' if self.overall_params[
+                'use_curv_to_ff_center'] else 'angle_opt_arc_from_cur_end_to_nxt'
             current_ang_cur_nxt = round(self.heading_info_df.loc[self.heading_info_df['stop_point_index'] ==
-                                                                 self.stop_point_index, 'angle_from_cur_ff_landing_to_nxt_ff'].item() * (180/np.pi), decimals)
+                                                                 self.stop_point_index, angle_var].item() * (180/np.pi), decimals)
             self.other_messages = f"Angle to Nxt FF from Traj: {current_ang_traj_nxt}, \n     Angle to Nxt FF from cur ff: {current_ang_cur_nxt}"
         else:
             current_traj_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
@@ -567,7 +570,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         # for the cur ff, we eliminate the point index after the capture
 
-        if self.overall_params['use_curvature_to_ff_center']:
+        if self.overall_params['use_curv_to_ff_center']:
             all_point_index = self.curv_of_traj_df_in_duration['point_index'].values
             self.cur_null_arc_info_for_duration = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(all_point_index, np.repeat(
                 np.array([self.cur_ff_index]), len(all_point_index)), self.monkey_information, self.ff_real_position_sorted, verbose=False)

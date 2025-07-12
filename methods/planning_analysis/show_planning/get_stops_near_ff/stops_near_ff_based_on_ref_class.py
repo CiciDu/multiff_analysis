@@ -46,7 +46,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                                    ref_point_mode='distance', ref_point_value=-150,
                                    curv_traj_window_before_stop=[-50, 0],
                                    curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25], truncate_curv_of_traj_by_time_of_capture=False,
-                                   eliminate_outliers=False, use_curvature_to_ff_center=False, deal_with_rows_with_big_ff_angles=True,
+                                   eliminate_outliers=False, use_curv_to_ff_center=False, deal_with_rows_with_big_ff_angles=True,
                                    remove_i_o_modify_rows_with_big_ff_angles=True,
                                    stops_near_ff_df_exists_ok=True,
                                    heading_info_df_exists_ok=True, test_or_control='test',
@@ -70,7 +70,7 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
         self.overall_params['remove_i_o_modify_rows_with_big_ff_angles'] = remove_i_o_modify_rows_with_big_ff_angles
-        self.overall_params['use_curvature_to_ff_center'] = use_curvature_to_ff_center
+        self.overall_params['use_curv_to_ff_center'] = use_curv_to_ff_center
 
         self._get_nxt_ff_and_cur_ff_info_based_on_ref_point(ref_point_mode, ref_point_value,
                                                             deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
@@ -98,24 +98,27 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after cur ff visible', ref_point_value=0.0,
                                                   curv_traj_window_before_stop=[
                                                       -50, 0],
-                                                  use_curvature_to_ff_center=False, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                                  save_data=True, merge_diff_in_curv_df_to_heading_info=True):
+                                                  use_curv_to_ff_center=False, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
+                                                  save_data=True, merge_diff_in_curv_df_to_heading_info=True,
+                                                  deal_with_rows_with_big_ff_angles=True,
+                                                  remove_i_o_modify_rows_with_big_ff_angles=True):
 
         self.ref_point_params = {
             'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value}
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
         self.curv_traj_window_before_stop = curv_traj_window_before_stop
-        self.overall_params['use_curvature_to_ff_center'] = use_curvature_to_ff_center
+        self.overall_params['use_curv_to_ff_center'] = use_curv_to_ff_center
 
         self.get_stops_near_ff_df(
             test_or_control=test_or_control, exists_ok=stops_near_ff_df_exists_ok, save_data=True)
         self._get_nxt_ff_and_cur_ff_info_based_on_ref_point(ref_point_mode, ref_point_value,
-                                                            deal_with_rows_with_big_ff_angles=True,
-                                                            remove_i_o_modify_rows_with_big_ff_angles=True)
+                                                            deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
+                                                            remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
         self.cur_and_nxt_ff_df = self._make_cur_and_nxt_ff_df()
         self.heading_info_df, self.diff_in_curv_df = self._make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
                                                                                 merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
+
 
     def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self, ref_point_mode, ref_point_value,
                                                        deal_with_rows_with_big_ff_angles=True,
@@ -236,13 +239,13 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         # else:
         #     return
 
-        if self.overall_params['use_curvature_to_ff_center']:
-            self.curv_var = 'curv_to_ff_center'
+        if self.overall_params['use_curv_to_ff_center']:
+            self.curv_var = 'cntr_arc_curv'
         else:
-            self.curv_var = 'optimal_curvature'
+            self.curv_var = 'opt_arc_curv'
 
         self.traj_curv_counted, self.nxt_curv_counted = find_stops_near_ff_utils.find_relative_curvature(
-            self.nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, self.overall_params['use_curvature_to_ff_center'])
+            self.nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, self.overall_params['use_curv_to_ff_center'])
 
         self.curv_for_correlation_df = pd.DataFrame({'traj_curv_counted': self.traj_curv_counted,
                                                      'nxt_curv_counted': self.nxt_curv_counted,
@@ -287,8 +290,8 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
         nxt_ff_df = self.nxt_ff_final_df.copy()
 
         self.d_heading_of_traj = nxt_ff_df['d_heading_of_traj'].values
-        self.d_heading_cur = self.cur_ff_final_df['d_heading_of_arc'].values
-        self.d_heading_nxt = nxt_ff_df['d_heading_of_arc'].values
+        self.d_heading_cur = self.cur_ff_final_df['opt_arc_d_heading'].values
+        self.d_heading_nxt = nxt_ff_df['opt_arc_d_heading'].values
 
         self.d_heading_of_traj = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
             self.d_heading_of_traj)
@@ -391,11 +394,8 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
                                                                     'stop_point_index', 'rank_by_angle_to_nxt_ff']], on='stop_point_index', how='left')
 
             if 'nxt_ff_angle_at_ref' not in self.heading_info_df.columns:
-                self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
-                self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df2['stop_point_index'].values
-                self.heading_info_df = self.heading_info_df.merge(
-                    self.both_ff_at_ref_df, on='stop_point_index', how='left')
-
+                self.add_both_ff_at_ref_to_heading_info_df()
+                
             df_name = find_stops_near_ff_utils.get_df_name_by_ref(
                 self.monkey_name, self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'])
             if save_data:
@@ -412,6 +412,13 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
 
     # choose one function from the above
     # ===================================================================================================
+
+    def add_both_ff_at_ref_to_heading_info_df(self):
+        self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
+        self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df2['stop_point_index'].values
+        columns_to_add = [col for col in self.both_ff_at_ref_df.columns if col not in self.heading_info_df.columns]
+        self.heading_info_df = self.heading_info_df.merge(
+            self.both_ff_at_ref_df[columns_to_add + ['stop_point_index']], on='stop_point_index', how='left')
 
     def _deal_with_rows_with_big_ff_angles(self, remove_i_o_modify_rows_with_big_ff_angles=True, verbose=False, delete_the_same_rows=True):
 
@@ -455,44 +462,31 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
 
         self.nxt_curv_df = curvature_utils.make_curvature_df(self.nxt_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information,
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
-                                                             invalid_curvature_ok=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+                                                             invalid_curvature_ok=True, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
         self.cur_curv_df = curvature_utils.make_curvature_df(self.cur_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information,
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
-                                                             invalid_curvature_ok=False, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+                                                             invalid_curvature_ok=False, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
 
         if self.opt_arc_type == 'opt_arc_stop_closest':
-            stop_and_ref_point_info = self.cur_ff_df_modified[['stop_point_index', 'point_index', 'ff_index', 'stop_x', 'stop_y', 'ff_x', 'ff_y', 'monkey_x', 'monkey_y']].copy()
+            stop_and_ref_point_info = self.cur_ff_df_modified[[
+                'stop_point_index', 'point_index', 'ff_index', 'ff_x', 'ff_y', 'monkey_x', 'monkey_y']].copy()
+            stop_and_ref_point_info = stop_and_ref_point_info.merge(self.stops_near_ff_df_modified[['stop_point_index', 'stop_x', 'stop_y']], on='stop_point_index', how='left')
             # if stop_x and stop_y don't exist
             # stop_and_ref_point_info['stop_x'], stop_and_ref_point_info['stop_y'] = self.monkey_information.loc[stop_and_ref_point_info['stop_point_index'], [
             #     'monkey_x', 'monkey_y']].values.T
-            
+
             self.cur_curv_df = opt_arc_utils.update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(self.cur_curv_df, stop_and_ref_point_info,
                                                                                                                      self.ff_real_position_sorted, self.monkey_information)
 
         # use merge to add curvature_info
-        shared_columns = ['ff_index', 'point_index', 'optimal_curvature', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction', 'curv_of_traj', 'curv_to_ff_center',
-                          'arc_radius_to_ff_center', 'd_heading_to_center', 'opt_arc_d_heading', 'opt_arc_end_x', 'opt_arc_end_y', 'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']
+        shared_columns = ['ff_index', 'point_index', 'opt_arc_curv', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction', 'curv_of_traj', 'cntr_arc_curv',
+                          'cntr_arc_radius', 'cntr_arc_d_heading', 'opt_arc_d_heading', 'opt_arc_end_x', 'opt_arc_end_y', 'cntr_arc_end_x', 'cntr_arc_end_y']
         self.nxt_ff_final_df = self.nxt_ff_df_modified.merge(
             self.nxt_curv_df[shared_columns], on=['ff_index', 'point_index'], how='left')
         self.cur_ff_final_df = self.cur_ff_df_modified.merge(
             self.cur_curv_df[shared_columns], on=['ff_index', 'point_index'], how='left')
 
     def _add_d_heading_info(self):
-
-        if self.overall_params['use_curvature_to_ff_center']:
-            self.nxt_ff_final_df['d_heading_of_arc'] = self.nxt_ff_final_df['d_heading_to_center']
-            self.cur_ff_final_df['d_heading_of_arc'] = self.cur_ff_final_df['d_heading_to_center']
-            self.nxt_ff_final_df[['arc_end_x', 'arc_end_y']] = self.nxt_ff_final_df[[
-                'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']]
-            self.cur_ff_final_df[['arc_end_x', 'arc_end_y']] = self.cur_ff_final_df[[
-                'arc_end_x_to_ff_center', 'arc_end_y_to_ff_center']]
-        else:
-            self.nxt_ff_final_df['d_heading_of_arc'] = self.nxt_ff_final_df['opt_arc_d_heading']
-            self.cur_ff_final_df['d_heading_of_arc'] = self.cur_ff_final_df['opt_arc_d_heading']
-            self.nxt_ff_final_df[['arc_end_x', 'arc_end_y']] = self.nxt_ff_final_df[[
-                'opt_arc_end_x', 'opt_arc_end_y']]
-            self.cur_ff_final_df[['arc_end_x', 'arc_end_y']] = self.cur_ff_final_df[[
-                'opt_arc_end_x', 'opt_arc_end_y']]
 
         self.nxt_ff_final_df = self.add_d_heading_of_traj_to_df(
             self.nxt_ff_final_df)
@@ -584,8 +578,6 @@ class StopsNearFFBasedOnRef(plot_stops_near_ff_class._PlotStopsNearFF):
     def _make_info_based_on_monkey_angle(self):
         self.info_based_on_monkey_angle_before_stop = find_stops_near_ff_utils.calculate_info_based_on_monkey_angles(
             self.stops_near_ff_df, self.stops_near_ff_df.monkey_angle_before_stop.values)
-        self.info_based_on_monkey_angle_when_nxt_ff_last_seen = find_stops_near_ff_utils.calculate_info_based_on_monkey_angles(
-            self.stops_near_ff_df, self.nxt_ff_df.monkey_angle_ff_last_seen.values)
 
     def _make_kwargs_for_correlation_plot(self):
 

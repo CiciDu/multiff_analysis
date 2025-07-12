@@ -77,7 +77,7 @@ class GPFAHelperClass():
         except Exception as e:
             print(f'Warning: Failed to save trajectories: {str(e)}')
 
-    def prepare_spikes_for_gpfa(self, align_at_beginning=False):
+    def prepare_spikes_for_gpfa(self, behav_segment_df, bin_width=None, align_at_beginning=False):
 
         self.align_at_beginning = align_at_beginning
 
@@ -85,10 +85,13 @@ class GPFAHelperClass():
                                                         sampling_rate=self.sampling_rate)
 
         self.spike_segs_df = fit_gpfa_utils.make_spike_segs_df(
-            spike_df, self.single_vis_target_df)
+            spike_df, behav_segment_df)
+        
+        if bin_width is None:
+            bin_width = self.bin_width
 
         self.common_t_stop = max(
-            self.spike_segs_df['t_duration']) + self.bin_width
+            self.spike_segs_df['t_duration']) + bin_width
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
 

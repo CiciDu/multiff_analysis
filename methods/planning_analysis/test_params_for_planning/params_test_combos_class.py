@@ -64,7 +64,7 @@ class ParamsTestCombos(dash_prep_class.DashCartesianPreparation):
                                                                                curv_of_traj_upper_end_based_on_mode=self.curv_of_traj_upper_end_based_on_mode,
                                                                                ref_point_value_based_on_mode=self.ref_point_params_based_on_mode)
         self.all_combo_df = params_utils.add_columns_of_dummy_variables_to_all_combos_df(
-            self.all_combo_df, column_names=['use_curvature_to_ff_center'])
+            self.all_combo_df, column_names=['use_curv_to_ff_center'])
         self.all_combo_short = self.all_combo_df.copy()
         self.all_combo_df = params_utils.add_columns_of_dummy_variables_to_all_combos_df(
             self.all_combo_df, column_names=['truncate_curv_of_traj_by_time_of_capture', 'eliminate_outliers'])
@@ -99,12 +99,12 @@ class ParamsTestCombos(dash_prep_class.DashCartesianPreparation):
         self.curv_of_traj_upper_end = self.row['curv_of_traj_upper_end']
         self.curv_of_traj_params['window_for_curv_of_traj'] = [
             self.curv_of_traj_lower_end, self.curv_of_traj_upper_end]
-        self.overall_params['use_curvature_to_ff_center'] = self.row['use_curvature_to_ff_center']
+        self.overall_params['use_curv_to_ff_center'] = self.row['use_curv_to_ff_center']
 
         # self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] = self.row['truncate_curv_of_traj_by_time_of_capture']
         # self.overall_params['eliminate_outliers'] = self.row['eliminate_outliers']
 
-        if self.overall_params['use_curvature_to_ff_center']:
+        if self.overall_params['use_curv_to_ff_center']:
             self.overall_params['remove_i_o_modify_rows_with_big_ff_angles'] = True
         else:
             self.overall_params['remove_i_o_modify_rows_with_big_ff_angles'] = False
@@ -114,8 +114,8 @@ class ParamsTestCombos(dash_prep_class.DashCartesianPreparation):
             (self.all_combo_df['ref_point_value'] == self.row['ref_point_value']) &\
             (self.all_combo_df['curv_of_traj_lower_end'] == self.row['curv_of_traj_lower_end']) &\
             (self.all_combo_df['curv_of_traj_upper_end'] == self.row['curv_of_traj_upper_end']) &\
-            (self.all_combo_df['use_curvature_to_ff_center']
-             == self.row['use_curvature_to_ff_center'])
+            (self.all_combo_df['use_curv_to_ff_center']
+             == self.row['use_curv_to_ff_center'])
 
     def test_one_set_of_hyperparameters(self, sample_size, position_index=None):
 
@@ -133,7 +133,7 @@ class ParamsTestCombos(dash_prep_class.DashCartesianPreparation):
                                         eliminate_outliers=self.overall_params['eliminate_outliers'],
                                         remove_i_o_modify_rows_with_big_ff_angles=self.overall_params[
                                             'remove_i_o_modify_rows_with_big_ff_angles'],
-                                        use_curvature_to_ff_center=self.overall_params['use_curvature_to_ff_center'])
+                                        use_curv_to_ff_center=self.overall_params['use_curv_to_ff_center'])
         self.all_combo_df.loc[self.current_main_hyperparameters_info, [
             'sample_size']] = sample_size
 
@@ -171,14 +171,14 @@ class ParamsTestCombos(dash_prep_class.DashCartesianPreparation):
             nxt_curv_counted, traj_curv_counted)
 
         all_r_values, all_p_values = params_utils.generate_distribution_of_correlation_after_shuffling_nxt_ff_curv(
-            self.nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, self.overall_params['use_curvature_to_ff_center'], sample_size)
+            self.nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, self.overall_params['use_curv_to_ff_center'], sample_size)
         self.all_combo_df.loc[self.current_full_hyperparameters_info, [
             'curv_r', 'shuffled_curv_r_mean', 'shuffled_curv_r_std']] = r_value, np.mean(all_r_values), np.std(all_r_values)
 
     def calculate_heading_r(self, sample_size=100):
-        d_heading_nxt = self.nxt_ff_counted_df['d_heading_of_arc'].values.copy(
+        d_heading_nxt = self.nxt_ff_counted_df['opt_arc_d_heading'].values.copy(
         )
-        d_heading_cur = self.cur_ff_counted_df['d_heading_of_arc'].values.copy(
+        d_heading_cur = self.cur_ff_counted_df['opt_arc_d_heading'].values.copy(
         )
         d_heading_of_traj = self.nxt_ff_counted_df['d_heading_of_traj'].values.copy(
         )

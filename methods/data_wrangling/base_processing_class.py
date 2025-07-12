@@ -72,6 +72,8 @@ class BaseProcessing:
             'raw_monkey_data', 'processed_data')
         self.planning_data_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'planning')
+        self.planning_neural_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'planning_and_neural')
         self.patterns_and_features_data_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'patterns_and_features')
         self.decision_making_folder_path = raw_data_folder_path.replace(
@@ -82,6 +84,8 @@ class BaseProcessing:
             'raw_monkey_data', 'processed_neural_data')
         self.time_calibration_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'time_calibration')
+        self.decoding_targets_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'decoding_targets')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
@@ -326,3 +330,6 @@ class BaseProcessing:
         self.diff_in_curv_partial_path = f'diff_in_curv_df/{opt_arc_type}'
         self.plan_x_partial_path = f'plan_x_df/{opt_arc_type}'
         self.plan_y_partial_path = f'plan_y_df/{opt_arc_type}'
+        # this can plater replace plan_x and plan_y
+        self.planning_data_by_point_partial_path = f'planning_segment_data/{opt_arc_type}'
+        self.planning_data_by_point_partial_path = f'planning_data_by_point/{opt_arc_type}'

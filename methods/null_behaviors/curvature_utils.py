@@ -17,7 +17,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=15, clean=True,
                       monkey_information=None, ff_caught_T_new=None,
                       remove_invalid_rows=True, invalid_curvature_ok=False,
-                      include_curv_to_ff_center=True, include_optimal_curvature=True,
+                      include_cntr_arc_curv=True, include_opt_arc_curv=True,
                       opt_arc_stop_first_vis_bdry=False,  # whether optimal arc stop at visible boundary
                       ignore_error=False):
 
@@ -27,10 +27,10 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=1
     if remove_invalid_rows:
         ff_dataframe_sub = ff_dataframe_sub.copy()
         original_length = len(ff_dataframe_sub)
-        if include_curv_to_ff_center:
+        if include_cntr_arc_curv:
             mask = ff_dataframe_sub.ff_angle.between(
                 -45*math.pi/180, 45*math.pi/180)
-        elif include_optimal_curvature:
+        elif include_opt_arc_curv:
             mask = ff_dataframe_sub.ff_angle_boundary.between(
                 -45*math.pi/180, 45*math.pi/180)
         # if mask is empty, then we don't need to drop any rows
@@ -52,40 +52,37 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=1
         ff_dataframe_sub['point_index'].values, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_new=ff_caught_T_new)
 
     curvature_df = _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=ff_radius_for_opt_arc, clean=clean, invalid_curvature_ok=invalid_curvature_ok,
-                                      include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature,
+                                      include_cntr_arc_curv=include_cntr_arc_curv, include_opt_arc_curv=include_opt_arc_curv,
                                       opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry, ignore_error=ignore_error)
     return curvature_df
 
 
 def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15, clean=False,
                        invalid_curvature_ok=False,
-                       include_curv_to_ff_center=True, include_optimal_curvature=True,
+                       include_cntr_arc_curv=True, include_opt_arc_curv=True,
                        opt_arc_stop_first_vis_bdry=True, ignore_error=False):
 
     # it needs ff_dataframe_sub to have the following columns:
     # point_index, ff_index, monkey_x, monkey_y, monkey_angle, ff_x, ff_y, ff_distance, ff_angle, ff_angle_boundary
 
-    if (not include_curv_to_ff_center) and (not include_optimal_curvature):
+    if (not include_cntr_arc_curv) and (not include_opt_arc_curv):
         raise ValueError(
-            "At least one of include_curv_to_ff_center and include_optimal_curvature should be True.")
+            "At least one of include_cntr_arc_curv and include_opt_arc_curv should be True.")
 
-    curvature_df = pd.DataFrame({'curv_of_traj': curv_of_traj,
-                                 'point_index': ff_dataframe_sub['point_index'].values,
-                                 'ff_index': ff_dataframe_sub['ff_index'].values,
-                                 })
 
-    curvature_df = curvature_df.merge(ff_dataframe_sub[['point_index', 'ff_index', 'monkey_x', 'monkey_y', 'monkey_angle',
-                                                        'ff_x', 'ff_y', 'ff_distance', 'ff_angle', 'ff_angle_boundary']],
-                                      on=['point_index', 'ff_index'], how='left')
+    curvature_df = ff_dataframe_sub[['point_index', 'ff_index', 'monkey_x', 'monkey_y', 'monkey_angle',
+                                    'ff_x', 'ff_y', 'ff_distance', 'ff_angle', 'ff_angle_boundary']].copy()
+
+    curvature_df['curv_of_traj'] = curv_of_traj
 
     curvature_df = supply_with_ff_curvature_info(curvature_df, ff_radius_for_opt_arc=ff_radius_for_opt_arc, invalid_curvature_ok=invalid_curvature_ok,
-                                                 include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature,
+                                                 include_cntr_arc_curv=include_cntr_arc_curv, include_opt_arc_curv=include_opt_arc_curv,
                                                  opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry, ignore_error=ignore_error)
-    add_d_heading_info(curvature_df, include_curv_to_ff_center=include_curv_to_ff_center,
-                       include_optimal_curvature=include_optimal_curvature)
+    add_d_heading_info(curvature_df, include_cntr_arc_curv=include_cntr_arc_curv,
+                       include_opt_arc_curv=include_opt_arc_curv)
 
-    if include_optimal_curvature:
-        curvature_df.loc[:, 'curv_diff'] = curvature_df['optimal_curvature'].values - \
+    if include_opt_arc_curv:
+        curvature_df.loc[:, 'curv_diff'] = curvature_df['opt_arc_curv'].values - \
             curvature_df['curv_of_traj'].values
         curvature_df.loc[:, 'abs_curv_diff'] = np.abs(
             curvature_df.loc[:, 'curv_diff'])
@@ -94,18 +91,18 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15,
 
     if clean:
         clean_curvature_info(
-            curvature_df, include_optimal_curvature=include_optimal_curvature)
+            curvature_df, include_opt_arc_curv=include_opt_arc_curv)
 
     return curvature_df
 
 
 def supply_with_ff_curvature_info(curvature_df, ff_radius_for_opt_arc=15, invalid_curvature_ok=False,
-                                  include_curv_to_ff_center=True, include_optimal_curvature=True,
+                                  include_cntr_arc_curv=True, include_opt_arc_curv=True,
                                   opt_arc_stop_first_vis_bdry=True, ignore_error=False):
-    if include_curv_to_ff_center:
+    if include_cntr_arc_curv:
         curvature_df = _supply_curvature_df_with_arc_to_ff_center_info(
             curvature_df, invalid_curvature_ok=invalid_curvature_ok)
-    if include_optimal_curvature:
+    if include_opt_arc_curv:
         curvature_df = opt_arc_utils._supply_curvature_df_with_opt_arc_info(curvature_df, ff_radius_for_opt_arc, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry,
                                                                             ignore_error=ignore_error)
 
@@ -118,10 +115,10 @@ def _add_arc_ending_xy_to_ff_center_to_curvature_df(curvature_df):
     # # find arc ending xy for curv to ff center
     arc_ff_xy = curvature_df[['ff_x', 'ff_y']].values
 
-    arc_end_x, arc_end_y = _find_arc_ending_xy_in_world_coord(arc_ff_xy, monkey_xy, monkey_angle, curvature_df['arc_radius_to_ff_center'].values,
-                                                              curvature_df['arc_end_direction_to_ff_center'].values)
-    curvature_df['arc_end_x_to_ff_center'] = arc_end_x
-    curvature_df['arc_end_y_to_ff_center'] = arc_end_y
+    arc_end_x, arc_end_y = _find_arc_ending_xy_in_world_coord(arc_ff_xy, monkey_xy, monkey_angle, curvature_df['cntr_arc_radius'].values,
+                                                              curvature_df['cntr_arc_end_dir'].values)
+    curvature_df['cntr_arc_end_x'] = arc_end_x
+    curvature_df['cntr_arc_end_y'] = arc_end_y
 
     return curvature_df
 
@@ -138,13 +135,13 @@ def _find_arc_ending_xy_in_world_coord(arc_ff_xy, monkey_xy, monkey_angle, arc_r
     return arc_end_x, arc_end_y
 
 
-def add_d_heading_info(curvature_df, include_curv_to_ff_center=True, include_optimal_curvature=True):
-    if include_curv_to_ff_center:
-        curvature_df['arc_measure_to_center'], curvature_df['arc_length_to_center'] = find_arc_measure_and_length_to_ff_center(
-            curvature_df['arc_radius_to_ff_center'], curvature_df['ff_distance'], curvature_df['ff_angle'])
-        curvature_df['d_heading_to_center'] = curvature_df['arc_measure_to_center'] * \
+def add_d_heading_info(curvature_df, include_cntr_arc_curv=True, include_opt_arc_curv=True):
+    if include_cntr_arc_curv:
+        curvature_df['cntr_arc_measure'], curvature_df['cntr_arc_length'] = find_arc_measure_and_length_to_ff_center(
+            curvature_df['cntr_arc_radius'], curvature_df['ff_distance'], curvature_df['ff_angle'])
+        curvature_df['cntr_arc_d_heading'] = curvature_df['cntr_arc_measure'] * \
             np.sign(curvature_df['ff_angle'].values)
-    if include_optimal_curvature:
+    if include_opt_arc_curv:
         curvature_df['opt_arc_d_heading'] = curvature_df['opt_arc_measure'] * \
             curvature_df['opt_arc_end_direction'].values
 
@@ -185,14 +182,14 @@ def furnish_curvature_df(curvature_df, monkey_information, ff_real_position_sort
 def _supply_curvature_df_with_arc_to_ff_center_info(curvature_df, invalid_curvature_ok=False):
     all_ff_angle = curvature_df['ff_angle'].values.copy()
     all_ff_distance = curvature_df['ff_distance'].values.copy()
-    curvature_df['curv_to_ff_center'], curvature_df['arc_radius_to_ff_center'] = opt_arc_utils.find_arc_curvature(
+    curvature_df['cntr_arc_curv'], curvature_df['cntr_arc_radius'] = opt_arc_utils.find_arc_curvature(
         all_ff_angle, all_ff_distance, invalid_curvature_ok=invalid_curvature_ok)
-    curvature_df['arc_end_direction_to_ff_center'] = np.sign(
-        curvature_df['curv_to_ff_center'])
-    curvature_df['arc_measure_to_ff_center'], curvature_df['arc_length_to_ff_center'] = find_arc_measure_and_length_to_ff_center(
-        curvature_df['arc_radius_to_ff_center'], all_ff_distance, all_ff_angle)
+    curvature_df['cntr_arc_end_dir'] = np.sign(
+        curvature_df['cntr_arc_curv'])
+    curvature_df['cntr_arc_measure'], curvature_df['cntr_arc_length'] = find_arc_measure_and_length_to_ff_center(
+        curvature_df['cntr_arc_radius'], all_ff_distance, all_ff_angle)
     curvature_df.loc[curvature_df['ff_distance'] <= 25,
-                     'curv_to_ff_center'] = curvature_df.loc[curvature_df['ff_distance'] <= 25, 'curv_of_traj']
+                     'cntr_arc_curv'] = curvature_df.loc[curvature_df['ff_distance'] <= 25, 'curv_of_traj']
 
     # also add arc end xy
     curvature_df = _add_arc_ending_xy_to_ff_center_to_curvature_df(
@@ -369,15 +366,15 @@ def _find_polar_arc_starting_and_ending_angles(arc_radius, arc_measure, arc_end_
     return arc_starting_angle, arc_ending_angle
 
 
-def clean_curvature_info(curvature_df, include_optimal_curvature=True):
+def clean_curvature_info(curvature_df, include_opt_arc_curv=True):
     curvature_df['curv_of_traj'] = curvature_df['curv_of_traj'].clip(
         lower=-0.5, upper=0.5)
-    if include_optimal_curvature:
+    if include_opt_arc_curv:
         curvature_df['curvature_lower_bound'] = curvature_df['curvature_lower_bound'].clip(
             lower=-20, upper=2)
         curvature_df['curvature_upper_bound'] = curvature_df['curvature_upper_bound'].clip(
             lower=-20, upper=-2)
-        curvature_df['optimal_curvature'] = curvature_df['optimal_curvature'].clip(
+        curvature_df['opt_arc_curv'] = curvature_df['opt_arc_curv'].clip(
             lower=-0.2, upper=0.2)
         if 'curv_diff' in curvature_df.columns:
             curvature_df['curv_diff'] = curvature_df['curv_diff'].clip(
@@ -388,9 +385,9 @@ def clean_curvature_info(curvature_df, include_optimal_curvature=True):
 
 
 def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_new=None, curv_of_traj_df=None):
-    if 'optimal_curvature' in df.columns:
+    if 'opt_arc_curv' in df.columns:
         # need to fill NA of columns associated with curvature. At this point, NA should only occur when ff_index = -10 (placeholders). Thus, we fill NA with 0, instead of using the function 'fill_up_NAs_in_columns_related_to_curvature'
-        df['optimal_curvature'] = df[['optimal_curvature']].fillna(0)
+        df['opt_arc_curv'] = df[['opt_arc_curv']].fillna(0)
     if 'curvature_lower_bound' in df.columns:
         df['curvature_lower_bound'] = df[['curvature_lower_bound']].fillna(-20)
     if 'curvature_upper_bound' in df.columns:
@@ -426,10 +423,10 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
             df.loc[curv_traj_na_index, 'curv_of_traj'] = curv_of_traj
             df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
 
-    # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the optimal_curvature value shall be the same as curv_of_traj
-    if 'optimal_curvature' in df.columns:
+    # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the opt_arc_curv value shall be the same as curv_of_traj
+    if 'opt_arc_curv' in df.columns:
         within_ff_na_index = (df['ff_distance'] <=
-                              25) & df['optimal_curvature'].isna()
+                              25) & df['opt_arc_curv'].isna()
     elif 'curv_diff' in df.columns:
         within_ff_na_index = (df['ff_distance'] <= 25) & df['curv_diff'].isna()
     elif 'abs_curv_diff' in df.columns:
@@ -437,13 +434,13 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
                               25) & df['abs_curv_diff'].isna()
     else:
         raise ValueError(
-            "Please provide either optimal_curvature, curv_diff, or abs_curv_diff in df.columns. Otherwise, change the algorithm here.")
+            "Please provide either opt_arc_curv, curv_diff, or abs_curv_diff in df.columns. Otherwise, change the algorithm here.")
 
-    if 'optimal_curvature' in df.columns:
+    if 'opt_arc_curv' in df.columns:
         df.loc[within_ff_na_index,
-               'optimal_curvature'] = df.loc[within_ff_na_index, 'curv_of_traj'].values
-        df.loc[within_ff_na_index, 'optimal_curvature'] = df.loc[within_ff_na_index,
-                                                                 'optimal_curvature'].clip(lower=-0.1, upper=0.1)
+               'opt_arc_curv'] = df.loc[within_ff_na_index, 'curv_of_traj'].values
+        df.loc[within_ff_na_index, 'opt_arc_curv'] = df.loc[within_ff_na_index,
+                                                            'opt_arc_curv'].clip(lower=-0.1, upper=0.1)
 
     # Fill NA values for other columns
     for column in ['curvature_lower_bound', 'curvature_upper_bound', 'curv_diff', 'abs_curv_diff']:
@@ -471,26 +468,26 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
         df.loc[ff_right_na_index, ['curvature_lower_bound',
                                    'curvature_upper_bound']] = np.array([-200, 0])
         middle_ff_na_index = (df['ff_angle_boundary']
-                              == 0) & df['optimal_curvature'].isna()
+                              == 0) & df['opt_arc_curv'].isna()
         df.loc[middle_ff_na_index, ['curvature_lower_bound',
                                     'curvature_upper_bound']] = np.array([-200, 200])
 
-    if 'optimal_curvature' in df.columns:
+    if 'opt_arc_curv' in df.columns:
         ff_left_na_index = (df['ff_angle_boundary'] >
-                            0) & df['optimal_curvature'].isna()
-        df.loc[ff_left_na_index, 'optimal_curvature'] = 0.1
+                            0) & df['opt_arc_curv'].isna()
+        df.loc[ff_left_na_index, 'opt_arc_curv'] = 0.1
         ff_right_na_index = (df['ff_angle_boundary'] <
-                             0) & df['optimal_curvature'].isna()
-        df.loc[ff_right_na_index, 'optimal_curvature'] = -0.1
+                             0) & df['opt_arc_curv'].isna()
+        df.loc[ff_right_na_index, 'opt_arc_curv'] = -0.1
         middle_ff_na_index = (df['ff_angle_boundary']
-                              == 0) & df['optimal_curvature'].isna()
-        df.loc[middle_ff_na_index, 'optimal_curvature'] = 0
+                              == 0) & df['opt_arc_curv'].isna()
+        df.loc[middle_ff_na_index, 'opt_arc_curv'] = 0
 
-    df['curv_diff'] = df['optimal_curvature'].values - df['curv_of_traj'].values
+    df['curv_diff'] = df['opt_arc_curv'].values - df['curv_of_traj'].values
     df['abs_curv_diff'] = np.abs(df['curv_diff'].values)
 
 
-def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['optimal_curvature', 'curv_diff']):
+def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['opt_arc_curv', 'curv_diff']):
     if curvature_df is None:
         raise ValueError('curvature_df is None, but add_arc_info is True')
     curvature_df_sub = curvature_df[[

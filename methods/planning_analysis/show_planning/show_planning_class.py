@@ -210,7 +210,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                          curv_traj_window_before_stop=[-50, 0],
                                          test_or_control=None, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                          show_printed_output=False, sessions_df_for_one_monkey=None,
-                                         use_curvature_to_ff_center=False,
+                                         use_curv_to_ff_center=False,
                                          merge_diff_in_curv_df_to_heading_info=True,
                                          save_data=True):
         self.ref_point_mode = ref_point_mode
@@ -226,13 +226,13 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             self.combd_heading_df_x_sessions = self._make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                                       curv_traj_window_before_stop=curv_traj_window_before_stop, test_or_control=test_or_control,
                                                                                       stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, sessions_df_for_one_monkey=sessions_df_for_one_monkey, heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                                      use_curvature_to_ff_center=use_curvature_to_ff_center)
+                                                                                      use_curv_to_ff_center=use_curv_to_ff_center)
         else:
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 self.combd_heading_df_x_sessions = self._make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                                           curv_traj_window_before_stop=curv_traj_window_before_stop, test_or_control=test_or_control,
                                                                                           stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, sessions_df_for_one_monkey=sessions_df_for_one_monkey,
-                                                                                          heading_info_df_exists_ok=heading_info_df_exists_ok, use_curvature_to_ff_center=use_curvature_to_ff_center)
+                                                                                          heading_info_df_exists_ok=heading_info_df_exists_ok, use_curv_to_ff_center=use_curv_to_ff_center)
 
         self.combd_heading_df_x_sessions.reset_index(drop=True, inplace=True)
         self.combd_diff_in_curv_df.reset_index(drop=True, inplace=True)
@@ -251,7 +251,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
     def _make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
                                           curv_traj_window_before_stop=[-50, 0], test_or_control='test',
                                           stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True, sessions_df_for_one_monkey=None,
-                                          use_curvature_to_ff_center=False):
+                                          use_curv_to_ff_center=False):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
         self.curv_traj_window_before_stop = curv_traj_window_before_stop
@@ -273,7 +273,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                                                      ref_point_value=ref_point_value, test_or_control=test_or_control,
                                                                                      curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                      stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                                     use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                                                     use_curv_to_ff_center=use_curv_to_ff_center,
                                                                                      merge_diff_in_curv_df_to_heading_info=False,
                                                                                      )
                 self.heading_info_df['data_name'] = row['data_name']
@@ -287,7 +287,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def _make_heading_info_df_for_a_data_session(self, monkey_name, data_name, ref_point_mode='distance', ref_point_value=-150, curv_traj_window_before_stop=[-50, 0],
                                                  test_or_control='test', heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
-                                                 use_curvature_to_ff_center=False,
+                                                 use_curv_to_ff_center=False,
                                                  merge_diff_in_curv_df_to_heading_info=True):
         self.ref_point_value = ref_point_value
         self.ref_point_mode = ref_point_mode
@@ -322,7 +322,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             self.snf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode,
                                                                ref_point_value=ref_point_value, curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                               use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                               use_curv_to_ff_center=use_curv_to_ff_center,
                                                                heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
             heading_info_df = self.snf.heading_info_df.copy()
@@ -333,16 +333,16 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                                                     -50, 0],
                                                                                 combd_heading_df_x_sessions_exists_ok=True,
                                                                                 heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
-                                                                                show_printed_output=False, use_curvature_to_ff_center=False, save_data=True):
+                                                                                show_printed_output=False, use_curv_to_ff_center=False, save_data=True):
         for test_or_control in ['control', 'test']:
             stops_near_ff_df_exists_ok = stops_near_ff_df_exists_ok if test_or_control == 'test' else stops_near_ff_df_exists_ok
             self.handle_heading_info_df(ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok, heading_info_df_exists_ok, stops_near_ff_df_exists_ok,
-                                        show_printed_output, test_or_control, curv_traj_window_before_stop=curv_traj_window_before_stop, use_curvature_to_ff_center=use_curvature_to_ff_center, save_data=save_data)
+                                        show_printed_output, test_or_control, curv_traj_window_before_stop=curv_traj_window_before_stop, use_curv_to_ff_center=use_curv_to_ff_center, save_data=save_data)
         return self.test_heading_info_df, self.ctrl_heading_info_df
 
     def handle_heading_info_df(self, ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok, heading_info_df_exists_ok, stops_near_ff_df_exists_ok, show_output, test_or_control,
                                curv_traj_window_before_stop=[-50, 0],
-                               use_curvature_to_ff_center=False, save_data=True):
+                               use_curv_to_ff_center=False, save_data=True):
         df_name = "test_heading_info_df" if test_or_control == 'test' else "ctrl_heading_info_df"
         try:
             if combd_heading_df_x_sessions_exists_ok:
@@ -356,7 +356,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                                        stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                                                        show_printed_output=show_output, test_or_control=test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                                                       use_curvature_to_ff_center=use_curvature_to_ff_center, save_data=save_data,
+                                                                                                       use_curv_to_ff_center=use_curv_to_ff_center, save_data=save_data,
                                                                                                        merge_diff_in_curv_df_to_heading_info=True)
             setattr(self, df_name, combd_heading_df_x_sessions)
         setattr(self, df_name, combd_heading_df_x_sessions)

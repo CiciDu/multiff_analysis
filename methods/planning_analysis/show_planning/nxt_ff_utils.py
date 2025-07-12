@@ -55,11 +55,11 @@ def get_all_nxt_ff_df_from_ff_dataframe(stops_near_ff_df, ff_dataframe_visible,
         ff_real_position_sorted[all_nxt_ff_df['cur_ff_index'].values] - all_nxt_ff_df[['ff_x', 'ff_y']].values, axis=1)
     all_nxt_ff_df.loc[all_nxt_ff_df['d_from_cur_ff_to_nxt_ff'] <=
                       min_distance_between_cur_and_nxt_ff, 'data_category_by_vis'] = 'neither'
-    print(f'{len(all_nxt_ff_df[all_nxt_ff_df["data_category_by_vis"]=="neither"])} rows out of {len(all_nxt_ff_df)} rows were not used from all_nxt_ff_df because the distance between stop and nxt ff is smaller than {min_distance_between_cur_and_nxt_ff}cm')
+    print(f'{len(all_nxt_ff_df[all_nxt_ff_df["data_category_by_vis"]=="neither"])} rows out of {len(all_nxt_ff_df)} rows were not used from all_nxt_ff_df because the distance between cur and nxt ff is smaller than {min_distance_between_cur_and_nxt_ff}cm')
 
     all_nxt_ff_df.loc[all_nxt_ff_df['d_from_cur_ff_to_nxt_ff'] >=
                       max_distance_between_cur_and_nxt_ff, 'data_category_by_vis'] = 'neither'
-    print(f'{len(all_nxt_ff_df[all_nxt_ff_df["data_category_by_vis"]=="neither"])} rows out of {len(all_nxt_ff_df)} rows were not used from all_nxt_ff_df because the distance between stop and nxt ff is larger than {max_distance_between_cur_and_nxt_ff}cm')
+    print(f'{len(all_nxt_ff_df[all_nxt_ff_df["data_category_by_vis"]=="neither"])} rows out of {len(all_nxt_ff_df)} rows were not used from all_nxt_ff_df because the distance between cur and nxt ff is larger than {max_distance_between_cur_and_nxt_ff}cm')
 
     all_nxt_ff_df = add_nxt_ff_first_and_last_seen_info(
         all_nxt_ff_df, ff_dataframe_visible, monkey_information, ff_real_position_sorted, ff_life_sorted)

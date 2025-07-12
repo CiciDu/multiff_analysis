@@ -307,10 +307,10 @@ def _find_ff_curv_df(ff_index, current_plotly_key_comp, ff_dataframe, monkey_inf
         monkey_information[['point_index', 'cum_distance']], on='point_index', how='left')
     ff_curv_df['rel_distance'] = np.round(
         ff_curv_df['cum_distance'] - row.stop_cum_distance, 2)
-    ff_curv_df['curv_to_ff_center'] = ff_curv_df['curv_to_ff_center'] * \
+    ff_curv_df['cntr_arc_curv'] = ff_curv_df['cntr_arc_curv'] * \
         180/np.pi * 100  # convert to degree/cm
-    ff_curv_df['optimal_curvature'] = ff_curv_df['optimal_curvature'] * \
+    ff_curv_df['opt_arc_curv'] = ff_curv_df['opt_arc_curv'] * \
         180/np.pi * 100  # convert to degree/cm
     ff_curv_df_sub = ff_curv_df[['point_index', 'rel_time',
-                                 'rel_distance', 'curv_to_ff_center', 'optimal_curvature']].copy()
+                                 'rel_distance', 'cntr_arc_curv', 'opt_arc_curv']].copy()
     return ff_curv_df_sub

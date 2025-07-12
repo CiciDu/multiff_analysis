@@ -114,15 +114,15 @@ def generate_distribution_of_correlation_after_shuffling_d_heading(d_heading_nxt
     return all_r_values, all_p_values
 
 
-def generate_distribution_of_correlation_after_shuffling_nxt_ff_curv(nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curvature_to_ff_center, sample_size):
+def generate_distribution_of_correlation_after_shuffling_nxt_ff_curv(nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curv_to_ff_center, sample_size):
     nxt_ff_counted_df = nxt_ff_counted_df.copy()
     all_r_values = []
     all_p_values = []
     for i in range(sample_size):
-        nxt_ff_counted_df[['curv_to_ff_center', 'optimal_curvature']] = nxt_ff_counted_df[[
-            'curv_to_ff_center', 'optimal_curvature']].sample(frac=1).values
+        nxt_ff_counted_df[['cntr_arc_curv', 'opt_arc_curv']] = nxt_ff_counted_df[[
+            'cntr_arc_curv', 'opt_arc_curv']].sample(frac=1).values
         traj_curv_counted, nxt_curv_counted = find_stops_near_ff_utils.find_relative_curvature(
-            nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curvature_to_ff_center)
+            nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curv_to_ff_center)
         slope, intercept, r_value, p_value, std_err = stats.linregress(
             nxt_curv_counted, traj_curv_counted)
         all_r_values.append(r_value)
@@ -273,7 +273,7 @@ def plot_tested_heading_df_or_curv_df2(sub_df,
     ref_point_mode = hyperparameter_dict['ref_point_mode']
     window_size = hyperparameter_dict['window_size']
     ref_point_value = hyperparameter_dict['ref_point_value']
-    use_curvature_to_ff_center = hyperparameter_dict['use_curvature_to_ff_center']
+    use_curv_to_ff_center = hyperparameter_dict['use_curv_to_ff_center']
     heading_instead_of_curv = hyperparameter_dict['heading_instead_of_curv']
 
     # given a subset, take out the rows belonging to the same window size
@@ -324,13 +324,13 @@ def plot_tested_heading_df_or_curv_df2(sub_df,
     fig_lines.add_shape(type="line", x0=0, y0=-1, x1=0, y1=num_lines,
                         line=dict(color="black", width=1, dash="dashdot"))
 
-    # use heading_instead_of_curv and use_curvature_to_ff_center to make a title
+    # use heading_instead_of_curv and use_curv_to_ff_center to make a title
     if heading_instead_of_curv:
         title = 'Heading'
     else:
         title = 'Curv'
 
-    if use_curvature_to_ff_center:
+    if use_curv_to_ff_center:
         title += ' to FF Center'
     else:
         title += ' to FF'

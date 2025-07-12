@@ -28,7 +28,7 @@ def organize_replacement_x_df(replacement_df, prior_to_replacement_df, non_chose
                                              'ff_angle_boundary', 'time_since_last_vis'],
                               add_arc_info=False,
                               arc_info_to_add=[
-                                  'optimal_curvature', 'curv_diff'],
+                                  'opt_arc_curv', 'curv_diff'],
                               non_chosen_ff_selection_criterion='abs_ff_angle_boundary'):
 
     # First deal with the chosen ff
@@ -98,7 +98,7 @@ def organize_replacement_x_df(replacement_df, prior_to_replacement_df, non_chose
     return changing_pursued_ff_data, changing_pursued_ff_data_diff, replacement_inputs_additional_info, replacement_inputs_for_plotting
 
 
-def add_arc_info_to_old_and_new_ff_info(old_ff_info, new_ff_info, curvature_df, monkey_information, ff_caught_T_new, curv_of_traj_df, arc_info_to_add=['optimal_curvature', 'curv_diff']):
+def add_arc_info_to_old_and_new_ff_info(old_ff_info, new_ff_info, curvature_df, monkey_information, ff_caught_T_new, curv_of_traj_df, arc_info_to_add=['opt_arc_curv', 'curv_diff']):
     old_temp_df = old_ff_info[['ff_index', 'point_index',
                                'ff_distance', 'ff_angle_boundary']].copy()
     new_temp_df = new_ff_info[['ff_index', 'point_index',
@@ -195,7 +195,7 @@ def get_parallel_old_ff_info(all_point_index, all_time, manual_anno, ff_real_pos
 
 def combine_old_and_new_ff_info(new_ff_info, old_ff_info, point_index_array, monkey_information, ff_caught_T_new,
                                 window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False,
-                                add_arc_info=False, arc_info_to_add=['optimal_curvature', 'curv_diff'],
+                                add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                                 add_current_curv_of_traj=False, curvature_df=None, curv_of_traj_df=None):
 
     if curv_of_traj_df is None:
@@ -219,7 +219,7 @@ def combine_old_and_new_ff_info(new_ff_info, old_ff_info, point_index_array, mon
     return changing_pursued_ff_data
 
 
-def find_changing_pursued_ff_data_diff(changing_pursued_ff_data, add_old_values_to_diff_df=False, add_arc_info=False, arc_info_to_add=['optimal_curvature', 'curv_diff'],
+def find_changing_pursued_ff_data_diff(changing_pursued_ff_data, add_old_values_to_diff_df=False, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                                        add_current_curv_of_traj=False, ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis']):
 
     changing_pursued_ff_data_diff = changing_pursued_ff_data[[
@@ -241,7 +241,7 @@ def find_changing_pursued_ff_data_diff(changing_pursued_ff_data, add_old_values_
                                           ] = changing_pursued_ff_data[['old_'+attr for attr in arc_info_to_add]].copy()
 
     if not add_old_values_to_diff_df:
-        for column in ['ff_angle_diff', 'ff_angle_boundary_diff', 'curvature_lower_bound_diff', 'curvature_upper_bound_diff', 'optimal_curvature_diff']:
+        for column in ['ff_angle_diff', 'ff_angle_boundary_diff', 'curvature_lower_bound_diff', 'curvature_upper_bound_diff', 'opt_arc_curv_diff']:
             if column in changing_pursued_ff_data_diff.columns:
                 changing_pursued_ff_data_diff.drop(
                     columns=[column], inplace=True)

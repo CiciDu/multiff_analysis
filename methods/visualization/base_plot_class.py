@@ -53,9 +53,9 @@ class BasePlotter():
         plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_for_counted_points(
             self)
 
-    def get_null_arc_info_for_counted_points(self, use_fixed_arc_length=False, fixed_arc_length=None, use_curvature_to_ff_center=False):
+    def get_null_arc_info_for_counted_points(self, use_fixed_arc_length=False, fixed_arc_length=None, use_curv_to_ff_center=False):
 
-        if use_curvature_to_ff_center:
+        if use_curv_to_ff_center:
             self.cur_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(
                 self.ref_point_index_counted, self.cur_ff_counted_df.ff_index.values, self.monkey_information, self.ff_real_position_sorted)
             self.nxt_null_arc_info_for_counted_points = show_null_trajectory.find_and_package_arc_to_center_info_for_plotting(

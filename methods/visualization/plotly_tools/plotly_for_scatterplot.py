@@ -207,7 +207,7 @@ def add_two_horizontal_lines(fig_scatter, use_two_y_axes, x_range=[-3, 3], y_val
     return fig_scatter
 
 
-def make_new_trace_for_scatterplot(ff_curv_df, name, color='purple', x_column_name='rel_time', y_column_name='curv_to_ff_center', size=5, symbol='circle', showlegend=True):
+def make_new_trace_for_scatterplot(ff_curv_df, name, color='purple', x_column_name='rel_time', y_column_name='cntr_arc_curv', size=5, symbol='circle', showlegend=True):
     plot_to_add = go.Scatter(x=ff_curv_df[x_column_name], y=ff_curv_df[y_column_name],
                              name=name,
                              legendgroup=name,
@@ -218,7 +218,7 @@ def make_new_trace_for_scatterplot(ff_curv_df, name, color='purple', x_column_na
     return plot_to_add
 
 
-def add_to_the_scatterplot(fig, ff_curv_df, name, color='purple', x_column_name='rel_time', y_column_name='curv_to_ff_center', symbol='circle'):
+def add_to_the_scatterplot(fig, ff_curv_df, name, color='purple', x_column_name='rel_time', y_column_name='cntr_arc_curv', symbol='circle'):
     plot_to_add = make_new_trace_for_scatterplot(
         ff_curv_df, name, color=color, x_column_name=x_column_name, y_column_name=y_column_name, symbol=symbol)
     fig.add_trace(plot_to_add)
@@ -234,7 +234,7 @@ def add_new_curv_of_traj_to_fig_scatter(fig_scatter, curv_of_traj_df_in_duration
                                                  color=random_color, symbol=symbol)
     return fig_scatter_updated
 
-    
+
 def add_new_curv_of_traj_to_fig_scatter_combd(fig_scatter_combd, curv_of_traj_df_in_duration, curv_of_traj_mode, lower_end, upper_end):
     random_color = random.choice(hex_colors)
     window_for_curv_of_traj = [lower_end, upper_end]

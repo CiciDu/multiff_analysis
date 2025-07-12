@@ -367,7 +367,7 @@ def find_ff_info_n_cm_ago(ff_df, monkey_information, ff_real_position_sorted, n_
 def find_ff_info(all_ff_index, all_point_index, monkey_information, ff_real_position_sorted):
     ff_df = pd.DataFrame(
         {'ff_index': all_ff_index, 'point_index': all_point_index})
-    
+
     ff_df[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_df['ff_index'].values]
     ff_df[['monkey_x', 'monkey_y', 'monkey_angle']] = monkey_information.loc[ff_df['point_index'], [
         'monkey_x', 'monkey_y', 'monkey_angle']].values
@@ -416,14 +416,14 @@ def plot_relationship(nxt_curv_counted, traj_curv_counted, slope=None, show_plot
     return ax
 
 
-def find_relative_curvature(nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curvature_to_ff_center):
+def find_relative_curvature(nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curv_to_ff_center):
     if curv_of_traj_counted is None:
         raise ValueError('curv_of_traj_counted cannot be None')
 
-    if use_curvature_to_ff_center:
-        curv_var = 'curv_to_ff_center'
+    if use_curv_to_ff_center:
+        curv_var = 'cntr_arc_curv'
     else:
-        curv_var = 'optimal_curvature'
+        curv_var = 'opt_arc_curv'
 
     nxt_ff_counted_df = nxt_ff_counted_df.copy()
     cur_ff_counted_df = cur_ff_counted_df.copy()
@@ -474,7 +474,7 @@ def organize_snf_streamline_organizing_info_kwargs(ref_point_params, curv_of_tra
         'window_for_curv_of_traj': curv_of_traj_params['window_for_curv_of_traj'],
         'truncate_curv_of_traj_by_time_of_capture': curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'],
         'remove_i_o_modify_rows_with_big_ff_angles': overall_params['remove_i_o_modify_rows_with_big_ff_angles'],
-        'use_curvature_to_ff_center': overall_params['use_curvature_to_ff_center']}
+        'use_curv_to_ff_center': overall_params['use_curv_to_ff_center']}
     return snf_streamline_organizing_info_kwargs
 
 
@@ -571,7 +571,8 @@ def _get_monkey_sub_for_polar_plot(monkey_information, row, nxt_ff_df2, start, e
                         'ref_point_index': nxt_ff_df2.loc[nxt_ff_df2['ff_index'] == row['nxt_ff_index'], 'point_index'].item()
                         }
 
-    monkey_sub = monkey_information.loc[point_index_dict[start]: point_index_dict[end] + 1].copy()
+    monkey_sub = monkey_information.loc[point_index_dict[start]
+        : point_index_dict[end] + 1].copy()
 
     # rotated monkey_x and monkey_y in reference to monkey angle at the reference point
     monkey_ref_xy = monkey_sub.loc[point_index_dict[start], [
@@ -587,8 +588,10 @@ def _get_monkey_sub_for_polar_plot(monkey_information, row, nxt_ff_df2, start, e
 
 def check_ff_vs_cluster(df, ff_column, cluster_column):
     # check for na in both columns
-    print(f'There are {df[ff_column].isnull().sum()} rows where {ff_column} is null')
-    print(f'There are {df[cluster_column].isnull().sum()} rows where {cluster_column} is null')
+    print(
+        f'There are {df[ff_column].isnull().sum()} rows where {ff_column} is null')
+    print(
+        f'There are {df[cluster_column].isnull().sum()} rows where {cluster_column} is null')
     print('===============================================')
 
     len_subset = len(df[df[ff_column] < df[cluster_column]])
@@ -618,7 +621,7 @@ def get_df_name_by_ref(monkey_name, ref_point_mode, ref_point_value):
         ref_point_mode_name = 'dist'
         ref_point_value = int(ref_point_value)
     elif ref_point_mode == 'time after cur ff visible':
-        ref_point_mode_name = 'stop'
+        ref_point_mode_name = 'cur_vis'
     else:
         ref_point_mode_name = 'special'
 

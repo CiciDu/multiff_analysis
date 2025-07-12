@@ -58,7 +58,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
 
         if not hasattr(self, 'heading_info_df'):
             self.make_heading_info_df_without_long_process(test_or_control=self.test_or_control, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
-                                                           curv_traj_window_before_stop=self.curv_traj_window_before_stop, use_curvature_to_ff_center=self.use_curvature_to_ff_center)
+                                                           curv_traj_window_before_stop=self.curv_traj_window_before_stop, use_curv_to_ff_center=self.use_curv_to_ff_center)
 
         plan_x = plan_factors_utils.make_plan_x_df(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
                                                    stop_period_duration=stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
@@ -76,7 +76,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         self.make_heading_info_df_without_long_process(
             test_or_control=self.test_or_control, ref_point_mode=self.ref_point_mode,
             curv_traj_window_before_stop=self.curv_traj_window_before_stop,
-            ref_point_value=self.ref_point_value, use_curvature_to_ff_center=self.use_curvature_to_ff_center,
+            ref_point_value=self.ref_point_value, use_curv_to_ff_center=self.use_curv_to_ff_center,
             heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
             save_data=save_data
         )

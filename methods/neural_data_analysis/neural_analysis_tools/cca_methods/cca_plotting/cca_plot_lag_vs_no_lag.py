@@ -31,7 +31,7 @@ from neural_data_analysis.neural_analysis_tools.cca_methods import cca_cv_utils
 def plot_cca_lag_vs_nolag_and_train_vs_test(
     df, dataset_name, chunk_size=30, alpha=0.8,
     base_width=0.35, narrower_width_ratio=0.4,
-    width_per_var=0.2, fig_width=8,
+    width_per_var=0.25, fig_width=8,
     mode='train_offset'
 ):
 

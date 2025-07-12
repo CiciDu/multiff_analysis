@@ -50,7 +50,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
     def make_plan_x_and_y_for_both_test_and_ctrl(self, already_made_ok=True, plan_x_exists_ok=True, plan_y_exists_ok=True,
                                                  ref_point_mode='time after cur ff visible',
                                                  ref_point_value=0.0, curv_traj_window_before_stop=[-50, 0],
-                                                 use_curvature_to_ff_center=False, heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
+                                                 use_curv_to_ff_center=False, heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                  use_eye_data=True, save_data=True):
 
         if already_made_ok:
@@ -73,7 +73,7 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
             obj.ref_point_mode = ref_point_mode
             obj.ref_point_value = ref_point_value
             obj.curv_traj_window_before_stop = curv_traj_window_before_stop
-            obj.use_curvature_to_ff_center = use_curvature_to_ff_center
+            obj.use_curv_to_ff_center = use_curv_to_ff_center
 
         self.make_plan_y_test_and_ctrl(
             exists_ok=plan_y_exists_ok,

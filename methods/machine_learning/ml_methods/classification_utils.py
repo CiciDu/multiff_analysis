@@ -1,5 +1,5 @@
 import sys
-from machine_learning.ml_methods import ml_methods_class
+from machine_learning.ml_methods import ml_methods_class, regression_utils
 import pandas as pd
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
@@ -113,22 +113,24 @@ def use_logistic_regression(x_var_df, y_var_df):
     X_train, X_test, y_train, y_test = train_test_split(
         x_var_df, y_var_df, test_size=0.2, random_state=42)
 
-    model = LogisticRegression()
-    results = model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    conf_matrix = confusion_matrix(y_test, y_pred)
-    print(f"Confusion Matrix:\n{confusion_matrix}")
+    conf_matrix = _use_logistic_regression(X_train, X_test, y_train, y_test)
 
     # Fit the model on the entire dataset for coefficients and p-values
     model = sm.Logit(y_var_df.values.reshape(-1), x_var_df)
     results = model.fit()
     summary_df = pd.DataFrame(
         {'p_value': results.pvalues, 'Coefficient': results.params})
-    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
-    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
-
+    summary_df = regression_utils.process_summary_df(summary_df)
     return summary_df, conf_matrix
 
+def _use_logistic_regression(X_train, X_test, y_train, y_test):
+    model = LogisticRegression()
+    results = model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    print(f"Confusion Matrix:\n{conf_matrix}")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+    return conf_matrix
 
 def use_logistic_regression_cv(x_var_df, y_var_df, num_folds=5):
 

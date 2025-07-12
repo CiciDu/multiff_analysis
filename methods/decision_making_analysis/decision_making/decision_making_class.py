@@ -184,7 +184,7 @@ class DecisionMaking():
               self.non_chosen_df.shape[0], "out of", original_length, "rows remains")
 
     def get_replacement_x_df(self, add_arc_info=False, add_current_curv_of_traj=False, curvature_df=None, curv_of_traj_df=None, replacement_inputs_format='old_plus_diff_between_old_and_new',
-                             ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], arc_info_to_add=['optimal_curvature', 'curv_diff'],
+                             ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                              non_chosen_ff_selection_criterion='ff_angle_boundary', ff_caught_T_new=None):
         '''
         changing_pursued_ff_data: df, containing the input features for both original and alternative ff
@@ -225,7 +225,7 @@ class DecisionMaking():
             ['whether_changed'], axis=1).values
         self.replacement_labels = replacement_x_df['whether_changed'].values
 
-    def get_free_selection_x(self, num_ff_per_row=5, keeping_1_out_of_n_rows=1, add_arc_info=False, arc_info_to_add=['optimal_curvature', 'curv_diff'],
+    def get_free_selection_x(self, num_ff_per_row=5, keeping_1_out_of_n_rows=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                              curvature_df=None, curv_of_traj_df=None, **kwargs):
         '''
         free_selection_x_df: df, the input features for machine learning
@@ -635,7 +635,7 @@ class DecisionMaking():
 
 
 def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, pseudo_manual_anno,
-                                        add_arc_info=True, arc_info_to_add=['optimal_curvature', 'curv_diff'], add_current_curv_of_traj=True, furnish_with_trajectory_data=True, num_time_points_for_trajectory=20,
+                                        add_arc_info=True, arc_info_to_add=['opt_arc_curv', 'curv_diff'], add_current_curv_of_traj=True, furnish_with_trajectory_data=True, num_time_points_for_trajectory=20,
                                         ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None,
                                         time_range_of_trajectory=[-0.8, 0.8], n_seconds_before_crossing_boundary=0.8, n_seconds_after_crossing_boundary=0.8,
                                         replacement_inputs_format='diff_between_old_and_new'):

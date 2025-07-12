@@ -99,10 +99,10 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
                                 current_stop_point_index_to_mark=None, ref_point_descr='', traj_curv_descr='',
                                 title=None, **kwargs):
 
-    # find rows in heading_info_df that contains na in angle_from_m_before_stop_to_nxt_ff or angle_from_cur_ff_landing_to_nxt_ff
+    # find rows in heading_info_df that contains na in angle_from_m_before_stop_to_nxt_ff or angle_opt_arc_from_cur_end_to_nxt
     original_length = len(heading_info_df)
     heading_info_df = heading_info_df.dropna(
-        subset=['angle_from_m_before_stop_to_nxt_ff', 'angle_from_cur_ff_landing_to_nxt_ff'])
+        subset=['angle_from_m_before_stop_to_nxt_ff', 'angle_opt_arc_from_cur_end_to_nxt'])
     new_length = len(heading_info_df)
     if original_length != new_length:
         add_to_title = '# nan removed: ' + \
@@ -112,7 +112,7 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
 
     # Extract relevant angles from heading_info_df
     ang_traj_nxt = heading_info_df['angle_from_m_before_stop_to_nxt_ff'].values
-    ang_cur_nxt = heading_info_df['angle_from_cur_ff_landing_to_nxt_ff'].values
+    ang_cur_nxt = heading_info_df['angle_opt_arc_from_cur_end_to_nxt'].values
 
     # Convert angles to degrees if required
     if change_units_to_degrees:

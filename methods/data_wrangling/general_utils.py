@@ -298,7 +298,7 @@ def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
     return perfect_pairs
 
 
-def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=False):
+def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=True):
     """
     Find and analyze rows with NA values in a DataFrame.
 
@@ -357,6 +357,17 @@ def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=False):
         return
 
 
+def drop_all_na_columns(df):
+    """
+    Drops columns from the DataFrame that contain only NaN values.
+    """
+    all_na_cols = df.columns[df.isna().all()].tolist()
+
+    print("Dropped columns with all NaN values:", all_na_cols)
+
+    return df.drop(columns=all_na_cols)
+
+
 def convert_bool_to_int(df):
     """
     Convert all boolean columns to integer type.
@@ -364,3 +375,16 @@ def convert_bool_to_int(df):
     bool_cols = df.select_dtypes(include=['bool']).columns
     df[bool_cols] = df[bool_cols].astype(int)
     return df
+
+
+def drop_columns_with_many_nans(df, threshold=0.3):
+    """
+    Drops columns from the DataFrame that have more than `threshold` proportion of missing values.
+    """
+    print(f"Dropping columns with more than {threshold*100}% missing values ...")
+    missing_ratio = df.isna().mean()
+    cols_to_drop = missing_ratio[missing_ratio > threshold].index.tolist()
+    df_cleaned = df.drop(columns=cols_to_drop)
+    if len(cols_to_drop) > 0:
+        print(f"Dropped {len(cols_to_drop)} columns with more than {threshold*100}% missing values: {cols_to_drop}")
+    return df_cleaned, cols_to_drop

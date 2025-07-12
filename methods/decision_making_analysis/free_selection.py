@@ -26,7 +26,7 @@ np.set_printoptions(suppress=True)
 
 def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, num_ff_per_row=3, guarantee_including_target_info=True, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
                                 placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=0, placeholder_ff_angle_boundary=0, placeholder_time_since_last_vis=3, curv_of_traj_df=None,
-                                add_arc_info=False, curvature_df=None, arc_info_to_add=['optimal_curvature', 'curv_diff']):
+                                add_arc_info=False, curvature_df=None, arc_info_to_add=['opt_arc_curv', 'curv_diff']):
     if only_select_n_ff_case is not None:
         # if only_select_n_ff_case is not an integer
         if isinstance(only_select_n_ff_case, int) is False:
@@ -162,7 +162,7 @@ def organize_free_selection_x(free_selection_df, ff_dataframe, ff_real_position_
                                   'ff_distance', 'ff_angle', 'time_since_last_vis'],
                               add_arc_info=False,
                               arc_info_to_add=[
-                                  'optimal_curvature', 'curv_diff'],  # or []
+                                  'opt_arc_curv', 'curv_diff'],  # or []
                               info_of_n_ff_per_point=None):
 
     if not add_arc_info:
@@ -345,7 +345,7 @@ def fill_up_additional_attributes_for_placeholders(placeholder_df,
                                                    placeholder_ff_angle_boundary=math.pi/4,
                                                    placeholder_time_till_next_visible=10,
                                                    placeholder_duration_of_last_vis_period=0,
-                                                   placeholder_optimal_curvature=0.1):
+                                                   placeholder_opt_arc_curv=0.1):
     attributes = []
     additional_placeholder_mapping = {}
 
@@ -355,7 +355,7 @@ def fill_up_additional_attributes_for_placeholders(placeholder_df,
                    'distance_from_monkey_now_to_monkey_when_ff_next_seen', 'angle_from_monkey_now_to_monkey_when_ff_next_seen',
                    'last_seen_ff_distance', 'last_seen_ff_angle', 'last_seen_ff_angle_boundary', 'last_seen_curv_diff', 'last_seen_abs_curv_diff',
                    'distance_from_monkey_now_to_monkey_when_ff_last_seen', 'angle_from_monkey_now_to_monkey_when_ff_last_seen',
-                   'optimal_curvature']:
+                   'opt_arc_curv']:
         if column in ff_dataframe_sub.columns:
             attributes.append(column)
 
@@ -382,7 +382,7 @@ def fill_up_additional_attributes_for_placeholders(placeholder_df,
                                       'last_seen_abs_curv_diff': [placeholder_curv_diff, False],
                                       'distance_from_monkey_now_to_monkey_when_ff_last_seen': [placeholder_ff_distance, False],
                                       'angle_from_monkey_now_to_monkey_when_ff_last_seen': [placeholder_ff_angle, True],
-                                      'optimal_curvature': [placeholder_optimal_curvature, True]}
+                                      'opt_arc_curv': [placeholder_opt_arc_curv, True]}
 
     placeholder_df = decision_making_utils.fill_new_columns_with_placeholder_values(
         placeholder_df, columns=attributes, additional_placeholder_mapping=additional_placeholder_mapping)

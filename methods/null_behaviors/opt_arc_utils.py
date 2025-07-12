@@ -18,11 +18,12 @@ def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curv
     if 'cur_ff_index' not in stop_and_ref_point_info.columns:
         try:
             stop_and_ref_point_info = stop_and_ref_point_info.rename(columns={'ff_index': 'cur_ff_index',
-                                                                            'ff_x': 'cur_ff_x',
-                                                                            'ff_y': 'cur_ff_y',
-                                                                            })
+                                                                              'ff_x': 'cur_ff_x',
+                                                                              'ff_y': 'cur_ff_y',
+                                                                              })
         except:
-            raise ValueError('cur_ff_index, cur_ff_x, cur_ff_y must exist in update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop. If not, at least ff_index, ff_x, ff_y must exist.')
+            raise ValueError(
+                'cur_ff_index, cur_ff_x, cur_ff_y must exist in update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop. If not, at least ff_index, ff_x, ff_y must exist.')
 
     # Extract new firefly coordinates
     old_cur_null_arc_info = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
@@ -30,14 +31,16 @@ def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curv
     )
 
     # Get the optimal arc landing points closest to the stop
-    arc_rows_closest_to_stop = show_planning_utils.get_opt_arc_landing_points_closest_to_stop(
+    arc_rows_closest_to_stop = show_planning_utils.get_opt_arc_end_points_closest_to_stop(
         old_cur_null_arc_info, stop_and_ref_point_info
     )
-    
+
     # add some columns to arc_rows_closest_to_stop
     columns_to_add = ['monkey_x', 'monkey_y', 'point_index']
-    arc_rows_closest_to_stop.drop(columns=columns_to_add, inplace=True, errors='ignore')
-    arc_rows_closest_to_stop = arc_rows_closest_to_stop.merge(stop_and_ref_point_info[columns_to_add + ['cur_ff_index']], on='cur_ff_index', how='left')
+    arc_rows_closest_to_stop.drop(
+        columns=columns_to_add, inplace=True, errors='ignore')
+    arc_rows_closest_to_stop = arc_rows_closest_to_stop.merge(
+        stop_and_ref_point_info[columns_to_add + ['cur_ff_index']], on='cur_ff_index', how='left')
 
     # Extract new firefly x and y coordinates
     new_ff_x, new_ff_y = arc_rows_closest_to_stop['x'].values, arc_rows_closest_to_stop['y'].values
@@ -48,7 +51,8 @@ def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curv
 
     # calculate the distance between "new ff" and monkey xy. If the distance is within 1 cm, make it so that new ff is at the monkey xy
     new_ff_x, new_ff_y = show_planning_utils.make_new_ff_at_monkey_xy_if_within_1_cm(new_ff_x, new_ff_y,
-                                                                                     arc_rows_closest_to_stop['monkey_x'].values, arc_rows_closest_to_stop['monkey_y'].values
+                                                                                     arc_rows_closest_to_stop[
+                                                                                         'monkey_x'].values, arc_rows_closest_to_stop['monkey_y'].values
                                                                                      )
 
     # Find and package arc to center info for plotting
@@ -199,7 +203,7 @@ def find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, monkey_xy, monkey
             'arc_starting_angle': angle_from_center_to_monkey,
             'arc_ending_angle': angle_from_center_to_stop
         })
-        arc_rows_to_first_reach_boundary = show_planning_utils.get_opt_arc_landing_points_when_first_reaching_visible_boundary(
+        arc_rows_to_first_reach_boundary = show_planning_utils.get_opt_arc_end_points_when_first_reaching_visible_boundary(
             temp_null_arc_info)
         angle_from_center_to_stop = arc_rows_to_first_reach_boundary['angle'].values
 
@@ -217,22 +221,22 @@ def _supply_curvature_df_with_opt_arc_info(curvature_df, ff_radius_for_opt_arc, 
     curvature_df['curvature_lower_bound'] = curvature_lower_bound
     curvature_df['curvature_upper_bound'] = curvature_upper_bound
     # clip curvature to be between lower and upper bound
-    curvature_df['optimal_curvature'] = np.clip(
+    curvature_df['opt_arc_curv'] = np.clip(
         curvature_df['curv_of_traj'], curvature_df['curvature_lower_bound'], curvature_df['curvature_upper_bound'])
-    # make sure that optimal_curvature has the same sign has ff_angle
-    abs_optimal_curvature = np.abs(curvature_df['optimal_curvature'])
+    # make sure that opt_arc_curv has the same sign has ff_angle
+    abs_opt_arc_curv = np.abs(curvature_df['opt_arc_curv'])
     # if there's any 0, make it a small number
-    abs_optimal_curvature[abs_optimal_curvature == 0] = 0.000001
-    curvature_df['optimal_curvature'] = abs_optimal_curvature * \
+    abs_opt_arc_curv[abs_opt_arc_curv == 0] = 0.000001
+    curvature_df['opt_arc_curv'] = abs_opt_arc_curv * \
         np.sign(curvature_df['ff_angle'])
     curvature_df['opt_arc_end_direction'] = np.sign(
-        curvature_df['optimal_curvature'])
+        curvature_df['opt_arc_curv'])
     # if any opt_arc_end_direction is 0, raise an error
     if np.any(curvature_df['opt_arc_end_direction'] == 0):
         raise ValueError(
             "At least one opt_arc_end_direction is 0, which is not possible. Please check the code.")
     curvature_df['opt_arc_radius'] = find_arc_radius_based_on_curvature(
-        curvature_df['optimal_curvature'])
+        curvature_df['opt_arc_curv'])
 
     # find arc ending xy for optimal curvature (curv to disk edge)
     add_opt_arc_measure_and_length(curvature_df, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry,
@@ -324,7 +328,8 @@ def find_arc_curvature(ff_angle, ff_distance, invalid_curvature_ok=False):
     # all_arc_radius should be all positive
     if invalid_curvature_ok is False:
         if np.any(all_arc_radius < 0):
-            raise ValueError("Note: at least one arc has a negative radius here, because its relative_y to the monkey is negative. In other words, the ff is behind the monkey. If a negative radius is not desired, please eliminate ff behind the monkey before calling this function.")
+            raise ValueError("Note: at least one arc has a negative radius here, because its relative_y to the monkey is negative. \n"
+                             "In other words, the ff is behind the monkey. If a negative radius is not desired, please eliminate ff behind the monkey before calling this function.")
         # if any ff angle has an absolute value larger than pi/4, it's invalid
         if np.any(np.abs(ff_angle) > pi/4):
             max_angle = np.max(np.abs(ff_angle)) * 180/math.pi

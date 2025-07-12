@@ -8,7 +8,7 @@ class PlanFactorsOfAgent():
                  # overall_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu',
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  data_name='data_0',
-                 use_curvature_to_ff_center=False,
+                 use_curv_to_ff_center=False,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
                  ):
@@ -16,7 +16,7 @@ class PlanFactorsOfAgent():
         self.monkey_name = None
         self.model_folder_name = model_folder_name
         self.data_name = data_name
-        self.use_curvature_to_ff_center = use_curvature_to_ff_center
+        self.use_curv_to_ff_center = use_curv_to_ff_center
         self.opt_arc_type = opt_arc_type
         rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name, data_name=data_name)
@@ -86,7 +86,7 @@ class PlanFactorsOfAgent():
                                               plan_y_exists_ok=False,
                                               heading_info_df_exists_ok=False,
                                               stops_near_ff_df_exists_ok=False,
-                                              use_curvature_to_ff_center=False,
+                                              use_curv_to_ff_center=False,
                                               save_data=True,
                                               curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
                                               n_steps=8000,
@@ -102,7 +102,7 @@ class PlanFactorsOfAgent():
                       ref_point_mode=ref_point_mode,
                       ref_point_value=ref_point_value,
                       curv_traj_window_before_stop=curv_traj_window_before_stop,
-                      use_curvature_to_ff_center=use_curvature_to_ff_center,
+                      use_curv_to_ff_center=use_curv_to_ff_center,
                       use_eye_data=False,
                       already_made_ok=False,
                       save_data=save_data)
@@ -123,7 +123,7 @@ class PlanFactorsOfAgent():
                                                           monkey_data_exists_ok=True,
                                                           heading_info_df_exists_ok=False,
                                                           stops_near_ff_df_exists_ok=False,
-                                                          use_curvature_to_ff_center=False,
+                                                          use_curv_to_ff_center=False,
                                                           save_data=True,
                                                           curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
                                                           n_steps=8000,
@@ -149,7 +149,7 @@ class PlanFactorsOfAgent():
             for test_or_control in ['test', 'control']:
                 self.pf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode,
                                                                   curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                  ref_point_value=ref_point_value, use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                                  ref_point_value=ref_point_value, use_curv_to_ff_center=use_curv_to_ff_center,
                                                                   heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                   save_data=save_data,
                                                                   merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)

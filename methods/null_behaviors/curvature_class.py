@@ -20,14 +20,14 @@ class CurvatureOfPath():
         self.seed = seed
 
     def make_curvature_df(self, window_for_curv_of_traj, curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False, ff_radius_for_opt_arc=15, clean=True,
-                          include_curv_to_ff_center=True, include_optimal_curvature=True,
+                          include_cntr_arc_curv=True, include_opt_arc_curv=True,
                           opt_arc_stop_first_vis_bdry=False,  # whether optimal arc stop at visible boundary
                           ignore_error=False):
         ff_dataframe = self.ff_dataframe.copy()
         self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(
             window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         self.curvature_df = curvature_utils.make_curvature_df(ff_dataframe, self.curv_of_traj_df, ff_radius_for_opt_arc=ff_radius_for_opt_arc, clean=clean,
-                                                              include_curv_to_ff_center=include_curv_to_ff_center, include_optimal_curvature=include_optimal_curvature,
+                                                              include_cntr_arc_curv=include_cntr_arc_curv, include_opt_arc_curv=include_opt_arc_curv,
                                                               opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry, ignore_error=ignore_error)
         self.curvature_point_index = self.curvature_df.point_index.values
 
@@ -38,7 +38,7 @@ class CurvatureOfPath():
         self.all_arc_lengths = self.curvature_df.opt_arc_length.values
         self.all_arc_radius = self.curvature_df.opt_arc_radius.values
         self.arc_end_direction = np.sign(
-            self.curvature_df.optimal_curvature.values)
+            self.curvature_df.opt_arc_curv.values)
 
         # find the angle from the monkey to the end point of the arc
         self.arc_end_angles = self.curvature_df.opt_arc_measure.values / \

@@ -57,12 +57,12 @@ def add_column_curv_of_traj_before_stop(df, curv_of_traj_df_w_one_sided_window):
 def process_heading_info_df(heading_info_df):
     heading_info_df = heading_info_df.copy()
     # add some columns
-    if 'angle_from_cur_ff_landing_to_nxt_ff' in heading_info_df.columns:
-        heading_info_df[['angle_from_m_before_stop_to_nxt_ff', 'angle_from_cur_ff_landing_to_nxt_ff']] = heading_info_df[[
-            'angle_from_m_before_stop_to_nxt_ff', 'angle_from_cur_ff_landing_to_nxt_ff']] * (180/np.pi)
+    if 'angle_from_m_before_stop_to_nxt_ff' in heading_info_df.columns:
+        heading_info_df[['angle_from_m_before_stop_to_nxt_ff', 'angle_opt_arc_from_cur_end_to_nxt', 'angle_cntr_arc_from_cur_end_to_nxt']] = heading_info_df[[
+            'angle_from_m_before_stop_to_nxt_ff', 'angle_opt_arc_from_cur_end_to_nxt', 'angle_cntr_arc_from_cur_end_to_nxt']] * (180/np.pi)
         _add_diff_in_d_heading_to_cur_ff(heading_info_df)
         _add_diff_in_d_heading_to_nxt_ff(heading_info_df)
-        heading_info_df['ratio_of_angle_to_nxt_ff'] = heading_info_df['angle_from_cur_ff_landing_to_nxt_ff'] / \
+        heading_info_df['ratio_of_angle_to_nxt_ff'] = heading_info_df['angle_opt_arc_from_cur_end_to_nxt'] / \
             heading_info_df['angle_from_m_before_stop_to_nxt_ff']
     return heading_info_df
 
@@ -79,7 +79,7 @@ def _add_diff_in_d_heading_to_nxt_ff(heading_info_df):
     -----------
     heading_info_df : pandas.DataFrame
         DataFrame containing heading information with columns:
-        - 'angle_from_cur_ff_landing_to_nxt_ff': angle from current firefly landing to next firefly
+        - 'angle_opt_arc_from_cur_end_to_nxt': angle from current firefly landing to next firefly based on optimal arc
         - 'angle_from_m_before_stop_to_nxt_ff': angle from monkey position before stop to next firefly
 
     Returns:
@@ -90,10 +90,10 @@ def _add_diff_in_d_heading_to_nxt_ff(heading_info_df):
         - 'diff_in_abs_angle_to_nxt_ff': difference between absolute values of the two angles
     """
 
-    heading_info_df['diff_in_angle_to_nxt_ff'] = heading_info_df['angle_from_cur_ff_landing_to_nxt_ff'] - \
+    heading_info_df['diff_in_angle_to_nxt_ff'] = heading_info_df['angle_opt_arc_from_cur_end_to_nxt'] - \
         heading_info_df['angle_from_m_before_stop_to_nxt_ff']
     heading_info_df['diff_in_abs_angle_to_nxt_ff'] = np.abs(
-        heading_info_df['angle_from_cur_ff_landing_to_nxt_ff']) - np.abs(heading_info_df['angle_from_m_before_stop_to_nxt_ff'])
+        heading_info_df['angle_opt_arc_from_cur_end_to_nxt']) - np.abs(heading_info_df['angle_from_m_before_stop_to_nxt_ff'])
 
 
 def _add_diff_in_d_heading_to_cur_ff(heading_info_df):

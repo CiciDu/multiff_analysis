@@ -102,8 +102,8 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
             use_two_y_axes=self.use_two_y_axes)
         self.fig_scatter_natural_y_range = [np.min(self.curv_of_traj_df_in_duration['curv_of_traj_deg_over_cm'].values), np.max(
             self.curv_of_traj_df_in_duration['curv_of_traj_deg_over_cm'].values)]
-        y_column_name = 'curv_to_ff_center' if self.overall_params[
-            'use_curvature_to_ff_center'] else 'optimal_curvature'
+        y_column_name = 'cntr_arc_curv' if self.overall_params[
+            'use_curv_to_ff_center'] else 'opt_arc_curv'
         if self.scatter_plot_params['show_nxt_ff_curv_in_scatterplot']:
             self._show_nxt_ff_curv_in_scatterplot_func(
                 y_column_name=y_column_name)
@@ -184,7 +184,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
                 self.fig_scatter_s.update_traces(
                     visible=False, selector=dict(name=name))
 
-    def _show_nxt_ff_curv_in_scatterplot_func(self, y_column_name='curv_to_ff_center'):
+    def _show_nxt_ff_curv_in_scatterplot_func(self, y_column_name='cntr_arc_curv'):
         if self.curv_of_traj_df is None:
             raise ValueError(
                 'curv_of_traj_df is None, so cannot show nxt_ff_curv')
@@ -195,7 +195,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
             self.fig_scatter_cm, self.nxt_ff_curv_df, name='Nxt FF Curv to Center', color=self.nxt_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-down')
 
-    def _show_cur_ff_curv_in_scatterplot_func(self, y_column_name='curv_to_ff_center'):
+    def _show_cur_ff_curv_in_scatterplot_func(self, y_column_name='cntr_arc_curv'):
         self.cur_ff_curv_df = dash_utils._find_cur_ff_curv_df(
             self.current_plotly_key_comp, self.ff_dataframe, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df, ff_caught_T_new=self.ff_caught_T_new)
         self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
@@ -223,13 +223,13 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         self.fig_corr_2 = go.Figure()
         if 'heading_instead_of_curv' in self.overall_params:
             if not self.overall_params['heading_instead_of_curv']:
-                # shuffle the rows for the two columns 'curv_to_ff_center', 'optimal_curvature' in nxt_ff_counted_df
+                # shuffle the rows for the two columns 'cntr_arc_curv', 'opt_arc_curv' in nxt_ff_counted_df
                 nxt_ff_counted_df = self.nxt_ff_counted_df.copy()
-                nxt_ff_counted_df[['curv_to_ff_center', 'optimal_curvature']] = nxt_ff_counted_df[[
-                    'curv_to_ff_center', 'optimal_curvature']].sample(frac=1).values
+                nxt_ff_counted_df[['cntr_arc_curv', 'opt_arc_curv']] = nxt_ff_counted_df[[
+                    'cntr_arc_curv', 'opt_arc_curv']].sample(frac=1).values
 
                 traj_curv_counted, nxt_curv_counted = find_stops_near_ff_utils.find_relative_curvature(
-                    nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, use_curvature_to_ff_center=self.overall_params['use_curvature_to_ff_center'])
+                    nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, use_curv_to_ff_center=self.overall_params['use_curv_to_ff_center'])
 
                 self.kwargs_for_correlation_plot_2 = copy.deepcopy(
                     self.kwargs_for_correlation_plot)
@@ -251,24 +251,6 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
 
         return self.fig_heading
 
-        # # randomly shuffle the elements in d_heading_cur
-        # d_heading_nxt = self.nxt_ff_final_df['d_heading_of_arc'].values.copy()
-        # np.random.shuffle(d_heading_nxt)
-
-        # rel_heading_traj = self.d_heading_of_traj - self.cur_ff_final_df['d_heading_of_arc'].values
-        # rel_heading_alt = d_heading_nxt - self.cur_ff_final_df['d_heading_of_arc'].values
-        # rel_heading_traj = find_stops_near_ff_utils.confine_angle_to_within_one_pie(rel_heading_traj)
-        # rel_heading_alt = find_stops_near_ff_utils.confine_angle_to_within_one_pie(rel_heading_alt)
-
-        # self.kwargs_for_heading_plot_2 = copy.deepcopy(self.kwargs_for_heading_plot)
-        # self.kwargs_for_heading_plot_2['rel_heading_df']['rel_heading_traj'] = rel_heading_traj
-        # self.kwargs_for_heading_plot_2['rel_heading_df']['rel_heading_alt'] = rel_heading_alt
-        # self.kwargs_for_heading_plot_2['current_stop_point_index_to_mark'] = None
-
-        # self.fig_heading_2 = plotly_for_correlation.make_heading_plot_in_plotly(**self.kwargs_for_heading_plot_2, title="After Shuffling Nxt FF Curvature")
-        # # self.fig_heading_2.update_layout(title="After Shuffling Nxt FF Curvature")
-
-        # return self.fig_heading_2
 
     def _make_fig_corr_and_fig_heading_both_unshuffled_and_shuffled(self):
         self.fig_corr = go.Figure()

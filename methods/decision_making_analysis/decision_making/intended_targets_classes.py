@@ -130,7 +130,7 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
 
         self.manual_anno_long['ff_index'] = manual_anno_long['sub_ff_index']
 
-    def get_input_data(self, num_ff_per_row=5, keeping_1_out_of_n_rows=1, add_arc_info=False, arc_info_to_add=['optimal_curvature', 'curv_diff'], curvature_df=None, curv_of_traj_df=None, **kwargs):
+    def get_input_data(self, num_ff_per_row=5, keeping_1_out_of_n_rows=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'], curvature_df=None, curv_of_traj_df=None, **kwargs):
         self.free_selection_df = self.manual_anno_long
         super().get_free_selection_x(num_ff_per_row=num_ff_per_row, keeping_1_out_of_n_rows=keeping_1_out_of_n_rows,
                                      add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, **kwargs)
@@ -182,7 +182,7 @@ class ModelOfMultipleIntendedTargets(ModelOfIntendedTargets):
 
 
 def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, pseudo_manual_anno, pseudo_manual_anno_long,
-                              num_ff_per_row=5, keeping_1_out_of_n_rows=10, add_arc_info=True, arc_info_to_add=['optimal_curvature', 'curv_diff'],
+                              num_ff_per_row=5, keeping_1_out_of_n_rows=10, add_arc_info=True, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                               add_current_curv_of_traj=True, furnish_with_trajectory_data=True, keep_whole_chunks=False,
                               ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None, curv_of_traj_df=None,
                               time_range_of_trajectory=[-0.8, 0], n_seconds_before_crossing_boundary=0, n_seconds_after_crossing_boundary=0.8,):

@@ -5,6 +5,7 @@ from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plo
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
+from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils, ml_plotting_utils
 import os
 import numpy as np
 import matplotlib
@@ -23,14 +24,18 @@ from sklearn.preprocessing import StandardScaler
 from palettable.colorbrewer import qualitative
 import matplotlib.gridspec as gridspec
 from scipy.stats import pearsonr
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.linear_model import Ridge, Lasso, ElasticNet, RidgeCV, LassoCV, ElasticNetCV
+from sklearn.metrics import r2_score
 
 
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+from sklearn.cluster import AgglomerativeClustering
 
 
-def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X', 
+def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X',
                          max_components=20, features_per_fig=30, base_width=0.75, base_height=0.3,
                          annotation_threshold=0.3, pval_threshold=0.05):
     """
@@ -51,6 +56,11 @@ def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values
     - annotation_threshold (float): Threshold above which values will be annotated on heatmap
     - pval_threshold (float): Threshold below which p-values are considered significant
     """
+    # reorder loadings based on clustering
+    loadings, row_order, col_order = ml_plotting_utils.reorder_based_on_clustering(
+        loadings)
+    feature_names = feature_names[row_order]
+
     max_components = min(max_components, loadings.shape[1])
     num_features = loadings.shape[0]
     feature_names = np.asarray(feature_names)
@@ -73,7 +83,8 @@ def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         submatrix = loadings[start:end, :max_components]
-        im = ax.imshow(submatrix, aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+        im = ax.imshow(submatrix, aspect='auto',
+                       cmap='RdBu_r', vmin=vmin, vmax=vmax)
 
         ax.set_title(f'{matrix_label} Loadings (Features {start}-{end})')
 
@@ -100,10 +111,14 @@ def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values
             for col in range(max_components):
                 val = submatrix[row, col]
                 if abs(val) >= annotation_threshold:
-                    bg_color = im.cmap((val - vmin) / (vmax - vmin))  # RGBA tuple
-                    brightness = 0.299*bg_color[0] + 0.587*bg_color[1] + 0.114*bg_color[2]  # luminance
+                    bg_color = im.cmap(
+                        (val - vmin) / (vmax - vmin))  # RGBA tuple
+                    brightness = 0.299 * \
+                        bg_color[0] + 0.587*bg_color[1] + \
+                        0.114*bg_color[2]  # luminance
                     text_color = 'white' if brightness < 0.3 else 'black'
-                    ax.text(col, row, f"{val:.2f}", ha='center', va='center', fontsize=7, color=text_color)
+                    ax.text(col, row, f"{val:.2f}", ha='center',
+                            va='center', fontsize=7, color=text_color)
 
         plt.colorbar(im, ax=ax)
         plt.subplots_adjust(left=left_margin)
@@ -140,9 +155,6 @@ def plot_cca_results(cca_results):
 
     plt.tight_layout()
     plt.show()
-    
-    
-
 
 
 def plot_cca_component_scatter(X1_c, X2_c, components, show_y_eq_x=True):
@@ -156,22 +168,24 @@ def plot_cca_component_scatter(X1_c, X2_c, components, show_y_eq_x=True):
     - components: list or iterable of int, 1-based indices of components to plot
     - show_y_eq_x: bool, whether to draw y = x line in each subplot
     """
-    
+
     # if components is an integer, convert to a list
     if isinstance(components, int):
         components = [components]
-    
+
     n_plots = len(components)
     n_cols = 2
     n_rows = (n_plots + 1) // n_cols
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 4 * n_rows), squeeze=False)
+    fig, axes = plt.subplots(
+        n_rows, n_cols, figsize=(12, 4 * n_rows), squeeze=False)
     axes = axes.flatten()
 
     for i, comp in enumerate(components):
-        
+
         if comp < 1:
-            raise ValueError(f"Component index must be greater than 0, but got {comp}")
+            raise ValueError(
+                f"Component index must be greater than 0, but got {comp}")
 
         x_vals = X1_c[:, comp - 1]
         y_vals = X2_c[:, comp - 1]
@@ -205,8 +219,10 @@ def plot_cca_component_scatter(X1_c, X2_c, components, show_y_eq_x=True):
                 fontsize=11,
                 bbox=dict(facecolor='white', alpha=0.6, edgecolor='gray'))
 
-        ax.set_xlabel(f'Canonical Variable {comp} (X)', fontsize=11, weight='bold')
-        ax.set_ylabel(f'Canonical Variable {comp} (Y)', fontsize=11, weight='bold')
+        ax.set_xlabel(
+            f'Canonical Variable {comp} (X)', fontsize=11, weight='bold')
+        ax.set_ylabel(
+            f'Canonical Variable {comp} (Y)', fontsize=11, weight='bold')
         ax.set_title(f'Component {comp}', fontsize=13, weight='bold')
         ax.grid(True, linestyle='--', alpha=0.5)
         ax.set_xlim(lims)
@@ -221,7 +237,6 @@ def plot_cca_component_scatter(X1_c, X2_c, components, show_y_eq_x=True):
 
     plt.tight_layout()
     plt.show()
-
 
 
 # Function to make a series of bar plots of ranked loadings
@@ -372,3 +387,5 @@ def plot_y_loadings(avg_y_loadings, avg_canon_corrs, X2):
     make_a_series_of_barplots_of_ranked_loadings_or_weights(
         squared_loading, avg_canon_corrs, num_variates, keep_one_value_for_each_feature=True, max_features_to_show_per_plot=5)
     return
+
+

@@ -144,11 +144,11 @@ def combine_relevant_features(x_features_df, only_cur_ff_df, plan_x_df, plan_y_d
     return x_df
 
 
-columns_to_keep_from_only_cur_ff_df = ['optimal_curvature',
+columns_to_keep_from_only_cur_ff_df = ['opt_arc_curv',
                                        'opt_arc_measure',
                                        'opt_arc_d_heading',
-                                       'curv_to_ff_center',
-                                       # 'd_heading_to_center', # this is perfectly correlated with cur_ff_angle_at_ref
+                                       'cntr_arc_curv',
+                                       # 'cntr_arc_d_heading', # this is perfectly correlated with cur_ff_angle_at_ref
                                        # 'diff_in_d_heading_to_cur_ff',
                                        # the columns below are repeated later
                                        # 'curv_of_traj',

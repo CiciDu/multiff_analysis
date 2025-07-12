@@ -68,7 +68,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                                               stops_near_ff_df_exists_ok=True,
                                               curv_of_traj_mode='distance',
                                               window_for_curv_of_traj=[-25, 25],
-                                              use_curvature_to_ff_center=False,
+                                              use_curv_to_ff_center=False,
                                               ref_point_mode='distance',
                                               ref_point_value=-150,
                                               curv_traj_window_before_stop=[
@@ -82,7 +82,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.curv_of_traj_mode = curv_of_traj_mode
         self.window_for_curv_of_traj = window_for_curv_of_traj
         self.curv_traj_window_before_stop = curv_traj_window_before_stop
-        self.use_curvature_to_ff_center = use_curvature_to_ff_center
+        self.use_curv_to_ff_center = use_curv_to_ff_center
 
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
@@ -156,7 +156,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                     self.pf.make_plan_x_and_y_for_both_test_and_ctrl(plan_x_exists_ok=plan_x_exists_ok, plan_y_exists_ok=plan_y_exists_ok,
                                                                      ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
                                                                      curv_traj_window_before_stop=self.curv_traj_window_before_stop,
-                                                                     use_curvature_to_ff_center=self.use_curvature_to_ff_center,
+                                                                     use_curv_to_ff_center=self.use_curv_to_ff_center,
                                                                      heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                      stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok)
 
@@ -179,7 +179,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                                                         curv_traj_window_before_stop=[
                                                             -50, 0],
                                                         heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
-                                                        use_curvature_to_ff_center=False,
+                                                        use_curv_to_ff_center=False,
                                                         exists_ok=True, save_data=True):
 
         self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name,
@@ -187,7 +187,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                                                    )
         self.combd_heading_df_x_sessions_test, self.combd_heading_df_x_sessions_ctrl = self.sp.make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(ref_point_mode, ref_point_value,
                                                                                                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                                                                                                                       combd_heading_df_x_sessions_exists_ok=exists_ok, use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                                                                                                                                       combd_heading_df_x_sessions_exists_ok=exists_ok, use_curv_to_ff_center=use_curv_to_ff_center,
                                                                                                                                                                        show_printed_output=True, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                                                                                                                        stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data)
 

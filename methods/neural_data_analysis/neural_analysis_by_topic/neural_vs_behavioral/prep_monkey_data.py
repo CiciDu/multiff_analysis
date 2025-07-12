@@ -36,9 +36,14 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
     monkey_information['bin'] = np.digitize(time, time_bins)-1
 
     if one_behav_idx_per_bin:
-        # note, if one_behav_idx_per_bin is True, there won't be the column stop_time_ratio_in_bin
-        monkey_info_in_bins = monkey_information.sort_values(
-            by=['bin', 'point_index']).groupby('bin').first().reset_index()
+        median_indices = (
+            monkey_information.groupby('bin')['point_index']
+            .median().round().astype(int)
+        )
+        # extract corresponding rows from monkey_information
+        monkey_info_in_bins = monkey_information.set_index('point_index').loc[median_indices.values].reset_index(drop=False)
+        # add bin info back 
+        monkey_info_in_bins['bin'] = median_indices.index
     else:
         monkey_info_in_bins = _rebin_monkey_info(
             monkey_information).reset_index(drop=True)
@@ -54,7 +59,6 @@ def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=
 
     monkey_info_in_bins['bin_start_time'] = time_bins[monkey_info_in_bins['bin'].values]
     monkey_info_in_bins['bin_end_time'] = time_bins[monkey_info_in_bins['bin'].values + 1]
-
     monkey_info_in_bins['point_index'] = monkey_info_in_bins['point_index'].astype(
         int)
 

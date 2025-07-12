@@ -468,7 +468,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         curvature_df_sub = curvature_df[['point_index', 'ff_index']].copy()
         curvature_df = curvature_df[~curvature_df_sub.duplicated()]
         arc_info = ['curv_of_traj', 'curvature_lower_bound',
-                    'curvature_upper_bound', 'optimal_curvature', 'curv_diff', 'abs_curv_diff']
+                    'curvature_upper_bound', 'opt_arc_curv', 'curv_diff', 'abs_curv_diff']
 
         curvature_df_sub = curvature_df[[
             'ff_index', 'point_index'] + arc_info].copy()

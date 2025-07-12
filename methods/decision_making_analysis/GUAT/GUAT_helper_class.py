@@ -52,7 +52,7 @@ class GUATHelperClass(cluster_replacement_class.ClusterReplacement):
                               truncate_curv_of_traj_by_time_of_capture=False,
                               ff_attributes=[
                                   'ff_distance', 'ff_angle', 'time_since_last_vis', 'time_till_next_visible'],
-                              arc_info_to_add=['optimal_curvature', 'curv_diff']):
+                              arc_info_to_add=['opt_arc_curv', 'curv_diff']):
         if curv_of_traj_df is None:
             self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(
                 window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)

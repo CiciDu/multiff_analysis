@@ -53,11 +53,11 @@ def conduct_linear_regression(X, y):
     ols_model = sm.OLS(y, X_with_const).fit()
     p_values = ols_model.pvalues
     f_p_value = ols_model.f_pvalue
-
+    
     return slope, intercept, r_value, r_squared, p_values, f_p_value, y_pred
 
 
-def get_y_var_lr_df(binned_spikes_matrix, final_behavioral_data):
+def get_y_var_lr_df(binned_spikes_matrix, final_behavioral_data, verbose=False):
     # conduct linear regression on X and y
     x_var = binned_spikes_matrix.copy()
     all_r = []
@@ -70,6 +70,8 @@ def get_y_var_lr_df(binned_spikes_matrix, final_behavioral_data):
         all_r.append(r_value)
         all_r_squared.append(r_squared)
         all_p_values.append(f_p_value)
+        if verbose:
+            print(f'{column} r: {round(r_value, 3)}, r_squared: {round(r_squared, 3)}, p_values: {round(f_p_value, 3)}')
     y_var_lr_df = pd.DataFrame({'feature': final_behavioral_data.columns,
                                'r': all_r, 'r_squared': all_r_squared, 'p_values': all_p_values})
     y_var_lr_df['significant'] = y_var_lr_df['p_values'] < 0.05

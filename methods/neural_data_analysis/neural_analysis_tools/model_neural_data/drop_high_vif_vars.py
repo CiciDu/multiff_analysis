@@ -76,39 +76,81 @@ def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_in
     return y_var_lags_reduced
 
 
-def get_vif_df(var_df, verbose=True):
-    vif_df = pd.DataFrame()
-    vif_df["feature"] = var_df.columns
-    vif_values = []
-    num_total_features = var_df.shape[1]
-    if num_total_features > 1:
-        for i in range(var_df.shape[1]):
-            # check for RuntimeWarning; print the column name that causes the warning
-            try:
-                vif_values.append(variance_inflation_factor(
-                    var_df.values, i))
-            except RuntimeWarning as e:
-                print(f'RuntimeWarning: {e}')
-                print(f'Column {var_df.columns[i]} causes the warning')
-            if verbose:
-                if num_total_features > 50:
-                    if i % 10 == 0:
-                        print(
-                            f'{i} out of {var_df.shape[1]} features are processed for VIF.')
-        vif_df['vif'] = vif_values
-        vif_df = vif_df.sort_values(by='vif', ascending=False).round(1)
-        return vif_df
-    else:
-        # if num_total_features == 1:
-        #     if verbose:
-        #         print(
-        #             f'{var_df.columns.values[0]} is the only feature in the dataframe. No VIF to calculate')
-        # else:
-        #     if verbose:
-        #         print('The dataframe is empty. No VIF to calculate')
+# def get_vif_df(var_df, verbose=True):
+#     vif_df = pd.DataFrame()
+#     vif_df["feature"] = var_df.columns
+#     vif_values = []
+#     num_total_features = var_df.shape[1]
+#     if num_total_features > 1:
+#         for i in range(var_df.shape[1]):
+#             # check for RuntimeWarning; print the column name that causes the warning
+#             try:
+#                 vif_values.append(variance_inflation_factor(
+#                     var_df.values, i))
+#             # except RuntimeWarning as e:
+#             except Exception as e:
+#                 print(f'Error: {e}')
+#                 print(f'Column {var_df.columns[i]} causes the error')
+#             if verbose:
+#                 if num_total_features > 50:
+#                     if i % 10 == 0:
+#                         print(
+#                             f'{i} out of {var_df.shape[1]} features are processed for VIF.')
+#         vif_df['vif'] = vif_values
+#         vif_df = vif_df.sort_values(by='vif', ascending=False).round(1)
+#         return vif_df
+#     else:
 
-        vif_df['vif'] = 0
+#         vif_df['vif'] = 0
+#         return vif_df
+
+def get_vif_df(var_df, verbose=False) -> pd.DataFrame:
+    """
+    Fast computation of VIFs using correlation matrix inversion.
+    Mimics output of get_vif_df but much faster for large feature sets.
+
+    Parameters:
+        var_df (pd.DataFrame): DataFrame of numeric predictors.
+        verbose (bool): If True, prints warnings for collinearity and errors.
+
+    Returns:
+        pd.DataFrame: VIF results with columns ['feature', 'vif'], sorted descending.
+    """
+    num_features = var_df.shape[1]
+    if num_features <= 1:
+        if verbose:
+            if num_features == 1:
+                print(f"Only one feature: '{var_df.columns[0]}'. VIF = 0 by definition.")
+            else:
+                print("DataFrame is empty. No VIFs to compute.")
+        vif_df = pd.DataFrame({'feature': var_df.columns, 'vif': 0})
         return vif_df
+
+
+    X = var_df.copy()
+    X_std = (X - X.mean()) / X.std(ddof=0)
+
+    # Compute correlation matrix
+    corr = np.corrcoef(X_std.T)
+
+    try:
+        inv_corr = np.linalg.inv(corr)
+    except np.linalg.LinAlgError as e:
+        if verbose:
+            print("❌ Correlation matrix inversion failed. Using pseudo-inverse.")
+            print(f"Error: {e}")
+        inv_corr = np.linalg.pinv(corr)
+
+    vif_values = np.diag(inv_corr)
+
+    vif_df = pd.DataFrame({
+        'feature': X.columns,
+        'vif': np.round(vif_values, 1)
+    }).sort_values(by='vif', ascending=False).reset_index(drop=True)
+
+    return vif_df
+
+
 
 
 def check_vif_contribution(df, target_feature, top_n=15, standardize=True):
@@ -226,9 +268,10 @@ def take_out_subset_of_high_vif_and_iteratively_drop_column_w_highest_vif(df,
         print(f"Final number of columns {df_reduced.shape[1]}")
         subset_above_threshold = final_vif_df.loc[final_vif_df['vif']
                                                   > vif_threshold_for_initial_subset]
-        print(f"Columns still above threshold: ")
-        print(subset_above_threshold)
-
+        if len(subset_above_threshold) > 0:
+            print(f"Columns still above threshold: ")
+            print(subset_above_threshold)
+            
     return df_reduced, columns_dropped, final_vif_df
 
 

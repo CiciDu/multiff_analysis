@@ -113,7 +113,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                               stops_near_ff_df_exists_ok=True,
                                               curv_of_traj_mode='distance',
                                               window_for_curv_of_traj=[-25, 25],
-                                              use_curvature_to_ff_center=False,
+                                              use_curv_to_ff_center=False,
                                               save_data=True,
                                               **env_kwargs
                                               ):
@@ -132,7 +132,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                                                                   stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                                                   curv_of_traj_mode=curv_of_traj_mode,
                                                                                                   window_for_curv_of_traj=window_for_curv_of_traj,
-                                                                                                  use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                                                                  use_curv_to_ff_center=use_curv_to_ff_center,
                                                                                                   **plan_xy_tc_kwargs)
 
     def make_combd_plan_xy_tc(self,
@@ -171,7 +171,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                curv_of_traj_mode=self.curv_of_traj_mode,
                                                                window_for_curv_of_traj=self.window_for_curv_of_traj,
-                                                               use_curvature_to_ff_center=self.use_curvature_to_ff_center,
+                                                               use_curv_to_ff_center=self.use_curv_to_ff_center,
                                                                save_data=save_data,
                                                                n_steps=self.num_steps_per_dataset,
                                                                **env_kwargs)
@@ -196,7 +196,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                          heading_info_df_exists_ok=True,
                                          stops_near_ff_df_exists_ok=True,
                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
-                                         use_curvature_to_ff_center=False,
+                                         use_curv_to_ff_center=False,
                                          save_data=True,
                                          **env_kwargs
                                          ):
@@ -220,7 +220,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                                        stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                                        curv_of_traj_mode=curv_of_traj_mode,
                                                                        window_for_curv_of_traj=window_for_curv_of_traj,
-                                                                       use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                                       use_curv_to_ff_center=use_curv_to_ff_center,
                                                                        save_data=save_data,
                                                                        n_steps=self.num_steps_per_dataset,
                                                                        **env_kwargs)
@@ -250,7 +250,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                           combd_heading_df_x_sessions_exists_ok=True,
                                                           stops_near_ff_df_exists_ok=True,
                                                           curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
-                                                          use_curvature_to_ff_center=False,
+                                                          use_curv_to_ff_center=False,
                                                           save_data=True,
                                                           **env_kwargs
                                                           ):
@@ -272,7 +272,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                   heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                   stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                                   curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,
-                                                  use_curvature_to_ff_center=use_curvature_to_ff_center,
+                                                  use_curv_to_ff_center=use_curv_to_ff_center,
                                                   save_data=save_data,
                                                   **env_kwargs)
 

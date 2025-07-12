@@ -98,7 +98,7 @@ class CCAclass():
         self.test_results = stats_cca.corr_test()
         self.CanCorr_canonical_corrs = self.test_results.stats['Canonical Correlation'].values.astype(float)
         self.p_values = self.test_results.stats['Pr > F'].values.astype(float)
-        
+        print(self.test_results)
         # check if self.CanCorr_canonical_corrs and self.canon_corr are the same (with shared components).
         # If not, raise an warning and print the components that are different.
         num_components = min(len(self.CanCorr_canonical_corrs), len(self.canon_corr))

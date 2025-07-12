@@ -40,13 +40,12 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
 from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.model_selection import KFold, train_test_split
-
-
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+
 
 def use_linear_regression(X_train, X_test, y_train, y_test,
                           show_plot=True, y_var_name=None):
@@ -68,7 +67,8 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
     # Metrics
     r2_train = results.rsquared
     r2_adj = results.rsquared_adj
-    r2_test = round(1 - sum((y_test - y_pred) ** 2) / sum((y_test - np.mean(y_test)) ** 2), 4)
+    r2_test = round(1 - sum((y_test - y_pred) ** 2) /
+                    sum((y_test - np.mean(y_test)) ** 2), 4)
     pearson_corr = np.corrcoef(y_test, y_pred)[0, 1]
     mse = mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
@@ -93,7 +93,7 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
     # Plot
     if show_plot:
         plt.figure(figsize=(6, 6))
-        plt.scatter(y_test, y_pred, alpha=0.7)
+        plt.scatter(y_test, y_pred, alpha=0.4)
         plt.plot([y_test.min(), y_test.max()],
                  [y_test.min(), y_test.max()], 'k--', lw=2)
         plt.xlabel("Actual Values")
@@ -112,8 +112,8 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
         't': results.tvalues,
         'p_value': results.pvalues
     })
-    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
-    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
+
+    summary_df = process_summary_df(summary_df)
 
     return summary_df, y_pred, results, r2_test
 
@@ -222,24 +222,26 @@ def _choose_best_model(model, model_name, X_train, X_test, y_test):
 def _get_rf_feature_importances(model, feature_names=None):
     feature_importances = model.feature_importances_
     if feature_names is None:
-        feature_names = [f"Neuron_{i}" for i in range(len(feature_importances))]
+        feature_names = [f"Neuron_{i}" for i in range(
+            len(feature_importances))]
     # Combine feature names and their importances
     importance_df = pd.DataFrame({
         'feature': feature_names,
         'importance': feature_importances
     }).sort_values('importance', ascending=False)
-    
+
     return importance_df
+
 
 def plot_feature_importance(importance_df, predictor_var):
     plt.figure(figsize=(10, 6))
-    plt.bar(range(min(15, len(importance_df))), 
+    plt.bar(range(min(15, len(importance_df))),
             importance_df['importance'].head(15))
     plt.title(f'Feature Importance: {predictor_var}')
     plt.xlabel('Neuron Index (sorted by importance)')
     plt.ylabel('Importance')
-    plt.xticks(range(min(15, len(importance_df))), 
-                importance_df['feature'].head(15), rotation=45)
+    plt.xticks(range(min(15, len(importance_df))),
+               importance_df['feature'].head(15), rotation=45)
     plt.tight_layout()
     plt.show()
 
@@ -351,6 +353,7 @@ def use_neural_network_on_linear_regression_func(X_train, y_train, X_test, y_tes
 
     return model, predictions
 
+
 def get_significant_features_in_one_row(summary_df, max_features_to_save=None, add_coeff=True):
     summary_df = summary_df.copy()
     summary_df = summary_df.reset_index(drop=False).copy()
@@ -358,7 +361,7 @@ def get_significant_features_in_one_row(summary_df, max_features_to_save=None, a
     if max_features_to_save is not None:
         summary_df = summary_df.set_index(
             'rank_by_abs_coeff').iloc[:max_features_to_save].copy()
-    
+
     summary_df.index = summary_df.index.astype(str)
     temp_info = summary_df[['feature']].T.reset_index(drop=True).copy()
     if add_coeff:
@@ -371,7 +374,7 @@ def get_significant_features_in_one_row(summary_df, max_features_to_save=None, a
         raise ValueError('temp_info should only have one row')
     temp_info.columns.name = ''
     return temp_info
-    
+
 
 # def get_significant_features_in_one_row(summary_df, max_features_to_save=None, add_coeff=True):
 #     summary_df = summary_df.copy()
@@ -391,3 +394,14 @@ def get_significant_features_in_one_row(summary_df, max_features_to_save=None, a
 #         raise ValueError('temp_info should only have one row')
 #     temp_info.columns.name = ''
 #     return temp_info
+
+def process_summary_df(summary_df):
+    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
+    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
+    summary_df['significant'] = summary_df['p_value'] <= 0.05
+    summary_df['rank_by_abs_coeff'] = summary_df['abs_coeff'].rank(
+        ascending=False, method='first').astype(int)
+    # summary_df.reset_index(drop=False, inplace=True)
+    return summary_df
+
+

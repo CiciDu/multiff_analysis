@@ -74,18 +74,10 @@ class MlMethods():
                     by='importance', ascending=False, inplace=True)
                 self.feature_results_df = feature_results_df
 
-    def process_summary_df(self, summary_df):
-        self.summary_df_all = summary_df.copy()
-        # self.summary_df = summary_df[summary_df['p_value'] <= 0.05].copy()
-        self.summary_df['significant'] = self.summary_df['p_value'] <= 0.05
-        self.summary_df['rank_by_abs_coeff'] = self.summary_df['abs_coeff'].rank(
-            ascending=False, method='first').astype(int)
-        #self.summary_df.reset_index(drop=False, inplace=True)
 
     def use_linear_regression(self, show_plot=True, y_var_name=None):
         self.summary_df, self.y_pred, self.results, self.r2_test = regression_utils.use_linear_regression(
             self.X_train, self.X_test, self.y_train, self.y_test, show_plot=show_plot, y_var_name=y_var_name)
-        self.process_summary_df(self.summary_df)
 
     def split_and_use_linear_regression(self, x_var_df, y_var_df, test_size=0.2):
         # if y_var_df is a series, convert it to a dataframe
@@ -122,7 +114,6 @@ class MlMethods():
 
         self.summary_df, _ = classification_utils.use_logistic_regression(
             X_selected, y_var_df)
-        self.process_summary_df(self.summary_df)
 
     def use_ml_model_for_classification(self, x_var_df, y_var_df, model=None):
         y_var_df = np.array(y_var_df)
