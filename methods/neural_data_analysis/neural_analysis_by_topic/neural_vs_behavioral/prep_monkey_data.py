@@ -254,6 +254,7 @@ def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, window_width,
         monkey_info_in_bins_essential['num_distinct_stops'], gaussian_kernel, 'same')
     num_caught_ff_convolved = np.convolve(
         monkey_info_in_bins_essential['num_caught_ff'], gaussian_kernel, 'same')
+    # note, stop_rate here is the number of stops in a bin convolved by a gaussian kernel
     monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved/window_width
     # suppress the warning for the line below
     with warnings.catch_warnings():

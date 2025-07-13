@@ -29,7 +29,7 @@ import quantities as pq
 import neo
 from sklearn.decomposition import PCA
 from elephant.spike_train_generation import inhomogeneous_poisson_process
-
+import pickle
 
 class GPFAHelperClass():
 
@@ -44,7 +44,7 @@ class GPFAHelperClass():
         exists_ok : bool
             Whether to load existing trajectories if available
         """
-        import pickle
+
 
         alignment = 'segStart' if self.align_at_beginning else 'segEnd'
         file_name = f'gpfa_neural_aligned_{alignment}_d{latent_dimensionality}.pkl'
@@ -90,8 +90,9 @@ class GPFAHelperClass():
         if bin_width is None:
             bin_width = self.bin_width
 
+        # add a small value to common t stop
         self.common_t_stop = max(
-            self.spike_segs_df['t_duration']) + bin_width
+            self.spike_segs_df['t_duration']) + 1e-6 # originally added bin_width
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
 
