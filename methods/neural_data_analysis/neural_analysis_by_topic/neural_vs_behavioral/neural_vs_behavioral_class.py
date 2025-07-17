@@ -22,13 +22,11 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
     def __init__(self,
                  raw_data_folder_path=None,
                  bin_width=0.02,
-                 window_width=0.25,
-                 one_behav_idx_per_bin=True):
+                 one_point_index_per_bin=True):
 
         super().__init__(raw_data_folder_path=raw_data_folder_path,
                          bin_width=bin_width,
-                         window_width=window_width,
-                         one_behav_idx_per_bin=one_behav_idx_per_bin)
+                         one_point_index_per_bin=one_point_index_per_bin)
 
     def streamline_preparing_neural_and_behavioral_data(self, max_y_lag_number=3):
         self.get_basic_data()
@@ -43,13 +41,10 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
                              continuous_data=self.final_behavioral_data)
 
     def make_relevant_paths(self):
-        self.y_var_lags_path = os.path.join(
-            self.processed_neural_data_folder_path, 'y_var_lags')
         self.vif_df_path = os.path.join(
             self.processed_neural_data_folder_path, 'vif_df')
         self.lr_df_path = os.path.join(
             self.processed_neural_data_folder_path, 'lr_df')
-        os.makedirs(self.y_var_lags_path, exist_ok=True)
         os.makedirs(self.vif_df_path, exist_ok=True)
         os.makedirs(self.lr_df_path, exist_ok=True)
 
@@ -101,9 +96,9 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
 
     def _add_monkey_info(self):
         self.monkey_info_in_bins = prep_monkey_data.bin_monkey_information(
-            self.monkey_information, self.time_bins, one_behav_idx_per_bin=self.one_behav_idx_per_bin)
+            self.monkey_information, self.time_bins, one_point_index_per_bin=self.one_point_index_per_bin)
         self.monkey_info_in_bins_ess = prep_monkey_data.make_monkey_info_in_bins_essential(
-            self.monkey_info_in_bins, self.time_bins, self.ff_caught_T_new, self.window_width)
+            self.monkey_info_in_bins, self.time_bins, self.ff_caught_T_new)
         self.binned_features = self.binned_features.merge(
             self.monkey_info_in_bins_ess, how='left', on='bin')
 
@@ -112,7 +107,7 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
         self._make_or_retrieve_target_cluster_df()
         self._make_cmb_target_df()
 
-        if self.one_behav_idx_per_bin:
+        if self.one_point_index_per_bin:
             self.target_df_to_use = self.cmb_target_df[self.cmb_target_df['point_index'].isin(
                 self.monkey_info_in_bins['point_index'].values)]
         else:

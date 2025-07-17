@@ -133,11 +133,11 @@ def fill_na_in_target_df(target_df):
 
         # Forward fill NA values within each target_index group
         target_df[na_cols] = target_df.groupby(
-            'target_index')[na_cols].ffill()
+            'target_index')[na_cols].ffill().astype(int)
 
         # Backward fill any remaining NA values within each target_index group
         target_df[na_cols] = target_df.groupby(
-            'target_index')[na_cols].bfill()
+            'target_index')[na_cols].bfill().astype(int)
 
         # Check and print results after filling
         na_sum = target_df.isna().sum()

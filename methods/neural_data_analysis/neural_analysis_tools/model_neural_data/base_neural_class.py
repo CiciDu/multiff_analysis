@@ -4,7 +4,7 @@ from neural_data_analysis.neural_analysis_tools.model_neural_data import transfo
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, prep_target_data
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_by_topic.decode_targets import prep_target_decoder, behav_features_to_keep
+from neural_data_analysis.neural_analysis_by_topic.target_decoder import prep_target_decoder, behav_features_to_keep
 import os
 import numpy as np
 import matplotlib
@@ -23,13 +23,12 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
     def __init__(self,
                  raw_data_folder_path=None,
                  bin_width=0.02,
-                 window_width=0.25,
-                 one_behav_idx_per_bin=True):
+
+                 one_point_index_per_bin=True):
 
         super().__init__(raw_data_folder_path=raw_data_folder_path)
         self.bin_width = bin_width
-        self.window_width = window_width
-        self.one_behav_idx_per_bin = one_behav_idx_per_bin
+        self.one_point_index_per_bin = one_point_index_per_bin
         self.max_bin = None
         self.max_visibility_window = 10
 
@@ -40,8 +39,6 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
     def retrieve_neural_data(self, binned_spikes_df_exists_ok=True):
 
-        # self.window_width, self.num_bins_in_window, self.convolve_pattern = neural_data_processing.calculate_window_parameters(
-        #     window_width=self.window_width, bin_width=self.bin_width)
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
         bin_width_str = str(self.bin_width).replace('.', 'p')
         binned_spikes_df_path = os.path.join(
@@ -50,24 +47,25 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         if binned_spikes_df_exists_ok & os.path.exists(binned_spikes_df_path):
             self.binned_spikes_df = pd.read_csv(binned_spikes_df_path)
             last_bin = self.binned_spikes_df['bin'].max()
-            self.time_bins = np.arange(0, (last_bin + 2) * self.bin_width, self.bin_width)
+            self.time_bins = np.arange(
+                0, (last_bin + 2) * self.bin_width, self.bin_width)
             print(f'Loaded binned_spikes_df from {binned_spikes_df_path}')
         else:
             if not hasattr(self, 'ff_caught_T_sorted'):
                 self.get_basic_data()
-            
+
             spike_df = neural_data_processing.make_spike_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                             sampling_rate=self.sampling_rate)
-            
+
             self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
-                spike_df, bin_width=self.bin_width, max_bin=self.max_bin)
+                spike_df, bin_width=self.bin_width)
             self.binned_spikes_df.to_csv(binned_spikes_df_path, index=False)
             print(
                 f'Made new binned_spikes_df and saved to {binned_spikes_df_path}')
 
         if self.max_bin is not None:
             self.binned_spikes_df = self.binned_spikes_df[self.binned_spikes_df['bin'] <= self.max_bin]
-        
+
     def _make_or_retrieve_target_df(self, exists_ok=True, fill_na=False):
         target_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_df.csv')
@@ -101,11 +99,11 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             self.target_cluster_df.to_csv(
                 target_cluster_df_filepath, index=False)
             print("Made new target_cluster_df")
-            
+
         if fill_na:
             self.target_df = prep_target_data.fill_na_in_target_df(
                 self.target_df)
-            
+
     def _add_ff_info(self, binned_features):
         ff_info = prep_monkey_data.get_ff_info_for_bins(
             binned_features[['bin']], self.ff_dataframe, self.ff_caught_T_new, self.time_bins)
@@ -117,13 +115,19 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             ff_info, on='bin', how='left')
         return binned_features
 
+    def _get_curv_of_traj_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
+        self.curv_of_traj_df = self.get_curv_of_traj_df(
+            window_for_curv_of_traj=window_for_curv_of_traj,
+            curv_of_traj_mode=curv_of_traj_mode,
+            truncate_curv_of_traj_by_time_of_capture=False
+        )
+
     def _reduce_y_var_base(self, y_var, corr_threshold_for_lags_of_a_feature=0.85,
                            vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
                            filter_corr_by_all_columns=True,
                            filter_vif_by_subsets=True,
                            filter_vif_by_all_columns=True,
                            ):
-
 
         y_var_reduced = prep_target_decoder.remove_zero_var_cols(
             y_var)
@@ -157,7 +161,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         y_var_lags_reduced = prep_target_decoder.remove_zero_var_cols(
             self.y_var_lags)
-        
+
         # Call the function to iteratively drop lags with high correlation for each feature
         self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var_lags_reduced,
                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
@@ -176,11 +180,9 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                                                                                 filter_by_all_columns=filter_vif_by_all_columns,
                                                                                 get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vif)
 
-
         # sort y_var_lags_reduced by column name
         self.y_var_lags_reduced = self.y_var_lags_reduced.reindex(
             sorted(self.y_var_lags_reduced.columns), axis=1)
-
 
     def _reduce_x_var_lags(self,
                            corr_threshold_for_lags_of_a_feature=0.85,
@@ -193,7 +195,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         self.x_var_lags_reduced = prep_target_decoder.remove_zero_var_cols(
             self.x_var_lags)
-        
+
         # Call the function to iteratively drop lags with high correlation for each feature
         self.x_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.x_var_lags_reduced,
                                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
@@ -214,22 +216,32 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.x_var_lags_reduced = self.x_var_lags_reduced.reindex(
             sorted(self.x_var_lags_reduced.columns), axis=1)
 
+    def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True, save_data=True, df_path=None):
 
-    def make_or_retrieve_y_var_lags_reduced(self, exists_ok=True):
-        df_path = os.path.join(self.y_var_lags_path,
-                               f'y_var_lags_{self.max_y_lag_number}_reduced.csv')
-        if exists(df_path) & exists_ok:
-            self.y_var_lags_reduced = pd.read_csv(df_path)
-        else:
-            if not hasattr(self, 'y_var_lags'):
-                self._get_y_var_lags(
-                    max_y_lag_number=self.max_y_lag_number, continuous_data=self.final_behavioral_data)
-            self._reduce_y_var_lags()
+        if exists_ok & os.path.exists(df_path):
+            if os.path.exists(df_path):
+                self.y_var_lags_reduced = pd.read_csv(df_path)
+                if len(self.y_var_lags_reduced) == len(self.y_var_lags):
+                    print(f'Loaded y_var_lags_reduced from {df_path}')
+                    return
+                else:
+                    print(
+                        'The number of rows in y_var_lags_reduced does not match that of y_var_lags. New y_var_lags_reduced will be made.')
+
+        if not hasattr(self, 'y_var_lags'):
+            self._get_y_var_lags(
+                max_y_lag_number=self.max_y_lag_number, continuous_data=self.final_behavioral_data)
+        self._reduce_y_var_lags()
+
+        if save_data & (df_path is not None):
             self.y_var_lags_reduced.to_csv(df_path, index=False)
+            print(f'Saved y_var_lags_reduced to {df_path}')
+        else:
+            print('Made new y_var_lags_reduced (but not saved)')
 
     def _get_x_and_y_var(self):
         self.x_var = self.binned_spikes_df.set_index(
-            'bin').loc[self.valid_bin_index].reset_index(drop=True)
+            'bin').loc[self.valid_bin_index].reset_index(drop=False)
         self.y_var = self.final_behavioral_data.set_index(
             'bin').loc[self.valid_bin_index].reset_index(drop=False)
 
@@ -261,11 +273,9 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                 'bin_0').loc[self.valid_bin_index].reset_index(drop=False)
         return var_lags, lag_numbers
 
-          
     def _reduce_x_var(self):
         self.x_var_reduced = prep_target_decoder.remove_zero_var_cols(
             self.x_var)
-
 
     def _reduce_y_var(self,
                       df_path=None,
@@ -282,19 +292,15 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         print('===============================================')
         print('Getting y_var_reduced...')
 
-        can_retrieve = False
         if exists_ok & (df_path is not None):
             if os.path.exists(df_path):
-                can_retrieve = True
-
-        if exists_ok and can_retrieve:
-            self.y_var_reduced = pd.read_csv(df_path)
-            if len(self.y_var_reduced) == len(self.y_var):
-                print(f'Loaded y_var_reduced from {df_path}')
-                return 
-            else:
-                print('The number of rows in y_var_reduced does not match that of y_var. New y_var_reduced will be made.')
-            
+                self.y_var_reduced = pd.read_csv(df_path)
+                if len(self.y_var_reduced) == len(self.y_var):
+                    print(f'Loaded y_var_reduced from {df_path}')
+                    return
+                else:
+                    print(
+                        'The number of rows in y_var_reduced does not match that of y_var. New y_var_reduced will be made.')
 
         # drop columns with std less than 0.001
         columns_w_small_std = self.y_var.std(
@@ -340,24 +346,15 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         print('===============================================')
         print('Getting y_var_lags_reduced...')
 
-        can_retrieve = False
         if exists_ok & (df_path is not None):
             if os.path.exists(df_path):
-                can_retrieve = True
-
-        # Try to load cached results if allowed
-        if exists_ok and can_retrieve:
-            try:
-                cached_data = pd.read_csv(df_path)
-                if len(cached_data) == len(self.y_var_lags):
-                    self.y_var_lags_reduced = cached_data
-                    if verbose:
-                        print(
-                            f'Loaded y_var_lags_reduced from {df_path}')
+                self.y_var_lags_reduced = pd.read_csv(df_path)
+                if len(self.y_var_lags_reduced) == len(self.y_var_lags):
+                    print(f'Loaded y_var_lags_reduced from {df_path}')
                     return
-            except (pd.errors.EmptyDataError, ValueError) as e:
-                if verbose:
-                    print(f'Failed to load cached data: {str(e)}')
+                else:
+                    print(
+                        'The number of rows in y_var_lags_reduced does not match that of y_var_lags. New y_var_lags_reduced will be made.')
 
         # If we get here, we need to recompute
         if verbose:

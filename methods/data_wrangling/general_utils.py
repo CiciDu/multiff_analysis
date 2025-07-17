@@ -388,3 +388,20 @@ def drop_columns_with_many_nans(df, threshold=0.3):
     if len(cols_to_drop) > 0:
         print(f"Dropped {len(cols_to_drop)} columns with more than {threshold*100}% missing values: {cols_to_drop}")
     return df_cleaned, cols_to_drop
+
+
+def drop_na_cols(df, df_name=None):
+    # Identify columns with missing values
+    na_counts = df.isna().sum()
+    cols_with_na = na_counts[na_counts > 0].index.tolist()
+
+    # Print number and names of dropped columns
+    if df_name:
+        print(f'Dropped {len(cols_with_na)} columns due to containing NA in {df_name} via calling drop_na_cols function: {cols_with_na}')
+    else:
+        print(f'Dropped {len(cols_with_na)} columns due to containing NA via calling drop_na_cols function: {cols_with_na}')
+
+    # Drop columns with missing values
+    df.drop(columns=cols_with_na, inplace=True)
+    return df
+    

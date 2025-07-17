@@ -1,51 +1,22 @@
-import sys
-from machine_learning.ml_methods import ml_methods_class
+from machine_learning.ml_methods import ml_methods_utils
 import pandas as pd
-from plotly.subplots import make_subplots
-import plotly.graph_objs as go
-import pprint
-from scipy import stats
 import torch
 import torch.optim as optim
 import torch.nn as nn
-from sklearn.metrics import accuracy_score
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
-import matplotlib.pyplot as plt
-import pandas as pd
-from sklearn.model_selection import cross_validate
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier, BaggingClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
 from sklearn.metrics import r2_score
-import math
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
-import numpy as np
-import pandas as pd
 import statsmodels.api as sm
-from sklearn.metrics import accuracy_score, confusion_matrix
-import numpy as np
-from sklearn.linear_model import Lasso, LogisticRegression
-from sklearn.model_selection import KFold, train_test_split
-import numpy as np
-import pandas as pd
-import statsmodels.api as sm
-import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-
+from scipy.stats import pearsonr
+from sklearn.model_selection import cross_validate
 
 def use_linear_regression(X_train, X_test, y_train, y_test,
                           show_plot=True, y_var_name=None):
@@ -113,7 +84,7 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
         'p_value': results.pvalues
     })
 
-    summary_df = process_summary_df(summary_df)
+    summary_df = ml_methods_utils.process_summary_df(summary_df)
 
     return summary_df, y_pred, results, r2_test
 
@@ -246,39 +217,151 @@ def plot_feature_importance(importance_df, predictor_var):
     plt.show()
 
 
-def use_linear_regression_cv(x_var, y_var, num_folds=10):
-    # also try cross validation
-    model = LinearRegression()
+def pearson_r_score(y_true, y_pred):
+    # Pearson r as a scorer, ignoring p-value
+    return pearsonr(y_true, y_pred)[0]
 
-    # Perform cross-validation
-    # cv specifies the number of folds in K-Fold cross-validation
-    # You can adjust the scoring parameter based on your requirements
+def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
+    """
+    Perform cross-validation with linear regression.
+    
+    Parameters:
+    - x_var: feature matrix
+    - y_var: target vector
+    - cv: int or cross-validation splitter
+    - groups: optional group labels (for GroupKFold)
+    
+    Returns:
+    - dict of train/test metrics (mean ± std) including R² and Pearson r.
+    """
+    scoring = {
+        'r2': make_scorer(r2_score),
+        'pearson_r': make_scorer(pearson_r_score)
+    }
+    
     cv_results = cross_validate(
-        model,
+        LinearRegression(),
         x_var,
         y_var,
-        cv=num_folds,
-        scoring='r2',
+        cv=cv,
+        scoring=scoring,
+        groups=groups,
         return_train_score=True
     )
 
-    test_scores = cv_results['test_score']
-    train_scores = cv_results['train_score']
+    metrics = ['r2', 'pearson_r']
+    results = {}
 
-    # Calculate the average R-squared across all folds
-    test_avg_r_squared = test_scores.mean()
-    train_avg_r_squared = train_scores.mean()
+    if verbose:
+        print(f"{'Metric':<12} {'Train Mean':>12} {'Test Mean':>12} {'Train Std':>12}   {'Test Std':>12}")
+        print("-" * 70)
 
-    # You can also calculate other statistics like standard deviation to assess variability
-    test_std_r_squared = test_scores.std()
-    train_std_r_squared = train_scores.std()
+    # Then print metrics
+    for metric in metrics:
+        train_scores = cv_results[f'train_{metric}']
+        test_scores = cv_results[f'test_{metric}']
+        train_mean, train_std = np.mean(train_scores), np.std(train_scores)
+        test_mean, test_std = np.mean(test_scores), np.std(test_scores)
 
-    print(
-        f"Average R-squared on train set ({num_folds}-fold CV): {round(train_avg_r_squared, 4)}")
-    print(
-        f"Average R-squared on test set ({num_folds}-fold CV): {round(test_avg_r_squared, 4)}")
+        results[f'train_{metric}'] = (train_mean, train_std)
+        results[f'test_{metric}'] = (test_mean, test_std)
 
-    return test_avg_r_squared, test_std_r_squared, train_avg_r_squared, train_std_r_squared
+        if verbose:
+            print(f"{metric.capitalize():<12} {train_mean:12.4f} {test_mean:12.4f} {train_std:12.4f}   {test_std:12.4f}")
+
+    return results
+
+
+# def use_linear_regression_cv(x_var, y_var, num_folds=10):
+#     kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+#     r2_train_scores = []
+#     r2_test_scores = []
+#     pearson_test_scores = []
+#     pearson_p_values = []
+
+#     for train_index, test_index in kf.split(x_var):
+#         x_train, x_test = x_var[train_index], x_var[test_index]
+#         y_train, y_test = y_var[train_index], y_var[test_index]
+
+#         model = LinearRegression()
+#         model.fit(x_train, y_train)
+
+#         y_train_pred = model.predict(x_train)
+#         y_test_pred = model.predict(x_test)
+
+#         # R² scores
+#         r2_train_scores.append(r2_score(y_train, y_train_pred))
+#         r2_test_scores.append(r2_score(y_test, y_test_pred))
+
+#         # Pearson r and p-value on test set
+#         r, p = pearsonr(y_test, y_test_pred)
+#         pearson_test_scores.append(r)
+#         pearson_p_values.append(p)
+
+#     # Summary stats
+#     train_r2_mean = np.mean(r2_train_scores)
+#     train_r2_std = np.std(r2_train_scores)
+#     test_r2_mean = np.mean(r2_test_scores)
+#     test_r2_std = np.std(r2_test_scores)
+#     pearson_r_mean = np.mean(pearson_test_scores)
+#     pearson_r_std = np.std(pearson_test_scores)
+#     pearson_p_mean = np.mean(pearson_p_values)
+#     pearson_p_std = np.std(pearson_p_values)
+
+#     print(f"{'Metric':<35}{'Mean':>10} ± {'Std':<10}")
+#     print("-" * 60)
+#     print(f"{'Train R²':<35}{train_r2_mean:>10.4f} ± {train_r2_std:<10.4f}")
+#     print(f"{'Test R²':<35}{test_r2_mean:>10.4f} ± {test_r2_std:<10.4f}")
+#     print(f"{'Test Pearson r':<35}{pearson_r_mean:>10.4f} ± {pearson_r_std:<10.4f}")
+#     print(f"{'Test Pearson p-value':<35}{pearson_p_mean:>10.4g} ± {pearson_p_std:<10.4g}")
+
+#     return {
+#         "train_r2_mean": train_r2_mean,
+#         "train_r2_std": train_r2_std,
+#         "test_r2_mean": test_r2_mean,
+#         "test_r2_std": test_r2_std,
+#         "pearson_r_mean": pearson_r_mean,
+#         "pearson_r_std": pearson_r_std,
+#         "pearson_p_mean": pearson_p_mean,
+#         "pearson_p_std": pearson_p_std
+#     }
+
+
+
+
+# def use_linear_regression_cv(x_var, y_var, num_folds=10):
+#     # also try cross validation
+#     model = LinearRegression()
+
+#     # Perform cross-validation
+#     # cv specifies the number of folds in K-Fold cross-validation
+#     # You can adjust the scoring parameter based on your requirements
+#     cv_results = cross_validate(
+#         model,
+#         x_var,
+#         y_var,
+#         cv=num_folds,
+#         scoring='r2',
+#         return_train_score=True
+#     )
+
+#     test_scores = cv_results['test_score']
+#     train_scores = cv_results['train_score']
+
+#     # Calculate the average R-squared across all folds
+#     test_avg_r_squared = test_scores.mean()
+#     train_avg_r_squared = train_scores.mean()
+
+#     # You can also calculate other statistics like standard deviation to assess variability
+#     test_std_r_squared = test_scores.std()
+#     train_std_r_squared = train_scores.std()
+
+#     print(
+#         f"Average R-squared on train set ({num_folds}-fold CV): {round(train_avg_r_squared, 4)}")
+#     print(
+#         f"Average R-squared on test set ({num_folds}-fold CV): {round(test_avg_r_squared, 4)}")
+
+#     return test_avg_r_squared, test_std_r_squared, train_avg_r_squared, train_std_r_squared
 
 
 class MultiLayerRegression(nn.Module):
@@ -395,13 +478,5 @@ def get_significant_features_in_one_row(summary_df, max_features_to_save=None, a
 #     temp_info.columns.name = ''
 #     return temp_info
 
-def process_summary_df(summary_df):
-    summary_df['abs_coeff'] = np.abs(summary_df['Coefficient'])
-    summary_df.sort_values(by='abs_coeff', ascending=False, inplace=True)
-    summary_df['significant'] = summary_df['p_value'] <= 0.05
-    summary_df['rank_by_abs_coeff'] = summary_df['abs_coeff'].rank(
-        ascending=False, method='first').astype(int)
-    # summary_df.reset_index(drop=False, inplace=True)
-    return summary_df
 
 

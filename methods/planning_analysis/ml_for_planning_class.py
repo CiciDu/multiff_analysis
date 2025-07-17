@@ -142,10 +142,10 @@ class MlForPlanning(ml_methods_class.MlMethods):
 
         more_temp_info = regression_utils.get_significant_features_in_one_row(
             self.summary_df, max_features_to_save=max_features_to_save, add_coeff=add_coeff)
-        test_avg_r_squared, test_std_r_squared, train_avg_r_squared, train_std_r_squared = regression_utils.use_linear_regression_cv(
+        result = regression_utils.use_linear_regression_cv(
             self.x_var_prepared, self.y_var_prepared)
-        more_temp_info['avg_r_squared'] = round(test_avg_r_squared, 4)
-        more_temp_info['std_r_squared'] = round(test_std_r_squared, 4)
+        more_temp_info['avg_r_squared'] = round(result['test_r2_mean'], 4)
+        more_temp_info['std_r_squared'] = round(result['test_r2_std'], 4)
 
         temp_info = pd.concat([temp_info, more_temp_info], axis=1)
         self.lr_variations_df = pd.concat(

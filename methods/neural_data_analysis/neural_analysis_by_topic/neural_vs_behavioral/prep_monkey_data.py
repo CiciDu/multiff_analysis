@@ -30,47 +30,143 @@ monkey_info_columns_of_interest = ['bin',
                                    ]
 
 
-def bin_monkey_information(monkey_information, time_bins, one_behav_idx_per_bin=True):
-    monkey_information = monkey_information.copy()
-    time = monkey_information['time'].values
-    monkey_information['bin'] = np.digitize(time, time_bins)-1
+# Custom function for mode (returns first mode if multiple)
+def get_mode(x):
+    return x.mode().iloc[0] if not x.mode().empty else pd.NA
 
-    if one_behav_idx_per_bin:
-        median_indices = (
-            monkey_information.groupby('bin')['point_index']
-            .median().round().astype(int)
-        )
-        # extract corresponding rows from monkey_information
-        monkey_info_in_bins = monkey_information.set_index('point_index').loc[median_indices.values].reset_index(drop=False)
-        # add bin info back 
-        monkey_info_in_bins['bin'] = median_indices.index
+# Define strict median function
+
+
+def strict_median(series, method='lower'):
+    sorted_vals = np.sort(series.dropna().values)
+    n = len(sorted_vals)
+    if n == 0:
+        return np.nan
+    elif n % 2 == 1:
+        return sorted_vals[n // 2]
     else:
-        monkey_info_in_bins = _rebin_monkey_info(
-            monkey_information).reset_index(drop=True)
+        if method == 'lower':
+            return sorted_vals[n // 2 - 1]
+        elif method == 'upper':
+            return sorted_vals[n // 2]
+        else:
+            raise ValueError("method must be 'lower' or 'upper'")
 
-    # make sure that every bin has info
-    all_bins = pd.DataFrame({'bin': range(max(monkey_information['bin']))})
+
+def _bin_behav_data_by_point(ori_df):
+    col_max = ['target_visible_dummy', 'target_cluster_visible_dummy', 'capture_target_dummy',
+               #'num_visible_ff', 'any_ff_visible', 'catching_ff' # these features are merged into df after binning later
+               ]
+    col_strict_median = ['point_index', 'valid_view_point']
+
+    # Combine aggregation functions
+    agg_funcs = {col: 'max' for col in col_max}
+    agg_funcs.update({col: strict_median for col in col_strict_median})
+
+    # Get list of remaining columns to apply median
+    remaining_cols = [col for col in ori_df.columns if col not in ['bin'] + list(agg_funcs)]
+    for col in remaining_cols:
+        agg_funcs[col] = 'median'
+    
+    # Perform groupby
+    binned_df = ori_df.groupby('bin').agg(agg_funcs).reset_index()
+
+    # Drop unwanted columns (corrected)
+    binned_df = binned_df.drop(columns=[
+        'target_index',
+        'target_has_disappeared_for_last_time_dummy',
+        'target_cluster_has_disappeared_for_last_time_dummy'
+    ])
+
+    # Merge back relevant columns (corrected)
+    binned_df = binned_df.merge(
+        ori_df[['point_index', 'target_index', 'target_has_disappeared_for_last_time_dummy',
+                'target_cluster_has_disappeared_for_last_time_dummy']],
+        on='point_index',
+        how='left'
+    )
+    return binned_df
+
+
+def bin_behav_data_by_point(ori_df, time_bins, add_stop_time_ratio_in_bin=True, one_point_index_per_bin=True):
+    ori_df = ori_df.copy()
+    ori_df['bin'] = np.digitize(
+        ori_df['time'].values, time_bins)-1
+
+    if one_point_index_per_bin:
+        binned_df = _bin_by_one_point_index_per_bin(
+            ori_df)
+    else:
+        binned_df = _bin_behav_data_by_point(ori_df)
+        if add_stop_time_ratio_in_bin:
+            binned_df = _add_stop_time_ratio_in_bin(ori_df, binned_df)
+
+    binned_df = _make_sure_every_bin_has_info(binned_df)
+    binned_df = _add_bin_time_info(binned_df, time_bins)
+    binned_df['point_index'] = binned_df['point_index'].astype(
+        int)
+
+    return binned_df
+
+def bin_monkey_information(ori_df, time_bins, add_stop_time_ratio_in_bin=True, one_point_index_per_bin=True):
+    ori_df = ori_df.copy()
+    ori_df['bin'] = np.digitize(
+        ori_df['time'].values, time_bins)-1
+
+    if one_point_index_per_bin:
+        binned_df = _bin_by_one_point_index_per_bin(
+            ori_df)
+    else:
+        binned_df = ori_df.groupby(
+            'bin', as_index=False).mean()
+        if add_stop_time_ratio_in_bin:
+            binned_df = _add_stop_time_ratio_in_bin(ori_df, binned_df)
+
+    binned_df = _make_sure_every_bin_has_info(binned_df)
+    binned_df = _add_bin_time_info(binned_df, time_bins)
+    binned_df['point_index'] = binned_df['point_index'].astype(
+        int)
+
+    return binned_df
+
+
+def _bin_by_one_point_index_per_bin(monkey_information):
+    median_indices = (
+        monkey_information.groupby('bin')['point_index']
+        .median().round().astype(int)
+    )
+    # extract corresponding rows from monkey_information
+    monkey_info_in_bins = monkey_information.set_index(
+        'point_index').loc[median_indices.values].reset_index(drop=False)
+    # add bin info back
+    monkey_info_in_bins['bin'] = median_indices.index
+
+    return monkey_info_in_bins
+
+
+def _make_sure_every_bin_has_info(monkey_info_in_bins):
+    all_bins = pd.DataFrame({'bin': range(max(monkey_info_in_bins['bin']))})
     monkey_info_in_bins = monkey_info_in_bins.merge(
         all_bins, on='bin', how='right')
     monkey_info_in_bins = monkey_info_in_bins.ffill(
     ).infer_objects(copy=False).reset_index(drop=True)
     monkey_info_in_bins = monkey_info_in_bins.bfill(
     ).infer_objects(copy=False).reset_index(drop=True)
-
-    monkey_info_in_bins['bin_start_time'] = time_bins[monkey_info_in_bins['bin'].values]
-    monkey_info_in_bins['bin_end_time'] = time_bins[monkey_info_in_bins['bin'].values + 1]
-    monkey_info_in_bins['point_index'] = monkey_info_in_bins['point_index'].astype(
-        int)
-
     return monkey_info_in_bins
 
 
-def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught_T_new, window_width):
+def _add_bin_time_info(monkey_info_in_bins, time_bins):
+    monkey_info_in_bins['bin_start_time'] = time_bins[monkey_info_in_bins['bin'].values]
+    monkey_info_in_bins['bin_end_time'] = time_bins[monkey_info_in_bins['bin'].values + 1]
+    return monkey_info_in_bins
+
+
+def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught_T_new):
     """Prepare behavioral data."""
 
     monkey_info_in_bins_ess = monkey_info_in_bins.copy()
 
-    # add the number of distinct stops; it's more meaningful when one_behav_idx_per_bin is False; otherwise, it's the same as the monkey_speeddummy
+    # add the number of distinct stops; it's more meaningful when one_point_index_per_bin is False; otherwise, it's the same as the monkey_speeddummy
     monkey_info_in_bins_ess['num_distinct_stops'] = monkey_info_in_bins.groupby(
         'bin').sum()['whether_new_distinct_stop'].values
 
@@ -88,7 +184,7 @@ def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught
     monkey_info_in_bins_essential = _select_monkey_info_columns_of_interest(
         monkey_info_in_bins_ess)
     monkey_info_in_bins_essential = _add_stop_rate_and_success_rate(
-        monkey_info_in_bins_essential, window_width)
+        monkey_info_in_bins_essential)
 
     return monkey_info_in_bins_essential
 
@@ -96,8 +192,6 @@ def make_monkey_info_in_bins_essential(monkey_info_in_bins, time_bins, ff_caught
 def initialize_binned_features(monkey_information, bin_width):
     max_time = monkey_information['time'].max()
     time_bins = np.arange(0, max_time + bin_width * 2, bin_width)
-    monkey_information['bin'] = np.digitize(
-        monkey_information['time'].values, time_bins)-1
     binned_features = pd.DataFrame({'bin': range(len(time_bins))})
     return binned_features, time_bins
 
@@ -179,21 +273,41 @@ def _make_final_behavioral_data(monkey_info_in_bins_essential, binned_features):
     return final_behavioral_data
 
 
-def _rebin_monkey_info(monkey_information):
-    """Rebin monkey information."""
-    monkey_information = monkey_information.copy()
-    monkey_information['stop_duration'] = monkey_information['time']
-    monkey_information.loc[monkey_information['monkey_speeddummy']
-                           > 1, 'stop_duration'] = 0
-    monkey_info_in_bins_ess = monkey_information.groupby('bin').mean()
-    # take out the name of the index
+def _add_stop_time_ratio_in_bin(ori_df, binned_df):
+    monkey_stop_time_ratio_in_bin = _calculate_stop_time_ratio_in_bin(
+        ori_df)
+    binned_df = binned_df.merge(
+        monkey_stop_time_ratio_in_bin[['bin', 'stop_time_ratio_in_bin']], on='bin', how='left')
+    binned_df.drop(columns=['monkey_speeddummy'], inplace=True)
+    return binned_df
 
-    monkey_info_in_bins_ess['bin'] = monkey_info_in_bins_ess.index
-    monkey_info_in_bins_ess.rename(
-        columns={'monkey_speeddummy': 'stop_time_ratio_in_bin'}, inplace=True)
-    monkey_info_in_bins_ess['stop_time_ratio_in_bin'] = monkey_info_in_bins_ess['stop_time_ratio_in_bin'] / \
-        monkey_info_in_bins_ess['time']
-    return monkey_info_in_bins_ess
+
+def _calculate_stop_time_ratio_in_bin(monkey_information):
+    """
+    Calculate the stop time ratio in each bin.
+
+    For each bin, computes the total time spent stopped (speed ≤ 1) divided by the total time in that bin.
+
+    Returns:
+        DataFrame indexed by bin with:
+            - 'stop_duration': total stop time in the bin
+            - 'stop_time_ratio_in_bin': stop_duration / time
+    """
+    df = monkey_information.copy()
+
+    # Set stop_duration to time if speed ≤ 1, else 0
+    df['stop_duration'] = df['time']
+    df.loc[df['monkey_speeddummy'] > 1, 'stop_duration'] = 0
+
+    # Group by bin and sum stop_duration and time
+    binned_df = df.groupby('bin', as_index=False)[
+        ['stop_duration', 'time']].sum()
+
+    # Calculate stop time ratio
+    binned_df['stop_time_ratio_in_bin'] = binned_df['stop_duration'] / \
+        binned_df['time']
+
+    return binned_df
 
 
 def _add_num_caught_ff(monkey_info_in_bins_ess, ff_caught_T_new, time_bins):
@@ -207,7 +321,8 @@ def _add_num_caught_ff(monkey_info_in_bins_ess, ff_caught_T_new, time_bins):
     monkey_info_in_bins_ess['num_caught_ff'] = 0
     # make sure catching_target_bins_unique doesn't exceed bound
     point_index_max = monkey_info_in_bins_ess.index.max()
-    catching_target_bins_unique[catching_target_bins_unique > point_index_max] = point_index_max
+    catching_target_bins_unique[catching_target_bins_unique >
+                                point_index_max] = point_index_max
     monkey_info_in_bins_ess.loc[catching_target_bins_unique,
                                 'num_caught_ff'] = counts
     return monkey_info_in_bins_ess
@@ -241,21 +356,21 @@ def _select_monkey_info_columns_of_interest(monkey_info_in_bins_ess):
     return monkey_info_in_bins_essential
 
 
-def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, window_width, 
+def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential,
                                     kernel_size=7, std_dev=2):
     """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
-    
+
     # Create a Gaussian kernel
     gaussian_kernel = gaussian(kernel_size, std_dev)
     # Normalize the kernel so it sums to 1
     gaussian_kernel /= gaussian_kernel.sum()
-    
+
     num_distinct_stops_convolved = np.convolve(
         monkey_info_in_bins_essential['num_distinct_stops'], gaussian_kernel, 'same')
     num_caught_ff_convolved = np.convolve(
         monkey_info_in_bins_essential['num_caught_ff'], gaussian_kernel, 'same')
     # note, stop_rate here is the number of stops in a bin convolved by a gaussian kernel
-    monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved/window_width
+    monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved
     # suppress the warning for the line below
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning)
@@ -265,24 +380,6 @@ def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, window_width,
     monkey_info_in_bins_essential['stop_success_rate'] = monkey_info_in_bins_essential['stop_success_rate'].replace([
         np.inf, -np.inf], np.nan).fillna(0)
     return monkey_info_in_bins_essential
-
-
-# def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential, convolve_pattern, window_width):
-#     """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
-#     num_distinct_stops_convolved = np.convolve(
-#         monkey_info_in_bins_essential['num_distinct_stops'], convolve_pattern, 'same')
-#     num_caught_ff_convolved = np.convolve(
-#         monkey_info_in_bins_essential['num_caught_ff'], convolve_pattern, 'same')
-#     monkey_info_in_bins_essential['stop_rate'] = num_distinct_stops_convolved/window_width
-#     # suppress the warning for the line below
-#     with warnings.catch_warnings():
-#         warnings.filterwarnings('ignore', category=RuntimeWarning)
-#         monkey_info_in_bins_essential['stop_success_rate'] = num_caught_ff_convolved / \
-#             num_distinct_stops_convolved
-#     # if there's na or inf in monkey_info_in_bins_essential['stop_success_rate'], replace it with 0
-#     monkey_info_in_bins_essential['stop_success_rate'] = monkey_info_in_bins_essential['stop_success_rate'].replace([
-#         np.inf, -np.inf], np.nan).fillna(0)
-#     return monkey_info_in_bins_essential
 
 
 def _prepare_bin_midlines(time_bins, ff_caught_T_new, all_trial_patterns):

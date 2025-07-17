@@ -30,8 +30,8 @@ import numpy as np
 import plotly.graph_objects as go
 
 
-def plot_gpfa_traj_3d(trajectories, figsize=(15, 5), linewidth_single_trial=0.75,
-                      alpha_single_trial=0.3, linewidth_trial_average=2,
+def plot_gpfa_traj_3d(trajectories, figsize=(15, 5), linewidth_single_trial=0.5,
+                      alpha_single_trial=0.2, linewidth_trial_average=3,
                       title='Latent dynamics extracted by GPFA',
                       num_traj_to_plot=30,
                       view_azim=-5, view_elev=60):
@@ -50,6 +50,9 @@ def plot_gpfa_traj_3d(trajectories, figsize=(15, 5), linewidth_single_trial=0.75
 
     # Collect all points for axis scaling
     all_points = []
+
+    if num_traj_to_plot is None:
+        num_traj_to_plot = len(trajectories)
 
     # Plot single trials
     for traj in trajectories[:num_traj_to_plot]:

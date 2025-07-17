@@ -1,10 +1,4 @@
-import sys
-from machine_learning.ml_methods import ml_methods_class, regression_utils
-import pandas as pd
-from plotly.subplots import make_subplots
-import plotly.graph_objs as go
-import pprint
-from scipy import stats
+from machine_learning.ml_methods import ml_methods_utils
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -20,26 +14,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier, BaggingClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import mean_squared_error
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
-from sklearn.metrics import r2_score
-import math
-from sklearn.metrics import make_scorer
 from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold
-import numpy as np
-import pandas as pd
 import statsmodels.api as sm
 from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
-from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.model_selection import KFold, train_test_split
-from sklearn.model_selection import cross_val_score
 
 
 def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None, cv=None):
@@ -120,8 +99,9 @@ def use_logistic_regression(x_var_df, y_var_df):
     results = model.fit()
     summary_df = pd.DataFrame(
         {'p_value': results.pvalues, 'Coefficient': results.params})
-    summary_df = regression_utils.process_summary_df(summary_df)
+    summary_df = ml_methods_utils.process_summary_df(summary_df)
     return summary_df, conf_matrix
+
 
 def _use_logistic_regression(X_train, X_test, y_train, y_test):
     model = LogisticRegression()
@@ -132,28 +112,131 @@ def _use_logistic_regression(X_train, X_test, y_train, y_test):
     print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
     return conf_matrix
 
-def use_logistic_regression_cv(x_var_df, y_var_df, num_folds=5):
+
+def use_logistic_regression_cv(x_var_df, y_var_df, cv=5, groups=None, verbose=False):
+    """
+    Perform cross-validation with logistic regression.
+    
+    Parameters:
+    - x_var_df: Features dataframe.
+    - y_var_df: Target series or dataframe column.
+    - cv: integer or cross-validation splitter object.
+    - groups: array-like, group labels for samples (used if cv is GroupKFold).
+    
+    Returns:
+    - dict of train/test metrics (mean ± std).
+    """
+    scoring = {
+        'accuracy': 'accuracy',
+        'precision': 'precision',
+        'recall': 'recall',
+        'f1': 'f1',
+        'roc_auc': 'roc_auc'
+    }
 
     cv_results = cross_validate(
-        LogisticRegression(),
+        LogisticRegression(max_iter=1000),
         x_var_df,
         y_var_df,
-        cv=num_folds,
-        scoring='accuracy',
+        cv=cv,
+        scoring=scoring,
+        groups=groups,
         return_train_score=True
     )
 
-    test_accuracies = cv_results['test_score']
-    train_accuracies = cv_results['train_score']
+    metrics = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
+    results = {}
 
-    # Calculate the average accuracy
-    test_avg_accuracy = np.mean(test_accuracies)
-    train_avg_accuracy = np.mean(train_accuracies)
-    print(
-        f"Average Model Accuracy on train set (10-fold CV): {train_avg_accuracy}")
-    print(f"Average Model Accuracy (10-fold CV): {test_avg_accuracy}")
+    # Print header first
+    if verbose:
+        print(f"{'Metric':<12} {'Train Mean':>12} {'Test Mean':>12} {'Train Std':>12}   {'Test Std':>12}")
+        print("-" * 70)
 
-    return test_accuracies, train_accuracies
+    # Then print metrics
+    for metric in metrics:
+        train_scores = cv_results[f'train_{metric}']
+        test_scores = cv_results[f'test_{metric}']
+        train_mean, train_std = np.mean(train_scores), np.std(train_scores)
+        test_mean, test_std = np.mean(test_scores), np.std(test_scores)
+
+        results[f'train_{metric}'] = (train_mean, train_std)
+        results[f'test_{metric}'] = (test_mean, test_std)
+
+        if verbose:
+            print(f"{metric.capitalize():<12} {train_mean:12.4f} {test_mean:12.4f} {train_std:12.4f}   {test_std:12.4f}")
+
+    return results
+
+
+# def use_logistic_regression_cv(x_var_df, y_var_df, num_folds=5):
+#     scoring = {
+#         'accuracy': 'accuracy',
+#         'precision': 'precision',
+#         'recall': 'recall',
+#         'f1': 'f1',
+#         'roc_auc': 'roc_auc'
+#     }
+
+#     cv_results = cross_validate(
+#         LogisticRegression(max_iter=1000),
+#         x_var_df,
+#         y_var_df,
+#         cv=num_folds,
+#         scoring=scoring,
+#         return_train_score=True
+#     )
+
+#     metrics = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
+    
+#     print(f"{'Metric':<12}{'Train Mean':>15} ± {'Std':<10}{'Test Mean':>15} ± {'Std':<10}")
+#     print("-" * 70)
+    
+#     results = {}
+
+#     for metric in metrics:
+#         train_scores = cv_results[f'train_{metric}']
+#         test_scores = cv_results[f'test_{metric}']
+#         train_mean, train_std = np.mean(train_scores), np.std(train_scores)
+#         test_mean, test_std = np.mean(test_scores), np.std(test_scores)
+
+#         results[f'train_{metric}'] = (train_mean, train_std)
+#         results[f'test_{metric}'] = (test_mean, test_std)
+
+#         print(f"{metric.capitalize():<12}"
+#               f"{train_mean:>15.4f} ± {train_std:<10.4f}"
+#               f"{test_mean:>15.4f} ± {test_std:<10.4f}")
+    
+#     return results
+
+
+# def use_logistic_regression_cv(x_var_df, y_var_df, num_folds=5):
+
+#     cv_results = cross_validate(
+#         LogisticRegression(),
+#         x_var_df,
+#         y_var_df,
+#         cv=num_folds,
+#         scoring='accuracy',
+#         return_train_score=True
+#     )
+
+#     test_accuracies = cv_results['test_score']
+#     train_accuracies = cv_results['train_score']
+
+#     # Calculate the average accuracy
+#     test_avg_accuracy = np.mean(test_accuracies)
+#     train_avg_accuracy = np.mean(train_accuracies)
+
+#     # print(f"Average Train Accuracy (10-fold CV): {train_avg_accuracy:.4f}")
+#     # print(f"Average Test Accuracy  (10-fold CV): {test_avg_accuracy:.4f}")
+
+#     print(
+#         f"Average Accuracy (10-fold CV)\n"
+#         f"  Train: {train_avg_accuracy:.4f}\n"
+#         f"   Test: {test_avg_accuracy:.4f}"
+#     )
+
+#     return test_accuracies, train_accuracies, test_avg_accuracy, train_avg_accuracy
 
 
 def F_score(output, label, threshold=0.5, beta=1):

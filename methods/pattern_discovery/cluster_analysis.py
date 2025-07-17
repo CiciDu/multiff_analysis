@@ -314,7 +314,8 @@ def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff
     Calculate metrics for the last visible target.
     """
     metrics = {
-        'last_vis_point_index': [], 'time_since_last_vis': [],
+        'last_vis_point_index': [], 
+        'time_since_last_vis': [],
         'last_vis_dist': [], 'last_vis_cum_dist': [], 'last_vis_ang': [], 'last_vis_ang_to_bndry': []
     }
 

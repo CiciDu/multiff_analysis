@@ -84,8 +84,8 @@ class BaseProcessing:
             'raw_monkey_data', 'processed_neural_data')
         self.time_calibration_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'time_calibration')
-        self.decoding_targets_folder_path = raw_data_folder_path.replace(
-            'raw_monkey_data', 'decoding_targets')
+        self.target_decoder_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'target_decoder')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)

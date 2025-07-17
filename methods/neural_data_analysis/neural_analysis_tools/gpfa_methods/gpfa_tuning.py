@@ -48,7 +48,7 @@ def run_time_resolved_baseline(X_trials, Y_trials, regression_type='ridge', ridg
         X_trials = [pca.fit_transform(trial) for trial in X_trials]
     # Use your time-resolved regression function
     from methods.neural_data_analysis.neural_analysis_tools.gpfa_methods import gpfa_regression_utils
-    scores_by_time, times = gpfa_regression_utils.run_time_resolved_regression_variable_length_trials(
+    scores_by_time, times, trial_counts = gpfa_regression_utils.run_time_resolved_regression_variable_length_trials(
         X_trials, Y_trials, time_step=0.02, cv_folds=5, max_timepoints=75, align_at_beginning=True
     )
     mean_r2 = np.nanmean(scores_by_time)
@@ -56,7 +56,7 @@ def run_time_resolved_baseline(X_trials, Y_trials, regression_type='ridge', ridg
 
 
 def run_gpfa_experiment_time_resolved(
-    dec, smoothing, sqrt, gpfa_dim, bin_width, ridge_alpha, regression_type, align_at_beginning, baseline=None, pca_components=None
+    dec, smoothing, sqrt, gpfa_dim, bin_width, ridge_alpha, regression_type, align_at_beginning, baseline=None, pca_components=None,
 ):
     # Preprocess neural data
     neural_trials = [trial.copy() for trial in dec.gpfa_neural_trials]
@@ -106,12 +106,14 @@ def run_gpfa_experiment_time_resolved(
         }
     # GPFA pipeline
     dec.get_gpfa_traj(latent_dimensionality=gpfa_dim, exists_ok=False)
+    dec.get_rebinned_behav_data(
+    )
     dec.get_trialwise_gpfa_and_behav_data()
     X_trials_gpfa = [StandardScaler().fit_transform(trial)
                      for trial in dec.gpfa_neural_trials]
     Y_trials_gpfa = [StandardScaler().fit_transform(trial)
                      for trial in dec.behav_trials]
-    scores_by_time, times = gpfa_regression_utils.run_time_resolved_regression_variable_length_trials(
+    scores_by_time, times, trial_counts = gpfa_regression_utils.run_time_resolved_regression_variable_length_trials(
         X_trials_gpfa, Y_trials_gpfa, time_step=bin_width, cv_folds=5, max_timepoints=75, align_at_beginning=align_at_beginning
     )
     mean_r2 = np.nanmean(scores_by_time)

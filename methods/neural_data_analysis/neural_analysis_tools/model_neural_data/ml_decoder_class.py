@@ -90,7 +90,7 @@ class MLBehavioralDecoder:
                     print(f"Using {variable} as behavioral variable")
                 else:
                     print(
-                        f"Behavioral variable {variable} not found. Available columns:")
+                        f"Behavioral variable {variable} not found")
                     print(behavioral_data.columns.tolist())
                     return None, None, None, None, None
 

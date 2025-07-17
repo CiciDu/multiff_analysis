@@ -80,27 +80,67 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
     return spike_times_in_s, spike_clusters
 
 
+
+# def rebin_raw_spike_data(spike_segs_df, new_seg_info, bin_width=0.2):
+#     # This function rebins the data by segment and time bin, and takes the median of the data within each bin
+#     # It makes sure that the bins are perfectly aligned within segments (whereas in the previous method, bins are continuously assigned to all time points)
+#     # df must contain columns: segment, seg_start_time, seg_end_time, time, bin,
+
+#     new_seg_info.sort_values(by='segment', inplace=True)
+#     concat_seg_data = []
+    
+#     df = spike_segs_df
+
+#     for _, segment_row in new_seg_info.iterrows():
+
+#         # Not using fully vectorized approach in case there's overlap of time between segments
+#         # Subset relevant rows belonging to the segment
+#         seg_data_df = df[
+#             (df['segment'] == segment_row['segment']) &
+#             (df['time'] >= segment_row['new_seg_start_time']) &
+#             (df['time'] <= segment_row['new_seg_end_time'])
+#         ].copy()  # copy to avoid SettingWithCopyWarning
+
+#         # Create time bins and assign bin index
+#         time_bins = np.arange(segment_row['new_seg_start_time'], segment_row['new_seg_end_time'], bin_width)
+#         seg_data_df['new_bin'] = np.digitize(
+#             seg_data_df['time'], time_bins) - 1
+        
+#         cols = ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+#         seg_data_df[cols] = segment_row[cols].values
+
+#         concat_seg_data.append(seg_data_df)
+
+#     # Concatenate all processed segments
+#     concat_seg_data = pd.concat(concat_seg_data, ignore_index=True)
+#     concat_seg_data.sort_values(by=['new_segment', 'new_bin'], inplace=True)
+
+#     # Take the median of the data within each bin
+#     rebinned_data = concat_seg_data.groupby(
+#         ['new_segment', 'new_bin']).median().reset_index(drop=False)
+
+#     return rebinned_data
+
+
 def _make_all_binned_spikes(spike_df, bin_width=0.02):
-    """Bin spikes and stack bins for each spike cluster."""
+    """Efficiently bin spikes and stack bins for each spike cluster."""
     max_time = math.ceil(spike_df.time.max())
-    time_bins = np.arange(0, max_time, bin_width)
-    unique_clusters = np.sort(spike_df.cluster.unique())
-    all_binned_spikes = np.zeros([len(time_bins)-1, len(unique_clusters)])
+    time_bins = np.arange(0, max_time + bin_width, bin_width)
+    spike_df = spike_df.copy()
 
-    for i in range(len(unique_clusters)):
-        cluster = unique_clusters[i]
-        spike_subset = spike_df[spike_df['cluster'] == cluster]
-        binned_spikes, bin_numbers = np.histogram(spike_subset.time, time_bins)
-        all_binned_spikes[:, i] = binned_spikes
+    # Assign each spike to a time bin
+    spike_df['bin'] = np.digitize(spike_df['time'], time_bins) - 1  # subtract 1 for 0-based indexing
 
-    # make sure that the number of time bins in all_binned_spikes does not exceed len(time_bins) - 1
-    if all_binned_spikes.shape[0] > len(time_bins) - 1:
-        all_binned_spikes = all_binned_spikes[:len(time_bins) - 1, :]
+    # Group by bin and cluster, then count spikes
+    grouped = spike_df.groupby(['bin', 'cluster']).size().unstack(fill_value=0)
 
-    return time_bins, all_binned_spikes
+    # Ensure all bins and all clusters are present
+    grouped = grouped.reindex(index=np.arange(len(time_bins)-1), columns=np.sort(spike_df['cluster'].unique()), fill_value=0)
+
+    return time_bins, grouped.values
 
 
-def prepare_binned_spikes_df(spike_df, bin_width=0.02, max_bin=None):
+def prepare_binned_spikes_df(spike_df, bin_width=0.02):
     """
     Prepare the binned_spikes_df dataframe by extracting the maximum bin from final_behavioral_data,
     slicing all_binned_spikes, and creating column names.
@@ -112,23 +152,6 @@ def prepare_binned_spikes_df(spike_df, bin_width=0.02, max_bin=None):
     binned_spikes_df = pd.DataFrame(binned_spikes_matrix, columns=column_names)
     binned_spikes_df['bin'] = np.arange(binned_spikes_matrix.shape[0])
     return time_bins, binned_spikes_df
-
-        
-def calculate_window_parameters(window_width, bin_width):
-    """Calculate window parameters and ensure num_bins_in_window is odd."""
-    original_window_width = window_width
-    num_bins_in_window = int(window_width/bin_width)
-    # make sure num_bins_in_window is odd
-    if num_bins_in_window % 2 == 0:
-        num_bins_in_window += 1
-        window_width = num_bins_in_window * bin_width
-    window_width = round(window_width, 3)
-    convolve_pattern = np.ones(num_bins_in_window)/num_bins_in_window
-
-    if original_window_width != window_width:
-        print(
-            f"Window width changed from {original_window_width} to {window_width} to make it odd")
-    return window_width, num_bins_in_window, convolve_pattern
 
 
 def convolve_neural_data(x_var, kernel_len=7):
@@ -174,7 +197,7 @@ def add_lags_to_each_feature(var, lag_numbers, trial_vector=None, rearrange_lag_
         lagged_data = np.full((n, n_units * len(lag_numbers)), np.nan)
 
         # Convert to numpy for fast slicing
-        arr = df.drop(columns=['lag_segment_id']).values
+        arr = df.drop(columns=['lag_segment_id'], errors='ignore').values
 
         # For each lag, fill corresponding columns with shifted data
         for idx, lag in enumerate(lag_numbers):

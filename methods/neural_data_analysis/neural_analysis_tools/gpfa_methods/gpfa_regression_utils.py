@@ -25,13 +25,12 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from elephant.gpfa import GPFA
 
 
-# Assuming you've run:
-# scores_by_time, times = run_time_resolved_regression_variable_length_trials(...)
-
 import numpy as np
 from sklearn.linear_model import RidgeCV
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
+
+os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
 
 
 def get_latent_neural_data_for_trial(trajectories, current_seg, trial_length, spiketrain_corr_segs, align_at_beginning=True):
@@ -79,26 +78,44 @@ def run_time_resolved_regression_variable_length_trials(
     gpfa_neural_trials, behav_trials, time_step=0.02, cv_folds=5,
     max_timepoints=None, align_at_beginning=True, n_jobs=-1
 ):
+    """
+    Run time-resolved regression for variable length trials.
+    Returns:
+        scores_by_time: np.ndarray, shape (max_timepoints, n_behaviors)
+        times: np.ndarray, time vector
+        trial_counts: np.ndarray, number of trials used at each timepoint (NaN for unused timepoints)
+    """
+    assert len(gpfa_neural_trials) == len(
+        behav_trials), "Mismatch in number of trials"
+
     n_latent_dims = gpfa_neural_trials[0].shape[1]
     n_behaviors = behav_trials[0].shape[1]
     if max_timepoints is None:
         max_timepoints = max(trial.shape[0] for trial in gpfa_neural_trials)
 
     scores_by_time = np.full((max_timepoints, n_behaviors), np.nan)
+    trial_counts = np.full(max_timepoints, np.nan)
     kf = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
     alphas = np.logspace(-6, 6, 13)
 
     valid_ts, XYs = [], []
-    for t in range(max_timepoints):
+    min_samples = max(cv_folds, n_latent_dims)
+    for t_idx in range(max_timepoints):
         X_t, Y_t = [], []
         for latent, behavior in zip(gpfa_neural_trials, behav_trials):
-            if latent.shape[0] > t:
-                idx = t if align_at_beginning else -1 - t
-                X_t.append(latent[idx])
-                Y_t.append(behavior[idx])
-        if len(X_t) > max(cv_folds, n_latent_dims):
+            if latent.shape[0] > t_idx:
+                if align_at_beginning:
+                    t = t_idx
+                    X_t.append(latent[t])
+                    Y_t.append(behavior[t])
+                else:
+                    t = max_timepoints - 1 - t_idx
+                    X_t.append(latent[- 1 - t_idx])
+                    Y_t.append(behavior[- 1 - t_idx])
+        if len(X_t) > min_samples:
             valid_ts.append(t)
             XYs.append((np.vstack(X_t), np.vstack(Y_t)))
+            trial_counts[t] = len(X_t)
 
     # 🧠 Show progress bar while running regression in parallel
     with tqdm_joblib(tqdm(total=len(XYs), desc="Timepoints")):
@@ -111,7 +128,8 @@ def run_time_resolved_regression_variable_length_trials(
         scores_by_time[t, :] = r2s
 
     times = np.arange(max_timepoints) * time_step
-    return scores_by_time, times
+
+    return scores_by_time, times, trial_counts
 
 
 def plot_trial_counts_by_timepoint(gpfa_neural_trials, times, align_at_beginning=True):
@@ -123,66 +141,76 @@ def plot_trial_counts_by_timepoint(gpfa_neural_trials, times, align_at_beginning
     if not align_at_beginning:
         # Reverse for segment-end alignment so time 0 is segment start
         trial_counts = trial_counts[::-1]
-    plt.plot(times, trial_counts)
+    plt.plot(times, trial_counts, color='black', marker='o')
     plt.xlabel("Time (s)")
     plt.ylabel("Trials with data")
     plt.title("Number of trials with data at each timepoint")
     plt.show()
 
 
-def plot_time_resolved_scores(scores_by_time, times, behavior_labels=None):
+def plot_time_resolved_scores(scores_by_time, times, behavior_labels=None, trial_counts=None, show_counts_on_xticks=True):
     """
     Plot time-resolved regression R² scores over time for each behavior.
 
     Parameters:
-    - scores_by_time: np.array, shape (time, behaviors)
-    - times: np.array, time vector
+    - scores_by_time: np.ndarray, shape (time, behaviors)
+    - times: np.ndarray, time vector
     - behavior_labels: list of str, optional behavior names
+    - trial_counts: np.ndarray, number of trials per timepoint
+    - show_counts_on_xticks: bool, whether to show trial counts on x-tick labels
     """
     n_behaviors = scores_by_time.shape[1]
-
     n_behaviors_per_plot = 4
+    xtick_labels = None
+
+    if show_counts_on_xticks and trial_counts is not None:
+        xtick_labels = [f"{t:.2f}\n({int(n)})" if not np.isnan(n) else f"{t:.2f}\n(n/a)"
+                        for t, n in zip(times, trial_counts)]
+
+    def finalize_plot():
+        plt.axhline(0, color='gray', lw=3)
+        plt.xlabel(
+            'Time (s)' + (' and trial count' if show_counts_on_xticks else ''))
+        plt.ylabel('Cross-validated $R^2$')
+        plt.title('Time-Resolved Regression Performance')
+        plt.ylim(-2, 1.03)
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        if xtick_labels is not None:
+            plt.xticks(times, xtick_labels, ha='right', rotation=0)
+        plt.show()
 
     for b in range(n_behaviors):
-
-        if b == 0:
-            plt.figure(figsize=(10, 5))
-
-        elif b % n_behaviors_per_plot == 0:
-            plt.plot(times, [1] * len(times), lw=2)
-            plt.plot(times, [0] * len(times), lw=2)
-            # plt.plot(0, )
-            plt.xlabel('Time (s)')
-            plt.ylabel('Cross-validated $R^2$')
-            plt.title('Time-Resolved Regression Performance')
-            plt.ylim(-2, 1)
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.show()
-
-            # new figure
+        if b % n_behaviors_per_plot == 0:
+            if b > 0:
+                finalize_plot()
             plt.figure(figsize=(10, 5))
 
         label = behavior_labels[b] if (
             behavior_labels is not None) else f'Behavior {b + 1}'
         plt.plot(times, scores_by_time[:, b], label=label)
 
-    plt.plot(times, [1] * len(times), lw=2)
-    plt.plot(times, [0] * len(times), lw=2)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Cross-validated $R^2$')
-    plt.title('Time-Resolved Regression Performance')
-    plt.legend()
-    plt.ylim(-2, 1)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-    return
-
+    finalize_plot()
 
 # below are suggesed functions that i have yet to try
+
+
+def plot_trial_point_distribution(pursuit_data):
+    trial_points = pursuit_data.groupby('segment').count()['bin'].values
+    # Compute bin edges for width = 1
+    min_val = min(trial_points)
+    max_val = max(trial_points)
+    bins = np.arange(min_val, max_val + 2)  # +2 to include the last value
+
+    plt.hist(trial_points, bins=bins, edgecolor='black')
+    plt.title('Number of points of the trials')
+    plt.xlabel('Number of points')
+    plt.ylabel('Number of trials')
+    plt.show()
+
+    print('Number of trials:', len(trial_points))
+    print('Number of points of the trials:', trial_points)
 
 
 def print_trials_per_timepoint(gpfa_neural_trials, max_timepoints=None):
@@ -193,10 +221,10 @@ def print_trials_per_timepoint(gpfa_neural_trials, max_timepoints=None):
         for latent in gpfa_neural_trials:
             if latent.shape[0] > t:
                 counts[t] += 1
-    print('Trials per timepoint:', counts)
+    # print('Trials per timepoint:', counts)
     plt.figure(figsize=(10, 3))
     plt.plot(counts)
-    plt.xlabel('Timepoint')
+    plt.xlabel('Timepoint (no unit, aligned at beginning)')
     plt.ylabel('Number of trials')
     plt.title('Number of trials at each timepoint')
     plt.show()
@@ -209,19 +237,23 @@ def standardize_trials(trials):
     return [scaler.fit_transform(trial) for trial in trials]
 
 
-def try_multiple_latent_dims_and_plot(dec, behav_trials, dims=[3, 5, 10, 15], time_step=0.02, cv_folds=5, max_timepoints=None):
+def try_multiple_latent_dims_and_plot(dec, behav_trials, dims=[3, 5, 10, 15], time_step=0.02, cv_folds=5, max_timepoints=None,
+                                      ):
     """Try multiple latent dimensionalities and plot R^2 curves."""
     results = {}
     for d in dims:
         dec.get_gpfa_traj(latent_dimensionality=d, exists_ok=False)
+
+        dec.get_rebinned_behav_data(
+        )
         dec.get_trialwise_gpfa_and_behav_data()
-        scores_by_time, times = run_time_resolved_regression_variable_length_trials(
+        scores_by_time, times, trial_counts = run_time_resolved_regression_variable_length_trials(
             dec.gpfa_neural_trials, behav_trials, time_step=time_step, cv_folds=cv_folds, max_timepoints=max_timepoints)
         results[d] = (scores_by_time, times)
         scores_by_time_df = pd.DataFrame(
-            scores_by_time, columns=dec.gpfa_behav_data_columns)
+            scores_by_time, columns=dec.rebinned_behav_data_columns)
         plot_time_resolved_scores(
-            scores_by_time, times, behavior_labels=scores_by_time_df.columns)
+            scores_by_time, times, behavior_labels=scores_by_time_df.columns, trial_counts=trial_counts)
 
     for k, v in results.items():
         scores_by_time, times = v
@@ -234,14 +266,16 @@ def try_multiple_latent_dims_and_plot(dec, behav_trials, dims=[3, 5, 10, 15], ti
     return results
 
 
-def plot_latents_and_behav_trials(gpfa_neural_trials, behav_trials, n_trials=5):
+def plot_latents_and_behav_trials(gpfa_neural_trials, behav_trials, bin_width, n_trials=5):
     """Plot latent trajectories and behavioral variables for a few trials."""
     for i in range(min(n_trials, len(gpfa_neural_trials))):
+        time_points = np.arange(gpfa_neural_trials[i].shape[0]) * bin_width
         fig, axs = plt.subplots(2, 1, figsize=(12, 6))
-        axs[0].plot(gpfa_neural_trials[i])
+        axs[0].plot(time_points, gpfa_neural_trials[i])
         axs[0].set_title(f'Latent Trajectory Trial {i}')
-        axs[1].plot(behav_trials[i])
+        axs[1].plot(time_points, behav_trials[i])
         axs[1].set_title(f'Behavioral Variables Trial {i}')
+        plt.xlabel('Time (s)')
         plt.tight_layout()
         plt.show()
 
