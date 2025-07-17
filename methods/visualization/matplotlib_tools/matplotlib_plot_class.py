@@ -1,6 +1,6 @@
 import sys
 from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_class, find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.matplotlib_tools import plot_behaviors_utils
@@ -30,10 +30,10 @@ class MatplotlibPlotter(base_plot_class.BasePlotter):
 
             current_i = i+1
 
-            fig, R, x0, y0 = plot_stops_near_ff_utils.plot_stops_near_ff_func(stops_near_ff_row, self.monkey_information, self.ff_real_position_sorted, self.ff_dataframe, self.null_arcs_plotting_kwargs, self.PlotTrials_args,
-                                                                              ff_max_distance_to_path_to_show_visible_segments=None,
-                                                                              additional_plotting_kwargs=additional_plotting_kwargs
-                                                                              )
+            fig, R, x0, y0 = plot_cvn_utils.plot_cvn_func(stops_near_ff_row, self.monkey_information, self.ff_real_position_sorted, self.ff_dataframe, self.null_arcs_plotting_kwargs, self.PlotTrials_args,
+                                                          ff_max_distance_to_path_to_show_visible_segments=None,
+                                                          additional_plotting_kwargs=additional_plotting_kwargs
+                                                          )
 
             axes = fig.axes[0]
             if show_monkey_heading:
@@ -45,13 +45,13 @@ class MatplotlibPlotter(base_plot_class.BasePlotter):
                     i]
                 self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_counted_points(
                     i=i)
-                axes = plot_stops_near_ff_utils.show_null_arcs_func(axes, current_arc_point_index, self.monkey_information, R, x0=x0, y0=y0,
-                                                                    cur_null_arc_info_for_the_point=self.cur_null_arc_info_for_the_point,
-                                                                    nxt_null_arc_info_for_the_point=self.nxt_null_arc_info_for_the_point,
-                                                                    )
+                axes = plot_cvn_utils.show_null_arcs_func(axes, current_arc_point_index, self.monkey_information, R, x0=x0, y0=y0,
+                                                          cur_null_arc_info_for_the_point=self.cur_null_arc_info_for_the_point,
+                                                          nxt_null_arc_info_for_the_point=self.nxt_null_arc_info_for_the_point,
+                                                          )
 
             if show_position_in_scatter_plot:
-                axes = find_stops_near_ff_utils.plot_relationship(
+                axes = find_cvn_utils.plot_relationship(
                     self.nxt_curv_counted, self.traj_curv_counted, show_plot=False, change_units_to_degrees_per_m=self.overall_params['change_units_to_degrees_per_m'])
                 axes.scatter(
                     self.traj_curv_counted[i], self.nxt_curv_counted[i], color='red')

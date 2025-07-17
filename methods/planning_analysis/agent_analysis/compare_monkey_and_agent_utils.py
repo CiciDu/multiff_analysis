@@ -1,5 +1,5 @@
 import sys
-from planning_analysis.show_planning.get_stops_near_ff import stops_near_ff_based_on_ref_class, find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import cur_vs_nxt_ff_from_ref_class, find_cvn_utils
 from planning_analysis.show_planning import show_planning_class, nxt_ff_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils

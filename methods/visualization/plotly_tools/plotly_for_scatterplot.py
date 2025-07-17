@@ -4,7 +4,7 @@ from turtle import fillcolor
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_behaviors_utils
 from null_behaviors import show_null_trajectory, curv_of_traj_utils
-from planning_analysis.show_planning.get_stops_near_ff import plot_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import plot_cvn_utils
 from decision_making_analysis.decision_making import plot_decision_making
 from visualization.plotly_tools import plotly_preparation, plotly_for_monkey
 from decision_making_analysis import trajectory_info

@@ -1,5 +1,5 @@
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 
 import os
 import numpy as np
@@ -97,8 +97,8 @@ def process_trials_df(trials_df, monkey_information, ff_dataframe_visible, stop_
 
 
 def further_make_trials_df(processed_df, monkey_information, ff_real_position_sorted, stop_period_duration, ref_point_mode, ref_point_value):
-    processed_df2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(processed_df, monkey_information, ff_real_position_sorted,
-                                                                             ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
+    processed_df2 = find_cvn_utils.find_ff_info_based_on_ref_point(processed_df, monkey_information, ff_real_position_sorted,
+                                                                   ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
 
     processed_df2.rename(
         columns={'point_index': 'ref_point_index'}, inplace=True)

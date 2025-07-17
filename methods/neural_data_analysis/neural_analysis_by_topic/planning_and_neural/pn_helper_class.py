@@ -1,7 +1,7 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils, general_utils
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import pn_utils
 from neural_data_analysis.neural_analysis_by_topic.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
@@ -53,8 +53,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         folder_name = os.path.join(self.planning_neural_folder_path,
                                    self.planning_data_by_point_partial_path, self.test_or_control)
 
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
-                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+        df_name = find_cvn_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
+                                                           curv_traj_window_before_stop=self.curv_traj_window_before_stop)
 
         os.makedirs(folder_name, exist_ok=True)
 
@@ -96,14 +96,14 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     def make_temporary_heading_info_df(self):
         # need to make a new one so that all stop_point_index are included
         # (in the original method, ff with big angles at ref point are removed)
-        self.nxt_ff_df3 = self.add_d_heading_of_traj_to_df(
-            self.nxt_ff_df2)
-        self.cur_ff_df3 = self.add_d_heading_of_traj_to_df(
-            self.cur_ff_df2)
-        self.cur_and_nxt_ff_df2 = show_planning_utils.make_cur_and_nxt_ff_df(
-            self.nxt_ff_df3, self.cur_ff_df3, include_arc_info=False)
+        nxt_ff_df_from_ref = self.add_d_heading_of_traj_to_df(
+            self.nxt_ff_df_from_ref)
+        cur_ff_df_from_ref = self.add_d_heading_of_traj_to_df(
+            self.cur_ff_df_from_ref)
+        cur_and_nxt_ff_from_ref_df = show_planning_utils.make_cur_and_nxt_ff_from_ref_df(
+            nxt_ff_df_from_ref, cur_ff_df_from_ref, include_arc_info=False)
         self.heading_info_df = show_planning_utils.make_heading_info_df(
-            self.cur_and_nxt_ff_df2, self.stops_near_ff_df, self.monkey_information, self.ff_real_position_sorted)
+            cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df, self.monkey_information, self.ff_real_position_sorted)
         self.add_both_ff_at_ref_to_heading_info_df()
 
     def add_heading_info_to_planning_data_by_point(self):
@@ -126,8 +126,10 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                     ]
         all_columns_to_add = heading_columns_to_add + temp_more_columns_to_try
         # print the columns that are not in heading_info_df
-        print(
-            f'Note: The following columns are not in the new heading_info_df: {set(all_columns_to_add) - set(self.heading_info_df.columns)}')
+        missing_columns = set(all_columns_to_add) - set(self.heading_info_df.columns)
+        if missing_columns:
+            print(f'Note: The following columns are not in the new heading_info_df: {missing_columns}')
+
         all_columns_to_add = [
             col for col in all_columns_to_add if col in self.heading_info_df.columns]
 
@@ -234,7 +236,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values) - 1
 
     def _add_ff_info_to_df(self, df, which_ff_info):
-        ff_df = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
+        ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
         ff_df = ff_df[ff_df['ff_angle_boundary']
                       .between(-np.pi/4, np.pi/4)].copy()
         curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
@@ -249,7 +251,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         return df, curv_df, columns_added
 
     # def _add_ff_info_to_df(self, df, which_ff_info):
-    #     ff_df = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
+    #     ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
     #     ff_df = ff_df[ff_df['ff_angle'].between(-np.pi/4, np.pi/4)].copy()
     #     curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
     #                                                 remove_invalid_rows=True,
@@ -273,7 +275,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         return df, time_columns
 
     def _add_basic_ff_info(self, df, which_ff_info):
-        ff_df = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
+        ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
         ff_df = ff_df.copy()
         ff_df.rename(columns={'ff_index': f'{which_ff_info}ff_index',
                               'ff_angle': f'{which_ff_info}ff_angle',
@@ -313,21 +315,21 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         return info_to_add
 
     def _find_ff_info(self, info_to_add):
-        self.nxt_ff_df2 = find_stops_near_ff_utils.find_ff_info(
+        self.nxt_ff_df_from_ref = find_cvn_utils.find_ff_info(
             info_to_add['nxt_ff_index'].values,
             info_to_add['point_index'].values,
             self.monkey_information,
             self.ff_real_position_sorted)
-        self.cur_ff_df2 = find_stops_near_ff_utils.find_ff_info(
+        self.cur_ff_df_from_ref = find_cvn_utils.find_ff_info(
             info_to_add['cur_ff_index'].values,
             info_to_add['point_index'].values,
             self.monkey_information,
             self.ff_real_position_sorted)
         # self._deal_with_rows_with_big_ff_angles(remove_i_o_modify_rows_with_big_ff_angles=True, delete_the_same_rows=True)
 
-        self.nxt_ff_df2[['stop_point_index', 'time', 'stop_time']] = info_to_add[[
+        self.nxt_ff_df_from_ref[['stop_point_index', 'time', 'stop_time']] = info_to_add[[
             'stop_point_index', 'time', 'stop_time']].values
-        self.cur_ff_df2[['stop_point_index', 'time', 'stop_time']] = info_to_add[[
+        self.cur_ff_df_from_ref[['stop_point_index', 'time', 'stop_time']] = info_to_add[[
             'stop_point_index', 'time', 'stop_time']].values
 
         return info_to_add
@@ -358,13 +360,13 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         # If crossing_ff is true, we'll get nxt_ff_info when cur_ff was first/last seen, and vice versa
 
         print('Making both_ff_when_seen_df...')
-        self.both_ff_when_seen_df = self.nxt_ff_df2[[
+        self.both_ff_when_seen_df = self.nxt_ff_df_from_ref[[
             'stop_point_index']].copy().set_index('stop_point_index')
         for first_or_last in ['first', 'last']:
-            for when_which_ff, ff_df in [('when_nxt_ff', self.nxt_ff_df2),
-                                         ('when_cur_ff', self.cur_ff_df2)]:
+            for when_which_ff, ff_df in [('when_nxt_ff', self.nxt_ff_df_from_ref),
+                                         ('when_cur_ff', self.cur_ff_df_from_ref)]:
                 all_point_index = ff_df[f'point_index_ff_{first_or_last}_seen'].values
-                self._find_nxt_ff_df2_2_and_cur_ff_df2_2_based_on_specific_point_index(
+                self._find_nxt_ff_df_from_ref_2_and_cur_ff_df_from_ref_2_based_on_specific_point_index(
                     all_point_index=all_point_index)
                 if deal_with_rows_with_big_ff_angles:
                     self._deal_with_rows_with_big_ff_angles(
@@ -380,9 +382,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                         if (which_ff_info == 'cur_') & (when_which_ff == 'when_nxt_ff'):
                             continue
                     if deal_with_rows_with_big_ff_angles:
-                        ff_df_modified = self.nxt_ff_df2_modified if which_ff_info == 'nxt_' else self.cur_ff_df2_modified
+                        ff_df_modified = self.nxt_ff_df_from_ref_modified if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref_modified
                     else:
-                        ff_df_modified = self.nxt_ff_df2 if which_ff_info == 'nxt_' else self.cur_ff_df2
+                        ff_df_modified = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
 
                     opt_arc_stop_first_vis_bdry = True if (
                         self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False

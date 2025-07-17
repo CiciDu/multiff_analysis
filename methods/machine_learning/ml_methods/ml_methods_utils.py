@@ -29,8 +29,8 @@ def process_summary_df(summary_df):
     return summary_df
 
 
-def train_test_split_based_on_segments(x_var, y_var, trial_column='target_index'):
-    all_targets = y_var[trial_column].unique()
+def train_test_split_based_on_segments(x_var, y_var, segment_column='target_index'):
+    all_targets = y_var[segment_column].unique()
 
     test_targets = np.random.choice(
         all_targets, size=int(len(all_targets)*0.2), replace=False)
@@ -40,8 +40,8 @@ def train_test_split_based_on_segments(x_var, y_var, trial_column='target_index'
     x_var.reset_index(drop=True, inplace=True)
     y_var.reset_index(drop=True, inplace=True)
 
-    train_rows = y_var[trial_column].isin(train_targets)
-    test_rows = y_var[trial_column].isin(test_targets)
+    train_rows = y_var[segment_column].isin(train_targets)
+    test_rows = y_var[segment_column].isin(test_targets)
 
     X_train = x_var[train_rows]
     X_test = x_var[test_rows]
@@ -52,9 +52,9 @@ def train_test_split_based_on_segments(x_var, y_var, trial_column='target_index'
     return X_train, X_test, y_train, y_test
 
 
-def run_segment_split_regression(x_var, y_var, columns_of_interest):
+def run_segment_split_regression(x_var, y_var, columns_of_interest, segment_column='new_segment'):
     X_train, X_test, y_train, y_test = train_test_split_based_on_segments(
-        x_var, y_var, trial_column='new_segment')
+        x_var, y_var, segment_column=segment_column)
     results = regress_by_variable_type(X_train, X_test, y_train,
                                        y_test, columns_of_interest)
     return results
@@ -72,7 +72,8 @@ def regress_by_variable_type(X_train, X_test, y_train, y_test, columns_of_intere
         # if y_var_column is a dummy variable, use logistic regression
         num_unique = y_train[y_var_column].nunique()
         if num_unique == 1:
-            print(f"Skipping target '{y_var_column}' because it has only one unique value.")
+            print(
+                f"Skipping target '{y_var_column}' because it has only one unique value.")
             continue
         elif num_unique == 2:
             conf_matrix = classification_utils._use_logistic_regression(
@@ -83,17 +84,17 @@ def regress_by_variable_type(X_train, X_test, y_train, y_test, columns_of_intere
 
 
 def regress_by_variable_type_cv(
-    x_var_df, 
-    y_var_df, 
-    columns_of_interest, 
-    num_folds=5, 
+    x_var_df,
+    y_var_df,
+    columns_of_interest,
+    num_folds=5,
     segment_column=None,
     verbose=False
 ):
     """
     Perform cross-validation for each target column in columns_of_interest.
     Uses logistic regression for binary targets, linear regression for continuous.
-    
+
     Parameters:
         x_var_df (DataFrame): Predictor variables.
         y_var_df (DataFrame): Target variables.
@@ -109,7 +110,8 @@ def regress_by_variable_type_cv(
 
     if segment_column:
         if segment_column not in y_var_df.columns:
-            raise ValueError(f"segment_column '{segment_column}' not found in y_var_df")
+            raise ValueError(
+                f"segment_column '{segment_column}' not found in y_var_df")
         groups = y_var_df[segment_column]
         cv = GroupKFold(n_splits=num_folds)
     else:
@@ -125,7 +127,8 @@ def regress_by_variable_type_cv(
         num_unique = y_var_df[y_var_column].nunique()
         if num_unique == 1:
             if verbose:
-                print(f"Skipping target '{y_var_column}' because it has only one unique value.")
+                print(
+                    f"Skipping target '{y_var_column}' because it has only one unique value.")
             continue
 
         if num_unique == 2:
@@ -165,8 +168,8 @@ def make_barplot_to_compare_results(results_df, metric, targets=None):
     wide_df = (
         results_df
         .pivot_table(
-            index=['Target', 'Model', 'test_or_control'], 
-            columns='Metric', 
+            index=['Target', 'Model', 'test_or_control'],
+            columns='Metric',
             values=['Mean', 'Std']
         )
     )
@@ -174,7 +177,6 @@ def make_barplot_to_compare_results(results_df, metric, targets=None):
     wide_df = wide_df.reset_index()
 
     _make_barplot_to_compare_results(wide_df, metric, targets)
-    
 
 
 def _make_barplot_to_compare_results(wide_df, metric, targets=None):
@@ -190,7 +192,7 @@ def _make_barplot_to_compare_results(wide_df, metric, targets=None):
         vals = []
         for g in groups:
             val = wide_df.loc[
-                (wide_df['Target'] == t) & (wide_df['test_or_control'] == g), 
+                (wide_df['Target'] == t) & (wide_df['test_or_control'] == g),
                 metric
             ]
             vals.append(val.values[0] if len(val) > 0 else np.nan)

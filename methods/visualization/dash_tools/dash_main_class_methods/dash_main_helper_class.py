@@ -1,7 +1,7 @@
 import sys
 from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot
 from visualization.dash_tools import dash_prep_class, dash_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, plot_monkey_heading_helper_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils, plot_monkey_heading_helper_class
 from visualization.matplotlib_tools import monkey_heading_functions
 from visualization.plotly_tools import plotly_for_monkey
 from null_behaviors import show_null_trajectory
@@ -62,7 +62,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         }
         self.scatter_plot_params = scatter_plot_params
 
-        self.snf_streamline_organizing_info_kwargs = find_stops_near_ff_utils.organize_snf_streamline_organizing_info_kwargs(
+        self.snf_streamline_organizing_info_kwargs = find_cvn_utils.organize_snf_streamline_organizing_info_kwargs(
             ref_point_params, curv_of_traj_params, overall_params)
         super().streamline_organizing_info(**self.snf_streamline_organizing_info_kwargs, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                            heading_info_df_exists_ok=heading_info_df_exists_ok, test_or_control=test_or_control)
@@ -517,8 +517,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.stops_near_ff_row['cum_distance_between_two_stops'], decimals))
 
         # Also get nxt ff angle at ref point
-        nxt_ff_angle_at_ref_point = self.nxt_ff_df2.loc[self.nxt_ff_df2['stop_point_index']
-                                                        == self.stop_point_index, 'ff_angle'].item() * (180/np.pi)
+        nxt_ff_angle_at_ref_point = self.nxt_ff_df_from_ref.loc[self.nxt_ff_df_from_ref['stop_point_index']
+                                                                == self.stop_point_index, 'ff_angle'].item() * (180/np.pi)
         self.other_messages += ", \n Nxt FF angle at ref point: " + \
             str(round(nxt_ff_angle_at_ref_point, decimals))
         return self.other_messages

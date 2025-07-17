@@ -1,5 +1,5 @@
 import sys
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.test_params_for_planning import params_utils
 from visualization.dash_tools import dash_prep_class
 import pandas as pd
@@ -185,9 +185,9 @@ class ParamsTestCombos(dash_prep_class.DashCartesianPreparation):
 
         rel_heading_traj = d_heading_of_traj - d_heading_cur
         rel_heading_alt = d_heading_nxt - d_heading_cur
-        rel_heading_traj = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+        rel_heading_traj = find_cvn_utils.confine_angle_to_within_one_pie(
             rel_heading_traj)
-        rel_heading_alt = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+        rel_heading_alt = find_cvn_utils.confine_angle_to_within_one_pie(
             rel_heading_alt)
         slope, intercept, r_value, p_value, std_err = stats.linregress(
             rel_heading_alt, rel_heading_traj)

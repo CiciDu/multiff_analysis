@@ -1,6 +1,6 @@
 
 import sys
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from dash import html, dcc
 import pandas as pd
 import numpy as np
@@ -101,9 +101,9 @@ def generate_distribution_of_correlation_after_shuffling_d_heading(d_heading_nxt
         np.random.shuffle(d_heading_nxt)
         rel_heading_traj = d_heading_of_traj - d_heading_cur
         rel_heading_alt = d_heading_nxt - d_heading_cur
-        rel_heading_traj = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+        rel_heading_traj = find_cvn_utils.confine_angle_to_within_one_pie(
             rel_heading_traj)
-        rel_heading_alt = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+        rel_heading_alt = find_cvn_utils.confine_angle_to_within_one_pie(
             rel_heading_alt)
         slope, intercept, r_value, p_value, std_err = stats.linregress(
             rel_heading_alt, rel_heading_traj)
@@ -121,7 +121,7 @@ def generate_distribution_of_correlation_after_shuffling_nxt_ff_curv(nxt_ff_coun
     for i in range(sample_size):
         nxt_ff_counted_df[['cntr_arc_curv', 'opt_arc_curv']] = nxt_ff_counted_df[[
             'cntr_arc_curv', 'opt_arc_curv']].sample(frac=1).values
-        traj_curv_counted, nxt_curv_counted = find_stops_near_ff_utils.find_relative_curvature(
+        traj_curv_counted, nxt_curv_counted = find_cvn_utils.find_relative_curvature(
             nxt_ff_counted_df, cur_ff_counted_df, curv_of_traj_counted, use_curv_to_ff_center)
         slope, intercept, r_value, p_value, std_err = stats.linregress(
             nxt_curv_counted, traj_curv_counted)

@@ -1,6 +1,6 @@
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils
 from planning_analysis.show_planning import show_planning_class
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.variations_of_factors_vs_results import _variations_base_class
 from data_wrangling import specific_utils, combine_info_utils, base_processing_class
@@ -85,9 +85,9 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.use_curv_to_ff_center = use_curv_to_ff_center
 
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
-                                                                     curv_traj_window_before_stop=self.curv_traj_window_before_stop)
-        # df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode, ref_point_value, curv_traj_window_before_stop)
+        df_name = find_cvn_utils.find_diff_in_curv_df_name(ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
+                                                           curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+        # df_name = find_cvn_utils.find_diff_in_curv_df_name(ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         combd_plan_x_tc_path = os.path.join(
             self.combd_plan_x_tc_folder_path, df_name)
         combd_plan_y_tc_path = os.path.join(

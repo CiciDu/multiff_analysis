@@ -2,7 +2,7 @@
 from planning_analysis.plan_factors import test_vs_control_utils, test_vs_control_utils
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, process_variations_utils
 from planning_analysis.show_planning import show_planning_class
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils, ml_methods_class
 import os
@@ -112,7 +112,7 @@ class _CompareYValues:
                              heading_info_df_exists_ok=True,
                              verbose=False, save_data=True):
 
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(
+        df_name = find_cvn_utils.find_diff_in_curv_df_name(
             ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         df_path = os.path.join(self.all_median_info_folder_path, df_name)
         if all_median_info_exists_ok & exists(df_path):

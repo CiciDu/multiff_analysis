@@ -1,6 +1,6 @@
 from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from null_behaviors import curv_of_traj_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils, cur_vs_nxt_ff_from_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import pn_utils
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
+class PlanFactors(cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee):
 
     def __init__(self, raw_data_folder_path=None, curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
@@ -101,8 +101,8 @@ class PlanFactors(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
         for plan_type in ['plan_x', 'plan_y']:
             for test_or_ctrl in ['test', 'ctrl']:
                 test_or_control = 'test' if test_or_ctrl == 'test' else 'control'
-                df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                                             curv_traj_window_before_stop=curv_traj_window_before_stop)
+                df_name = find_cvn_utils.find_diff_in_curv_df_name(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                                   curv_traj_window_before_stop=curv_traj_window_before_stop)
 
                 if plan_type == 'plan_x':
                     folder_name = os.path.join(

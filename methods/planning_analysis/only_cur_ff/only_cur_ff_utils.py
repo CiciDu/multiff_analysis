@@ -1,7 +1,7 @@
 import sys
 from data_wrangling import specific_utils
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, build_factor_comp_utils, build_factor_comp
 from data_wrangling import specific_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils, opt_arc_utils
@@ -45,11 +45,11 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
     ff_info = ff_info.groupby('stop_point_index').first().reset_index()
 
     # Determine reference points for curvature estimation
-    ff_info = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(
+    ff_info = find_cvn_utils.find_ff_info_based_on_ref_point(
         ff_info, monkey_information, ff_real_position_sorted,
         ref_point_mode=ref_point_mode, ref_point_value=ref_point_value
     )
-    ff_info = find_stops_near_ff_utils.add_monkey_info_before_stop(
+    ff_info = find_cvn_utils.add_monkey_info_before_stop(
         monkey_information, ff_info
     )
 
@@ -87,13 +87,13 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
 
     # Add d_heading info
     df = plan_factors_utils.add_d_heading_of_traj_to_df(df)
-    
+
     d_heading_var = 'cntr_arc_d_heading' if use_curv_to_ff_center else 'opt_arc_d_heading'
-        
+
     df[['cur_d_heading_of_arc', 'd_heading_of_traj']
-                   ] = df[[d_heading_var, 'd_heading_of_traj']]*180/math.pi
-    
-    df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_180(
+       ] = df[[d_heading_var, 'd_heading_of_traj']]*180/math.pi
+
+    df['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_180(
         df['d_heading_of_traj'].values)
     df['diff_in_d_heading_to_cur_ff'] = df['d_heading_of_traj'] - \
         df['cur_d_heading_of_arc']

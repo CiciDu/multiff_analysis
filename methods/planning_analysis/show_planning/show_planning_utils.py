@@ -1,6 +1,6 @@
 
 from data_wrangling import specific_utils
-from planning_analysis.show_planning.get_stops_near_ff import plot_stops_near_ff_utils, find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import plot_cvn_utils, find_cvn_utils
 from null_behaviors import curv_of_traj_utils, curvature_utils
 
 import seaborn as sns
@@ -225,7 +225,7 @@ def make_new_ff_at_monkey_xy_if_within_1_cm(new_ff_x, new_ff_y, monkey_x, monkey
     return new_ff_x, new_ff_y
 
 
-def make_cur_and_nxt_ff_df(nxt_ff_final_df, cur_ff_final_df, include_arc_info=True):
+def make_cur_and_nxt_ff_from_ref_df(nxt_ff_df_final, cur_ff_df_final, include_arc_info=True):
     # Define shared and relevant columns
     shared_columns = ['monkey_x', 'monkey_y', 'monkey_angle', 'curv_of_traj', 'point_index',
                       'stop_point_index', 'monkey_angle_before_stop', 'd_heading_of_traj']
@@ -234,66 +234,68 @@ def make_cur_and_nxt_ff_df(nxt_ff_final_df, cur_ff_final_df, include_arc_info=Tr
                         'opt_arc_curv', 'opt_arc_measure', 'opt_arc_radius', 'opt_arc_end_direction',
                         'cntr_arc_curv', 'cntr_arc_radius', 'opt_arc_d_heading', 'cntr_arc_d_heading',
                         'cntr_arc_end_x', 'cntr_arc_end_y', 'opt_arc_end_x', 'opt_arc_end_y']
-    
+
     if not include_arc_info:
         # remove arc related columns
-        shared_columns = [col for col in shared_columns if col not in ['d_heading_of_traj', 'curv_of_traj']]
-        relevant_columns = [col for col in relevant_columns if 'arc' not in col]
+        shared_columns = [col for col in shared_columns if col not in [
+            'd_heading_of_traj', 'curv_of_traj']]
+        relevant_columns = [
+            col for col in relevant_columns if 'arc' not in col]
 
-    # Create a copy of the shared columns from nxt_ff_final_df and rename them
-    cur_and_nxt_ff_df = pd.concat(
-        [nxt_ff_final_df[shared_columns], cur_ff_final_df[shared_columns]], axis=0)
+    # Create a copy of the shared columns from nxt_ff_df_final and rename them
+    cur_and_nxt_ff_from_ref_df = pd.concat(
+        [nxt_ff_df_final[shared_columns], cur_ff_df_final[shared_columns]], axis=0)
     # drop duplicate rows
-    cur_and_nxt_ff_df = cur_and_nxt_ff_df.drop_duplicates(
+    cur_and_nxt_ff_from_ref_df = cur_and_nxt_ff_from_ref_df.drop_duplicates(
         subset=['stop_point_index']).reset_index(drop=True)
 
-    cur_and_nxt_ff_df.rename(columns={'point_index': 'ref_point_index',
+    cur_and_nxt_ff_from_ref_df.rename(columns={'point_index': 'ref_point_index',
                                       'monkey_x': 'ref_monkey_x',
-                                      'monkey_y': 'ref_monkey_y',
-                                      'monkey_angle': 'ref_monkey_angle',
-                                      'curv_of_traj': 'ref_curv_of_traj'}, inplace=True, errors='ignore')
+                                               'monkey_y': 'ref_monkey_y',
+                                               'monkey_angle': 'ref_monkey_angle',
+                                               'curv_of_traj': 'ref_curv_of_traj'}, inplace=True, errors='ignore')
 
     relevant_columns = [
-        col for col in relevant_columns if col in nxt_ff_final_df.columns]
-    # Create copies of the relevant columns from nxt_ff_final_df2 and cur_ff_final_df2 and rename them
-    nxt_ff_final_df2 = nxt_ff_final_df[relevant_columns].copy()
-    nxt_ff_final_df2.columns = [
-        'nxt_'+col for col in nxt_ff_final_df2.columns.tolist()]
-    nxt_ff_final_df2['stop_point_index'] = nxt_ff_final_df['stop_point_index']
+        col for col in relevant_columns if col in nxt_ff_df_final.columns]
+    # Create copies of the relevant columns from nxt_ff_df_final2 and cur_ff_df_final2 and rename them
+    nxt_ff_df_final2 = nxt_ff_df_final[relevant_columns].copy()
+    nxt_ff_df_final2.columns = [
+        'nxt_'+col for col in nxt_ff_df_final2.columns.tolist()]
+    nxt_ff_df_final2['stop_point_index'] = nxt_ff_df_final['stop_point_index']
 
-    cur_ff_final_df2 = cur_ff_final_df[relevant_columns].copy()
-    cur_ff_final_df2.columns = [
-        'cur_'+col for col in cur_ff_final_df2.columns.tolist()]
-    cur_ff_final_df2['stop_point_index'] = cur_ff_final_df['stop_point_index']
+    cur_ff_df_final2 = cur_ff_df_final[relevant_columns].copy()
+    cur_ff_df_final2.columns = [
+        'cur_'+col for col in cur_ff_df_final2.columns.tolist()]
+    cur_ff_df_final2['stop_point_index'] = cur_ff_df_final['stop_point_index']
 
-    # Merge cur_and_nxt_ff_df, nxt_ff_final_df2, and cur_ff_final_df2
-    cur_and_nxt_ff_df = cur_and_nxt_ff_df.merge(
-        nxt_ff_final_df2, how='left', on='stop_point_index')
-    cur_and_nxt_ff_df = cur_and_nxt_ff_df.merge(
-        cur_ff_final_df2, how='left', on='stop_point_index')
+    # Merge cur_and_nxt_ff_from_ref_df, nxt_ff_df_final2, and cur_ff_df_final2
+    cur_and_nxt_ff_from_ref_df = cur_and_nxt_ff_from_ref_df.merge(
+        nxt_ff_df_final2, how='left', on='stop_point_index')
+    cur_and_nxt_ff_from_ref_df = cur_and_nxt_ff_from_ref_df.merge(
+        cur_ff_df_final2, how='left', on='stop_point_index')
 
     # Calculate landing headings
     if include_arc_info:
-        cur_and_nxt_ff_df['cur_cntr_arc_end_heading'] = cur_and_nxt_ff_df['ref_monkey_angle'] + \
-            cur_and_nxt_ff_df['cur_cntr_arc_d_heading']
-        cur_and_nxt_ff_df['cur_opt_arc_end_heading'] = cur_and_nxt_ff_df['ref_monkey_angle'] + \
-            cur_and_nxt_ff_df['cur_opt_arc_d_heading']
+        cur_and_nxt_ff_from_ref_df['cur_cntr_arc_end_heading'] = cur_and_nxt_ff_from_ref_df['ref_monkey_angle'] + \
+            cur_and_nxt_ff_from_ref_df['cur_cntr_arc_d_heading']
+        cur_and_nxt_ff_from_ref_df['cur_opt_arc_end_heading'] = cur_and_nxt_ff_from_ref_df['ref_monkey_angle'] + \
+            cur_and_nxt_ff_from_ref_df['cur_opt_arc_d_heading']
 
-        cur_and_nxt_ff_df['nxt_cntr_arc_end_heading'] = cur_and_nxt_ff_df['ref_monkey_angle'] + \
-            cur_and_nxt_ff_df['nxt_cntr_arc_d_heading']
-        cur_and_nxt_ff_df['nxt_opt_arc_end_heading'] = cur_and_nxt_ff_df['ref_monkey_angle'] + \
-            cur_and_nxt_ff_df['nxt_opt_arc_d_heading']
+        cur_and_nxt_ff_from_ref_df['nxt_cntr_arc_end_heading'] = cur_and_nxt_ff_from_ref_df['ref_monkey_angle'] + \
+            cur_and_nxt_ff_from_ref_df['nxt_cntr_arc_d_heading']
+        cur_and_nxt_ff_from_ref_df['nxt_opt_arc_end_heading'] = cur_and_nxt_ff_from_ref_df['ref_monkey_angle'] + \
+            cur_and_nxt_ff_from_ref_df['nxt_opt_arc_d_heading']
 
-    # if 'cur_d_heading_of_arc' in cur_and_nxt_ff_df.columns:
-    #     cur_and_nxt_ff_df['cur_arc_end_heading'] = cur_and_nxt_ff_df['ref_monkey_angle'] + \
-    #         cur_and_nxt_ff_df['cur_d_heading_of_arc']
-    #     cur_and_nxt_ff_df['nxt_arc_end_heading'] = cur_and_nxt_ff_df['ref_monkey_angle'] + \
-    #         cur_and_nxt_ff_df['nxt_d_heading_of_arc']
+    # if 'cur_d_heading_of_arc' in cur_and_nxt_ff_from_ref_df.columns:
+    #     cur_and_nxt_ff_from_ref_df['cur_arc_end_heading'] = cur_and_nxt_ff_from_ref_df['ref_monkey_angle'] + \
+    #         cur_and_nxt_ff_from_ref_df['cur_d_heading_of_arc']
+    #     cur_and_nxt_ff_from_ref_df['nxt_arc_end_heading'] = cur_and_nxt_ff_from_ref_df['ref_monkey_angle'] + \
+    #         cur_and_nxt_ff_from_ref_df['nxt_d_heading_of_arc']
 
-    return cur_and_nxt_ff_df
+    return cur_and_nxt_ff_from_ref_df
 
 
-def make_heading_info_df(cur_and_nxt_ff_df, stops_near_ff_df, monkey_information, ff_real_position_sorted):
+def make_heading_info_df(cur_and_nxt_ff_from_ref_df, stops_near_ff_df, monkey_information, ff_real_position_sorted):
     # Select relevant columns from stops_near_ff_df
     heading_info_df = stops_near_ff_df[['stop_point_index', 'stop_x', 'stop_y', 'stop_time',
                                         'cur_ff_index', 'cur_ff_x', 'cur_ff_y', 'cur_ff_cluster_50_size',
@@ -318,7 +320,7 @@ def make_heading_info_df(cur_and_nxt_ff_df, stops_near_ff_df, monkey_information
     heading_info_df[['nxt_ff_x', 'nxt_ff_y']
                     ] = ff_real_position_sorted[heading_info_df['nxt_ff_index']]
 
-    # Merge with cur_and_nxt_ff_df to get landing headings
+    # Merge with cur_and_nxt_ff_from_ref_df to get landing headings
     columns_to_keep = ['stop_point_index',
                        'cur_cntr_arc_d_heading', 'nxt_cntr_arc_d_heading',
                        'cur_opt_arc_d_heading', 'nxt_opt_arc_d_heading',
@@ -329,9 +331,9 @@ def make_heading_info_df(cur_and_nxt_ff_df, stops_near_ff_df, monkey_information
                        'd_heading_of_traj', 'ref_monkey_angle', 'ref_curv_of_traj',
                        ]
     columns_to_keep = [
-        col for col in columns_to_keep if col in cur_and_nxt_ff_df.columns]
+        col for col in columns_to_keep if col in cur_and_nxt_ff_from_ref_df.columns]
     heading_info_df = heading_info_df.merge(
-        cur_and_nxt_ff_df[columns_to_keep], how='left', on='stop_point_index')
+        cur_and_nxt_ff_from_ref_df[columns_to_keep], how='left', on='stop_point_index')
 
     # Calculate angles from monkey before stop to nxt ff and from cur ff null arc landing position to alternative ff
     heading_info_df['angle_from_m_before_stop_to_cur_ff'] = specific_utils.calculate_angles_to_ff_centers(
@@ -429,7 +431,7 @@ def conduct_linear_regression_to_show_planning(ang_traj_nxt, ang_cur_nxt, use_ab
         title = f'slope: {round(slope, 2)}, intercept: {round(intercept, 2)}, r value: {round(r_value, 2)}, p value: {round(p_value, 4)}, sample size: {sample_size}'
 
     if show_plot:
-        plot_stops_near_ff_utils.plot_ang_traj_nxt_vs_ang_cur_nxt(
+        plot_cvn_utils.plot_ang_traj_nxt_vs_ang_cur_nxt(
             ang_traj_nxt, ang_cur_nxt, hue, title, slope, intercept)
 
     # print(results.summary())
@@ -470,7 +472,7 @@ def remove_outliers(x_var_df, y_var):
     return x_var_df, y_var
 
 
-def make_nxt_ff_info_for_null_arc(nxt_ff_df_modified, cur_ff_final_df, heading_info_df,
+def make_nxt_ff_info_for_null_arc(nxt_ff_df_modified, cur_ff_df_final, heading_info_df,
                                   use_curv_to_ff_center=False):
     # To get # curv of null arc from monkey stop to nxt ff
 
@@ -496,14 +498,14 @@ def make_nxt_ff_info_for_null_arc(nxt_ff_df_modified, cur_ff_final_df, heading_i
     nxt_ff_info_for_null_arc['point_index'] = heading_info_df['point_index_before_stop'].values
 
     # curv_of_traj will be cur null curv's opt_arc_curv
-    nxt_ff_info_for_null_arc['curv_of_traj'] = cur_ff_final_df['opt_arc_curv'].values
+    nxt_ff_info_for_null_arc['curv_of_traj'] = cur_ff_df_final['opt_arc_curv'].values
 
     return nxt_ff_info_for_null_arc
 
 
 def make_nxt_ff_info_for_monkey(nxt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                 curv_traj_window_before_stop=[-50, 0]):
-    nxt_ff_info_for_monkey = find_stops_near_ff_utils.find_ff_info(
+    nxt_ff_info_for_monkey = find_cvn_utils.find_ff_info(
         nxt_ff_df_modified.ff_index.values, heading_info_df.point_index_before_stop.values, monkey_information, ff_real_position_sorted)
     nxt_ff_info_for_monkey['stop_point_index'] = heading_info_df['stop_point_index'].values
 
@@ -588,9 +590,9 @@ def make_diff_in_curv_df(nxt_ff_info_for_monkey, nxt_ff_info_for_null_arc):
     monkey_curv_df = monkey_curv_df[[
         'opt_arc_curv']].reset_index(drop=True)
     monkey_curv_df[['stop_point_index', 'curv_of_traj']] = nxt_ff_info_for_monkey_cleaned[[
-        'stop_point_index', 'curv_of_traj']].values 
+        'stop_point_index', 'curv_of_traj']].values
     # note, the window for curv_of_traj_in_window_to_cur_ff is curv_traj_window_before_stop, used in make_nxt_ff_info_for_monkey
-    monkey_curv_df.rename(columns={'curv_of_traj': 'curv_of_traj_in_window_to_cur_ff', 
+    monkey_curv_df.rename(columns={'curv_of_traj': 'curv_of_traj_in_window_to_cur_ff',
                                    'opt_arc_curv': 'opt_arc_curv_from_m_before_stop_to_nxt'}, inplace=True)
 
     diff_in_curv_df = monkey_curv_df.merge(
@@ -627,7 +629,7 @@ def furnish_diff_in_curv_df(diff_in_curv_df):
 def retrieve_df_based_on_ref_point(ref_point_mode, ref_point_value, test_or_control, data_folder_name, df_partial_path, monkey_name):
     df_path = os.path.join(data_folder_name, df_partial_path, test_or_control)
     os.makedirs(df_path, exist_ok=True)
-    df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+    df_name = find_cvn_utils.get_df_name_by_ref(
         None, ref_point_mode, ref_point_value)
     retrieved_df = pd.read_csv(os.path.join(df_path, df_name), index_col=0)
     print(

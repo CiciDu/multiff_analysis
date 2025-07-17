@@ -4,7 +4,7 @@ from planning_analysis import ml_for_planning_class, ml_for_planning_utils
 from machine_learning.ml_methods import classification_utils, regression_utils, prep_ml_data_utils, ml_methods_class, hyperparam_tuning_class
 from planning_analysis.only_cur_ff import only_cur_ff_class
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_class, test_vs_control_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils, only_cur_ff_utils, features_to_keep_utils
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
@@ -150,7 +150,7 @@ class OnlyStopFFAcrossSessions():
             by=['data_name', 'stop_point_index']).reset_index(drop=True)
 
         # to save the csv
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, ref_point_mode, ref_point_value)
         self.combd_only_cur_ff_df.to_csv(os.path.join(
             self.combd_only_cur_ff_df_folder_path, df_name))
@@ -159,7 +159,7 @@ class OnlyStopFFAcrossSessions():
         self.prepare_only_cur_ff_data_for_ml()
 
     def _retrieve_combd_only_cur_ff_df(self, ref_point_mode='distance', ref_point_value=-100):
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, ref_point_mode, ref_point_value)
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
@@ -173,7 +173,7 @@ class OnlyStopFFAcrossSessions():
                 f'combd_only_cur_ff_df ({df_name}) is not in the folder: {self.combd_only_cur_ff_df_folder_path}')
 
     def _retrieve_combd_x_features_df(self, ref_point_mode='distance', ref_point_value=-100):
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, ref_point_mode, ref_point_value)
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value

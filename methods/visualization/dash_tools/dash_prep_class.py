@@ -3,10 +3,10 @@ import sys
 from visualization.plotly_tools import plotly_preparation, plotly_for_scatterplot, plotly_for_null_arcs, plotly_for_correlation, plotly_for_monkey, plotly_plot_class
 from visualization.dash_tools import dash_utils, dash_utils
 from null_behaviors import curv_of_traj_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils, cur_vs_nxt_ff_from_ref_class
 from visualization.matplotlib_tools import monkey_heading_functions
 from eye_position_analysis import eye_positions
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_class, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_class, find_cvn_utils, plot_cvn_class, plot_cvn_utils, plot_monkey_heading_helper_class
 
 
 import os
@@ -32,7 +32,7 @@ np.set_printoptions(suppress=True)
 # https://dash.plotly.com/interactive-graphing
 
 
-class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef, plotly_plot_class.PlotlyPlotter):
+class DashCartesianPreparation(cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee, plotly_plot_class.PlotlyPlotter):
 
     def __init__(self,
                  raw_data_folder_path=None):
@@ -68,8 +68,8 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._determine_fig_corr_or_heading()
 
     def _find_trajectory_ref_row(self):
-        ref_point_index = self.nxt_ff_df2[self.nxt_ff_df2['stop_point_index']
-                                          == self.stop_point_index]['point_index'].item()
+        ref_point_index = self.nxt_ff_df_from_ref[self.nxt_ff_df_from_ref['stop_point_index']
+                                                  == self.stop_point_index]['point_index'].item()
         trajectory_df = self.current_plotly_key_comp['trajectory_df']
         self.trajectory_ref_row = trajectory_df[trajectory_df['point_index']
                                                 <= ref_point_index]
@@ -228,7 +228,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
                 nxt_ff_counted_df[['cntr_arc_curv', 'opt_arc_curv']] = nxt_ff_counted_df[[
                     'cntr_arc_curv', 'opt_arc_curv']].sample(frac=1).values
 
-                traj_curv_counted, nxt_curv_counted = find_stops_near_ff_utils.find_relative_curvature(
+                traj_curv_counted, nxt_curv_counted = find_cvn_utils.find_relative_curvature(
                     nxt_ff_counted_df, self.cur_ff_counted_df, self.curv_of_traj_counted, use_curv_to_ff_center=self.overall_params['use_curv_to_ff_center'])
 
                 self.kwargs_for_correlation_plot_2 = copy.deepcopy(
@@ -250,7 +250,6 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
     def _make_fig_heading_2(self):
 
         return self.fig_heading
-
 
     def _make_fig_corr_and_fig_heading_both_unshuffled_and_shuffled(self):
         self.fig_corr = go.Figure()
@@ -297,7 +296,7 @@ class DashCartesianPreparation(stops_near_ff_based_on_ref_class.StopsNearFFBased
         if self.overall_params['eliminate_outliers']:
             self._eliminate_outliers_in_cur_ff_curv()
         # self._find_relative_heading_info()
-        self.cur_and_nxt_ff_df = self._make_cur_and_nxt_ff_df()
+        self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
         self.heading_info_df, self.diff_in_curv_df = self._make_heading_info_df(
             self.test_or_control)
         self.kwargs_for_heading_plot = self._make_kwargs_for_heading_plot()

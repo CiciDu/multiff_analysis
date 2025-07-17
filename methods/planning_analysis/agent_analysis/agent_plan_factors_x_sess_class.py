@@ -1,5 +1,5 @@
 
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
 from planning_analysis.agent_analysis import agent_plan_factors_class
@@ -233,7 +233,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
         if save_data:
             for test_or_control in ['test', 'control']:
                 path = self.dict_of_combd_heading_info_folder_path[test_or_control]
-                df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+                df_name = find_cvn_utils.get_df_name_by_ref(
                     'monkey_agent', ref_point_mode, ref_point_value)
                 df_path = os.path.join(path, df_name)
                 os.makedirs(path, exist_ok=True)

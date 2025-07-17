@@ -2,7 +2,7 @@ import sys
 from data_wrangling import combine_info_utils, base_processing_class
 from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_class, test_vs_control_utils, monkey_plan_factors_x_sess_class
 from planning_analysis.only_cur_ff import only_cur_ff_utils, only_cur_ff_utils, features_to_keep_utils
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
@@ -76,7 +76,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
         os.makedirs(self.x_features_folder_path, exist_ok=True)
 
     def make_only_cur_ff_df(self, exists_ok=True, stop_period_duration=2, ref_point_mode='distance', ref_point_value=-150):
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, ref_point_mode, ref_point_value)
         df_path = os.path.join(self.only_cur_ff_folder_path, df_name + '.csv')
         if exists_ok:
@@ -118,7 +118,7 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
                            list_of_flash_cluster_period=[
                                [1.0, 1.5], [1.5, 2.0]],
                            ):
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, ref_point_mode, ref_point_value)
         df_path = os.path.join(self.x_features_folder_path, df_name + '.csv')
         if exists_ok:

@@ -3,7 +3,7 @@ import sys
 from visualization.dash_tools.dash_main_class_methods import dash_main_class
 from visualization.plotly_tools import plotly_for_correlation
 from visualization.dash_tools import dash_utils, dash_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 
 import os
 import numpy as np
@@ -45,7 +45,7 @@ class DashComparison(dash_main_class.DashMainPlots):
         self.curv_of_traj_params = curv_of_traj_params
         self.overall_params = overall_params
 
-        self.snf_streamline_organizing_info_kwargs = find_stops_near_ff_utils.organize_snf_streamline_organizing_info_kwargs(
+        self.snf_streamline_organizing_info_kwargs = find_cvn_utils.organize_snf_streamline_organizing_info_kwargs(
             ref_point_params, curv_of_traj_params, overall_params)
         super().streamline_organizing_info(**self.snf_streamline_organizing_info_kwargs)
 

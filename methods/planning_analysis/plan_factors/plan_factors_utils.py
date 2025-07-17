@@ -1,5 +1,5 @@
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils
 from data_wrangling import specific_utils
@@ -13,11 +13,11 @@ def make_plan_y_df(heading_info_df, curv_of_traj_df, curv_of_traj_df_w_one_sided
 
     plan_y_df = build_factor_comp.process_heading_info_df(
         heading_info_df)
-    
+
     curv_of_traj_stat_df = build_factor_comp.find_curv_of_traj_stat_df(
         heading_info_df, curv_of_traj_df)
     plan_y_df = build_factor_comp_utils._add_stat_columns_to_df(
-            curv_of_traj_stat_df, plan_y_df, ['curv'], 'stop_point_index')
+        curv_of_traj_stat_df, plan_y_df, ['curv'], 'stop_point_index')
 
     if curv_of_traj_df_w_one_sided_window is not None:
         plan_y_df = build_factor_comp.add_column_curv_of_traj_before_stop(
@@ -68,7 +68,7 @@ def make_plan_x_df(stops_near_ff_df, heading_info_df, both_ff_at_ref_df, ff_data
     plan_x_df = plan_x_df.merge(
         cluster_df, on='stop_point_index', how='left').reset_index(drop=True)
 
-    # nxt_ff_last_seen_info = build_factor_comp.get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df2, ff_dataframe_visible, monkey_information,
+    # nxt_ff_last_seen_info = build_factor_comp.get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df_from_ref, ff_dataframe_visible, monkey_information,
     #                                                                     stops_near_ff_df, ff_real_position_sorted)
     # plan_x_df = pd.concat([plan_x_df, nxt_ff_last_seen_info])
 
@@ -124,7 +124,8 @@ def process_plan_x_to_predict_monkey_info(plan_x, for_classification=False):
 def process_plan_x_to_predict_ff_info(plan_x, plan_y):
 
     non_cluster_columns_to_save = ['distance_between_stop_and_arena_edge'] + feature_lists.cur_ff_at_ref_columns + feature_lists.nxt_ff_at_ref_columns \
-        + feature_lists.all_eye_features + feature_lists.trajectory_features + feature_lists.traj_to_cur_ff_features
+        + feature_lists.all_eye_features + feature_lists.trajectory_features + \
+        feature_lists.traj_to_cur_ff_features
 
     # delete 'curv_range' and 'curv_iqr' from non_cluster_columns_to_save
     non_cluster_columns_to_save.remove('curv_range')
@@ -152,7 +153,8 @@ def process_plan_x_to_predict_ff_info(plan_x, plan_y):
 
 
 def delete_monkey_info_in_plan_x(plan_x):
-    columns_to_drop = feature_lists.all_eye_features + feature_lists.trajectory_features + feature_lists.traj_to_cur_ff_features
+    columns_to_drop = feature_lists.all_eye_features + \
+        feature_lists.trajectory_features + feature_lists.traj_to_cur_ff_features
     # delete 'curv_range'
     columns_to_drop.remove('curv_range')
     plan_x = plan_x.drop(columns=columns_to_drop, errors='ignore')
@@ -191,6 +193,6 @@ def quickly_process_plan_xy_test_and_ctrl(plan_xy_test, plan_xy_ctrl, column_for
 
 def add_d_heading_of_traj_to_df(df):
     df['d_heading_of_traj'] = df['monkey_angle_before_stop'] - df['monkey_angle']
-    df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
+    df['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_one_pie(
         df['d_heading_of_traj'].values)
     return df

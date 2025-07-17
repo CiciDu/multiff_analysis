@@ -1,10 +1,10 @@
 
 import sys
 from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils, cur_vs_nxt_ff_from_ref_class
 from planning_analysis.variations_of_factors_vs_results import make_variations_utils
 
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from data_wrangling import combine_info_utils, base_processing_class
 
 
@@ -103,7 +103,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         if test_or_control is None:
             test_or_control = self.test_or_control
         path = self.dict_of_combd_heading_info_folder_path[test_or_control]
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, ref_point_mode, ref_point_value)
         df_path = os.path.join(path, df_name)
         if not os.path.exists(df_path):
@@ -125,7 +125,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                        curv_traj_window_before_stop=[-50, 0]):
 
         folder_path = self.dict_of_combd_diff_in_curv_folder_path[test_or_control]
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(
+        df_name = find_cvn_utils.find_diff_in_curv_df_name(
             ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         df_path = os.path.join(folder_path, df_name)
         if not os.path.exists(df_path):
@@ -139,7 +139,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
     def _store_combd_heading_df_x_sessions(self, test_or_control=None):
         if test_or_control is None:
             test_or_control = self.test_or_control
-        df_name = find_stops_near_ff_utils.get_df_name_by_ref(
+        df_name = find_cvn_utils.get_df_name_by_ref(
             self.monkey_name, self.ref_point_mode, self.ref_point_value)
         os.makedirs(
             self.dict_of_combd_heading_info_folder_path[test_or_control], exist_ok=True)
@@ -149,7 +149,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
               self.dict_of_combd_heading_info_folder_path[test_or_control])
 
     def _store_combd_diff_in_curv_df(self, test_or_control=None):
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(
+        df_name = find_cvn_utils.find_diff_in_curv_df_name(
             self.ref_point_mode, self.ref_point_value, self.curv_traj_window_before_stop)
         os.makedirs(
             self.dict_of_combd_diff_in_curv_folder_path[test_or_control], exist_ok=True)
@@ -306,7 +306,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             if heading_info_df_exists_ok is False:
                 raise FileNotFoundError(
                     'Force the creation of heading_info_df')
-            self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(
+            self.snf = cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee(
                 raw_data_folder_path=None, opt_arc_type=self.opt_arc_type)
 
             self.snf.extract_info_from_raw_data_folder_path(
@@ -316,7 +316,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                                                   merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
         except FileNotFoundError:
             print('Making new heading_info_df ...')
-            self.snf = stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef(
+            self.snf = cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee(
                 raw_data_folder_path=raw_data_folder_path, opt_arc_type=self.opt_arc_type)
 
             self.snf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode,

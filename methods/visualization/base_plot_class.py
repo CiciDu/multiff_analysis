@@ -1,6 +1,6 @@
 import sys
 from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_class, find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.matplotlib_tools import plot_behaviors_utils

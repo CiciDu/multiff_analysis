@@ -1,6 +1,6 @@
 import sys
 from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_class, find_stops_near_ff_utils, plot_stops_near_ff_utils, plot_monkey_heading_helper_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_class, find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
 from visualization.matplotlib_tools import plot_behaviors_utils
@@ -68,7 +68,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                     i=i)
 
             current_i = i+1
-            self.current_plotly_key_comp, self.fig = self.plot_stops_near_ff_in_plotly_func(
+            self.current_plotly_key_comp, self.fig = self.plot_cvn_in_plotly_func(
                 self.monkey_plot_params,
                 plot_counter_i=i)
 
@@ -77,10 +77,10 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         return current_i
 
-    def plot_stops_near_ff_in_plotly_func(self,
-                                          monkey_plot_params={},
-                                          plot_counter_i=None,
-                                          ):
+    def plot_cvn_in_plotly_func(self,
+                                monkey_plot_params={},
+                                plot_counter_i=None,
+                                ):
 
         self.monkey_plot_params = {
             **copy.deepcopy(self.default_monkey_plot_params),

@@ -1,5 +1,5 @@
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils, build_factor_comp_utils, build_factor_comp
 from data_wrangling import specific_utils
@@ -7,6 +7,7 @@ from data_wrangling import specific_utils
 import numpy as np
 import pandas as pd
 import math
+
 
 def _add_stat_columns_to_df(stat_df, df, stat_columns, groupby_column):
     '''
@@ -48,12 +49,11 @@ def _take_out_info_of_all_segments(ori_df, all_start_time, all_end_time, all_seg
     return extended_df
 
 
-def _prepare_data_of_segments_based_on_stop_point_index(stops_near_ff_df, monkey_information, 
-                                           groupby_column='stop_point_index',
-                                           start_time_column='beginning_time',
-                                           end_time_column='stop_time'):
+def _prepare_data_of_segments_based_on_stop_point_index(stops_near_ff_df, monkey_information,
+                                                        groupby_column='stop_point_index',
+                                                        start_time_column='beginning_time',
+                                                        end_time_column='stop_time'):
     df = stops_near_ff_df.copy()
-    
 
     data_of_segments = _take_out_info_of_all_segments(monkey_information,
                                                       all_start_time=df[start_time_column].values,
@@ -135,6 +135,7 @@ def _find_summary_stats_of_each_segment(data_of_segments,
     stat_df.reset_index(drop=False, inplace=True)
     return stat_df
 
+
 def _get_monkey_speed_stat_df(data_of_segments):
     monkey_speed_stat_df = build_factor_comp_utils._find_summary_stats_of_each_segment(data_of_segments,
                                                                                        groupby_column='stop_point_index',
@@ -190,7 +191,7 @@ def _get_eye_stats_bsans(stops_near_ff_df, monkey_information):
     eye_toward_ff_time_perc_df_bsans.columns = [
         col + '_bsans' if col != 'stop_point_index' else col for col in eye_toward_ff_time_perc_df_bsans.columns]
 
-    return eye_stat_df_bsans, eye_toward_ff_time_perc_df_bsans  
+    return eye_stat_df_bsans, eye_toward_ff_time_perc_df_bsans
 
 
 def _find_clusters_in_ff_info_in_all_stop_periods(ff_info_in_all_stop_periods,

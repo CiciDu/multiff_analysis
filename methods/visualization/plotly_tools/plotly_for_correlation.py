@@ -2,7 +2,7 @@
 from multiprocessing import Value
 import sys
 from null_behaviors import curv_of_traj_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 import os
 import numpy as np
 import matplotlib

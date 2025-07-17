@@ -1,7 +1,7 @@
 from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
 from null_behaviors import curv_of_traj_utils
 
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils, cur_vs_nxt_ff_from_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import pn_utils
@@ -15,7 +15,7 @@ import numpy as np
 # note, one class instance is either for test or control, but not both
 
 
-class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef):
+class PlanFactorsHelpClass(cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee):
 
     def __init__(self, test_or_control, raw_data_folder_path, curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],
@@ -47,11 +47,11 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
             self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=self.curv_of_traj_mode,
                                window_for_curv_of_traj=self.window_for_curv_of_traj)
 
-        self.get_stops_near_ff_df(test_or_control=self.test_or_control,
-                                  exists_ok=stops_near_ff_df_exists_ok, save_data=save_stops_near_ff_df)
+        self.make_stops_near_ff_and_ff_comparison_dfs(test_or_control=self.test_or_control,
+                                                      exists_ok=stops_near_ff_df_exists_ok, save_data=save_stops_near_ff_df)
 
         self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
-        self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df2['stop_point_index']
+        self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df_from_ref['stop_point_index']
 
         if self.ff_dataframe is None:
             self.get_more_monkey_data()
@@ -88,8 +88,8 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         # prepare to add monkey_angle_when_cur_ff_first_seen
         self.cur_ff_df_modified = self.cur_ff_df_modified.merge(self.cur_ff_df[[
                                                                 'stop_point_index', 'point_index_ff_first_seen']], on='stop_point_index', how='left').sort_values(by='stop_point_index')
-        self.cur_ff_df_temp = find_stops_near_ff_utils.find_ff_info(self.cur_ff_df_modified.ff_index.values, self.cur_ff_df_modified['point_index_ff_first_seen'].values,
-                                                                    self.monkey_information, self.ff_real_position_sorted)
+        self.cur_ff_df_temp = find_cvn_utils.find_ff_info(self.cur_ff_df_modified.ff_index.values, self.cur_ff_df_modified['point_index_ff_first_seen'].values,
+                                                          self.monkey_information, self.ff_real_position_sorted)
 
         plan_y = plan_factors_utils.make_plan_y_df(
             self.heading_info_df, self.curv_of_traj_df, self.curv_of_traj_df_w_one_sided_window)
@@ -100,7 +100,7 @@ class PlanFactorsHelpClass(stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRe
         return plan_y
 
     def _get_file_names_for_plan_x_or_y(self, plan_type):
-        df_name = find_stops_near_ff_utils.find_diff_in_curv_df_name(
+        df_name = find_cvn_utils.find_diff_in_curv_df_name(
             ref_point_mode=self.ref_point_mode,
             ref_point_value=self.ref_point_value,
             curv_traj_window_before_stop=self.curv_traj_window_before_stop

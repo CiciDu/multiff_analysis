@@ -1,7 +1,7 @@
 import sys
 from data_wrangling import general_utils
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.neural_analysis_by_topic.target_decoder import prep_target_decoder, behav_features_to_keep, target_decoder_class
 from neural_data_analysis.neural_analysis_by_topic.planning_and_neural import pn_utils, pn_helper_class

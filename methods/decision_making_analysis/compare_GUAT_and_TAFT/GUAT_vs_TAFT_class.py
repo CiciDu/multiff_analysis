@@ -1,6 +1,6 @@
 from decision_making_analysis.GUAT import GUAT_collect_info_class
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils, helper_GUAT_vs_TAFT_class
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from data_wrangling import base_processing_class
 
 import os
@@ -162,8 +162,8 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         sub = sub.merge(GUAT_or_TAFT_x_df[[
                         'stop_point_index', 'cur_ff_distance_at_ref']], on='stop_point_index', how='left')
 
-        sub2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(sub, self.monkey_information, self.ff_real_position_sorted,
-                                                                        ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
+        sub2 = find_cvn_utils.find_ff_info_based_on_ref_point(sub, self.monkey_information, self.ff_real_position_sorted,
+                                                              ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
 
         sub2.rename(columns={'point_index': 'ref_point_index'}, inplace=True)
         sub = sub.merge(

@@ -1,5 +1,5 @@
 from planning_analysis.show_planning import nxt_ff_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils
 from data_wrangling import specific_utils
@@ -148,31 +148,31 @@ def get_distance_between_stop_and_arena_edge(stops_near_ff_df):
     return distance_between_stop_and_arena_edge
 
 
-def get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df2, ff_dataframe_visible, monkey_information, stops_near_ff_df, ff_real_position_sorted):
+def get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df_from_ref, ff_dataframe_visible, monkey_information, stops_near_ff_df, ff_real_position_sorted):
     last_seen_point_index = build_factor_comp_utils._get_point_index_of_nxt_ff_last_seen_before_next_stop(
         ff_dataframe_visible, stops_near_ff_df)
-    nxt_ff_df2 = find_stops_near_ff_utils.find_ff_info(
+    nxt_ff_df_from_ref = find_cvn_utils.find_ff_info(
         stops_near_ff_df.nxt_ff_index.values, last_seen_point_index, monkey_information, ff_real_position_sorted)
-    nxt_ff_df2['stop_point_index'] = stops_near_ff_df['stop_point_index'].values
-    nxt_ff_df2['time_last_seen'] = monkey_information.loc[nxt_ff_df2['point_index'].values, 'time'].values
-    nxt_ff_df2 = nxt_ff_df2.merge(stops_near_ff_df[[
-                                  'stop_point_index', 'next_stop_time']], on='stop_point_index', how='left')
-    nxt_ff_df2['time_nxt_ff_last_seen_before_next_stop'] = nxt_ff_df2['next_stop_time'].values - \
-        nxt_ff_df2['time_last_seen'].values
+    nxt_ff_df_from_ref['stop_point_index'] = stops_near_ff_df['stop_point_index'].values
+    nxt_ff_df_from_ref['time_last_seen'] = monkey_information.loc[nxt_ff_df_from_ref['point_index'].values, 'time'].values
+    nxt_ff_df_from_ref = nxt_ff_df_from_ref.merge(stops_near_ff_df[[
+        'stop_point_index', 'next_stop_time']], on='stop_point_index', how='left')
+    nxt_ff_df_from_ref['time_nxt_ff_last_seen_before_next_stop'] = nxt_ff_df_from_ref['next_stop_time'].values - \
+        nxt_ff_df_from_ref['time_last_seen'].values
 
-    nxt_ff_last_seen_info = nxt_ff_df2[[
+    nxt_ff_last_seen_info = nxt_ff_df_from_ref[[
         'ff_distance', 'ff_angle', 'time_nxt_ff_last_seen_before_next_stop']].copy()
     nxt_ff_last_seen_info.rename(columns={'ff_distance': 'nxt_ff_distance_when_nxt_ff_last_seen_before_next_stop',
                                           'ff_angle': 'nxt_ff_angle_when_nxt_ff_last_seen_before_next_stop'}, inplace=True)
     return nxt_ff_last_seen_info
 
 
-def add_d_monkey_angle(plan_y_df, cur_ff_df2, stops_near_ff_df):
+def add_d_monkey_angle(plan_y_df, cur_ff_df_from_ref, stops_near_ff_df):
     plan_y_df = plan_y_df.merge(stops_near_ff_df[[
                                 'stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left')
-    cur_ff_df2['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df2['monkey_angle'] * 180 / math.pi
+    cur_ff_df_from_ref['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df_from_ref['monkey_angle'] * 180 / math.pi
     if 'monkey_angle_when_cur_ff_first_seen' not in plan_y_df.columns:
-        plan_y_df = plan_y_df.merge(cur_ff_df2[[
+        plan_y_df = plan_y_df.merge(cur_ff_df_from_ref[[
                                     'ff_index', 'monkey_angle_when_cur_ff_first_seen']], left_on='cur_ff_index', right_on='ff_index', how='left')
     plan_y_df['stop_monkey_angle'] = plan_y_df['stop_monkey_angle'] * 180/math.pi
     plan_y_df['monkey_angle_before_stop'] = plan_y_df['monkey_angle_before_stop'] * 180/math.pi
@@ -180,9 +180,9 @@ def add_d_monkey_angle(plan_y_df, cur_ff_df2, stops_near_ff_df):
         plan_y_df['monkey_angle_when_cur_ff_first_seen']
     plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'] = plan_y_df['monkey_angle_before_stop'] - \
         plan_y_df['monkey_angle_when_cur_ff_first_seen']
-    plan_y_df['d_monkey_angle_since_cur_ff_first_seen'] = find_stops_near_ff_utils.confine_angle_to_within_180(
+    plan_y_df['d_monkey_angle_since_cur_ff_first_seen'] = find_cvn_utils.confine_angle_to_within_180(
         plan_y_df['d_monkey_angle_since_cur_ff_first_seen'].values)
-    plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'] = find_stops_near_ff_utils.confine_angle_to_within_180(
+    plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'] = find_cvn_utils.confine_angle_to_within_180(
         plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'].values)
     return plan_y_df
 
@@ -257,11 +257,11 @@ def make_cluster_df_as_part_of_plan_factors(stops_near_ff_df, ff_dataframe_visib
     # add info at ref point
     _, _, cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
         stops_near_ff_df)
-    cur_ff_df2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(cur_ff_df, monkey_information, ff_real_position_sorted,
-                                                                          ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
+    cur_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(cur_ff_df, monkey_information, ff_real_position_sorted,
+                                                                        ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
 
-    ref_info = cur_ff_df2[['stop_point_index', 'point_index', 'monkey_x', 'monkey_y',
-                           'monkey_angle']].rename(columns={'point_index': 'ref_point_index'}).copy()
+    ref_info = cur_ff_df_from_ref[['stop_point_index', 'point_index', 'monkey_x', 'monkey_y',
+                                   'monkey_angle']].rename(columns={'point_index': 'ref_point_index'}).copy()
     ref_info['ref_time'] = monkey_information.loc[ref_info['ref_point_index'].values, 'time'].values
     ref_info['stop_time'] = monkey_information.loc[ref_info['stop_point_index'].values, 'time'].values
     ref_info['beginning_time'] = ref_info['stop_time'] - stop_period_duration

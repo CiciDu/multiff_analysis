@@ -2,7 +2,7 @@ from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils
 from planning_analysis.plan_factors import plan_factors_class, plan_factors_helper_class, build_factor_comp_utils, build_factor_comp
 from planning_analysis.only_cur_ff import only_cur_ff_utils, features_to_keep_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
-from planning_analysis.show_planning.get_stops_near_ff import find_stops_near_ff_utils, stops_near_ff_based_on_ref_class
+from planning_analysis.show_planning.get_cur_vs_nxt_ff_data import find_cvn_utils, cur_vs_nxt_ff_from_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from null_behaviors import curv_of_traj_utils
 
@@ -73,16 +73,16 @@ class HelperGUATavsTAFTclass():
         self.stops_near_ff_df = nxt_ff_utils.add_if_nxt_ff_and_nxt_ff_cluster_flash_bsans(self.stops_near_ff_df, self.ff_real_position_sorted,
                                                                                           self.ff_flash_sorted, self.ff_life_sorted)
 
-        find_stops_near_ff_utils.add_cur_ff_cluster_50_size(self.stops_near_ff_df, self.ff_real_position_sorted, self.ff_life_sorted,
-                                                            empty_cluster_ok=True)
+        find_cvn_utils.add_cur_ff_cluster_50_size(self.stops_near_ff_df, self.ff_real_position_sorted, self.ff_life_sorted,
+                                                  empty_cluster_ok=True)
 
         self.stops_near_ff_df = nxt_ff_utils._add_stop_or_nxt_ff_first_seen_and_last_seen_info_bbas(
             self.stops_near_ff_df, self.ff_dataframe_visible, self.monkey_information, cur_or_nxt='cur')
 
         # The below is not needed rn since it will filter out rows based on visibility of cur or nxt ff
-        # self.stops_near_ff_df = find_stops_near_ff_utils.process_shared_stops_near_ff_df(self.stops_near_ff_df)
+        # self.stops_near_ff_df = find_cvn_utils.process_shared_stops_near_ff_df(self.stops_near_ff_df)
 
-        self.stops_near_ff_df = find_stops_near_ff_utils.add_monkey_info_before_stop(
+        self.stops_near_ff_df = find_cvn_utils.add_monkey_info_before_stop(
             self.monkey_information, self.stops_near_ff_df)
         self._add_curv_of_traj_stat_df()
 
@@ -97,7 +97,7 @@ class HelperGUATavsTAFTclass():
 
         self._make_heading_info_df()
         setattr(self, f'{test_or_ctrl}_heading_info_df', self.heading_info_df)
-        stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef._make_curv_of_traj_df_if_not_already_made(
+        cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee._make_curv_of_traj_df_if_not_already_made(
             self)
         plan_factors_helper_class.PlanFactorsHelpClass._make_curv_of_traj_df_w_one_sided_window_if_not_already_made(
             self)
@@ -127,17 +127,17 @@ class HelperGUATavsTAFTclass():
         self._get_stops_near_ff_df(already_made_ok=True)
 
         self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
-        self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df2['stop_point_index'].values
+        self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df_from_ref['stop_point_index'].values
 
         if self.ff_dataframe is None:
-            stops_near_ff_based_on_ref_class.StopsNearFFBasedOnRef.get_more_monkey_data(
+            cur_vs_nxt_ff_from_ref_class.CurVsNxtFfFromRefClasee.get_more_monkey_data(
                 self)
 
         if getattr(self, 'nxt_ff_df', None) is None:
             self._get_stops_near_ff_df(already_made_ok=True)
             self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
                 self.stops_near_ff_df)
-            self.nxt_ff_df2, self.cur_ff_df2 = self.find_nxt_ff_df_2_and_cur_ff_df_2()
+            self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref()
 
         self.plan_x_df = plan_factors_utils.make_plan_x_df(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
                                                            stop_period_duration=self.stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
@@ -188,25 +188,25 @@ class HelperGUATavsTAFTclass():
                                                                    self.curv_of_traj_df, self.ff_dataframe_visible, stop_period_duration=self.stop_period_duration,
                                                                    ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
 
-    def find_nxt_ff_df_2_and_cur_ff_df_2(self):
+    def find_nxt_ff_df_and_cur_ff_df_from_ref(self):
 
-        # then get the actual nxt_ff_df2 and cur_ff_df2
-        self.nxt_ff_df2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(self.nxt_ff_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                   ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
-                                                                                   point_index_cur_ff_first_seen=self.cur_ff_df['point_index_ff_first_seen'].values)
-        self.cur_ff_df2 = find_stops_near_ff_utils.find_ff_info_based_on_ref_point(self.cur_ff_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                   ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
+        # then get the actual nxt_ff_df_from_ref and cur_ff_df_from_ref
+        self.nxt_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.nxt_ff_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                 ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
+                                                                                 point_index_cur_ff_first_seen=self.cur_ff_df['point_index_ff_first_seen'].values)
+        self.cur_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.cur_ff_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                 ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
 
-        return self.nxt_ff_df2, self.cur_ff_df2
+        return self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref
 
     def get_both_ff_at_ref_df(self):
-        self.nxt_ff_df2, self.cur_ff_df2 = self.find_nxt_ff_df_2_and_cur_ff_df_2()
-        self.both_ff_at_ref_df = self.nxt_ff_df2[[
+        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref()
+        self.both_ff_at_ref_df = self.nxt_ff_df_from_ref[[
             'ff_distance', 'ff_angle']].copy()
         self.both_ff_at_ref_df.rename(columns={'ff_distance': 'nxt_ff_distance_at_ref',
                                                'ff_angle': 'nxt_ff_angle_at_ref'}, inplace=True)
-        self.both_ff_at_ref_df = pd.concat([self.both_ff_at_ref_df.reset_index(drop=True), self.cur_ff_df2[['ff_distance', 'ff_angle',
-                                                                                                            'ff_angle_boundary']].reset_index(drop=True)], axis=1)
+        self.both_ff_at_ref_df = pd.concat([self.both_ff_at_ref_df.reset_index(drop=True), self.cur_ff_df_from_ref[['ff_distance', 'ff_angle',
+                                                                                                                    'ff_angle_boundary']].reset_index(drop=True)], axis=1)
         self.both_ff_at_ref_df.rename(columns={'ff_distance': 'cur_ff_distance_at_ref',
                                                'ff_angle': 'cur_ff_angle_at_ref',
                                                'ff_angle_boundary': 'cur_ff_angle_boundary_at_ref'}, inplace=True)
@@ -220,11 +220,11 @@ class HelperGUATavsTAFTclass():
 
         self._get_stops_near_ff_df(already_made_ok=True)
         self._get_nxt_ff_and_cur_ff_info_based_on_ref_point()
-        self.cur_and_nxt_ff_df = show_planning_utils.make_cur_and_nxt_ff_df(
-            self.nxt_ff_final_df, self.cur_ff_final_df)
+        self.cur_and_nxt_ff_from_ref_df = show_planning_utils.make_cur_and_nxt_ff_from_ref_df(
+            self.nxt_ff_df_final, self.cur_ff_df_final)
 
         self.heading_info_df = show_planning_utils.make_heading_info_df(
-            self.cur_and_nxt_ff_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
+            self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
 
     def _add_nxt_ff_index(self):
         if self.GUAT_or_TAFT == 'TAFT':
@@ -252,32 +252,32 @@ class HelperGUATavsTAFTclass():
     def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self):
         self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
             self.stops_near_ff_df)
-        self.find_nxt_ff_df_2_and_cur_ff_df_2()
-        self.nxt_ff_df_modified = self.nxt_ff_df2.copy()
-        self.cur_ff_df_modified = self.cur_ff_df2.copy()
+        self.find_nxt_ff_df_and_cur_ff_df_from_ref()
+        self.nxt_ff_df_modified = self.nxt_ff_df_from_ref.copy()
+        self.cur_ff_df_modified = self.cur_ff_df_from_ref.copy()
         self.stop_point_index_modified = self.nxt_ff_df_modified.stop_point_index.values.copy()
         self.stops_near_ff_df_modified = self.stops_near_ff_df.copy()
 
-        self.nxt_ff_df2 = self.nxt_ff_df2.merge(
+        self.nxt_ff_df_from_ref = self.nxt_ff_df_from_ref.merge(
             self.curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
-        self.cur_ff_df2 = self.cur_ff_df2.merge(
+        self.cur_ff_df_from_ref = self.cur_ff_df_from_ref.merge(
             self.curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
-        self.nxt_ff_final_df = self.nxt_ff_df2.copy()
-        self.cur_ff_final_df = self.cur_ff_df2.copy()
+        self.nxt_ff_df_final = self.nxt_ff_df_from_ref.copy()
+        self.cur_ff_df_final = self.cur_ff_df_from_ref.copy()
 
-        self.nxt_ff_final_df = self.nxt_ff_final_df.merge(
+        self.nxt_ff_df_final = self.nxt_ff_df_final.merge(
             self.stops_near_ff_df[['stop_point_index', 'monkey_angle_before_stop']], how='left')
-        self.nxt_ff_final_df['d_heading_of_traj'] = self.nxt_ff_final_df['monkey_angle_before_stop'] - \
-            self.nxt_ff_final_df['monkey_angle']
-        self.nxt_ff_final_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
-            self.nxt_ff_final_df['d_heading_of_traj'].values)
-        self.cur_ff_final_df = self.cur_ff_final_df.merge(
+        self.nxt_ff_df_final['d_heading_of_traj'] = self.nxt_ff_df_final['monkey_angle_before_stop'] - \
+            self.nxt_ff_df_final['monkey_angle']
+        self.nxt_ff_df_final['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_one_pie(
+            self.nxt_ff_df_final['d_heading_of_traj'].values)
+        self.cur_ff_df_final = self.cur_ff_df_final.merge(
             self.stops_near_ff_df[['stop_point_index', 'monkey_angle_before_stop']], how='left')
-        self.cur_ff_final_df['d_heading_of_traj'] = self.cur_ff_final_df['monkey_angle_before_stop'] - \
-            self.cur_ff_final_df['monkey_angle']
-        self.cur_ff_final_df['d_heading_of_traj'] = find_stops_near_ff_utils.confine_angle_to_within_one_pie(
-            self.cur_ff_final_df['d_heading_of_traj'].values)
+        self.cur_ff_df_final['d_heading_of_traj'] = self.cur_ff_df_final['monkey_angle_before_stop'] - \
+            self.cur_ff_df_final['monkey_angle']
+        self.cur_ff_df_final['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_one_pie(
+            self.cur_ff_df_final['d_heading_of_traj'].values)
 
     def _get_TAFT_df(self):
         self.TAFT_df = GUAT_vs_TAFT_utils.process_trials_df(
