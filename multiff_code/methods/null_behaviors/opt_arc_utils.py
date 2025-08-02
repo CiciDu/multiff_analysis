@@ -87,6 +87,7 @@ def add_opt_arc_measure_and_length(curvature_df,
     arc_ff_xy = curvature_df[['ff_x', 'ff_y']].values
     arc_end_direction = curvature_df['opt_arc_end_direction'].values
     arc_radius = curvature_df['opt_arc_radius'].values
+    arc_point_index = curvature_df.point_index.values
 
     whether_ff_behind = (np.abs(curvature_df['ff_angle_boundary']) > math.pi/2)
 
@@ -95,7 +96,7 @@ def add_opt_arc_measure_and_length(curvature_df,
             raise ValueError(
                 "At least one ff has an angle to boundary larger than pi/4. This is invalid. Please check the input.")
 
-    center_x, center_y, arc_starting_angle, arc_ending_angle = find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
+    center_x, center_y, arc_starting_angle, arc_ending_angle = find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, arc_point_index, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
                                                                                                                arc_end_direction, whether_ff_behind=whether_ff_behind,
                                                                                                                opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry,
                                                                                                                ignore_error=ignore_error)
@@ -123,9 +124,9 @@ def add_opt_arc_measure_and_length(curvature_df,
                 "Warning: At least one arc end is outside the reward boundary. This is invalid. We will adjust them by making them a little less than pi.")
 
 
-def find_cartesian_arc_center_and_angle_for_opt_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction, whether_ff_behind=None,
+def find_cartesian_arc_center_and_angle_for_opt_arc_to_arc_end(arc_end_xy, arc_point_index, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction, whether_ff_behind=None,
                                                                ignore_error=False):
-    center_x, center_y, arc_starting_angle, arc_ending_angle = find_cartesian_arc_center_and_angle_for_opt_arc(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction,
+    center_x, center_y, arc_starting_angle, arc_ending_angle = find_cartesian_arc_center_and_angle_for_opt_arc(arc_end_xy, arc_point_index, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction,
                                                                                                                whether_ff_behind=whether_ff_behind, ignore_error=ignore_error,
                                                                                                                opt_arc_stop_first_vis_bdry=False)
     return center_x, center_y, arc_starting_angle, arc_ending_angle
@@ -182,7 +183,7 @@ def find_angle_from_arc_center_to_ff(arc_ff_xy, center_x, center_y):
     return angle_from_center_to_stop
 
 
-def find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction, whether_ff_behind=None,
+def find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, arc_point_index, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius, arc_end_direction, whether_ff_behind=None,
                                                     opt_arc_stop_first_vis_bdry=False, ignore_error=False):
     # Note: sometimes arc_ff_xy is replaced by arc ending xy, which produces the same result if the normal optimal arc is used;
     # but if opt_arc_stop_closest was True (optimal arc stop at closest point to monkey stop), then arc ending xy has to be used to mimic a new ff center
@@ -196,6 +197,7 @@ def find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, monkey_xy, monkey
         temp_null_arc_info = pd.DataFrame({
             # this is just for keeping the ff in sequence, not for merging, so it's fine to use np.arange
             'arc_ff_index': np.arange(len(ff_angle)),
+            'arc_point_index': arc_point_index,
             'all_arc_radius': arc_radius,
             'center_x': center_x,
             'center_y': center_y,

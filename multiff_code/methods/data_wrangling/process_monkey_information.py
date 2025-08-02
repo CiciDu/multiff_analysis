@@ -39,7 +39,7 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
     if exists(monkey_information_path) & exists_ok:
         print("Retrieved monkey_information")
         monkey_information = pd.read_csv(
-            monkey_information_path).drop(["Unnamed: 0"], axis=1)
+            monkey_information_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
     else:
         raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(
             raw_data_folder_path)
@@ -453,11 +453,12 @@ def add_monkey_dw_column(monkey_information):
 def add_monkey_speeddummy_column(monkey_information):
     if 'monkey_speeddummy' not in monkey_information.columns:
         monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > 0.1) |
-                                                (np.abs(monkey_information['monkey_dw']) > 0.0035)).astype(int)
+                                                   (np.abs(monkey_information['monkey_dw']) > 0.0035)).astype(int)
     if 'monkey_speed_smr' in monkey_information.columns:
         monkey_information['monkey_speeddummy_smr'] = ((monkey_information['monkey_speed_smr'] > 0.1) |
-                                                    (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int)
+                                                       (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int)
         # now, make monkey_speeddummy 0 if it's 0 in either monkey_speeddummy or monkey_speeddummy_smr
         monkey_information['monkey_speeddummy'] = monkey_information['monkey_speeddummy'] & monkey_information['monkey_speeddummy_smr']
-        monkey_information.drop(columns=['monkey_speeddummy_smr'], inplace=True)
+        monkey_information.drop(
+            columns=['monkey_speeddummy_smr'], inplace=True)
     return monkey_information

@@ -37,7 +37,8 @@ def find_smr_markers_start_and_end_time(raw_data_folder_path, ff_caught_T_sorted
     filepath = os.path.join(time_calibration_folder_path,
                             'adj_smr_markers_start_and_end_time.csv')
     if exists(filepath) & exists_ok:
-        start_and_end_time = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
+        start_and_end_time = pd.read_csv(filepath).drop(
+            columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         smr_markers_start_time = start_and_end_time.iloc[0].item()
         smr_markers_end_time = start_and_end_time.iloc[1].item()
     else:
@@ -225,7 +226,7 @@ def make_or_retrieve_txt_smr_t_diff_via_xy_df(raw_data_folder_path, exists_ok=Tr
     file_path = os.path.join(time_calibration_folder_path, filename)
     if exists(file_path) & exists_ok:
         txt_smr_t_diff_via_xy_df = pd.read_csv(
-            file_path).drop(["Unnamed: 0"], axis=1)
+            file_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         print(f'Retrieved {filename} from {file_path}')
     else:
         raw_monkey_information = retrieve_raw_data.get_raw_monkey_information_from_txt_data(
@@ -251,7 +252,7 @@ def make_or_retrieve_txt_smr_t_linreg_df(raw_data_folder_path, ceiling_of_min_di
     file_path = os.path.join(time_calibration_folder_path, filename)
     if exists(file_path) & exists_ok:
         txt_smr_t_linreg_df = pd.read_csv(
-            file_path).drop(["Unnamed: 0"], axis=1)
+            file_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         print(f'Retrieved {filename} from {file_path}')
     else:
         txt_smr_t_diff_via_xy_df = make_or_retrieve_txt_smr_t_diff_via_xy_df(
@@ -278,7 +279,7 @@ def make_or_retrieve_txt_neural_t_linreg_df(raw_data_folder_path, ff_caught_T_so
     file_path = os.path.join(time_calibration_folder_path, filename)
     if exists(file_path) & exists_ok & (not show_plot):
         txt_neural_t_linreg_df = pd.read_csv(
-            file_path).drop(["Unnamed: 0"], axis=1)
+            file_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         print(f'Retrieved {filename} from {file_path}')
     else:
         temp_smr_and_neural = make_temp_txt_and_neural(

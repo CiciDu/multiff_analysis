@@ -3,7 +3,7 @@ from data_wrangling import general_utils, specific_utils, process_monkey_informa
 from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe
 from machine_learning.RL.env_related import env_for_lstm, env_for_sb3
 
-import os
+import os, shutil
 import sys
 import numpy as np
 import matplotlib
@@ -804,3 +804,48 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     }
 
     return info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent
+
+def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
+    """
+    Remove all contents inside folders in all_collected_data that are derived
+    from the given processed_data_folder_path, but keep the folders themselves.
+    """
+    if 'processed_data/' not in processed_data_folder_path:
+        raise ValueError("'processed_data/' not found in the provided path.")
+
+    after_processed_data = processed_data_folder_path.split('processed_data/', 1)[1]
+    search_root = 'RL_models/SB3_stored_models/all_collected_data'
+
+    matching_dirs = []
+
+    # Collect matching directories
+    for root, dirs, files in os.walk(search_root, topdown=True):
+        for dir_name in dirs:
+            full_path = os.path.join(root, dir_name)
+            if after_processed_data in full_path:
+                matching_dirs.append(full_path)
+
+    # Sort so parents come before children (longer paths = deeper dirs)
+    matching_dirs.sort(key=len)
+
+    # Filter to keep only top-level (non-nested) matches
+    filtered_matches = []
+    for path in matching_dirs:
+        if not any(path.startswith(parent + os.sep) for parent in filtered_matches):
+            filtered_matches.append(path)
+            
+    # Now clean out each directory but do not delete the directory itself
+    for folder in filtered_matches:
+        print(f"Cleaning contents of: {folder}")
+        for item in os.listdir(folder):
+            item_path = os.path.join(folder, item)
+            try:
+                if os.path.isfile(item_path) or os.path.islink(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path, ignore_errors=True)
+            except Exception as e:
+                print(f"Failed to delete {item_path}: {e}")
+
+                    
+                    

@@ -135,7 +135,7 @@ def find_and_package_opt_arc_info_for_plotting(best_arc_df, monkey_information=N
             'monkey_x', 'monkey_y']].values
         monkey_angle = monkey_information.loc[arc_point_index,
                                               'monkey_angle'].values
-        center_x, center_y, arc_starting_angle, arc_ending_angle = opt_arc_utils.find_cartesian_arc_center_and_angle_for_opt_arc_to_arc_end(arc_end_xy, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
+        center_x, center_y, arc_starting_angle, arc_ending_angle = opt_arc_utils.find_cartesian_arc_center_and_angle_for_opt_arc_to_arc_end(arc_end_xy, arc_point_index, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
                                                                                                                                             arc_end_direction, whether_ff_behind=whether_ff_behind,
                                                                                                                                             ignore_error=ignore_error)
     elif mode == 'polar':

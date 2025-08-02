@@ -214,7 +214,7 @@ def _rebin_spike_data(concat_seg_data):
     # Clean column names
     rebinned_spike_data.columns.name = None
     rebinned_spike_data.columns = [
-        f'cluster_{i}' for i in range(rebinned_spike_data.shape[1])]
+        f'cluster_{i}' for i in clusters]
     rebinned_spike_data.reset_index(drop=False, inplace=True)
     return rebinned_spike_data
 

@@ -847,7 +847,7 @@ def find_ff_info_based_on_ref_point(ff_info, monkey_information, ff_real_positio
     elif ref_point_mode == 'time after cur ff visible':
         if point_index_cur_ff_first_seen is None:
             point_index_cur_ff_first_seen = ff_info['point_index_ff_first_seen'].values
-        all_time = monkey_information.loc[point_index_cur_ff_first_seen,
+        all_time = monkey_information.loc[point_index_cur_ff_first_seen.astype(int),
                                           'time'].values + ref_point_value
         new_point_index = monkey_information['point_index'].values[np.searchsorted(
             monkey_information['time'].values, all_time, side='right') - 1]

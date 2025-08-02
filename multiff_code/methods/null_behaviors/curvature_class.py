@@ -1,6 +1,6 @@
 
 from null_behaviors import find_best_arc, curvature_utils, curv_of_traj_utils
-
+from null_behaviors import find_best_arc, curv_of_traj_utils, opt_arc_utils
 
 import math
 import numpy as np
@@ -63,7 +63,8 @@ class CurvatureOfPath():
                                                     'monkey_angle'].values
         ff_distance = self.curvature_df.ff_distance.values
         ff_angle = self.curvature_df.ff_angle.values
+        arc_point_index = self.curvature_df.point_index.values
         whether_ff_behind = (np.abs(ff_angle) > math.pi/2)
-        self.center_x, self.center_y, self.arc_starting_angle, self.arc_ending_angle = opt_arc_utils.find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, monkey_xy, monkey_angles, ff_distance, ff_angle, self.all_arc_radius, np.sign(self.arc_end_angles),
+        self.center_x, self.center_y, self.arc_starting_angle, self.arc_ending_angle = opt_arc_utils.find_cartesian_arc_center_and_angle_for_opt_arc(arc_ff_xy, arc_point_index, monkey_xy, monkey_angles, ff_distance, ff_angle, self.all_arc_radius, np.sign(self.arc_end_angles),
                                                                                                                                                      whether_ff_behind=whether_ff_behind, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry,
                                                                                                                                                      ignore_error=ignore_error)

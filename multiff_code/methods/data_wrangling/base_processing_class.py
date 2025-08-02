@@ -106,7 +106,8 @@ class BaseProcessing:
         csv_name = df_name + '.csv'
         filepath = os.path.join(data_folder_name_for_retrieval, csv_name)
         if exists(filepath) & exists_ok:
-            df_of_interest = pd.read_csv(filepath).drop(["Unnamed: 0"], axis=1)
+            df_of_interest = pd.read_csv(filepath).drop(
+                columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
             print("Retrieved", df_name)
         else:
             df_of_interest = None
@@ -172,7 +173,7 @@ class BaseProcessing:
                             'closest_stop_to_capture_df.csv')
         if exists_ok & exists(path):
             self.closest_stop_to_capture_df = pd.read_csv(
-                path).drop(["Unnamed: 0"], axis=1)
+                path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         else:
             self.closest_stop_to_capture_df = nxt_ff_utils.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted,
                                                                                                      cur_ff_index_array=np.arange(len(self.ff_caught_T_sorted)))
@@ -228,7 +229,7 @@ class BaseProcessing:
                             'target_clust_last_vis_df.csv')
         if exists_ok & exists(path):
             self.target_clust_last_vis_df = pd.read_csv(
-                path).drop(["Unnamed: 0"], axis=1)
+                path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
             print("Retrieved target_clust_last_vis_df")
         else:
             self.target_clust_last_vis_df = cluster_analysis.get_target_clust_last_vis_df(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted,
@@ -242,7 +243,7 @@ class BaseProcessing:
                             'target_last_vis_df.csv')
         if exists_ok & exists(path):
             self.target_last_vis_df = pd.read_csv(
-                path).drop(["Unnamed: 0"], axis=1)
+                path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
             print("Retrieved target_last_vis_df")
         else:
             self.target_last_vis_df = cluster_analysis.get_target_last_vis_df(self.ff_dataframe, self.monkey_information,

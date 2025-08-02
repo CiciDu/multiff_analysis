@@ -44,7 +44,7 @@ class _FindCurVsNxtFF(base_processing_class.BaseProcessing):
     def retrieve_shared_stops_near_ff_df(self):
         try:
             self.shared_stops_near_ff_df = pd.read_csv(os.path.join(
-                self.planning_data_folder_path, 'shared_stops_near_ff_df.csv')).drop(["Unnamed: 0"], axis=1)
+                self.planning_data_folder_path, 'shared_stops_near_ff_df.csv')).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
             self.shared_stops_near_ff_df = find_cvn_utils.process_shared_stops_near_ff_df(
                 self.shared_stops_near_ff_df)
             print('Retrieving shared_stops_near_ff_df succeeded')

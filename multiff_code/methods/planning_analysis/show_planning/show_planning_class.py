@@ -111,7 +111,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             raise FileNotFoundError(
                 f'combd_heading_df_x_sessions ({df_name}) is not in the folder: ', path)
         else:
-            self.combd_heading_df_x_sessions = pd.read_csv(df_path)
+            self.combd_heading_df_x_sessions = pd.read_csv(df_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
             print('Successfully retrieved combd_heading_df_x_sessions from: ', df_path)
 
         self.combd_diff_in_curv_df = self.retrieve_combd_diff_in_curv_df(ref_point_mode, ref_point_value, test_or_control,
@@ -133,7 +133,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             raise FileNotFoundError(
                 f'combd_diff_in_curv_df ({df_name}) is not in the folder: ', folder_path)
         else:
-            self.combd_diff_in_curv_df = pd.read_csv(df_path)
+            self.combd_diff_in_curv_df = pd.read_csv(df_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
             print('Successfully retrieved combd_diff_in_curv_df from: ', df_path)
         return self.combd_diff_in_curv_df
 

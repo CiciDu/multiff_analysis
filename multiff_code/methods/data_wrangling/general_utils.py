@@ -426,3 +426,16 @@ def clean_float(val):
         val_str = f"{val:.10f}".rstrip('0').rstrip('.')  # Remove trailing zeros and dot
         return val_str.replace('.', 'p')
     return str(val)
+
+def check_for_high_correlations(df, threshold=0.9):
+    corr = df.corr()
+    # Mask upper triangle and diagonal
+    mask = np.tril(np.ones(corr.shape), k=-1).astype(bool)
+    corr_masked = corr.where(mask)
+
+    # Extract high correlations
+    high_corr_pairs = corr_masked.stack()
+    high_corr_pairs = high_corr_pairs[high_corr_pairs.abs() > threshold]
+
+    if len(high_corr_pairs) > 0:
+        print(high_corr_pairs)

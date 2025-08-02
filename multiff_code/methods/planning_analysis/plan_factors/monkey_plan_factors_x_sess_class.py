@@ -96,8 +96,8 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
 
         if exists_ok:
             if exists(combd_plan_x_tc_path) & exists(combd_plan_y_tc_path):
-                self.combd_plan_x_tc = pd.read_csv(combd_plan_x_tc_path)
-                self.combd_plan_y_tc = pd.read_csv(combd_plan_y_tc_path)
+                self.combd_plan_x_tc = pd.read_csv(combd_plan_x_tc_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+                self.combd_plan_y_tc = pd.read_csv(combd_plan_y_tc_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
                 return
             else:
                 print(

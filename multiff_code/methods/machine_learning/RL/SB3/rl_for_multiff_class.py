@@ -223,6 +223,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                         'rm -rf ' + self.processed_data_folder_path + '/*')
                     print('Removed all files in the folder:',
                           self.processed_data_folder_path)
+            # also remove all derived data
+            collect_agent_data_utils.remove_all_data_derived_from_current_agent_data(
+                self.processed_data_folder_path)
 
         self.n_steps = n_steps
 
@@ -260,9 +263,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.monkey_information_path = os.path.join(
             self.processed_data_folder_path, 'monkey_information.csv')
         self.monkey_information = pd.read_csv(
-            self.monkey_information_path).drop(["Unnamed: 0"], axis=1)
-        monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
-            monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+            self.monkey_information_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
+        self.monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
+            self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
 
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
@@ -293,7 +296,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.processed_data_folder_path, 'ff_dataframe.csv'))
 
         if exists_ok & exists(self.ff_dataframe_path):
-            self.ff_dataframe = pd.read_csv(self.ff_dataframe_path)
+            self.ff_dataframe = pd.read_csv(self.ff_dataframe_path).drop(
+                columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         else:
             print('Warnings: currently, only ff in obs at each step are used in ff_dataframe. All ff are labeled \'visible\' regardless of their actual time since last visible.')
             if self.sb3_or_lstm == 'lstm':
@@ -486,7 +490,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     def whether_to_update_record_and_make_plots(self):
 
         pattern_frequencies_record = pd.read_csv(
-            self.overall_folder + 'pattern_frequencies_record.csv').drop(["Unnamed: 0"], axis=1)
+            self.overall_folder + 'pattern_frequencies_record.csv').drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         self.current_info_condition_for_pattern_frequencies = self.get_current_info_condition(
             pattern_frequencies_record)
         to_update_record = len(
@@ -582,7 +586,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     def check_and_update_parameters_record(self):
         self.parameters_record = pd.read_csv(
-            self.overall_folder + 'parameters_record.csv').drop(["Unnamed: 0"], axis=1)
+            self.overall_folder + 'parameters_record.csv').drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         self.current_info_condition = self.get_current_info_condition(
             self.parameters_record)
         retrieved_current_info = self.parameters_record.loc[self.current_info_condition]

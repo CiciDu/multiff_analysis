@@ -36,7 +36,10 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
                                                 time_limit_to_count_sighting=2,
                                                 pre_event_window=0.25, post_event_window=0.75,
                                                 rebinned_max_x_lag_number=2,
-                                                latent_dimensionality=7, use_raw_spike_data_instead=False):
+                                                latent_dimensionality=7, 
+                                                use_raw_spike_data_instead=False,
+                                                use_lagged_raw_spike_data=False,
+                                                apply_pca_on_raw_spike_data=False):
 
         self.prepare_seg_aligned_data(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                                       time_limit_to_count_sighting=time_limit_to_count_sighting,
@@ -47,8 +50,8 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             latent_dimensionality=latent_dimensionality, exists_ok=False)
 
         self.get_concat_data_for_regression(use_raw_spike_data_instead=use_raw_spike_data_instead,
-                                            use_lagged_raw_spike_data=False,
-                                            apply_pca_on_raw_spike_data=True,
+                                            use_lagged_raw_spike_data=use_lagged_raw_spike_data,
+                                            apply_pca_on_raw_spike_data=apply_pca_on_raw_spike_data,
                                             num_pca_components=7,
                                             )
 
@@ -117,8 +120,8 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
         self.prepare_spikes_for_gpfa()
 
     def get_concat_data_for_regression(self, use_raw_spike_data_instead=False,
-                                       apply_pca_on_raw_spike_data=True,
-                                       use_lagged_raw_spike_data=True,
+                                       apply_pca_on_raw_spike_data=False,
+                                       use_lagged_raw_spike_data=False,
                                        use_lagged_rebinned_behav_data=False,
                                        num_pca_components=7):
         self.get_rebinned_behav_data(

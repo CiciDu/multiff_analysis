@@ -35,7 +35,7 @@ def retrieve_or_make_family_of_agents_log(overall_folder):
         print("No family_of_agents_log existed. Made new family_of_agents_log")
     else:
         family_of_agents_log = pd.read_csv(
-            filepath).drop(["Unnamed: 0"], axis=1)
+            filepath).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
     return family_of_agents_log
 
 

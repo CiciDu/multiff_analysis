@@ -299,7 +299,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         filepath = os.path.join(self.GUAT_folder_path, 'curv_of_traj_df.csv')
         if exists(filepath) & exists_ok:
             self.curv_of_traj_df = pd.read_csv(
-                filepath).drop(["Unnamed: 0"], axis=1)
+                filepath).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
             self.curv_of_traj_df = self.curv_of_traj_df[[
                 'point_index', 'curv_of_traj']]
             print('Retrieved curv_of_traj_df')

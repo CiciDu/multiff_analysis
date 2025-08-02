@@ -56,8 +56,8 @@ class TargetDecoderSegmentAlignedClass(target_decoder_class.TargetDecoderClass, 
     def get_concat_data_for_regression(self,
                                        use_lagged_rebinned_behav_data=False,
                                        use_raw_spike_data_instead=False,
-                                       apply_pca_on_raw_spike_data=True,
-                                       use_lagged_raw_spike_data=True):
+                                       apply_pca_on_raw_spike_data=False,
+                                       use_lagged_raw_spike_data=False):
         self.get_rebinned_behav_data(
             use_lagged_rebinned_behav_data=use_lagged_rebinned_behav_data)
         self._get_concat_data_for_regression(use_raw_spike_data_instead=use_raw_spike_data_instead,

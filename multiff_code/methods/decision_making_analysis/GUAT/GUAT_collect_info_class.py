@@ -82,7 +82,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         for df in df_names:
             if df != 'GUAT_w_ff_df':
                 setattr(self, df, pd.read_csv(os.path.join(
-                    self.GUAT_folder_path, df + '.csv')).drop(["Unnamed: 0"], axis=1))
+                    self.GUAT_folder_path, df + '.csv')).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore'))
             else:
                 setattr(self, df, pd.read_csv(os.path.join(self.GUAT_folder_path, df +
                         '.csv'), sep='\t', converters={'nearby_alive_ff_indices': pd.eval}))

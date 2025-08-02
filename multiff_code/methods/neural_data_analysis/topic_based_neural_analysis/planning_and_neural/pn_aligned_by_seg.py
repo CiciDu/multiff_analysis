@@ -37,8 +37,8 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
         self.prepare_spikes_for_gpfa(align_at_beginning=False)
 
     def get_concat_data_for_regression(self, use_raw_spike_data_instead=False,
-                                       apply_pca_on_raw_spike_data=True,
-                                       use_lagged_raw_spike_data=True,
+                                       apply_pca_on_raw_spike_data=False,
+                                       use_lagged_raw_spike_data=False,
                                        use_lagged_rebinned_behav_data=False,
                                        num_pca_components=7):
         self.get_rebinned_behav_data(
