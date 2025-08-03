@@ -176,10 +176,10 @@ def regress_by_variable_type_cv(
     return pd.DataFrame(results_summary)
 
 
-def make_barplot_to_compare_results(results_df, metric, features=None):
-    wide_df = convert_results_to_wide_df(results_df, index_columns=[
-                                         'Feature', 'Model', 'test_or_control'])
-    _make_barplot_to_compare_results(wide_df, metric, features)
+# def make_barplot_to_compare_results(results_df, metric, features=None):
+#     wide_df = convert_results_to_wide_df(results_df, index_columns=[
+#                                          'Feature', 'Model', 'test_or_control'])
+#     _make_barplot_to_compare_results(wide_df, metric, features)
 
 
 def convert_results_to_wide_df(results_df, index_columns=['Feature', 'Model']):
@@ -196,31 +196,75 @@ def convert_results_to_wide_df(results_df, index_columns=['Feature', 'Model']):
 
     return wide_df
 
+def _prepare_grouped_bar_data(results_df, metric, features=None):
+    """Extract matrix of mean metric values per feature per group."""
+    metric_df = results_df[results_df['Metric'] == metric].copy()
 
-def _make_barplot_to_compare_results(wide_df, metric, features=None, max_targets_per_plot=15):
-    """
-    Compare a metric (e.g. Accuracy_Mean) across test/control groups for each feature.
-    Uses vertical grid lines to separate each stack of bars clearly.
-    """
     if features is not None:
-        wide_df = wide_df[wide_df['Feature'].isin(features)]
+        metric_df = metric_df[metric_df['Feature'].isin(features)]
 
-    features = wide_df.groupby('Feature')[metric].max(
-    ).sort_values(ascending=False).index.values
-    groups = wide_df['test_or_control'].unique()
+    features = (
+        metric_df.groupby('Feature')['Mean']
+        .max()
+        .sort_values(ascending=False)
+        .index.values
+    )
+    groups = metric_df['test_or_control'].unique()
 
-    # Prepare data matrix
     data_dict = {}
     for feat in features:
         vals = []
         for group in groups:
-            val = wide_df.loc[
-                (wide_df['Feature'] == feat) & (
-                    wide_df['test_or_control'] == group),
-                metric
+            val = metric_df.loc[
+                (metric_df['Feature'] == feat) &
+                (metric_df['test_or_control'] == group),
+                'Mean'
             ]
             vals.append(val.values[0] if len(val) > 0 else np.nan)
         data_dict[feat] = vals
+
+    return features, groups, data_dict
+
+
+def _draw_grouped_barplot(chunk_targets, chunk_data, groups, metric, plot_title):
+    """Render a bar plot for a chunk of features."""
+    num_groups = len(groups)
+    bar_width = 0.25
+    group_spacing = 1.0
+    group_centers = np.arange(len(chunk_targets)) * group_spacing
+
+    fig, ax = plt.subplots(figsize=(max(8, len(chunk_targets) * 0.7), 6))
+
+    for i, group in enumerate(groups):
+        offsets = group_centers + (i - (num_groups - 1) / 2) * bar_width
+        ax.bar(offsets, chunk_data[:, i], width=bar_width, label=group, zorder=3)
+
+    for center in group_centers:
+        ax.axvline(center - group_spacing / 2, color='lightgray', linestyle='-', linewidth=1, zorder=1)
+    ax.axvline(group_centers[-1] + group_spacing / 2, color='lightgray', linestyle='-', linewidth=1, zorder=1)
+
+    if 'r2' in metric.lower():
+        ax.set_ylim(max(-2, np.nanmin(chunk_data)), 1)
+        ax.axhline(0, color='black', linewidth=0.6, alpha=0.8)
+        ax.axhline(0.1, color='gray', linestyle='--', linewidth=1)
+
+    ax.set_xticks(group_centers)
+    ax.set_xticklabels(chunk_targets, rotation=40, ha='right', fontsize=10)
+    ax.set_ylabel(f"{metric} (Mean)")
+    ax.set_title(plot_title)
+    ax.legend(title='test_or_control')
+    ax.yaxis.grid(True, linestyle='--', alpha=0.4)
+    ax.set_axisbelow(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def make_barplot_to_compare_results(results_df, metric, features=None, max_targets_per_plot=15):
+    """
+    Main wrapper function: Prepares data and calls plot renderer in chunks.
+    """
+    features, groups, data_dict = _prepare_grouped_bar_data(results_df, metric, features)
 
     num_targets = len(features)
     num_plots = math.ceil(num_targets / max_targets_per_plot)
@@ -231,45 +275,5 @@ def _make_barplot_to_compare_results(wide_df, metric, features=None, max_targets
         chunk_targets = features[start:end]
         chunk_data = np.array([data_dict[t] for t in chunk_targets])
 
-        num_groups = len(groups)
-        bar_width = 0.25
-        group_spacing = 1.0
-        group_centers = np.arange(len(chunk_targets)) * group_spacing
-
-        fig, ax = plt.subplots(figsize=(max(8, len(chunk_targets) * 0.7), 6))
-
-        # Plot bars
-        for i, group in enumerate(groups):
-            offsets = group_centers + (i - (num_groups - 1) / 2) * bar_width
-            ax.bar(offsets, chunk_data[:, i],
-                   width=bar_width, label=group, zorder=3)
-
-        # Add vertical lines between each stack of bars
-        for center in group_centers:
-            left = center - group_spacing / 2
-            right = center + group_spacing / 2
-            ax.axvline(left, color='lightgray',
-                       linestyle='-', linewidth=1, zorder=1)
-
-        # Optional: rightmost line
-        ax.axvline(group_centers[-1] + group_spacing / 2,
-                   color='lightgray', linestyle='-', linewidth=1, zorder=1)
-
-        # Special handling for r²
-        if 'r2' in metric.lower():
-            ax.set_ylim(max(-2, np.nanmin(chunk_data)), 1)
-            ax.axhline(0, color='black', linewidth=0.6, alpha=0.8)
-            ax.axhline(0.1, color='gray', linestyle='--', linewidth=1)
-
-        # X-axis labels
-        ax.set_xticks(group_centers)
-        ax.set_xticklabels(chunk_targets, rotation=40, ha='right', fontsize=10)
-
-        ax.set_ylabel(metric)
-        ax.set_title(f'Comparison of {metric} ({start + 1}–{end})')
-        ax.legend(title='test_or_control')
-        ax.yaxis.grid(True, linestyle='--', alpha=0.4)
-        ax.set_axisbelow(True)
-
-        plt.tight_layout()
-        plt.show()
+        title = f'Comparison of {metric} ({start + 1}–{end})'
+        _draw_grouped_barplot(chunk_targets, chunk_data, groups, metric, title)
