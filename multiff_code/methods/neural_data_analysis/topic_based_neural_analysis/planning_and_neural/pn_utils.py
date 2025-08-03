@@ -181,12 +181,12 @@ def rebin_spike_data(spikes_df, new_seg_info, bin_width=0.2):
         spikes_df, new_seg_info, bin_width=bin_width)
 
     # Convert binned spike data into wide-format matrix
-    rebinned_spike_data = _rebin_spike_data(concat_seg_data)
+    rebinned_spike_data = _rebin_spike_data(concat_seg_data, new_segments=new_seg_info['new_segment'].unique())
 
     return rebinned_spike_data
 
 
-def _rebin_spike_data(concat_seg_data):
+def _rebin_spike_data(concat_seg_data, new_segments=None):
     """
     Create a wide-format binned spike matrix with shape [segments × bins, clusters].
 
@@ -202,11 +202,12 @@ def _rebin_spike_data(concat_seg_data):
     )
 
     # Ensure all (segment, bin) combinations and all clusters are included
-    segments = concat_seg_data['new_segment'].unique()
+    if new_segments is None:
+        new_segments = concat_seg_data['new_segment'].unique()
     bins = np.arange(concat_seg_data['new_bin'].max() + 1)
     clusters = np.sort(concat_seg_data['cluster'].unique())
     full_index = pd.MultiIndex.from_product(
-        [segments, bins], names=['new_segment', 'new_bin'])
+        [new_segments, bins], names=['new_segment', 'new_bin'])
 
     rebinned_spike_data = rebinned_spike_data.reindex(
         index=full_index, columns=clusters, fill_value=0)

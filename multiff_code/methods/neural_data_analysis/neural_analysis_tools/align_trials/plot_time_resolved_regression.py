@@ -34,9 +34,10 @@ os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
 
 def plot_trial_counts_by_timepoint(time_resolved_cv_scores, trial_column='trial_count'):
     # make sure that y axis starts from 0
-    plt.plot(time_resolved_cv_scores['bin_mid_time'],
-             time_resolved_cv_scores[trial_column], color='black', marker='o')
-    plt.ylim(0, max(time_resolved_cv_scores[trial_column]) + 10)
+    trial_counts = time_resolved_cv_scores[['bin_mid_time', trial_column]].drop_duplicates().sort_values(by='bin_mid_time')
+    plt.plot(trial_counts['bin_mid_time'],
+             trial_counts[trial_column], color='black', marker='o')
+    plt.ylim(0, max(trial_counts[trial_column]) + 10)
     plt.xlabel("Time (s)")
     plt.ylabel("Trials with data")
     plt.title("Number of trials with data at each timepoint")
@@ -57,24 +58,34 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
     - features_not_to_plot: list of str, columns to exclude from plotting
     - score_threshold_to_plot: float or None, threshold to plot only behaviors with scores (for at least one timepoint) above this threshold
     """
+    
+    print('time_resolved_cv_scores.shape', time_resolved_cv_scores.shape)
+    time_resolved_cv_scores = time_resolved_cv_scores.groupby(['behavior', 'new_bin']).mean().reset_index(drop=False)
+    print('time_resolved_cv_scores.shape', time_resolved_cv_scores.shape)
+
+    behaviorals = time_resolved_cv_scores['behavior'].unique()
+    max_values_by_behavior = time_resolved_cv_scores.groupby('behavior').max()
+    
+    if score_threshold_to_plot is not None:
+        good_behaviors = max_values_by_behavior['r2'] >= score_threshold_to_plot
+        behaviorals = max_values_by_behavior[good_behaviors].index.values
 
     if rank_by_max_score:
-        ranked_columns = time_resolved_cv_scores.max().sort_values(ascending=False)
-        time_resolved_cv_scores = time_resolved_cv_scores[ranked_columns.index]
-
-    if score_threshold_to_plot is not None:
-        columns_to_plot = time_resolved_cv_scores.columns[time_resolved_cv_scores.max(
-        ) > score_threshold_to_plot]
-        time_resolved_cv_scores = time_resolved_cv_scores[columns_to_plot]
-
+        behaviorals = max_values_by_behavior.loc[behaviorals].sort_values(by='r2', ascending=False).index.tolist()
+    else:
+        behaviorals = list(behaviorals)
+    
     n_behaviors_per_plot = 4
+    xticks = None
     xtick_labels = None
 
     if show_counts_on_xticks:
+        unique_bins = time_resolved_cv_scores[['bin_mid_time', 'trial_count']].drop_duplicates().sort_values('bin_mid_time')
+        xticks = unique_bins['bin_mid_time']
         xtick_labels = [
             f"{row.bin_mid_time:.2f}\n({int(row.trial_count)})" if not np.isnan(row.trial_count)
             else f"{row.bin_mid_time:.2f}\n(n/a)"
-            for row in time_resolved_cv_scores.itertuples()
+            for row in unique_bins.itertuples()
         ]
 
     def finalize_plot():
@@ -87,7 +98,7 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
         plt.legend(fontsize=10, loc='lower left')
         plt.grid(True)
         if xtick_labels is not None:
-            plt.xticks(time_resolved_cv_scores['bin_mid_time'],
+            plt.xticks(xticks,
                        xtick_labels, ha='right', rotation=0)
         if event_time is not None:
             plt.axvline(event_time, color='red', linestyle='--')
@@ -102,9 +113,7 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
 
     if features_to_plot is None:
         features_to_plot = [
-            col for col in time_resolved_cv_scores.columns if col not in features_not_to_plot]
-    else:
-        features_to_plot = set(features_to_plot)
+            feat for feat in behaviorals if feat not in features_not_to_plot]
 
     any_plots = False
     for b, behavior in enumerate(features_to_plot):
@@ -114,8 +123,8 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
             plt.figure(figsize=(8, 4))
             any_plots = True
 
-        plt.plot(time_resolved_cv_scores['bin_mid_time'],
-                 time_resolved_cv_scores[behavior], label=behavior)
+        df_b = time_resolved_cv_scores[time_resolved_cv_scores['behavior'] == behavior]
+        plt.plot(df_b['bin_mid_time'], df_b['r2'], label=behavior)
 
     if any_plots:
         finalize_plot()

@@ -61,7 +61,7 @@ class GPFAHelperClass():
             self.spike_segs_df['t_duration']) + 1e-6  # originally added bin_width
 
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
-            self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
+            self.spike_segs_df, new_seg_info['new_segment'].unique(), common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
 
     def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True, file_name=None):
         """
@@ -214,8 +214,8 @@ class GPFAHelperClass():
             self.concat_neural_trials[['new_segment', 'new_bin']])
 
         # check for NA
-        general_utils.check_na_in_df(self.concat_neural_trials)
-        general_utils.check_na_in_df(self.concat_behav_trials)
+        general_utils.check_na_in_df(self.concat_neural_trials, df_name='concat_neural_trials')
+        general_utils.check_na_in_df(self.concat_behav_trials, df_name='concat_behav_trials')
 
     def print_data_dimensions(self):
         print("\n=== Data Dimensions Summary ===")
@@ -257,17 +257,15 @@ class GPFAHelperClass():
             warnings.filterwarnings(
                 'ignore', category=DeprecationWarning)
 
-            all_scores_df = time_resolved_regression.time_resolved_gpfa_regression_cv(
+            self.time_resolved_cv_scores_gpfa = time_resolved_gpfa_regression.time_resolved_gpfa_regression_cv(
                 self.concat_behav_trials, self.spiketrains, self.spiketrain_corr_segs, bin_bounds, self.bin_width_w_unit,
-                cv_folds=cv_folds, n_jobs=-1, latent_dimensionality=latent_dimensionality
+                cv_folds=cv_folds, n_jobs=-1, latent_dimensionality=latent_dimensionality,
             )
-
-        time_resolved_cv_scores_gpfa = all_scores_df.groupby(
-            ['new_bin']).mean().reset_index(drop=False)
-        time_resolved_cv_scores_gpfa['bin_mid_time'] = time_resolved_cv_scores_gpfa['new_bin'] * \
+        
+        self.time_resolved_cv_scores_gpfa['bin_mid_time'] = self.time_resolved_cv_scores_gpfa['new_bin'] * \
             self.bin_width + self.new_bin_start_time + self.bin_width/2
-        self.time_resolved_cv_scores_gpfa = time_resolved_cv_scores_gpfa.drop(
-            columns='fold')
+            
+        self.time_resolved_cv_scores_gpfa['trial_count'] = self.time_resolved_cv_scores_gpfa['train_trial_count']
 
     def _get_time_resolved_cv_scores_file_path(self, folder_name, file_name, cv_folds=5, latent_dimensionality=7):
         if file_name is None:
@@ -334,6 +332,7 @@ class GPFAHelperClass():
 
         self.make_time_resolved_cv_scores_gpfa(
             cv_folds=cv_folds, latent_dimensionality=latent_dimensionality)
+        
         self.time_resolved_cv_scores_gpfa.to_csv(time_resolved_cv_scores_path)
         print(
             f'Saved time_resolved_cv_scores_gpfa to {time_resolved_cv_scores_path}')

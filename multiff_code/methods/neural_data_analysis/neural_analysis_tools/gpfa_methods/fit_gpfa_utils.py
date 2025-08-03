@@ -32,55 +32,98 @@ def make_spike_segs_df(spikes_df, new_seg_info):
     return spike_segs_df
 
 
-def turn_spike_segs_df_into_spiketrains(spike_segs_df, common_t_stop, align_at_beginning=False):
+def turn_spike_segs_df_into_spiketrains(
+    spike_segs_df,
+    new_segments,
+    common_t_stop,
+    align_at_beginning=False
+):
+    """
+    Convert a spike segments DataFrame into Neo SpikeTrain objects per segment and cluster.
+
+    Parameters:
+    - spike_segs_df (pd.DataFrame): Must include columns ['cluster', 'time', 'new_segment',
+      'new_seg_start_time', 'new_seg_duration'].
+    - new_segments (iterable): Ordered list of segment identifiers to convert.
+    - common_t_stop (float): Duration (in seconds) to which all SpikeTrains should be aligned.
+    - align_at_beginning (bool): If True, aligns all spike times to the start of segment.
+      If False, applies padding at the beginning to align to the end.
+
+    Returns:
+    - spiketrains (list of list of neo.SpikeTrain): Outer list over segments, inner list over clusters.
+    - processed_segments (np.ndarray): List of segment IDs corresponding to spiketrains.
+    """
+    import numpy as np
     import neo
     import quantities as pq
+    import warnings
 
     spiketrains = []
-    spiketrain_corr_segs = []
+    processed_segments = []
 
-    # Get full list of clusters (sorted for consistent ordering)
+    # Sorted list of clusters ensures consistent ordering
     all_clusters = np.sort(spike_segs_df['cluster'].unique())
 
-    # Group once by segment
-    segment_groups = spike_segs_df.groupby('new_segment')
-
     num_padding_applied_segs = 0
-    for seg, seg_df in segment_groups:
+
+    for seg in new_segments:
+        seg_df = spike_segs_df[spike_segs_df['new_segment'] == seg]
+
+        seg_spiketrain = []
+
+        if len(seg_df) == 0:
+            # No spikes for this segment; insert empty SpikeTrains per cluster
+            empty_spiketrain = neo.SpikeTrain(
+                times=np.array([]) * pq.s,
+                t_start=0 * pq.s,
+                t_stop=common_t_stop * pq.s
+            )
+            for _ in all_clusters:
+                seg_spiketrain.append(empty_spiketrain)
+
+            spiketrains.append(seg_spiketrain)
+            processed_segments.append(seg)
+            continue
+
         seg_start_time = seg_df.new_seg_start_time.iloc[0]
         seg_duration = seg_df.new_seg_duration.iloc[0]
-        padding_at_beginning = 0 if align_at_beginning else (
-            common_t_stop - seg_duration)
+        padding_at_beginning = 0 if align_at_beginning else (common_t_stop - seg_duration)
+
+        if padding_at_beginning < 0:
+            raise ValueError(
+                f"Segment '{seg}' duration ({seg_duration}) exceeds common_t_stop ({common_t_stop})."
+            )
+
         if padding_at_beginning > 1e-5:
             num_padding_applied_segs += 1
 
-        # Group cluster data within this segment
-        cluster_groups = dict(tuple(seg_df.groupby('cluster')))
+        # Group spikes by cluster
+        cluster_groups = {k: v for k, v in seg_df.groupby('cluster')}
 
-        seg_spiketrain = []
         for cluster in all_clusters:
             if cluster in cluster_groups:
                 cluster_df = cluster_groups[cluster]
-                spike_time = cluster_df.time.values - seg_start_time + padding_at_beginning
+                spike_times = cluster_df.time.values - seg_start_time + padding_at_beginning
             else:
-                spike_time = np.array([])
+                spike_times = np.array([])
 
             spiketrain = neo.SpikeTrain(
-                times=spike_time * pq.s,
-                t_start=0,
+                times=spike_times * pq.s,
+                t_start=0 * pq.s,
                 t_stop=common_t_stop * pq.s
             )
             seg_spiketrain.append(spiketrain)
 
         spiketrains.append(seg_spiketrain)
-        spiketrain_corr_segs.append(seg)
+        processed_segments.append(seg)
 
     if num_padding_applied_segs > 0:
         pad_pos = 'beginning' if align_at_beginning else 'end'
-        print(
-            f'number of segments with padding at the {pad_pos} when calling turn_spike_segs_df_into_spiketrains: {num_padding_applied_segs}')
+        warnings.warn(
+            f"{num_padding_applied_segs} segment(s) had padding at the {pad_pos} to match common_t_stop = {common_t_stop}s."
+        )
 
-    return spiketrains, np.array(spiketrain_corr_segs)
+    return spiketrains, np.array(processed_segments)
 
 
 def assign_new_bin_aligned_at_end(df, new_segment_column='new_segment'):

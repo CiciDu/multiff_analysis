@@ -1,102 +1,85 @@
-from sklearn.metrics import r2_score
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import KFold
-from sklearn.pipeline import make_pipeline
-from contextlib import contextmanager
-import joblib
-from tqdm import tqdm
-from joblib import Parallel, delayed
+import os
 import sys
-from data_wrangling import process_monkey_information, specific_utils, further_processing_class, specific_utils, general_utils
+import math
+import numpy as np
+import pandas as pd
+import logging
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.metrics import r2_score
+from sklearn.linear_model import RidgeCV
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
+from joblib import Parallel, delayed
+
+from elephant.gpfa import GPFA
+
+from neural_data_analysis.neural_analysis_tools.gpfa_methods import fit_gpfa_utils
+from data_wrangling import process_monkey_information, specific_utils, further_processing_class, general_utils
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
+from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, cluster_analysis, organize_patterns_and_features, category_class
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from null_behaviors import curvature_utils, curv_of_traj_utils
-from neural_data_analysis.neural_analysis_tools.gpfa_methods import elephant_utils, fit_gpfa_utils
-import warnings
-import os
-import sys
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-import pandas as pd
-import math
-import seaborn as sns
-import colorcet
-import logging
-from matplotlib import rc
-from os.path import exists
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from elephant.gpfa import GPFA
-import numpy as np
-from sklearn.linear_model import RidgeCV
-from sklearn.model_selection import KFold, cross_val_score
-from sklearn.preprocessing import StandardScaler
 
 os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
+logging.basicConfig(level=logging.INFO)
 
-
-# ================================
-# ================================
-# fit gpfa on train set and test on test set
 
 def time_resolved_gpfa_regression_cv(
     concat_behav_trials, spiketrains, spiketrain_corr_segs, bin_bounds, bin_width_w_unit,
-    cv_folds=5, n_jobs=-1, latent_dimensionality=7
+    cv_folds=5, n_jobs=-1, latent_dimensionality=7, alphas = np.logspace(-4, 4, 9)
 ):
     all_segments = list(concat_behav_trials['new_segment'].unique())
     splitter = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
 
     all_scores = []
+
     for fold_idx, (train_idx, test_idx) in enumerate(splitter.split(all_segments)):
         train_segments = [all_segments[i] for i in train_idx]
         test_segments = [all_segments[i] for i in test_idx]
 
-        print(
-            f"Fold {fold_idx + 1} | Train segments: {len(train_segments)} | Test segments: {len(test_segments)}")
+        logging.info(
+            f"Fold {fold_idx + 1} | Train segments: {len(train_segments)} | Test segments: {len(test_segments)}"
+        )
 
-        # GPFA step
-        gpfa_train, gpfa_test= fit_gpfa(train_segments, test_segments, spiketrains,
-                        spiketrain_corr_segs, bin_bounds, latent_dimensionality, bin_width_w_unit)
-        
-        # Prepare behavior data subsets
-        behav_train = concat_behav_trials[concat_behav_trials['new_segment'].isin(
-            train_segments)].reset_index(drop=True)
-        behav_test = concat_behav_trials[concat_behav_trials['new_segment'].isin(
-            test_segments)].reset_index(drop=True)
+        gpfa_train, gpfa_test = fit_gpfa(
+            train_segments, test_segments, spiketrains,
+            spiketrain_corr_segs, bin_bounds, latent_dimensionality, bin_width_w_unit
+        )
 
-        assert np.all(gpfa_train[['new_segment', 'new_bin']].values == behav_train[['new_segment', 'new_bin']].values)
-        assert np.all(gpfa_test[['new_segment', 'new_bin']].values == behav_test[['new_segment', 'new_bin']].values)
- 
+        behav_train = concat_behav_trials.loc[concat_behav_trials['new_segment'].isin(train_segments)].reset_index(drop=True)
+        behav_test = concat_behav_trials.loc[concat_behav_trials['new_segment'].isin(test_segments)].reset_index(drop=True)
+
+        # Check row alignment
+        if not gpfa_train[['new_segment', 'new_bin']].equals(behav_train[['new_segment', 'new_bin']]):
+            raise ValueError("GPFA train and behavior train are misaligned.")
+        if not gpfa_test[['new_segment', 'new_bin']].equals(behav_test[['new_segment', 'new_bin']]):
+            raise ValueError("GPFA test and behavior test are misaligned.")
+
         gpfa_train = gpfa_train.drop(columns=['new_segment', 'new_bin']).reset_index(drop=True)
         gpfa_test = gpfa_test.drop(columns=['new_segment', 'new_bin']).reset_index(drop=True)
 
         scores_df = run_time_resolved_regression_train_test(
             gpfa_train, behav_train,
             gpfa_test, behav_test,
-            n_jobs=n_jobs
+            n_jobs=n_jobs, alphas=alphas
         )
-
         scores_df['fold'] = fold_idx
         all_scores.append(scores_df)
 
-    all_scores_df = pd.concat(all_scores, ignore_index=True)
-
-    return all_scores_df
+    return pd.concat(all_scores, ignore_index=True)
 
 
 def fit_gpfa(train_segments, test_segments, spiketrains, spiketrain_corr_segs, bin_bounds, latent_dimensionality, bin_width_w_unit):
     """
-    Fit GPFA model on training segments, transform test segments,
-    and prepare concatenated data for regression.
+    Fit GPFA model on training segments and transform both train and test data.
     """
-    gpfa = GPFA(x_dim=latent_dimensionality,
-                bin_size=bin_width_w_unit, verbose=False)
-    train_trajectories = gpfa.fit_transform(
-        [spiketrains[seg] for seg in train_segments])
-    test_trajectories = gpfa.transform(
-        [spiketrains[seg] for seg in test_segments])
+    gpfa = GPFA(x_dim=latent_dimensionality, bin_size=bin_width_w_unit, verbose=False)
+    train_trajectories = gpfa.fit_transform([spiketrains[seg] for seg in train_segments])
+    test_trajectories = gpfa.transform([spiketrains[seg] for seg in test_segments])
 
     gpfa_train = fit_gpfa_utils._get_concat_gpfa_data(
         train_trajectories, spiketrain_corr_segs[train_segments], bin_bounds,
@@ -111,62 +94,63 @@ def fit_gpfa(train_segments, test_segments, spiketrains, spiketrain_corr_segs, b
 
 
 def run_time_resolved_regression_train_test(
-    neural_train, behav_train, neural_test, behav_test, n_jobs=-1
+    neural_train, behav_train, neural_test, behav_test, alphas = np.logspace(-6, 6, 13), n_jobs=-1
 ):
     """
-    Train time-resolved Ridge regression models on train set and evaluate on test set,
-    selecting the best alpha per time bin via cross-validation on the train set.
-
-    Args:
-        neural_train, behav_train: training data (dataframes)
-        neural_test, behav_test: test data (dataframes)
-        alphas: list or array of alpha values to try. If None, use default.
-        n_jobs: parallel jobs
+    Perform ridge regression at each time bin to predict behavioral variables from GPFA neural data.
+    
+    Parameters:
+        - neural_train/test: DataFrames with latent neural trajectories
+        - behav_train/test: DataFrames with behavioral variables
+        - global_alphas, per_fold_alphas: Optional dictionaries of pre-selected alphas
+        - n_jobs: parallel workers
 
     Returns:
-        DataFrame with R² scores per behavioral variable, new_bin, and selected alpha.
+        - DataFrame with R² scores and best alphas per behavior per time bin
     """
     behavior_cols = behav_train.select_dtypes(include=[float, int]).columns
 
     def fit_and_score_bin(new_bin):
-        try:
-            train_mask = behav_train['new_bin'] == new_bin
-            test_mask = behav_test['new_bin'] == new_bin
-            X_train = neural_train[train_mask].select_dtypes(include=[float, int]).values
-            X_test = neural_test[test_mask].select_dtypes(include=[float, int]).values
-            Y_train = behav_train[train_mask]
-            Y_test = behav_test[test_mask][behavior_cols].values
-        except KeyError:
-            return None
+        train_mask = behav_train['new_bin'] == new_bin
+        test_mask = behav_test['new_bin'] == new_bin
+
+        X_train = neural_train.loc[train_mask].select_dtypes(include=[float, int]).values
+        X_test = neural_test.loc[test_mask].select_dtypes(include=[float, int]).values
+        Y_train_all = behav_train.loc[train_mask, behavior_cols].values
+        Y_test_all = behav_test.loc[test_mask, behavior_cols].values
 
         if len(X_train) < 2 or len(X_test) < 1:
             return None
 
+        n_behaviors = Y_train_all.shape[1]
+        r2s = np.full(n_behaviors, np.nan)
+        all_best_alphas = np.full(n_behaviors, np.nan)
 
-        # model = make_pipeline(StandardScaler(), Ridge(alpha=0.1))
-        alphas = np.logspace(-6, 6, 13)
-        model = make_pipeline(StandardScaler(),RidgeCV(alphas=alphas, scoring='r2', cv=3, n_jobs=n_jobs))
-        
-        model.fit(X_train, Y_train)
-        # best_alpha = model.alpha_
+        for b in range(n_behaviors):
+            Y_train = Y_train_all[:, b]
+            Y_test = Y_test_all[:, b]
 
-        Y_pred = model.predict(X_test)
-        scores = [r2_score(Y_test[:, i], Y_pred[:, i])
-                  for i in range(Y_test.shape[1])]
+            ridge_cv = RidgeCV(alphas=alphas, scoring='r2', cv=3)
+            model = make_pipeline(StandardScaler(), ridge_cv)
+            model.fit(X_train, Y_train)
 
-        row = dict(zip(behavior_cols, scores))
-        row['new_bin'] = new_bin
-        row['train_trial_count'] = len(X_train)
-        row['test_trial_count'] = len(X_test)
-        # row['best_alpha'] = best_alpha
-        return row
-    
+            best_alpha = model.named_steps['ridgecv'].alpha_
+            Y_pred = model.predict(X_test)
+
+            r2s[b] = r2_score(Y_test, Y_pred)
+            all_best_alphas[b] = best_alpha
+
+        return pd.DataFrame({
+            'behavior': behavior_cols,
+            'r2': r2s,
+            'best_alpha': all_best_alphas,
+            'new_bin': new_bin,
+            'train_trial_count': len(X_train),
+            'test_trial_count': len(X_test)
+        })
+
     new_bins = behav_train['new_bin'].unique()
-
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(fit_and_score_bin)(nb) for nb in new_bins
-    )
+    results = Parallel(n_jobs=n_jobs)(delayed(fit_and_score_bin)(nb) for nb in new_bins)
     results = [r for r in results if r is not None]
 
-    return pd.DataFrame(results)
-
+    return pd.concat(results, ignore_index=True)
