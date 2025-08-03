@@ -252,9 +252,10 @@ def run_time_resolved_regression_train_test(
         if len(X_train) < 2 or len(X_test) < 1:
             return None
 
-        # model = RidgeCV(alphas=alphas, scoring='r2', cv=3, n_jobs=n_jobs)
-        # model = Ridge(alpha=0.1)
-        model = make_pipeline(StandardScaler(), Ridge(alpha=0.1))
+
+        # model = make_pipeline(StandardScaler(), Ridge(alpha=0.1))
+        alphas = np.logspace(-6, 6, 13)
+        model = make_pipeline(StandardScaler(),RidgeCV(alphas=alphas, scoring='r2', cv=3, n_jobs=n_jobs)))
         
         model.fit(X_train, Y_train)
         # best_alpha = model.alpha_

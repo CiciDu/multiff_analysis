@@ -1,11 +1,11 @@
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result, tuning_curve, raster_plot
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result, find_tuning_curves, raster_plot
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def prepare_trial_aligned_tuning_curve_data(aligned_spike_trains):
+def prepare_trial_aligned_tuning_curves_data(aligned_spike_trains):
     aligned_spike_trains = raster_plot.add_relative_times(
         aligned_spike_trains, reference_time_col='new_seg_start_time')
     return aligned_spike_trains
@@ -143,7 +143,8 @@ def plot_avg_firing(
                 for pos in event_x_position:
                     ax.axvline(x=pos, color='red', linestyle='--', alpha=0.7)
             else:
-                ax.axvline(x=event_x_position, color='red', linestyle='--', alpha=0.7)
+                ax.axvline(x=event_x_position, color='red',
+                           linestyle='--', alpha=0.7)
 
         ax.legend(
             title="Clusters",
@@ -210,6 +211,7 @@ def trial_averaged_time_normalized_firing(
     if rescale_avg_firing_rate:
         avg_firing_df = scale_firing_rates(avg_firing_df)
 
-    plot_avg_firing(avg_firing_df, clusters_per_fig=clusters_per_fig, event_x_position=event_x_position, show_se=show_se)
+    plot_avg_firing(avg_firing_df, clusters_per_fig=clusters_per_fig,
+                    event_x_position=event_x_position, show_se=show_se)
 
     return firing_df, avg_firing_df

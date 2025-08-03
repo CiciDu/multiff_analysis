@@ -1,4 +1,4 @@
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result, tuning_curve, raster_plot, trial_aligned_tuning_curve
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result, find_tuning_curves, raster_plot, trial_aligned_tuning_curves
 
 
 import numpy as np
@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ttest_rel, wilcoxon
 from statsmodels.stats.multitest import multipletests
+
 
 def compare_baseline_vs_post_event_from_spikes(
     spike_df,
@@ -80,9 +81,11 @@ def compare_baseline_vs_post_event_from_spikes(
             'n_trials': len(common_trials)
         })
 
-    result_df = pd.DataFrame(results).sort_values('p_value').reset_index(drop=True)
+    result_df = pd.DataFrame(results).sort_values(
+        'p_value').reset_index(drop=True)
     if use_multipletests:
-        result_df = _correct_p_values(result_df, alpha=alpha, method=correction_method)
+        result_df = _correct_p_values(
+            result_df, alpha=alpha, method=correction_method)
 
     return result_df
 
@@ -93,7 +96,8 @@ def _correct_p_values(result_df, alpha=0.05, method='fdr_bh'):
     corrected = np.full(len(result_df), np.nan)  # fill with NaNs
     significant = np.full(len(result_df), np.nan)
     if valid_mask.sum() > 0:
-        reject, p_corr, _, _ = multipletests(result_df.loc[valid_mask, 'p_value'], alpha=alpha, method=method)
+        reject, p_corr, _, _ = multipletests(
+            result_df.loc[valid_mask, 'p_value'], alpha=alpha, method=method)
         corrected[valid_mask] = p_corr
         significant[valid_mask] = reject
     result_df['p_corrected'] = corrected

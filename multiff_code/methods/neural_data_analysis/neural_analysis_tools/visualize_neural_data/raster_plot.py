@@ -43,7 +43,7 @@ def prepare_aligned_spike_trains(new_seg_info, spikes_df):
     new_seg_info = new_seg_info.dropna(
         subset=['new_seg_start_time', 'new_seg_end_time']).reset_index(drop=True)
     print(f'Dropped {original_len - len(new_seg_info)} rows out of {original_len} due to NA in new_seg_start_time or new_seg_end_time, '
-          f'which is {original_len - len(new_seg_info)/original_len*100:.2f}% of the original data')
+          f'which is {(original_len - len(new_seg_info))/original_len*100:.2f}% of the original data')
 
     # needs to update new_seg_duration in case of new_seg_start_time and new_seg_end_time have been changed
     new_seg_info['new_seg_duration'] = new_seg_info['new_seg_end_time'] - \
