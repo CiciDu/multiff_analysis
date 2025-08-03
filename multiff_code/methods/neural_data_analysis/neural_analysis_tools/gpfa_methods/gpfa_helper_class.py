@@ -7,7 +7,7 @@ from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral impor
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from null_behaviors import curvature_utils, curv_of_traj_utils
 from neural_data_analysis.neural_analysis_tools.gpfa_methods import elephant_utils, fit_gpfa_utils, plot_gpfa_utils
-from neural_data_analysis.neural_analysis_tools.align_trials import time_resolved_regression, plot_time_resolved_regression, align_trial_utils
+from neural_data_analysis.neural_analysis_tools.align_trials import time_resolved_regression, time_resolved_gpfa_regression, plot_time_resolved_regression, align_trial_utils
 import warnings
 import os
 import sys
@@ -49,18 +49,19 @@ class GPFAHelperClass():
             spikes_df, new_seg_info)
 
         # Perform rank check on spike count data (neurons × trials) and identify redundant neurons to drop
-        self.get_concat_data_for_regression(use_raw_spike_data_instead=True) 
+        self.get_concat_data_for_regression(use_raw_spike_data_instead=True)
         if len(self.dropped_neurons) > 0:
-            extracted_numbers = [int(col.split('_')[-1]) for col in self.dropped_neurons]
-            self.spike_segs_df = self.spike_segs_df[~self.spike_segs_df['cluster'].isin(extracted_numbers)]  
-            
+            extracted_numbers = [int(col.split('_')[-1])
+                                 for col in self.dropped_neurons]
+            self.spike_segs_df = self.spike_segs_df[~self.spike_segs_df['cluster'].isin(
+                extracted_numbers)]
+
         # add a small value to common t stop
         self.common_t_stop = max(
             self.spike_segs_df['t_duration']) + 1e-6  # originally added bin_width
 
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
-
 
     def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True, file_name=None):
         """
@@ -139,7 +140,7 @@ class GPFAHelperClass():
         # make sure that x_var_df has the same new_segment and new_bin as rebinned_behav_data
         x_var_df = x_var_df.merge(
             self.rebinned_behav_data[['new_segment', 'new_bin']], on=['new_segment', 'new_bin'], how='right')
-        
+
         if apply_pca_on_raw_spike_data:
             pca = PCA(n_components=num_pca_components)
             x_var_df.drop(columns=['new_segment', 'new_bin'],
@@ -151,8 +152,8 @@ class GPFAHelperClass():
             x_var_df['new_bin'] = self.rebinned_behav_data['new_bin'].values
             self.concat_raw_spike_data = x_var_df
         else:
-            self.concat_raw_spike_data, self.dropped_neurons = align_trial_utils.drop_redundant_neurons_from_concat_raw_spike_data(x_var_df)
-
+            self.concat_raw_spike_data, self.dropped_neurons = align_trial_utils.drop_redundant_neurons_from_concat_raw_spike_data(
+                x_var_df)
 
     def get_concat_gpfa_data(self, new_segments_for_gpfa=None):
         self.apply_pca_on_raw_spike_data = False

@@ -10,7 +10,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
 from neural_data_analysis.neural_analysis_tools.gpfa_methods import elephant_utils, fit_gpfa_utils, plot_gpfa_utils, gpfa_helper_class
-from neural_data_analysis.neural_analysis_tools.align_trials import time_resolved_regression, plot_time_resolved_regression
+from neural_data_analysis.neural_analysis_tools.align_trials import time_resolved_regression, time_resolved_gpfa_regression, plot_time_resolved_regression
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 import numpy as np
 import pandas as pd
@@ -36,7 +36,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
                                                 time_limit_to_count_sighting=2,
                                                 pre_event_window=0.25, post_event_window=0.75,
                                                 rebinned_max_x_lag_number=2,
-                                                latent_dimensionality=7, 
+                                                latent_dimensionality=7,
                                                 use_raw_spike_data_instead=False,
                                                 use_lagged_raw_spike_data=False,
                                                 apply_pca_on_raw_spike_data=False):
