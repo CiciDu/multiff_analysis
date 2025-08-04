@@ -176,12 +176,6 @@ def regress_by_variable_type_cv(
     return pd.DataFrame(results_summary)
 
 
-# def make_barplot_to_compare_results(results_df, metric, features=None):
-#     wide_df = convert_results_to_wide_df(results_df, index_columns=[
-#                                          'Feature', 'Model', 'test_or_control'])
-#     _make_barplot_to_compare_results(wide_df, metric, features)
-
-
 def convert_results_to_wide_df(results_df, index_columns=['Feature', 'Model']):
     wide_df = (
         results_df

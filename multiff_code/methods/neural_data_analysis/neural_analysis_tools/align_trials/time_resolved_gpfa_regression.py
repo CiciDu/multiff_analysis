@@ -1,3 +1,5 @@
+# gpfa new
+
 import os
 import sys
 import math
@@ -30,7 +32,7 @@ logging.basicConfig(level=logging.INFO)
 
 def time_resolved_gpfa_regression_cv(
     concat_behav_trials, spiketrains, spiketrain_corr_segs, bin_bounds, bin_width_w_unit,
-    cv_folds=5, n_jobs=-1, latent_dimensionality=7, alphas = np.logspace(-4, 4, 9)
+    cv_folds=5, n_jobs=-1, latent_dimensionality=7, alphas=np.logspace(-6, 6, 13)
 ):
     all_segments = list(concat_behav_trials['new_segment'].unique())
     splitter = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
@@ -50,8 +52,10 @@ def time_resolved_gpfa_regression_cv(
             spiketrain_corr_segs, bin_bounds, latent_dimensionality, bin_width_w_unit
         )
 
-        behav_train = concat_behav_trials.loc[concat_behav_trials['new_segment'].isin(train_segments)].reset_index(drop=True)
-        behav_test = concat_behav_trials.loc[concat_behav_trials['new_segment'].isin(test_segments)].reset_index(drop=True)
+        behav_train = concat_behav_trials.loc[concat_behav_trials['new_segment'].isin(
+            train_segments)].reset_index(drop=True)
+        behav_test = concat_behav_trials.loc[concat_behav_trials['new_segment'].isin(
+            test_segments)].reset_index(drop=True)
 
         # Check row alignment
         if not gpfa_train[['new_segment', 'new_bin']].equals(behav_train[['new_segment', 'new_bin']]):
@@ -59,8 +63,10 @@ def time_resolved_gpfa_regression_cv(
         if not gpfa_test[['new_segment', 'new_bin']].equals(behav_test[['new_segment', 'new_bin']]):
             raise ValueError("GPFA test and behavior test are misaligned.")
 
-        gpfa_train = gpfa_train.drop(columns=['new_segment', 'new_bin']).reset_index(drop=True)
-        gpfa_test = gpfa_test.drop(columns=['new_segment', 'new_bin']).reset_index(drop=True)
+        gpfa_train = gpfa_train.drop(
+            columns=['new_segment', 'new_bin']).reset_index(drop=True)
+        gpfa_test = gpfa_test.drop(
+            columns=['new_segment', 'new_bin']).reset_index(drop=True)
 
         scores_df = run_time_resolved_regression_train_test(
             gpfa_train, behav_train,
@@ -77,9 +83,12 @@ def fit_gpfa(train_segments, test_segments, spiketrains, spiketrain_corr_segs, b
     """
     Fit GPFA model on training segments and transform both train and test data.
     """
-    gpfa = GPFA(x_dim=latent_dimensionality, bin_size=bin_width_w_unit, verbose=False)
-    train_trajectories = gpfa.fit_transform([spiketrains[seg] for seg in train_segments])
-    test_trajectories = gpfa.transform([spiketrains[seg] for seg in test_segments])
+    gpfa = GPFA(x_dim=latent_dimensionality,
+                bin_size=bin_width_w_unit, verbose=False)
+    train_trajectories = gpfa.fit_transform(
+        [spiketrains[seg] for seg in train_segments])
+    test_trajectories = gpfa.transform(
+        [spiketrains[seg] for seg in test_segments])
 
     gpfa_train = fit_gpfa_utils._get_concat_gpfa_data(
         train_trajectories, spiketrain_corr_segs[train_segments], bin_bounds,
@@ -94,11 +103,11 @@ def fit_gpfa(train_segments, test_segments, spiketrains, spiketrain_corr_segs, b
 
 
 def run_time_resolved_regression_train_test(
-    neural_train, behav_train, neural_test, behav_test, alphas = np.logspace(-6, 6, 13), n_jobs=-1
+    neural_train, behav_train, neural_test, behav_test, alphas=np.logspace(-6, 6, 13), n_jobs=-1
 ):
     """
     Perform ridge regression at each time bin to predict behavioral variables from GPFA neural data.
-    
+
     Parameters:
         - neural_train/test: DataFrames with latent neural trajectories
         - behav_train/test: DataFrames with behavioral variables
@@ -114,8 +123,10 @@ def run_time_resolved_regression_train_test(
         train_mask = behav_train['new_bin'] == new_bin
         test_mask = behav_test['new_bin'] == new_bin
 
-        X_train = neural_train.loc[train_mask].select_dtypes(include=[float, int]).values
-        X_test = neural_test.loc[test_mask].select_dtypes(include=[float, int]).values
+        X_train = neural_train.loc[train_mask].select_dtypes(
+            include=[float, int]).values
+        X_test = neural_test.loc[test_mask].select_dtypes(
+            include=[float, int]).values
         Y_train_all = behav_train.loc[train_mask, behavior_cols].values
         Y_test_all = behav_test.loc[test_mask, behavior_cols].values
 
@@ -141,7 +152,7 @@ def run_time_resolved_regression_train_test(
             all_best_alphas[b] = best_alpha
 
         return pd.DataFrame({
-            'behavior': behavior_cols,
+            'feature': behavior_cols,
             'r2': r2s,
             'best_alpha': all_best_alphas,
             'new_bin': new_bin,
@@ -150,7 +161,8 @@ def run_time_resolved_regression_train_test(
         })
 
     new_bins = behav_train['new_bin'].unique()
-    results = Parallel(n_jobs=n_jobs)(delayed(fit_and_score_bin)(nb) for nb in new_bins)
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(fit_and_score_bin)(nb) for nb in new_bins)
     results = [r for r in results if r is not None]
 
     return pd.concat(results, ignore_index=True)

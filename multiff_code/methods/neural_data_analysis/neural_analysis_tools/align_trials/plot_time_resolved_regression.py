@@ -32,9 +32,25 @@ from sklearn.preprocessing import StandardScaler
 os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
 
 
+def plot_best_alpha_counts(df, title='Counts of Best Alpha Values'):
+    counts = df['best_alpha'].value_counts()
+    # Sort by index (best_alpha) ascending
+    counts = counts.sort_index()
+
+    plt.figure(figsize=(6, 3.5))
+    plt.bar(counts.index.astype(str), counts.values, edgecolor='black')
+    plt.xlabel('Best Alpha')
+    plt.ylabel('Count')
+    plt.title(title)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+    
+    
 def plot_trial_counts_by_timepoint(time_resolved_cv_scores, trial_column='trial_count'):
     # make sure that y axis starts from 0
-    trial_counts = time_resolved_cv_scores[['bin_mid_time', trial_column]].drop_duplicates().sort_values(by='bin_mid_time')
+    trial_counts = time_resolved_cv_scores[[
+        'bin_mid_time', trial_column]].drop_duplicates().sort_values(by='bin_mid_time')
     plt.plot(trial_counts['bin_mid_time'],
              trial_counts[trial_column], color='black', marker='o')
     plt.ylim(0, max(trial_counts[trial_column]) + 10)
@@ -42,6 +58,35 @@ def plot_trial_counts_by_timepoint(time_resolved_cv_scores, trial_column='trial_
     plt.ylabel("Trials with data")
     plt.title("Number of trials with data at each timepoint")
     plt.show()
+
+
+def _agg_info_across_folds(time_resolved_cv_scores, group_cols=['feature', 'new_bin']):
+    group_cols = ['feature', 'new_bin']
+
+    # Dynamically construct the aggregation dictionary
+    agg_dict = {
+        col: ['mean', 'std'] if col == 'r2' else 'mean'
+        for col in ['r2', 'bin_mid_time', 'trial_count', 'train_trial_count', 'test_trial_count']
+    }
+
+    # Group and aggregate
+    agg_df = (
+        time_resolved_cv_scores
+        .groupby(group_cols)
+        .agg(agg_dict)
+        .reset_index()
+    )
+
+    # Flatten columns
+    agg_df.columns = [
+        'r2_std' if col == ('r2', 'std')
+        else 'r2' if col == ('r2', 'mean')
+        else col[0] if col[1] == 'mean'
+        else ''.join(col)  # fallback for anything unexpected
+        for col in agg_df.columns
+    ]
+
+    return agg_df
 
 
 def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xticks=True,
@@ -58,34 +103,33 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
     - features_not_to_plot: list of str, columns to exclude from plotting
     - score_threshold_to_plot: float or None, threshold to plot only behaviors with scores (for at least one timepoint) above this threshold
     """
-    
-    print('time_resolved_cv_scores.shape', time_resolved_cv_scores.shape)
-    time_resolved_cv_scores = time_resolved_cv_scores.groupby(['behavior', 'new_bin']).mean().reset_index(drop=False)
-    print('time_resolved_cv_scores.shape', time_resolved_cv_scores.shape)
 
-    behaviorals = time_resolved_cv_scores['behavior'].unique()
-    max_values_by_behavior = time_resolved_cv_scores.groupby('behavior').max()
-    
+    agg_df = _agg_info_across_folds(time_resolved_cv_scores)
+
+    behaviorals = agg_df['feature'].unique()
+    max_values_by_behavior = agg_df.groupby('feature').max()
+
     if score_threshold_to_plot is not None:
         good_behaviors = max_values_by_behavior['r2'] >= score_threshold_to_plot
         behaviorals = max_values_by_behavior[good_behaviors].index.values
 
     if rank_by_max_score:
-        behaviorals = max_values_by_behavior.loc[behaviorals].sort_values(by='r2', ascending=False).index.tolist()
+        behaviorals = max_values_by_behavior.loc[behaviorals].sort_values(
+            by='r2', ascending=False).index.tolist()
     else:
         behaviorals = list(behaviorals)
-    
+
     n_behaviors_per_plot = 4
     xticks = None
     xtick_labels = None
 
     if show_counts_on_xticks:
-        unique_bins = time_resolved_cv_scores[['bin_mid_time', 'trial_count']].drop_duplicates().sort_values('bin_mid_time')
-        xticks = unique_bins['bin_mid_time']
+        min_trial_counts = agg_df[['bin_mid_time', 'trial_count']].groupby('bin_mid_time').min().reset_index()
+        xticks = min_trial_counts['bin_mid_time']
         xtick_labels = [
             f"{row.bin_mid_time:.2f}\n({int(row.trial_count)})" if not np.isnan(row.trial_count)
             else f"{row.bin_mid_time:.2f}\n(n/a)"
-            for row in unique_bins.itertuples()
+            for row in min_trial_counts.itertuples()
         ]
 
     def finalize_plot():
@@ -123,14 +167,11 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
             plt.figure(figsize=(8, 4))
             any_plots = True
 
-        df_b = time_resolved_cv_scores[time_resolved_cv_scores['behavior'] == behavior]
+        df_b = agg_df[agg_df['feature'] == behavior]
         plt.plot(df_b['bin_mid_time'], df_b['r2'], label=behavior)
 
     if any_plots:
         finalize_plot()
-
-# below are suggesed functions that i have yet to try
-
 
 def plot_trial_point_distribution(pursuit_data):
     trial_points = pursuit_data.groupby('segment').count()['bin'].values

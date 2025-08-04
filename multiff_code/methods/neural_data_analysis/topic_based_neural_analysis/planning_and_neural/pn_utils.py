@@ -97,6 +97,9 @@ def compute_overlap_and_drop(df1, col1, df2, col2):
     percentage_avg = len(overlap) / ((len(a) + len(b)) / 2) * \
         100 if (len(a) + len(b)) > 0 else 0
 
+    if len(overlap) == 0:
+        return df1, df2
+
     print(f"Overlap: {overlap}")
     print(f"Percentage overlap relative to df1: {percentage_a:.2f}%")
     print(f"Percentage overlap relative to df2: {percentage_b:.2f}%")
