@@ -35,7 +35,7 @@ def time_resolved_gpfa_regression_cv(
     cv_folds=5, n_jobs=-1, latent_dimensionality=7, alphas=np.logspace(-6, 6, 13)
 ):
     all_segments = list(concat_behav_trials['new_segment'].unique())
-    splitter = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
+    splitter = KFold(n_splits=cv_folds, shuffle=True)
 
     all_scores = []
 
