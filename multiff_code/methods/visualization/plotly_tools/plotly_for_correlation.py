@@ -182,11 +182,11 @@ def find_new_curv_of_traj_counted(point_index_for_curv_of_traj_df, monkey_inform
             new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_distance_window(
                 point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         else:
-            raise PreventUpdate
+            raise PreventUpdate("No update was made because curv_of_traj_mode is not recognized.")
         new_curv_of_traj_counted = new_curv_of_traj_df['curv_of_traj'].values
         return new_curv_of_traj_counted
     else:
-        raise PreventUpdate
+        raise PreventUpdate("No update was made because lower_end or upper_end is None.")
 
 
 def find_curv_of_traj_counted_from_curv_of_traj_df(curv_of_traj_df, point_index_for_curv_of_traj_df):

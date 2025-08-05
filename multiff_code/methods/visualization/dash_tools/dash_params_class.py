@@ -200,7 +200,7 @@ class ParamsDash(params_test_combos_class.ParamsTestCombos):
                     else:
                         self.hyperparameter_dict[param] = False
             else:
-                raise PreventUpdate
+                raise PreventUpdate("No update was triggered because trigger ID was not related to ref_point_slider.value, window_size_slider.value, or checklist_for_all_plots.value.")
 
             self.sub_df = params_utils.get_subset_of_combo_df(
                 self.combo_df_long, self.hyperparameter_dict)

@@ -11,6 +11,76 @@ from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
+def extend_arc_from_curv_of_traj(curv_of_traj_df, monkey_information, arc_length=300):
+    """
+    Extend an arc from the current position and curvature of a trajectory.
+
+    Parameters:
+    - df: pandas.DataFrame
+        Must contain columns: 'curv_of_traj', 'monkey_x', 'monkey_y', 'monkey_angle'
+    - arc_length: float
+        Length of the arc to be extended
+
+    Returns:
+    - null_arc_info_for_plotting: dict
+        Contains arc metadata useful for plotting:
+        'arc_point_index', 'arc_ff_index', 'center_x', 'center_y',
+        'arc_starting_angle', 'arc_ending_angle', 'all_arc_radius', 'all_arc_end_direction'
+
+    - df_in_opt_arc_format: pandas.DataFrame
+        Original dataframe with added arc-related columns:
+        'opt_arc_curv', 'opt_arc_length', 'opt_arc_measure',
+        'opt_arc_radius', 'opt_arc_end_direction',
+        'opt_arc_end_x', 'opt_arc_end_y'
+    """
+    # Store curvature and arc length
+    
+    traj_arc_df = curv_of_traj_df[['point_index','curv_of_traj']].copy()
+    df = traj_arc_df.merge(monkey_information[['point_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle']], on='point_index', how='left')
+    
+    df = df.copy()
+    df['opt_arc_curv'] = df['curv_of_traj']
+    df['opt_arc_length'] = arc_length
+
+    # Determine arc direction and radius
+    arc_direction = np.sign(df['opt_arc_curv'])
+    arc_radius = find_arc_radius_based_on_curvature(df['opt_arc_curv'])
+
+    # Compute arc measure (angle in radians subtended by arc)
+    df['opt_arc_measure'] = df['opt_arc_length'] / arc_radius
+
+    # Extract monkey position and orientation
+    monkey_xy = df[['monkey_x', 'monkey_y']].values
+    monkey_angle = df['monkey_angle'].values
+
+    # Calculate arc center
+    center_x, center_y = find_arc_center_in_world_coord(
+        monkey_xy, monkey_angle, arc_radius, arc_direction
+    )
+
+    # Calculate start and end angles of arc
+    angle_to_monkey = find_angle_from_arc_center_to_monkey(
+        monkey_xy, center_x, center_y
+    )
+    start_angle = angle_to_monkey
+    end_angle = start_angle + arc_direction * df['opt_arc_measure']
+
+    # Compute arc end coordinates
+    df['opt_arc_end_x'] = np.cos(end_angle) * arc_radius + center_x
+    df['opt_arc_end_y'] = np.sin(end_angle) * arc_radius + center_y
+
+    # Store computed arc parameters
+    df['opt_arc_radius'] = arc_radius
+    df['opt_arc_end_direction'] = arc_direction
+    df_in_opt_arc_format = df
+    
+    null_arc_info_for_plotting = {'arc_point_index': df['point_index'].values, 'arc_ff_index': np.nan, 'center_x': center_x, 'center_y': center_y, 'arc_starting_angle': start_angle,
+                                  'arc_ending_angle': end_angle, 'all_arc_radius': arc_radius, 'all_arc_end_direction': arc_direction,
+                                  'time': df['time'].values}
+    null_arc_info_for_plotting = pd.DataFrame(null_arc_info_for_plotting)
+    return df_in_opt_arc_format, null_arc_info_for_plotting
+
+
 def update_curvature_df_to_let_opt_arc_stop_at_closest_point_to_monkey_stop(curvature_df, stop_and_ref_point_info,
                                                                             ff_real_position_sorted, monkey_information):
     # The idea is to find the closest point on optimal arc to the stop that's also within ff, and then

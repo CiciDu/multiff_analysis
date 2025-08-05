@@ -34,9 +34,10 @@ np.set_printoptions(suppress=True)
 class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
     def __init__(self,
-                 raw_data_folder_path=None):
+                 raw_data_folder_path=None,
+                 opt_arc_type='opt_arc_stop_closest'):
 
-        super().__init__(raw_data_folder_path=raw_data_folder_path)
+        super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
 
     def prepare_to_make_dash_for_main_plots(self,
                                             ref_point_params={},
@@ -101,6 +102,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                  'value': 'show_traj_portion'},
                              {'label': 'show null trajectory of ff',
                                  'value': 'show_null_arcs_to_ff'},
+                             {'label': 'show extended traj arc',
+                                 'value': 'show_extended_traj_arc'},
                              {'label': 'show stops', 'value': 'show_stops'},
                              {'label': 'show all eye positions',
                                  'value': 'show_all_eye_positions'},
@@ -109,7 +112,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                              {'label': 'show eye positions for both eyes', 'value': 'show_eye_positions_for_both_eyes'}]
 
         checklist_params = ['show_visible_fireflies', 'show_in_memory_fireflies', 'show_monkey_heading', 'show_visible_segments',
-                            'show_null_arcs_to_ff', 'show_stops', 'show_all_eye_positions', 'show_current_eye_positions', 'show_eye_positions_for_both_eyes']
+                            'show_null_arcs_to_ff', 'show_extended_traj_arc', 'show_stops', 'show_all_eye_positions',
+                            'show_current_eye_positions', 'show_eye_positions_for_both_eyes']
         checklist_values = [
             key for key in checklist_params if self.monkey_plot_params[key] is True]
 
@@ -192,9 +196,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                 'show_visible_fireflies': self.monkey_plot_params['show_visible_fireflies'],
                                 'show_in_memory_fireflies': self.monkey_plot_params['show_in_memory_fireflies'],
                                 'show_null_arcs_to_ff': self.monkey_plot_params['show_null_arcs_to_ff'],
+                                'show_extended_traj_arc': self.monkey_plot_params['show_extended_traj_arc'],
                                 }
 
-        for param in ['show_monkey_heading', 'show_visible_segments', 'show_traj_portion', 'show_null_arcs_to_ff', 'show_stops', 'show_all_eye_positions', 'show_current_eye_positions',
+        for param in ['show_monkey_heading', 'show_visible_segments', 'show_traj_portion', 'show_null_arcs_to_ff', 
+                      'show_extended_traj_arc', 'show_stops', 'show_all_eye_positions', 'show_current_eye_positions',
                       'show_eye_positions_for_both_eyes', 'show_visible_fireflies', 'show_in_memory_fireflies']:
             if param in checklist_for_monkey_plot:
                 self.monkey_plot_params[param] = True
@@ -205,6 +211,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.find_null_arcs_info_for_plotting_for_the_duration()
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper._find_mheading_and_triangle_df_for_null_arcs_for_the_duration(
                 self)
+
+        if (self.monkey_plot_params['show_extended_traj_arc'] != old_checklist_params['show_extended_traj_arc']):
+            self._find_ext_traj_arc_info_for_duration()
 
         for param in ['show_visible_segments', 'show_visible_fireflies', 'show_in_memory_fireflies']:
             if old_checklist_params[param] != self.monkey_plot_params[param]:
@@ -251,7 +260,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         elif (self.overall_params['heading_instead_of_curv'] != old_checklist_params['heading_instead_of_curv']):
             self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._determine_fig_corr_or_heading()
         else:
-            raise PreventUpdate
+            raise PreventUpdate(
+                "No update was made in calling _update_dash_based_on_checklist_for_all_plots.")
 
         return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2
 
@@ -259,7 +269,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         trace_index = monkey_hoverdata['points'][0]['curveNumber']
         if not ((trace_index == self.trajectory_data_trace_index) or (trace_index == self.traj_portion_trace_index)):
-            raise PreventUpdate
+            raise PreventUpdate(
+                "No update was triggered because trace_index is not in trajectory_data_trace_index or traj_portion_trace_index.")
 
         monkey_hoverdata_value = monkey_hoverdata['points'][0]['customdata']
 
@@ -268,9 +279,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             try:
                 monkey_hoverdata_value = monkey_hoverdata_value[0]
             except TypeError:
-                raise PreventUpdate
+                raise PreventUpdate(
+                    "No update was triggered because monkey_hoverdata_value is not a list.")
         if monkey_hoverdata_value is None:
-            raise PreventUpdate
+            raise PreventUpdate(
+                "No update was triggered because monkey_hoverdata_value is None.")
 
         ONLY_UPDATE_EYE_POSITION = False
         self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_scatterplot.find_monkey_hoverdata_value_for_both_fig_scatter(
@@ -404,7 +417,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.ref_point_column = 'rel_time'
         else:
             print('Warnings: ref_point_mode is not recognized, so no update is made')
-            raise PreventUpdate
+            raise PreventUpdate(
+                "No update was made because ref_point_mode is not recognized.")
 
         self.ref_point_params['ref_point_mode'] = ref_point_mode
         self.ref_point_params['ref_point_value'] = ref_point_value
@@ -416,7 +430,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if len(self.stops_near_ff_df_counted) == 0:
             print(
                 'Warning: After update, stops_near_ff_df_counted is empty! So no update is made')
-            raise PreventUpdate
+            raise PreventUpdate(
+                "No update was made because stops_near_ff_df_counted is empty after update.")
         self._prepare_static_main_plots()
 
         print(
@@ -451,6 +466,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self.fig = self._update_null_arcs_for_cur_and_nxt_ff_in_plotly()
+
+        if self.monkey_plot_params['show_extended_traj_arc']:
+            self.fig = self._update_extended_traj_arc_in_plotly()
 
         if self.monkey_plot_params['show_monkey_heading']:
             self.fig = self._update_all_monkey_heading_in_fig()
@@ -555,7 +573,10 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self.find_null_arcs_info_for_plotting_for_the_duration()
-
+            
+        if self.monkey_plot_params['show_extended_traj_arc']:
+            self._find_ext_traj_arc_info_for_duration()
+            
         if self.monkey_plot_params['show_monkey_heading']:
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_and_triangle_df_for_the_duration(
                 self)

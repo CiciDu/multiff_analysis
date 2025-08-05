@@ -119,17 +119,17 @@ class DashComparison(dash_main_class.DashMainPlots):
                 else:
                     print(
                         'Warning: curv_of_traj_lower_end is larger than curv_of_traj_upper_end, so no update is made')
-                    raise PreventUpdate
+                    raise PreventUpdate("No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
 
             elif (ctx.triggered[0]['prop_id'] == 'update_ref_point.n_clicks'):
                 if ref_point_value is not None:
                     self.fig_corr, self.fig_corr_2, self.fig_heading, self.fig_heading_2 = self._update_dash_based_on_new_ref_point_descr(
                         ref_point_mode, ref_point_value)
                 else:
-                    raise PreventUpdate
+                    raise PreventUpdate("No update was made because ref_point_value is None.")
 
             else:
-                raise PreventUpdate
+                raise PreventUpdate("No update was triggered because trigger ID was not related to update_curv_of_traj.n_clicks or update_ref_point.n_clicks.")
 
             return self.fig_corr, self.fig_corr_2, self.fig_heading, self.fig_heading_2
         return

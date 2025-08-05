@@ -259,7 +259,7 @@ def create_error_message_display(id_prefix='main_plots_'):
             children='Updated successfully',
             style={'padding': '10px 10px 10px 10px', 'color': 'purple'}
         )],
-        style={'width': '25%', 'padding': '10px 10px 10px 10px',
+        style={'width': '75%', 'padding': '10px 10px 10px 10px',
                'background-color': 'orange'}
     )
 

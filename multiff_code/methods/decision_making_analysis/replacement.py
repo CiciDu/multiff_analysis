@@ -195,7 +195,7 @@ def get_parallel_old_ff_info(all_point_index, all_time, manual_anno, ff_real_pos
 
 
 def combine_old_and_new_ff_info(new_ff_info, old_ff_info, point_index_array, monkey_information, ff_caught_T_new,
-                                window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False,
+                                window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False,
                                 add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                                 add_current_curv_of_traj=False, curvature_df=None, curv_of_traj_df=None):
 

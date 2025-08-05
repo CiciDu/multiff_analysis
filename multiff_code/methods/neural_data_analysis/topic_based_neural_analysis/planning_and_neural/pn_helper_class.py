@@ -31,7 +31,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                             eliminate_outliers=False,
                                             use_curv_to_ff_center=False,
                                             curv_of_traj_mode='distance',
-                                            window_for_curv_of_traj=[-25, 25],
+                                            window_for_curv_of_traj=[-25, 0],
                                             curv_traj_window_before_stop=[
                                                 -50, 0],
                                             truncate_curv_of_traj_by_time_of_capture=True,

@@ -48,7 +48,7 @@ class GUATHelperClass(cluster_replacement_class.ClusterReplacement):
                               add_current_curv_of_traj=False,
                               curvature_df=None,
                               curv_of_traj_df=None,
-                              window_for_curv_of_traj=[-25, 25],
+                              window_for_curv_of_traj=[-25, 0],
                               curv_of_traj_mode='distance',
                               truncate_curv_of_traj_by_time_of_capture=False,
                               ff_attributes=[

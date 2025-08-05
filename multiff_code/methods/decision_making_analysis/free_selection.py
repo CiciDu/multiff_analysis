@@ -157,7 +157,7 @@ def find_free_selection_x_from_info_of_n_ff_per_point(info_of_n_ff_per_point,
 
 def organize_free_selection_x(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, only_select_n_ff_case=None, num_ff_per_row=5,
                               guarantee_including_target_info=True, add_current_curv_of_traj=False, ff_caught_T_new=None,
-                              window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance',
+                              window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance',
                               curvature_df=None, curv_of_traj_df=None, selection_criterion_if_too_many_ff='time_since_last_vis',
                               ff_attributes=[
                                   'ff_distance', 'ff_angle', 'time_since_last_vis'],

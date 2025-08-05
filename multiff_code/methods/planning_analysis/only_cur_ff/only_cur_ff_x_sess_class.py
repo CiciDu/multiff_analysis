@@ -43,7 +43,7 @@ class OnlyStopFFAcrossSessions():
     def __init__(self, monkey_name='monkey_Bruno',
                  opt_arc_type='opt_arc_stop_closest',
                  curv_of_traj_mode='distance',
-                 window_for_curv_of_traj=[-25, 25],
+                 window_for_curv_of_traj=[-25, 0],
                  truncate_curv_of_traj_by_time_of_capture=False):
         self.monkey_information = None
         self.ff_info_at_start_df = None

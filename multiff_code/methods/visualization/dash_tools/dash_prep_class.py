@@ -7,7 +7,7 @@ from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_fr
 from visualization.matplotlib_tools import monkey_heading_utils
 from eye_position_analysis import eye_positions
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_helper_class, find_cvn_utils, plot_cvn_class, plot_cvn_utils, plot_monkey_heading_helper_class
-
+from null_behaviors import find_best_arc, curv_of_traj_utils, opt_arc_utils
 
 import os
 import sys
@@ -30,14 +30,13 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-
-
 class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly_plot_class.PlotlyPlotter):
 
     def __init__(self,
-                 raw_data_folder_path=None):
+                 raw_data_folder_path=None,
+                 opt_arc_type='opt_arc_stop_closest'):
 
-        super().__init__(raw_data_folder_path=raw_data_folder_path)
+        super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
 
     def _prepare_static_main_plots(self,
                                    show_static_plots=False,
@@ -212,6 +211,29 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix, trace_name='cur null arc')
         return self.fig
 
+    def _update_extended_traj_arc_in_plotly(self):
+        self._get_ext_traj_arc_info_for_the_point()
+        self.fig = plotly_for_null_arcs.update_null_arcs_in_plotly(
+            self.fig, self.ext_traj_arc_info_for_the_point, rotation_matrix=self.current_plotly_key_comp['rotation_matrix'], trace_name='extended traj arc')
+        return self.fig
+    
+    def _get_ext_traj_arc_info_for_the_point(self):
+        if not hasattr(self, 'ext_traj_arc_info'):
+            df_in_opt_arc_format, self.ext_traj_arc_info = opt_arc_utils.extend_arc_from_curv_of_traj(
+                self.curv_of_traj_df, self.monkey_information)
+        if not hasattr(self, 'ext_traj_arc_info_for_duration'):
+            self._find_ext_traj_arc_info_for_duration()
+        self.ext_traj_arc_info_for_the_point = self.ext_traj_arc_info_for_duration[
+            self.ext_traj_arc_info_for_duration['arc_point_index'] == self.point_index_to_show_traj_curv]
+        
+        
+    def _find_ext_traj_arc_info_for_duration(self):   
+        if not hasattr(self, 'ext_traj_arc_info'):
+            df_in_opt_arc_format, self.ext_traj_arc_info = opt_arc_utils.extend_arc_from_curv_of_traj(
+                self.curv_of_traj_df, self.monkey_information)
+        self.ext_traj_arc_info_for_duration = self.ext_traj_arc_info[self.ext_traj_arc_info['time'].between(
+            self.current_plotly_key_comp['duration_to_plot'][0], self.current_plotly_key_comp['duration_to_plot'][1])]
+                
     def _find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration(self):
         self.cur_null_arc_info_for_the_point = self.cur_null_arc_info_for_duration[
             self.cur_null_arc_info_for_duration['arc_point_index'] == self.point_index_to_show_traj_curv]
@@ -320,7 +342,8 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
                 trajectory_df, duration, rotation_matrix=rotation_matrix, eye_col_suffix=suffix
             )
-            monkey_subset = plotly_for_monkey._merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df)
+            monkey_subset = plotly_for_monkey._merge_monkey_subset_with_trajectory_df(
+                monkey_subset, trajectory_df)
             monkey_subset.set_index('point_index', inplace=True)
             monkey_subset['point_index'] = monkey_subset.index
             self.both_eyes_info[left_or_right] = monkey_subset
@@ -329,7 +352,8 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
             trajectory_df, duration, rotation_matrix=rotation_matrix)
         # use merge, but first make sure no duplicate column
-        self.monkey_subset = plotly_for_monkey._merge_monkey_subset_with_trajectory_df(self.monkey_subset, trajectory_df)
+        self.monkey_subset = plotly_for_monkey._merge_monkey_subset_with_trajectory_df(
+            self.monkey_subset, trajectory_df)
 
     def _produce_fig_for_dash(self, mark_reference_point=True):
 
@@ -359,6 +383,9 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             self.fig = plotly_plot_class.PlotlyPlotter._show_null_arcs_for_cur_and_nxt_ff_in_plotly(
                 self)
 
+        if self.monkey_plot_params['show_extended_traj_arc']:
+            self._plot_extended_traj_arc()
+
         if mark_reference_point:
             self.fig = plotly_for_monkey.mark_reference_point_in_monkey_plot(
                 self.fig, self.trajectory_ref_row)
@@ -375,6 +402,11 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
                 break
 
         return self.fig
+
+    def _plot_extended_traj_arc(self):
+        self._get_ext_traj_arc_info_for_the_point()
+        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.ext_traj_arc_info_for_the_point, rotation_matrix=self.current_plotly_key_comp['rotation_matrix'],
+                                                                 color=self.traj_arc_color, trace_name='extended traj arc', linewidth=2)
 
     def _update_show_stop_point_indices(self):
         if self.monkey_plot_params.get('show_stops', False):

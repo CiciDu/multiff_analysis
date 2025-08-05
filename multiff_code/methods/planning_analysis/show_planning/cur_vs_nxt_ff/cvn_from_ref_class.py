@@ -46,7 +46,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                    # ref_point_mode can be 'time', 'distance', or 'time after cur ff visible'
                                    ref_point_mode='distance', ref_point_value=-150,
                                    curv_traj_window_before_stop=[-50, 0],
-                                   curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25], truncate_curv_of_traj_by_time_of_capture=False,
+                                   curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0], truncate_curv_of_traj_by_time_of_capture=False,
                                    eliminate_outliers=False, use_curv_to_ff_center=False, deal_with_rows_with_big_ff_angles=True,
                                    remove_i_o_modify_rows_with_big_ff_angles=False,
                                    stops_near_ff_df_exists_ok=True,
@@ -448,7 +448,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.stops_near_ff_df_modified = self.stops_near_ff_df.set_index(
             'stop_point_index').loc[self.stop_point_index_modified].reset_index()
 
-    def _make_curv_of_traj_df_if_not_already_made(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
+    def _make_curv_of_traj_df_if_not_already_made(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         if getattr(self, 'curv_of_traj_df', None) is None:
             self.curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new,
                                                                                                          curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)

@@ -88,7 +88,7 @@ class PlanFactorsOfAgent():
                                               stops_near_ff_df_exists_ok=False,
                                               use_curv_to_ff_center=False,
                                               save_data=True,
-                                              curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
+                                              curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                               n_steps=8000,
                                               **env_kwargs):
 
@@ -125,7 +125,7 @@ class PlanFactorsOfAgent():
                                                           stops_near_ff_df_exists_ok=False,
                                                           use_curv_to_ff_center=False,
                                                           save_data=True,
-                                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
+                                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                                           n_steps=8000,
                                                           merge_diff_in_curv_df_to_heading_info=True,
                                                           **env_kwargs):

@@ -116,7 +116,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             ff_info, on='bin', how='left')
         return binned_features
 
-    def _get_curv_of_traj_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
+    def _get_curv_of_traj_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0]):
         self.curv_of_traj_df = self.get_curv_of_traj_df(
             window_for_curv_of_traj=window_for_curv_of_traj,
             curv_of_traj_mode=curv_of_traj_mode,

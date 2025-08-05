@@ -231,7 +231,7 @@ def add_curv_diff_to_df(df, monkey_information, curv_of_traj_df, ff_real_positio
 
 
 def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=False, add_curv_diff=False,
-                           ff_caught_T_new=None, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False,
+                           ff_caught_T_new=None, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False,
                            ff_radius=10, curv_of_traj_df=None, add_duration_of_last_vis_period=True):
     """
     Computes various information about multiple fireflies and their relationship to a monkey, given their indices and positions.

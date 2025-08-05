@@ -239,7 +239,7 @@ class HelperGUATavsTAFTclass():
             if np.any(self.stops_near_ff_df['nxt_ff_caught_time'] - self.stops_near_ff_df['stop_time'] < 0):
                 raise ValueError('nxt_ff_index is not correct')
 
-    def _add_curv_of_traj_stat_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
+    def _add_curv_of_traj_stat_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0]):
         if self.curv_of_traj_df is None:
             self.curv_of_traj_df, self.traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new,
                                                                                                                             curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False)
@@ -350,7 +350,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'last_seen_and_next_seen_attributes_to_add': ['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y'],
 
              'curv_of_traj_mode': 'time',
-             'window_for_curv_of_traj': [-1, 1],
+             'window_for_curv_of_traj': [-1, 0],
              'truncate_curv_of_traj_by_time_of_capture': False,
 
              'time_range_of_trajectory': [-2.5, 0],  # original [-2, 0]

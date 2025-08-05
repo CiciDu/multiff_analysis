@@ -114,7 +114,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                               heading_info_df_exists_ok=True,
                                               stops_near_ff_df_exists_ok=True,
                                               curv_of_traj_mode='distance',
-                                              window_for_curv_of_traj=[-25, 25],
+                                              window_for_curv_of_traj=[-25, 0],
                                               use_curv_to_ff_center=False,
                                               save_data=True,
                                               **env_kwargs
@@ -197,7 +197,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                          curv_traj_window_before_stop=[-50, 0],
                                          heading_info_df_exists_ok=True,
                                          stops_near_ff_df_exists_ok=True,
-                                         curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
+                                         curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                          use_curv_to_ff_center=False,
                                          save_data=True,
                                          **env_kwargs
@@ -251,7 +251,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                           heading_info_df_exists_ok=True,
                                                           combd_heading_df_x_sessions_exists_ok=True,
                                                           stops_near_ff_df_exists_ok=True,
-                                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25],
+                                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                                           use_curv_to_ff_center=False,
                                                           save_data=True,
                                                           **env_kwargs

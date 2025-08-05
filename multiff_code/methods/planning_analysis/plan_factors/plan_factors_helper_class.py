@@ -19,7 +19,7 @@ import numpy as np
 class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
     def __init__(self, test_or_control, raw_data_folder_path, curv_of_traj_mode='distance',
-                 window_for_curv_of_traj=[-25, 25],
+                 window_for_curv_of_traj=[-25, 0],
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
                  ):

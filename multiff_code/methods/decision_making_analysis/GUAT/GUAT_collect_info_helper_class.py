@@ -293,7 +293,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 self.monkey_information['curv_of_traj'] = self.monkey_information['curv_of_traj'].fillna(
                     0)
 
-    def make_or_retrieve_curv_of_traj_df(self, exists_ok=True, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance',
+    def make_or_retrieve_curv_of_traj_df(self, exists_ok=True, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance',
                                          truncate_curv_of_traj_by_time_of_capture=False):
 
         filepath = os.path.join(self.GUAT_folder_path, 'curv_of_traj_df.csv')

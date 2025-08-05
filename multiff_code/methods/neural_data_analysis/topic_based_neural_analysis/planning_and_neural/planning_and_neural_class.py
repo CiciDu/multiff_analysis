@@ -33,7 +33,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
                                       eliminate_outliers=False,
                                       use_curv_to_ff_center=False,
                                       curv_of_traj_mode='distance',
-                                      window_for_curv_of_traj=[-25, 25],
+                                      window_for_curv_of_traj=[-25, 0],
                                       truncate_curv_of_traj_by_time_of_capture=True,
                                       planning_data_by_point_exists_ok=True,
                                       add_behav_data=True,

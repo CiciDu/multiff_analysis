@@ -38,7 +38,7 @@ class BaseProcessing:
         self.ff_dataframe = None
         self.curv_of_traj_params = {}
 
-    def load_raw_data(self, raw_data_folder_path=None, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
+    def load_raw_data(self, raw_data_folder_path=None, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         if raw_data_folder_path is None:
             try:
                 raw_data_folder_path = self.raw_data_folder_path
@@ -295,7 +295,7 @@ class BaseProcessing:
         self.ff_dataframe = self.ff_dataframe.drop(
             columns=['left_right', 'abs_delta_ff_angle', 'abs_delta_ff_angle_boundary'], errors='ignore')
 
-    def get_curv_of_traj_df(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
+    def get_curv_of_traj_df(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         self.curv_of_traj_params = {}
         self.curv_of_traj_params['curv_of_traj_mode'] = curv_of_traj_mode
         self.curv_of_traj_params['window_for_curv_of_traj'] = window_for_curv_of_traj

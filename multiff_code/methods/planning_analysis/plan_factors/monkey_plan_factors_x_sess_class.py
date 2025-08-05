@@ -68,7 +68,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                                               heading_info_df_exists_ok=False,
                                               stops_near_ff_df_exists_ok=True,
                                               curv_of_traj_mode='distance',
-                                              window_for_curv_of_traj=[-25, 25],
+                                              window_for_curv_of_traj=[-25, 0],
                                               use_curv_to_ff_center=False,
                                               ref_point_mode='distance',
                                               ref_point_value=-150,
@@ -96,8 +96,10 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
 
         if exists_ok:
             if exists(combd_plan_x_tc_path) & exists(combd_plan_y_tc_path):
-                self.combd_plan_x_tc = pd.read_csv(combd_plan_x_tc_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
-                self.combd_plan_y_tc = pd.read_csv(combd_plan_y_tc_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+                self.combd_plan_x_tc = pd.read_csv(combd_plan_x_tc_path).drop(
+                    ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+                self.combd_plan_y_tc = pd.read_csv(combd_plan_y_tc_path).drop(
+                    ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
                 return
             else:
                 print(

@@ -111,7 +111,7 @@ class _FindCurVsNxtFF(base_processing_class.BaseProcessing):
             self, f'stops_near_ff_df_{test_or_ctrl}', self.stops_near_ff_df)
         # print(f'Made stops_near_ff_df_test, which has {len(self.stops_near_ff_df_test)} rows')
 
-    def _add_curv_of_traj_stat_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 25]):
+    def _add_curv_of_traj_stat_df(self, curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0]):
         if self.curv_of_traj_df is None:
             self.curv_of_traj_df = self.get_curv_of_traj_df(window_for_curv_of_traj=window_for_curv_of_traj, curv_of_traj_mode=curv_of_traj_mode,
                                                             truncate_curv_of_traj_by_time_of_capture=False)
