@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import copy
 
-# need: monkey_plot_params
 
 
 class PlotlyPlotter(base_plot_class.BasePlotter):

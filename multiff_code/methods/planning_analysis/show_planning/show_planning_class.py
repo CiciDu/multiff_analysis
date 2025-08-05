@@ -111,7 +111,8 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             raise FileNotFoundError(
                 f'combd_heading_df_x_sessions ({df_name}) is not in the folder: ', path)
         else:
-            self.combd_heading_df_x_sessions = pd.read_csv(df_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+            self.combd_heading_df_x_sessions = pd.read_csv(df_path).drop(
+                ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
             print('Successfully retrieved combd_heading_df_x_sessions from: ', df_path)
 
         self.combd_diff_in_curv_df = self.retrieve_combd_diff_in_curv_df(ref_point_mode, ref_point_value, test_or_control,
@@ -133,7 +134,8 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             raise FileNotFoundError(
                 f'combd_diff_in_curv_df ({df_name}) is not in the folder: ', folder_path)
         else:
-            self.combd_diff_in_curv_df = pd.read_csv(df_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+            self.combd_diff_in_curv_df = pd.read_csv(df_path).drop(
+                ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
             print('Successfully retrieved combd_diff_in_curv_df from: ', df_path)
         return self.combd_diff_in_curv_df
 
@@ -307,7 +309,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             if heading_info_df_exists_ok is False:
                 raise FileNotFoundError(
                     'Force the creation of heading_info_df')
-            self.snf = cvn_from_ref_class.CurVsNxtFfFromRefClasee(
+            self.snf = cvn_from_ref_class.CurVsNxtFfFromRefClass(
                 raw_data_folder_path=None, opt_arc_type=self.opt_arc_type)
 
             self.snf.extract_info_from_raw_data_folder_path(
@@ -317,7 +319,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                                                   merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
         except FileNotFoundError:
             print('Making new heading_info_df ...')
-            self.snf = cvn_from_ref_class.CurVsNxtFfFromRefClasee(
+            self.snf = cvn_from_ref_class.CurVsNxtFfFromRefClass(
                 raw_data_folder_path=raw_data_folder_path, opt_arc_type=self.opt_arc_type)
 
             self.snf.make_heading_info_df_without_long_process(test_or_control=test_or_control, ref_point_mode=ref_point_mode,

@@ -16,7 +16,7 @@ import numpy as np
 # note, one class instance is either for test or control, but not both
 
 
-class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClasee):
+class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
     def __init__(self, test_or_control, raw_data_folder_path, curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],

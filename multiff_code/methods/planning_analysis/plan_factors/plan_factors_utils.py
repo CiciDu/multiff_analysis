@@ -107,7 +107,7 @@ def process_plan_x_to_predict_monkey_info(plan_x, for_classification=False):
     plan_x['curv_iqr'] = plan_x['curv_Q3'] - plan_x['curv_Q1']
 
     non_cluster_columns_to_save = [
-        'distance_between_stop_and_arena_edge'] + feature_lists.cur_ff_at_ref_columns + feature_lists.nxt_ff_at_ref_columns \
+        'distance_between_stop_and_arena_edge'] + feature_lists.cur_ff_at_ref_features + feature_lists.nxt_ff_at_ref_features \
         + feature_lists.all_eye_features + feature_lists.trajectory_features
 
     cluster_columns_to_save = [col for col in plan_x.columns if (
@@ -123,7 +123,7 @@ def process_plan_x_to_predict_monkey_info(plan_x, for_classification=False):
 
 def process_plan_x_to_predict_ff_info(plan_x, plan_y):
 
-    non_cluster_columns_to_save = ['distance_between_stop_and_arena_edge'] + feature_lists.cur_ff_at_ref_columns + feature_lists.nxt_ff_at_ref_columns \
+    non_cluster_columns_to_save = ['distance_between_stop_and_arena_edge'] + feature_lists.cur_ff_at_ref_features + feature_lists.nxt_ff_at_ref_features \
         + feature_lists.all_eye_features + feature_lists.trajectory_features + \
         feature_lists.traj_to_cur_ff_features
 

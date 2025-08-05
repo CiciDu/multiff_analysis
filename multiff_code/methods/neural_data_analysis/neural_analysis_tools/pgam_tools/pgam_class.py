@@ -26,13 +26,20 @@ from sklearn.cross_decomposition import CCA
 import rcca
 from sklearn.preprocessing import StandardScaler
 
-if not '/Users/dusiyi/Documents/Multifirefly-Project/PGAM/src/PGAM' in sys.path:
-    sys.path.append(
-        '/Users/dusiyi/Documents/Multifirefly-Project/PGAM/src/PGAM')
-from GAM_library import *
-import gam_data_handlers as gdh
+pgam_path = '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/external/pgam/src/'
+import sys
+if not pgam_path in sys.path: 
+    sys.path.append(pgam_path)
+    
+import numpy as np
+import sys
+from PGAM.GAM_library import *
+import PGAM.gam_data_handlers as gdh
+import matplotlib.pylab as plt
+import pandas as pd
 from post_processing import postprocess_results
 from scipy.io import savemat
+
 
 
 class PGAMclass():

@@ -30,10 +30,9 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-# https://dash.plotly.com/interactive-graphing
 
 
-class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClasee, plotly_plot_class.PlotlyPlotter):
+class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly_plot_class.PlotlyPlotter):
 
     def __init__(self,
                  raw_data_folder_path=None):
@@ -321,10 +320,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClasee, plotl
             monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
                 trajectory_df, duration, rotation_matrix=rotation_matrix, eye_col_suffix=suffix
             )
-            columns_to_merge = [col for col in [
-                'rel_time', 'monkey_x', 'monkey_y'] if col not in monkey_subset.columns]
-            monkey_subset = monkey_subset.merge(trajectory_df[[
-                'point_index'] + columns_to_merge], on='point_index', how='left')
+            monkey_subset = plotly_for_monkey._merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df)
             monkey_subset.set_index('point_index', inplace=True)
             monkey_subset['point_index'] = monkey_subset.index
             self.both_eyes_info[left_or_right] = monkey_subset
@@ -333,11 +329,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClasee, plotl
         self.monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(
             trajectory_df, duration, rotation_matrix=rotation_matrix)
         # use merge, but first make sure no duplicate column
-        columns_to_merge = [col for col in [
-            'rel_time', 'monkey_x', 'monkey_y'] if col not in self.monkey_subset.columns]
-        self.monkey_subset = self.monkey_subset.merge(trajectory_df[[
-                                                      'point_index'] + columns_to_merge], on='point_index', how='left')
-        self.monkey_subset.index = self.monkey_subset['point_index'].values
+        self.monkey_subset = plotly_for_monkey._merge_monkey_subset_with_trajectory_df(self.monkey_subset, trajectory_df)
 
     def _produce_fig_for_dash(self, mark_reference_point=True):
 

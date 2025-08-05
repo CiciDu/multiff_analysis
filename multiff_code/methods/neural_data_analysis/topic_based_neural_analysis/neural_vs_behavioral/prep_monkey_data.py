@@ -13,7 +13,7 @@ import colorcet
 import logging
 from matplotlib import rc
 import warnings
-from scipy.signal import gaussian
+import scipy
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -364,7 +364,7 @@ def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential,
     """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
 
     # Create a Gaussian kernel
-    gaussian_kernel = gaussian(kernel_size, std_dev)
+    gaussian_kernel = scipy.signal.gaussian(kernel_size, std_dev)
     # Normalize the kernel so it sums to 1
     gaussian_kernel /= gaussian_kernel.sum()
 

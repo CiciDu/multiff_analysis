@@ -177,7 +177,7 @@ def put_down_monkey_plot(fig, monkey_hoverdata_value, id='monkey_plot'):
                     )
         #  inline-block helps designers create boxes that automatically wrap text and other content to give them space and set them apart when beside other content.
         # 'display': 'inline-block',
-    ],  style={'width': '60%', 'padding': '0 0 0 0',
+    ],  style={'width': '80%', 'padding': '0 0 0 0',
                })
 
 
@@ -211,7 +211,7 @@ def show_a_static_plot(fig_scatter):
 
 
 def update_marked_traj_portion_in_monkey_plot(fig, traj_portion, hoverdata_multi_columns=['rel_time']):
-    fig.update_traces(overwrite=True, marker={"opacity": 0.4, "color": 'orange'},
+    fig.update_traces(overwrite=True, marker={"size": 10, "opacity": 1, "color": 'orange'},
                       x=traj_portion['monkey_x'].values, y=traj_portion['monkey_y'].values,
                       customdata=traj_portion[hoverdata_multi_columns].values,
                       selector=dict(name="to_show_the_scope_for_curv"))

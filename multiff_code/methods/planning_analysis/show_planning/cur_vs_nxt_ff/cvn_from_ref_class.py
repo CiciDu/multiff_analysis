@@ -10,7 +10,7 @@ import sys
 import copy
 
 
-class CurVsNxtFfFromRefClasee(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._PlotCurVsNxtFF):
+class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._PlotCurVsNxtFF):
 
     def __init__(self,
                  raw_data_folder_path=None,

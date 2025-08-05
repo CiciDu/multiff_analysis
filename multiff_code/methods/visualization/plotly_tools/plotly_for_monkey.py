@@ -47,8 +47,10 @@ def update_layout_and_x_and_y_limit(fig, current_plotly_key_comp, show_eye_posit
     else:
         fig.update_layout(
             autosize=False,
-            width=700,
-            height=400,
+            # width=700,
+            # height=400,
+            width=850,
+            height=600,
             margin={'l': 10, 'b': 0, 't': 20, 'r': 10},
         )
 
@@ -98,9 +100,8 @@ def plot_eye_positions_in_plotly(fig, current_plotly_key_comp, show_eye_position
             df_for_eye_positions, duration, rotation_matrix=current_plotly_key_comp[
                 'rotation_matrix']
         )
-        monkey_subset = monkey_subset.merge(
-            trajectory_df[['point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left'
-        )
+        monkey_subset = _merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df)
+        
         fig = show_eye_positions_using_either_marker_or_arrow(
             fig, x0, y0, monkey_subset, trace_name='eye_positions', update_if_already_exist=update_if_already_exist,
             marker='circle', marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions
@@ -114,15 +115,20 @@ def plot_eye_positions_in_plotly(fig, current_plotly_key_comp, show_eye_position
                 df_for_eye_positions, duration, rotation_matrix=current_plotly_key_comp[
                     'rotation_matrix'], eye_col_suffix=suffix
             )
-            monkey_subset = monkey_subset.merge(
-                trajectory_df[['point_index', 'rel_time', 'monkey_x', 'monkey_y']], on='point_index', how='left'
-            )
+            monkey_subset = _merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df)
+            
             fig = show_eye_positions_using_either_marker_or_arrow(
                 fig, x0, y0, monkey_subset, trace_name=trace_name + trace_name_suffix, update_if_already_exist=update_if_already_exist,
                 marker=marker, marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions, arrowcolor=arrowcolor
             )
 
     return fig
+
+def _merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df):
+    columns_to_merge = ['rel_time', 'monkey_x', 'monkey_y']
+    monkey_subset = monkey_subset.drop(columns=columns_to_merge, errors='ignore')
+    monkey_subset = monkey_subset.merge(trajectory_df[['point_index'] + columns_to_merge], on='point_index', how='left')
+    return monkey_subset
 
 
 def show_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset, trace_name='eye_positions', update_if_already_exist=True, marker='circle', marker_size=4, arrowcolor=None, use_arrow_to_show_eye_positions=False):
@@ -494,7 +500,7 @@ def plot_a_portion_of_trajectory_to_show_the_scope_for_curv(fig, traj_portion, c
                              color_discrete_sequence=[color])
     fig.add_traces(plot_to_add.data)
     fig.data[-1].name = 'to_show_the_scope_for_curv'
-    fig.update_traces(marker=dict(size=7, opacity=1),
+    fig.update_traces(marker=dict(size=10, opacity=1),
                       selector=dict(name='to_show_the_scope_for_curv'))
     hovertemplate = ' <br>'.join(
         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])

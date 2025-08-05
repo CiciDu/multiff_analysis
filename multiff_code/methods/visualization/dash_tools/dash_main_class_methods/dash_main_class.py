@@ -29,7 +29,6 @@ np.set_printoptions(suppress=True)
 
 # https://dash.plotly.com/interactive-graphing
 
-
 class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
     def __init__(self, raw_data_folder_path=None):
@@ -44,7 +43,9 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
     def _get_empty_figure(self):
         """Get a copy of the empty figure template to avoid race conditions"""
-        return self._empty_fig_template.copy()
+        self._empty_fig_template = go.Figure()
+        self._empty_fig_template.update_layout(height=10, width=10)
+        return self._empty_fig_template
 
     def prepare_dash_for_main_plots_layout(self, id_prefix='main_plots_'):
         self.id_prefix = id_prefix

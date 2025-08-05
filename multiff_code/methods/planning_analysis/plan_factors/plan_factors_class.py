@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClasee):
+class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
     def __init__(self, raw_data_folder_path=None, curv_of_traj_mode='distance',
                  window_for_curv_of_traj=[-25, 25],

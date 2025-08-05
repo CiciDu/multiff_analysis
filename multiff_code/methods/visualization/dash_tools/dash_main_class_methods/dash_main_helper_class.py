@@ -31,9 +31,6 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-# https://dash.plotly.com/interactive-graphing
-
-
 class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
     def __init__(self,

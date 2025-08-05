@@ -96,7 +96,7 @@ class HelperGUATavsTAFTclass():
 
         self._make_heading_info_df()
         setattr(self, f'{test_or_ctrl}_heading_info_df', self.heading_info_df)
-        cvn_from_ref_class.CurVsNxtFfFromRefClasee._make_curv_of_traj_df_if_not_already_made(
+        cvn_from_ref_class.CurVsNxtFfFromRefClass._make_curv_of_traj_df_if_not_already_made(
             self)
         plan_factors_helper_class.PlanFactorsHelpClass._make_curv_of_traj_df_w_one_sided_window_if_not_already_made(
             self)
@@ -129,7 +129,7 @@ class HelperGUATavsTAFTclass():
         self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df_from_ref['stop_point_index'].values
 
         if self.ff_dataframe is None:
-            cvn_from_ref_class.CurVsNxtFfFromRefClasee.get_more_monkey_data(
+            cvn_from_ref_class.CurVsNxtFfFromRefClass.get_more_monkey_data(
                 self)
 
         if getattr(self, 'nxt_ff_df', None) is None:
@@ -254,7 +254,7 @@ class HelperGUATavsTAFTclass():
         self.find_nxt_ff_df_and_cur_ff_df_from_ref()
         self.nxt_ff_df_modified = self.nxt_ff_df_from_ref.copy()
         self.cur_ff_df_modified = self.cur_ff_df_from_ref.copy()
-        
+
         self.stop_point_index_modified = self.nxt_ff_df_modified.stop_point_index.values.copy()
         self.stops_near_ff_df_modified = self.stops_near_ff_df.copy()
 
@@ -269,11 +269,13 @@ class HelperGUATavsTAFTclass():
         def _merge_and_compute_heading(df):
             # Merge stops_near_ff_df info (stop_point_index, monkey_angle_before_stop)
             df = df.merge(
-                self.stops_near_ff_df[['stop_point_index', 'monkey_angle_before_stop']],
+                self.stops_near_ff_df[[
+                    'stop_point_index', 'monkey_angle_before_stop']],
                 how='left'
             )
             # Calculate heading difference and confine angle
-            df['d_heading_of_traj'] = df['monkey_angle_before_stop'] - df['monkey_angle']
+            df['d_heading_of_traj'] = df['monkey_angle_before_stop'] - \
+                df['monkey_angle']
             df['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_one_pie(
                 df['d_heading_of_traj'].values
             )
@@ -282,7 +284,6 @@ class HelperGUATavsTAFTclass():
         # Apply to both final DataFrames
         self.nxt_ff_df_final = _merge_and_compute_heading(self.nxt_ff_df_final)
         self.cur_ff_df_final = _merge_and_compute_heading(self.cur_ff_df_final)
-        
 
     def _get_TAFT_df(self):
         self.TAFT_df = GUAT_vs_TAFT_utils.process_trials_df(

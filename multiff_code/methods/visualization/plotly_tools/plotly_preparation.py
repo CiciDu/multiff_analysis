@@ -73,7 +73,7 @@ def prepare_to_plot_a_planning_instance_in_plotly(row, PlotTrials_args, monkey_p
 
     # Create connect path DataFrame and find shown firefly indices
     show_connect_path_ff_specific_indices = [
-        int(row.cur_ff_index), int(row.nxt_ff_index)]
+        int(row.cur_ff_index.iloc[0]), int(row.nxt_ff_index.iloc[0])]
     if monkey_plot_params['show_connect_path_ff']:
         connect_path_ff_df, shown_ff_indices = _make_connect_path_ff_df(
             row, monkey_plot_params['show_connect_path_ff_specific_indices'], show_connect_path_ff_specific_indices, ff_dataframe_in_duration_visible,
