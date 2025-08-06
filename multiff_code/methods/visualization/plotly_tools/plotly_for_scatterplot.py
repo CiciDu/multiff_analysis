@@ -517,6 +517,6 @@ def plot_lines_to_show_ff_visible_segments_in_fig_scatter(fig_scatter, ff_info, 
             # fig_scatter.update_traces(opacity=1, selector=dict(name=ff_names[i] + ' stops visible'),
             #                   line=dict(dash='dot'), showlegend=showlegend, legendgroup=ff_names[i])
 
-            # break  # for right now, we only want to show when the ff first becomes visible
+            #break  # for right now, we only want to show when the ff first becomes visible
 
     return fig_scatter

@@ -182,7 +182,7 @@ class ParamsDash(params_test_combos_class.ParamsTestCombos):
             Input(self.id_prefix + 'window_size_slider', 'value'),
             Input(self.id_prefix + 'checklist_for_all_plots', 'value'),
             prevent_initial_call=True)
-        def update_correlation_plot(ref_point_value,
+        def update_plot_based_on_new_info(ref_point_value,
                                     window_size,
                                     checklist_for_all_plots):
 

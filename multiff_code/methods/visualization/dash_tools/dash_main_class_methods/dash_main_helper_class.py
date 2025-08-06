@@ -288,8 +288,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         trace_index = monkey_hoverdata['points'][0]['curveNumber']
         if not ((trace_index == self.trajectory_data_trace_index) or (trace_index == self.traj_portion_trace_index)):
-            raise PreventUpdate(
-                "No update was triggered because hover is not over trajectory.")
+            # raise PreventUpdate(
+            #     "No update was triggered because hover is not over trajectory.") # this seems too extra to show
+            raise PreventUpdate
 
         monkey_hoverdata_value = monkey_hoverdata['points'][0]['customdata']
 

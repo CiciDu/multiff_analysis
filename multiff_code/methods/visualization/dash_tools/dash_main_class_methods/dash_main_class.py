@@ -13,6 +13,7 @@ import pandas as pd
 from dash import Dash, html, Input, State, Output, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
+import logging
 
 # Import shared configuration
 from visualization.dash_tools.dash_config import configure_plotting_environment
@@ -141,7 +142,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             State(self.id_prefix + 'ref_point_value', 'value'),
             prevent_initial_call=True
         )
-        def update_correlation_plot(monkey_hoverdata, scatter_plot_hoverdata, scatter_plot_relayoutData,
+        def update_all_plots_based_on_new_info(monkey_hoverdata, scatter_plot_hoverdata, scatter_plot_relayoutData,
                                     update_ref_point, checklist_for_all_plots, checklist_for_monkey_plot,
                                     ref_point_mode, ref_point_value):
 
@@ -250,19 +251,21 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             State(self.id_prefix + 'monkey_plot', 'hoverData'),
             prevent_initial_call=True
         )
-        def update_correlation_plot(clickData, hoverData):
+        def show_or_hind_visible_segments(clickData, hoverData):
             try:
-                hoverdata = hoverData['points'][0]['customdata'][0]
+                data = hoverData['points'][0]['customdata'][0]
             except (KeyError, IndexError):
-                raise PreventUpdate("No update was triggered because customdata is not in correlation_plot_clickdata.")
+                raise PreventUpdate("No update was triggered because customdata is not in hoverData.")
 
-            if not isinstance(hoverdata, int):
-                raise PreventUpdate("No update was triggered because hoverdata is not an integer.")
+            if not isinstance(data, int):
+                raise PreventUpdate("No update was triggered because hoverdata is not an integer, which ff_index should be.")
 
-            legendgroup = f'ff {hoverdata}'
+            legendgroup = f'ff {data}'
             for trace in self.fig.data:
                 if trace.legendgroup == legendgroup:
                     trace.visible = 'legendonly' if trace.visible != 'legendonly' else True
+                    logging.info(f'ff {data} is now {trace.visible}.')
+                    break
 
             return self.fig
 
@@ -275,7 +278,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             Input(self.id_prefix + 'refresh_correlation_plot_2', 'n_clicks'),
             prevent_initial_call=True
         )
-        def update_correlation_plot(n_clicks):
+        def refresh_fig_corr_2(n_clicks):
             try:
                 if self.overall_params['heading_instead_of_curv']:
                     self.fig_heading_2 = self._make_fig_heading_2()

@@ -107,7 +107,7 @@ class DashComparison(dash_main_class.DashMainPlots):
             Input('update_curv_of_traj', 'n_clicks'),
             Input('update_ref_point', 'n_clicks'),
             prevent_initial_call=True)
-        def update_correlation_plot(curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end,
+        def update_all_plots_based_on_new_info(curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end,
                                     ref_point_mode, ref_point_value, update_curv_of_traj, update_ref_point):
 
             if (ctx.triggered[0]['prop_id'] == 'update_curv_of_traj.nclicks'):
@@ -140,7 +140,7 @@ class DashComparison(dash_main_class.DashMainPlots):
             Output('correlation_plot_2', 'figure', allow_duplicate=True),
             Input('refresh_fig_corr_2', 'n_clicks'),
             prevent_initial_call=True)
-        def update_correlation_plot(n_clicks):
+        def refresh_fig_corr_2(n_clicks):
             # print('I will update fig_corr_2')
             self.fig_corr_2 = self._make_fig_corr_2()
             return self.fig_corr_2
@@ -151,7 +151,7 @@ class DashComparison(dash_main_class.DashMainPlots):
             Output('heading_plot_2', 'figure', allow_duplicate=True),
             Input('refresh_fig_heading_2', 'n_clicks'),
             prevent_initial_call=True)
-        def update_correlation_plot(n_clicks):
+        def refresh_fig_heading_2(n_clicks):
             # print('I will update fig_heading_2')
             self.fig_heading_2 = self._make_fig_heading_2()
             return self.fig_heading_2
