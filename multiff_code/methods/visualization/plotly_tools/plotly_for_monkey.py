@@ -22,6 +22,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import seaborn as sns
 import matplotlib.colors as mcolors
+import logging
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -100,9 +101,10 @@ def plot_eye_positions_in_plotly(fig, current_plotly_key_comp, show_eye_position
             df_for_eye_positions, duration, rotation_matrix=current_plotly_key_comp[
                 'rotation_matrix']
         )
-        monkey_subset = _merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df)
-        
-        fig = show_eye_positions_using_either_marker_or_arrow(
+        monkey_subset = _merge_monkey_subset_with_trajectory_df(
+            monkey_subset, trajectory_df)
+
+        fig = plot_or_update_eye_positions_using_either_marker_or_arrow(
             fig, x0, y0, monkey_subset, trace_name='eye_positions', update_if_already_exist=update_if_already_exist,
             marker='circle', marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions
         )
@@ -115,23 +117,27 @@ def plot_eye_positions_in_plotly(fig, current_plotly_key_comp, show_eye_position
                 df_for_eye_positions, duration, rotation_matrix=current_plotly_key_comp[
                     'rotation_matrix'], eye_col_suffix=suffix
             )
-            monkey_subset = _merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df)
-            
-            fig = show_eye_positions_using_either_marker_or_arrow(
+            monkey_subset = _merge_monkey_subset_with_trajectory_df(
+                monkey_subset, trajectory_df)
+
+            fig = plot_or_update_eye_positions_using_either_marker_or_arrow(
                 fig, x0, y0, monkey_subset, trace_name=trace_name + trace_name_suffix, update_if_already_exist=update_if_already_exist,
                 marker=marker, marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions, arrowcolor=arrowcolor
             )
 
     return fig
 
+
 def _merge_monkey_subset_with_trajectory_df(monkey_subset, trajectory_df):
     columns_to_merge = ['rel_time', 'monkey_x', 'monkey_y']
-    monkey_subset = monkey_subset.drop(columns=columns_to_merge, errors='ignore')
-    monkey_subset = monkey_subset.merge(trajectory_df[['point_index'] + columns_to_merge], on='point_index', how='left')
+    monkey_subset = monkey_subset.drop(
+        columns=columns_to_merge, errors='ignore')
+    monkey_subset = monkey_subset.merge(
+        trajectory_df[['point_index'] + columns_to_merge], on='point_index', how='left')
     return monkey_subset
 
 
-def show_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset, trace_name='eye_positions', update_if_already_exist=True, marker='circle', marker_size=4, arrowcolor=None, use_arrow_to_show_eye_positions=False):
+def plot_or_update_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset, trace_name='eye_positions', update_if_already_exist=True, marker='circle', marker_size=4, arrowcolor=None, use_arrow_to_show_eye_positions=False):
     if use_arrow_to_show_eye_positions:
         fig = _plot_or_update_arrow_to_eye_positions_in_plotly(
             fig, x0, y0, monkey_subset, trace_name=trace_name, update_if_already_exist=update_if_already_exist, arrowcolor=arrowcolor)
@@ -224,11 +230,14 @@ def _plot_or_update_arrow_to_eye_positions_in_plotly(fig, x0, y0, monkey_subset,
     )
 
     if monkey_subset_meaningful.shape[0] == 0:
+        #logging.warning(f'Failed to update arrow to eye positions for trace_name: {trace_name} because no valid eye position data are found.')
         return fig
     elif monkey_subset_meaningful.shape[0] > 1:
         # make a warning
-        print('More than one meaningful eye position found, only the first one is used to plot the arrow.')
+        #logging.warning('More than one meaningful eye position found, only the first one is used to plot the arrow.')
         monkey_subset_meaningful = monkey_subset_meaningful.iloc[0:1]
+    # else:
+    #     logging.info('Meaningful eye position is found, using it to plot the arrow.')
 
     if arrowcolor is None:
         arrowcolor = 'black'

@@ -9,6 +9,7 @@ import pandas as pd
 from numpy import linalg as LA
 from contextlib import contextmanager
 from os.path import exists
+import logging
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
@@ -439,3 +440,14 @@ def check_for_high_correlations(df, threshold=0.9):
 
     if len(high_corr_pairs) > 0:
         print(high_corr_pairs)
+       
+        
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,  # or use `stream=sys.stdout` for console
+    )
+    print('Set up logging configuration.')
+    
+setup_logging()

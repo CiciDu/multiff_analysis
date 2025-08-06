@@ -20,6 +20,7 @@ import pandas as pd
 from dash import dcc
 import plotly.graph_objects as go
 import copy
+import logging
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -47,7 +48,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                             scatter_plot_params={},
                                             stops_near_ff_df_exists_ok=True,
                                             heading_info_df_exists_ok=False,
-                                            test_or_control='test'):
+                                            test_or_control='test',
+                                            stop_point_index=None):
 
         self.ref_point_params = ref_point_params
         self.curv_of_traj_params = curv_of_traj_params
@@ -66,10 +68,23 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         super().streamline_organizing_info(**self.snf_streamline_organizing_info_kwargs, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                                            heading_info_df_exists_ok=heading_info_df_exists_ok, test_or_control=test_or_control)
 
-        # we use the first instance in stops_near_ff_df_counted to plot for now.
-        self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[0]
+        self._get_stops_near_ff_row(stop_point_index)
+        
         self._prepare_static_main_plots()
 
+    def _get_stops_near_ff_row(self, stop_point_index):
+        if stop_point_index is None:
+            # we use the first instance in stops_near_ff_df_counted to plot for now.
+            self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[0]
+        else:
+            try:
+                self.stops_near_ff_row = self.stops_near_ff_df_counted[self.stops_near_ff_df_counted['stop_point_index']
+                                                            == stop_point_index].iloc[0]
+                logging.info(f'Successfully retrieved stop_point_index: {stop_point_index}.')
+            except:
+                logging.warning(f'stop_point_index: {stop_point_index} is not in stops_near_ff_df_counted. Using the first instance in stops_near_ff_df_counted to plot.')
+        self.stop_point_index = self.stops_near_ff_row['stop_point_index']
+                
     def _put_down_checklist_for_all_plots(self, id_prefix=None):
         checklist_options = [{'label': 'show heading instead of curv', 'value': 'heading_instead_of_curv'},
                              {'label': 'truncate curv of traj by time of capture',
@@ -167,27 +182,31 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             fig['layout']['annotations'] = []
 
         if not show_eye_positions_for_both_eyes:
-            monkey_subset2 = self.monkey_subset.copy()
+            monkey_subset2 = self.avg_eye_info.copy()
             if point_index_to_show_traj_curv is not None:
                 try:
-                    monkey_subset2 = self.monkey_subset.loc[[
+                    monkey_subset2 = self.avg_eye_info.loc[[
                         point_index_to_show_traj_curv]].copy()
-                except:
+                except KeyError:
+                    print(
+                        'No eye positions are updated because point_index_to_show_traj_curv is not in monkey_subset.point_index.')
                     return fig
-            fig = plotly_for_monkey.show_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset2, trace_name='eye_positions', update_if_already_exist=update_if_already_exist,
-                                                                                    marker='circle', marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions)
+            fig = plotly_for_monkey.plot_or_update_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset2, trace_name=trace_name, update_if_already_exist=update_if_already_exist,
+                                                                                              marker='circle', marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions,
+                                                                                              arrowcolor='orange')
         else:
-            for left_or_right, marker, trace_name, arrowcolor in [('left', 'triangle-left', trace_name + '_left', 'purple'), ('right', 'triangle-right', trace_name + '_right', 'orange')]:
+            for left_or_right, marker, trace_name, arrowcolor in [('left', 'triangle-left', trace_name + '_left', 'orange'), ('right', 'triangle-right', trace_name + '_right', 'purple')]:
                 monkey_subset = self.both_eyes_info[left_or_right]
-                monkey_subset2 = self.monkey_subset.copy()
                 if point_index_to_show_traj_curv is not None:
                     try:
                         monkey_subset2 = monkey_subset.loc[[
                             point_index_to_show_traj_curv]].copy()
-                    except:
+                    except KeyError:
+                        logging.warning(
+                            f'No eye positions are updated for {left_or_right} eye because point_index_to_show_traj_curv is not in monkey_subset.point_index.')
                         return fig
-                fig = plotly_for_monkey.show_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset2, trace_name=trace_name, update_if_already_exist=update_if_already_exist,
-                                                                                        marker=marker, marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions, arrowcolor=arrowcolor)
+                fig = plotly_for_monkey.plot_or_update_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset2, trace_name=trace_name, update_if_already_exist=update_if_already_exist,
+                                                                                                  marker=marker, marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions, arrowcolor=arrowcolor)
         return fig
 
     def _update_dash_based_on_checklist_for_monkey_plot(self, checklist_for_monkey_plot):
@@ -199,7 +218,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                 'show_extended_traj_arc': self.monkey_plot_params['show_extended_traj_arc'],
                                 }
 
-        for param in ['show_monkey_heading', 'show_visible_segments', 'show_traj_portion', 'show_null_arcs_to_ff', 
+        for param in ['show_monkey_heading', 'show_visible_segments', 'show_traj_portion', 'show_null_arcs_to_ff',
                       'show_extended_traj_arc', 'show_stops', 'show_all_eye_positions', 'show_current_eye_positions',
                       'show_eye_positions_for_both_eyes', 'show_visible_fireflies', 'show_in_memory_fireflies']:
             if param in checklist_for_monkey_plot:
@@ -270,7 +289,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         trace_index = monkey_hoverdata['points'][0]['curveNumber']
         if not ((trace_index == self.trajectory_data_trace_index) or (trace_index == self.traj_portion_trace_index)):
             raise PreventUpdate(
-                "No update was triggered because trace_index is not in trajectory_data_trace_index or traj_portion_trace_index.")
+                "No update was triggered because hover is not over trajectory.")
 
         monkey_hoverdata_value = monkey_hoverdata['points'][0]['customdata']
 
@@ -573,10 +592,10 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self.find_null_arcs_info_for_plotting_for_the_duration()
-            
+
         if self.monkey_plot_params['show_extended_traj_arc']:
             self._find_ext_traj_arc_info_for_duration()
-            
+
         if self.monkey_plot_params['show_monkey_heading']:
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_and_triangle_df_for_the_duration(
                 self)
