@@ -26,7 +26,7 @@ def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
         df, use_curv_to_ff_center=use_curv_to_ff_center)
     cur_end_to_next_ff_curv = _compute_curv_from_cur_end(mock_monkey_info,
                                                          ff_radius_for_opt_arc=ff_radius_for_opt_arc)
-    cur_end_to_next_ff_curv['stop_point_index'] = heading_info_df['stop_point_index'].values
+    cur_end_to_next_ff_curv['ref_point_index'] = heading_info_df['ref_point_index'].values
     return cur_end_to_next_ff_curv
 
 
@@ -109,38 +109,36 @@ def _compute_curv_from_cur_end(mock_monkey_info,
         invalid_curvature_ok=True,
         ignore_error=True,
         include_cntr_arc_curv=False,
-        opt_arc_stop_first_vis_bdry=False, # this doesn't matter since we only care about the curvature to nxt ff, not the null arc landing point inside nxt ff;
+        # this doesn't matter since we only care about the curvature to nxt ff, not the null arc landing point inside nxt ff;
+        opt_arc_stop_first_vis_bdry=False,
         # and whether the arc ends at start of the visible boundary doesn't change the curvature to nxt ff
     )
 
     result_df = null_arc_curv_df[['point_index', 'ff_angle_boundary']].copy()
-    result_df['opt_arc_curv_to_cur_ff'] = mock_monkey_info['curv_of_traj'].values
-    result_df['opt_arc_curv_from_cur_end_to_nxt'] = null_arc_curv_df['opt_arc_curv'].values
+    result_df['opt_curv_to_cur_ff'] = mock_monkey_info['curv_of_traj'].values
+    result_df['curv_from_cur_end_to_nxt_ff'] = null_arc_curv_df['opt_arc_curv'].values
     return result_df
 
 
-def compute_prev_stop_to_next_ff_curv(nxt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_new,
+def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                       curv_of_traj_mode='distance', curv_traj_window_before_stop=[-50, 0]):
-    df = _prepare_prev_stop_to_next_ff_data(nxt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_new,
+    df = _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                             curv_of_traj_mode=curv_of_traj_mode, curv_traj_window_before_stop=curv_traj_window_before_stop)
-
     prev_stop_to_next_ff_curv = _compute_curv_from_prev_stop(
         df)
-    prev_stop_to_next_ff_curv['stop_point_index'] = heading_info_df['stop_point_index'].values
     return prev_stop_to_next_ff_curv
 
 
-def _prepare_prev_stop_to_next_ff_data(nxt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_new,
+def _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                        curv_of_traj_mode='distance', curv_traj_window_before_stop=[-50, 0]):
     df = find_cvn_utils.find_ff_info(
-        nxt_ff_df_modified.ff_index.values, heading_info_df.point_index_before_stop.values, monkey_information, ff_real_position_sorted)
-    df['stop_point_index'] = heading_info_df['stop_point_index'].values
+        nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted)
 
     curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(curv_traj_window_before_stop, monkey_information, ff_caught_T_new,
                                                                                             curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=False)
     curv_of_traj_df.set_index('point_index', inplace=True)
-    monkey_curv_before_stop = curv_of_traj_df.loc[heading_info_df[
-        'point_index_before_stop'].values, 'curv_of_traj'].values
+    monkey_curv_before_stop = curv_of_traj_df.loc[point_indexes_before_stop,
+                                                  'curv_of_traj'].values
     df['curv_of_traj'] = monkey_curv_before_stop
     return df
 
@@ -159,8 +157,8 @@ def _compute_curv_from_prev_stop(monkey_info):
 
     result_df = monkey_curv_df[['point_index', 'ff_angle_boundary']].copy()
     result_df['ff_angle_boundary'] = monkey_info['ff_angle_boundary'].values
-    result_df['opt_arc_curv_from_m_before_stop_to_nxt'] = monkey_curv_df['opt_arc_curv'].values
-    result_df['curv_of_traj_in_window_to_cur_ff'] = monkey_info['curv_of_traj'].values
+    result_df['curv_from_stop_to_nxt_ff'] = monkey_curv_df['opt_arc_curv'].values
+    result_df['traj_curv_to_stop'] = monkey_info['curv_of_traj'].values
     return result_df
 
 
@@ -204,24 +202,27 @@ def make_diff_in_curv_df(prev_stop_to_next_ff_curv, cur_end_to_next_ff_curv):
         null_arc_outside_boundary.index)
 
     monkey_curv_df = monkey_curv_df[[
-        'stop_point_index', 'opt_arc_curv_from_m_before_stop_to_nxt', 'curv_of_traj_in_window_to_cur_ff']]
+        'ref_point_index', 'traj_curv_to_stop', 'curv_from_stop_to_nxt_ff']]
     null_arc_curv_df = null_arc_curv_df[[
-        'stop_point_index', 'opt_arc_curv_from_cur_end_to_nxt', 'opt_arc_curv_to_cur_ff']]
+        'ref_point_index', 'opt_curv_to_cur_ff', 'curv_from_cur_end_to_nxt_ff']]
 
     diff_in_curv_df = monkey_curv_df.merge(
-        null_arc_curv_df, how='outer', on='stop_point_index')
+        null_arc_curv_df, how='outer', on='ref_point_index')
+
+    diff_in_curv_df = furnish_diff_in_curv_df(diff_in_curv_df)
 
     return diff_in_curv_df
 
 
+
 def furnish_diff_in_curv_df(diff_in_curv_df):
     # we need the df to have the following columns:
-    # opt_arc_curv_from_cur_end_to_nxt, opt_arc_curv_from_m_before_stop_to_nxt, curv_of_traj_in_window_to_cur_ff, opt_arc_curv_to_cur_ff
+    # curv_from_cur_end_to_nxt_ff, curv_from_stop_to_nxt_ff, traj_curv_to_stop, opt_curv_to_cur_ff
 
     diff_in_curv_df['d_curv_null_arc'] = (180/math.pi * 100) * (
-        diff_in_curv_df['opt_arc_curv_from_cur_end_to_nxt'] - diff_in_curv_df['opt_arc_curv_to_cur_ff'])
+        diff_in_curv_df['curv_from_cur_end_to_nxt_ff'] - diff_in_curv_df['opt_curv_to_cur_ff'])
     diff_in_curv_df['d_curv_monkey'] = (180/math.pi * 100) * (
-        diff_in_curv_df['opt_arc_curv_from_m_before_stop_to_nxt'] - diff_in_curv_df['curv_of_traj_in_window_to_cur_ff'])
+        diff_in_curv_df['curv_from_stop_to_nxt_ff'] - diff_in_curv_df['traj_curv_to_stop'])
 
     diff_in_curv_df['abs_d_curv_null_arc'] = np.abs(
         diff_in_curv_df['d_curv_null_arc'])
@@ -234,10 +235,10 @@ def furnish_diff_in_curv_df(diff_in_curv_df):
         diff_in_curv_df['d_curv_null_arc']) - np.abs(diff_in_curv_df['d_curv_monkey'])
 
     # # The following 2 vars are currently unused
-    # diff_in_curv_df['diff_in_curv_to_cur_ff'] = diff_in_curv_df['opt_arc_curv_to_cur_ff'] - \
-    #     diff_in_curv_df['curv_of_traj_in_window_to_cur_ff']
-    # diff_in_curv_df['diff_in_curv_to_nxt_ff'] = diff_in_curv_df['opt_arc_curv_from_cur_end_to_nxt'] - \
-    #     diff_in_curv_df['opt_arc_curv_from_m_before_stop_to_nxt']
+    # diff_in_curv_df['diff_in_curv_to_cur_ff'] = diff_in_curv_df['opt_curv_to_cur_ff'] - \
+    #     diff_in_curv_df['traj_curv_to_stop']
+    # diff_in_curv_df['diff_in_curv_to_nxt_ff'] = diff_in_curv_df['curv_from_cur_end_to_nxt_ff'] - \
+    #     diff_in_curv_df['curv_from_stop_to_nxt_ff']
 
     return diff_in_curv_df
 

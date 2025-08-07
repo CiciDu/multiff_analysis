@@ -172,20 +172,20 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         if merge_diff_in_curv_df_to_heading_info:
             if hasattr(self, 'heading_info_df'):
                 self.heading_info_df = self.heading_info_df.merge(
-                    self.diff_in_curv_df, on='stop_point_index', how='left')
+                    self.diff_in_curv_df, on='ref_point_index', how='left')
 
         return self.diff_in_curv_df
 
     def make_diff_in_curv_df(self, curv_traj_window_before_stop=[-50, 0]):
         self.cur_end_to_next_ff_curv = diff_in_curv_utils.compute_cur_end_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df,
                                                                                            use_curv_to_ff_center=False)
-        self.prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df, self.monkey_information,
+        self.prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.heading_info_df['nxt_ff_index'].values, self.heading_info_df['point_index_before_stop'].values, 
+                                                                                              self.monkey_information,
                                                                                                self.ff_real_position_sorted, self.ff_caught_T_new,
                                                                                                curv_traj_window_before_stop=curv_traj_window_before_stop)
+        self.prev_stop_to_next_ff_curv['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
             self.prev_stop_to_next_ff_curv, self.cur_end_to_next_ff_curv)
-        self.diff_in_curv_df = diff_in_curv_utils.furnish_diff_in_curv_df(
-            self.diff_in_curv_df)
         return self.diff_in_curv_df
 
     def _init_empty_vars(self):
@@ -373,7 +373,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         if merge_diff_in_curv_df_to_heading_info:
             self.heading_info_df = self.heading_info_df.merge(
-                self.diff_in_curv_df, on='stop_point_index', how='left')
+                self.diff_in_curv_df, on='ref_point_index', how='left')
         return self.heading_info_df, self.diff_in_curv_df
 
     def retrieve_or_make_heading_info_df(self, test_or_control='test', heading_info_df_exists_ok=True, diff_in_curv_df_exists_ok=True, save_data=True,

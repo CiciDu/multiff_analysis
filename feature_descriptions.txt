@@ -1,0 +1,47 @@
+1. traj_curv_to_stop
+- Description: The curvature of the monkey’s trajectory leading up to the stop point at the current firefly target.
+- How it’s computed: Extracted from past trajectory data within a specified window (e.g., 50 time steps before the stop).
+- Purpose: Represents how curved the monkey’s path was before stopping, to contrast with forward planning curvature.
+
+2. curv_from_stop_to_nxt_ff
+- Description: The curvature required to move from the stop point to the next firefly location, assuming an optimal arc.
+- How it’s computed: Using the stop point’s position and heading as the arc’s starting point, then solving for curvature to the next ff.
+- Purpose: Simulates a planned future path assuming the monkey started from the stop at the current target.
+
+3. opt_curv_to_cur_ff
+- Description: The curvature of the monkey’s actual trajectory toward its current ff target.
+- How it’s computed: Taken from the monkey’s current position and solving for curvature to the current ff target.
+- Purpose: Represents the planned path from the current position to the target.
+
+4. curv_from_cur_end_to_nxt_ff
+- Description: The optimal arc curvature from the current trajectory endpoint to the next ff.
+- How it’s computed: Built from the endpoint of the current trajectory arc and computed using planning logic to find the optimal arc.
+- Purpose: Simulates a new planned movement from the current position if the monkey started a new arc toward the next ff.
+
+5. d_curv_null_arc
+- Description: The difference in curvature between the optimal arc to the next ff and the current arc endpoint curvature (null model).
+- Formula: (180/π * 100) × (curv_from_cur_end_to_nxt_ff − opt_curv_to_cur_ff)
+- Purpose: Measures curvature change within the model, independent of actual behavior.
+
+6. d_curv_monkey
+- Description: The difference in curvature between the monkey’s trajectory toward a stop and the curvature needed to reach the next ff from that stop.
+- Formula: (180/π * 100) × (curv_from_stop_to_nxt_ff − traj_curv_to_stop)
+- Purpose: Captures how the monkey’s behavior would need to adjust curvature to go from stop to next goal.
+
+7. abs_d_curv_null_arc
+- Description: The absolute value of d_curv_null_arc.
+- Purpose: Focuses on the magnitude of curvature change, regardless of direction, within the null model.
+
+8. abs_d_curv_monkey
+- Description: The absolute value of d_curv_monkey.
+- Purpose: Measures the magnitude of behavioral curvature change from stop to next ff.
+
+9. diff_in_d_curv
+- Description: The difference between the null model’s curvature change and the monkey’s curvature change.
+- Formula: d_curv_null_arc − d_curv_monkey
+- Purpose: Compares how much more or less curvature change the null model experiences compared to actual behavior.
+
+10. diff_in_abs_d_curv
+- Description: The difference between the absolute curvature changes in the null model and behavior.
+- Formula: |d_curv_null_arc| − |d_curv_monkey|
+- Purpose: Captures relative differences in curvature adjustment magnitudes.

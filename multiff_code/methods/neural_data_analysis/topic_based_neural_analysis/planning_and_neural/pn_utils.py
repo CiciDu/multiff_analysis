@@ -1,6 +1,7 @@
 import sys
 from data_wrangling import process_monkey_information, specific_utils
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling
+from planning_analysis.plan_indicators import diff_in_curv_utils
 import numpy as np
 import pandas as pd
 
@@ -40,16 +41,45 @@ def add_to_both_ff_when_seen_df(both_ff_when_seen_df, which_ff_info, when_which_
     both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_of_traj']
 
 
-def add_angle_from_cur_arc_end_to_nxt_ff(df, cur_curv_df, nxt_curv_df):
-    angle_df = get_angle_from_cur_arc_end_to_nxt_ff(
-        cur_curv_df, nxt_curv_df)
+def add_angle_from_cur_arc_end_to_nxt_ff(df, both_curv_df):
+    angle_df = get_angle_from_cur_arc_end_to_nxt_ff(both_curv_df)
     df = df.merge(angle_df[['point_index', 'cur_opt_arc_end_heading', 'cur_cntr_arc_end_heading', 'angle_opt_arc_from_cur_end_to_nxt',
                             'angle_cntr_arc_from_cur_end_to_nxt']], on='point_index', how='left')
     return df
 
 
-def get_angle_from_cur_arc_end_to_nxt_ff(cur_curv_df, nxt_curv_df):
+def get_angle_from_cur_arc_end_to_nxt_ff(both_curv_df):
+    both_curv_df['angle_opt_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+        both_curv_df['nxt_ff_x'], both_curv_df['nxt_ff_y'], both_curv_df['cur_opt_arc_end_x'], both_curv_df['cur_opt_arc_end_y'], both_curv_df['cur_opt_arc_end_heading'])
+    both_curv_df['angle_cntr_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+        both_curv_df['nxt_ff_x'], both_curv_df['nxt_ff_y'], both_curv_df['cur_cntr_arc_end_x'], both_curv_df['cur_cntr_arc_end_y'], both_curv_df['cur_cntr_arc_end_heading'])
+
+    return both_curv_df
+
+
+def find_diff_in_curv_info(both_curv_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new, 
+                          curv_traj_window_before_stop=[-50, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
+    
+    cur_end_to_next_ff_curv = find_curv_of_traj_info(both_curv_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_curv_df['nxt_ff_index'].values, point_indexes_before_stop,
+                                                                                            monkey_information, ff_real_position_sorted, ff_caught_T_new,
+                                                                                            curv_traj_window_before_stop=curv_traj_window_before_stop)
+    prev_stop_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index'].values
+    
+    diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
+        prev_stop_to_next_ff_curv, cur_end_to_next_ff_curv)
+    return diff_in_curv_df
+
+def find_curv_of_traj_info(both_curv_df,use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
+    mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
+        both_curv_df, use_curv_to_ff_center=use_curv_to_ff_center)
+    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    cur_end_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index']
+    return cur_end_to_next_ff_curv
+    
+def _merge_curv_df(cur_curv_df, nxt_curv_df):
     # add 'cur_' to all columns in cur_curv_df except 'point_index'
+    
     cur_curv_df.columns = ['cur_' + col if col !=
                            'point_index' else col for col in cur_curv_df.columns]
     # add 'nxt_' to all columns in nxt_curv_df except 'point_index'
@@ -62,14 +92,7 @@ def get_angle_from_cur_arc_end_to_nxt_ff(cur_curv_df, nxt_curv_df):
         both_curv_df['cur_opt_arc_d_heading']
     both_curv_df['cur_cntr_arc_end_heading'] = both_curv_df['cur_monkey_angle'] + \
         both_curv_df['cur_cntr_arc_d_heading']
-
-    both_curv_df['angle_opt_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
-        both_curv_df['nxt_ff_x'], both_curv_df['nxt_ff_y'], both_curv_df['cur_opt_arc_end_x'], both_curv_df['cur_opt_arc_end_y'], both_curv_df['cur_opt_arc_end_heading'])
-    both_curv_df['angle_cntr_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
-        both_curv_df['nxt_ff_x'], both_curv_df['nxt_ff_y'], both_curv_df['cur_cntr_arc_end_x'], both_curv_df['cur_cntr_arc_end_y'], both_curv_df['cur_cntr_arc_end_heading'])
-
     return both_curv_df
-
 
 def compute_overlap_and_drop(df1, col1, df2, col2):
     """
