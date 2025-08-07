@@ -41,58 +41,88 @@ def add_to_both_ff_when_seen_df(both_ff_when_seen_df, which_ff_info, when_which_
     both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_of_traj']
 
 
-def add_angle_from_cur_arc_end_to_nxt_ff(df, both_curv_df):
-    angle_df = get_angle_from_cur_arc_end_to_nxt_ff(both_curv_df)
+def add_angle_from_cur_arc_end_to_nxt_ff(df, both_ff_df):
+    angle_df = get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df)
     df = df.merge(angle_df[['point_index', 'cur_opt_arc_end_heading', 'cur_cntr_arc_end_heading', 'angle_opt_arc_from_cur_end_to_nxt',
                             'angle_cntr_arc_from_cur_end_to_nxt']], on='point_index', how='left')
     return df
 
 
-def get_angle_from_cur_arc_end_to_nxt_ff(both_curv_df):
-    both_curv_df['angle_opt_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
-        both_curv_df['nxt_ff_x'], both_curv_df['nxt_ff_y'], both_curv_df['cur_opt_arc_end_x'], both_curv_df['cur_opt_arc_end_y'], both_curv_df['cur_opt_arc_end_heading'])
-    both_curv_df['angle_cntr_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
-        both_curv_df['nxt_ff_x'], both_curv_df['nxt_ff_y'], both_curv_df['cur_cntr_arc_end_x'], both_curv_df['cur_cntr_arc_end_y'], both_curv_df['cur_cntr_arc_end_heading'])
+def get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df):
+    both_ff_df['angle_opt_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+        both_ff_df['nxt_ff_x'], both_ff_df['nxt_ff_y'], both_ff_df['cur_opt_arc_end_x'], both_ff_df['cur_opt_arc_end_y'], both_ff_df['cur_opt_arc_end_heading'])
+    both_ff_df['angle_cntr_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+        both_ff_df['nxt_ff_x'], both_ff_df['nxt_ff_y'], both_ff_df['cur_cntr_arc_end_x'], both_ff_df['cur_cntr_arc_end_y'], both_ff_df['cur_cntr_arc_end_heading'])
 
-    return both_curv_df
+    return both_ff_df
 
 
-def find_diff_in_curv_info(both_curv_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new, 
-                          curv_traj_window_before_stop=[-50, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
-    
-    cur_end_to_next_ff_curv = find_curv_of_traj_info(both_curv_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
-    prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_curv_df['nxt_ff_index'].values, point_indexes_before_stop,
-                                                                                            monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                                                                            curv_traj_window_before_stop=curv_traj_window_before_stop)
+def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
+                           curv_traj_window_before_stop=[-50, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
+
+    cur_end_to_next_ff_curv = find_curv_of_traj_info(
+        both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_ff_df['nxt_ff_index'].values, point_indexes_before_stop,
+                                                                                     monkey_information, ff_real_position_sorted, ff_caught_T_new,
+                                                                                     curv_traj_window_before_stop=curv_traj_window_before_stop)
     prev_stop_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index'].values
-    
+
     diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
         prev_stop_to_next_ff_curv, cur_end_to_next_ff_curv)
     return diff_in_curv_df
 
-def find_curv_of_traj_info(both_curv_df,use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
+
+def find_curv_of_traj_info(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
     mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
-        both_curv_df, use_curv_to_ff_center=use_curv_to_ff_center)
-    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+        both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center)
+    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(
+        mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
     cur_end_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index']
     return cur_end_to_next_ff_curv
-    
-def _merge_curv_df(cur_curv_df, nxt_curv_df):
+
+
+def _merge_both_ff_df(cur_curv_df, nxt_ff_info):
     # add 'cur_' to all columns in cur_curv_df except 'point_index'
-    
+    cur_curv_df = cur_curv_df.copy()
+    nxt_ff_info = nxt_ff_info.copy()
     cur_curv_df.columns = ['cur_' + col if col !=
                            'point_index' else col for col in cur_curv_df.columns]
     # add 'nxt_' to all columns in nxt_curv_df except 'point_index'
-    nxt_curv_df.columns = ['nxt_' + col if col !=
-                           'point_index' else col for col in nxt_curv_df.columns]
+    nxt_ff_info.columns = ['nxt_' + col if col !=
+                           'point_index' else col for col in nxt_ff_info.columns]
 
-    both_curv_df = cur_curv_df.merge(nxt_curv_df, on='point_index', how='left')
+    both_ff_df = cur_curv_df.merge(nxt_ff_info, on='point_index', how='left')
 
-    both_curv_df['cur_opt_arc_end_heading'] = both_curv_df['cur_monkey_angle'] + \
-        both_curv_df['cur_opt_arc_d_heading']
-    both_curv_df['cur_cntr_arc_end_heading'] = both_curv_df['cur_monkey_angle'] + \
-        both_curv_df['cur_cntr_arc_d_heading']
-    return both_curv_df
+    both_ff_df['cur_opt_arc_end_heading'] = both_ff_df['cur_monkey_angle'] + \
+        both_ff_df['cur_opt_arc_d_heading']
+    both_ff_df['cur_cntr_arc_end_heading'] = both_ff_df['cur_monkey_angle'] + \
+        both_ff_df['cur_cntr_arc_d_heading']
+    return both_ff_df
+
+
+def add_diff_in_curv_info(df, both_ff_df, monkey_information, ff_real_position_sorted, ff_caught_T_new):
+    # get point_index_before_stop from heading_info_df
+    # check for NA in point_index_before_stop
+    if both_ff_df['point_index_before_stop'].isna().any():
+        raise ValueError(
+            'There are NA in point_index_before_stop in both_ff_df. Please check the heading_info_df.')
+
+    diff_in_curv_info = find_diff_in_curv_info(
+        both_ff_df, both_ff_df['point_index_before_stop'].values, monkey_information, ff_real_position_sorted, ff_caught_T_new)
+    diff_in_curv_info.rename(
+        columns={'ref_point_index': 'point_index'}, inplace=True)
+
+    columns_to_merge = ['traj_curv_to_stop', 'curv_from_stop_to_nxt_ff',
+                        'opt_curv_to_cur_ff', 'curv_from_cur_end_to_nxt_ff',
+                        'd_curv_null_arc', 'd_curv_monkey',
+                        'abs_d_curv_null_arc', 'abs_d_curv_monkey',
+                        'diff_in_d_curv', 'diff_in_abs_d_curv']
+
+    df.drop(columns=columns_to_merge, errors='ignore', inplace=True)
+    df = df.merge(diff_in_curv_info[['point_index'] +
+                  columns_to_merge], on='point_index', how='left')
+    return df
+
 
 def compute_overlap_and_drop(df1, col1, df2, col2):
     """
@@ -207,7 +237,8 @@ def rebin_spike_data(spikes_df, new_seg_info, bin_width=0.2):
         spikes_df, new_seg_info, bin_width=bin_width)
 
     # Convert binned spike data into wide-format matrix
-    rebinned_spike_data = _rebin_spike_data(concat_seg_data, new_segments=new_seg_info['new_segment'].unique())
+    rebinned_spike_data = _rebin_spike_data(
+        concat_seg_data, new_segments=new_seg_info['new_segment'].unique())
 
     return rebinned_spike_data
 

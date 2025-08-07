@@ -9,6 +9,7 @@ from decision_making_analysis.decision_making import plot_decision_making
 from visualization.plotly_tools import plotly_preparation, plotly_for_monkey
 from decision_making_analysis import trajectory_info
 from pattern_discovery import make_ff_dataframe
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 
 import os
 import sys
@@ -32,14 +33,26 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def find_best_arc_df_for_ff_in_duration(ff_indices, duration, curv_of_traj_df, monkey_information, ff_real_position_sorted, opt_arc_stop_first_vis_bdry=True):
-    mini_ff_dataframe = make_mini_ff_dataframe(
-        ff_indices, duration, monkey_information, ff_real_position_sorted, ff_radius=10, max_distance=400)
-    temp_curvature_df = curvature_utils.make_curvature_df(mini_ff_dataframe, curv_of_traj_df, ff_radius_for_opt_arc=15, clean=True,
+
+def find_best_arc_df_for_ff(ff_indices, point_indexes, curv_of_traj_df, monkey_information, 
+                            ff_real_position_sorted, opt_arc_stop_first_vis_bdry=True):
+
+    ff_info = find_cvn_utils.find_ff_info(
+            ff_indices,
+            point_indexes,
+            monkey_information,
+            ff_real_position_sorted)  
+    
+    curvature_df = curvature_utils.make_curvature_df(ff_info, curv_of_traj_df, clean=True,
                                                           opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
-    ff_best_arc_df, best_arc_original_columns = find_best_arc.make_best_arc_df(
-        temp_curvature_df, monkey_information, ff_real_position_sorted)
-    return ff_best_arc_df
+    return curvature_df, ff_info
+    # mini_ff_dataframe = make_mini_ff_dataframe(
+    #     ff_indices, duration, monkey_information, ff_real_position_sorted, ff_radius=10, max_distance=400)
+    # temp_curvature_df = curvature_utils.make_curvature_df(mini_ff_dataframe, curv_of_traj_df, ff_radius_for_opt_arc=15, clean=True,
+    #                                                       opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+    # ff_best_arc_df, best_arc_original_columns = find_best_arc.make_best_arc_df(
+    #     temp_curvature_df, monkey_information, ff_real_position_sorted)
+    #return ff_best_arc_df
 
 
 def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, linewidth=2,

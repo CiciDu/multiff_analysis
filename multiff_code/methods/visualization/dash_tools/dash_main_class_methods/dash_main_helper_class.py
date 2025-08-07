@@ -6,6 +6,7 @@ from visualization.matplotlib_tools import monkey_heading_utils
 from visualization.plotly_tools import plotly_for_monkey
 from null_behaviors import show_null_trajectory
 from visualization.plotly_tools import plotly_for_null_arcs
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
 
 import os
 import sys
@@ -69,7 +70,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                            heading_info_df_exists_ok=heading_info_df_exists_ok, test_or_control=test_or_control)
 
         self._get_stops_near_ff_row(stop_point_index)
-        
+
         self._prepare_static_main_plots()
 
     def _get_stops_near_ff_row(self, stop_point_index):
@@ -79,12 +80,14 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         else:
             try:
                 self.stops_near_ff_row = self.stops_near_ff_df_counted[self.stops_near_ff_df_counted['stop_point_index']
-                                                            == stop_point_index].iloc[0]
-                logging.info(f'Successfully retrieved stop_point_index: {stop_point_index}.')
+                                                                       == stop_point_index].iloc[0]
+                logging.info(
+                    f'Successfully retrieved stop_point_index: {stop_point_index}.')
             except:
-                logging.warning(f'stop_point_index: {stop_point_index} is not in stops_near_ff_df_counted. Using the first instance in stops_near_ff_df_counted to plot.')
+                logging.warning(
+                    f'stop_point_index: {stop_point_index} is not in stops_near_ff_df_counted. Using the first instance in stops_near_ff_df_counted to plot.')
         self.stop_point_index = self.stops_near_ff_row['stop_point_index']
-                
+
     def _put_down_checklist_for_all_plots(self, id_prefix=None):
         checklist_options = [{'label': 'show heading instead of curv', 'value': 'heading_instead_of_curv'},
                              {'label': 'truncate curv of traj by time of capture',
@@ -607,7 +610,10 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index
         self.nxt_ff_index = self.stops_near_ff_row.nxt_ff_index
 
-        # for the cur ff, we eliminate the point index after the capture
+        self.point_indexes_in_duration = self.monkey_information.loc[self.monkey_information['time'].between(
+            duration[0], duration[1]), 'point_index'].values
+        # # can also do:
+        # self.point_indexes_in_duration = self.curv_of_traj_df_in_duration['point_index'].values
 
         if self.overall_params['use_curv_to_ff_center']:
             all_point_index = self.curv_of_traj_df_in_duration['point_index'].values
@@ -618,11 +624,22 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         else:
             opt_arc_stop_first_vis_bdry = True if (
                 self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
-            self.cur_ff_best_arc_df = plotly_for_null_arcs.find_best_arc_df_for_ff_in_duration([self.cur_ff_index], duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                               opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+            self.cur_curv_df, self.cur_ff_info = plotly_for_null_arcs.find_best_arc_df_for_ff([self.cur_ff_index] * len(self.point_indexes_in_duration),
+                                                                                              self.point_indexes_in_duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                              opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
             self.cur_null_arc_info_for_duration = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
-                self.cur_ff_best_arc_df, self.monkey_information)
-            self.nxt_ff_best_arc_df = plotly_for_null_arcs.find_best_arc_df_for_ff_in_duration([self.nxt_ff_index], duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                               opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+                self.cur_curv_df, self.monkey_information)
+            self.nxt_curv_df, self.nxt_ff_info = plotly_for_null_arcs.find_best_arc_df_for_ff([self.nxt_ff_index] * len(self.point_indexes_in_duration),
+                                                                                              self.point_indexes_in_duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                              opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
             self.nxt_null_arc_info_for_duration = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
-                self.nxt_ff_best_arc_df, self.monkey_information)
+                self.nxt_curv_df, self.monkey_information)
+
+    def add_diff_in_curv_info_to_curv_of_traj_df_in_duration(self):
+        both_ff_df = pn_utils._merge_both_ff_df(
+            self.cur_curv_df, self.nxt_ff_info)
+        both_ff_df['point_index_before_stop'] = self.stops_near_ff_row.point_index_before_stop
+        self.curv_of_traj_df_in_duration = pn_utils.add_diff_in_curv_info(self.curv_of_traj_df_in_duration, both_ff_df,
+                                                                          self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)
+        # diff_in_curv_info = pn_utils.find_diff_in_curv_info(
+        #     both_ff_df, both_ff_df['point_index_before_stop'].values, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)

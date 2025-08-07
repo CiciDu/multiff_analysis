@@ -541,8 +541,11 @@ def find_ff_info_n_cm_ago(ff_df, monkey_information, ff_real_position_sorted, n_
 
 
 def find_ff_info(all_ff_index, all_point_index, monkey_information, ff_real_position_sorted):
-    ff_df = pd.DataFrame(
-        {'ff_index': all_ff_index.astype(int), 'point_index': all_point_index.astype(int)})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # Turn warnings into errors
+    
+        ff_df = pd.DataFrame(
+            {'ff_index': np.array(all_ff_index).astype(int), 'point_index': np.array(all_point_index).astype(int)})
 
     ff_df[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_df['ff_index'].values]
     ff_df[['monkey_x', 'monkey_y', 'monkey_angle']] = monkey_information.loc[ff_df['point_index'], [

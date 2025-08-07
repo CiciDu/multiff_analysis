@@ -186,22 +186,22 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         all_info_to_add, nxt_columns_added = self._add_basic_ff_info(
             all_info_to_add, 'nxt_')
 
-        all_info_to_add, cur_curv_df, cur_columns_added2 = self._add_ff_curv_info_to_df(
+        all_info_to_add, cur_ff_df, cur_curv_df, cur_columns_added2 = self._add_ff_curv_info_to_df(
             all_info_to_add, 'cur_')
-        all_info_to_add, nxt_curv_df, nxt_columns_added2 = self._add_ff_curv_info_to_df(
+        all_info_to_add, nxt_ff_df, nxt_curv_df, nxt_columns_added2 = self._add_ff_curv_info_to_df(
             all_info_to_add, 'nxt_')
-        both_curv_df = pn_utils._merge_curv_df(cur_curv_df, nxt_curv_df)
-        
+        both_ff_df = pn_utils._merge_both_ff_df(cur_curv_df, nxt_ff_df)
+
         columns_to_keep = time_columns + cur_columns_added + nxt_columns_added + cur_columns_added2 + nxt_columns_added2 + \
             ['stop_point_index', 'point_index', 'segment', 'target_index']
         # make sure there's no duplicate in columns_to_keep
         columns_to_keep = list(set(columns_to_keep))
         self.both_ff_across_time_df = all_info_to_add[columns_to_keep].copy()
-        
+
         self.both_ff_across_time_df = pn_utils.add_angle_from_cur_arc_end_to_nxt_ff(
-            self.both_ff_across_time_df, both_curv_df)
-        
-        self.add_diff_in_curv_info(both_curv_df)
+            self.both_ff_across_time_df, both_ff_df)
+
+        self.add_diff_in_curv_info_to_both_ff_across_time_df(both_ff_df)
 
         self._add_rel_x_and_y_to_both_ff_across_time_df()
         self.both_ff_across_time_df = self._add_traj_curv_to_df(
@@ -212,28 +212,30 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.both_ff_across_time_df.reset_index(drop=True, inplace=True)
 
         return self.both_ff_across_time_df
-    
-    
-    def add_diff_in_curv_info(self, both_curv_df):
-        # get point_index_before_stop from heading_info_df
-        both_curv_df = both_curv_df.merge(self.heading_info_df[['point_index_before_stop', 'cur_ff_index']], on='cur_ff_index', how='left')
-        # check for NA in point_index_before_stop
-        if both_curv_df['point_index_before_stop'].isna().any():
-            raise ValueError('There are NA in point_index_before_stop in both_curv_df. Please check the heading_info_df.')
 
-        diff_in_curv_info = pn_utils.find_diff_in_curv_info(
-            both_curv_df, both_curv_df['point_index_before_stop'].values, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)
-        columns_to_merge = ['traj_curv_to_stop', 'curv_from_stop_to_nxt_ff', 
-                             'opt_curv_to_cur_ff', 'curv_from_cur_end_to_nxt_ff',
-                             'd_curv_null_arc', 'd_curv_monkey', 
-                             'abs_d_curv_null_arc', 'abs_d_curv_monkey', 
-                             'diff_in_d_curv', 'diff_in_abs_d_curv']
-        
-        diff_in_curv_info.rename(columns={'ref_point_index': 'point_index'}, inplace=True)
-        self.both_ff_across_time_df.drop(columns=columns_to_merge, errors='ignore', inplace=True)
-        self.both_ff_across_time_df = self.both_ff_across_time_df.merge(diff_in_curv_info[['point_index'] + columns_to_merge], on='point_index', how='left')
-        
-        
+    def add_diff_in_curv_info_to_both_ff_across_time_df(self, both_ff_df):
+        # get point_index_before_stop from heading_info_df
+        both_ff_df = both_ff_df.merge(self.heading_info_df[[
+            'point_index_before_stop', 'cur_ff_index']], on='cur_ff_index', how='left')
+        self.both_ff_across_time_df = pn_utils.add_diff_in_curv_info(
+            self.both_ff_across_time_df, both_ff_df, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)
+
+        # # check for NA in point_index_before_stop
+        # if both_ff_df['point_index_before_stop'].isna().any():
+        #     raise ValueError('There are NA in point_index_before_stop in both_ff_df. Please check the heading_info_df.')
+
+        # diff_in_curv_info = pn_utils.find_diff_in_curv_info(
+        #     both_ff_df, both_ff_df['point_index_before_stop'].values, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)
+        # columns_to_merge = ['traj_curv_to_stop', 'curv_from_stop_to_nxt_ff',
+        #                      'opt_curv_to_cur_ff', 'curv_from_cur_end_to_nxt_ff',
+        #                      'd_curv_null_arc', 'd_curv_monkey',
+        #                      'abs_d_curv_null_arc', 'abs_d_curv_monkey',
+        #                      'diff_in_d_curv', 'diff_in_abs_d_curv']
+
+        # diff_in_curv_info.rename(columns={'ref_point_index': 'point_index'}, inplace=True)
+        # self.both_ff_across_time_df.drop(columns=columns_to_merge, errors='ignore', inplace=True)
+        # self.both_ff_across_time_df = self.both_ff_across_time_df.merge(diff_in_curv_info[['point_index'] + columns_to_merge], on='point_index', how='left')
+
     def collect_data_for_each_segment(self, build_segment_func, select_info_kwargs={}):
         all_info_to_add = pd.DataFrame([])
 
@@ -321,9 +323,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
     def _add_ff_curv_info_to_df(self, df, which_ff_info):
         ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
-        ff_df = ff_df[ff_df['ff_angle_boundary']
+        ff_df2 = ff_df[ff_df['ff_angle_boundary']
                       .between(-np.pi/4, np.pi/4)].copy()
-        curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
+        curv_df = curvature_utils.make_curvature_df(ff_df2, self.curv_of_traj_df, clean=False,
                                                     remove_invalid_rows=False,
                                                     invalid_curvature_ok=True,
                                                     monkey_information=self.monkey_information,
@@ -333,20 +335,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         df, columns_added = pn_utils.add_curv_info(
             df, curv_df, which_ff_info)
 
-        return df, curv_df, columns_added
+        return df, ff_df, curv_df, columns_added
 
-    # def _add_ff_curv_info_to_df(self, df, which_ff_info):
-    #     ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
-    #     ff_df = ff_df[ff_df['ff_angle'].between(-np.pi/4, np.pi/4)].copy()
-    #     curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,
-    #                                                 remove_invalid_rows=True,
-    #                                                 monkey_information=self.monkey_information,
-    #                                                 ff_caught_T_new=self.ff_caught_T_new)
-
-    #     df, columns_added = pn_utils.add_curv_info(
-    #         df, curv_df, which_ff_info)
-
-    #     return df, curv_df, columns_added
 
     def _add_time_info_to_df(self, df):
         df['time'] = self.monkey_information.loc[df['point_index'].values, 'time'].values
