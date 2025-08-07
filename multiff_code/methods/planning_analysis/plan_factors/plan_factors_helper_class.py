@@ -68,7 +68,7 @@ class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
         return plan_x
 
-    def _make_plan_y(self, heading_info_df_exists_ok=False, stops_near_ff_df_exists_ok=False, save_data=False):
+    def _make_plan_y(self, heading_info_df_exists_ok=False, stops_near_ff_df_exists_ok=False, save_data=True):
 
         if getattr(self, 'monkey_dataframe', None) is None:
             self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=self.curv_of_traj_mode,
@@ -151,7 +151,7 @@ class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
             print(f'Successfully retrieved {attr_name} ({df_name})')
         else:
             print(f'Making new: {attr_name} ({df_name})')
-            plan_data = self._make_plan_y(**make_plan_func_kwargs)
+            plan_data = self._make_plan_y(**make_plan_func_kwargs, save_data=save_data)
             if save_data:
                 plan_data.to_csv(csv_path, index=False)
                 print(f'Made {attr_name} and saved to {csv_path}')

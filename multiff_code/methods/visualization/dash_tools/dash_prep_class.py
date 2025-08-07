@@ -318,7 +318,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             self._eliminate_outliers_in_cur_ff_curv()
         # self._find_relative_heading_info()
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
-        self.heading_info_df, self.diff_in_curv_df = self._make_heading_info_df(
+        self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(
             self.test_or_control)
         self.kwargs_for_heading_plot = self._make_kwargs_for_heading_plot()
 

@@ -4,7 +4,7 @@ from planning_analysis.show_planning import show_planning_class, nxt_ff_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils
 from planning_analysis.agent_analysis import agent_plan_factors_x_sess_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils, process_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils, plot_variations_utils, process_variations_utils
 from machine_learning.RL.SB3 import rl_for_multiff_utils
 from data_wrangling import specific_utils
 from sklearn.preprocessing import StandardScaler

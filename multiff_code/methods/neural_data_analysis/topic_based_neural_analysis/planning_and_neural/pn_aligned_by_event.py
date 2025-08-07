@@ -298,9 +298,9 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
         self.data_kwargs1 = {'raw_data_folder_path': self.raw_data_folder_path,
                              'one_point_index_per_bin': self.one_point_index_per_bin}
 
-        self.test_data_inst = pn_helper_class.PlanningAndNeuralHelper(test_or_control='test',
-                                                                      **self.data_kwargs1)
-        self.test_data_inst._only_make_stops_near_ff_df()
+        self.test_inst = pn_helper_class.PlanningAndNeuralHelper(test_or_control='test',
+                                                                 **self.data_kwargs1)
+        self.test_inst._only_make_stops_near_ff_df()
 
 
 # These might be useful in the future

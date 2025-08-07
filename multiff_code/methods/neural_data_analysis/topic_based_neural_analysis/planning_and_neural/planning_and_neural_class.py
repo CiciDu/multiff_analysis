@@ -58,16 +58,16 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
         # get behavioral_data
         # if test_or_control == 'test':
-        self.test_data_inst = pn_helper_class.PlanningAndNeuralHelper(test_or_control='test',
-                                                                      **data_kwargs1)
-        self.test_data_inst.prep_behav_data_to_analyze_planning(**data_kwargs2)
+        self.test_inst = pn_helper_class.PlanningAndNeuralHelper(test_or_control='test',
+                                                                 **data_kwargs1)
+        self.test_inst.prep_behav_data_to_analyze_planning(**data_kwargs2)
 
-        self.ctrl_data_inst = pn_helper_class.PlanningAndNeuralHelper(test_or_control='control',
-                                                                      **data_kwargs1)
-        self.ctrl_data_inst.prep_behav_data_to_analyze_planning(**data_kwargs2)
+        self.ctrl_inst = pn_helper_class.PlanningAndNeuralHelper(test_or_control='control',
+                                                                 **data_kwargs1)
+        self.ctrl_inst.prep_behav_data_to_analyze_planning(**data_kwargs2)
 
-        test_data, ctr_data = pn_utils.compute_overlap_and_drop(self.test_data_inst.planning_data_by_point, 'point_index',
-                                                                self.ctrl_data_inst.planning_data_by_point, 'point_index')
+        test_data, ctr_data = pn_utils.compute_overlap_and_drop(self.test_inst.planning_data_by_point, 'point_index',
+                                                                self.ctrl_inst.planning_data_by_point, 'point_index')
         test_data['whether_test'] = 1
         ctr_data['whether_test'] = 0
 

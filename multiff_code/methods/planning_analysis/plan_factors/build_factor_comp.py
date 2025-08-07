@@ -61,13 +61,13 @@ def process_heading_info_df(heading_info_df):
         heading_info_df[['angle_from_m_before_stop_to_nxt_ff', 'angle_opt_arc_from_cur_end_to_nxt', 'angle_cntr_arc_from_cur_end_to_nxt']] = heading_info_df[[
             'angle_from_m_before_stop_to_nxt_ff', 'angle_opt_arc_from_cur_end_to_nxt', 'angle_cntr_arc_from_cur_end_to_nxt']] * (180/np.pi)
         _add_diff_in_d_heading_to_cur_ff(heading_info_df)
-        _add_diff_in_d_heading_to_nxt_ff(heading_info_df)
+        _add_diff_in_abs_angle_to_nxt_ff(heading_info_df)
         heading_info_df['ratio_of_angle_to_nxt_ff'] = heading_info_df['angle_opt_arc_from_cur_end_to_nxt'] / \
             heading_info_df['angle_from_m_before_stop_to_nxt_ff']
     return heading_info_df
 
 
-def _add_diff_in_d_heading_to_nxt_ff(heading_info_df):
+def _add_diff_in_abs_angle_to_nxt_ff(heading_info_df):
     """
     Calculate the difference in directional heading angles between null and actual movement directions.
 

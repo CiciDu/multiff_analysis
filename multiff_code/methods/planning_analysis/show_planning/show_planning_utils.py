@@ -16,18 +16,6 @@ import os
 import sys
 
 
-def _extend_arc_length_by_increasing_arc_ending_angle(null_arc_info):
-    abs_delta_angle = abs(
-        null_arc_info['arc_ending_angle'] - null_arc_info['arc_starting_angle'])
-    # clip angle_to_add so that its absolute value is within 45 degrees
-    angle_to_add = np.clip(abs_delta_angle * 3, 0, math.pi/2 - 0.00001)
-    angle_to_add = angle_to_add * \
-        np.sign(null_arc_info['arc_ending_angle'] -
-                null_arc_info['arc_starting_angle'])
-    null_arc_info['arc_ending_angle'] = null_arc_info['arc_starting_angle'] + angle_to_add
-    return null_arc_info
-
-
 def get_points_on_each_arc(null_arc_info, num_points_on_each_arc=2000, extend_arc_angle=False):
 
     # Generate angle array
@@ -69,6 +57,18 @@ def get_points_on_each_arc(null_arc_info, num_points_on_each_arc=2000, extend_ar
     arc_df['delta_angle_from_starting_angle'] = np.abs(
         arc_df['angle'] - arc_df['arc_starting_angle'])
     return arc_df
+
+
+def _extend_arc_length_by_increasing_arc_ending_angle(null_arc_info):
+    abs_delta_angle = abs(
+        null_arc_info['arc_ending_angle'] - null_arc_info['arc_starting_angle'])
+    # clip angle_to_add so that its absolute value is within 45 degrees
+    angle_to_add = np.clip(abs_delta_angle * 3, 0, math.pi/2 - 0.00001)
+    angle_to_add = angle_to_add * \
+        np.sign(null_arc_info['arc_ending_angle'] -
+                null_arc_info['arc_starting_angle'])
+    null_arc_info['arc_ending_angle'] = null_arc_info['arc_starting_angle'] + angle_to_add
+    return null_arc_info
 
 
 def get_opt_arc_end_points_closest_to_stop(null_arc_info, stop_and_ref_point_info, reward_boundary_radius=25):
@@ -323,11 +323,12 @@ def make_heading_info_df(cur_and_nxt_ff_from_ref_df, stops_near_ff_df, monkey_in
                     ] = ff_real_position_sorted[heading_info_df['nxt_ff_index']]
 
     # Merge with cur_and_nxt_ff_from_ref_df to get landing headings
-    columns_to_keep = ['stop_point_index',
+    columns_to_keep = ['stop_point_index', 'ref_point_index',
                        'cur_cntr_arc_d_heading', 'nxt_cntr_arc_d_heading',
                        'cur_opt_arc_d_heading', 'nxt_opt_arc_d_heading',
                        'cur_cntr_arc_end_heading', 'nxt_cntr_arc_end_heading',
                        'cur_opt_arc_end_heading', 'nxt_opt_arc_end_heading',
+                       'cur_cntr_arc_curv', 'cur_opt_arc_curv', 'nxt_cntr_arc_curv', 'nxt_opt_arc_curv',
                        'cur_cntr_arc_end_x', 'cur_cntr_arc_end_y', 'nxt_cntr_arc_end_x', 'nxt_cntr_arc_end_y',
                        'cur_opt_arc_end_x', 'cur_opt_arc_end_y', 'nxt_opt_arc_end_x', 'nxt_opt_arc_end_y',
                        'd_heading_of_traj', 'ref_monkey_angle', 'ref_curv_of_traj',
@@ -475,172 +476,15 @@ def remove_outliers(x_var_df, y_var):
     return x_var_df, y_var
 
 
-def make_nxt_ff_info_for_null_arc(nxt_ff_df_modified, cur_ff_df_final, heading_info_df,
-                                  use_curv_to_ff_center=False):
-    # To get # curv of null arc from monkey stop to nxt ff
-
-    # use 'cur_arc_end_x', 'cur_arc_end_y', 'cur_arc_end_heading'
-    # to replace 'monkey_x', 'monkey_y', 'monkey_angle'
-    nxt_ff_info_for_null_arc = nxt_ff_df_modified.copy()
-    if use_curv_to_ff_center:
-        nxt_ff_info_for_null_arc[['monkey_x', 'monkey_y', 'monkey_angle']] = heading_info_df[[
-            'cur_cntr_arc_end_x', 'cur_cntr_arc_end_y', 'cur_cntr_arc_end_heading']].values
-    else:
-        nxt_ff_info_for_null_arc[['monkey_x', 'monkey_y', 'monkey_angle']] = heading_info_df[[
-            'cur_opt_arc_end_x', 'cur_opt_arc_end_y', 'cur_opt_arc_end_heading']].values
-
-    # then calculate ff_distance', 'ff_angle', 'ff_angle_boundary'
-    nxt_ff_info_for_null_arc['ff_distance'] = np.sqrt((nxt_ff_info_for_null_arc['monkey_x'] - nxt_ff_info_for_null_arc['ff_x'])**2 + (
-        nxt_ff_info_for_null_arc['monkey_y'] - nxt_ff_info_for_null_arc['ff_y'])**2)
-    nxt_ff_info_for_null_arc['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(ff_x=nxt_ff_info_for_null_arc['ff_x'].values, ff_y=nxt_ff_info_for_null_arc['ff_y'].values, mx=nxt_ff_info_for_null_arc['monkey_x'].values,
-                                                                                         my=nxt_ff_info_for_null_arc['monkey_y'].values, m_angle=nxt_ff_info_for_null_arc['monkey_angle'].values)
-    nxt_ff_info_for_null_arc['ff_angle_boundary'] = specific_utils.calculate_angles_to_ff_boundaries(
-        angles_to_ff=nxt_ff_info_for_null_arc['ff_angle'].values, distances_to_ff=nxt_ff_info_for_null_arc['ff_distance'].values)
-
-    # make the point index as point index right before stop; but this only matters in sorting rows later
-    nxt_ff_info_for_null_arc['point_index'] = heading_info_df['point_index_before_stop'].values
-
-    # curv_of_traj will be cur null curv's opt_arc_curv
-    nxt_ff_info_for_null_arc['curv_of_traj'] = cur_ff_df_final['opt_arc_curv'].values
-
-    return nxt_ff_info_for_null_arc
-
-
-def make_nxt_ff_info_for_monkey(nxt_ff_df_modified, heading_info_df, monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                curv_traj_window_before_stop=[-50, 0]):
-    nxt_ff_info_for_monkey = find_cvn_utils.find_ff_info(
-        nxt_ff_df_modified.ff_index.values, heading_info_df.point_index_before_stop.values, monkey_information, ff_real_position_sorted)
-    nxt_ff_info_for_monkey['stop_point_index'] = heading_info_df['stop_point_index'].values
-
-    curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(curv_traj_window_before_stop, monkey_information, ff_caught_T_new,
-                                                                                            curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False)
-    curv_of_traj_df.set_index('point_index', inplace=True)
-    monkey_curv_before_stop = curv_of_traj_df.loc[heading_info_df[
-        'point_index_before_stop'].values, 'curv_of_traj'].values
-
-    nxt_ff_info_for_monkey['curv_of_traj'] = monkey_curv_before_stop
-
-    return nxt_ff_info_for_monkey
-
-
-def make_diff_in_curv_df(nxt_ff_info_for_monkey, nxt_ff_info_for_null_arc):
-    """
-    Calculate the difference in curvature between null arc and monkey data, 
-    excluding rows where ff_angle_boundary is outside of [-45, 45] degrees.
-    """
-
-    # Define the angle boundary
-    angle_boundary = [-math.pi/4, math.pi/4]
-
-    # Find rows where ff_angle_boundary is outside of [-45, 45] degrees for both DataFrames
-    null_arc_outside_boundary = nxt_ff_info_for_null_arc[
-        (nxt_ff_info_for_null_arc['ff_angle_boundary'] < angle_boundary[0]) |
-        (nxt_ff_info_for_null_arc['ff_angle_boundary'] > angle_boundary[1])
-    ]
-
-    monkey_outside_boundary = nxt_ff_info_for_monkey[
-        (nxt_ff_info_for_monkey['ff_angle_boundary'] < angle_boundary[0]) |
-        (nxt_ff_info_for_monkey['ff_angle_boundary'] > angle_boundary[1])
-    ]
-
-    # Get the union of the indices of the rows outside the boundary
-    union_indices = null_arc_outside_boundary.index.union(
-        monkey_outside_boundary.index)
-
-    # Calculate the percentage of these rows out of all rows for both DataFrames
-    total_rows = len(nxt_ff_info_for_null_arc) + len(nxt_ff_info_for_monkey)
-    percentage_outside_boundary = len(union_indices) / total_rows * 100
-
-    # Print the percentage
-    print(
-        f"Percentage of rows outside of [-45, 45]: {percentage_outside_boundary:.2f}%")
-
-    # Drop the union of these rows from both DataFrames
-    nxt_ff_info_for_null_arc_cleaned = nxt_ff_info_for_null_arc.drop(
-        null_arc_outside_boundary.index)
-    nxt_ff_info_for_monkey_cleaned = nxt_ff_info_for_monkey.drop(
-        monkey_outside_boundary.index)
-
-    # Generate curvature DataFrames
-    null_arc_curv_df = curvature_utils._make_curvature_df(
-        nxt_ff_info_for_null_arc_cleaned,
-        nxt_ff_info_for_null_arc_cleaned['curv_of_traj'].values,
-        ff_radius_for_opt_arc=15,
-        clean=False,
-        invalid_curvature_ok=False,
-        include_cntr_arc_curv=False,
-        # this doesn't matter since we only care about the curvature to nxt ff, not the null arc landing point inside nxt ff
-        opt_arc_stop_first_vis_bdry=False,
-    )
-
-    monkey_curv_df = curvature_utils._make_curvature_df(
-        nxt_ff_info_for_monkey_cleaned,
-        nxt_ff_info_for_monkey_cleaned['curv_of_traj'].values,
-        ff_radius_for_opt_arc=15,
-        clean=False,
-        invalid_curvature_ok=True,
-        include_cntr_arc_curv=False,
-        opt_arc_stop_first_vis_bdry=False,
-    )
-
-    null_arc_curv_df = null_arc_curv_df[[
-        'opt_arc_curv']].reset_index(drop=True)
-    null_arc_curv_df[['stop_point_index', 'curv_of_traj']] = nxt_ff_info_for_null_arc_cleaned[[
-        'stop_point_index', 'curv_of_traj']].values
-    null_arc_curv_df.rename(columns={'curv_of_traj': 'opt_arc_curv_to_cur_ff',
-                                     'opt_arc_curv': 'opt_arc_curv_from_cur_end_to_nxt'}, inplace=True)
-
-    monkey_curv_df = monkey_curv_df[[
-        'opt_arc_curv']].reset_index(drop=True)
-    monkey_curv_df[['stop_point_index', 'curv_of_traj']] = nxt_ff_info_for_monkey_cleaned[[
-        'stop_point_index', 'curv_of_traj']].values
-    # note, the window for curv_of_traj_in_window_to_cur_ff is curv_traj_window_before_stop, used in make_nxt_ff_info_for_monkey
-    monkey_curv_df.rename(columns={'curv_of_traj': 'curv_of_traj_in_window_to_cur_ff',
-                                   'opt_arc_curv': 'opt_arc_curv_from_m_before_stop_to_nxt'}, inplace=True)
-
-    diff_in_curv_df = monkey_curv_df.merge(
-        null_arc_curv_df, how='outer', on='stop_point_index')
-
-    return diff_in_curv_df
-
-
-def furnish_diff_in_curv_df(diff_in_curv_df):
-    diff_in_curv_df['d_curv_null_arc'] = (180/math.pi * 100) * (
-        diff_in_curv_df['opt_arc_curv_from_cur_end_to_nxt'] - diff_in_curv_df['opt_arc_curv_to_cur_ff'])
-    diff_in_curv_df['d_curv_monkey'] = (180/math.pi * 100) * (
-        diff_in_curv_df['opt_arc_curv_from_m_before_stop_to_nxt'] - diff_in_curv_df['curv_of_traj_in_window_to_cur_ff'])
-
-    diff_in_curv_df['abs_d_curv_null_arc'] = np.abs(
-        diff_in_curv_df['d_curv_null_arc'])
-    diff_in_curv_df['abs_d_curv_monkey'] = np.abs(
-        diff_in_curv_df['d_curv_monkey'])
-
-    diff_in_curv_df['diff_in_d_curv'] = diff_in_curv_df['d_curv_null_arc'] - \
-        diff_in_curv_df['d_curv_monkey']
-    diff_in_curv_df['diff_in_abs_d_curv'] = np.abs(
-        diff_in_curv_df['d_curv_null_arc']) - np.abs(diff_in_curv_df['d_curv_monkey'])
-
-    # # The following 2 vars are currently unused
-    # diff_in_curv_df['diff_in_curv_to_cur_ff'] = diff_in_curv_df['opt_arc_curv_to_cur_ff'] - \
-    #     diff_in_curv_df['curv_of_traj_in_window_to_cur_ff']
-    # diff_in_curv_df['diff_in_curv_to_nxt_ff'] = diff_in_curv_df['opt_arc_curv_from_cur_end_to_nxt'] - \
-    #     diff_in_curv_df['opt_arc_curv_from_m_before_stop_to_nxt']
-
-    return diff_in_curv_df
-
-
-def retrieve_df_based_on_ref_point(ref_point_mode, ref_point_value, test_or_control, data_folder_name, df_partial_path, monkey_name):
+def retrieve_df_based_on_ref_point(monkey_name, ref_point_mode, ref_point_value, test_or_control, data_folder_name, df_partial_path,
+                                   target_var_name=None):
     df_path = os.path.join(data_folder_name, df_partial_path, test_or_control)
     os.makedirs(df_path, exist_ok=True)
     df_name = find_cvn_utils.get_df_name_by_ref(
-        None, ref_point_mode, ref_point_value)
+        monkey_name, ref_point_mode, ref_point_value)
     retrieved_df = pd.read_csv(os.path.join(df_path, df_name), index_col=0)
+    if target_var_name is None:
+        target_var_name = df_name
     print(
-        f'Retrieving {df_name} from {os.path.join(df_path, df_name)} succeeded')
+        f'Successfully retrieved {target_var_name} from {os.path.join(df_path, df_name)}')
     return retrieved_df
-
-
-def get_diff_in_curv_df_from_heading_info_df(heading_info_df):
-    diff_in_curv_df = heading_info_df[['stop_point_index', 'd_curv_null_arc', 'd_curv_monkey',
-                                       'abs_d_curv_null_arc', 'abs_d_curv_monkey', 'diff_in_abs_d_curv']].copy()
-    return diff_in_curv_df

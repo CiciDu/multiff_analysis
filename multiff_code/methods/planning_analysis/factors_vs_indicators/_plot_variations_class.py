@@ -1,5 +1,5 @@
 
-from planning_analysis.variations_of_factors_vs_results import plot_variations_utils
+from planning_analysis.factors_vs_indicators import plot_variations_utils
 
 import os
 import sys

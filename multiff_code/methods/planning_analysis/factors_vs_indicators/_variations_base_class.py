@@ -1,6 +1,6 @@
 
 from planning_analysis.plan_factors import test_vs_control_utils, test_vs_control_utils
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, _predict_y_values_class, _compare_y_values_class, _plot_variations_class
+from planning_analysis.factors_vs_indicators import make_variations_utils, _predict_y_values_class, _compare_y_values_class, _plot_variations_class
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 import os

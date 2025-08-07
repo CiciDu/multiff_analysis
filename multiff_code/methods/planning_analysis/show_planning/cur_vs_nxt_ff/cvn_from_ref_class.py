@@ -1,4 +1,5 @@
 import sys
+from planning_analysis.plan_indicators import diff_in_curv_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, opt_arc_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_cvn_class, cvn_helper_class
@@ -44,13 +45,19 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def streamline_organizing_info(self,
                                    # ref_point_mode can be 'time', 'distance', or 'time after cur ff visible'
-                                   ref_point_mode='distance', ref_point_value=-150,
+                                   ref_point_mode='distance', 
+                                   ref_point_value=-150,
                                    curv_traj_window_before_stop=[-50, 0],
-                                   curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0], truncate_curv_of_traj_by_time_of_capture=False,
-                                   eliminate_outliers=False, use_curv_to_ff_center=False, deal_with_rows_with_big_ff_angles=True,
+                                   curv_of_traj_mode='distance', 
+                                   window_for_curv_of_traj=[-25, 0], 
+                                   truncate_curv_of_traj_by_time_of_capture=False,
+                                   eliminate_outliers=False, 
+                                   use_curv_to_ff_center=False, 
+                                   deal_with_rows_with_big_ff_angles=True,
                                    remove_i_o_modify_rows_with_big_ff_angles=False,
                                    stops_near_ff_df_exists_ok=True,
-                                   heading_info_df_exists_ok=True, test_or_control='test',
+                                   heading_info_df_exists_ok=True, 
+                                   test_or_control='test',
                                    ):
 
         self.make_stops_near_ff_and_ff_comparison_dfs(
@@ -88,7 +95,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         # make some other useful df
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
-        self.heading_info_df, self.diff_in_curv_df = self._make_heading_info_df(
+        self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(
             test_or_control, heading_info_df_exists_ok)
 
         self.kwargs_for_heading_plot = self._make_kwargs_for_heading_plot()
@@ -99,8 +106,11 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
     def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after cur ff visible', ref_point_value=0.0,
                                                   curv_traj_window_before_stop=[
                                                       -50, 0],
-                                                  use_curv_to_ff_center=False, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                                  save_data=True, merge_diff_in_curv_df_to_heading_info=True,
+                                                  use_curv_to_ff_center=False, 
+                                                  stops_near_ff_df_exists_ok=True, 
+                                                  heading_info_df_exists_ok=True,
+                                                  save_data=True, 
+                                                  merge_diff_in_curv_df_to_heading_info=True,
                                                   deal_with_rows_with_big_ff_angles=True,
                                                   remove_i_o_modify_rows_with_big_ff_angles=False):
 
@@ -117,7 +127,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                             deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
                                                             remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
-        self.heading_info_df, self.diff_in_curv_df = self._make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
+        self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
                                                                                 merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
     def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self, ref_point_mode, ref_point_value,
@@ -147,17 +157,17 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         df_path = os.path.join(folder_path, df_name)
         if exists_ok & os.path.exists(df_path):
             self.diff_in_curv_df = pd.read_csv(df_path)
-            print(f'Retrieving {df_name} from {df_path} succeeded')
+            print(f'Successfully retrieved diff_in_curv_df from {df_path}')
         else:
             if not only_try_retrieving:
                 self.make_diff_in_curv_df(
                     curv_traj_window_before_stop=curv_traj_window_before_stop)
                 if save_data:
                     self.diff_in_curv_df.to_csv(df_path)
-                    print(f'Stored {df_name} in {df_path}')
+                    print(f'Saved diff_in_curv_df in {df_path}')
             else:
                 raise FileNotFoundError(
-                    f'{df_name} is not in the folder: {folder_path}')
+                    f'Failed to retrieve diff_in_curv_df: {df_name} is not in the folder: {folder_path}')
 
         if merge_diff_in_curv_df_to_heading_info:
             if hasattr(self, 'heading_info_df'):
@@ -167,14 +177,14 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         return self.diff_in_curv_df
 
     def make_diff_in_curv_df(self, curv_traj_window_before_stop=[-50, 0]):
-        self.nxt_ff_info_for_null_arc = show_planning_utils.make_nxt_ff_info_for_null_arc(
-            self.nxt_ff_df_modified, self.cur_ff_df_final, self.heading_info_df)
-        self.nxt_ff_info_for_monkey = show_planning_utils.make_nxt_ff_info_for_monkey(self.nxt_ff_df_modified, self.heading_info_df, self.monkey_information,
-                                                                                      self.ff_real_position_sorted, self.ff_caught_T_new,
-                                                                                      curv_traj_window_before_stop=curv_traj_window_before_stop)
-        self.diff_in_curv_df = show_planning_utils.make_diff_in_curv_df(
-            self.nxt_ff_info_for_monkey, self.nxt_ff_info_for_null_arc)
-        self.diff_in_curv_df = show_planning_utils.furnish_diff_in_curv_df(
+        self.cur_end_to_next_ff_curv = diff_in_curv_utils.compute_cur_end_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df,
+                                                                                           use_curv_to_ff_center=False)
+        self.prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df, self.monkey_information,
+                                                                                               self.ff_real_position_sorted, self.ff_caught_T_new,
+                                                                                               curv_traj_window_before_stop=curv_traj_window_before_stop)
+        self.diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
+            self.prev_stop_to_next_ff_curv, self.cur_end_to_next_ff_curv)
+        self.diff_in_curv_df = diff_in_curv_utils.furnish_diff_in_curv_df(
             self.diff_in_curv_df)
         return self.diff_in_curv_df
 
@@ -358,14 +368,15 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                                      only_try_retrieving=True)
 
         self.heading_info_df = show_planning_utils.retrieve_df_based_on_ref_point(
-            ref_point_mode, ref_point_value, test_or_control, self.planning_data_folder_path, self.heading_info_partial_path, self.monkey_name)
+            self.monkey_name, ref_point_mode, ref_point_value, test_or_control, self.planning_data_folder_path, self.heading_info_partial_path,
+            target_var_name='heading_info_df')
 
         if merge_diff_in_curv_df_to_heading_info:
             self.heading_info_df = self.heading_info_df.merge(
                 self.diff_in_curv_df, on='stop_point_index', how='left')
         return self.heading_info_df, self.diff_in_curv_df
 
-    def _make_heading_info_df(self, test_or_control='test', heading_info_df_exists_ok=True, diff_in_curv_df_exists_ok=True, save_data=True,
+    def retrieve_or_make_heading_info_df(self, test_or_control='test', heading_info_df_exists_ok=True, diff_in_curv_df_exists_ok=True, save_data=True,
                               merge_diff_in_curv_df_to_heading_info=True):
         self.heading_info_path = os.path.join(
             self.planning_data_folder_path, self.heading_info_partial_path, test_or_control)
@@ -381,7 +392,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         except Exception as e:
             if heading_info_df_exists_ok:
                 print(
-                    f'Failed to retrieve heading_info_df because of {e}; will make new heading_info_df')
+                    f'Failed to retrieve heading_info_df because {e}; will make new heading_info_df')
             self.heading_info_df = show_planning_utils.make_heading_info_df(
                 self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
             self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['angle_from_m_before_stop_to_nxt_ff'].rank(
@@ -406,7 +417,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
             self.diff_in_curv_df = self.make_or_retrieve_diff_in_curv_df(self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'], test_or_control,
                                                                          curv_traj_window_before_stop=self.curv_traj_window_before_stop,
-                                                                         exists_ok=diff_in_curv_df_exists_ok, save_data=save_data, merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
+                                                                         exists_ok=diff_in_curv_df_exists_ok, save_data=save_data, 
+                                                                         merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
         return self.heading_info_df, self.diff_in_curv_df
 

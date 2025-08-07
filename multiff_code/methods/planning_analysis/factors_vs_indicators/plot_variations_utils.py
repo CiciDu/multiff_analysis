@@ -1,4 +1,4 @@
-from planning_analysis.variations_of_factors_vs_results import process_variations_utils
+from planning_analysis.factors_vs_indicators import process_variations_utils
 import numpy as np
 import math
 import plotly.graph_objects as go

@@ -2,7 +2,7 @@
 import sys
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils
 
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from data_wrangling import combine_info_utils, base_processing_class
@@ -251,9 +251,11 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
         return self.combd_heading_df_x_sessions, self.combd_diff_in_curv_df
 
-    def _make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
-                                          curv_traj_window_before_stop=[-50, 0], test_or_control='test',
-                                          stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True, sessions_df_for_one_monkey=None,
+    def _make_combd_heading_df_x_sessions(self, test_or_control='test',
+                                          ref_point_mode='distance', ref_point_value=-100,
+                                          curv_traj_window_before_stop=[-50, 0], 
+                                          stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True, 
+                                          sessions_df_for_one_monkey=None,
                                           use_curv_to_ff_center=False):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value

@@ -186,9 +186,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         all_info_to_add, nxt_columns_added = self._add_basic_ff_info(
             all_info_to_add, 'nxt_')
 
-        all_info_to_add, cur_curv_df, cur_columns_added2 = self._add_ff_info_to_df(
+        all_info_to_add, cur_curv_df, cur_columns_added2 = self._add_ff_curv_info_to_df(
             all_info_to_add, 'cur_')
-        all_info_to_add, nxt_curv_df, nxt_columns_added2 = self._add_ff_info_to_df(
+        all_info_to_add, nxt_curv_df, nxt_columns_added2 = self._add_ff_curv_info_to_df(
             all_info_to_add, 'nxt_')
 
         columns_to_keep = time_columns + cur_columns_added + nxt_columns_added + cur_columns_added2 + nxt_columns_added2 + \
@@ -294,7 +294,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(
             self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values) - 1
 
-    def _add_ff_info_to_df(self, df, which_ff_info):
+    def _add_ff_curv_info_to_df(self, df, which_ff_info):
         ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
         ff_df = ff_df[ff_df['ff_angle_boundary']
                       .between(-np.pi/4, np.pi/4)].copy()
@@ -304,12 +304,13 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                                     monkey_information=self.monkey_information,
                                                     ff_caught_T_new=self.ff_caught_T_new)
 
+        print('curv_df.columns:', np.unique(curv_df.columns))
         df, columns_added = pn_utils.add_curv_info(
             df, curv_df, which_ff_info)
 
         return df, curv_df, columns_added
 
-    # def _add_ff_info_to_df(self, df, which_ff_info):
+    # def _add_ff_curv_info_to_df(self, df, which_ff_info):
     #     ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
     #     ff_df = ff_df[ff_df['ff_angle'].between(-np.pi/4, np.pi/4)].copy()
     #     curv_df = curvature_utils.make_curvature_df(ff_df, self.curv_of_traj_df, clean=False,

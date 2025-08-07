@@ -1,5 +1,5 @@
 
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils
 from planning_analysis import ml_for_planning_class, ml_for_planning_utils
 from machine_learning.ml_methods import ml_methods_class
 import os

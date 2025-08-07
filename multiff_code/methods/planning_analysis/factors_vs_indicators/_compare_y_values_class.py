@@ -1,6 +1,6 @@
 
 from planning_analysis.plan_factors import test_vs_control_utils, test_vs_control_utils
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, process_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils, process_variations_utils
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
@@ -85,7 +85,8 @@ class _CompareYValues:
         # since the results are the same regardless
 
         if exists_ok & exists(self.all_perc_info_path):
-            self.all_perc_info = pd.read_csv(self.all_perc_info_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+            self.all_perc_info = pd.read_csv(self.all_perc_info_path).drop(
+                ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                    heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok)
@@ -117,7 +118,8 @@ class _CompareYValues:
             ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         df_path = os.path.join(self.all_median_info_folder_path, df_name)
         if all_median_info_exists_ok & exists(df_path):
-            self.all_median_info = pd.read_csv(df_path).drop(["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+            self.all_median_info = pd.read_csv(df_path).drop(
+                ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
             print('Successfully retrieved all_median_info from ', df_path)
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,

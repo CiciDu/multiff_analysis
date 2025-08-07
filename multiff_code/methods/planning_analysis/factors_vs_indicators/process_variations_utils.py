@@ -3,7 +3,7 @@ from planning_analysis.show_planning import nxt_ff_utils, show_planning_class, s
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_helper_class, find_cvn_utils, plot_cvn_class, plot_cvn_utils, plot_monkey_heading_helper_class, cvn_from_ref_class
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import test_vs_control_utils
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, plot_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils, plot_variations_utils
 from data_wrangling import specific_utils, general_utils
 from sklearn.preprocessing import StandardScaler
 import numpy as np

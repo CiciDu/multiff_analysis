@@ -804,7 +804,7 @@ def get_df_name_by_ref(monkey_name, ref_point_mode, ref_point_value):
     if monkey_name is not None:
         if len(monkey_name.split('_')) > 1:
             df_name = monkey_name.split(
-                '_')[1] + '_' + ref_point_mode_name + '_' + str(abs(ref_point_value))
+                '_')[1] + '_' + ref_point_mode_name + '_' + str((ref_point_value))
             df_name = df_name.replace('.', '_')
             return df_name
 

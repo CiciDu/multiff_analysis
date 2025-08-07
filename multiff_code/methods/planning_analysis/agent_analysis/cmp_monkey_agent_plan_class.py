@@ -1,6 +1,6 @@
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
-from planning_analysis.variations_of_factors_vs_results import make_variations_utils, _plot_variations_class, _variations_base_class
+from planning_analysis.factors_vs_indicators import make_variations_utils, _plot_variations_class, _variations_base_class
 
 import os
 import sys
