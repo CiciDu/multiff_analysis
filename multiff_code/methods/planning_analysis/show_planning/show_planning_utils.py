@@ -342,13 +342,13 @@ def make_heading_info_df(cur_and_nxt_ff_from_ref_df, stops_near_ff_df, monkey_in
     # Calculate angles from monkey before stop to nxt ff and from cur ff null arc landing position to alternative ff
     heading_info_df['angle_from_m_before_stop_to_cur_ff'] = specific_utils.calculate_angles_to_ff_centers(
         heading_info_df['cur_ff_x'], heading_info_df['cur_ff_y'], heading_info_df['mx_before_stop'], heading_info_df['my_before_stop'], heading_info_df['monkey_angle_before_stop'])
-    heading_info_df['angle_from_m_before_stop_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(
+    heading_info_df['angle_from_stop_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(
         heading_info_df['nxt_ff_x'], heading_info_df['nxt_ff_y'], heading_info_df['mx_before_stop'], heading_info_df['my_before_stop'], heading_info_df['monkey_angle_before_stop'])
 
     if 'cur_opt_arc_end_x' in heading_info_df.columns:
-        heading_info_df['angle_opt_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+        heading_info_df['angle_opt_cur_end_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(
             heading_info_df['nxt_ff_x'], heading_info_df['nxt_ff_y'], heading_info_df['cur_opt_arc_end_x'], heading_info_df['cur_opt_arc_end_y'], heading_info_df['cur_opt_arc_end_heading'])
-        heading_info_df['angle_cntr_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+        heading_info_df['angle_cntr_cur_end_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(
             heading_info_df['nxt_ff_x'], heading_info_df['nxt_ff_y'], heading_info_df['cur_cntr_arc_end_x'], heading_info_df['cur_cntr_arc_end_y'], heading_info_df['cur_cntr_arc_end_heading'])
 
     # The following two columns are originally from calculate_info_based_on_monkey_angles
@@ -369,9 +369,9 @@ def get_ang_traj_nxt_and_ang_cur_nxt(heading_info_df):
     print(heading_info_df.isnull().sum()[heading_info_df.isnull().sum() > 0])
 
     # heading_info_df.dropna(inplace=True)
-    ang_traj_nxt = heading_info_df['angle_from_m_before_stop_to_nxt_ff'].values.reshape(
+    ang_traj_nxt = heading_info_df['angle_from_stop_to_nxt_ff'].values.reshape(
         -1)
-    ang_cur_nxt = heading_info_df['angle_opt_arc_from_cur_end_to_nxt'].values.reshape(
+    ang_cur_nxt = heading_info_df['angle_opt_cur_end_to_nxt_ff'].values.reshape(
         -1)
 
     # heading_info_df_no_na = heading_info_df.copy()

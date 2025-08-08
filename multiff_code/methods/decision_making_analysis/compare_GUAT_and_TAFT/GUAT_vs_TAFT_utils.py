@@ -66,7 +66,7 @@ def deal_with_duplicated_stop_point_index(GUAT_w_ff_df):
     # add rows back to GUAT_w_ff_df (only keep the columns in GUAT_w_ff_df)
     GUAT_w_ff_df = pd.concat([GUAT_w_ff_df, df[GUAT_w_ff_df.columns]], axis=0)
     GUAT_w_ff_df.sort_values(by='stop_point_index', inplace=True)
-    
+
     print('Warning: there can be multiple stop_point_index for the same ff_index. '
           'This can happen when there are multiple failed attempts to catch another ff before catching the current target.')
     return GUAT_w_ff_df
@@ -221,7 +221,7 @@ columns_to_keep_from_plan_y_df = [
     'd_heading_of_traj',
     'ref_curv_of_traj',
     # 'angle_from_m_before_stop_to_cur_ff',
-    'angle_from_m_before_stop_to_nxt_ff',
+    'angle_from_stop_to_nxt_ff',
     # 'angle_from_cur_ff_to_stop',
     'angle_from_cur_ff_to_nxt_ff',
     'curv_mean',

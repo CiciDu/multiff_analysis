@@ -31,25 +31,25 @@ matplotlib.rcParams['animation.embed_limit'] = 2**128
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
-
 colors = matplotlib.colors.TABLEAU_COLORS
 hex_colors = tuple(colors.values())
 
 
-def make_the_initial_fig_scatter(curv_of_traj_df_in_duration, monkey_hoverdata_value, cur_ff_color, nxt_ff_color, use_two_y_axes=True, change_y_ranges=True, add_vertical_line=True,
-                                 x_column_name='rel_time', trajectory_ref_row=None, curv_of_traj_trace_name='Curvature of Trajectory', show_visible_segments=True, visible_segments_info={},
+def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_value, cur_ff_color, nxt_ff_color, use_two_y_axes=False, change_y_ranges=True, add_vertical_line=True,
+                                 x_column_name='rel_time', trajectory_ref_row=None, curv_of_traj_trace_name='Curvature of Trajectory', show_visible_segments=True, 
+                                 visible_segments_info={},
                                  y_range_for_v_line=[-200, 200], trajectory_next_stop_row=None):
     if use_two_y_axes:
         fig_scatter = plot_curv_of_traj_vs_time_with_two_y_axes(
-            curv_of_traj_df_in_duration, change_y_ranges=change_y_ranges, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
+            curv_of_traj_in_duration, change_y_ranges=change_y_ranges, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
         # plot two horizontal lines at 0.01 and -0.01 based on y-axis
-        x_range_for_h_line = [np.min(curv_of_traj_df_in_duration[x_column_name].values), np.max(
-            curv_of_traj_df_in_duration[x_column_name].values)]
+        x_range_for_h_line = [np.min(curv_of_traj_in_duration[x_column_name].values), np.max(
+            curv_of_traj_in_duration[x_column_name].values)]
         fig_scatter = add_two_horizontal_lines(
             fig_scatter, use_two_y_axes, x_range=x_range_for_h_line)
     else:
         fig_scatter = plot_curv_of_traj_vs_time(
-            curv_of_traj_df_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
+            curv_of_traj_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
     if add_vertical_line:
         fig_scatter = add_vertical_line_for_an_x_value(
             fig_scatter, x_value=monkey_hoverdata_value, y_range=y_range_for_v_line)
@@ -63,6 +63,7 @@ def make_the_initial_fig_scatter(curv_of_traj_df_in_duration, monkey_hoverdata_v
                                                               unique_ff_indices=[
                                                                   stops_near_ff_row.cur_ff_index, stops_near_ff_row.nxt_ff_index], time_or_distance=time_or_distance, y_range_for_v_line=y_range_for_v_line,
                                                               varying_colors=[cur_ff_color, nxt_ff_color], ff_names=['cur ff', 'nxt ff'])
+
     # plot a vertical line at stop point (which is 0)
     fig_scatter = add_vertical_line_for_an_x_value(
         fig_scatter, x_value=0, y_range=y_range_for_v_line, name='First stop point', color='black')
@@ -84,6 +85,96 @@ def make_the_initial_fig_scatter(curv_of_traj_df_in_duration, monkey_hoverdata_v
                               yaxis2=dict(range=['null', 'null'],))
 
     return fig_scatter
+
+
+def plot_curv_of_traj_vs_time_with_two_y_axes(curv_of_traj_in_duration, change_y_ranges=True, y_column_name_for_change_in_curv='curv_of_traj_diff', x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
+    change_in_curv_of_traj_plot = make_the_plot_of_change_in_curv_of_traj_vs_time(
+        curv_of_traj_in_duration, y_column_name=y_column_name_for_change_in_curv, x_column_name=x_column_name)
+
+    # Create figure with secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    # Add traces
+    fig = add_curv_of_traj_data_to_fig_scatter(
+        fig, curv_of_traj_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
+
+    for data in change_in_curv_of_traj_plot.data:
+        data.marker = {'color': 'green', 'symbol': 'circle'}
+        data.name = 'Change in Curvature of Trajectory'
+        data.showlegend = True
+        fig.add_trace(data, secondary_y=True)
+        fig.update_traces(visible='legendonly', opacity=0.5, marker={'size': 3}, line={
+                          'color': 'green'}, selector=dict(name='Change in Curvature of Trajectory'))
+
+    if y_column_name_for_change_in_curv == 'curv_of_traj_diff_over_dt':
+        yaxis2_title = "Delta Curv of Trajectory (deg/cm/s)"
+    elif y_column_name_for_change_in_curv == 'curv_of_traj_diff_over_distance':
+        yaxis2_title = "Delta Curv of Trajectory (deg/cm^2)"
+    elif y_column_name_for_change_in_curv == 'curv_of_traj_diff':
+        yaxis2_title = "Delta Curv of Trajectory (deg/cm)"
+    else:
+        yaxis2_title = 'y axis 2 title'
+
+    fig.update_layout(
+        yaxis2=dict(title=dict(text=yaxis2_title),
+                    side="right",
+                    overlaying="y",
+                    tickmode="sync"))
+
+    if change_y_ranges:
+        fig.update_layout(yaxis=dict(range=[-100, 100]),
+                          yaxis2=dict(range=[-25, 25]))
+
+    return fig
+
+
+def make_the_plot_of_change_in_curv_of_traj_vs_time(curv_of_traj_in_duration, y_column_name='curv_of_traj_diff_over_distance', x_column_name='rel_time'):
+    curv_of_traj_in_duration = curv_of_traj_in_duration.copy()
+    plot_to_add = px.line(curv_of_traj_in_duration, x=x_column_name, y=y_column_name,
+                          title='Change in Curvature of Trajectory',
+                          hover_data=[x_column_name, y_column_name],
+                          labels={'rel_time': 'Relative Time(s)',
+                                  'rel_distance': 'Relative Distance(cm)',
+                                  'curv_of_traj_diff': 'Change in Curvature of Trajectory (deg/cm)',
+                                  'curv_of_traj_diff_over_dt': 'Change in Curv of Trajectory Over Time',
+                                  'curv_of_traj_diff_over_distance': 'Change in Curv of Trajectory Over Distance', },
+                          # width=1000, height=700,
+                          )
+
+    return plot_to_add
+
+def add_curv_of_traj_data_to_fig_scatter(fig, curv_of_traj_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
+    # curv_of_traj_plot = make_the_plot_of_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
+    # for data in curv_of_traj_plot.data:
+    #     data.marker = {'color': 'orange', 'symbol': 'circle', 'opacity': 0.8}
+    #     data.name = curv_of_traj_trace_name
+    #     data.showlegend = True
+    #     fig.add_trace(data)
+    #     fig.update_traces(marker={'size': 3}, selector=dict(name=curv_of_traj_trace_name))
+
+    if fig is None:
+        fig = go.Figure(layout=dict(width=1000, height=700))
+    plot_to_add = make_new_trace_for_scatterplot(curv_of_traj_in_duration, curv_of_traj_trace_name, color='orange',
+                                                 x_column_name=x_column_name, y_column_name='curv_of_traj_deg_over_cm', symbol='circle', size=5)
+    fig.add_trace(plot_to_add)
+
+    if x_column_name == 'rel_time':
+        x_axis_label = "Relative Time (s)"
+    elif x_column_name == 'rel_distance':
+        x_axis_label = "Relative Distance (cm)"
+    else:
+        x_axis_label = 'x axis label'
+
+    fig.update_layout(legend=dict(orientation="h", y=-0.2),
+                      # xaxis=dict(range=[-2.5, 0.1]),
+                      # xaxis=dict(title=dict(text=x_axis_label)),
+                      yaxis=dict(title=dict(text="Curvature of Trajectory (deg/cm)"),
+                                 side="left"),
+                      title=go.layout.Title(text=x_axis_label,
+                                            xref="paper",
+                                            x=0,
+                                            font=dict(size=14)),)
+    return fig
 
 
 def add_annotation_to_fig_scatter(fig_scatter, text, x_position, y_position=130):
@@ -108,21 +199,6 @@ def add_annotation_to_fig_scatter(fig_scatter, text, x_position, y_position=130)
     )
     return fig_scatter
 
-
-def make_the_plot_of_change_in_curv_of_traj_vs_time(curv_of_traj_df_in_duration, y_column_name='curv_of_traj_diff_over_distance', x_column_name='rel_time'):
-    curv_of_traj_df_in_duration = curv_of_traj_df_in_duration.copy()
-    plot_to_add = px.line(curv_of_traj_df_in_duration, x=x_column_name, y=y_column_name,
-                          title='Change in Curvature of Trajectory',
-                          hover_data=[x_column_name, y_column_name],
-                          labels={'rel_time': 'Relative Time(s)',
-                                  'rel_distance': 'Relative Distance(cm)',
-                                  'curv_of_traj_diff': 'Change in Curvature of Trajectory (deg/cm)',
-                                  'curv_of_traj_diff_over_dt': 'Change in Curv of Trajectory Over Time',
-                                  'curv_of_traj_diff_over_distance': 'Change in Curv of Trajectory Over Distance', },
-                          # width=1000, height=700,
-                          )
-
-    return plot_to_add
 
 
 def add_vertical_line_for_an_x_value(fig_scatter, x_value=0, y_range=[-100, 100],
@@ -174,9 +250,9 @@ def mark_next_stop_in_scatter_plot(fig_scatter, x_column_name, trajectory_next_s
     return fig_scatter
 
 
-def add_line_for_current_time_window(fig_scatter, curv_of_traj_df_in_duration, current_time_window, x_column_name='rel_time'):
-    curv_of_traj_df_to_use = curv_of_traj_df_in_duration[
-        curv_of_traj_df_in_duration['time_window'] == current_time_window].copy()
+def add_line_for_current_time_window(fig_scatter, curv_of_traj_in_duration, current_time_window, x_column_name='rel_time'):
+    curv_of_traj_df_to_use = curv_of_traj_in_duration[
+        curv_of_traj_in_duration['time_window'] == current_time_window].copy()
     fig_scatter.add_trace(
         go.Scatter(x=curv_of_traj_df_to_use[x_column_name].values, y=curv_of_traj_df_to_use['curv_of_traj_deg_over_cm'].values,
                    mode='lines',
@@ -226,44 +302,43 @@ def add_to_the_scatterplot(fig, ff_curv_df, name, color='purple', x_column_name=
     return fig
 
 
-def add_new_curv_of_traj_to_fig_scatter(fig_scatter, curv_of_traj_df_in_duration, curv_of_traj_mode, lower_end, upper_end, x_column_name, symbol='circle'):
+def add_new_curv_of_traj_to_fig_scatter(fig_scatter, curv_of_traj_in_duration, curv_of_traj_mode, lower_end, upper_end, x_column_name, symbol='circle'):
     random_color = random.choice(hex_colors)
     window_for_curv_of_traj = [lower_end, upper_end]
     curv_of_traj_trace_name = curv_of_traj_utils.get_curv_of_traj_trace_name(
         curv_of_traj_mode, window_for_curv_of_traj)
-    fig_scatter_updated = add_to_the_scatterplot(fig_scatter, curv_of_traj_df_in_duration, curv_of_traj_trace_name, x_column_name=x_column_name, y_column_name='curv_of_traj_deg_over_cm',
+    fig_scatter_updated = add_to_the_scatterplot(fig_scatter, curv_of_traj_in_duration, curv_of_traj_trace_name, x_column_name=x_column_name, y_column_name='curv_of_traj_deg_over_cm',
                                                  color=random_color, symbol=symbol)
     return fig_scatter_updated
 
 
-def add_new_curv_of_traj_to_fig_scatter_combd(fig_scatter_combd, curv_of_traj_df_in_duration, curv_of_traj_mode, lower_end, upper_end):
+def add_new_curv_of_traj_to_fig_scatter_combd(fig_scatter_combd, curv_of_traj_in_duration, curv_of_traj_mode, lower_end, upper_end):
     random_color = random.choice(hex_colors)
     window_for_curv_of_traj = [lower_end, upper_end]
     curv_of_traj_trace_name = curv_of_traj_utils.get_curv_of_traj_trace_name(
         curv_of_traj_mode, window_for_curv_of_traj)
-    plot_to_add_cm = make_new_trace_for_scatterplot(curv_of_traj_df_in_duration, curv_of_traj_trace_name,
+    plot_to_add_cm = make_new_trace_for_scatterplot(curv_of_traj_in_duration, curv_of_traj_trace_name,
                                                     color=random_color, x_column_name='rel_time', y_column_name='curv_of_traj_deg_over_cm', size=7)
     fig_scatter_combd.add_trace(plot_to_add_cm, row=1, col=1)
-    plot_to_add_s = make_new_trace_for_scatterplot(curv_of_traj_df_in_duration, curv_of_traj_trace_name, color=random_color,
+    plot_to_add_s = make_new_trace_for_scatterplot(curv_of_traj_in_duration, curv_of_traj_trace_name, color=random_color,
                                                    x_column_name='rel_distance', y_column_name='curv_of_traj_deg_over_cm', size=7, showlegend=False)
     fig_scatter_combd.add_trace(plot_to_add_s, row=2, col=1)
     return fig_scatter_combd
 
 
-def plot_curv_of_traj_vs_time(curv_of_traj_df_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory', change_y_ranges=True):
-    fig = go.Figure()
+def plot_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory', change_y_ranges=True):
     fig = add_curv_of_traj_data_to_fig_scatter(
-        fig, curv_of_traj_df_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
+        None, curv_of_traj_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
 
     if change_y_ranges:
         fig.update_layout(yaxis=dict(range=[-100, 100]))
     return fig
 
 
-# def make_the_plot_of_curv_of_traj_vs_time(curv_of_traj_df_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
-#     curv_of_traj_df_in_duration = curv_of_traj_df_in_duration.copy()
+# def make_the_plot_of_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
+#     curv_of_traj_in_duration = curv_of_traj_in_duration.copy()
 #     hover_data=[x_column_name, 'curv_of_traj_deg_over_cm']
-#     plot_to_add = px.scatter(curv_of_traj_df_in_duration, x=x_column_name, y='curv_of_traj_deg_over_cm',
+#     plot_to_add = px.scatter(curv_of_traj_in_duration, x=x_column_name, y='curv_of_traj_deg_over_cm',
 #                                 title=curv_of_traj_trace_name,
 #                                 hover_data=hover_data,
 #                                 labels={'rel_time': 'Relative Time(s)',
@@ -274,79 +349,6 @@ def plot_curv_of_traj_vs_time(curv_of_traj_df_in_duration, x_column_name='rel_ti
 #                                     )
 #     return plot_to_add
 
-
-def add_curv_of_traj_data_to_fig_scatter(fig, curv_of_traj_df_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
-    # curv_of_traj_plot = make_the_plot_of_curv_of_traj_vs_time(curv_of_traj_df_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
-    # for data in curv_of_traj_plot.data:
-    #     data.marker = {'color': 'orange', 'symbol': 'circle', 'opacity': 0.8}
-    #     data.name = curv_of_traj_trace_name
-    #     data.showlegend = True
-    #     fig.add_trace(data)
-    #     fig.update_traces(marker={'size': 3}, selector=dict(name=curv_of_traj_trace_name))
-
-    fig = go.Figure(layout=dict(width=1000, height=700))
-    plot_to_add = make_new_trace_for_scatterplot(curv_of_traj_df_in_duration, curv_of_traj_trace_name, color='orange',
-                                                 x_column_name=x_column_name, y_column_name='curv_of_traj_deg_over_cm', symbol='circle', size=5)
-    fig.add_trace(plot_to_add)
-
-    if x_column_name == 'rel_time':
-        x_axis_label = "Relative Time (s)"
-    elif x_column_name == 'rel_distance':
-        x_axis_label = "Relative Distance (cm)"
-    else:
-        x_axis_label = 'x axis label'
-
-    fig.update_layout(legend=dict(orientation="h", y=-0.2),
-                      # xaxis=dict(range=[-2.5, 0.1]),
-                      # xaxis=dict(title=dict(text=x_axis_label)),
-                      yaxis=dict(title=dict(text="Curvature of Trajectory (deg/cm)"),
-                                 side="left"),
-                      title=go.layout.Title(text=x_axis_label,
-                                            xref="paper",
-                                            x=0,
-                                            font=dict(size=14)),)
-    return fig
-
-
-def plot_curv_of_traj_vs_time_with_two_y_axes(curv_of_traj_df_in_duration, change_y_ranges=True, y_column_name_for_change_in_curv='curv_of_traj_diff', x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
-    change_in_curv_of_traj_plot = make_the_plot_of_change_in_curv_of_traj_vs_time(
-        curv_of_traj_df_in_duration, y_column_name=y_column_name_for_change_in_curv, x_column_name=x_column_name)
-
-    # Create figure with secondary y-axis
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-    # Add traces
-    fig = add_curv_of_traj_data_to_fig_scatter(
-        fig, curv_of_traj_df_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
-
-    for data in change_in_curv_of_traj_plot.data:
-        data.marker = {'color': 'green', 'symbol': 'circle'}
-        data.name = 'Change in Curvature of Trajectory'
-        data.showlegend = True
-        fig.add_trace(data, secondary_y=True)
-        fig.update_traces(visible='legendonly', opacity=0.5, marker={'size': 3}, line={
-                          'color': 'green'}, selector=dict(name='Change in Curvature of Trajectory'))
-
-    if y_column_name_for_change_in_curv == 'curv_of_traj_diff_over_dt':
-        yaxis2_title = "Delta Curv of Trajectory (deg/cm/s)"
-    elif y_column_name_for_change_in_curv == 'curv_of_traj_diff_over_distance':
-        yaxis2_title = "Delta Curv of Trajectory (deg/cm^2)"
-    elif y_column_name_for_change_in_curv == 'curv_of_traj_diff':
-        yaxis2_title = "Delta Curv of Trajectory (deg/cm)"
-    else:
-        yaxis2_title = 'y axis 2 title'
-
-    fig.update_layout(
-        yaxis2=dict(title=dict(text=yaxis2_title),
-                    side="right",
-                    overlaying="y",
-                    tickmode="sync"))
-
-    if change_y_ranges:
-        fig.update_layout(yaxis=dict(range=[-100, 100]),
-                          yaxis2=dict(range=[-25, 25]))
-
-    return fig
 
 
 def turn_visibility_of_vertical_lines_on_or_off_in_scatter_plot(fig_scatter,
@@ -517,6 +519,6 @@ def plot_lines_to_show_ff_visible_segments_in_fig_scatter(fig_scatter, ff_info, 
             # fig_scatter.update_traces(opacity=1, selector=dict(name=ff_names[i] + ' stops visible'),
             #                   line=dict(dash='dot'), showlegend=showlegend, legendgroup=ff_names[i])
 
-            #break  # for right now, we only want to show when the ff first becomes visible
+            # break  # for right now, we only want to show when the ff first becomes visible
 
     return fig_scatter

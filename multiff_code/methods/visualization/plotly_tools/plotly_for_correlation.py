@@ -100,10 +100,10 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
                                 current_stop_point_index_to_mark=None, ref_point_descr='', traj_curv_descr='',
                                 title=None, **kwargs):
 
-    # find rows in heading_info_df that contains na in angle_from_m_before_stop_to_nxt_ff or angle_opt_arc_from_cur_end_to_nxt
+    # find rows in heading_info_df that contains na in angle_from_stop_to_nxt_ff or angle_opt_cur_end_to_nxt_ff
     original_length = len(heading_info_df)
     heading_info_df = heading_info_df.dropna(
-        subset=['angle_from_m_before_stop_to_nxt_ff', 'angle_opt_arc_from_cur_end_to_nxt'])
+        subset=['angle_from_stop_to_nxt_ff', 'angle_opt_cur_end_to_nxt_ff'])
     new_length = len(heading_info_df)
     if original_length != new_length:
         add_to_title = '# nan removed: ' + \
@@ -112,8 +112,8 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
         add_to_title = ''
 
     # Extract relevant angles from heading_info_df
-    ang_traj_nxt = heading_info_df['angle_from_m_before_stop_to_nxt_ff'].values
-    ang_cur_nxt = heading_info_df['angle_opt_arc_from_cur_end_to_nxt'].values
+    ang_traj_nxt = heading_info_df['angle_from_stop_to_nxt_ff'].values
+    ang_cur_nxt = heading_info_df['angle_opt_cur_end_to_nxt_ff'].values
 
     # Convert angles to degrees if required
     if change_units_to_degrees:
@@ -182,11 +182,13 @@ def find_new_curv_of_traj_counted(point_index_for_curv_of_traj_df, monkey_inform
             new_curv_of_traj_df = curv_of_traj_utils.find_curv_of_traj_df_based_on_distance_window(
                 point_index_for_curv_of_traj_df, lower_end, upper_end, monkey_information, ff_caught_T_new, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         else:
-            raise PreventUpdate("No update was made because curv_of_traj_mode is not recognized.")
+            raise PreventUpdate(
+                "No update was made because curv_of_traj_mode is not recognized.")
         new_curv_of_traj_counted = new_curv_of_traj_df['curv_of_traj'].values
         return new_curv_of_traj_counted
     else:
-        raise PreventUpdate("No update was made because lower_end or upper_end is None.")
+        raise PreventUpdate(
+            "No update was made because lower_end or upper_end is None.")
 
 
 def find_curv_of_traj_counted_from_curv_of_traj_df(curv_of_traj_df, point_index_for_curv_of_traj_df):

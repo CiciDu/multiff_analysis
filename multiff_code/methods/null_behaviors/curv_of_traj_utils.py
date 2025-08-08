@@ -218,10 +218,10 @@ def truncate_curv_of_traj_by_time_of_capture_new_func(curv_of_traj_df, monkey_in
     return curv_of_traj_df
 
 
-def find_curv_of_traj_df_in_duration(curv_of_traj_df, duration_to_plot):
-    curv_of_traj_df_in_duration = curv_of_traj_df[curv_of_traj_df['time'].between(
+def find_curv_of_traj_in_duration(curv_of_traj_df, duration_to_plot):
+    curv_of_traj_in_duration = curv_of_traj_df[curv_of_traj_df['time'].between(
         duration_to_plot[0], duration_to_plot[1], inclusive='both')].copy()
-    return curv_of_traj_df_in_duration
+    return curv_of_traj_in_duration
 
 
 def find_all_curv_of_traj_df(monkey_information, ff_caught_T_new,

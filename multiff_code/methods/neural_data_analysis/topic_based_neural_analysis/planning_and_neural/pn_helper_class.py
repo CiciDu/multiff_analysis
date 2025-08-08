@@ -135,8 +135,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.add_rel_time_info_to_heading_info_df()
 
         heading_columns_to_add = [
-            'stop_point_index', 'angle_from_m_before_stop_to_cur_ff', 'angle_from_m_before_stop_to_nxt_ff']
-        # Note: variables like 'angle_opt_arc_from_cur_end_to_nxt', 'angle_cntr_arc_from_cur_end_to_nxt' in heading_info_df are based on ref points.
+            'stop_point_index', 'angle_from_m_before_stop_to_cur_ff', 'angle_from_stop_to_nxt_ff']
+        # Note: variables like 'angle_opt_cur_end_to_nxt_ff', 'angle_cntr_cur_end_to_nxt_ff' in heading_info_df are based on ref points.
         # However, in both_ff_across_time_df, they are based on each point in the trajectory. So we use the variables in both_ff_across_time_df.
 
         build_factor_comp.add_dir_from_cur_ff_same_side(self.heading_info_df)
@@ -191,15 +191,16 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         all_info_to_add, nxt_ff_df, nxt_curv_df, nxt_columns_added2 = self._add_ff_curv_info_to_df(
             all_info_to_add, 'nxt_')
         both_ff_df = pn_utils._merge_both_ff_df(cur_curv_df, nxt_ff_df)
-
+        both_ff_df = both_ff_df.merge(self.heading_info_df[[
+            'point_index_before_stop', 'cur_ff_index']], on='cur_ff_index', how='left')
+        
         columns_to_keep = time_columns + cur_columns_added + nxt_columns_added + cur_columns_added2 + nxt_columns_added2 + \
             ['stop_point_index', 'point_index', 'segment', 'target_index']
         # make sure there's no duplicate in columns_to_keep
         columns_to_keep = list(set(columns_to_keep))
         self.both_ff_across_time_df = all_info_to_add[columns_to_keep].copy()
 
-        self.both_ff_across_time_df = pn_utils.add_angle_from_cur_arc_end_to_nxt_ff(
-            self.both_ff_across_time_df, both_ff_df)
+        self.add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(both_ff_df)
 
         self.add_diff_in_curv_info_to_both_ff_across_time_df(both_ff_df)
 
@@ -213,10 +214,22 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
         return self.both_ff_across_time_df
 
+    def add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(self, both_ff_df):
+        angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df)
+        
+        angle_df['angle_from_stop_to_nxt_ff'] = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, both_ff_df.point_index_before_stop.values,
+                                                                                 both_ff_df.nxt_ff_x.values, both_ff_df.nxt_ff_y.values)
+        build_factor_comp._add_diff_in_abs_angle_to_nxt_ff(
+            angle_df)
+
+        columns_to_merge = ['cur_opt_arc_end_heading', 'angle_opt_cur_end_to_nxt_ff', 'angle_from_stop_to_nxt_ff',
+                            'diff_in_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff'
+                            ]
+        self.both_ff_across_time_df.drop(columns=columns_to_merge, errors='ignore', inplace=True)
+        self.both_ff_across_time_df = self.both_ff_across_time_df.merge(angle_df[['point_index'] + columns_to_merge], on='point_index', how='left')
+        
+    
     def add_diff_in_curv_info_to_both_ff_across_time_df(self, both_ff_df):
-        # get point_index_before_stop from heading_info_df
-        both_ff_df = both_ff_df.merge(self.heading_info_df[[
-            'point_index_before_stop', 'cur_ff_index']], on='cur_ff_index', how='left')
         self.both_ff_across_time_df = pn_utils.add_diff_in_curv_info(
             self.both_ff_across_time_df, both_ff_df, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)
 
@@ -324,7 +337,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     def _add_ff_curv_info_to_df(self, df, which_ff_info):
         ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
         ff_df2 = ff_df[ff_df['ff_angle_boundary']
-                      .between(-np.pi/4, np.pi/4)].copy()
+                       .between(-np.pi/4, np.pi/4)].copy()
         curv_df = curvature_utils.make_curvature_df(ff_df2, self.curv_of_traj_df, clean=False,
                                                     remove_invalid_rows=False,
                                                     invalid_curvature_ok=True,
@@ -336,7 +349,6 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             df, curv_df, which_ff_info)
 
         return df, ff_df, curv_df, columns_added
-
 
     def _add_time_info_to_df(self, df):
         df['time'] = self.monkey_information.loc[df['point_index'].values, 'time'].values

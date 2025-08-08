@@ -45,18 +45,18 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def streamline_organizing_info(self,
                                    # ref_point_mode can be 'time', 'distance', or 'time after cur ff visible'
-                                   ref_point_mode='distance', 
+                                   ref_point_mode='distance',
                                    ref_point_value=-150,
                                    curv_traj_window_before_stop=[-50, 0],
-                                   curv_of_traj_mode='distance', 
-                                   window_for_curv_of_traj=[-25, 0], 
+                                   curv_of_traj_mode='distance',
+                                   window_for_curv_of_traj=[-25, 0],
                                    truncate_curv_of_traj_by_time_of_capture=False,
-                                   eliminate_outliers=False, 
-                                   use_curv_to_ff_center=False, 
+                                   eliminate_outliers=False,
+                                   use_curv_to_ff_center=False,
                                    deal_with_rows_with_big_ff_angles=True,
                                    remove_i_o_modify_rows_with_big_ff_angles=False,
                                    stops_near_ff_df_exists_ok=True,
-                                   heading_info_df_exists_ok=True, 
+                                   heading_info_df_exists_ok=True,
                                    test_or_control='test',
                                    ):
 
@@ -106,10 +106,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
     def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after cur ff visible', ref_point_value=0.0,
                                                   curv_traj_window_before_stop=[
                                                       -50, 0],
-                                                  use_curv_to_ff_center=False, 
-                                                  stops_near_ff_df_exists_ok=True, 
+                                                  use_curv_to_ff_center=False,
+                                                  stops_near_ff_df_exists_ok=True,
                                                   heading_info_df_exists_ok=True,
-                                                  save_data=True, 
+                                                  save_data=True,
                                                   merge_diff_in_curv_df_to_heading_info=True,
                                                   deal_with_rows_with_big_ff_angles=True,
                                                   remove_i_o_modify_rows_with_big_ff_angles=False):
@@ -128,7 +128,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                             remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
-                                                                                merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
+                                                                                           merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
     def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self, ref_point_mode, ref_point_value,
                                                        deal_with_rows_with_big_ff_angles=True,
@@ -178,11 +178,11 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def make_diff_in_curv_df(self, curv_traj_window_before_stop=[-50, 0]):
         self.cur_end_to_next_ff_curv = diff_in_curv_utils.compute_cur_end_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df,
-                                                                                           use_curv_to_ff_center=False)
-        self.prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.heading_info_df['nxt_ff_index'].values, self.heading_info_df['point_index_before_stop'].values, 
+                                                                                          use_curv_to_ff_center=False)
+        self.prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.heading_info_df['nxt_ff_index'].values, self.heading_info_df['point_index_before_stop'].values,
                                                                                               self.monkey_information,
-                                                                                               self.ff_real_position_sorted, self.ff_caught_T_new,
-                                                                                               curv_traj_window_before_stop=curv_traj_window_before_stop)
+                                                                                              self.ff_real_position_sorted, self.ff_caught_T_new,
+                                                                                              curv_traj_window_before_stop=curv_traj_window_before_stop)
         self.prev_stop_to_next_ff_curv['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
             self.prev_stop_to_next_ff_curv, self.cur_end_to_next_ff_curv)
@@ -377,7 +377,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         return self.heading_info_df, self.diff_in_curv_df
 
     def retrieve_or_make_heading_info_df(self, test_or_control='test', heading_info_df_exists_ok=True, diff_in_curv_df_exists_ok=True, save_data=True,
-                              merge_diff_in_curv_df_to_heading_info=True):
+                                         merge_diff_in_curv_df_to_heading_info=True):
         self.heading_info_path = os.path.join(
             self.planning_data_folder_path, self.heading_info_partial_path, test_or_control)
         os.makedirs(self.heading_info_path, exist_ok=True)
@@ -395,7 +395,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                     f'Failed to retrieve heading_info_df because {e}; will make new heading_info_df')
             self.heading_info_df = show_planning_utils.make_heading_info_df(
                 self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
-            self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['angle_from_m_before_stop_to_nxt_ff'].rank(
+            self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['angle_from_stop_to_nxt_ff'].rank(
                 method='first')
             self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['rank_by_angle_to_nxt_ff'].astype(
                 'int')
@@ -417,7 +417,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
             self.diff_in_curv_df = self.make_or_retrieve_diff_in_curv_df(self.ref_point_params['ref_point_mode'], self.ref_point_params['ref_point_value'], test_or_control,
                                                                          curv_traj_window_before_stop=self.curv_traj_window_before_stop,
-                                                                         exists_ok=diff_in_curv_df_exists_ok, save_data=save_data, 
+                                                                         exists_ok=diff_in_curv_df_exists_ok, save_data=save_data,
                                                                          merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
         return self.heading_info_df, self.diff_in_curv_df

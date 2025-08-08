@@ -60,9 +60,9 @@ class PlotMonkeyHeadingHelper():
 
     def find_all_mheading_and_triangle_df_for_the_duration(self):
         self.mheading_for_traj_in_duration = monkey_heading_utils.find_mheading_dict_from_curv_of_traj(
-            self.curv_of_traj_df_in_duration)
+            self.curv_of_traj_in_duration)
         self.traj_triangle_df_in_duration = monkey_heading_utils.turn_mheading_into_triangle_df(
-            self.mheading_for_traj_in_duration, self.current_plotly_key_comp['rotation_matrix'], point_index=self.curv_of_traj_df_in_duration['point_index'].values)
+            self.mheading_for_traj_in_duration, self.current_plotly_key_comp['rotation_matrix'], point_index=self.curv_of_traj_in_duration['point_index'].values)
 
         self._find_mheading_and_triangle_df_for_stop_for_the_duration()
 

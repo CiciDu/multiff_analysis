@@ -45,3 +45,12 @@
 - Description: The difference between the absolute curvature changes in the null model and behavior.
 - Formula: |d_curv_null_arc| − |d_curv_monkey|
 - Purpose: Captures relative differences in curvature adjustment magnitudes.
+
+
+
+=======
+Others:
+Current name - Original name:
+angle_opt_cur_end_to_nxt_ff - angle_opt_arc_from_cur_end_to_nxt
+angle_cntr_cur_end_to_nxt_ff - angle_cntr_arc_from_cur_end_to_nxt
+angle_from_m_before_stop_to_nxt_ff - angle_from_stop_to_nxt_ff

@@ -41,17 +41,10 @@ def add_to_both_ff_when_seen_df(both_ff_when_seen_df, which_ff_info, when_which_
     both_ff_when_seen_df[f'traj_curv_{when_which_ff}_{first_or_last}_seen'] = curv_df['curv_of_traj']
 
 
-def add_angle_from_cur_arc_end_to_nxt_ff(df, both_ff_df):
-    angle_df = get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df)
-    df = df.merge(angle_df[['point_index', 'cur_opt_arc_end_heading', 'cur_cntr_arc_end_heading', 'angle_opt_arc_from_cur_end_to_nxt',
-                            'angle_cntr_arc_from_cur_end_to_nxt']], on='point_index', how='left')
-    return df
-
-
 def get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df):
-    both_ff_df['angle_opt_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+    both_ff_df['angle_opt_cur_end_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(
         both_ff_df['nxt_ff_x'], both_ff_df['nxt_ff_y'], both_ff_df['cur_opt_arc_end_x'], both_ff_df['cur_opt_arc_end_y'], both_ff_df['cur_opt_arc_end_heading'])
-    both_ff_df['angle_cntr_arc_from_cur_end_to_nxt'] = specific_utils.calculate_angles_to_ff_centers(
+    both_ff_df['angle_cntr_cur_end_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(
         both_ff_df['nxt_ff_x'], both_ff_df['nxt_ff_y'], both_ff_df['cur_cntr_arc_end_x'], both_ff_df['cur_cntr_arc_end_y'], both_ff_df['cur_cntr_arc_end_heading'])
 
     return both_ff_df
@@ -291,3 +284,10 @@ def _get_new_seg_info(planning_data):
 #     planning_data['new_seg_duration'] = pre_event_window + post_event_window
 #     planning_data = planning_data[planning_data['time'].between(planning_data['new_seg_start_time'], planning_data['new_seg_end_time'])]
 #     return planning_data
+
+def calculate_angle_from_stop_to_nxt_ff(monkey_information, point_index_before_stop, nxt_ff_x, nxt_ff_y):
+    mx_before_stop, my_before_stop, m_angle_before_stop = monkey_information.loc[point_index_before_stop, [
+        'monkey_x', 'monkey_y', 'monkey_angle']].values.T
+    angle_from_stop_to_nxt_ff = specific_utils.calculate_angles_to_ff_centers(
+        nxt_ff_x, nxt_ff_y, mx_before_stop, my_before_stop, m_angle_before_stop)
+    return angle_from_stop_to_nxt_ff
