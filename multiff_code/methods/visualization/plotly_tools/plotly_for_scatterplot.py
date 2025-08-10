@@ -33,15 +33,23 @@ CURVATURE_COLOR = '#ff7f0e'  # orange from Plotly default palette
 
 
 def _apply_clean_scatter_theme(fig):
+    # Check if legend is already configured
+    existing_legend = fig.layout.legend if hasattr(
+        fig.layout, 'legend') else None
+
     fig.update_layout(
         template=PLOTLY_SCATTER_TEMPLATE,
         font=dict(family='Arial, Helvetica, Sans-Serif',
                   size=12, color='black'),
         paper_bgcolor='white',
         plot_bgcolor='white',
-        legend=dict(orientation='h', y=-0.22),
-        margin={'l': 60, 'b': 40, 't': 0, 'r': 60},
+        margin={'l': 60, 'b': 40, 't': 120, 'r': 60},
     )
+
+    # Only set legend if it's not already configured
+    if existing_legend is None:
+        fig.update_layout(legend=dict(
+            orientation='h', y=1.05, x=0.5, xanchor='center'))
     fig.update_xaxes(
         showgrid=True,
         gridcolor=GRID_COLOR,
@@ -71,12 +79,12 @@ def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_valu
                                  x_column_name='rel_time', trajectory_ref_row=None, curv_of_traj_trace_name='Curvature of Trajectory', show_visible_segments=True,
                                  visible_segments_info={},
                                  y_range_for_v_line=[-200, 200], trajectory_next_stop_row=None):
+    x_range_for_h_line = [np.min(curv_of_traj_in_duration[x_column_name].values), np.max(
+        curv_of_traj_in_duration[x_column_name].values)]
     if use_two_y_axes:
         fig_scatter = plot_curv_of_traj_vs_time_with_two_y_axes(
             curv_of_traj_in_duration, change_y_ranges=change_y_ranges, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
         # plot two horizontal lines at 0.01 and -0.01 based on y-axis
-        x_range_for_h_line = [np.min(curv_of_traj_in_duration[x_column_name].values), np.max(
-            curv_of_traj_in_duration[x_column_name].values)]
         fig_scatter = add_two_horizontal_lines(
             fig_scatter, use_two_y_axes, x_range=x_range_for_h_line)
     else:
@@ -91,14 +99,18 @@ def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_valu
     if show_visible_segments:
         time_or_distance = 'time' if x_column_name == 'rel_time' else 'distance'
         stops_near_ff_row = visible_segments_info['stops_near_ff_row']
-        plot_lines_to_show_ff_visible_segments_in_fig_scatter(fig_scatter, visible_segments_info['ff_info'], visible_segments_info['monkey_information'], stops_near_ff_row,
-                                                              unique_ff_indices=[
-                                                                  stops_near_ff_row.cur_ff_index, stops_near_ff_row.nxt_ff_index], time_or_distance=time_or_distance, y_range_for_v_line=y_range_for_v_line,
-                                                              varying_colors=[cur_ff_color, nxt_ff_color], ff_names=['cur ff', 'nxt ff'])
+        fig_scatter = plot_blocks_to_show_ff_visible_segments_in_fig_scatter(fig_scatter, visible_segments_info['ff_info'], visible_segments_info['monkey_information'], stops_near_ff_row,
+                                                                             unique_ff_indices=[
+            stops_near_ff_row.cur_ff_index, stops_near_ff_row.nxt_ff_index], time_or_distance=time_or_distance, y_range_for_v_line=y_range_for_v_line,
+            varying_colors=[cur_ff_color, nxt_ff_color], ff_names=['cur ff', 'nxt ff'])
 
     # plot a vertical line at stop point (which is 0)
     fig_scatter = add_vertical_line_for_an_x_value(
         fig_scatter, x_value=0, y_range=y_range_for_v_line, name='First stop point', color=GUIDE_LINE_COLOR)
+    # also add a horizontal line at 0
+    fig_scatter = add_horizontal_line_to_fig_scatter(
+        fig_scatter, use_two_y_axes, x_range=x_range_for_h_line, y_value=0, showlegend=False)
+
     if trajectory_next_stop_row is not None:
         fig_scatter = mark_next_stop_in_scatter_plot(
             fig_scatter, x_column_name, trajectory_next_stop_row, y_range_for_v_line=y_range_for_v_line)
@@ -110,7 +122,7 @@ def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_valu
     fig_scatter.update_layout(
         width=800,
         height=300,
-        margin={'l': 60, 'b': 30, 't': 0, 'r': 60},
+        margin={'l': 60, 'b': 30, 't': 120, 'r': 60},
     )
 
     # Apply clean theme at the end so traces and axes are styled consistently
@@ -203,7 +215,7 @@ def add_curv_of_traj_data_to_fig_scatter(fig, curv_of_traj_in_duration, x_column
     else:
         x_axis_label = 'x axis label'
 
-    fig.update_layout(legend=dict(orientation="h", y=-0.2),
+    fig.update_layout(legend=dict(orientation="h", y=1.02, x=0.5, xanchor='center'),
                       # xaxis=dict(range=[-2.5, 0.1]),
                       # xaxis=dict(title=dict(text=x_axis_label)),
                       yaxis=dict(title=dict(text="Curvature of Trajectory (deg/cm)"),
@@ -303,6 +315,20 @@ def add_line_for_current_time_window(fig_scatter, curv_of_traj_in_duration, curr
                    name='line_for_current_time_window',),
     )
 
+    return fig_scatter
+
+
+def add_horizontal_line_to_fig_scatter(fig_scatter, use_two_y_axes, x_range=[-3, 3], y_value=0, showlegend=False):
+    secondary_y = use_two_y_axes if use_two_y_axes else None
+    fig_scatter.add_trace(
+        go.Scatter(x=x_range, y=[y_value, y_value],
+                   mode='lines',
+                   name='y2 =' + str(y_value),
+                   showlegend=showlegend,
+                   ), secondary_y=secondary_y,
+    )
+    fig_scatter.update_traces(opacity=1, selector=dict(name='y2 =' + str(y_value)),
+                              line=dict(color='#888', width=1, dash='dot'))
     return fig_scatter
 
 
@@ -449,8 +475,16 @@ def make_fig_scatter_combd(fig_scatter_s, fig_scatter_cm, use_two_y_axes):
                            'Change in Curvature of Trajectory', 'y2 =5 or -5'])
         fig_scatter_combd.add_trace(
             data, row=1, col=1, secondary_y=secondary_y)
+
+    # Transfer annotations from the time-based scatter plot
     for annotation in fig_scatter_s.layout.annotations:
         fig_scatter_combd.add_annotation(annotation)
+
+    # Transfer shapes from the time-based scatter plot
+    if hasattr(fig_scatter_s.layout, 'shapes') and fig_scatter_s.layout.shapes:
+        for shape in fig_scatter_s.layout.shapes:
+            # Add shape to the first subplot (time-based)
+            fig_scatter_combd.add_shape(shape, row=1, col=1)
 
     for data in fig_scatter_cm.data:
         data['legendgroup'] = data['name']
@@ -462,9 +496,16 @@ def make_fig_scatter_combd(fig_scatter_s, fig_scatter_cm, use_two_y_axes):
         fig_scatter_combd.add_trace(
             data, row=2, col=1, secondary_y=secondary_y)
 
-    fig_scatter_combd.update_layout(legend=dict(orientation="h", y=1.3, groupclick="togglegroup"),
+    # Transfer shapes from the distance-based scatter plot (if any)
+    if hasattr(fig_scatter_cm.layout, 'shapes') and fig_scatter_cm.layout.shapes:
+        for shape in fig_scatter_cm.layout.shapes:
+            # Add shape to the second subplot (distance-based)
+            fig_scatter_combd.add_shape(shape, row=2, col=1)
+
+    fig_scatter_combd.update_layout(legend=dict(orientation="h", y=1.2, groupclick="togglegroup"),
                                     width=800, height=600,
-                                    margin=dict(l=10, r=50, b=10, t=50, pad=4),
+                                    margin=dict(l=10, r=50, b=10,
+                                                t=120, pad=4),
                                     # paper_bgcolor="LightSteelBlue",
                                     xaxis=dict(title='Relative Time (s)'),
                                     xaxis2=dict(
@@ -484,7 +525,7 @@ def make_fig_scatter_combd(fig_scatter_s, fig_scatter_cm, use_two_y_axes):
     return fig_scatter_combd
 
 
-def update_fig_scatter_natural_y_range(fig_scatter_natural_y_range, df, y_column_name, cap=[-150, 150]):
+def update_fig_scatter_natural_y_range(fig_scatter_natural_y_range, df, y_column_name, cap=[-200, 200]):
     new_fig_scatter_natural_y_range = [
         np.min(df[y_column_name].values), np.max(df[y_column_name].values)]
     fig_scatter_natural_y_range = [np.min([fig_scatter_natural_y_range[0], new_fig_scatter_natural_y_range[0]]), np.max([
@@ -496,73 +537,75 @@ def update_fig_scatter_natural_y_range(fig_scatter_natural_y_range, df, y_column
     return fig_scatter_natural_y_range
 
 
-def plot_lines_to_show_ff_visible_segments_in_fig_scatter(fig_scatter, ff_info, monkey_information, stops_near_ff_row,
-                                                          unique_ff_indices=None, time_or_distance='time', y_range_for_v_line=[-200, 200],
-                                                          varying_colors=[
-                                                              '#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64'],
-                                                          ff_names=None):
-
-    # Define threshold for separating visible intervals
+def plot_blocks_to_show_ff_visible_segments_in_fig_scatter(
+    fig_scatter,
+    ff_info,
+    monkey_information,
+    stops_near_ff_row,
+    unique_ff_indices=None,
+    time_or_distance='time',
+    y_range_for_v_line=[-200, 200],
+    varying_colors=['#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64'],
+    ff_names=None
+):
     point_index_gap_threshold_to_sep_vis_intervals = 12
-
-    # Set unique_ff_indices to all unique indices in ff_info if not provided
     unique_ff_indices = ff_info.ff_index.unique(
     ) if unique_ff_indices is None else np.array(unique_ff_indices)
 
-    # Iterate over unique firefly indices
-    for i, ff_index in enumerate(unique_ff_indices):
-        # Define color for current firefly
-        color = varying_colors[i % 5]
-        # Extract and sort data for current firefly
-        temp_df = ff_info[ff_info['ff_index'] == ff_index].copy().sort_values(by=[
-            'point_index'])
+    if ff_names is None:
+        ff_names = ['ff ' + str(i) for i in range(len(unique_ff_indices))]
 
-        if len(temp_df) == 0:
+    for i, ff_index in enumerate(unique_ff_indices):
+        color = varying_colors[i % len(varying_colors)]
+        temp_df = ff_info[ff_info['ff_index'] ==
+                          ff_index].copy().sort_values(by='point_index')
+
+        if temp_df.empty:
             continue
 
-        # Find breaking points of visible segments
         all_point_index = temp_df.point_index.values
         all_breaking_points = np.where(np.diff(
             all_point_index) >= point_index_gap_threshold_to_sep_vis_intervals)[0] + 1
 
-        # Find values for starting and ending points of visible segments
         all_starting_points = np.insert(
             all_point_index[all_breaking_points], 0, all_point_index[0])
-        # all_ending_points = np.append(
-        #     all_point_index[all_breaking_points-1], all_point_index[-1])
+        all_ending_points = np.append(
+            all_point_index[all_breaking_points - 1], all_point_index[-1])
 
-        # Find relative values for starting and ending points of visible segments
         ref_value = stops_near_ff_row['stop_time'] if time_or_distance == 'time' else stops_near_ff_row['stop_cum_distance']
         time_or_distance_var = 'time' if time_or_distance == 'time' else 'cum_distance'
+
         all_starting_rel_values = monkey_information.loc[all_starting_points,
                                                          time_or_distance_var].values - ref_value
-        # all_ending_rel_values = monkey_information.loc[all_ending_points,
-        #                                                time_or_distance_var].values - ref_value
-        if ff_names is None:
-            ff_names = ['ff ' + str(i) for i in range(len(unique_ff_indices))]
-        # Find and plot beginning and end of each visible segment
-        for j in range(len(all_breaking_points)+1):
-            # Plot points when firefly starts being visible
-            if j == 0:
-                showlegend = True
-            else:
-                showlegend = False
+        all_ending_rel_values = monkey_information.loc[all_ending_points,
+                                                       time_or_distance_var].values - ref_value
 
-            fig_scatter = add_vertical_line_for_an_x_value(fig_scatter, x_value=all_starting_rel_values[j], y_range=y_range_for_v_line, color=color,
-                                                           name=ff_names[i] + ' starts visible')
-
-            fig_scatter = add_annotation_to_fig_scatter(
-                fig_scatter, ff_names[i], all_starting_rel_values[j])
-
-            fig_scatter.update_traces(opacity=1, selector=dict(name=ff_names[i] + ' starts visible'),
-                                      showlegend=showlegend, legendgroup=ff_names[i])
-
-            # fig_scatter = add_vertical_line_for_an_x_value(fig_scatter, x_value=all_ending_rel_values[j], y_range=y_range_for_v_line, color=color,
-            #                          name=ff_names[i] + ' stops visible')
-
-            # fig_scatter.update_traces(opacity=1, selector=dict(name=ff_names[i] + ' stops visible'),
-            #                   line=dict(dash='dot'), showlegend=showlegend, legendgroup=ff_names[i])
-
-            # break  # for right now, we only want to show when the ff first becomes visible
+        # Add one block (shape) per visible segment
+        for j in range(len(all_starting_rel_values)):
+            # Add a translucent rectangular block spanning start to end
+            fig_scatter.add_shape(
+                type='rect',
+                x0=all_starting_rel_values[j],
+                x1=all_ending_rel_values[j],
+                y0=y_range_for_v_line[0],
+                y1=y_range_for_v_line[1],
+                fillcolor=color,
+                opacity=0.2,
+                layer='below',
+                line=dict(width=0),
+                name=ff_names[i] + f' visible segment {j}'
+            )
+            # Optionally add annotation at the center of the block
+            center_x = (
+                all_starting_rel_values[j] + all_ending_rel_values[j]) / 2
+            fig_scatter.add_annotation(
+                x=center_x,
+                y=y_range_for_v_line[1],
+                text=ff_names[i],
+                showarrow=False,
+                font=dict(color=color),
+                opacity=0.5,
+                yanchor='bottom'
+            )
 
     return fig_scatter

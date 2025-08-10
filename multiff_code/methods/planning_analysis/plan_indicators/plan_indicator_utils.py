@@ -2,6 +2,12 @@
 from data_wrangling import specific_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils, find_cvn_utils
 from null_behaviors import curv_of_traj_utils, curvature_utils
+from planning_analysis.plan_factors import build_factor_comp
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from planning_analysis.plan_indicators import diff_in_curv_utils
+from planning_analysis.plan_indicators import plan_indicator_utils
+
+
 
 import seaborn as sns
 import statsmodels.api as sm
@@ -14,17 +20,28 @@ import plotly.express as px
 import math
 import os
 import sys
+from scipy.stats import mannwhitneyu
 
 import numpy as np
 
+
+
 def run_tests_over_monkeys(
-    test_func_angle,
-    test_func_d_curv,
     ref_point_params,
     monkeys=['monkey_Schro', 'monkey_Bruno'],
-    num_permutations=10000,
     verbose=True,
+    test='wilcoxon', # or 'permutation'
 ):
+    assert test in ['wilcoxon', 'permutation']
+    if test == 'wilcoxon':
+        test_angle_func = lambda x, y: mannwhitneyu_test(x, y, alternative='greater')
+        test_d_curv_func = lambda x, y: mannwhitneyu_test(x, y, alternative='greater')
+        test_d_dir_func = lambda x, y: mannwhitneyu_test(x, y, alternative='greater')
+    elif test == 'permutation':
+        test_angle_func = lambda x, y: permutation_test(x, y, num_permutations=10000, alternative='greater', statistic='median')
+        test_d_curv_func = lambda x, y: permutation_test(x, y, num_permutations=10000, alternative='greater', statistic='median')
+        test_d_dir_func = lambda x, y: permutation_test(x, y, num_permutations=10000, alternative='greater', statistic='mean')
+        
     results = []
     
     for monkey_name in monkeys:
@@ -56,21 +73,41 @@ def run_tests_over_monkeys(
                 planner.combd_heading_df_x_sessions_ctrl.copy()
             )
             
+            # Filter NaNs for d_curv column
+            test_df_clean, ctrl_df_clean = filter_and_report_nan(
+                test_df, ctrl_df, col_name='diff_in_abs_angle_to_nxt_ff'
+            )
+            
             # Run angle test directly on raw data (assumed no filtering needed)
-            angle_p = test_func_angle(
-                test_df['diff_in_abs_angle_to_nxt_ff'].values,
-                ctrl_df['diff_in_abs_angle_to_nxt_ff'].values
+            angle_p = test_angle_func(
+                test_df_clean['diff_in_abs_angle_to_nxt_ff'].values,
+                ctrl_df_clean['diff_in_abs_angle_to_nxt_ff'].values
             )
             
             # Filter NaNs for d_curv column
             test_df_clean, ctrl_df_clean = filter_and_report_nan(
                 test_df, ctrl_df, col_name='diff_in_abs_d_curv'
             )
-            
+
             # Run d_curv test on cleaned data
-            d_curv_p = test_func_d_curv(
+            d_curv_p = test_d_curv_func(
                 test_df_clean['diff_in_abs_d_curv'].values,
                 ctrl_df_clean['diff_in_abs_d_curv'].values
+            )
+
+            # get dir_from_cur_ff_same_side
+            build_factor_comp.add_dir_from_cur_ff_same_side(test_df)
+            build_factor_comp.add_dir_from_cur_ff_same_side(ctrl_df)
+
+            # Run d_dir test on cleaned data
+            d_dir_p = test_d_dir_func(
+                test_df['dir_from_cur_ff_same_side'].values,
+                ctrl_df['dir_from_cur_ff_same_side'].values
+            )
+            
+            # Filter NaNs for d_dir column
+            test_df_clean, ctrl_df_clean = filter_and_report_nan(
+                test_df, ctrl_df, col_name='dir_from_cur_ff_same_side'
             )
             
             # Collect results
@@ -80,9 +117,38 @@ def run_tests_over_monkeys(
                 'ref_point_value': ref_point_value,
                 'angle_p_value': angle_p,
                 'd_curv_p_value': d_curv_p,
+                'd_dir_p_value': d_dir_p,
             })
     
     return pd.DataFrame(results)
+
+def mannwhitneyu_test(x, y):
+    _, p = mannwhitneyu(x, y, alternative='greater')
+    return p
+
+
+def filter_and_report_nan(
+    test_df, ctrl_df, col_name='diff_in_abs_d_curv'
+):
+    # Count before filtering
+    test_total = len(test_df)
+    ctrl_total = len(ctrl_df)
+
+    # Filter out NaNs in the specified column
+    test_df_clean = test_df[test_df[col_name].notna()]
+    ctrl_df_clean = ctrl_df[ctrl_df[col_name].notna()]
+
+    # Count after filtering
+    test_filtered = len(test_df_clean)
+    ctrl_filtered = len(ctrl_df_clean)
+
+    # Print stats
+    print(f"test_df dropped {test_total - test_filtered} out of {test_total} rows "
+          f"({100 * (test_total - test_filtered) / test_total:.2f}%) due to NaN in {col_name}")
+    print(f"ctrl_df dropped {ctrl_total - ctrl_filtered} out of {ctrl_total} rows "
+          f"({100 * (ctrl_total - ctrl_filtered) / ctrl_total:.2f}%) due to NaN in {col_name}")
+
+    return test_df_clean, ctrl_df_clean
 
 
 def permutation_test(
@@ -136,7 +202,7 @@ def permutation_test(
         y_perm = permuted[len(x):]
         perm_diff = stat_func(x_perm) - stat_func(y_perm)
         
-        if _ % 5000 == 0:
+        if _ % 500 == 0:
             print(f'perm_diff: {perm_diff}')
 
         if alternative == 'two-sided':

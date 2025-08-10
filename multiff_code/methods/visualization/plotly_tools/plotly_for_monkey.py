@@ -230,11 +230,11 @@ def _plot_or_update_arrow_to_eye_positions_in_plotly(fig, x0, y0, monkey_subset,
     )
 
     if monkey_subset_meaningful.shape[0] == 0:
-        #logging.warning(f'Failed to update arrow to eye positions for trace_name: {trace_name} because no valid eye position data are found.')
+        # logging.warning(f'Failed to update arrow to eye positions for trace_name: {trace_name} because no valid eye position data are found.')
         return fig
     elif monkey_subset_meaningful.shape[0] > 1:
         # make a warning
-        #logging.warning('More than one meaningful eye position found, only the first one is used to plot the arrow.')
+        # logging.warning('More than one meaningful eye position found, only the first one is used to plot the arrow.')
         monkey_subset_meaningful = monkey_subset_meaningful.iloc[0:1]
     # else:
     #     logging.info('Meaningful eye position is found, using it to plot the arrow.')
@@ -288,7 +288,7 @@ def update_legend(fig):
     fig.update_layout(legend=dict(
         orientation="h",
         yanchor="bottom",
-        y=1.02,
+        y=1.05,
         itemsizing='constant',
         xanchor="right",
         x=1

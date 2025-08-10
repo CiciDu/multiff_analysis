@@ -171,8 +171,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         if merge_diff_in_curv_df_to_heading_info:
             if hasattr(self, 'heading_info_df'):
+                columns_to_add = [
+                    col for col in self.diff_in_curv_df.columns if col not in self.heading_info_df.columns]
                 self.heading_info_df = self.heading_info_df.merge(
-                    self.diff_in_curv_df, on='ref_point_index', how='left')
+                    self.diff_in_curv_df[['ref_point_index'] + columns_to_add], on='ref_point_index', how='left')
 
         return self.diff_in_curv_df
 
@@ -377,8 +379,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
             self.diff_in_curv_df = self.diff_in_curv_df.merge(self.heading_info_df[['ref_point_index', 'stop_point_index']], on='ref_point_index', how='left')
 
         if merge_diff_in_curv_df_to_heading_info:
+            columns_to_add = [
+                col for col in self.diff_in_curv_df.columns if col not in self.heading_info_df.columns]
             self.heading_info_df = self.heading_info_df.merge(
-                self.diff_in_curv_df, on='ref_point_index', how='left')
+                self.diff_in_curv_df[['ref_point_index'] + columns_to_add], on='ref_point_index', how='left')
         return self.heading_info_df, self.diff_in_curv_df
 
     def retrieve_or_make_heading_info_df(self, test_or_control='test', heading_info_df_exists_ok=True, diff_in_curv_df_exists_ok=True, save_data=True,

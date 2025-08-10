@@ -42,13 +42,13 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         self.add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration()
         temp_df = self.curv_of_traj_in_duration.copy()
         for y_column_name, color, name, symbol in [
-                                           # ('angle_from_stop_to_nxt_ff', 'magenta', 'angle from stop to nxt ff', 'x'),
-                                           ('angle_opt_cur_end_to_nxt_ff', 'yellow',
+            # ('angle_from_stop_to_nxt_ff', 'magenta', 'angle from stop to nxt ff', 'x'),
+            ('angle_opt_cur_end_to_nxt_ff', 'yellow',
                                             'angle from cur arc end to nxt ff', 'x'),
-                                           # ('diff_in_angle_to_nxt_ff', 'grey', 'diff in angle to nxt ff', 'x'),
-                                           ('diff_in_abs_angle_to_nxt_ff', 'cyan',
+            # ('diff_in_angle_to_nxt_ff', 'grey', 'diff in angle to nxt ff', 'x'),
+            ('diff_in_abs_angle_to_nxt_ff', 'cyan',
                                             'diff in abs angle to nxt ff', 'x')
-                                           ]:
+        ]:
             temp_df[y_column_name] = temp_df[y_column_name] * \
                 180 / np.pi  # convert radians to degrees
             self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
@@ -59,18 +59,17 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
     def _show_d_curv_to_nxt_ff_in_scatterplot_func(self, y_column_name='d_curv_monkey'):
         self.add_diff_in_curv_info_to_curv_of_traj_in_duration()
         for y_column_name, color, name, symbol in [
-                                           # ('d_curv_monkey', 'green', 'd_curv_monkey', 'cross'),
-                                           ('d_curv_null_arc', 'blue',
-                                            'd_curv_null_arc', 'cross'),
-                                           # ('diff_in_d_curv', 'khaki', 'diff in d curv', 'cross'),
-                                           ('diff_in_abs_d_curv', 'purple',
-                                            'diff in abs d curv', 'cross')
-                                           ]:
+            # ('d_curv_monkey', 'green', 'd_curv_monkey', 'cross'),
+            ('d_curv_null_arc', 'blue',
+             'd_curv_null_arc', 'cross'),
+            # ('diff_in_d_curv', 'khaki', 'diff in d curv', 'cross'),
+            ('diff_in_abs_d_curv', 'purple',
+             'diff in abs d curv', 'cross')
+        ]:
             self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
                 self.fig_scatter_s, self.curv_of_traj_in_duration, name=name, color=color, x_column_name='rel_time', y_column_name=y_column_name, symbol=symbol)
             self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
                 self.fig_scatter_cm, self.curv_of_traj_in_duration, name=name, color=color, x_column_name='rel_distance', y_column_name=y_column_name, symbol=symbol)
-
 
     def _prepare_static_main_plots(self,
                                    show_static_plots=False,
@@ -153,6 +152,10 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
                     self.fig_scatter_natural_y_range, self.cur_ff_curv_df, y_column_name)
             except:
                 pass
+        if self.scatter_plot_params.get('show_d_curv_to_nxt_ff', False):
+            self._show_d_curv_to_nxt_ff_in_scatterplot_func()
+        if self.scatter_plot_params.get('show_angle_to_nxt_ff', False):
+            self._show_angle_to_nxt_ff_in_scatterplot_func()
         self.fig_scatter_combd = plotly_for_scatterplot.make_fig_scatter_combd(
             self.fig_scatter_s, self.fig_scatter_cm, self.use_two_y_axes)
         self._update_fig_scatter_combd_y_range()
@@ -235,7 +238,6 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             self.fig_scatter_s, self.cur_ff_curv_df, name='Cur FF Opt Curv', color=self.cur_ff_color, x_column_name='rel_time', y_column_name=y_column_name, symbol='triangle-up')
         self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
             self.fig_scatter_cm, self.cur_ff_curv_df, name='Cur FF Opt Curv', color=self.cur_ff_color, x_column_name='rel_distance', y_column_name=y_column_name, symbol='triangle-up')
-
 
     def _update_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
