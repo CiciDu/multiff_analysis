@@ -2,6 +2,7 @@
 from data_wrangling import specific_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils, find_cvn_utils
 from null_behaviors import curv_of_traj_utils, curvature_utils
+from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 
 import seaborn as sns
 import statsmodels.api as sm
@@ -356,7 +357,9 @@ def make_heading_info_df(cur_and_nxt_ff_from_ref_df, stops_near_ff_df, monkey_in
                                                                                                  mx=heading_info_df['cur_ff_x'].values, my=heading_info_df['cur_ff_y'], m_angle=heading_info_df['monkey_angle_before_stop'])
     heading_info_df['angle_from_cur_ff_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(ff_x=heading_info_df['nxt_ff_x'].values, ff_y=heading_info_df['nxt_ff_y'],
                                                                                                    mx=heading_info_df['cur_ff_x'].values, my=heading_info_df['cur_ff_y'], m_angle=heading_info_df['monkey_angle_before_stop'])
-
+    
+    heading_info_df = build_factor_comp.process_heading_info_df(
+        heading_info_df)
     return heading_info_df
 
 

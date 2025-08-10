@@ -25,46 +25,71 @@ matplotlib.rcParams['animation.embed_limit'] = 2**128
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
+import numpy as np
 
-def make_correlation_plot_in_plotly(curv_for_correlation_df=None, change_units_to_degrees_per_m=True,
+def make_correlation_plot_in_plotly(heading_info_df=None,
+                                    x_var_column='cum_distance_between_two_stops',
+                                    y_var_column='diff_in_abs_angle_to_nxt_ff',
                                     current_stop_point_index_to_mark=None, traj_curv_descr='', ref_point_descr='',
                                     title=None, **kwargs):
 
-    traj_curv_counted = curv_for_correlation_df['traj_curv_counted'].values
-    nxt_curv_counted = curv_for_correlation_df['nxt_curv_counted'].values
-    curv_for_correlation_df = curv_for_correlation_df.reset_index()
+    if heading_info_df is None:
+        print("Warning: heading_info_df is None, cannot create plot.")
+        return None
+
+    # Extract x and y variables, raise error if columns missing
+    try:
+        x_var = heading_info_df[x_var_column].values
+        y_var = heading_info_df[y_var_column].values
+    except KeyError as e:
+        print(f"Warning: Missing column in dataframe: {e}")
+        return None
+
+    # Check for empty arrays
+    if len(x_var) == 0 or len(y_var) == 0:
+        print('Warning: Data arrays are empty, so correlation plot is not shown')
+        return None
+
+    # Find index to mark on plot
     current_position_index_to_mark = None
     if current_stop_point_index_to_mark is not None:
         try:
-            current_position_index_to_mark = curv_for_correlation_df[curv_for_correlation_df[
-                'stop_point_index'] == current_stop_point_index_to_mark].index.values[0]
+            matches = heading_info_df.index[
+                heading_info_df['stop_point_index'] == current_stop_point_index_to_mark
+            ]
+            current_position_index_to_mark = matches[0]
         except:
-            pass
+            raise ValueError(f'Warning: No match found for current_stop_point_index_to_mark: {current_stop_point_index_to_mark}')
 
-    if traj_curv_counted is None or nxt_curv_counted is None:
-        print('Warning: nxt_ff_counted_df or cur_ff_counted_df is None, so correlation plot is not shown')
-        return None
 
-    traj_curv_counted = traj_curv_counted.copy()
-    nxt_curv_counted = nxt_curv_counted.copy()
-
-    if change_units_to_degrees_per_m:
-        traj_curv_counted = traj_curv_counted * (180/np.pi) * 100
-        nxt_curv_counted = nxt_curv_counted * (180/np.pi) * 100
-
+    # Compose title if none given
     if title is None:
         title = traj_curv_descr + "<br>" + ref_point_descr
-    customdata = curv_for_correlation_df['stop_point_index'].values
-    hovertemplate = ('<b>nxt ff curv - cur ff curv: %{x:.2f} <br>Traj curv - cur ff curv: %{y:.2f}</b><BR><BR>Stop point index:<BR>' +
-                     '%{customdata}' +
-                     '<extra></extra>')
-    xaxis_title = 'Curv to nxt ff - Curv to cur ff (cm)'
-    yaxis_title = 'Traj Curv - Curv to cur ff (cm)'
-    fig_corr = plot_relationship_in_plotly(nxt_curv_counted, traj_curv_counted, show_plot=False, title=title, current_position_index_to_mark=current_position_index_to_mark,
-                                           hovertemplate=hovertemplate, customdata=customdata, xaxis_title=xaxis_title, yaxis_title=yaxis_title)
+
+    # Prepare customdata for hover info
+    if 'stop_point_index' in heading_info_df.columns:
+        customdata = heading_info_df['stop_point_index'].values
+    else:
+        customdata = None
+
+    # Plotly hovertemplate formatting (Plotly uses %{x} and %{y}, not Python f-string formatting)
+    hovertemplate = (
+        f'<b>{x_var_column}: %{{x:.2f}} <br>{y_var_column}: %{{y:.2f}}</b><br><br>'
+        'Stop point index:<br>%{{customdata}}'
+        '<extra></extra>'
+    )
+
+    # Axis titles
+    xaxis_title = x_var_column
+    yaxis_title = y_var_column
+
+    # Call your plotting function (make sure plot_relationship_in_plotly is defined elsewhere)
+    fig_corr = plot_scatter_plot_in_plotly(x_var, y_var, customdata, hovertemplate, current_position_index_to_mark, title, xaxis_title, yaxis_title)
+
     fig_corr.update_layout(title_font_size=13, showlegend=False)
 
     return fig_corr
+
 
 
 # def make_heading_plot_in_plotly(rel_heading_df=None, change_units_to_degrees=True,
@@ -112,12 +137,12 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
         add_to_title = ''
 
     # Extract relevant angles from heading_info_df
-    ang_traj_nxt = heading_info_df['angle_from_stop_to_nxt_ff'].values
+    ang_stop_nxt = heading_info_df['angle_from_stop_to_nxt_ff'].values
     ang_cur_nxt = heading_info_df['angle_opt_cur_end_to_nxt_ff'].values
 
     # Convert angles to degrees if required
     if change_units_to_degrees:
-        ang_traj_nxt = ang_traj_nxt * (180/np.pi)
+        ang_stop_nxt = ang_stop_nxt * (180/np.pi)
         ang_cur_nxt = ang_cur_nxt * (180/np.pi)
 
     # Reset index of heading_info_df
@@ -134,19 +159,19 @@ def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=Tr
 
     # Set default title if not provided
     if title is None:
-        title = "Angle to Nxt FF from Traj vs From Cur FF" + "<br>" + ref_point_descr
+        title = "Angle from Stop to Next FF vs. Angle from Current Arc End to Next FF" + "<br>" + ref_point_descr
 
     # Prepare custom data and hover template for the plot
     customdata = heading_info_df['stop_point_index'].values
-    hovertemplate = ('<b>Angle to Nxt FF from Traj: %{x:.2f} <br>Angle to Nxt FF from cur ff: %{y:.2}</b><BR><BR>Stop point index:<BR>' +
+    hovertemplate = ('<b>Angle from Stop to Next FF: %{x:.2f} <br>Angle from Current Arc End to Next FF: %{y:.2}</b><BR><BR>Stop point index:<BR>' +
                      '%{customdata}' + '<extra></extra>')
 
     # Set axis titles
-    xaxis_title = 'Alt from Traj'
-    yaxis_title = 'Alt from Stop'
+    xaxis_title = 'Angle from Stop to Nxt FF'
+    yaxis_title = 'Angle from Cur Arc End to Nxt FF'
 
     # Generate the plot
-    fig_angle = plot_relationship_in_plotly(ang_traj_nxt, ang_cur_nxt, show_plot=False, title=title, current_position_index_to_mark=current_position_index_to_mark,
+    fig_angle = plot_relationship_in_plotly(ang_stop_nxt, ang_cur_nxt, show_plot=False, title=title, current_position_index_to_mark=current_position_index_to_mark,
                                             hovertemplate=hovertemplate, customdata=customdata, xaxis_title=xaxis_title, yaxis_title=yaxis_title, add_to_title=add_to_title)
 
     # Update layout of the plot
@@ -254,3 +279,42 @@ def plot_relationship_in_plotly(x_array, y_array, slope=None, show_plot=True,
     if show_plot:
         fig.show()
     return fig
+
+
+def plot_scatter_plot_in_plotly(x_var, y_var, customdata, hovertemplate, current_position_index_to_mark, title=None, xaxis_title=None, yaxis_title=None):
+    # Build the scatter plot figure directly
+    fig_corr = go.Figure()
+
+    fig_corr.add_trace(
+        go.Scatter(
+            x=x_var,
+            y=y_var,
+            mode='markers',
+            marker=dict(size=7, color='blue'),
+            customdata=customdata,
+            hovertemplate=hovertemplate
+        )
+    )
+
+    # If you want to mark the current position with a special symbol/color
+    if current_position_index_to_mark is not None and 0 <= current_position_index_to_mark < len(x_var):
+        fig_corr.add_trace(
+            go.Scatter(
+                x=[x_var[current_position_index_to_mark]],
+                y=[y_var[current_position_index_to_mark]],
+                mode='markers',
+                marker=dict(size=12, color='red', symbol='star'),
+                name='Current Stop',
+                showlegend=True,
+                hoverinfo='skip'
+            )
+        )
+
+    fig_corr.update_layout(
+        title=title,
+        xaxis_title=xaxis_title,
+        yaxis_title=yaxis_title,
+        title_font_size=13,
+        showlegend=True,
+    )
+

@@ -5,6 +5,7 @@ from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_cvn_class, cvn_helper_class
 from planning_analysis.plan_factors import plan_factors_utils
 from visualization.matplotlib_tools import monkey_heading_utils
+from planning_analysis.plan_factors import build_factor_comp
 import pandas as pd
 import os
 import sys
@@ -378,6 +379,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         if 'stop_point_index' not in self.diff_in_curv_df.columns:
             self.diff_in_curv_df = self.diff_in_curv_df.merge(self.heading_info_df[['ref_point_index', 'stop_point_index']], on='ref_point_index', how='left')
 
+        if 'diff_in_angle_to_nxt_ff' not in self.heading_info_df.columns:
+            self.heading_info_df = build_factor_comp.process_heading_info_df(
+                self.heading_info_df)
+
         if merge_diff_in_curv_df_to_heading_info:
             columns_to_add = [
                 col for col in self.diff_in_curv_df.columns if col not in self.heading_info_df.columns]
@@ -607,10 +612,11 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
     def _make_kwargs_for_correlation_plot(self):
 
         self.kwargs_for_correlation_plot = {
-            'curv_for_correlation_df': self.curv_for_correlation_df.copy(),
-            'change_units_to_degrees_per_m': self.overall_params['change_units_to_degrees_per_m'],
+            'heading_info_df': self.heading_info_df.copy(),
+            #'change_units_to_degrees_per_m': self.overall_params['change_units_to_degrees_per_m'],
             'ref_point_descr': self.ref_point_descr,
-            'traj_curv_descr': self.traj_curv_descr}
+            'traj_curv_descr': self.traj_curv_descr
+            }
         return self.kwargs_for_correlation_plot
 
     def _make_kwargs_for_heading_plot(self):

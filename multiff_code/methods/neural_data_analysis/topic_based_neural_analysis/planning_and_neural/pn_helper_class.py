@@ -219,8 +219,9 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         
         angle_df['angle_from_stop_to_nxt_ff'] = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, both_ff_df.point_index_before_stop.values,
                                                                                  both_ff_df.nxt_ff_x.values, both_ff_df.nxt_ff_y.values)
-        build_factor_comp._add_diff_in_abs_angle_to_nxt_ff(
-            angle_df)
+        if 'diff_in_angle_to_nxt_ff' not in angle_df.columns:
+            angle_df= build_factor_comp.process_heading_info_df(
+                angle_df)
 
         columns_to_merge = ['cur_opt_arc_end_heading', 'angle_opt_cur_end_to_nxt_ff', 'angle_from_stop_to_nxt_ff',
                             'diff_in_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff'

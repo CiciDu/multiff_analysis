@@ -644,8 +644,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.curv_of_traj_in_duration['angle_from_stop_to_nxt_ff'] = angle_from_stop_to_nxt_ff
 
         # add diff_in_angle_to_nxt_ff, diff_in_abs_angle_to_nxt_ff
-        build_factor_comp._add_diff_in_abs_angle_to_nxt_ff(
-            self.curv_of_traj_in_duration)
+        if 'diff_in_angle_to_nxt_ff' not in self.curv_of_traj_in_duration.columns:
+            build_factor_comp._add_diff_in_abs_angle_to_nxt_ff(
+                self.curv_of_traj_in_duration)
 
     def find_null_arcs_info_for_plotting_for_the_duration(self):
 
