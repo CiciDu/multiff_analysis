@@ -520,7 +520,7 @@ def plot_a_portion_of_trajectory_to_show_the_scope_for_curv(fig, traj_portion, c
 
 
 def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monkey_information, rotation_matrix, x0, y0,
-                                                             how_to_show_ff='square', unique_ff_indices=None):
+                                                             how_to_show_ff='square', unique_ff_indices=None, varying_colors=None):
     """
     This function plots horizontal lines to show visible segments of fireflies (ff) using Plotly.
     It also shows the ff position as a square or a circle.
@@ -556,9 +556,10 @@ def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monke
     # # Convert it to hex for the plotly plot
     # varying_colors = [matplotlib.colors.rgb2hex(color) for color in varying_colors]
 
-    varying_colors = ['#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64',
-                      '#FF5733', '#FFB533', '#33FFBE', '#3933FF', '#FF3346',
-                      '#FC33FF', '#FFEC33', '#FF5E33', '#B06B58']
+    if varying_colors is None:
+        varying_colors = ['#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64',
+                          '#FF5733', '#FFB533', '#33FFBE', '#3933FF', '#FF3346',
+                          '#FC33FF', '#FFEC33', '#FF5E33', '#B06B58']
 
     # Iterate over unique firefly indices
     # for i, ff_index in enumerate(unique_ff_indices):

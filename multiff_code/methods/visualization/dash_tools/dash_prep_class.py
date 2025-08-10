@@ -42,12 +42,10 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         self.add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration()
         temp_df = self.curv_of_traj_in_duration.copy()
         for y_column_name, color, name, symbol in [
+            ('diff_in_abs_angle_to_nxt_ff', 'cyan', 'diff in abs angle to nxt ff', 'x'),
+            # ('angle_opt_cur_end_to_nxt_ff', 'yellow', 'angle from cur arc end to nxt ff', 'x'),
             # ('angle_from_stop_to_nxt_ff', 'magenta', 'angle from stop to nxt ff', 'x'),
-            ('angle_opt_cur_end_to_nxt_ff', 'yellow',
-                                            'angle from cur arc end to nxt ff', 'x'),
             # ('diff_in_angle_to_nxt_ff', 'grey', 'diff in angle to nxt ff', 'x'),
-            ('diff_in_abs_angle_to_nxt_ff', 'cyan',
-                                            'diff in abs angle to nxt ff', 'x')
         ]:
             temp_df[y_column_name] = temp_df[y_column_name] * \
                 180 / np.pi  # convert radians to degrees
@@ -59,12 +57,11 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
     def _show_d_curv_to_nxt_ff_in_scatterplot_func(self, y_column_name='d_curv_monkey'):
         self.add_diff_in_curv_info_to_curv_of_traj_in_duration()
         for y_column_name, color, name, symbol in [
+            ('diff_in_abs_d_curv', 'purple','diff in abs d curv', 'cross'),
+            #('d_curv_null_arc', 'blue','d_curv_null_arc', 'cross'),
             # ('d_curv_monkey', 'green', 'd_curv_monkey', 'cross'),
-            ('d_curv_null_arc', 'blue',
-             'd_curv_null_arc', 'cross'),
             # ('diff_in_d_curv', 'khaki', 'diff in d curv', 'cross'),
-            ('diff_in_abs_d_curv', 'purple',
-             'diff in abs d curv', 'cross')
+            
         ]:
             self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
                 self.fig_scatter_s, self.curv_of_traj_in_duration, name=name, color=color, x_column_name='rel_time', y_column_name=y_column_name, symbol=symbol)
@@ -195,12 +192,21 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
                                                                                  show_visible_segments=self.current_plotly_key_comp[
                                                                                      'show_visible_segments'],
                                                                                  visible_segments_info=self.visible_segments_info, trajectory_next_stop_row=self.trajectory_next_stop_row)
+        
         self.fig_scatter_cm = plotly_for_scatterplot.make_the_initial_fig_scatter(self.curv_of_traj_in_duration, self.monkey_hoverdata_value_cm, self.cur_ff_color, self.nxt_ff_color, trajectory_ref_row=self.trajectory_ref_row,
                                                                                   use_two_y_axes=use_two_y_axes, x_column_name='rel_distance', curv_of_traj_trace_name=self.curv_of_traj_trace_name,
                                                                                   show_visible_segments=self.current_plotly_key_comp[
                                                                                       'show_visible_segments'],
                                                                                   visible_segments_info=self.visible_segments_info, trajectory_next_stop_row=self.trajectory_next_stop_row)
 
+        # also add y=-150 and y=-100 (for more reference points)
+        y_range_for_v_line = [-200, 200]
+        self.fig_scatter_cm = plotly_for_scatterplot.add_vertical_line_for_an_x_value(
+            self.fig_scatter_cm, x_value=-150, y_range=y_range_for_v_line, color='magenta', name='y=-150', dash=None)
+        self.fig_scatter_cm = plotly_for_scatterplot.add_vertical_line_for_an_x_value(
+            self.fig_scatter_cm, x_value=-100, y_range=y_range_for_v_line, color='magenta', name='y=-100', dash=None)
+        
+        
         # self._turn_on_or_off_vertical_lines_in_each_scatterplot_based_on_monkey_hoverdata_column()
         return self.fig_scatter_s, self.fig_scatter_cm
 

@@ -54,6 +54,84 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
     def __init__(self, PlotTrials_args):
         super().__init__(PlotTrials_args)
 
+    def make_one_monkey_plotly_plot(self,
+                                    monkey_plot_params={}):
+
+        m_params = {
+            **copy.deepcopy(self.default_monkey_plot_params),
+            **monkey_plot_params
+        }
+
+        self.fig = plotly_for_monkey.plot_fireflies(
+            None, self.current_plotly_key_comp['ff_df'])
+        if m_params['plot_arena_edge']:
+            self.fig = plotly_for_monkey.plot_arena_edge_in_plotly(self.fig)
+
+        if self.current_plotly_key_comp['connect_path_ff_df'] is not None:
+            self.fig = plotly_for_monkey.connect_points_to_points(self.fig, self.current_plotly_key_comp['connect_path_ff_df'],
+                                                                  show_traj_points_when_making_lines=m_params[
+                                                                      'show_traj_points_when_making_lines'],
+                                                                  hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
+
+        if self.current_plotly_key_comp['show_visible_segments']:
+            varying_colors = [self.cur_ff_color, self.nxt_ff_color, '#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64',
+                                '#FF5733', '#FFB533', '#33FFBE', '#3933FF', '#FF3346',
+                                '#FC33FF', '#FFEC33', '#FF5E33', '#B06B58']
+            self.fig = plotly_for_monkey.plot_horizontal_lines_to_show_ff_visible_segments_plotly(self.fig,
+                                                                                                  self.current_plotly_key_comp[
+                                                                                                      'ff_dataframe_in_duration_visible_qualified'],
+                                                                                                  self.current_plotly_key_comp[
+                                                                                                      'monkey_information'],
+                                                                                                  self.current_plotly_key_comp[
+                                                                                                      'rotation_matrix'], 0, 0,
+                                                                                                  how_to_show_ff='square',
+                                                                                                  unique_ff_indices=None,
+                                                                                                  varying_colors=varying_colors)
+
+        if m_params['traj_portion'] is not None:
+            self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_the_scope_for_curv(self.fig, m_params['traj_portion'],
+                                                                                                 hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
+
+        if m_params['show_reward_boundary']:
+            self.fig = plotly_for_monkey.plot_reward_boundary_in_plotly(
+                self.fig, self.current_plotly_key_comp['ff_df'])
+
+        if m_params['show_all_eye_positions']:
+            self.fig = plotly_for_monkey.plot_eye_positions_in_plotly(self.fig, self.current_plotly_key_comp,
+                                                                      show_eye_positions_for_both_eyes=m_params[
+                                                                          'show_eye_positions_for_both_eyes'],
+                                                                      trace_name=m_params['eye_positions_trace_name'],
+                                                                      use_arrow_to_show_eye_positions=m_params['use_arrow_to_show_eye_positions'])
+
+        self.fig = plotly_for_monkey.plot_trajectory_data(self.fig, self.current_plotly_key_comp['trajectory_df'],
+                                                          hoverdata_multi_columns=m_params['hoverdata_multi_columns'],
+                                                          show_color_as_time=m_params['show_all_eye_positions'],
+                                                          show_traj_color_as_speed=m_params['show_traj_color_as_speed'])
+
+        if m_params['show_cur_ff']:
+            self._show_cur_ff()
+
+        if m_params['show_nxt_ff']:
+            self._show_nxt_ff()
+
+        if m_params['show_stops'] | (m_params['show_stop_point_indices'] is not None):
+            show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(
+                self.monkey_plot_params, self.current_plotly_key_comp)
+            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
+                                                              hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
+
+        self.fig = plotly_for_monkey.update_layout_and_x_and_y_limit(self.fig, self.current_plotly_key_comp,
+                                                                     m_params['show_current_eye_positions'] or m_params['show_all_eye_positions'])
+
+        # update the x label and y label
+        self.fig.update_xaxes(title_text='monkey x after rotation (cm)')
+        self.fig.update_yaxes(title_text='monkey y after rotation (cm)',
+                              scaleanchor="x",
+                              scaleratio=1)
+
+        return self.fig
+    
+    
     def make_individual_plots_for_stops_near_ff_in_plotly(self, current_i, max_num_plot_to_make=5, show_fig=True,
                                                           **additional_plotting_kwargs):
 
@@ -125,78 +203,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         return self.current_plotly_key_comp, self.fig
 
-    def make_one_monkey_plotly_plot(self,
-                                    monkey_plot_params={}):
-
-        m_params = {
-            **copy.deepcopy(self.default_monkey_plot_params),
-            **monkey_plot_params
-        }
-
-        self.fig = plotly_for_monkey.plot_fireflies(
-            None, self.current_plotly_key_comp['ff_df'])
-        if m_params['plot_arena_edge']:
-            self.fig = plotly_for_monkey.plot_arena_edge_in_plotly(self.fig)
-
-        if self.current_plotly_key_comp['connect_path_ff_df'] is not None:
-            self.fig = plotly_for_monkey.connect_points_to_points(self.fig, self.current_plotly_key_comp['connect_path_ff_df'],
-                                                                  show_traj_points_when_making_lines=m_params[
-                                                                      'show_traj_points_when_making_lines'],
-                                                                  hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
-
-        if self.current_plotly_key_comp['show_visible_segments']:
-            self.fig = plotly_for_monkey.plot_horizontal_lines_to_show_ff_visible_segments_plotly(self.fig,
-                                                                                                  self.current_plotly_key_comp[
-                                                                                                      'ff_dataframe_in_duration_visible_qualified'],
-                                                                                                  self.current_plotly_key_comp[
-                                                                                                      'monkey_information'],
-                                                                                                  self.current_plotly_key_comp[
-                                                                                                      'rotation_matrix'], 0, 0,
-                                                                                                  how_to_show_ff='square',
-                                                                                                  unique_ff_indices=None)
-
-        if m_params['traj_portion'] is not None:
-            self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_the_scope_for_curv(self.fig, m_params['traj_portion'],
-                                                                                                 hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
-
-        if m_params['show_reward_boundary']:
-            self.fig = plotly_for_monkey.plot_reward_boundary_in_plotly(
-                self.fig, self.current_plotly_key_comp['ff_df'])
-
-        if m_params['show_all_eye_positions']:
-            self.fig = plotly_for_monkey.plot_eye_positions_in_plotly(self.fig, self.current_plotly_key_comp,
-                                                                      show_eye_positions_for_both_eyes=m_params[
-                                                                          'show_eye_positions_for_both_eyes'],
-                                                                      trace_name=m_params['eye_positions_trace_name'],
-                                                                      use_arrow_to_show_eye_positions=m_params['use_arrow_to_show_eye_positions'])
-
-        self.fig = plotly_for_monkey.plot_trajectory_data(self.fig, self.current_plotly_key_comp['trajectory_df'],
-                                                          hoverdata_multi_columns=m_params['hoverdata_multi_columns'],
-                                                          show_color_as_time=m_params['show_all_eye_positions'],
-                                                          show_traj_color_as_speed=m_params['show_traj_color_as_speed'])
-
-        if m_params['show_cur_ff']:
-            self._show_cur_ff()
-
-        if m_params['show_nxt_ff']:
-            self._show_nxt_ff()
-
-        if m_params['show_stops'] | (m_params['show_stop_point_indices'] is not None):
-            show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(
-                self.monkey_plot_params, self.current_plotly_key_comp)
-            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
-                                                              hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
-
-        self.fig = plotly_for_monkey.update_layout_and_x_and_y_limit(self.fig, self.current_plotly_key_comp,
-                                                                     m_params['show_current_eye_positions'] or m_params['show_all_eye_positions'])
-
-        # update the x label and y label
-        self.fig.update_xaxes(title_text='monkey x after rotation (cm)')
-        self.fig.update_yaxes(title_text='monkey y after rotation (cm)',
-                              scaleanchor="x",
-                              scaleratio=1)
-
-        return self.fig
 
     def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']

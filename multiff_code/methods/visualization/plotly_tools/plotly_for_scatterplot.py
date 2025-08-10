@@ -328,7 +328,7 @@ def add_horizontal_line_to_fig_scatter(fig_scatter, use_two_y_axes, x_range=[-3,
                    ), secondary_y=secondary_y,
     )
     fig_scatter.update_traces(opacity=1, selector=dict(name='y2 =' + str(y_value)),
-                              line=dict(color='#888', width=1, dash='dot'))
+                              line=dict(color='#888', width=2, dash='dot'))
     return fig_scatter
 
 

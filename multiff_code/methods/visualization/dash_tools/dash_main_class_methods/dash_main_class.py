@@ -30,6 +30,7 @@ np.set_printoptions(suppress=True)
 
 # https://dash.plotly.com/interactive-graphing
 
+
 class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
     def __init__(self, raw_data_folder_path=None, opt_arc_type='opt_arc_stop_closest'):
@@ -107,7 +108,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         # Register all callbacks
         self._register_all_callbacks()
 
-        self.app.run(debug=True, mode='inline', port=port)
+        print(f"Opening dash in browser at: http://127.0.0.1:{port}")
+        self.app.run(debug=True, mode='external', port=port, host='0.0.0.0')
 
     def _register_all_callbacks(self):
         """Register all callbacks in one place for better organization"""
@@ -143,8 +145,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             prevent_initial_call=True
         )
         def update_all_plots_based_on_new_info(monkey_hoverdata, scatter_plot_hoverdata, scatter_plot_relayoutData,
-                                    update_ref_point, checklist_for_all_plots, checklist_for_monkey_plot,
-                                    ref_point_mode, ref_point_value):
+                                               update_ref_point, checklist_for_all_plots, checklist_for_monkey_plot,
+                                               ref_point_mode, ref_point_value):
 
             try:
                 # Reset freeze flag if not triggered by scatter plot
@@ -157,54 +159,60 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                 if trigger_id == self.id_prefix + 'monkey_plot.hoverData':
                     if 'customdata' in monkey_hoverdata['points'][0]:
                         self.monkey_hoverdata = monkey_hoverdata
-                        fig, fig_scatter_combd = self._update_dash_based_on_monkey_hover_data(
+                        self.fig, self.fig_scatter_combd = self._update_dash_based_on_monkey_hover_data(
                             monkey_hoverdata)
                     else:
-                        raise PreventUpdate("No update was triggered because customdata is not in monkey_hoverdata[\'points\'][0].")
+                        raise PreventUpdate(
+                            "No update was triggered because customdata is not in monkey_hoverdata[\'points\'][0].")
 
                 elif trigger_id == self.id_prefix + 'scatterplot_combined.relayoutData':
                     self.freeze_scatterplot = True
-                    raise PreventUpdate("No update was triggered because trigger ID was related to scatterplot_combined.relayoutData.")
+                    raise PreventUpdate(
+                        "No update was triggered because trigger ID was related to scatterplot_combined.relayoutData.")
 
                 elif trigger_id == self.id_prefix + 'scatterplot_combined.hoverData':
                     if self.freeze_scatterplot:
-                        raise PreventUpdate("No update was triggered because freeze_scatterplot is True.")
+                        raise PreventUpdate(
+                            "No update was triggered because freeze_scatterplot is True.")
                     if 'x' in scatter_plot_hoverdata['points'][0]:
-                        fig, fig_scatter_combd = self._update_dash_based_on_scatter_plot_hoverdata(
+                        self.fig, self.fig_scatter_combd = self._update_dash_based_on_scatter_plot_hoverdata(
                             scatter_plot_hoverdata)
                     else:
-                        raise PreventUpdate("No update was made because x is not in scatter_plot_hoverdata.")
+                        raise PreventUpdate(
+                            "No update was made because x is not in scatter_plot_hoverdata.")
 
                 elif trigger_id == self.id_prefix + 'update_ref_point.n_clicks':
                     if ref_point_value is not None and ref_point_value < 0:
-                        fig, fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_based_on_new_ref_point_descr(
+                        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_based_on_new_ref_point_descr(
                             ref_point_mode, ref_point_value
                         )
                     else:
                         if ref_point_value is not None and ref_point_value >= 0:
                             print(
                                 'Warning: ref_point_value should not be negative. No update is made.')
-                        raise PreventUpdate("No update was made because ref_point_value is None or negative.")
+                        raise PreventUpdate(
+                            "No update was made because ref_point_value is None or negative.")
 
                 elif trigger_id == self.id_prefix + 'checklist_for_all_plots.value':
-                    fig, fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._update_dash_based_on_checklist_for_all_plots(
+                    self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._update_dash_based_on_checklist_for_all_plots(
                         checklist_for_all_plots)
 
                 elif trigger_id == self.id_prefix + 'checklist_for_monkey_plot.value':
-                    fig, fig_scatter_combd = self._update_dash_based_on_checklist_for_monkey_plot(
+                    self.fig, self.fig_scatter_combd = self._update_dash_based_on_checklist_for_monkey_plot(
                         checklist_for_monkey_plot)
 
                 else:
-                    raise PreventUpdate("No update was made for the current trigger.")
+                    raise PreventUpdate(
+                        "No update was made for the current trigger.")
 
                 # Handle conditional plot visibility
                 if not self.show_trajectory_scatter_plot:
-                    fig_scatter_combd = self._get_empty_figure()
+                    self.fig_scatter_combd = self._get_empty_figure()
 
                 if not self.show_shuffled_correlation_plot:
                     self.fig_corr_or_heading_2 = self._get_empty_figure()
 
-                return fig, fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2, 'Updated successfully'
+                return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2, 'Updated successfully'
 
             except Exception as e:
                 return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2, f"An error occurred. No update was made. Error: {e}"
@@ -235,7 +243,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     previous_or_next='next')
             else:
                 if not 'customdata' in correlation_plot_clickdata['points'][0]:
-                    raise PreventUpdate("No update was triggered because customdata is not in correlation_plot_clickdata.")
+                    raise PreventUpdate(
+                        "No update was triggered because customdata is not in correlation_plot_clickdata.")
                 self.stop_point_index = correlation_plot_clickdata['points'][0]['customdata']
                 fig, fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_based_on_correlation_plot_clickdata(
                     correlation_plot_clickdata)
@@ -255,10 +264,12 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             try:
                 data = hoverData['points'][0]['customdata'][0]
             except (KeyError, IndexError):
-                raise PreventUpdate("No update was triggered because customdata is not in hoverData.")
+                raise PreventUpdate(
+                    "No update was triggered because customdata is not in hoverData.")
 
             if not isinstance(data, int):
-                raise PreventUpdate("No update was triggered because hoverdata is not an integer, which ff_index should be.")
+                raise PreventUpdate(
+                    "No update was triggered because hoverdata is not an integer, which ff_index should be.")
 
             legendgroup = f'ff {data}'
             for trace in self.fig.data:
@@ -324,14 +335,16 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     else:
                         print(
                             'Warning: curv_of_traj_lower_end is larger than curv_of_traj_upper_end, so no update is made')
-                        raise PreventUpdate("No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
+                        raise PreventUpdate(
+                            "No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
 
                 elif trigger_id == self.id_prefix + 'curv_of_traj_mode.value':
                     if self.curv_of_traj_params['curv_of_traj_mode'] == 'now to stop':
                         self.curv_of_traj_params['window_for_curv_of_traj'] = [
                             0, 0]
                     else:
-                        raise PreventUpdate("No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
+                        raise PreventUpdate(
+                            "No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
 
                 # Handle conditional plot visibility
                 if not self.show_trajectory_scatter_plot:

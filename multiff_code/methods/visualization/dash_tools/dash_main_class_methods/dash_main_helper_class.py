@@ -49,7 +49,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                             monkey_plot_params={},
                                             scatter_plot_params={},
                                             stops_near_ff_df_exists_ok=True,
-                                            heading_info_df_exists_ok=False,
+                                            heading_info_df_exists_ok=True,
                                             test_or_control='test',
                                             stop_point_index=None):
 
@@ -294,7 +294,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if not ((trace_index == self.trajectory_data_trace_index) or (trace_index == self.traj_portion_trace_index)):
             # raise PreventUpdate(
             #     "No update was triggered because hover is not over trajectory.") # this seems too extra to show
-            raise PreventUpdate
+            raise PreventUpdate(
+                "No update was triggered because hover is not over trajectory.")
 
         monkey_hoverdata_value = monkey_hoverdata['points'][0]['customdata']
 
@@ -402,6 +403,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self._prepare_to_make_plotly_fig_for_dash_given_stop_point_index(
             self.stop_point_index)
         self.fig, self.fig_scatter_combd, self.fig_scatter_natural_y_range = self._produce_initial_plots()
+
         if not self.overall_params['heading_instead_of_curv']:
             self.kwargs_for_correlation_plot['current_stop_point_index_to_mark'] = self.stop_point_index
             self.fig_corr = plotly_for_correlation.make_correlation_plot_in_plotly(
@@ -595,6 +597,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.traj_portion = None
             self.traj_length = 0
 
+        self.prepare_both_ff_df()
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self.find_null_arcs_info_for_plotting_for_the_duration()
 
@@ -604,33 +607,30 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if self.monkey_plot_params['show_monkey_heading']:
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_and_triangle_df_for_the_duration(
                 self)
-            
-        self.prepare_both_ff_df()
 
+        
 
     def prepare_both_ff_df(self):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index
         self.nxt_ff_index = self.stops_near_ff_row.nxt_ff_index
         self.opt_arc_stop_first_vis_bdry = True if (
             self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
-        
+
         duration = self.current_plotly_key_comp['duration_to_plot']
         self.point_indexes_in_duration = self.monkey_information.loc[self.monkey_information['time'].between(
             duration[0], duration[1]), 'point_index'].values
         # # can also do:
         # self.point_indexes_in_duration = self.curv_of_traj_in_duration['point_index'].values
 
-
         self.cur_curv_df, self.cur_ff_info = plotly_for_null_arcs.find_best_arc_df_for_ff([self.cur_ff_index] * len(self.point_indexes_in_duration),
-                                                                                            self.point_indexes_in_duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                            opt_arc_stop_first_vis_bdry=self.opt_arc_stop_first_vis_bdry)
+                                                                                          self.point_indexes_in_duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                          opt_arc_stop_first_vis_bdry=self.opt_arc_stop_first_vis_bdry)
         self.nxt_curv_df, self.nxt_ff_info = plotly_for_null_arcs.find_best_arc_df_for_ff([self.nxt_ff_index] * len(self.point_indexes_in_duration),
-                                                                                            self.point_indexes_in_duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                            opt_arc_stop_first_vis_bdry=self.opt_arc_stop_first_vis_bdry)
+                                                                                          self.point_indexes_in_duration, self.curv_of_traj_df, self.monkey_information, self.ff_real_position_sorted,
+                                                                                          opt_arc_stop_first_vis_bdry=self.opt_arc_stop_first_vis_bdry)
         self.both_ff_df = pn_utils._merge_both_ff_df(
             self.cur_curv_df, self.nxt_ff_info)
-        self.both_ff_df['point_index_before_stop'] = self.stops_near_ff_row.point_index_before_stop    
-        
+        self.both_ff_df['point_index_before_stop'] = self.stops_near_ff_row.point_index_before_stop
 
     def add_diff_in_curv_info_to_curv_of_traj_in_duration(self):
         self.curv_of_traj_in_duration = pn_utils.add_diff_in_curv_info(self.curv_of_traj_in_duration, self.both_ff_df,
@@ -646,8 +646,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         # add diff_in_angle_to_nxt_ff, diff_in_abs_angle_to_nxt_ff
         build_factor_comp._add_diff_in_abs_angle_to_nxt_ff(
             self.curv_of_traj_in_duration)
-        
-         
+
     def find_null_arcs_info_for_plotting_for_the_duration(self):
 
         if self.overall_params['use_curv_to_ff_center']:
@@ -661,8 +660,6 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.cur_curv_df, self.monkey_information)
             self.nxt_null_arc_info_for_duration = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
                 self.nxt_curv_df, self.monkey_information)
-    
-
 
     def _add_angle_to_nxt_ff_curv_of_traj_in_duration(self):
         angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(
@@ -673,6 +670,3 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             columns=columns_to_merge, errors='ignore', inplace=True)
         self.curv_of_traj_in_duration = self.curv_of_traj_in_duration.merge(
             angle_df[['point_index'] + columns_to_merge], on='point_index', how='left')
-        
-        
-        

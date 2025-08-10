@@ -177,7 +177,7 @@ def put_down_monkey_plot(fig, monkey_hoverdata_value, id='monkey_plot'):
                     )
         #  inline-block helps designers create boxes that automatically wrap text and other content to give them space and set them apart when beside other content.
         # 'display': 'inline-block',
-    ],  style={'width': '80%', 'padding': '0 0 0 0',
+    ],  style={'width': '60%', 'padding': '0 0 0 0',
                })
 
 
