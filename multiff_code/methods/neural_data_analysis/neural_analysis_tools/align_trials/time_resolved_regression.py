@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -36,6 +35,7 @@ from sklearn.preprocessing import StandardScaler
 
 os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
 
+
 def time_resolved_regression_cv(
     concat_neural_trials, concat_behav_trials, cv_folds=5, n_jobs=-1,
     alphas=np.logspace(-6, 6, 13), nested=False,
@@ -43,14 +43,15 @@ def time_resolved_regression_cv(
     assert concat_neural_trials[['new_segment', 'new_bin']].equals(
         concat_behav_trials[['new_segment', 'new_bin']]
     ), "Mismatch in data dimensions"
-    
+
     n_behaviors = concat_behav_trials.shape[1]
 
     new_bins = np.sort(concat_neural_trials['new_bin'].unique())
     kf = KFold(n_splits=cv_folds, shuffle=True)
 
     neural_data_only = concat_neural_trials[
-        [col for col in concat_neural_trials.columns if col.startswith('dim_') or col == 'new_bin']
+        [col for col in concat_neural_trials.columns if col.startswith(
+            'dim_') or col == 'new_bin']
     ]
 
     neural_grouped = neural_data_only.groupby('new_bin')
@@ -82,7 +83,8 @@ def time_resolved_regression_cv(
 
     with tqdm_joblib(tqdm(total=len(XYs), desc="Timepoints")):
         results = Parallel(n_jobs=n_jobs, backend='threading')(
-            delayed(_regress_at_timepoint)(X_t, Y_t, n_behaviors, kf, alphas, nested)
+            delayed(_regress_at_timepoint)(
+                X_t, Y_t, n_behaviors, kf, alphas, nested)
             for X_t, Y_t in XYs
         )
 
@@ -148,14 +150,14 @@ def _regress_at_timepoint(X_t, Y_t, n_behaviors, kf, alphas, nested=False):
             try:
                 ridge_cv = RidgeCV(alphas=alphas)
                 ridge_cv.fit(X_t, y)  # <--- This is what was missing
-                scores = cross_val_score(Ridge(alpha=ridge_cv.alpha_), X_t, y, cv=kf, scoring='r2', n_jobs=1)
+                scores = cross_val_score(
+                    Ridge(alpha=ridge_cv.alpha_), X_t, y, cv=kf, scoring='r2', n_jobs=1)
                 r2s.append(scores)
                 best_alphas.append([ridge_cv.alpha_] * len(scores))
             except Exception as e:
                 print('Error in ridge_cv.fit(X_t, y):', e)
                 r2s.append([np.nan] * kf.get_n_splits())
                 best_alphas.append([np.nan] * kf.get_n_splits())
-
 
     return np.array(r2s), np.array(best_alphas)
 
@@ -198,11 +200,7 @@ def tqdm_joblib(tqdm_object):
         tqdm_object.close()
 
 
-
-
 def standardize_trials(trials):
     """Standardize each trial (list of arrays) independently."""
     scaler = StandardScaler()
     return [scaler.fit_transform(trial) for trial in trials]
-
-

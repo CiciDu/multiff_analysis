@@ -42,12 +42,15 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         self.add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration()
         temp_df = self.curv_of_traj_in_duration.copy()
         for y_column_name, color, name, symbol in [
-                                           #('angle_from_stop_to_nxt_ff', 'magenta', 'angle from stop to nxt ff', 'x'), 
-                                           ('angle_opt_cur_end_to_nxt_ff', 'yellow', 'angle from cur arc end to nxt ff', 'x'),
-                                           #('diff_in_angle_to_nxt_ff', 'grey', 'diff in angle to nxt ff', 'x'),
-                                           ('diff_in_abs_angle_to_nxt_ff', 'cyan', 'diff in abs angle to nxt ff', 'x')
+                                           # ('angle_from_stop_to_nxt_ff', 'magenta', 'angle from stop to nxt ff', 'x'),
+                                           ('angle_opt_cur_end_to_nxt_ff', 'yellow',
+                                            'angle from cur arc end to nxt ff', 'x'),
+                                           # ('diff_in_angle_to_nxt_ff', 'grey', 'diff in angle to nxt ff', 'x'),
+                                           ('diff_in_abs_angle_to_nxt_ff', 'cyan',
+                                            'diff in abs angle to nxt ff', 'x')
                                            ]:
-            temp_df[y_column_name] = temp_df[y_column_name] * 180 / np.pi  # convert radians to degrees
+            temp_df[y_column_name] = temp_df[y_column_name] * \
+                180 / np.pi  # convert radians to degrees
             self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
                 self.fig_scatter_s, temp_df, name=name, color=color, x_column_name='rel_time', y_column_name=y_column_name, symbol=symbol)
             self.fig_scatter_cm = plotly_for_scatterplot.add_to_the_scatterplot(
@@ -56,10 +59,12 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
     def _show_d_curv_to_nxt_ff_in_scatterplot_func(self, y_column_name='d_curv_monkey'):
         self.add_diff_in_curv_info_to_curv_of_traj_in_duration()
         for y_column_name, color, name, symbol in [
-                                           #('d_curv_monkey', 'green', 'd_curv_monkey', 'cross'), 
-                                           ('d_curv_null_arc', 'blue', 'd_curv_null_arc', 'cross'),
-                                           #('diff_in_d_curv', 'khaki', 'diff in d curv', 'cross'),
-                                           ('diff_in_abs_d_curv', 'purple', 'diff in abs d curv', 'cross')
+                                           # ('d_curv_monkey', 'green', 'd_curv_monkey', 'cross'),
+                                           ('d_curv_null_arc', 'blue',
+                                            'd_curv_null_arc', 'cross'),
+                                           # ('diff_in_d_curv', 'khaki', 'diff in d curv', 'cross'),
+                                           ('diff_in_abs_d_curv', 'purple',
+                                            'diff in abs d curv', 'cross')
                                            ]:
             self.fig_scatter_s = plotly_for_scatterplot.add_to_the_scatterplot(
                 self.fig_scatter_s, self.curv_of_traj_in_duration, name=name, color=color, x_column_name='rel_time', y_column_name=y_column_name, symbol=symbol)

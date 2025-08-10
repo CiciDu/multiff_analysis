@@ -17,9 +17,77 @@ import sys
 
 import numpy as np
 
+def run_tests_over_monkeys(
+    test_func_angle,
+    test_func_d_curv,
+    ref_point_params,
+    monkeys=['monkey_Schro', 'monkey_Bruno'],
+    num_permutations=10000,
+    verbose=True,
+):
+    results = []
+    
+    for monkey_name in monkeys:
+        variations_list = specific_utils.init_variations_list_func(
+            ref_point_params,
+            monkey_name=monkey_name
+        )
+        
+        for _, row in variations_list.iterrows():
+            ref_point_mode = row['ref_point_mode']
+            ref_point_value = row['ref_point_value']
+            if verbose:
+                print(row)
+            
+            # Initialize sessions
+            planner = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name)
+            planner.initialize_monkey_sessions_df_for_one_monkey()
+            planner.get_combd_heading_df_x_sessions_across_sessions(
+                ref_point_mode=ref_point_mode,
+                ref_point_value=ref_point_value,
+                save_data=False
+            )
+            
+            # Process test and control data
+            test_df = build_factor_comp.process_heading_info_df(
+                planner.combd_heading_df_x_sessions_test.copy()
+            )
+            ctrl_df = build_factor_comp.process_heading_info_df(
+                planner.combd_heading_df_x_sessions_ctrl.copy()
+            )
+            
+            # Run angle test directly on raw data (assumed no filtering needed)
+            angle_p = test_func_angle(
+                test_df['diff_in_abs_angle_to_nxt_ff'].values,
+                ctrl_df['diff_in_abs_angle_to_nxt_ff'].values
+            )
+            
+            # Filter NaNs for d_curv column
+            test_df_clean, ctrl_df_clean = filter_and_report_nan(
+                test_df, ctrl_df, col_name='diff_in_abs_d_curv'
+            )
+            
+            # Run d_curv test on cleaned data
+            d_curv_p = test_func_d_curv(
+                test_df_clean['diff_in_abs_d_curv'].values,
+                ctrl_df_clean['diff_in_abs_d_curv'].values
+            )
+            
+            # Collect results
+            results.append({
+                'monkey_name': monkey_name,
+                'ref_point_mode': ref_point_mode,
+                'ref_point_value': ref_point_value,
+                'angle_p_value': angle_p,
+                'd_curv_p_value': d_curv_p,
+            })
+    
+    return pd.DataFrame(results)
+
+
 def permutation_test(
     x, y, 
-    num_permutations=100000, 
+    num_permutations=10000, 
     alternative='two-sided', 
     statistic='median', 
     random_state=None

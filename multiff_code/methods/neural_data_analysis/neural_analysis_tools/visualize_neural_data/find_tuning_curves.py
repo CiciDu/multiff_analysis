@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 import statsmodels.api as sm
 from matplotlib import rc
@@ -52,14 +51,17 @@ def _compute_tuning_curves_pooled(
     """
     if variable_type == 'continuous':
         if binning_method == 'equal':
-            bins = np.linspace(np.min(flat_stimulus_values), np.max(flat_stimulus_values), n_stimulus_bins + 1)
+            bins = np.linspace(np.min(flat_stimulus_values), np.max(
+                flat_stimulus_values), n_stimulus_bins + 1)
         elif binning_method == 'quantile':
-            bins = np.quantile(flat_stimulus_values, np.linspace(0, 1, n_stimulus_bins + 1))
+            bins = np.quantile(flat_stimulus_values,
+                               np.linspace(0, 1, n_stimulus_bins + 1))
         else:
             raise ValueError(f"Unknown binning_method '{binning_method}'")
 
         bin_indices = np.digitize(flat_stimulus_values, bins) - 1
-        bin_indices[bin_indices == n_stimulus_bins] = n_stimulus_bins - 1  # edge case
+        bin_indices[bin_indices ==
+                    n_stimulus_bins] = n_stimulus_bins - 1  # edge case
         bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
         # Exclude edges if needed
@@ -94,15 +96,17 @@ def _compute_tuning_curves_pooled(
             else:
                 means.append(np.nan)
                 sems.append(np.nan)
-        tuning_curves[neuron_idx] = (bin_centers, np.array(means), np.array(sems), np.array(counts))
+        tuning_curves[neuron_idx] = (bin_centers, np.array(
+            means), np.array(sems), np.array(counts))
     return tuning_curves
 
 
 def compute_and_plot_tuning_curves_pooled(concat_neural_trials, concat_behav_trials, var_of_interest, **kwargs):
     flat_spikes = concat_neural_trials.filter(regex='cluster_').values
-    flat_stimulus_values = concat_behav_trials[var_of_interest].values.flatten()
-    tuning_curves = _compute_tuning_curves_pooled(flat_spikes, flat_stimulus_values, 
-                                                            **kwargs)
+    flat_stimulus_values = concat_behav_trials[var_of_interest].values.flatten(
+    )
+    tuning_curves = _compute_tuning_curves_pooled(flat_spikes, flat_stimulus_values,
+                                                  **kwargs)
     plot_tuning_curves(tuning_curves)
 
 
@@ -120,7 +124,8 @@ def plot_tuning_curves(tuning_curves, r2_scores=None, max_neurons_to_plot=None, 
         rows = int(np.ceil(n / cols))
 
         scale = 3.5
-        fig, axs = plt.subplots(rows, cols, figsize=(cols * scale, rows * scale))
+        fig, axs = plt.subplots(
+            rows, cols, figsize=(cols * scale, rows * scale))
         axs = np.array([axs]).flatten() if n == 1 else axs.flatten()
         for ax in axs[n:]:
             ax.set_visible(False)
@@ -136,16 +141,19 @@ def plot_tuning_curves(tuning_curves, r2_scores=None, max_neurons_to_plot=None, 
                 err = np.zeros_like(y)
                 counts = None
             else:
-                raise ValueError(f"Unsupported data tuple length {len(data)} for neuron {neuron}")
+                raise ValueError(
+                    f"Unsupported data tuple length {len(data)} for neuron {neuron}")
 
             line_color = '#1f77b4'  # nice blue
-            ax.plot(x, y, '-o', color=line_color, markerfacecolor='white', markeredgecolor=line_color, linewidth=2, markersize=6)
+            ax.plot(x, y, '-o', color=line_color, markerfacecolor='white',
+                    markeredgecolor=line_color, linewidth=2, markersize=6)
 
             if err is not None and len(err) == len(y):
                 upper = y + err
                 lower = y - err
                 ax.fill_between(x, lower, upper, color=line_color, alpha=0.2)
-                ax.errorbar(x, y, yerr=err, fmt='none', ecolor=line_color, elinewidth=1.2, capsize=4, alpha=0.6)
+                ax.errorbar(x, y, yerr=err, fmt='none', ecolor=line_color,
+                            elinewidth=1.2, capsize=4, alpha=0.6)
 
             ax.grid(True, linestyle='--', alpha=0.25)
 
@@ -157,17 +165,16 @@ def plot_tuning_curves(tuning_curves, r2_scores=None, max_neurons_to_plot=None, 
                     offset = 0.03 * y_range
                     y_pos = yi + ei + offset if idx % 2 else yi - ei - offset
                     va = 'bottom' if idx % 2 else 'top'
-                    ax.text(xi, y_pos, str(c), ha='center', va=va, fontsize=8, color='gray')
+                    ax.text(xi, y_pos, str(c), ha='center',
+                            va=va, fontsize=8, color='gray')
 
-            title=f'Neuron {neuron}'
+            title = f'Neuron {neuron}'
             if r2_scores and neuron in r2_scores:
                 title += f' | R² = {r2_scores[neuron]:.3f}'
-                
+
             ax.set(title=title, xlabel='Stimulus', ylabel='Mean Firing Rate')
             ax.tick_params(axis='both', which='major', labelsize=10)
             ax.set_facecolor('#fafafa')
 
         plt.tight_layout()
         plt.show()
-
-

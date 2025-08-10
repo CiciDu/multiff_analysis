@@ -18,7 +18,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -45,8 +44,8 @@ def plot_best_alpha_counts(df, title='Counts of Best Alpha Values'):
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
     plt.show()
-    
-    
+
+
 def plot_trial_counts_by_timepoint(time_resolved_cv_scores, trial_column='trial_count'):
     # make sure that y axis starts from 0
     trial_counts = time_resolved_cv_scores[[
@@ -124,7 +123,8 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
     xtick_labels = None
 
     if show_counts_on_xticks:
-        min_trial_counts = agg_df[['bin_mid_time', 'trial_count']].groupby('bin_mid_time').min().reset_index()
+        min_trial_counts = agg_df[['bin_mid_time', 'trial_count']].groupby(
+            'bin_mid_time').min().reset_index()
         xticks = min_trial_counts['bin_mid_time']
         xtick_labels = [
             f"{row.bin_mid_time:.2f}\n({int(row.trial_count)})" if not np.isnan(row.trial_count)
@@ -172,6 +172,7 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
 
     if any_plots:
         finalize_plot()
+
 
 def plot_trial_point_distribution(pursuit_data):
     trial_points = pursuit_data.groupby('segment').count()['bin'].values

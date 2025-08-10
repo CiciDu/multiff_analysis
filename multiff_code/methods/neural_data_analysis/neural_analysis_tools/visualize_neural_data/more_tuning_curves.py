@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 import statsmodels.api as sm
 from matplotlib import rc
@@ -68,8 +67,11 @@ def _fit_cosine_tuning_curves(flat_spikes, flat_angles_deg, n_points=100):
 
     return tuning_curves, r2_scores
 
+
 def fit_cosine_tuning_curves(concat_neural_trials, concat_behav_trials, var_of_interest, **kwargs):
     flat_spikes = concat_neural_trials.filter(regex='cluster_').values
-    flat_stimulus_values = concat_behav_trials[var_of_interest].values.flatten()
-    tuning_curves, r2_scores = _fit_cosine_tuning_curves(flat_spikes, flat_stimulus_values, **kwargs)
+    flat_stimulus_values = concat_behav_trials[var_of_interest].values.flatten(
+    )
+    tuning_curves, r2_scores = _fit_cosine_tuning_curves(
+        flat_spikes, flat_stimulus_values, **kwargs)
     find_tuning_curves.plot_tuning_curves(tuning_curves, r2_scores=r2_scores)

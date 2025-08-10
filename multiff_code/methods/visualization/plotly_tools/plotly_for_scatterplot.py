@@ -1,27 +1,16 @@
-import sys
-from turtle import fillcolor
-
-from data_wrangling import specific_utils
-from visualization.matplotlib_tools import plot_behaviors_utils
-from null_behaviors import show_null_trajectory, curv_of_traj_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils
-from decision_making_analysis.decision_making import plot_decision_making
-from visualization.plotly_tools import plotly_preparation, plotly_for_monkey
-from decision_making_analysis import trajectory_info
-
 import os
-import sys
-import numpy as np
+import random
+
 import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import seaborn as sns
+from matplotlib import rc
+from null_behaviors import curv_of_traj_utils
 from plotly.subplots import make_subplots
-import matplotlib
-import random
+from visualization.plotly_tools import plotly_for_monkey
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -34,9 +23,52 @@ np.set_printoptions(suppress=True)
 colors = matplotlib.colors.TABLEAU_COLORS
 hex_colors = tuple(colors.values())
 
+# Default styling constants for a cleaner scatter look
+PLOTLY_SCATTER_TEMPLATE = 'plotly_white'
+GRID_COLOR = 'rgba(0,0,0,0.08)'
+AXIS_LINE_COLOR = 'rgba(0,0,0,0.35)'
+GUIDE_LINE_COLOR = 'rgba(0,0,0,0.45)'
+HOVER_LINE_COLOR = '#1f77b4'
+CURVATURE_COLOR = '#ff7f0e'  # orange from Plotly default palette
+
+
+def _apply_clean_scatter_theme(fig):
+    fig.update_layout(
+        template=PLOTLY_SCATTER_TEMPLATE,
+        font=dict(family='Arial, Helvetica, Sans-Serif',
+                  size=12, color='black'),
+        paper_bgcolor='white',
+        plot_bgcolor='white',
+        legend=dict(orientation='h', y=-0.22),
+        margin={'l': 60, 'b': 40, 't': 0, 'r': 60},
+    )
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor=GRID_COLOR,
+        zeroline=False,
+        linecolor=AXIS_LINE_COLOR,
+        linewidth=1,
+        mirror=True,
+        ticks='outside',
+        ticklen=4,
+        tickcolor=AXIS_LINE_COLOR,
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor=GRID_COLOR,
+        zeroline=False,
+        linecolor=AXIS_LINE_COLOR,
+        linewidth=1,
+        mirror=True,
+        ticks='outside',
+        ticklen=4,
+        tickcolor=AXIS_LINE_COLOR,
+    )
+    return fig
+
 
 def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_value, cur_ff_color, nxt_ff_color, use_two_y_axes=False, change_y_ranges=True, add_vertical_line=True,
-                                 x_column_name='rel_time', trajectory_ref_row=None, curv_of_traj_trace_name='Curvature of Trajectory', show_visible_segments=True, 
+                                 x_column_name='rel_time', trajectory_ref_row=None, curv_of_traj_trace_name='Curvature of Trajectory', show_visible_segments=True,
                                  visible_segments_info={},
                                  y_range_for_v_line=[-200, 200], trajectory_next_stop_row=None):
     if use_two_y_axes:
@@ -52,7 +84,7 @@ def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_valu
             curv_of_traj_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
     if add_vertical_line:
         fig_scatter = add_vertical_line_for_an_x_value(
-            fig_scatter, x_value=monkey_hoverdata_value, y_range=y_range_for_v_line)
+            fig_scatter, x_value=monkey_hoverdata_value, y_range=y_range_for_v_line, color=HOVER_LINE_COLOR)
     if trajectory_ref_row is not None:
         fig_scatter = mark_reference_point_in_scatter_plot(
             fig_scatter, x_column_name, trajectory_ref_row, y_range=y_range_for_v_line)
@@ -66,7 +98,7 @@ def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_valu
 
     # plot a vertical line at stop point (which is 0)
     fig_scatter = add_vertical_line_for_an_x_value(
-        fig_scatter, x_value=0, y_range=y_range_for_v_line, name='First stop point', color='black')
+        fig_scatter, x_value=0, y_range=y_range_for_v_line, name='First stop point', color=GUIDE_LINE_COLOR)
     if trajectory_next_stop_row is not None:
         fig_scatter = mark_next_stop_in_scatter_plot(
             fig_scatter, x_column_name, trajectory_next_stop_row, y_range_for_v_line=y_range_for_v_line)
@@ -80,6 +112,9 @@ def make_the_initial_fig_scatter(curv_of_traj_in_duration, monkey_hoverdata_valu
         height=300,
         margin={'l': 60, 'b': 30, 't': 0, 'r': 60},
     )
+
+    # Apply clean theme at the end so traces and axes are styled consistently
+    fig_scatter = _apply_clean_scatter_theme(fig_scatter)
 
     fig_scatter.update_layout(yaxis=dict(range=['null', 'null'],),
                               yaxis2=dict(range=['null', 'null'],))
@@ -125,6 +160,8 @@ def plot_curv_of_traj_vs_time_with_two_y_axes(curv_of_traj_in_duration, change_y
         fig.update_layout(yaxis=dict(range=[-100, 100]),
                           yaxis2=dict(range=[-25, 25]))
 
+    fig = _apply_clean_scatter_theme(fig)
+
     return fig
 
 
@@ -143,6 +180,7 @@ def make_the_plot_of_change_in_curv_of_traj_vs_time(curv_of_traj_in_duration, y_
 
     return plot_to_add
 
+
 def add_curv_of_traj_data_to_fig_scatter(fig, curv_of_traj_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
     # curv_of_traj_plot = make_the_plot_of_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name=x_column_name, curv_of_traj_trace_name=curv_of_traj_trace_name)
     # for data in curv_of_traj_plot.data:
@@ -154,8 +192,8 @@ def add_curv_of_traj_data_to_fig_scatter(fig, curv_of_traj_in_duration, x_column
 
     if fig is None:
         fig = go.Figure(layout=dict(width=1000, height=700))
-    plot_to_add = make_new_trace_for_scatterplot(curv_of_traj_in_duration, curv_of_traj_trace_name, color='orange',
-                                                 x_column_name=x_column_name, y_column_name='curv_of_traj_deg_over_cm', symbol='circle', size=5)
+    plot_to_add = make_new_trace_for_scatterplot(curv_of_traj_in_duration, curv_of_traj_trace_name, color=CURVATURE_COLOR,
+                                                 x_column_name=x_column_name, y_column_name='curv_of_traj_deg_over_cm', symbol='circle', size=6)
     fig.add_trace(plot_to_add)
 
     if x_column_name == 'rel_time':
@@ -200,10 +238,8 @@ def add_annotation_to_fig_scatter(fig_scatter, text, x_position, y_position=130)
     return fig_scatter
 
 
-
 def add_vertical_line_for_an_x_value(fig_scatter, x_value=0, y_range=[-100, 100],
-                                     name='Monkey trajectory hover position', color='blue',
-                                     ):
+                                     name='Monkey trajectory hover position', color='blue', dash=None, width=None):
 
     vline_df = pd.DataFrame({'x': [x_value, x_value], 'y': y_range})
     fig_traces = px.line(vline_df,
@@ -212,8 +248,16 @@ def add_vertical_line_for_an_x_value(fig_scatter, x_value=0, y_range=[-100, 100]
                          )
     fig_scatter.add_traces(list(fig_traces.select_traces()))
     fig_scatter.data[-1].name = name
+
+    # Default styling for common guideline types
+    if dash is None:
+        dash = 'dash' if name == 'Monkey trajectory hover position' else 'solid'
+        if name == 'Next stop point':
+            dash = 'dot'
+    if width is None:
+        width = 2
     fig_scatter.update_traces(opacity=1, selector=dict(name=name),
-                              line=dict(color=color, width=2))
+                              line=dict(color=color, width=width, dash=dash))
 
     return fig_scatter
 
@@ -234,7 +278,7 @@ def mark_reference_point_in_scatter_plot(fig_scatter, x_column_name, trajectory_
     fig_scatter.data[-1].name = 'First stop point'
     fig_scatter.data[-1].showlegend = True
     fig_scatter.update_traces(opacity=1, selector=dict(name='First stop point'),
-                              line=dict(color='black', width=2))
+                              line=dict(color=GUIDE_LINE_COLOR, width=2, dash='solid'))
     fig_scatter = add_annotation_to_fig_scatter(
         fig_scatter, 'ref point', ref_point_value, -130)
     return fig_scatter
@@ -280,11 +324,11 @@ def add_two_horizontal_lines(fig_scatter, use_two_y_axes, x_range=[-3, 3], y_val
                    ), secondary_y=secondary_y,
     )
     fig_scatter.update_traces(opacity=1, selector=dict(name=fig_name), visible='legendonly',
-                              line=dict(color='red', width=1))
+                              line=dict(color='#888', width=1, dash='dot'))
     return fig_scatter
 
 
-def make_new_trace_for_scatterplot(ff_curv_df, name, color='purple', x_column_name='rel_time', y_column_name='cntr_arc_curv', size=5, symbol='circle', showlegend=True):
+def make_new_trace_for_scatterplot(ff_curv_df, name, color='purple', x_column_name='rel_time', y_column_name='cntr_arc_curv', size=6, symbol='circle', showlegend=True):
     plot_to_add = go.Scatter(x=ff_curv_df[x_column_name], y=ff_curv_df[y_column_name],
                              name=name,
                              legendgroup=name,
@@ -348,7 +392,6 @@ def plot_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name='rel_time'
 #                                 #width=1000, height=700,
 #                                     )
 #     return plot_to_add
-
 
 
 def turn_visibility_of_vertical_lines_on_or_off_in_scatter_plot(fig_scatter,
@@ -437,6 +480,7 @@ def make_fig_scatter_combd(fig_scatter_s, fig_scatter_cm, use_two_y_axes):
                                         # yaxis4=dict(title=dict(text="Delta Curv of Trajectory (deg/cm)"),
                                         #                         side="right", overlaying="y3", tickmode="sync"),
                                         )
+    fig_scatter_combd = _apply_clean_scatter_theme(fig_scatter_combd)
     return fig_scatter_combd
 
 
@@ -484,16 +528,16 @@ def plot_lines_to_show_ff_visible_segments_in_fig_scatter(fig_scatter, ff_info, 
         # Find values for starting and ending points of visible segments
         all_starting_points = np.insert(
             all_point_index[all_breaking_points], 0, all_point_index[0])
-        all_ending_points = np.append(
-            all_point_index[all_breaking_points-1], all_point_index[-1])
+        # all_ending_points = np.append(
+        #     all_point_index[all_breaking_points-1], all_point_index[-1])
 
         # Find relative values for starting and ending points of visible segments
         ref_value = stops_near_ff_row['stop_time'] if time_or_distance == 'time' else stops_near_ff_row['stop_cum_distance']
         time_or_distance_var = 'time' if time_or_distance == 'time' else 'cum_distance'
         all_starting_rel_values = monkey_information.loc[all_starting_points,
                                                          time_or_distance_var].values - ref_value
-        all_ending_rel_values = monkey_information.loc[all_ending_points,
-                                                       time_or_distance_var].values - ref_value
+        # all_ending_rel_values = monkey_information.loc[all_ending_points,
+        #                                                time_or_distance_var].values - ref_value
         if ff_names is None:
             ff_names = ['ff ' + str(i) for i in range(len(unique_ff_indices))]
         # Find and plot beginning and end of each visible segment

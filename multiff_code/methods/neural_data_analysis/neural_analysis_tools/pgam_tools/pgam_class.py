@@ -1,3 +1,8 @@
+from scipy.io import savemat
+from post_processing import postprocess_results
+import matplotlib.pylab as plt
+import PGAM.gam_data_handlers as gdh
+from PGAM.GAM_library import *
 import sys
 from data_wrangling import process_monkey_information, specific_utils, further_processing_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
@@ -17,7 +22,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -27,19 +31,8 @@ import rcca
 from sklearn.preprocessing import StandardScaler
 
 pgam_path = '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/external/pgam/src/'
-import sys
-if not pgam_path in sys.path: 
+if not pgam_path in sys.path:
     sys.path.append(pgam_path)
-    
-import numpy as np
-import sys
-from PGAM.GAM_library import *
-import PGAM.gam_data_handlers as gdh
-import matplotlib.pylab as plt
-import pandas as pd
-from post_processing import postprocess_results
-from scipy.io import savemat
-
 
 
 class PGAMclass():

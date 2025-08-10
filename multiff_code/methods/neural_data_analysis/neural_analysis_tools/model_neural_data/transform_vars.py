@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -21,7 +20,6 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.cross_decomposition import CCA
 import rcca
 from sklearn.preprocessing import StandardScaler
-from palettable.colorbrewer import qualitative
 from functools import partial
 from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 

@@ -26,6 +26,7 @@ def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
         df, use_curv_to_ff_center=use_curv_to_ff_center)
     cur_end_to_next_ff_curv = _compute_curv_from_cur_end(mock_monkey_info,
                                                          ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    assert np.all(cur_end_to_next_ff_curv['nxt_ff_index'] == heading_info_df['nxt_ff_index'])
     cur_end_to_next_ff_curv['ref_point_index'] = heading_info_df['ref_point_index'].values
     return cur_end_to_next_ff_curv
 
@@ -33,7 +34,7 @@ def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
 def _prepare_cur_end_to_next_ff_data(heading_info_df, nxt_ff_df_modified):
     # Select relevant columns from heading_info_df
     heading_cols = [
-        'ref_point_index',
+        'ref_point_index', 'nxt_ff_index',
         'cur_cntr_arc_end_x', 'cur_cntr_arc_end_y', 'cur_cntr_arc_end_heading', 'cur_cntr_arc_curv',
         'cur_opt_arc_end_x', 'cur_opt_arc_end_y', 'cur_opt_arc_end_heading', 'cur_opt_arc_curv'
     ]
@@ -56,7 +57,7 @@ def _prepare_cur_end_to_next_ff_data(heading_info_df, nxt_ff_df_modified):
     }, inplace=True)
 
     # Merge on 'ref_point_index' and rename it to 'point_index'
-    merged_df = df.merge(nxt_ff_df, on='point_index', how='left')
+    merged_df = df.merge(nxt_ff_df, on=['point_index', 'nxt_ff_index'], how='left')
 
     return merged_df
 
@@ -116,6 +117,7 @@ def _compute_curv_from_cur_end(mock_monkey_info,
 
     result_df = null_arc_curv_df[['point_index', 'ff_angle_boundary']].copy()
     result_df['opt_curv_to_cur_ff'] = mock_monkey_info['curv_of_traj'].values
+    result_df['nxt_ff_index'] = mock_monkey_info['ff_index'].values
     result_df['curv_from_cur_end_to_nxt_ff'] = null_arc_curv_df['opt_arc_curv'].values
     return result_df
 

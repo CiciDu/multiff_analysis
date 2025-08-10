@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -214,8 +213,10 @@ class GPFAHelperClass():
             self.concat_neural_trials[['new_segment', 'new_bin']])
 
         # check for NA
-        general_utils.check_na_in_df(self.concat_neural_trials, df_name='concat_neural_trials')
-        general_utils.check_na_in_df(self.concat_behav_trials, df_name='concat_behav_trials')
+        general_utils.check_na_in_df(
+            self.concat_neural_trials, df_name='concat_neural_trials')
+        general_utils.check_na_in_df(
+            self.concat_behav_trials, df_name='concat_behav_trials')
 
     def print_data_dimensions(self):
         print("\n=== Data Dimensions Summary ===")
@@ -261,10 +262,10 @@ class GPFAHelperClass():
                 self.concat_behav_trials, self.spiketrains, self.spiketrain_corr_segs, bin_bounds, self.bin_width_w_unit,
                 cv_folds=cv_folds, n_jobs=-1, latent_dimensionality=latent_dimensionality,
             )
-        
+
         self.time_resolved_cv_scores_gpfa['bin_mid_time'] = self.time_resolved_cv_scores_gpfa['new_bin'] * \
             self.bin_width + self.new_bin_start_time + self.bin_width/2
-            
+
         self.time_resolved_cv_scores_gpfa['trial_count'] = self.time_resolved_cv_scores_gpfa['train_trial_count']
 
     def _get_time_resolved_cv_scores_file_path(self, folder_name, file_name, cv_folds=5, latent_dimensionality=7):
@@ -332,7 +333,7 @@ class GPFAHelperClass():
 
         self.make_time_resolved_cv_scores_gpfa(
             cv_folds=cv_folds, latent_dimensionality=latent_dimensionality)
-        
+
         self.time_resolved_cv_scores_gpfa.to_csv(time_resolved_cv_scores_path)
         print(
             f'Saved time_resolved_cv_scores_gpfa to {time_resolved_cv_scores_path}')
@@ -354,18 +355,18 @@ class GPFAHelperClass():
             self.time_resolved_cv_scores)
 
     def streamline_getting_time_resolved_cv_scores(self,
-                                                planning_data_by_point_exists_ok=True,
-                                                latent_dimensionality=7,
-                                                cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                                                pre_event_window=0.25, post_event_window=0.75,
-                                                cv_folds=5):
+                                                   planning_data_by_point_exists_ok=True,
+                                                   latent_dimensionality=7,
+                                                   cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
+                                                   pre_event_window=0.25, post_event_window=0.75,
+                                                   cv_folds=5):
         # get data
         self.prep_data_to_analyze_planning(
             planning_data_by_point_exists_ok=planning_data_by_point_exists_ok)
         self.planning_data_by_point, cols_to_drop = general_utils.drop_columns_with_many_nans(
             self.planning_data_by_point)
         self.prepare_seg_aligned_data(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last, time_limit_to_count_sighting=time_limit_to_count_sighting,
-                                    pre_event_window=pre_event_window, post_event_window=post_event_window)
+                                      pre_event_window=pre_event_window, post_event_window=post_event_window)
 
         # time_resolved_cv_scores_gpfa
         self.get_concat_data_for_regression(use_raw_spike_data_instead=True)

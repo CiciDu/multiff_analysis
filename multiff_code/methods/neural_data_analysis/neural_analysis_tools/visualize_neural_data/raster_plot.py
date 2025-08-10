@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib
 import seaborn as sns
-import colorcet
 import logging
 import statsmodels.api as sm
 from matplotlib import rc

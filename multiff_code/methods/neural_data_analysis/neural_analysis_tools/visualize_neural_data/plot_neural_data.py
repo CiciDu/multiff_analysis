@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 import statsmodels.api as sm
 from matplotlib import rc
@@ -185,9 +184,11 @@ def plot_fr_over_time(
     binned_spikes_df, bin_width, max_time=None,
     combine_bin_factor=3, num_clusters_per_plot=5, plot_mean=True
 ):
-    fr_df, time = _prepare_fr_data(binned_spikes_df, bin_width, combine_bin_factor, max_time)
+    fr_df, time = _prepare_fr_data(
+        binned_spikes_df, bin_width, combine_bin_factor, max_time)
     cluster_cols = [col for col in fr_df.columns if col.startswith('cluster_')]
-    time, mean_fr_downsampled = _plot_fr_curves(fr_df, time, cluster_cols, num_clusters_per_plot, plot_mean)
+    time, mean_fr_downsampled = _plot_fr_curves(
+        fr_df, time, cluster_cols, num_clusters_per_plot, plot_mean)
 
     slope = np.polyfit(time, mean_fr_downsampled, 1)[0]
     total_change = mean_fr_downsampled.iloc[-1] - mean_fr_downsampled.iloc[0]
@@ -213,14 +214,16 @@ def _plot_fr_curves(fr_df, time, cluster_cols, num_clusters_per_plot, plot_mean=
 
     for i in range(num_plots):
         plt.figure(figsize=(8, 3.5))
-        cluster_subset = cluster_cols[i * num_clusters_per_plot:(i + 1) * num_clusters_per_plot]
+        cluster_subset = cluster_cols[i *
+                                      num_clusters_per_plot:(i + 1) * num_clusters_per_plot]
 
         for col in cluster_subset:
             plt.plot(time, fr_df[col][::100], alpha=0.6, label=col)
 
         if plot_mean & (len(cluster_subset) > 1):
-            plt.plot(time, mean_fr_downsampled, color='black', linewidth=2, label='mean')
-            
+            plt.plot(time, mean_fr_downsampled,
+                     color='black', linewidth=2, label='mean')
+
         # extract numbers from cluster_cols
         cluster_numbers = [int(col.split('_')[1]) for col in cluster_subset]
 
@@ -234,4 +237,3 @@ def _plot_fr_curves(fr_df, time, cluster_cols, num_clusters_per_plot, plot_mean=
         plt.show()
 
     return time, mean_fr_downsampled
-

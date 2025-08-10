@@ -186,6 +186,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.prev_stop_to_next_ff_curv['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
             self.prev_stop_to_next_ff_curv, self.cur_end_to_next_ff_curv)
+        if 'stop_point_index' not in self.diff_in_curv_df.columns:
+            self.diff_in_curv_df = self.diff_in_curv_df.merge(self.heading_info_df[['ref_point_index', 'stop_point_index']], on='ref_point_index', how='left')
         return self.diff_in_curv_df
 
     def _init_empty_vars(self):
@@ -370,6 +372,9 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.heading_info_df = show_planning_utils.retrieve_df_based_on_ref_point(
             self.monkey_name, ref_point_mode, ref_point_value, test_or_control, self.planning_data_folder_path, self.heading_info_partial_path,
             target_var_name='heading_info_df')
+        
+        if 'stop_point_index' not in self.diff_in_curv_df.columns:
+            self.diff_in_curv_df = self.diff_in_curv_df.merge(self.heading_info_df[['ref_point_index', 'stop_point_index']], on='ref_point_index', how='left')
 
         if merge_diff_in_curv_df_to_heading_info:
             self.heading_info_df = self.heading_info_df.merge(

@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 from matplotlib import rc
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
-import colorcet
 from os.path import exists
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 

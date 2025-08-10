@@ -86,8 +86,9 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15,
             curvature_df['curv_of_traj'].values
         curvature_df.loc[:, 'abs_curv_diff'] = np.abs(
             curvature_df.loc[:, 'curv_diff'])
-        curvature_df = curvature_df.sort_values(
-            by=['point_index', 'abs_curv_diff', 'ff_distance'], ascending=[True, True, True])
+        # curvature_df = curvature_df.sort_values(
+        #     by=['point_index', 'abs_curv_diff', 'ff_distance'], ascending=[True, True, True])
+
 
     if clean:
         clean_curvature_info(
@@ -105,7 +106,6 @@ def supply_with_ff_curvature_info(curvature_df, ff_radius_for_opt_arc=15, invali
     if include_opt_arc_curv:
         curvature_df = opt_arc_utils._supply_curvature_df_with_opt_arc_info(curvature_df, ff_radius_for_opt_arc, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry,
                                                                             ignore_error=ignore_error)
-
     return curvature_df
 
 

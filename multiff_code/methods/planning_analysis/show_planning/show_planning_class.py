@@ -355,6 +355,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                                                         curv_traj_window_before_stop=curv_traj_window_before_stop)
             else:
                 # Force the creation if combd_heading_df_x_sessions_exists_ok is False
+                print('Failed to retrieve combd_heading_df_x_sessions')
                 raise FileNotFoundError
         except FileNotFoundError:  # Specific exception for clarity
             combd_heading_df_x_sessions, combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,

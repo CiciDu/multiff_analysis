@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -42,16 +41,18 @@ def get_rebinned_var_lags(rebinned_var, trial_vector, rebinned_max_lag_number=2)
 
     return rebinned_var_lags
 
+
 def check_rank_of_spike_counts_matrix(spike_counts_matrix):
     rank = np.linalg.matrix_rank(spike_counts_matrix)
     n_neurons = spike_counts_matrix.shape[1]
     if rank < n_neurons:
         insufficient_rank = n_neurons - rank
-        print(f"Rank deficiency detected: {insufficient_rank} redundant neurons")
+        print(
+            f"Rank deficiency detected: {insufficient_rank} redundant neurons")
         print(f"Matrix shape: {spike_counts_matrix.shape}, Rank: {rank}")
         return insufficient_rank
     else:
-        #print("Matrix is full rank.")
+        # print("Matrix is full rank.")
         return None
 
 
@@ -73,27 +74,35 @@ def drop_redundant_neurons(spike_counts_per_segment, svd_threshold=1e-10):
 
     print(f"Dropping redundant neuron: {redundant_neuron_name}")
 
-    spike_counts_per_segment_dropped = spike_counts_per_segment.drop(columns=redundant_neuron_name)
+    spike_counts_per_segment_dropped = spike_counts_per_segment.drop(
+        columns=redundant_neuron_name)
     return spike_counts_per_segment_dropped, redundant_neuron_name, True
 
+
 def drop_redundant_neurons_from_concat_raw_spike_data(concat_raw_spike_data):
-    spike_counts_per_segment = concat_raw_spike_data.groupby('new_segment').sum()
-    spike_counts_per_segment = spike_counts_per_segment[[col for col in spike_counts_per_segment.columns if 'cluster_' in col]]
+    spike_counts_per_segment = concat_raw_spike_data.groupby(
+        'new_segment').sum()
+    spike_counts_per_segment = spike_counts_per_segment[[
+        col for col in spike_counts_per_segment.columns if 'cluster_' in col]]
 
     spike_counts_matrix = spike_counts_per_segment.values
-    num_redundant_neurons = check_rank_of_spike_counts_matrix(spike_counts_matrix)
+    num_redundant_neurons = check_rank_of_spike_counts_matrix(
+        spike_counts_matrix)
 
     dropped_neurons = []
     while num_redundant_neurons is not None:
-        spike_counts_per_segment, redundant_neuron_name, dropped = drop_redundant_neurons(spike_counts_per_segment)
+        spike_counts_per_segment, redundant_neuron_name, dropped = drop_redundant_neurons(
+            spike_counts_per_segment)
         dropped_neurons.append(redundant_neuron_name)
         if not dropped:
             break
         spike_counts_matrix = spike_counts_per_segment.values
-        num_redundant_neurons = check_rank_of_spike_counts_matrix(spike_counts_matrix)
-        
+        num_redundant_neurons = check_rank_of_spike_counts_matrix(
+            spike_counts_matrix)
+
     concat_raw_spike_data = concat_raw_spike_data.drop(columns=dropped_neurons)
     return concat_raw_spike_data, dropped_neurons
+
 
 def turn_spiketrains_into_df(spiketrains, cluster_ids):
     rows = []

@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
-import colorcet
 import logging
 from matplotlib import rc
 from os.path import exists
@@ -22,7 +21,6 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.cross_decomposition import CCA
 import rcca
 from sklearn.preprocessing import StandardScaler
-from palettable.colorbrewer import qualitative
 import matplotlib.gridspec as gridspec
 from scipy.stats import pearsonr
 from sklearn.cluster import AgglomerativeClustering

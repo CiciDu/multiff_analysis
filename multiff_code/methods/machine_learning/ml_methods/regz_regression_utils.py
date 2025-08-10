@@ -16,10 +16,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib import rc
 import seaborn as sns
-import colorcet
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
-from palettable.colorbrewer import qualitative
 
 # Scientific computing
 from scipy import stats
