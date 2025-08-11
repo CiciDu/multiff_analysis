@@ -89,12 +89,62 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                     f'stop_point_index: {stop_point_index} is not in stops_near_ff_df_counted. Using the first instance in stops_near_ff_df_counted to plot.')
         self.stop_point_index = self.stops_near_ff_row['stop_point_index']
 
+
+    def _put_down_trajectory_time_series_plot(self, layout, id_prefix=''):
+        # Add time series plot conditionally
+        if self.show_trajectory_time_series:
+            layout.append(dash_utils.put_down_time_series_plot(
+                self.fig_time_series_combd, id=id_prefix+'time_series_plot_combined'
+            ))
+        else:
+            layout.append(dash_utils.put_down_empty_plot_that_takes_no_space(
+                id=id_prefix+'time_series_plot_combined'
+            ))
+            
+        return layout
+    
+    def _put_down_neural_plots(self, layout, id_prefix=''):
+        # Add neural plots conditionally
+        if self.show_neural_plots:
+            try:
+                self.fig_raster = self._create_raster_plot_figure()
+                self.fig_fr = self._create_firing_rate_plot_figure()
+            except Exception as e:
+                logging.warning(
+                    f"Could not create neural plots: {e}. Using empty figures.")
+                self.fig_raster = self._get_empty_figure()
+                self.fig_fr = self._get_empty_figure()
+
+            layout.extend([
+                dash_utils.put_down_raster_plot(
+                    self.fig_raster, id=id_prefix+'raster_plot'
+                ),
+                dash_utils.put_down_firing_rate_plot(
+                    self.fig_fr, id=id_prefix+'firing_rate_plot'
+                )
+            ])
+        else:
+            # Initialize empty figures for neural plots even when not showing them
+            self.fig_raster = self._get_empty_figure()
+            self.fig_fr = self._get_empty_figure()
+
+            layout.extend([
+                dash_utils.put_down_empty_plot_that_takes_no_space(
+                    id=id_prefix+'raster_plot'
+                ),
+                dash_utils.put_down_empty_plot_that_takes_no_space(
+                    id=id_prefix+'firing_rate_plot'
+                )
+            ])
+        return layout
+
     def _put_down_checklist_for_all_plots(self, id_prefix=None):
         checklist_options = [{'label': 'use curvature to ff center', 'value': 'use_curv_to_ff_center'},
                              {'label': 'truncate curv of traj by time of capture',
-                                        'value': 'truncate_curv_of_traj_by_time_of_capture'},
+                              'value': 'truncate_curv_of_traj_by_time_of_capture'},
                              {'label': 'eliminate outliers', 'value': 'eliminate_outliers'}]
-        checklist_params = ['use_curv_to_ff_center', 'truncate_curv_of_traj_by_time_of_capture', 'eliminate_outliers']
+        checklist_params = ['use_curv_to_ff_center',
+                            'truncate_curv_of_traj_by_time_of_capture', 'eliminate_outliers']
         self.overall_params['truncate_curv_of_traj_by_time_of_capture'] = self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture']
         checklist_values = [
             key for key in checklist_params if self.overall_params[key] is True]
@@ -241,7 +291,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         old_checklist_params = {'use_curv_to_ff_center': self.overall_params['use_curv_to_ff_center'],
                                 'truncate_curv_of_traj_by_time_of_capture': self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'],
                                 'eliminate_outliers': self.overall_params['eliminate_outliers']}
-    
+
         # update checklist_params into the instance
         if 'truncate_curv_of_traj_by_time_of_capture' in checklist_for_all_plots:
             self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] = True
@@ -339,8 +389,24 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.monkey_hoverdata_value = self.monkey_hoverdata_value_s
 
         self.fig, self.fig_time_series_combd = self._update_fig_and_fig_time_series_based_on_monkey_hover_data()
+        self.fig_raster, self.fig_fr = self._update_neural_plots_based_on_monkey_hover_data(
+            self.monkey_hoverdata_value_s)
 
-        return self.fig, self.fig_time_series_combd
+        return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr
+
+    def _update_dash_based_on_neural_plot_hoverdata(self, neural_plot_hoverdata):
+        neural_plot_hoverdata_values = neural_plot_hoverdata['points'][0]['x']
+
+        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_time_series.find_monkey_hoverdata_value_for_both_fig_time_series(
+            'rel_time', neural_plot_hoverdata_values, self.current_plotly_key_comp['trajectory_df'])
+
+        self.monkey_hoverdata_value = self.monkey_hoverdata_value_s
+
+        self.fig, self.fig_time_series_combd = self._update_fig_and_fig_time_series_based_on_monkey_hover_data()
+        self.fig_raster, self.fig_fr = self._update_neural_plots_based_on_monkey_hover_data(
+            self.monkey_hoverdata_value_s)
+
+        return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr
 
     def _update_dash_based_on_correlation_plot_clickdata(self, hoverData):
         self.stop_point_index = hoverData['points'][0]['customdata']

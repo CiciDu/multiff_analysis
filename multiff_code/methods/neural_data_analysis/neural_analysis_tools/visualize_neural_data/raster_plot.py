@@ -15,6 +15,7 @@ import scipy.interpolate as interpolate
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from scipy.stats import linregress
+import plotly.graph_objects as go
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -124,12 +125,13 @@ def add_scaling_info(
     """
     df = aligned_spike_trains
 
+    # Define the anchor and scaling factor
+    df['scale_anchor'] = df[scale_anchor_col]
+
     # make sure that scale_factor_upper_col is greater than scale_factor_lower_col
     assert np.all(df[scale_factor_upper_col] > df[scale_factor_lower_col]
                   ), 'scale_factor_upper_col must be greater than scale_factor_lower_col'
 
-    # Define the anchor and scaling factor
-    df['scale_anchor'] = df[scale_anchor_col]
     df['scale_factor'] = df[scale_factor_upper_col] - df[scale_factor_lower_col]
 
     # Calculate relative anchor position (zero-point for scaling)
@@ -149,10 +151,9 @@ def add_scaling_info(
 def plot_rasters_and_fr(
     aligned_spike_trains, new_seg_info, binned_spikes_df, bin_width,
     cluster_col='cluster',
-    combine_bin_factor=3, plot_mean=True,
+    bins_per_aggregate=1, plot_mean=True,
     max_clusters_to_plot=None, max_segments_to_plot=None, max_time=None
 ):
-
     segments = new_seg_info['new_segment'].unique()
     segments = segments[:max_segments_to_plot] if max_segments_to_plot else segments
     clusters = _prepare_clusters(
@@ -160,8 +161,8 @@ def plot_rasters_and_fr(
     if max_time is None:
         max_time = new_seg_info['new_seg_end_time'].max()
 
-    fr_df, time = plot_neural_data._prepare_fr_data(
-        binned_spikes_df, bin_width, combine_bin_factor, max_time)
+    fr_df = plot_neural_data._prepare_fr_data(
+        binned_spikes_df, bin_width, bins_per_aggregate, max_time)
     cluster_cols = [col for col in fr_df.columns if col.startswith('cluster_')]
     grouped_spikes = aligned_spike_trains.groupby([cluster_col, 'new_segment'])[
         'rel_spike_time']
@@ -176,10 +177,10 @@ def plot_rasters_and_fr(
         fr_col = cluster_to_frcols.get(cluster_id)
         if fr_col:
             _plot_cluster_raster_and_fr(
-                spike_data, segments, fr_df[fr_col][::100], time, cluster_id, plot_mean)
+                spike_data, segments, fr_df[fr_col], fr_df['time'], cluster_id, plot_mean)
 
-    mean_fr_all = fr_df[cluster_cols].mean(axis=1)[::100]
-    slope = np.polyfit(time, mean_fr_all, 1)[0]
+    mean_fr_all = fr_df.mean(axis=1)
+    slope = np.polyfit(fr_df['time'], mean_fr_all, 1)[0]
     total_change = mean_fr_all.iloc[-1] - mean_fr_all.iloc[0]
     print(f'Slope: {slope:.4f}, Total change: {total_change:.4f}')
 

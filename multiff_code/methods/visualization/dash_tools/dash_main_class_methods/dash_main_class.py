@@ -2,6 +2,8 @@ import sys
 from visualization.dash_tools import dash_utils
 from visualization.dash_tools.dash_main_class_methods import dash_main_helper_class
 from visualization.dash_tools.dash_config import DEFAULT_PORT, DEFAULT_EXTERNAL_STYLESHEETS
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_and_fr_plot_in_plotly
+from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 import os
 import sys
@@ -14,6 +16,9 @@ from dash import Dash, html, Input, State, Output, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import logging
+
+# Import neural data visualization tools
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_plot, plot_neural_data
 
 # Import shared configuration
 from visualization.dash_tools.dash_config import configure_plotting_environment
@@ -36,6 +41,9 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
     def __init__(self, raw_data_folder_path=None, opt_arc_type='opt_arc_stop_closest'):
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
         self.freeze_time_series = False
+        self.show_neural_plots = False  # Add flag for neural plots
+        self.spikes_df = None  # Add neural data storage
+        self.binned_spikes_df = None  # Add binned neural data storage
         self._setup_default_figures()
 
     def _setup_default_figures(self):
@@ -64,15 +72,10 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             dash_utils.create_error_message_display(id_prefix=id_prefix)
         ]
 
-        # Add time series plot conditionally
-        if self.show_trajectory_time_series:
-            layout.append(dash_utils.put_down_time_series_plot(
-                self.fig_time_series_combd, id=id_prefix+'time_series_plot_combined'
-            ))
-        else:
-            layout.append(dash_utils.put_down_empty_plot_that_takes_no_space(
-                id=id_prefix+'time_series_plot_combined'
-            ))
+        # conditionally add trajectory time series plot and neural plots
+        layout = self._put_down_trajectory_time_series_plot(
+            layout, id_prefix=id_prefix)
+        layout = self._put_down_neural_plots(layout, id_prefix=id_prefix)
 
         # Add remaining components
         more_to_add = [
@@ -89,8 +92,11 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         layout.extend(more_to_add)
         return html.Div(layout)
 
-    def make_dash_for_main_plots(self, show_trajectory_time_series=True, port=DEFAULT_PORT):
+    def make_dash_for_main_plots(self, show_trajectory_time_series=True, show_neural_plots=False,
+                                 port=DEFAULT_PORT):
+
         self.show_trajectory_time_series = show_trajectory_time_series
+        self.show_neural_plots = show_neural_plots
 
         self.app = Dash(
             __name__, external_stylesheets=DEFAULT_EXTERNAL_STYLESHEETS)
@@ -127,11 +133,17 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + 'correlation_plot_2',
                    'figure', allow_duplicate=True),
+            Output(self.id_prefix + 'raster_plot',
+                   'figure', allow_duplicate=True),
+            Output(self.id_prefix + 'firing_rate_plot',
+                   'figure', allow_duplicate=True),
             Output(self.id_prefix + "error_message",
                    "children", allow_duplicate=True),
             Input(self.id_prefix + 'monkey_plot', 'hoverData'),
             Input(self.id_prefix + 'time_series_plot_combined', 'hoverData'),
             Input(self.id_prefix + 'time_series_plot_combined', 'relayoutData'),
+            Input(self.id_prefix + 'raster_plot', 'hoverData'),
+            Input(self.id_prefix + 'firing_rate_plot', 'hoverData'),
             Input(self.id_prefix + 'update_ref_point', 'n_clicks'),
             Input(self.id_prefix + 'checklist_for_all_plots', 'value'),
             Input(self.id_prefix + 'checklist_for_monkey_plot', 'value'),
@@ -140,7 +152,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             prevent_initial_call=True
         )
         def update_all_plots_based_on_new_info(monkey_hoverdata, time_series_plot_hoverdata, time_series_plot_relayoutData,
-                                               update_ref_point, checklist_for_all_plots, checklist_for_monkey_plot,
+                                               raster_plot_hoverdata, firing_rate_plot_hoverdata, update_ref_point, checklist_for_all_plots, checklist_for_monkey_plot,
                                                ref_point_mode, ref_point_value):
 
             try:
@@ -170,11 +182,28 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                         raise PreventUpdate(
                             "No update was triggered because freeze_time_series is True.")
                     if 'x' in time_series_plot_hoverdata['points'][0]:
-                        self.fig, self.fig_time_series_combd = self._update_dash_based_on_time_series_plot_hoverdata(
+                        self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr = self._update_dash_based_on_time_series_plot_hoverdata(
                             time_series_plot_hoverdata)
                     else:
                         raise PreventUpdate(
                             "No update was made because x is not in time_series_plot_hoverdata.")
+
+                elif trigger_id == self.id_prefix + 'raster_plot.hoverData':
+                    # Handle raster plot hover - update time series plot with vertical line
+                    if 'x' in raster_plot_hoverdata['points'][0]:
+                        self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr = self._update_dash_based_on_neural_plot_hoverdata(
+                            raster_plot_hoverdata)
+                    else:
+                        raise PreventUpdate(
+                            "No update was made because x is not in raster_plot_hoverdata.")
+
+                elif trigger_id == self.id_prefix + 'firing_rate_plot.hoverData':
+                    if 'x' in firing_rate_plot_hoverdata['points'][0]:
+                        self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr = self._update_dash_based_on_neural_plot_hoverdata(
+                            firing_rate_plot_hoverdata)
+                    else:
+                        raise PreventUpdate(
+                            "No update was made because x is not in firing_rate_plot_hoverdata.")
 
                 elif trigger_id == self.id_prefix + 'update_ref_point.n_clicks':
                     if ref_point_value is not None and ref_point_value < 0:
@@ -204,10 +233,24 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                 if not self.show_trajectory_time_series:
                     self.fig_time_series_combd = self._get_empty_figure()
 
-                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, 'Updated successfully'
+                # Create neural plots if enabled
+                if self.show_neural_plots:
+                    try:
+                        self.fig_raster = self._create_raster_plot_figure()
+                        self.fig_fr = self._create_firing_rate_plot_figure()
+                    except Exception as e:
+                        logging.warning(
+                            f"Could not update neural plots: {e}. Using empty figures.")
+                        self.fig_raster = self._get_empty_figure()
+                        self.fig_fr = self._get_empty_figure()
+                else:
+                    self.fig_raster = self._get_empty_figure()
+                    self.fig_fr = self._get_empty_figure()
+
+                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, 'Updated successfully'
 
             except Exception as e:
-                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, f"An error occurred. No update was made. Error: {e}"
+                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, f"An error occurred. No update was made. Error: {e}"
 
     def make_function_to_update_based_on_correlation_plot(self, app):
         @app.callback(
@@ -218,6 +261,10 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             Output(self.id_prefix + 'correlation_plot',
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + 'correlation_plot_2',
+                   'figure', allow_duplicate=True),
+            Output(self.id_prefix + 'raster_plot',
+                   'figure', allow_duplicate=True),
+            Output(self.id_prefix + 'firing_rate_plot',
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + "other_messages",
                    "children", allow_duplicate=True),
@@ -252,7 +299,22 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     correlation_plot_2_clickdata)
 
             self.other_messages = self.generate_other_messages()
-            return fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.other_messages
+
+            # Update neural plots if enabled
+            if self.show_neural_plots:
+                try:
+                    self.fig_raster = self._create_raster_plot_figure()
+                    self.fig_fr = self._create_firing_rate_plot_figure()
+                except Exception as e:
+                    logging.warning(
+                        f"Could not update neural plots: {e}. Using empty figures.")
+                    self.fig_raster = self._get_empty_figure()
+                    self.fig_fr = self._get_empty_figure()
+            else:
+                self.fig_raster = self._get_empty_figure()
+                self.fig_fr = self._get_empty_figure()
+
+            return fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, self.other_messages
 
     def make_function_to_show_or_hind_visible_segments(self, app):
         @app.callback(
@@ -328,8 +390,11 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                             "No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
 
                 # Handle conditional plot visibility
-                if not self.show_trajectory_time_series:
+                if not self.show_trajectory_scatter_plot:
                     self.fig_time_series_combd = self._get_empty_figure()
+
+                if not self.show_shuffled_correlation_plot:
+                    self.fig_scatter_or_reg2 = self._get_empty_figure()
 
                 return (self.curv_of_traj_params['curv_of_traj_mode'],
                         self.curv_of_traj_params['window_for_curv_of_traj'][0],

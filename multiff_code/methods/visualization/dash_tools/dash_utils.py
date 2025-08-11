@@ -315,3 +315,29 @@ def _find_ff_curv_df(ff_index, current_plotly_key_comp, ff_dataframe, monkey_inf
     ff_curv_df_sub = ff_curv_df[['point_index', 'rel_time',
                                  'rel_distance', 'cntr_arc_curv', 'opt_arc_curv']].copy()
     return ff_curv_df_sub
+
+
+def put_down_firing_rate_plot(fig_firing_rate, id='firing_rate_plot', width='60%'):
+    """Create a firing rate plot component for Dash."""
+    if id is None:
+        id = 'firing_rate_plot'
+
+    return html.Div([
+        dcc.Graph(
+            id=id,
+            figure=fig_firing_rate,
+        ),
+    ], style={'width': width, 'padding': '0 0 10 0'})
+
+
+def put_down_raster_plot(fig_raster, id='raster_plot', width='60%'):
+    """Create a raster plot component for Dash."""
+    if id is None:
+        id = 'raster_plot'
+
+    return html.Div([
+        dcc.Graph(
+            id=id,
+            figure=fig_raster,
+        ),
+    ], style={'width': width, 'padding': '0 0 10 0'})

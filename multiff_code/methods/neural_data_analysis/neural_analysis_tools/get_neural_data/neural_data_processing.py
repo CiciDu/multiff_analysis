@@ -121,10 +121,14 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
 #     return rebinned_data
 
 
-def _make_all_binned_spikes(spikes_df, bin_width=0.02):
+def _make_all_binned_spikes(spikes_df, min_time=None, max_time=None, bin_width=0.02):
     """Efficiently bin spikes and stack bins for each spike cluster."""
-    max_time = math.ceil(spikes_df.time.max())
-    time_bins = np.arange(0, max_time + bin_width, bin_width)
+    if max_time is None:
+        max_time = math.ceil(spikes_df.time.max())
+    if min_time is None:
+        min_time = 0
+
+    time_bins = np.arange(min_time, max_time + bin_width, bin_width)
     spikes_df = spikes_df.copy()
 
     # Assign each spike to a time bin

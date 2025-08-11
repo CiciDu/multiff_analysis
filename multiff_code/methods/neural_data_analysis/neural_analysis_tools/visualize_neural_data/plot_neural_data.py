@@ -182,58 +182,76 @@ def plot_regression(final_behavioral_data, column, x_var, bins_to_plot=None, min
 
 def plot_fr_over_time(
     binned_spikes_df, bin_width, max_time=None,
-    combine_bin_factor=3, num_clusters_per_plot=5, plot_mean=True
+    bins_per_aggregate=1, num_clusters_per_plot=5, plot_mean=True
 ):
-    fr_df, time = _prepare_fr_data(
-        binned_spikes_df, bin_width, combine_bin_factor, max_time)
+    fr_df = _prepare_fr_data(
+        binned_spikes_df, bin_width, bins_per_aggregate, max_time)
     cluster_cols = [col for col in fr_df.columns if col.startswith('cluster_')]
-    time, mean_fr_downsampled = _plot_fr_curves(
-        fr_df, time, cluster_cols, num_clusters_per_plot, plot_mean)
+    _plot_fr_curves(
+        fr_df, cluster_cols, num_clusters_per_plot, plot_mean)
 
-    slope = np.polyfit(time, mean_fr_downsampled, 1)[0]
-    total_change = mean_fr_downsampled.iloc[-1] - mean_fr_downsampled.iloc[0]
+    fr_mean = fr_df[cluster_cols].mean(axis=1)
+    slope = np.polyfit(fr_df['time'], fr_mean, 1)[0]
+    total_change = fr_mean.iloc[-1] - fr_mean.iloc[0]
     print(f'Slope: {slope}')
     print(f'Total change: {round(total_change, 4)}')
 
 
-def _prepare_fr_data(binned_df, bin_width, combine_bin_factor, max_time=None):
+def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None):
     df = binned_df.copy()
-    df['time'] = df['bin'] * bin_width
+    if time_array is None:
+        df['time'] = df['bin'] * bin_width
+    else:
+        df['time'] = time_array
     if max_time is not None:
         df = df[df['time'] <= max_time]
 
-    df['new_bin2'] = np.arange(len(df)) // combine_bin_factor
+    df['new_bin2'] = np.arange(len(df)) // bins_per_aggregate
     df_agg = df.groupby('new_bin2').mean().reset_index(drop=False)
-    return df_agg, df_agg['time'][::100]
+    return df_agg
 
 
-def _plot_fr_curves(fr_df, time, cluster_cols, num_clusters_per_plot, plot_mean=True, cluster_id=None):
+def _plot_fr_curves(fr_df, cluster_cols, num_clusters_per_plot, plot_mean=True):
+    """
+    Plot firing rate (FR) curves without downsampling.
+
+    Args:
+        fr_df (pd.DataFrame): DataFrame with firing rates for clusters, must include 'time' column.
+        cluster_cols (list): List of cluster column names to plot.
+        num_clusters_per_plot (int): How many clusters to plot per figure.
+        plot_mean (bool): Whether to plot mean firing rate across clusters.
+        cluster_id: Unused in this function.
+
+    Returns:
+        None
+    """
+    time = fr_df['time']
     mean_fr = fr_df[cluster_cols].mean(axis=1)
-    mean_fr_downsampled = mean_fr[::100]
+
     num_plots = int(np.ceil(len(cluster_cols) / num_clusters_per_plot))
 
     for i in range(num_plots):
         plt.figure(figsize=(8, 3.5))
+
         cluster_subset = cluster_cols[i *
                                       num_clusters_per_plot:(i + 1) * num_clusters_per_plot]
 
         for col in cluster_subset:
-            plt.plot(time, fr_df[col][::100], alpha=0.6, label=col)
+            plt.plot(time, fr_df[col], alpha=0.6, label=col)
 
-        if plot_mean & (len(cluster_subset) > 1):
-            plt.plot(time, mean_fr_downsampled,
-                     color='black', linewidth=2, label='mean')
+        if plot_mean and len(cluster_subset) > 1:
+            plt.plot(time, mean_fr, color='black', linewidth=2, label='mean')
 
-        # extract numbers from cluster_cols
+        # Extract cluster numbers for the title
         cluster_numbers = [int(col.split('_')[1]) for col in cluster_subset]
+        if len(cluster_subset) == 1:
+            title = f'Firing Rate for Cluster {cluster_numbers[0]}'
+        else:
+            title = f'Firing Rate for Clusters {cluster_numbers[0]} to {cluster_numbers[-1]}'
 
-        title = f'Firing Rate for Cluster {cluster_numbers[0]}' if len(cluster_subset) == 1 \
-            else f'Firing Rate for Clusters {cluster_numbers[0]} to {cluster_numbers[-1]}'
         plt.title(title)
         plt.ylabel('FR')
         plt.xlabel('Time (s)')
         plt.legend(loc='upper right', fontsize=8)
         plt.tight_layout()
         plt.show()
-
-    return time, mean_fr_downsampled

@@ -8,6 +8,8 @@ from visualization.matplotlib_tools import monkey_heading_utils
 from eye_position_analysis import eye_positions
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_helper_class, find_cvn_utils, plot_cvn_class, plot_cvn_utils, plot_monkey_heading_helper_class
 from null_behaviors import find_best_arc, curv_of_traj_utils, opt_arc_utils
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_and_fr_plot_in_plotly
+from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 import os
 import sys
@@ -37,6 +39,41 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
                  opt_arc_type='opt_arc_stop_closest'):
 
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
+
+
+    def _create_raster_plot_figure(self,
+                                   max_clusters_to_plot=None):
+        if not hasattr(self, 'spikes_df'):
+            self._make_spikes_df()
+        self.fig_raster = raster_and_fr_plot_in_plotly.create_raster_plot_for_one_duration_in_plotly(
+            self.spikes_df,
+            self.stops_near_ff_row['stop_time'],
+            self.current_plotly_key_comp['duration_to_plot'][0],
+            self.current_plotly_key_comp['duration_to_plot'][1],
+            max_clusters_to_plot=max_clusters_to_plot, rel_hover_time=self.monkey_hoverdata_value_s)
+        return self.fig_raster
+
+    def _create_firing_rate_plot_figure(self, max_clusters_to_plot=None):
+        if not hasattr(self, 'spikes_df'):
+            self._make_spikes_df()
+        self.fig_fr = raster_and_fr_plot_in_plotly.create_firing_rate_plot_for_one_duration_in_plotly(
+            self.spikes_df,
+            self.stops_near_ff_row['stop_time'],
+            self.current_plotly_key_comp['duration_to_plot'][0],
+            self.current_plotly_key_comp['duration_to_plot'][1],
+            max_clusters_to_plot=max_clusters_to_plot, rel_hover_time=self.monkey_hoverdata_value_s)
+        return self.fig_fr
+
+    def _update_neural_plots_based_on_monkey_hover_data(self, rel_hover_time):
+        self.fig_raster.update_traces(overwrite=True, selector=dict(name='rel_hover_time'), x=[rel_hover_time, rel_hover_time])
+        self.fig_fr.update_traces(overwrite=True, selector=dict(name='rel_hover_time'), x=[rel_hover_time, rel_hover_time])
+        return self.fig_raster, self.fig_fr
+    
+    def _make_spikes_df(self):
+        self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
+        self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
+                                                               sampling_rate=self.sampling_rate)
+
 
     def _show_angle_to_nxt_ff_in_time_series(self):
         self.add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration()
@@ -229,14 +266,12 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
 
     def _turn_on_or_off_vertical_lines_in_each_time_series_plot_based_on_monkey_hoverdata_column(self):
         if self.hoverdata_column == 'rel_time':
-            # , 'First stop point']:
             for name in ['Monkey trajectory hover position']:
                 self.fig_time_series_cm.update_traces(
                     visible=False, selector=dict(name=name))
                 self.fig_time_series_s.update_traces(
                     visible=True, selector=dict(name=name))
         else:
-            # , 'First stop point']:
             for name in ['Monkey trajectory hover position']:
                 self.fig_time_series_cm.update_traces(
                     visible=True, selector=dict(name=name))
