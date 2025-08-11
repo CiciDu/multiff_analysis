@@ -25,162 +25,308 @@ matplotlib.rcParams['animation.embed_limit'] = 2**128
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
-import numpy as np
 
-def make_correlation_plot_in_plotly(heading_info_df=None,
-                                    x_var_column='cum_distance_between_two_stops',
-                                    y_var_column='diff_in_abs_angle_to_nxt_ff',
-                                    current_stop_point_index_to_mark=None, traj_curv_descr='', ref_point_descr='',
-                                    title=None, **kwargs):
+def make_scatter_plot_in_plotly(heading_info_df=None,
+                                x_var_column='cum_distance_between_two_stops',
+                                y_var_column='diff_in_abs_angle_to_nxt_ff',
+                                current_stop_point_index_to_mark=None,
+                                title=None,
+                                equal_aspect=False,
+                                margin_factor=0.1,
+                                **kwargs):
 
+    # Validate and extract data
+    x_var, y_var = _validate_dataframe(
+        heading_info_df, x_var_column, y_var_column)
+
+    # Find index to mark on plot
+    current_position_index_to_mark = _find_current_position_index(
+        heading_info_df, current_stop_point_index_to_mark)
+
+    # Prepare hover data
+    customdata, hovertemplate = _prepare_hover_data(
+        heading_info_df, x_var_column, y_var_column)
+
+    # Get axis titles
+    xaxis_title, yaxis_title = _get_axis_titles(x_var_column, y_var_column)
+
+    # Create title
+    title = _create_title(x_var_column, y_var_column, title)
+
+    # Calculate axis limits
+    if equal_aspect:
+        x_lim, y_lim = _calculate_equal_aspect_limits(
+            x_var, y_var, margin_factor)
+    else:
+        x_lim, y_lim = _calculate_axis_limits(x_var, y_var, margin_factor)
+
+    # Create the plot
+    fig_scatter = _plot_scatter_plot_in_plotly(
+        x_var, y_var, customdata, hovertemplate, current_position_index_to_mark,
+        title, xaxis_title, yaxis_title)
+
+    # Apply improved axis limits
+    _apply_axis_limits(fig_scatter, x_lim, y_lim, equal_aspect)
+
+    fig_scatter.update_layout(title_font_size=13, showlegend=False)
+    return fig_scatter
+
+
+def make_regression_plot_in_plotly(heading_info_df=None,
+                                   x_var_column='angle_from_stop_to_nxt_ff',
+                                   y_var_column='angle_opt_cur_end_to_nxt_ff',
+                                   current_stop_point_index_to_mark=None,
+                                   title=None,
+                                   equal_aspect=False,
+                                   margin_factor=0.1,
+                                   **kwargs):
+
+    # Remove NaN values and track how many were removed
+    original_length = len(heading_info_df)
+    heading_info_df_clean = heading_info_df.dropna(
+        subset=[x_var_column, y_var_column])
+    new_length = len(heading_info_df_clean)
+
+    # Create additional title information about removed data
+    if original_length != new_length:
+        add_to_title = f'# nan removed: {original_length-new_length} out of {original_length}'
+    else:
+        add_to_title = ''
+
+    # Validate and extract data
+    x_var, y_var = _validate_dataframe(
+        heading_info_df_clean, x_var_column, y_var_column)
+
+    # Find the index of the current stop point to mark if provided
+    current_position_index_to_mark = _find_current_position_index(
+        heading_info_df_clean, current_stop_point_index_to_mark)
+
+    # Prepare hover data
+    customdata, hovertemplate = _prepare_hover_data(
+        heading_info_df_clean, x_var_column, y_var_column)
+
+    # Get axis titles
+    xaxis_title, yaxis_title = _get_axis_titles(x_var_column, y_var_column)
+
+    # Create title
+    title = _create_title(x_var_column, y_var_column, title, add_to_title)
+
+    # Generate the regression plot first to get slope and intercept
+    fig_angle = _plot_relationship_in_plotly(
+        x_var, y_var, show_plot=False, title=title,
+        current_position_index_to_mark=current_position_index_to_mark,
+        hovertemplate=hovertemplate, customdata=customdata,
+        xaxis_title=xaxis_title, yaxis_title=yaxis_title,
+        add_to_title=add_to_title)
+
+    # Calculate regression statistics for better limits
+    slope, intercept, _, _, _ = stats.linregress(x_var, y_var)
+
+    # Calculate axis limits considering regression line
+    if equal_aspect:
+        x_lim, y_lim = _calculate_equal_aspect_limits(
+            x_var, y_var, margin_factor)
+    else:
+        x_lim, y_lim = _calculate_regression_line_limits(
+            x_var, y_var, slope, intercept, margin_factor)
+
+    # Apply improved axis limits
+    _apply_axis_limits(fig_angle, x_lim, y_lim, equal_aspect)
+
+    # Update layout of the plot
+    fig_angle.update_layout(title_font_size=13, showlegend=False)
+    return fig_angle
+
+
+def _calculate_axis_limits(x_var, y_var, margin_factor=0.1):
+    """Calculate optimal axis limits with margins for better visualization."""
+    x_min, x_max = np.min(x_var), np.max(x_var)
+    y_min, y_max = np.min(y_var), np.max(y_var)
+
+    # Calculate ranges
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+
+    # Add margins (10% by default)
+    x_margin = x_range * margin_factor
+    y_margin = y_range * margin_factor
+
+    # Handle edge cases where range is zero
+    if x_range == 0:
+        x_margin = 0.1 if x_min == 0 else abs(x_min) * 0.1
+    if y_range == 0:
+        y_margin = 0.1 if y_min == 0 else abs(y_min) * 0.1
+
+    # Calculate limits
+    x_lim = [x_min - x_margin, x_max + x_margin]
+    y_lim = [y_min - y_margin, y_max + y_margin]
+
+    return x_lim, y_lim
+
+
+def _calculate_equal_aspect_limits(x_var, y_var, margin_factor=0.1):
+    """Calculate axis limits that maintain equal aspect ratio."""
+    x_min, x_max = np.min(x_var), np.max(x_var)
+    y_min, y_max = np.min(y_var), np.max(y_var)
+
+    # Calculate ranges
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+
+    # Use the larger range to determine the scale
+    max_range = max(x_range, y_range)
+
+    # Calculate centers
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+
+    # Add margins
+    margin = max_range * margin_factor
+
+    # Handle edge cases where range is zero
+    if max_range == 0:
+        margin = 0.1
+
+    # Calculate limits maintaining equal aspect ratio
+    half_range = max_range / 2 + margin
+
+    x_lim = [x_center - half_range, x_center + half_range]
+    y_lim = [y_center - half_range, y_center + half_range]
+
+    return x_lim, y_lim
+
+
+def _apply_axis_limits(fig, x_lim, y_lim, equal_aspect=True):
+    """Apply calculated limits to the figure."""
+    if equal_aspect:
+        fig.update_layout(
+            xaxis=dict(range=x_lim, scaleanchor="x", scaleratio=1),
+            yaxis=dict(range=y_lim)
+        )
+    else:
+        fig.update_layout(
+            xaxis=dict(range=x_lim),
+            yaxis=dict(range=y_lim)
+        )
+
+
+def _calculate_regression_line_limits(x_var, y_var, slope, intercept, margin_factor=0.1):
+    """Calculate limits that ensure the regression line is visible."""
+    # Calculate data limits
+    x_min, x_max = np.min(x_var), np.max(x_var)
+    y_min, y_max = np.min(y_var), np.max(y_var)
+
+    # Calculate regression line limits
+    reg_y_min = slope * x_min + intercept
+    reg_y_max = slope * x_max + intercept
+
+    # Find the overall limits including regression line
+    overall_y_min = min(y_min, reg_y_min)
+    overall_y_max = max(y_max, reg_y_max)
+
+    # Calculate ranges
+    x_range = x_max - x_min
+    y_range = overall_y_max - overall_y_min
+
+    # Add margins
+    x_margin = x_range * margin_factor
+    y_margin = y_range * margin_factor
+
+    # Handle edge cases
+    if x_range == 0:
+        x_margin = 0.1 if x_min == 0 else abs(x_min) * 0.1
+    if y_range == 0:
+        y_margin = 0.1 if overall_y_min == 0 else abs(overall_y_min) * 0.1
+
+    # Calculate limits
+    x_lim = [x_min - x_margin, x_max + x_margin]
+    y_lim = [overall_y_min - y_margin, overall_y_max + y_margin]
+
+    return x_lim, y_lim
+
+
+def _validate_dataframe(heading_info_df, x_var_column, y_var_column):
+    """Validate dataframe and extract required columns."""
     if heading_info_df is None:
-        print("Warning: heading_info_df is None, cannot create plot.")
-        return None
+        raise ValueError("heading_info_df is None, cannot create plot.")
 
     # Extract x and y variables, raise error if columns missing
     try:
         x_var = heading_info_df[x_var_column].values
         y_var = heading_info_df[y_var_column].values
     except KeyError as e:
-        print(f"Warning: Missing column in dataframe: {e}")
-        return None
+        raise ValueError(f"Missing column in dataframe: {e}")
 
     # Check for empty arrays
     if len(x_var) == 0 or len(y_var) == 0:
-        print('Warning: Data arrays are empty, so correlation plot is not shown')
+        raise ValueError(
+            'Data arrays are empty, so correlation plot is not shown')
+
+    return x_var, y_var
+
+
+def _find_current_position_index(heading_info_df, current_stop_point_index_to_mark):
+    """Find the index of the current stop point to mark on the plot."""
+    if current_stop_point_index_to_mark is None:
         return None
 
-    # Find index to mark on plot
-    current_position_index_to_mark = None
-    if current_stop_point_index_to_mark is not None:
-        try:
-            matches = heading_info_df.index[
-                heading_info_df['stop_point_index'] == current_stop_point_index_to_mark
-            ]
-            current_position_index_to_mark = matches[0]
-        except:
-            raise ValueError(f'Warning: No match found for current_stop_point_index_to_mark: {current_stop_point_index_to_mark}')
+    try:
+        matches = heading_info_df.index[
+            heading_info_df['stop_point_index'] == current_stop_point_index_to_mark
+        ]
+        return matches[0] if len(matches) > 0 else None
+    except (KeyError, IndexError):
+        raise ValueError(
+            f'No match found for current_stop_point_index_to_mark: {current_stop_point_index_to_mark}')
 
 
-    # Compose title if none given
-    if title is None:
-        title = traj_curv_descr + "<br>" + ref_point_descr
-
+def _prepare_hover_data(heading_info_df, x_var_column, y_var_column):
+    """Prepare customdata and hovertemplate for hover information."""
     # Prepare customdata for hover info
+    customdata = None
     if 'stop_point_index' in heading_info_df.columns:
         customdata = heading_info_df['stop_point_index'].values
-    else:
-        customdata = None
 
-    # Plotly hovertemplate formatting (Plotly uses %{x} and %{y}, not Python f-string formatting)
     hovertemplate = (
-        f'<b>{x_var_column}: %{{x:.2f}} <br>{y_var_column}: %{{y:.2f}}</b><br><br>'
-        'Stop point index:<br>%{{customdata}}'
+        '<b>x: %{x:.2f} <br>y: %{y:.2f}</b><br><br>'
+        'Stop point index:<br>%{customdata}'
         '<extra></extra>'
     )
 
-    # Axis titles
+    return customdata, hovertemplate
+
+
+def _get_axis_titles(x_var_column, y_var_column):
+    """Get formatted axis titles based on column names."""
     xaxis_title = x_var_column
     yaxis_title = y_var_column
 
-    # Call your plotting function (make sure plot_relationship_in_plotly is defined elsewhere)
-    fig_corr = plot_scatter_plot_in_plotly(x_var, y_var, customdata, hovertemplate, current_position_index_to_mark, title, xaxis_title, yaxis_title)
+    # Special formatting for specific columns
+    if x_var_column == 'angle_from_stop_to_nxt_ff':
+        xaxis_title = 'Angle from Stop to Nxt FF'
+    if y_var_column == 'angle_from_stop_to_nxt_ff':
+        yaxis_title = 'Angle from Stop to Nxt FF'
 
-    fig_corr.update_layout(title_font_size=13, showlegend=False)
-
-    return fig_corr
-
-
-
-# def make_heading_plot_in_plotly(rel_heading_df=None, change_units_to_degrees=True,
-#                                 current_stop_point_index_to_mark=None, ref_point_descr='', traj_curv_descr='',
-#                                 title=None, **kwargs):
-
-#     rel_heading_traj = rel_heading_df['rel_heading_traj'].values
-#     rel_heading_alt = rel_heading_df['rel_heading_alt'].values
-#     if change_units_to_degrees:
-#         rel_heading_traj = rel_heading_traj * (180/np.pi)
-#         rel_heading_alt = rel_heading_alt * (180/np.pi)
-#     rel_heading_df = rel_heading_df.reset_index()
-#     if current_stop_point_index_to_mark is not None:
-#         current_position_index_to_mark = rel_heading_df[rel_heading_df['stop_point_index'] == current_stop_point_index_to_mark].index.values[0]
-#     else:
-#         current_position_index_to_mark = None
-
-#     if title is None:
-#         title = 'Relative difference in monkey heading' + "<br>" + traj_curv_descr + "<br>" + ref_point_descr
-#     #title = 'Relative difference in monkey heading' + "<br>" + ref_point_descr
-#     customdata = rel_heading_df['stop_point_index'].values
-#     hovertemplate=('<b>Alt heading - Stop heading: %{x:.2f} <br>Traj heading - Stop heading: %{y:.2}</b><BR><BR>Stop point index:<BR>' +
-#                                     '%{customdata}' + '<extra></extra>')
-#     xaxis_title='Alt - Stop (deg)'
-#     yaxis_title='Traj - Stop (deg)'
-#     fig_heading = plot_relationship_in_plotly(rel_heading_alt, rel_heading_traj, show_plot=False, title=title, current_position_index_to_mark=current_position_index_to_mark,
-#                                            hovertemplate=hovertemplate, customdata=customdata, xaxis_title=xaxis_title, yaxis_title=yaxis_title)
-#     fig_heading.update_layout(title_font_size=13, showlegend=False)
-#     return fig_heading
+    return xaxis_title, yaxis_title
 
 
-def make_heading_plot_in_plotly(heading_info_df=None, change_units_to_degrees=True,
-                                current_stop_point_index_to_mark=None, ref_point_descr='', traj_curv_descr='',
-                                title=None, **kwargs):
-
-    # find rows in heading_info_df that contains na in angle_from_stop_to_nxt_ff or angle_opt_cur_end_to_nxt_ff
-    original_length = len(heading_info_df)
-    heading_info_df = heading_info_df.dropna(
-        subset=['angle_from_stop_to_nxt_ff', 'angle_opt_cur_end_to_nxt_ff'])
-    new_length = len(heading_info_df)
-    if original_length != new_length:
-        add_to_title = '# nan removed: ' + \
-            str(original_length-new_length) + ' out of ' + str(original_length)
-    else:
-        add_to_title = ''
-
-    # Extract relevant angles from heading_info_df
-    ang_stop_nxt = heading_info_df['angle_from_stop_to_nxt_ff'].values
-    ang_cur_nxt = heading_info_df['angle_opt_cur_end_to_nxt_ff'].values
-
-    # Convert angles to degrees if required
-    if change_units_to_degrees:
-        ang_stop_nxt = ang_stop_nxt * (180/np.pi)
-        ang_cur_nxt = ang_cur_nxt * (180/np.pi)
-
-    # Reset index of heading_info_df
-    heading_info_df = heading_info_df.reset_index()
-
-    # Find the index of the current stop point to mark if provided
-    current_position_index_to_mark = None
-    if current_stop_point_index_to_mark is not None:
-        try:
-            current_position_index_to_mark = heading_info_df[heading_info_df['stop_point_index']
-                                                             == current_stop_point_index_to_mark].index.values[0]
-        except:
-            pass
-
-    # Set default title if not provided
+def _create_title(x_var_column, y_var_column, title=None, add_to_title=''):
+    """Create plot title with optional additional information."""
     if title is None:
-        title = "Angle from Stop to Next FF vs. Angle from Current Arc End to Next FF" + "<br>" + ref_point_descr
+        # Split title into two lines after "vs"
+        title = f'{x_var_column}<br>vs {y_var_column}'
+    else:
+        # If custom title is provided, try to split it at "vs" if present
+        if ' vs ' in title:
+            title = title.replace(' vs ', '<br>vs ')
 
-    # Prepare custom data and hover template for the plot
-    customdata = heading_info_df['stop_point_index'].values
-    hovertemplate = ('<b>Angle from Stop to Next FF: %{x:.2f} <br>Angle from Current Arc End to Next FF: %{y:.2}</b><BR><BR>Stop point index:<BR>' +
-                     '%{customdata}' + '<extra></extra>')
+    if add_to_title:
+        title += f"<br><sup>{add_to_title}</sup>"
 
-    # Set axis titles
-    xaxis_title = 'Angle from Stop to Nxt FF'
-    yaxis_title = 'Angle from Cur Arc End to Nxt FF'
-
-    # Generate the plot
-    fig_angle = plot_relationship_in_plotly(ang_stop_nxt, ang_cur_nxt, show_plot=False, title=title, current_position_index_to_mark=current_position_index_to_mark,
-                                            hovertemplate=hovertemplate, customdata=customdata, xaxis_title=xaxis_title, yaxis_title=yaxis_title, add_to_title=add_to_title)
-
-    # Update layout of the plot
-    fig_angle.update_layout(title_font_size=13, showlegend=False)
-
-    return fig_angle
+    return title
 
 
-def put_down_correlation_plot(fig_corr, id='correlation_plot', width='60%'):
+def put_down_correlation_plot(fig_scatter, id='correlation_plot', width='60%'):
 
     if id is None:
         id = 'correlation_plot'
@@ -188,7 +334,7 @@ def put_down_correlation_plot(fig_corr, id='correlation_plot', width='60%'):
     return html.Div([
         dcc.Graph(
                     id=id,
-                    figure=fig_corr,
+                    figure=fig_scatter,
                     # ['Original-Present', 0]}]}
                     hoverData={'points': [{'customdata': 0}]},
                     clickData={'points': [{'customdata': 0}]}
@@ -223,98 +369,111 @@ def find_curv_of_traj_counted_from_curv_of_traj_df(curv_of_traj_df, point_index_
     return curv_of_traj_counted
 
 
-def plot_relationship_in_plotly(x_array, y_array, slope=None, show_plot=True,
-                                title="Traj Curv: From Current Point to Right Before Stop <br> At -1 Sec",
-                                xaxis_title='Traj Curv - Curv to cur ff (cm)',
-                                yaxis_title='Curv to nxt ff - Curv to cur ff (cm)',
-                                customdata=None,
-                                hovertemplate=None,
-                                current_position_index_to_mark=None,
-                                add_to_title=''):
+def _plot_relationship_in_plotly(x_array, y_array, slope=None, show_plot=True,
+                                 title="Traj Curv: From Current Point to Right Before Stop <br> At -1 Sec",
+                                 xaxis_title='Traj Curv - Curv to cur ff (cm)',
+                                 yaxis_title='Curv to nxt ff - Curv to cur ff (cm)',
+                                 customdata=None,
+                                 hovertemplate=None,
+                                 current_position_index_to_mark=None,
+                                 add_to_title=''):
 
+    # Calculate linear regression statistics
     slope, intercept, r_value, p_value, std_err = stats.linregress(
         x_array, y_array)
+
+    # Create the figure
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x_array,
-                             y=y_array,
-                             mode='markers',
-                             showlegend=False,
-                             customdata=customdata,
-                             hovertemplate=hovertemplate,
-                             #     hovertemplate=('<b>Traj curv - cur ff curv: %{x:.2f} <br>Alt curv - cur ff curv: %{y:.2}</b><BR><BR>Current Position in Data:<BR>' +
-                             #    '%{customdata}' +
-                             #    '<extra></extra>'),
-                             ))
-    # calculate and plot linear correlation
-    x_min = min(x_array)
-    x_max = max(x_array)
-    fig.add_trace(go.Scatter(x=np.array([x_min, x_max]),
-                             y=np.array([x_min, x_max])*slope+intercept,
-                             showlegend=False,
-                             mode='lines',
-                             line=dict(color='red')))
+
+    # Add scatter plot of data points
+    fig.add_trace(go.Scatter(
+        x=x_array,
+        y=y_array,
+        mode='markers',
+        showlegend=False,
+        customdata=customdata,
+        hovertemplate=hovertemplate,
+    ))
+
+    # Add regression line
+    x_min, x_max = min(x_array), max(x_array)
+    fig.add_trace(go.Scatter(
+        x=np.array([x_min, x_max]),
+        y=np.array([x_min, x_max]) * slope + intercept,
+        showlegend=False,
+        mode='lines',
+        line=dict(color='red')
+    ))
+
+    # Update layout with title and axis configuration
+    regression_stats = f'r value = {round(r_value, 2)}, slope = {round(slope, 2)}'
+    full_title = f"{title}<br><sup>{regression_stats}<br>{add_to_title}</sup>"
+
     fig.update_layout(
         xaxis_title=xaxis_title,
         yaxis_title=yaxis_title,
-        yaxis=dict(scaleanchor="x", scaleratio=1),
         title=go.layout.Title(
-            text=title + "<br><sup>" + 'r value =' +
-            str(round(r_value, 2)) + ', slope =' +
-            str(round(slope, 2)) + "<br>" + add_to_title + "</sup>",
+            text=full_title,
             xref="paper",
             x=0
         ),
     )
-    # make sure the x and y axis have the same scale
 
-    if (current_position_index_to_mark is not None):
-        fig.add_trace(go.Scatter(x=[x_array[current_position_index_to_mark]],
-                                 y=[y_array[current_position_index_to_mark]],
-                                 mode='markers', marker=dict(color='red', size=10),
-                                 customdata=[
-                                     customdata[current_position_index_to_mark]],
-                                 hovertemplate=hovertemplate,
-                                 name='Stop Point Index',))
+    # Mark current position if specified
+    if current_position_index_to_mark is not None:
+        fig = _plot_current_position_in_scatter_plot(
+            fig, x_array, y_array, current_position_index_to_mark)
 
     if show_plot:
         fig.show()
     return fig
 
 
-def plot_scatter_plot_in_plotly(x_var, y_var, customdata, hovertemplate, current_position_index_to_mark, title=None, xaxis_title=None, yaxis_title=None):
-    # Build the scatter plot figure directly
-    fig_corr = go.Figure()
+def _plot_scatter_plot_in_plotly(x_var, y_var, customdata, hovertemplate, current_position_index_to_mark, title=None, xaxis_title=None, yaxis_title=None):
+    """Create a scatter plot with optional current position marking."""
+    # Create the figure
+    fig_scatter = go.Figure()
 
-    fig_corr.add_trace(
+    # Add main scatter plot
+    fig_scatter.add_trace(
         go.Scatter(
             x=x_var,
             y=y_var,
             mode='markers',
             marker=dict(size=7, color='blue'),
             customdata=customdata,
-            hovertemplate=hovertemplate
+            hovertemplate=hovertemplate,
+            showlegend=False
         )
     )
 
-    # If you want to mark the current position with a special symbol/color
+    # Mark current position if specified and valid
     if current_position_index_to_mark is not None and 0 <= current_position_index_to_mark < len(x_var):
-        fig_corr.add_trace(
-            go.Scatter(
-                x=[x_var[current_position_index_to_mark]],
-                y=[y_var[current_position_index_to_mark]],
-                mode='markers',
-                marker=dict(size=12, color='red', symbol='star'),
-                name='Current Stop',
-                showlegend=True,
-                hoverinfo='skip'
-            )
-        )
+        fig_scatter = _plot_current_position_in_scatter_plot(
+            fig_scatter, x_var, y_var, current_position_index_to_mark)
 
-    fig_corr.update_layout(
+    # Update layout
+    fig_scatter.update_layout(
         title=title,
         xaxis_title=xaxis_title,
         yaxis_title=yaxis_title,
         title_font_size=13,
         showlegend=True,
     )
+    return fig_scatter
 
+
+def _plot_current_position_in_scatter_plot(fig_scatter, x_var, y_var, current_position_index_to_mark):
+    """Add a special marker for the current position in a scatter plot."""
+    fig_scatter.add_trace(
+        go.Scatter(
+            x=[x_var[current_position_index_to_mark]],
+            y=[y_var[current_position_index_to_mark]],
+            mode='markers',
+            marker=dict(size=12, color='red', symbol='star'),
+            name='Current Stop',
+            showlegend=True,
+            hoverinfo='skip'
+        )
+    )
+    return fig_scatter

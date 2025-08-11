@@ -4,11 +4,11 @@ import json
 with open('multiff_code/notebooks/planning_analysis/plan_data_exploration.ipynb', 'r') as f:
     notebook = json.load(f)
 
-# Find the cell with scatter_plot_params
+# Find the cell with time_series_plot_params
 for cell in notebook['cells']:
     if 'source' in cell:
         source = ''.join(cell['source'])
-        if 'scatter_plot_params = {' in source:
+        if 'time_series_plot_params = {' in source:
             # Find the line with the closing brace
             lines = cell['source']
             for i, line in enumerate(lines):

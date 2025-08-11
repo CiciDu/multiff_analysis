@@ -99,7 +99,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(
             test_or_control, heading_info_df_exists_ok)
 
-        self.kwargs_for_heading_plot = self._make_kwargs_for_heading_plot()
         if 'rank_by_angle_to_nxt_ff' not in self.stops_near_ff_df.columns:
             self.stops_near_ff_df = self.stops_near_ff_df.merge(self.heading_info_df[[
                                                                 'stop_point_index', 'rank_by_angle_to_nxt_ff']], on='stop_point_index', how='left')
@@ -248,11 +247,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def find_relative_curvature(self):
 
-        # if 'heading_instead_of_curv' in self.overall_params:
-        #     if self.overall_params['heading_instead_of_curv']:
-        #         return
-        # else:
-        #     return
 
         if self.overall_params['use_curv_to_ff_center']:
             self.curv_var = 'cntr_arc_curv'
@@ -329,7 +323,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                             'point_index': nxt_ff_df['point_index'].values,
                                             })
 
-        # self.kwargs_for_heading_plot = self._make_kwargs_for_heading_plot()
 
     def _find_mheading_before_stop(self):
         # this is more for plotting
@@ -608,22 +601,3 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
     def _make_info_based_on_monkey_angle(self):
         self.info_based_on_monkey_angle_before_stop = find_cvn_utils.calculate_info_based_on_monkey_angles(
             self.stops_near_ff_df, self.stops_near_ff_df.monkey_angle_before_stop.values)
-
-    def _make_kwargs_for_correlation_plot(self):
-
-        self.kwargs_for_correlation_plot = {
-            'heading_info_df': self.heading_info_df.copy(),
-            #'change_units_to_degrees_per_m': self.overall_params['change_units_to_degrees_per_m'],
-            'ref_point_descr': self.ref_point_descr,
-            'traj_curv_descr': self.traj_curv_descr
-            }
-        return self.kwargs_for_correlation_plot
-
-    def _make_kwargs_for_heading_plot(self):
-        self.kwargs_for_heading_plot = {'heading_info_df': self.heading_info_df,
-                                        # 'rel_heading_df': self.rel_heading_df,
-                                        'change_units_to_degrees': True,
-                                        'ref_point_descr': self.ref_point_descr,
-                                        'traj_curv_descr': self.traj_curv_descr, }
-
-        return self.kwargs_for_heading_plot

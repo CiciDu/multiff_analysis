@@ -15,7 +15,7 @@ from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, pl
 **After:**
 ```python
 from visualization.dash_tools import dash_utils  # Single import
-from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot, plotly_for_monkey, plotly_for_null_arcs  # Consolidated imports
+from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_time_series, plotly_for_monkey, plotly_for_null_arcs  # Consolidated imports
 ```
 
 ### 2. **Centralized Configuration**
@@ -70,7 +70,7 @@ def _get_empty_figure(self):
 - Reduces memory allocation during frequent updates
 - Improves performance for conditional plot visibility
 
-**Important Fix:** Initially used references (`self.fig_scatter_combd = self._empty_fig`), but this caused race conditions between callbacks. Now creates proper copies using `self._empty_fig_template.copy()`.
+**Important Fix:** Initially used references (`self.fig_time_series_combd = self._empty_fig`), but this caused race conditions between callbacks. Now creates proper copies using `self._empty_fig_template.copy()`.
 
 ### 5. **Code Structure Improvements**
 
@@ -101,7 +101,7 @@ self.hoverdata_value_upper_bound_cm = dash_utils.find_hoverdata_value_upper_boun
 ```
 
 #### **Optimized Conditional Logic**
-- Simplified boolean checks (`if not self.show_trajectory_scatter_plot` vs `if self.show_trajectory_scatter_plot is False`)
+- Simplified boolean checks (`if not self.show_trajectory_time_series` vs `if self.show_trajectory_time_series is False`)
 - Reduced redundant condition evaluations
 - Better use of early returns and `PreventUpdate`
 

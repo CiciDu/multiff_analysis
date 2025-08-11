@@ -35,7 +35,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
     def __init__(self, raw_data_folder_path=None, opt_arc_type='opt_arc_stop_closest'):
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
-        self.freeze_scatterplot = False
+        self.freeze_time_series = False
         self._setup_default_figures()
 
     def _setup_default_figures(self):
@@ -64,14 +64,14 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             dash_utils.create_error_message_display(id_prefix=id_prefix)
         ]
 
-        # Add scatter plot conditionally
-        if self.show_trajectory_scatter_plot:
-            layout.append(dash_utils.put_down_scatter_plot(
-                self.fig_scatter_combd, id=id_prefix+'scatterplot_combined'
+        # Add time series plot conditionally
+        if self.show_trajectory_time_series:
+            layout.append(dash_utils.put_down_time_series_plot(
+                self.fig_time_series_combd, id=id_prefix+'time_series_plot_combined'
             ))
         else:
             layout.append(dash_utils.put_down_empty_plot_that_takes_no_space(
-                id=id_prefix+'scatterplot_combined'
+                id=id_prefix+'time_series_plot_combined'
             ))
 
         # Add remaining components
@@ -89,9 +89,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         layout.extend(more_to_add)
         return html.Div(layout)
 
-    def make_dash_for_main_plots(self, show_trajectory_scatter_plot=True, show_shuffled_correlation_plot=True, port=DEFAULT_PORT):
-        self.show_trajectory_scatter_plot = show_trajectory_scatter_plot
-        self.show_shuffled_correlation_plot = show_shuffled_correlation_plot
+    def make_dash_for_main_plots(self, show_trajectory_time_series=True, port=DEFAULT_PORT):
+        self.show_trajectory_time_series = show_trajectory_time_series
 
         self.app = Dash(
             __name__, external_stylesheets=DEFAULT_EXTERNAL_STYLESHEETS)
@@ -116,17 +115,13 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         self.make_function_to_update_all_plots_based_on_new_info(self.app)
         self.make_function_to_show_or_hind_visible_segments(self.app)
         self.make_function_to_update_based_on_correlation_plot(self.app)
-
-        if self.show_shuffled_correlation_plot:
-            self.make_function_to_refresh_fig_corr_2(self.app)
-
         self.make_function_to_update_curv_of_traj(self.app)
 
     def make_function_to_update_all_plots_based_on_new_info(self, app):
         @app.callback(
             Output(self.id_prefix + 'monkey_plot',
                    'figure', allow_duplicate=True),
-            Output(self.id_prefix + 'scatterplot_combined',
+            Output(self.id_prefix + 'time_series_plot_combined',
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + 'correlation_plot',
                    'figure', allow_duplicate=True),
@@ -135,8 +130,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             Output(self.id_prefix + "error_message",
                    "children", allow_duplicate=True),
             Input(self.id_prefix + 'monkey_plot', 'hoverData'),
-            Input(self.id_prefix + 'scatterplot_combined', 'hoverData'),
-            Input(self.id_prefix + 'scatterplot_combined', 'relayoutData'),
+            Input(self.id_prefix + 'time_series_plot_combined', 'hoverData'),
+            Input(self.id_prefix + 'time_series_plot_combined', 'relayoutData'),
             Input(self.id_prefix + 'update_ref_point', 'n_clicks'),
             Input(self.id_prefix + 'checklist_for_all_plots', 'value'),
             Input(self.id_prefix + 'checklist_for_monkey_plot', 'value'),
@@ -144,14 +139,14 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             State(self.id_prefix + 'ref_point_value', 'value'),
             prevent_initial_call=True
         )
-        def update_all_plots_based_on_new_info(monkey_hoverdata, scatter_plot_hoverdata, scatter_plot_relayoutData,
+        def update_all_plots_based_on_new_info(monkey_hoverdata, time_series_plot_hoverdata, time_series_plot_relayoutData,
                                                update_ref_point, checklist_for_all_plots, checklist_for_monkey_plot,
                                                ref_point_mode, ref_point_value):
 
             try:
-                # Reset freeze flag if not triggered by scatter plot
-                if self.id_prefix + 'scatterplot_combined' not in ctx.triggered[0]['prop_id']:
-                    self.freeze_scatterplot = False
+                # Reset freeze flag if not triggered by time series plot
+                if self.id_prefix + 'time_series_plot_combined' not in ctx.triggered[0]['prop_id']:
+                    self.freeze_time_series = False
 
                 # Handle different trigger types
                 trigger_id = ctx.triggered[0]['prop_id']
@@ -159,31 +154,31 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                 if trigger_id == self.id_prefix + 'monkey_plot.hoverData':
                     if 'customdata' in monkey_hoverdata['points'][0]:
                         self.monkey_hoverdata = monkey_hoverdata
-                        self.fig, self.fig_scatter_combd = self._update_dash_based_on_monkey_hover_data(
+                        self.fig, self.fig_time_series_combd = self._update_dash_based_on_monkey_hover_data(
                             monkey_hoverdata)
                     else:
                         raise PreventUpdate(
                             "No update was triggered because customdata is not in monkey_hoverdata[\'points\'][0].")
 
-                elif trigger_id == self.id_prefix + 'scatterplot_combined.relayoutData':
-                    self.freeze_scatterplot = True
+                elif trigger_id == self.id_prefix + 'time_series_plot_combined.relayoutData':
+                    self.freeze_time_series = True
                     raise PreventUpdate(
-                        "No update was triggered because trigger ID was related to scatterplot_combined.relayoutData.")
+                        "No update was triggered because trigger ID was related to time_series_plot_combined.relayoutData.")
 
-                elif trigger_id == self.id_prefix + 'scatterplot_combined.hoverData':
-                    if self.freeze_scatterplot:
+                elif trigger_id == self.id_prefix + 'time_series_plot_combined.hoverData':
+                    if self.freeze_time_series:
                         raise PreventUpdate(
-                            "No update was triggered because freeze_scatterplot is True.")
-                    if 'x' in scatter_plot_hoverdata['points'][0]:
-                        self.fig, self.fig_scatter_combd = self._update_dash_based_on_scatter_plot_hoverdata(
-                            scatter_plot_hoverdata)
+                            "No update was triggered because freeze_time_series is True.")
+                    if 'x' in time_series_plot_hoverdata['points'][0]:
+                        self.fig, self.fig_time_series_combd = self._update_dash_based_on_time_series_plot_hoverdata(
+                            time_series_plot_hoverdata)
                     else:
                         raise PreventUpdate(
-                            "No update was made because x is not in scatter_plot_hoverdata.")
+                            "No update was made because x is not in time_series_plot_hoverdata.")
 
                 elif trigger_id == self.id_prefix + 'update_ref_point.n_clicks':
                     if ref_point_value is not None and ref_point_value < 0:
-                        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_based_on_new_ref_point_descr(
+                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg = self._update_dash_based_on_new_ref_point_descr(
                             ref_point_mode, ref_point_value
                         )
                     else:
@@ -194,11 +189,11 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                             "No update was made because ref_point_value is None or negative.")
 
                 elif trigger_id == self.id_prefix + 'checklist_for_all_plots.value':
-                    self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._update_dash_based_on_checklist_for_all_plots(
+                    self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_based_on_checklist_for_all_plots(
                         checklist_for_all_plots)
 
                 elif trigger_id == self.id_prefix + 'checklist_for_monkey_plot.value':
-                    self.fig, self.fig_scatter_combd = self._update_dash_based_on_checklist_for_monkey_plot(
+                    self.fig, self.fig_time_series_combd = self._update_dash_based_on_checklist_for_monkey_plot(
                         checklist_for_monkey_plot)
 
                 else:
@@ -206,51 +201,58 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                         "No update was made for the current trigger.")
 
                 # Handle conditional plot visibility
-                if not self.show_trajectory_scatter_plot:
-                    self.fig_scatter_combd = self._get_empty_figure()
+                if not self.show_trajectory_time_series:
+                    self.fig_time_series_combd = self._get_empty_figure()
 
-                if not self.show_shuffled_correlation_plot:
-                    self.fig_corr_or_heading_2 = self._get_empty_figure()
-
-                return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2, 'Updated successfully'
+                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, 'Updated successfully'
 
             except Exception as e:
-                return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2, f"An error occurred. No update was made. Error: {e}"
+                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, f"An error occurred. No update was made. Error: {e}"
 
     def make_function_to_update_based_on_correlation_plot(self, app):
         @app.callback(
             Output(self.id_prefix + 'monkey_plot',
                    'figure', allow_duplicate=True),
-            Output(self.id_prefix + 'scatterplot_combined',
+            Output(self.id_prefix + 'time_series_plot_combined',
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + 'correlation_plot',
+                   'figure', allow_duplicate=True),
+            Output(self.id_prefix + 'correlation_plot_2',
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + "other_messages",
                    "children", allow_duplicate=True),
             Input(self.id_prefix + 'correlation_plot', 'clickData'),
+            Input(self.id_prefix + 'correlation_plot_2', 'clickData'),
             Input(self.id_prefix + 'previous_plot_button', 'n_clicks'),
             Input(self.id_prefix + 'next_plot_button', 'n_clicks'),
             prevent_initial_call=True
         )
-        def update_other_messages(correlation_plot_clickdata, previous_plot_button, next_plot_button):
+        def update_other_messages(correlation_plot_clickdata, correlation_plot_2_clickdata, previous_plot_button, next_plot_button):
             trigger_id = ctx.triggered[0]['prop_id']
 
             if trigger_id == self.id_prefix + 'previous_plot_button.n_clicks':
-                fig, fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_after_clicking_previous_or_next_plot_button(
+                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_after_clicking_previous_or_next_plot_button(
                     previous_or_next='previous')
             elif trigger_id == self.id_prefix + 'next_plot_button.n_clicks':
-                fig, fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_after_clicking_previous_or_next_plot_button(
+                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_after_clicking_previous_or_next_plot_button(
                     previous_or_next='next')
-            else:
+            elif trigger_id == self.id_prefix + 'correlation_plot.clickData':
                 if not 'customdata' in correlation_plot_clickdata['points'][0]:
                     raise PreventUpdate(
                         "No update was triggered because customdata is not in correlation_plot_clickdata.")
                 self.stop_point_index = correlation_plot_clickdata['points'][0]['customdata']
-                fig, fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_based_on_correlation_plot_clickdata(
+                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_based_on_correlation_plot_clickdata(
                     correlation_plot_clickdata)
+            elif trigger_id == self.id_prefix + 'correlation_plot_2.clickData':
+                if not 'customdata' in correlation_plot_2_clickdata['points'][0]:
+                    raise PreventUpdate(
+                        "No update was triggered because customdata is not in correlation_plot_2_clickdata.")
+                self.stop_point_index = correlation_plot_2_clickdata['points'][0]['customdata']
+                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_based_on_correlation_plot_clickdata(
+                    correlation_plot_2_clickdata)
 
             self.other_messages = self.generate_other_messages()
-            return fig, fig_scatter_combd, self.fig_corr_or_heading, self.other_messages
+            return fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.other_messages
 
     def make_function_to_show_or_hind_visible_segments(self, app):
         @app.callback(
@@ -280,27 +282,6 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
             return self.fig
 
-    def make_function_to_refresh_fig_corr_2(self, app):
-        @app.callback(
-            Output(self.id_prefix + 'correlation_plot_2',
-                   'figure', allow_duplicate=True),
-            Output(self.id_prefix + "error_message",
-                   "children", allow_duplicate=True),
-            Input(self.id_prefix + 'refresh_correlation_plot_2', 'n_clicks'),
-            prevent_initial_call=True
-        )
-        def refresh_fig_corr_2(n_clicks):
-            try:
-                if self.overall_params['heading_instead_of_curv']:
-                    self.fig_heading_2 = self._make_fig_heading_2()
-                    self.fig_corr_or_heading_2 = self.fig_heading_2
-                else:
-                    self.fig_corr_2 = self._make_fig_corr_2()
-                    self.fig_corr_or_heading_2 = self.fig_corr_2
-                return self.fig_corr_or_heading_2, 'Updated successfully'
-            except Exception as e:
-                return self.fig_corr_or_heading_2, f"An error occurred. No update was made. Error: {e}"
-
     def make_function_to_update_curv_of_traj(self, app):
         @app.callback(
             Output(self.id_prefix + "curv_of_traj_mode", "value"),
@@ -308,7 +289,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             Output(self.id_prefix + "window_upper_end", "value"),
             Output(self.id_prefix + 'monkey_plot',
                    'figure', allow_duplicate=True),
-            Output(self.id_prefix + 'scatterplot_combined',
+            Output(self.id_prefix + 'time_series_plot_combined',
                    'figure', allow_duplicate=True),
             Output(self.id_prefix + 'correlation_plot',
                    'figure', allow_duplicate=True),
@@ -329,7 +310,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
                 if trigger_id == self.id_prefix + 'update_curv_of_traj.n_clicks':
                     if (window_lower_end < window_upper_end) or (curv_of_traj_mode == 'now to stop'):
-                        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading = self._update_dash_based_on_curv_of_traj_df(
+                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg = self._update_dash_based_on_curv_of_traj_df(
                             curv_of_traj_mode, window_lower_end, window_upper_end
                         )
                     else:
@@ -347,21 +328,18 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                             "No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
 
                 # Handle conditional plot visibility
-                if not self.show_trajectory_scatter_plot:
-                    self.fig_scatter_combd = self._get_empty_figure()
-
-                if not self.show_shuffled_correlation_plot:
-                    self.fig_corr_or_heading_2 = self._get_empty_figure()
+                if not self.show_trajectory_time_series:
+                    self.fig_time_series_combd = self._get_empty_figure()
 
                 return (self.curv_of_traj_params['curv_of_traj_mode'],
                         self.curv_of_traj_params['window_for_curv_of_traj'][0],
                         self.curv_of_traj_params['window_for_curv_of_traj'][1],
-                        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading,
-                        self.fig_corr_or_heading_2, 'Updated successfully')
+                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg,
+                        self.fig_scatter_or_reg2, 'Updated successfully')
 
             except Exception as e:
                 return (self.curv_of_traj_params['curv_of_traj_mode'],
                         self.curv_of_traj_params['window_for_curv_of_traj'][0],
                         self.curv_of_traj_params['window_for_curv_of_traj'][1],
-                        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading,
-                        self.fig_corr_or_heading_2, f"An error occurred. No update was made. Error: {e}")
+                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg,
+                        self.fig_scatter_or_reg2, f"An error occurred. No update was made. Error: {e}")

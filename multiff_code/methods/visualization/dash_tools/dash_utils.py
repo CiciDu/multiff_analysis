@@ -1,5 +1,5 @@
 import sys
-from visualization.plotly_tools import plotly_for_monkey, plotly_for_scatterplot, plotly_for_correlation
+from visualization.plotly_tools import plotly_for_monkey, plotly_for_time_series, plotly_for_correlation
 from null_behaviors import curv_of_traj_utils
 from eye_position_analysis import eye_positions
 from null_behaviors import curvature_utils, curv_of_traj_utils
@@ -116,12 +116,12 @@ def put_down_the_input_for_window_lower_end_and_upper_end(window_for_curv_of_tra
     )
 
 
-def put_down_scatter_plot(fig_scatter, id='curv_of_traj_vs_time', padding='0 0 10 0'):
+def put_down_time_series_plot(fig_time_series, id='curv_of_traj_vs_time', padding='0 0 10 0'):
     # it looks like changing padding does not work well.
     return html.Div([
         dcc.Graph(
                     id=id,
-                    figure=fig_scatter),
+                    figure=fig_time_series),
     ], style={'width': '60%', 'padding': padding,  # 'display': 'inline-block',
               })
 
@@ -141,26 +141,26 @@ def put_down_empty_plot_that_takes_no_space(id='empty_plot'):
               })
 
 
-def put_down_both_fig_scatter_separately(fig_scatter_cm, fig_scatter_s, hoverdata_column):
+def put_down_both_fig_time_series_separately(fig_time_series_cm, fig_time_series_s, hoverdata_column):
     if hoverdata_column == 'rel_time':
-        # fig_scatter_s.update_layout(showlegend=False)
-        return html.Div([put_down_scatter_plot(fig_scatter_cm, id='scatterplot_top'),
-                        put_down_scatter_plot(fig_scatter_s, id='scatterplot_bottom')])
+        # fig_time_series_s.update_layout(showlegend=False)
+        return html.Div([put_down_time_series_plot(fig_time_series_cm, id='time_series_plot_top'),
+                        put_down_time_series_plot(fig_time_series_s, id='time_series_bottom')])
 
     else:
-        # fig_scatter_cm.update_layout(showlegend=False)
-        return html.Div([put_down_scatter_plot(fig_scatter_s, id='scatterplot_top'),
-                        put_down_scatter_plot(fig_scatter_cm, id='scatterplot_bottom')])
+        # fig_time_series_cm.update_layout(showlegend=False)
+        return html.Div([put_down_time_series_plot(fig_time_series_s, id='time_series_plot_top'),
+                        put_down_time_series_plot(fig_time_series_cm, id='time_series_bottom')])
 
 
-# def _put_down_correlation_plots_in_dash(fig_corr_or_heading, fig_corr_or_heading_2=None, id=None, id_2='correlation_plot_2'):
-#     if fig_corr_or_heading_2 is None:
-#         correlation_plots_in_dash = plotly_for_correlation.put_down_correlation_plot(fig_corr_or_heading)
+# def _put_down_correlation_plots_in_dash(fig_scatter_or_reg, fig_scatter_or_reg2=None, id=None, id_2='correlation_plot_2'):
+#     if fig_scatter_or_reg2 is None:
+#         correlation_plots_in_dash = plotly_for_correlation.put_down_correlation_plot(fig_scatter_or_reg)
 #     else:
 #         correlation_plots_in_dash = html.Div([html.Button('Refresh shuffled plot on the right', id='refresh_correlation_plot_2', n_clicks=0,
 #                                                     style={'margin': '10px 10px 10px 10px', 'background-color': '#FFC0CB'}),
-#                                                 html.Div([plotly_for_correlation.put_down_correlation_plot(fig_corr_or_heading, id=id, width='50%'),
-#                                                         plotly_for_correlation.put_down_correlation_plot(fig_corr_or_heading_2, id=id_2, width='50%')
+#                                                 html.Div([plotly_for_correlation.put_down_correlation_plot(fig_scatter_or_reg, id=id, width='50%'),
+#                                                         plotly_for_correlation.put_down_correlation_plot(fig_scatter_or_reg2, id=id_2, width='50%')
 #                                                         ], style=dict(display='flex')),
 #                                             ])
 #     return correlation_plots_in_dash
@@ -201,12 +201,12 @@ def find_hoverdata_multi_columns(hoverdata_column):
     return hoverdata_multi_columns
 
 
-def show_a_static_plot(fig_scatter):
-    fig_scatter = go.Figure(fig_scatter)
-    fig_scatter.update_layout(
+def show_a_static_plot(fig_time_series):
+    fig_time_series = go.Figure(fig_time_series)
+    fig_time_series.update_layout(
         yaxis=dict(range=['null', 'null'],),
         yaxis2=dict(range=['null', 'null'],),)
-    fig_scatter.show()
+    fig_time_series.show()
     return
 
 
@@ -219,12 +219,12 @@ def update_marked_traj_portion_in_monkey_plot(fig, traj_portion, hoverdata_multi
     return fig
 
 
-def update_fig_scatter_combd_plot_based_on_monkey_hoverdata(fig_scatter_combd, current_hoverdata_value_s, current_hoverdata_value_cm):
-    fig_scatter_combd.update_traces(overwrite=True, marker={"opacity": 0.4}, selector=dict(name='Monkey trajectory hover position'),
-                                    x=[current_hoverdata_value_s, current_hoverdata_value_s])
-    fig_scatter_combd.update_traces(overwrite=True, marker={"opacity": 0.4}, selector=dict(name='scatter_cm_' + 'Monkey trajectory hover position'),
-                                    x=[current_hoverdata_value_cm, current_hoverdata_value_cm])
-    return fig_scatter_combd
+def update_fig_time_series_combd_plot_based_on_monkey_hoverdata(fig_time_series_combd, current_hoverdata_value_s, current_hoverdata_value_cm):
+    fig_time_series_combd.update_traces(overwrite=True, marker={"opacity": 0.4}, selector=dict(name='Monkey trajectory hover position'),
+                                        x=[current_hoverdata_value_s, current_hoverdata_value_s])
+    fig_time_series_combd.update_traces(overwrite=True, marker={"opacity": 0.4}, selector=dict(name='time_series_cm_' + 'Monkey trajectory hover position'),
+                                        x=[current_hoverdata_value_cm, current_hoverdata_value_cm])
+    return fig_time_series_combd
 
 
 # def make_the_update_functions_for_updating_window(app):

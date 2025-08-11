@@ -1,5 +1,5 @@
 import sys
-from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_scatterplot
+from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_time_series
 from visualization.dash_tools import dash_prep_class, dash_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_monkey_heading_helper_class
 from visualization.matplotlib_tools import monkey_heading_utils
@@ -47,7 +47,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                             curv_of_traj_params={},
                                             overall_params={},
                                             monkey_plot_params={},
-                                            scatter_plot_params={},
+                                            time_series_plot_params={},
                                             stops_near_ff_df_exists_ok=True,
                                             heading_info_df_exists_ok=True,
                                             test_or_control='test',
@@ -63,7 +63,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             **copy.deepcopy(self.default_monkey_plot_params),
             **monkey_plot_params
         }
-        self.scatter_plot_params = scatter_plot_params
+        self.time_series_plot_params = time_series_plot_params
 
         self.snf_streamline_organizing_info_kwargs = find_cvn_utils.organize_snf_streamline_organizing_info_kwargs(
             ref_point_params, curv_of_traj_params, overall_params)
@@ -90,19 +90,14 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.stop_point_index = self.stops_near_ff_row['stop_point_index']
 
     def _put_down_checklist_for_all_plots(self, id_prefix=None):
-        checklist_options = [{'label': 'show heading instead of curv', 'value': 'heading_instead_of_curv'},
+        checklist_options = [{'label': 'use curvature to ff center', 'value': 'use_curv_to_ff_center'},
                              {'label': 'truncate curv of traj by time of capture',
-                                 'value': 'truncate_curv_of_traj_by_time_of_capture'},
-                             {'label': 'eliminate outliers',
-                                 'value': 'eliminate_outliers'},
-                             {'label': 'use curvature to ff center', 'value': 'use_curv_to_ff_center'}]
-
-        checklist_params = ['heading_instead_of_curv',
-                            'eliminate_outliers', 'use_curv_to_ff_center']
+                                        'value': 'truncate_curv_of_traj_by_time_of_capture'},
+                             {'label': 'eliminate outliers', 'value': 'eliminate_outliers'}]
+        checklist_params = ['use_curv_to_ff_center', 'truncate_curv_of_traj_by_time_of_capture', 'eliminate_outliers']
+        self.overall_params['truncate_curv_of_traj_by_time_of_capture'] = self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture']
         checklist_values = [
             key for key in checklist_params if self.overall_params[key] is True]
-        if self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] is True:
-            checklist_params.append('truncate_curv_of_traj_by_time_of_capture')
 
         return html.Div([dcc.Checklist(options=checklist_options,
                                        value=checklist_values,
@@ -155,27 +150,16 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                         style=dict(display='flex'))
 
     def _put_down_correlation_plots_in_dash(self, id_prefix=''):
-        self.fig_corr, self.fig_corr_2, self.fig_heading, self.fig_heading_2 = self._make_fig_corr_and_fig_heading_both_unshuffled_and_shuffled()
-        self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._determine_fig_corr_or_heading()
+        self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._make_two_fig_scatter_or_reg()
 
         plot_layout = [plotly_for_correlation.put_down_correlation_plot(
-            self.fig_corr_or_heading, id=id_prefix+'correlation_plot', width='50%')]
+            self.fig_scatter_or_reg, id=id_prefix+'correlation_plot', width='50%')]
 
-        if self.show_shuffled_correlation_plot:
-            plot_layout.append(plotly_for_correlation.put_down_correlation_plot(
-                self.fig_corr_or_heading_2, id=id_prefix+'correlation_plot_2', width='50%'))
-            overall_layout = [html.Button('Refresh shuffled plot on the right', id=id_prefix+'refresh_correlation_plot_2', n_clicks=0,
-                              style={'margin': '10px 10px 10px 10px', 'background-color': '#FFC0CB'})]
-        else:
-            self.fig_corr_or_heading_2 = go.Figure()
-            self.fig_corr_or_heading_2.update_layout(height=10, width=10)
-            plot_layout.append(dash_utils.put_down_empty_plot_that_takes_no_space(
-                id=id_prefix+'correlation_plot_2'))
-            overall_layout = []
+        plot_layout.append(plotly_for_correlation.put_down_correlation_plot(
+            self.fig_scatter_or_reg2, id=id_prefix+'correlation_plot_2', width='50%'))
 
-        overall_layout.append(
-            html.Div(plot_layout, style=dict(display='flex')))
-        correlation_plots_in_dash = html.Div(overall_layout)
+        correlation_plots_in_dash = html.Div(
+            plot_layout, style=dict(display='flex'))
         return correlation_plots_in_dash
 
     def _plot_eye_positions_for_dash(self, fig, show_eye_positions_for_both_eyes=False, point_index_to_show_traj_curv=None, x0=0, y0=0,
@@ -248,25 +232,23 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         else:
             self._produce_fig_for_dash()
         # self._prepare_to_make_plotly_fig_for_dash_given_stop_point_index(self.stop_point_index)
-        # self.fig, self.fig_scatter_combd, self.fig_scatter_natural_y_range = self._produce_initial_plots()
+        # self.fig, self.fig_time_series_combd, self.fig_time_series_natural_y_range = self._produce_initial_plots()
 
-        return self.fig, self.fig_scatter_combd
+        return self.fig, self.fig_time_series_combd
 
     def _update_dash_based_on_checklist_for_all_plots(self, checklist_for_all_plots):
         # keep a copy of old checklist_params
-        old_checklist_params = {'heading_instead_of_curv': self.overall_params['heading_instead_of_curv'],  # We update based on this variable elsewhere
+        old_checklist_params = {'use_curv_to_ff_center': self.overall_params['use_curv_to_ff_center'],
                                 'truncate_curv_of_traj_by_time_of_capture': self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'],
-                                'eliminate_outliers': self.overall_params['eliminate_outliers'],
-                                'use_curv_to_ff_center': self.overall_params['use_curv_to_ff_center'],
-                                }
-
+                                'eliminate_outliers': self.overall_params['eliminate_outliers']}
+    
         # update checklist_params into the instance
         if 'truncate_curv_of_traj_by_time_of_capture' in checklist_for_all_plots:
             self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] = True
         else:
             self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'] = False
 
-        for param in ['eliminate_outliers', 'use_curv_to_ff_center', 'heading_instead_of_curv']:
+        for param in ['eliminate_outliers', 'use_curv_to_ff_center']:
             if param in checklist_for_all_plots:
                 self.overall_params[param] = True
             else:
@@ -280,13 +262,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         elif self.overall_params['eliminate_outliers'] != old_checklist_params['eliminate_outliers']:
             self._rerun_after_changing_eliminate_outliers()
             self._prepare_static_main_plots()
-        elif (self.overall_params['heading_instead_of_curv'] != old_checklist_params['heading_instead_of_curv']):
-            self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._determine_fig_corr_or_heading()
         else:
             raise PreventUpdate(
                 "No update was made in calling _update_dash_based_on_checklist_for_all_plots.")
 
-        return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading, self.fig_corr_or_heading_2
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
 
     def _update_dash_based_on_monkey_hover_data(self, monkey_hoverdata):
 
@@ -311,7 +291,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 "No update was triggered because monkey_hoverdata_value is None.")
 
         ONLY_UPDATE_EYE_POSITION = False
-        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_scatterplot.find_monkey_hoverdata_value_for_both_fig_scatter(
+        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_time_series.find_monkey_hoverdata_value_for_both_fig_time_series(
             self.hoverdata_column, monkey_hoverdata_value, self.current_plotly_key_comp['trajectory_df'])
         if self.curv_of_traj_params['curv_of_traj_mode'] == 'now to stop':
             if (self.monkey_hoverdata_value_s >= self.hoverdata_value_upper_bound_s) or (self.monkey_hoverdata_value_cm >= self.hoverdata_value_upper_bound_cm):
@@ -325,11 +305,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.fig = self._update_eye_positions_based_on_monkey_hoverdata(
                 self.point_index_to_show_traj_curv)
 
-        if self.show_trajectory_scatter_plot:
-            self.fig_scatter_combd = dash_utils.update_fig_scatter_combd_plot_based_on_monkey_hoverdata(
-                self.fig_scatter_combd, self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm)
+        if self.show_trajectory_time_series:
+            self.fig_time_series_combd = dash_utils.update_fig_time_series_combd_plot_based_on_monkey_hoverdata(
+                self.fig_time_series_combd, self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm)
 
-        return self.fig, self.fig_scatter_combd
+        return self.fig, self.fig_time_series_combd
 
     def _update_eye_positions_based_on_monkey_hoverdata(self, point_index_to_show_traj_curv):
         show_eye_positions_for_both_eyes = self.monkey_plot_params[
@@ -340,48 +320,46 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                                      )
         return self.fig
 
-    def _update_dash_based_on_scatter_plot_hoverdata(self, scatter_plot_hoverdata):
-        scatter_plot_hoverdata_values = scatter_plot_hoverdata['points'][0]['x']
+    def _update_dash_based_on_time_series_plot_hoverdata(self, time_series_plot_hoverdata):
+        time_series_plot_hoverdata_values = time_series_plot_hoverdata['points'][0]['x']
 
-        curveNumber = scatter_plot_hoverdata["points"][0]["curveNumber"]
+        curveNumber = time_series_plot_hoverdata["points"][0]["curveNumber"]
 
-        trace_name = self.fig_scatter_combd.data[curveNumber]['name']
-        if 'scatter_cm_' in trace_name:
+        trace_name = self.fig_time_series_combd.data[curveNumber]['name']
+        if 'time_series_cm_' in trace_name:
             x_column_name = 'rel_distance'
         else:
             x_column_name = 'rel_time'
-        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_scatterplot.find_monkey_hoverdata_value_for_both_fig_scatter(
-            x_column_name, scatter_plot_hoverdata_values, self.current_plotly_key_comp['trajectory_df'])
+        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_time_series.find_monkey_hoverdata_value_for_both_fig_time_series(
+            x_column_name, time_series_plot_hoverdata_values, self.current_plotly_key_comp['trajectory_df'])
 
         if self.hoverdata_column == 'rel_distance':
             self.monkey_hoverdata_value = self.monkey_hoverdata_value_cm
         else:
             self.monkey_hoverdata_value = self.monkey_hoverdata_value_s
 
-        self.fig, self.fig_scatter_combd = self._update_fig_and_fig_scatter_based_on_monkey_hover_data()
+        self.fig, self.fig_time_series_combd = self._update_fig_and_fig_time_series_based_on_monkey_hover_data()
 
-        return self.fig, self.fig_scatter_combd
+        return self.fig, self.fig_time_series_combd
 
     def _update_dash_based_on_correlation_plot_clickdata(self, hoverData):
         self.stop_point_index = hoverData['points'][0]['customdata']
         self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                        == self.stop_point_index].iloc[0]
-        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading = self._update_after_changing_stop_point_index()
-        return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
+        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_after_changing_stop_point_index()
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
 
     def _update_dash_after_clicking_previous_or_next_plot_button(self, previous_or_next='next'):
-        rank_var = 'rank_by_angle_to_nxt_ff' if self.overall_params[
-            'heading_instead_of_curv'] else 'rank_by_traj_curv'
-        stops_near_ff_df = self.stops_near_ff_df if self.overall_params[
-            'heading_instead_of_curv'] else self.stops_near_ff_df_counted
+        rank_var = 'rank_by_angle_to_nxt_ff'
+        stops_near_ff_df = self.stops_near_ff_df
         if previous_or_next == 'previous':
             self._get_previous_stops_near_ff_row(stops_near_ff_df, rank_var)
         elif previous_or_next == 'next':
             self._get_next_stops_near_ff_row(stops_near_ff_df, rank_var)
         else:
             raise ValueError('previous_or_next should be previous or next')
-        self.fig, self.fig_scatter_combd, self.fig_corr_or_heading = self._update_after_changing_stop_point_index()
-        return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
+        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_after_changing_stop_point_index()
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
 
     def _get_previous_stops_near_ff_row(self, stops_near_ff_df, rank_var):
         old_rank = self.stops_near_ff_row[rank_var].item()
@@ -402,36 +380,24 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
     def _update_after_changing_stop_point_index(self):
         self._prepare_to_make_plotly_fig_for_dash_given_stop_point_index(
             self.stop_point_index)
-        self.fig, self.fig_scatter_combd, self.fig_scatter_natural_y_range = self._produce_initial_plots()
-
-        if not self.overall_params['heading_instead_of_curv']:
-            self.kwargs_for_correlation_plot['current_stop_point_index_to_mark'] = self.stop_point_index
-            self.fig_corr = plotly_for_correlation.make_correlation_plot_in_plotly(
-                **self.kwargs_for_correlation_plot)
-            self.fig_corr_or_heading = self.fig_corr
-        else:
-            self.kwargs_for_heading_plot['current_stop_point_index_to_mark'] = self.stop_point_index
-            self.fig_heading = plotly_for_correlation.make_heading_plot_in_plotly(
-                **self.kwargs_for_heading_plot)
-            self.fig_corr_or_heading = self.fig_heading
-
-        return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
+        self.fig, self.fig_time_series_combd, self.fig_time_series_natural_y_range = self._produce_initial_plots()
+        self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._make_two_fig_scatter_or_reg()
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
 
     def _update_dash_based_on_curv_of_traj_df(self, curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end):
         self.curv_of_traj_params['curv_of_traj_mode'] = curv_of_traj_mode
         self.curv_of_traj_params['window_for_curv_of_traj'] = [
             curv_of_traj_lower_end, curv_of_traj_upper_end]
         self._rerun_after_changing_curv_of_traj_params()
-        self.fig_corr, self.fig_corr_2, self.fig_heading, self.fig_heading_2 = self._make_fig_corr_and_fig_heading_both_unshuffled_and_shuffled()
-        self.fig_corr_or_heading, self.fig_corr_or_heading_2 = self._determine_fig_corr_or_heading()
+        self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._make_two_fig_scatter_or_reg()
         self._get_curv_of_traj_in_duration()
         self.fig = self._update_fig_based_on_curv_of_traj()
-        self.fig_scatter_combd = plotly_for_scatterplot.add_new_curv_of_traj_to_fig_scatter_combd(
-            self.fig_scatter_combd, self.curv_of_traj_in_duration, curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end)
-        self.fig_scatter_natural_y_range = plotly_for_scatterplot.update_fig_scatter_natural_y_range(
-            self.fig_scatter_natural_y_range, self.curv_of_traj_in_duration, y_column_name='curv_of_traj_deg_over_cm')
-        self._update_fig_scatter_combd_y_range()
-        return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
+        self.fig_time_series_combd = plotly_for_time_series.add_new_curv_of_traj_to_fig_time_series_combd(
+            self.fig_time_series_combd, self.curv_of_traj_in_duration, curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end)
+        self.fig_time_series_natural_y_range = plotly_for_time_series.update_fig_time_series_natural_y_range(
+            self.fig_time_series_natural_y_range, self.curv_of_traj_in_duration, y_column_name='curv_of_traj_deg_over_cm')
+        self._update_fig_time_series_combd_y_range()
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg
 
     def _update_dash_based_on_new_ref_point_descr(self, ref_point_mode, ref_point_value):
 
@@ -462,7 +428,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         print(
             f'update all plots based on new reference point description: {self.ref_point_descr}.')
-        return self.fig, self.fig_scatter_combd, self.fig_corr_or_heading
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg
 
     def _find_point_index_to_show_traj_curv(self):
         try:
@@ -472,16 +438,16 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.point_index_to_show_traj_curv = int(
                 self.current_plotly_key_comp['trajectory_df'].iloc[-1]['point_index'])
 
-    def _update_fig_and_fig_scatter_based_on_monkey_hover_data(self):
-        self.fig_scatter_combd = dash_utils.update_fig_scatter_combd_plot_based_on_monkey_hoverdata(
-            self.fig_scatter_combd, self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm)
+    def _update_fig_and_fig_time_series_based_on_monkey_hover_data(self):
+        self.fig_time_series_combd = dash_utils.update_fig_time_series_combd_plot_based_on_monkey_hoverdata(
+            self.fig_time_series_combd, self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm)
         self._find_point_index_to_show_traj_curv()
         self.fig = self._update_fig_based_on_monkey_hover_data()
         if self.monkey_plot_params['show_current_eye_positions']:
             self.fig = self._update_eye_positions_based_on_monkey_hoverdata(
                 self.point_index_to_show_traj_curv)
 
-        return self.fig, self.fig_scatter_combd
+        return self.fig, self.fig_time_series_combd
 
     def _update_fig_based_on_monkey_hover_data(self):
         # also update the monkey plot
@@ -522,36 +488,13 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.fig, self.traj_triangle_df_in_duration, trace_name_prefix='monkey heading on trajectory', point_index=self.point_index_to_show_traj_curv)
         return self.fig
 
-    def _determine_fig_corr_or_heading(self):
-        if not self.overall_params['heading_instead_of_curv']:
-            self.fig_corr_or_heading = self.fig_corr
-            self.fig_corr_or_heading_2 = self.fig_corr_2
-        else:
-            self.fig_corr_or_heading = self.fig_heading
-            self.fig_corr_or_heading_2 = self.fig_heading_2
-        return self.fig_corr_or_heading, self.fig_corr_or_heading_2
-
     def generate_other_messages(self, decimals=2):
-        if 'heading_instead_of_curv' not in self.overall_params.keys():
-            self.overall_params['heading_instead_of_curv'] = True
-            print(
-                'Warning: overall_params does not have key heading_instead_of_curv. So we set it to True')
 
-        if self.overall_params['heading_instead_of_curv']:
-            current_ang_traj_nxt = round(self.heading_info_df.loc[self.heading_info_df['stop_point_index'] ==
-                                                                  self.stop_point_index, 'angle_from_stop_to_nxt_ff'].item() * (180/np.pi), decimals)
-
-            angle_var = 'angle_cntr_cur_end_to_nxt_ff' if self.overall_params[
-                'use_curv_to_ff_center'] else 'angle_opt_cur_end_to_nxt_ff'
-            current_ang_cur_nxt = round(self.heading_info_df.loc[self.heading_info_df['stop_point_index'] ==
-                                                                 self.stop_point_index, angle_var].item() * (180/np.pi), decimals)
-            self.other_messages = f"Angle to Nxt FF from Traj: {current_ang_traj_nxt}, \n     Angle to Nxt FF from cur ff: {current_ang_cur_nxt}"
-        else:
-            current_traj_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
-                                      == self.stop_point_index, 'traj_curv_counted'].item() * (180/np.pi) * 100, decimals)
-            current_nxt_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
-                                     == self.stop_point_index, 'nxt_curv_counted'].item() * (180/np.pi) * 100, decimals)
-            self.other_messages = f"Trajectory curvature: {current_traj_curv}, \n     Altitude curvature: {current_nxt_curv}"
+        current_traj_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
+                                                                   == self.stop_point_index, 'traj_curv_counted'].item() * (180/np.pi) * 100, decimals)
+        current_nxt_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
+                                                                  == self.stop_point_index, 'nxt_curv_counted'].item() * (180/np.pi) * 100, decimals)
+        self.other_messages = f"Trajectory curvature: {current_traj_curv}, \n     Altitude curvature: {current_nxt_curv}"
 
         # Add other info
         self.other_messages += ", \n Curv range: " + str(round(self.stops_near_ff_row['curv_range'], decimals)) + ", \n Cum distance between two stops: " + \
@@ -607,8 +550,6 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if self.monkey_plot_params['show_monkey_heading']:
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_and_triangle_df_for_the_duration(
                 self)
-
-        
 
     def prepare_both_ff_df(self):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index

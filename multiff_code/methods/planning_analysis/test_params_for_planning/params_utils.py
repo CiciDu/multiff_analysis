@@ -88,7 +88,7 @@ def make_a_slider_for_reference_point(ref_point_mode, ref_point_info, id='ref_po
     ), style={'width': '49%', 'padding': '0px 20px 20px 20px'})
 
 
-def put_down_scatter_plot(fig):
+def put_down_time_series_plot(fig):
     return html.Div([dcc.Graph(id='scatter_plot', figure=fig,
                                style={'width': '60%', 'padding': '0 0 0 0'})])
 
