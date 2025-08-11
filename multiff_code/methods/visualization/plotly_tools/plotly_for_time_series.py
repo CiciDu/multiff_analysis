@@ -27,8 +27,8 @@ hex_colors = tuple(colors.values())
 PLOTLY_TIME_SERIES_TEMPLATE = 'plotly_white'
 GRID_COLOR = 'rgba(0,0,0,0.08)'
 AXIS_LINE_COLOR = 'rgba(0,0,0,0.35)'
-GUIDE_LINE_COLOR = 'rgba(0,0,0,0.45)'
-HOVER_LINE_COLOR = '#1f77b4'
+GUIDE_LINE_COLOR = '#ff7f0e' #'rgba(0,0,0,0.45)'
+HOVER_LINE_COLOR = '#2ca02c' #'#1f77b4'
 CURVATURE_COLOR = '#ff7f0e'  # orange from Plotly default palette
 
 
@@ -403,21 +403,6 @@ def plot_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name='rel_time'
     if change_y_ranges:
         fig.update_layout(yaxis=dict(range=[-100, 100]))
     return fig
-
-
-# def make_the_plot_of_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
-#     curv_of_traj_in_duration = curv_of_traj_in_duration.copy()
-#     hover_data=[x_column_name, 'curv_of_traj_deg_over_cm']
-#     plot_to_add = px.scatter(curv_of_traj_in_duration, x=x_column_name, y='curv_of_traj_deg_over_cm',
-#                                 title=curv_of_traj_trace_name,
-#                                 hover_data=hover_data,
-#                                 labels={'rel_time': 'Relative Time(s)',
-#                                         'rel_distance': 'Relative Distance(cm)',
-#                                         'time_window': 'time',
-#                                         'curv_of_traj_deg_over_cm': 'Curvature of Trajectory (deg/cm)',},
-#                                 #width=1000, height=700,
-#                                     )
-#     return plot_to_add
 
 
 def turn_visibility_of_vertical_lines_on_or_off_in_time_series_plot(fig_time_series,

@@ -65,8 +65,8 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         return self.fig_fr
 
     def _update_neural_plots_based_on_monkey_hover_data(self, rel_hover_time):
-        self.fig_raster.update_traces(overwrite=True, selector=dict(name='rel_hover_time'), x=[rel_hover_time, rel_hover_time])
-        self.fig_fr.update_traces(overwrite=True, selector=dict(name='rel_hover_time'), x=[rel_hover_time, rel_hover_time])
+        self.fig_raster.update_traces(overwrite=True, selector=dict(name='Hover Time'), x=[rel_hover_time, rel_hover_time])
+        self.fig_fr.update_traces(overwrite=True, selector=dict(name='Hover Time'), x=[rel_hover_time, rel_hover_time])
         return self.fig_raster, self.fig_fr
     
     def _make_spikes_df(self):

@@ -317,10 +317,14 @@ def _find_ff_curv_df(ff_index, current_plotly_key_comp, ff_dataframe, monkey_inf
     return ff_curv_df_sub
 
 
-def put_down_firing_rate_plot(fig_firing_rate, id='firing_rate_plot', width='60%'):
+def put_down_firing_rate_plot(fig_firing_rate, id='firing_rate_plot', width='50%', height=300):
     """Create a firing rate plot component for Dash."""
     if id is None:
         id = 'firing_rate_plot'
+
+    # Update the figure height if provided
+    if height is not None:
+        fig_firing_rate.update_layout(height=height)
 
     return html.Div([
         dcc.Graph(
@@ -330,10 +334,14 @@ def put_down_firing_rate_plot(fig_firing_rate, id='firing_rate_plot', width='60%
     ], style={'width': width, 'padding': '0 0 10 0'})
 
 
-def put_down_raster_plot(fig_raster, id='raster_plot', width='60%'):
+def put_down_raster_plot(fig_raster, id='raster_plot', width='50%', height=300):
     """Create a raster plot component for Dash."""
     if id is None:
         id = 'raster_plot'
+
+    # Update the figure height if provided
+    if height is not None:
+        fig_raster.update_layout(height=height)
 
     return html.Div([
         dcc.Graph(

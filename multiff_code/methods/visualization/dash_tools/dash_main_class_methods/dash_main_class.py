@@ -41,9 +41,6 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
     def __init__(self, raw_data_folder_path=None, opt_arc_type='opt_arc_stop_closest'):
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
         self.freeze_time_series = False
-        self.show_neural_plots = False  # Add flag for neural plots
-        self.spikes_df = None  # Add neural data storage
-        self.binned_spikes_df = None  # Add binned neural data storage
         self._setup_default_figures()
 
     def _setup_default_figures(self):
@@ -79,20 +76,20 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
         # Add remaining components
         more_to_add = [
-            dash_utils.print_other_messages(
-                id_prefix=id_prefix, other_messages=self.other_messages),
             dash_utils.put_down_monkey_plot(
                 self.fig, self.monkey_hoverdata_value, id=id_prefix+'monkey_plot'),
             dash_utils.put_down_the_previous_plot_and_next_plot_button(
                 ids=[id_prefix+'previous_plot_button',
                      id_prefix+'next_plot_button']
             ),
-            self._put_down_correlation_plots_in_dash(id_prefix=id_prefix)
+            self._put_down_correlation_plots_in_dash(id_prefix=id_prefix),
+            dash_utils.print_other_messages(
+                id_prefix=id_prefix, other_messages=self.other_messages)
         ]
         layout.extend(more_to_add)
         return html.Div(layout)
 
-    def make_dash_for_main_plots(self, show_trajectory_time_series=True, show_neural_plots=False,
+    def make_dash_for_main_plots(self, show_trajectory_time_series=True, show_neural_plots=True,
                                  port=DEFAULT_PORT):
 
         self.show_trajectory_time_series = show_trajectory_time_series
@@ -166,7 +163,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                 if trigger_id == self.id_prefix + 'monkey_plot.hoverData':
                     if 'customdata' in monkey_hoverdata['points'][0]:
                         self.monkey_hoverdata = monkey_hoverdata
-                        self.fig, self.fig_time_series_combd = self._update_dash_based_on_monkey_hover_data(
+                        self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr = self._update_dash_based_on_monkey_hover_data(
                             monkey_hoverdata)
                     else:
                         raise PreventUpdate(
@@ -229,24 +226,6 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     raise PreventUpdate(
                         "No update was made for the current trigger.")
 
-                # Handle conditional plot visibility
-                if not self.show_trajectory_time_series:
-                    self.fig_time_series_combd = self._get_empty_figure()
-
-                # Create neural plots if enabled
-                if self.show_neural_plots:
-                    try:
-                        self.fig_raster = self._create_raster_plot_figure()
-                        self.fig_fr = self._create_firing_rate_plot_figure()
-                    except Exception as e:
-                        logging.warning(
-                            f"Could not update neural plots: {e}. Using empty figures.")
-                        self.fig_raster = self._get_empty_figure()
-                        self.fig_fr = self._get_empty_figure()
-                else:
-                    self.fig_raster = self._get_empty_figure()
-                    self.fig_fr = self._get_empty_figure()
-
                 return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, 'Updated successfully'
 
             except Exception as e:
@@ -278,43 +257,29 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             trigger_id = ctx.triggered[0]['prop_id']
 
             if trigger_id == self.id_prefix + 'previous_plot_button.n_clicks':
-                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_after_clicking_previous_or_next_plot_button(
+                self._update_dash_after_clicking_previous_or_next_plot_button(
                     previous_or_next='previous')
             elif trigger_id == self.id_prefix + 'next_plot_button.n_clicks':
-                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_after_clicking_previous_or_next_plot_button(
+                self._update_dash_after_clicking_previous_or_next_plot_button(
                     previous_or_next='next')
             elif trigger_id == self.id_prefix + 'correlation_plot.clickData':
-                if not 'customdata' in correlation_plot_clickdata['points'][0]:
+                if 'customdata' not in correlation_plot_clickdata['points'][0]:
                     raise PreventUpdate(
                         "No update was triggered because customdata is not in correlation_plot_clickdata.")
                 self.stop_point_index = correlation_plot_clickdata['points'][0]['customdata']
-                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_based_on_correlation_plot_clickdata(
+                self._update_dash_based_on_correlation_plot_clickdata(
                     correlation_plot_clickdata)
             elif trigger_id == self.id_prefix + 'correlation_plot_2.clickData':
-                if not 'customdata' in correlation_plot_2_clickdata['points'][0]:
+                if 'customdata' not in correlation_plot_2_clickdata['points'][0]:
                     raise PreventUpdate(
                         "No update was triggered because customdata is not in correlation_plot_2_clickdata.")
                 self.stop_point_index = correlation_plot_2_clickdata['points'][0]['customdata']
-                fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_based_on_correlation_plot_clickdata(
+                self._update_dash_based_on_correlation_plot_clickdata(
                     correlation_plot_2_clickdata)
 
             self.other_messages = self.generate_other_messages()
 
-            # Update neural plots if enabled
-            if self.show_neural_plots:
-                try:
-                    self.fig_raster = self._create_raster_plot_figure()
-                    self.fig_fr = self._create_firing_rate_plot_figure()
-                except Exception as e:
-                    logging.warning(
-                        f"Could not update neural plots: {e}. Using empty figures.")
-                    self.fig_raster = self._get_empty_figure()
-                    self.fig_fr = self._get_empty_figure()
-            else:
-                self.fig_raster = self._get_empty_figure()
-                self.fig_fr = self._get_empty_figure()
-
-            return fig, fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, self.other_messages
+            return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, self.other_messages
 
     def make_function_to_show_or_hind_visible_segments(self, app):
         @app.callback(
@@ -372,7 +337,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
                 if trigger_id == self.id_prefix + 'update_curv_of_traj.n_clicks':
                     if (window_lower_end < window_upper_end) or (curv_of_traj_mode == 'now to stop'):
-                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg = self._update_dash_based_on_curv_of_traj_df(
+                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_dash_based_on_curv_of_traj_df(
                             curv_of_traj_mode, window_lower_end, window_upper_end
                         )
                     else:
@@ -390,11 +355,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                             "No update was made because curv_of_traj_lower_end is larger than curv_of_traj_upper_end.")
 
                 # Handle conditional plot visibility
-                if not self.show_trajectory_scatter_plot:
+                if not self.show_trajectory_time_series:
                     self.fig_time_series_combd = self._get_empty_figure()
-
-                if not self.show_shuffled_correlation_plot:
-                    self.fig_scatter_or_reg2 = self._get_empty_figure()
 
                 return (self.curv_of_traj_params['curv_of_traj_mode'],
                         self.curv_of_traj_params['window_for_curv_of_traj'][0],

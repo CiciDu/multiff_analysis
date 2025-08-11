@@ -146,18 +146,47 @@ def _make_all_binned_spikes(spikes_df, min_time=None, max_time=None, bin_width=0
     return time_bins, grouped.values
 
 
-def prepare_binned_spikes_df(spikes_df, bin_width=0.02):
-    """
-    Prepare the binned_spikes_df dataframe by extracting the maximum bin from final_behavioral_data,
-    slicing all_binned_spikes, and creating column names.
-    """
-    time_bins, binned_spikes_matrix = _make_all_binned_spikes(
-        spikes_df, bin_width)
+import numpy as np
 
-    column_names = 'cluster_' + \
-        pd.Series(range(binned_spikes_matrix.shape[1])).astype(str)
-    binned_spikes_df = pd.DataFrame(binned_spikes_matrix, columns=column_names)
-    binned_spikes_df['bin'] = np.arange(binned_spikes_matrix.shape[0])
+def prepare_binned_spikes_df(spikes_df, spike_time_col='time', bin_width=0.02, min_time=None, max_time=None):
+    """
+    Bin spike times and return both the bin edges and a DataFrame of spike counts per cluster.
+    
+    Args:
+        spikes_df (pd.DataFrame): Must have 'time' and 'cluster' columns.
+        bin_width (float): Width of each bin in seconds.
+        min_time (float, optional): Minimum time for binning. Defaults to 0.
+        max_time (float, optional): Maximum time for binning. Defaults to ceil(max spike time).
+    
+    Returns:
+        time_bins (np.ndarray): Array of bin edges.
+        binned_spikes_df (pd.DataFrame): Rows = bins, columns = clusters + 'bin'.
+    """
+    if max_time is None:
+        max_time = np.ceil(spikes_df[spike_time_col].max())
+    if min_time is None:
+        min_time = 0
+
+    time_bins = np.arange(min_time, max_time + bin_width, bin_width)
+    spikes_df = spikes_df.copy()
+
+    # Assign each spike to a bin (0-based)
+    spikes_df['bin'] = np.digitize(spikes_df[spike_time_col], time_bins) - 1
+
+    # Count spikes per bin per cluster
+    spike_counts = spikes_df.groupby(['bin', 'cluster']).size().unstack(fill_value=0)
+
+    # Reindex to ensure all bins & clusters are present
+    binned_spikes_df = spike_counts.reindex(
+        index=np.arange(len(time_bins) - 1),
+        columns=np.sort(spikes_df['cluster'].unique()),
+        fill_value=0
+    )
+
+    # Rename columns
+    binned_spikes_df.columns = [f'cluster_{c}' for c in binned_spikes_df.columns]
+    binned_spikes_df['bin'] = binned_spikes_df.index
+
     return time_bins, binned_spikes_df
 
 

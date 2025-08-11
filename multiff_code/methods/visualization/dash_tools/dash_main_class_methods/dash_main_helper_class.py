@@ -103,6 +103,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             
         return layout
     
+        
     def _put_down_neural_plots(self, layout, id_prefix=''):
         # Add neural plots conditionally
         if self.show_neural_plots:
@@ -115,27 +116,30 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.fig_raster = self._get_empty_figure()
                 self.fig_fr = self._get_empty_figure()
 
-            layout.extend([
+            neural_plot_layout = [
                 dash_utils.put_down_raster_plot(
                     self.fig_raster, id=id_prefix+'raster_plot'
                 ),
                 dash_utils.put_down_firing_rate_plot(
                     self.fig_fr, id=id_prefix+'firing_rate_plot'
                 )
-            ])
+            ]
         else:
             # Initialize empty figures for neural plots even when not showing them
             self.fig_raster = self._get_empty_figure()
             self.fig_fr = self._get_empty_figure()
 
-            layout.extend([
+            neural_plot_layout = [
                 dash_utils.put_down_empty_plot_that_takes_no_space(
                     id=id_prefix+'raster_plot'
                 ),
                 dash_utils.put_down_empty_plot_that_takes_no_space(
                     id=id_prefix+'firing_rate_plot'
                 )
-            ])
+            ]
+        neural_plots_in_dash = html.Div(
+            neural_plot_layout, style=dict(display='flex'))
+        layout.append(neural_plots_in_dash)
         return layout
 
     def _put_down_checklist_for_all_plots(self, id_prefix=None):
@@ -358,8 +362,12 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if self.show_trajectory_time_series:
             self.fig_time_series_combd = dash_utils.update_fig_time_series_combd_plot_based_on_monkey_hoverdata(
                 self.fig_time_series_combd, self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm)
+            
+        if self.show_neural_plots:
+            self.fig_raster, self.fig_fr = self._update_neural_plots_based_on_monkey_hover_data(
+                self.monkey_hoverdata_value_s)
 
-        return self.fig, self.fig_time_series_combd
+        return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr
 
     def _update_eye_positions_based_on_monkey_hoverdata(self, point_index_to_show_traj_curv):
         show_eye_positions_for_both_eyes = self.monkey_plot_params[
@@ -412,8 +420,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.stop_point_index = hoverData['points'][0]['customdata']
         self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                        == self.stop_point_index].iloc[0]
-        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_after_changing_stop_point_index()
-        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
+        self._update_after_changing_stop_point_index()
+        
+
 
     def _update_dash_after_clicking_previous_or_next_plot_button(self, previous_or_next='next'):
         rank_var = 'rank_by_angle_to_nxt_ff'
@@ -424,8 +433,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self._get_next_stops_near_ff_row(stops_near_ff_df, rank_var)
         else:
             raise ValueError('previous_or_next should be previous or next')
-        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._update_after_changing_stop_point_index()
-        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
+        self._update_after_changing_stop_point_index()
 
     def _get_previous_stops_near_ff_row(self, stops_near_ff_df, rank_var):
         old_rank = self.stops_near_ff_row[rank_var].item()
@@ -448,7 +456,10 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.stop_point_index)
         self.fig, self.fig_time_series_combd, self.fig_time_series_natural_y_range = self._produce_initial_plots()
         self.fig_scatter_or_reg, self.fig_scatter_or_reg2 = self._make_two_fig_scatter_or_reg()
-        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
+        if self.show_neural_plots:
+            self.fig_raster = self._create_raster_plot_figure()
+            self.fig_fr = self._create_firing_rate_plot_figure()
+
 
     def _update_dash_based_on_curv_of_traj_df(self, curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end):
         self.curv_of_traj_params['curv_of_traj_mode'] = curv_of_traj_mode
@@ -463,7 +474,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.fig_time_series_natural_y_range = plotly_for_time_series.update_fig_time_series_natural_y_range(
             self.fig_time_series_natural_y_range, self.curv_of_traj_in_duration, y_column_name='curv_of_traj_deg_over_cm')
         self._update_fig_time_series_combd_y_range()
-        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg
+        return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2
 
     def _update_dash_based_on_new_ref_point_descr(self, ref_point_mode, ref_point_value):
 
@@ -560,7 +571,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                                                    == self.stop_point_index, 'traj_curv_counted'].item() * (180/np.pi) * 100, decimals)
         current_nxt_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
                                                                   == self.stop_point_index, 'nxt_curv_counted'].item() * (180/np.pi) * 100, decimals)
-        self.other_messages = f"Trajectory curvature: {current_traj_curv}, \n     Altitude curvature: {current_nxt_curv}"
+        self.other_messages = f"Trajectory curvature: {current_traj_curv}, \n     Nxt FF curvature: {current_nxt_curv}"
 
         # Add other info
         self.other_messages += ", \n Curv range: " + str(round(self.stops_near_ff_row['curv_range'], decimals)) + ", \n Cum distance between two stops: " + \

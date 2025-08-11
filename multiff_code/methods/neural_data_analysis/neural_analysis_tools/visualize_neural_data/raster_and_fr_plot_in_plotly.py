@@ -3,64 +3,17 @@ import logging
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.colors as pc
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data
-
-
-def create_raster_plot_for_one_duration_in_plotly(spikes_df, reference_time, start_time, end_time,
-                                                  max_clusters_to_plot=10, rel_hover_time=None):
-    try:
-        window_spikes, selected_clusters = _select_clusters_and_spikes_in_time_window(
-            spikes_df, start_time, end_time, max_clusters_to_plot)
-
-        if window_spikes.empty:
-            return go.Figure()
-
-        window_spikes = window_spikes.copy()
-        window_spikes['rel_spike_time'] = window_spikes['time'] - \
-            reference_time
-
-        fig = go.Figure()
-        for cluster_id, group in window_spikes.groupby('cluster'):
-            fig.add_trace(go.Scatter(
-                x=group['rel_spike_time'],
-                y=[cluster_id] * len(group),
-                mode='markers',
-                marker=dict(size=3, color='black'),
-                showlegend=False
-            ))
-
-        y_min, y_max = window_spikes['cluster'].min(
-        ), window_spikes['cluster'].max()
-
-        _add_vertical_line(fig, 0, y_min, y_max, color='red',
-                           name='Reference Time', showlegend=False)
-
-        if rel_hover_time is not None:
-            _add_vertical_line(fig, rel_hover_time, y_min, y_max, color='blue',
-                               dash='dash', showlegend=False, name='rel_hover_time')
-
-        fig.update_xaxes(
-            range=[start_time - reference_time, end_time - reference_time])
-        fig.update_layout(
-            title='Raster Plot (Neurons in Duration)',
-            xaxis_title='Relative Spike Time (s)',
-            yaxis_title='Cluster',
-            height=400,
-            showlegend=True
-        )
-        return fig
-
-    except Exception as e:
-        logging.error(f"Error creating raster plot: {e}", exc_info=True)
-        return go.Figure()
+from visualization.plotly_tools import plotly_for_time_series
 
 
 def create_firing_rate_plot_for_one_duration_in_plotly(
         spikes_df, reference_time, start_time, end_time,
         bin_width=0.1, bins_per_aggregate=3,
-        max_clusters_to_plot=10, rel_hover_time=None):
+        max_clusters_to_plot=None, rel_hover_time=None):
     """
     Create a firing rate plot over a given time window.
 
@@ -77,92 +30,280 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
     Returns:
         Plotly Figure with firing rate curves.
     """
-    try:
-        # Select spikes and clusters within time window
-        window_spikes, selected_clusters = _select_clusters_and_spikes_in_time_window(
-            spikes_df, start_time, end_time, max_clusters_to_plot)
+    # Select spikes and clusters within time window
+    filtered_spikes, selected_clusters = _select_clusters_and_spikes_in_time_window(
+        spikes_df, start_time, end_time, max_clusters_to_plot)
 
-        if window_spikes.empty or len(selected_clusters) == 0:
-            return go.Figure()
-
-        # Calculate relative spike times to reference_time
-        window_spikes = window_spikes.copy()
-        window_spikes['rel_spike_time'] = window_spikes['time'] - \
-            reference_time
-
-        # Get binned spike counts per cluster
-        time_bins, binned_df = neural_data_processing.prepare_binned_spikes_df(
-            window_spikes, bin_width=bin_width)
-        time_array = (time_bins[:-1] + time_bins[1:]) / 2
-
-        # Aggregate firing rates over bins_per_aggregate bins
-        fr_df = _prepare_fr_data(binned_df, bin_width,
-                                 bins_per_aggregate, time_array=time_array)
-
-        # Map cluster IDs to column names in binned_df/fr_df
-        selected_cluster_cols = [f"cluster_{c}" for c in selected_clusters]
-
-        # Sanity check for required columns
-        if 'time' not in fr_df.columns or not set(selected_cluster_cols).intersection(fr_df.columns):
-            logging.warning(
-                "Prepared firing rate DataFrame missing expected columns.")
-            return go.Figure()
-
-        fig = go.Figure()
-
-        # Plot each cluster's firing rate
-        for cluster_col in selected_cluster_cols:
-            if cluster_col in fr_df.columns:
-                fig.add_trace(go.Scatter(
-                    x=fr_df['time'],
-                    y=fr_df[cluster_col],
-                    mode='lines',
-                    name=cluster_col,
-                    line=dict(width=1)
-                ))
-
-        # Plot mean firing rate if multiple clusters
-        if len(selected_cluster_cols) > 1:
-            mean_fr = fr_df[selected_cluster_cols].mean(axis=1)
-            fig.add_trace(go.Scatter(
-                x=fr_df['time'],
-                y=mean_fr,
-                mode='lines',
-                name='Mean',
-                line=dict(color='red', width=2, dash='dash')
-            ))
-
-        # Set y-axis limits
-        y_min = 0
-        y_max = fr_df[selected_cluster_cols].max().max()
-        if y_max == 0:
-            y_max = 1
-
-        # Add vertical reference line at 0 (relative time)
-        _add_vertical_line(fig, 0, y_min, y_max, color='red',
-                           name='Reference Time', showlegend=False)
-
-        # Add optional hover vertical line (relative to reference_time)
-        if rel_hover_time is not None:
-            _add_vertical_line(fig, rel_hover_time, y_min, y_max, color='blue',
-                               dash='dash', showlegend=False, name='rel_hover_time')
-
-        fig.update_layout(
-            title='Firing Rate Over Time',
-            xaxis_title='Time (s) relative to reference',
-            yaxis_title='Firing Rate (Hz)',
-            height=400,
-            showlegend=True
-        )
-
-        return fig
-
-    except Exception as e:
-        logging.error(f"Error creating firing rate plot: {e}", exc_info=True)
+    if filtered_spikes.empty or len(selected_clusters) == 0:
         return go.Figure()
 
+    # Calculate relative spike times to reference_time
+    filtered_spikes = filtered_spikes.copy()
+    filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - \
+        reference_time
 
-def _select_clusters_and_spikes_in_time_window(spikes_df, start_time, end_time, max_clusters_to_plot=10):
+    # Get binned spike counts per cluster
+    rel_start_time = start_time - reference_time
+    rel_end_time = end_time - reference_time
+    time_bins, binned_df = neural_data_processing.prepare_binned_spikes_df(
+        filtered_spikes, bin_width=bin_width, spike_time_col='rel_spike_time', min_time=rel_start_time, max_time=rel_end_time)
+    time_array = (time_bins[:-1] + time_bins[1:]) / 2
+
+    # Aggregate firing rates over bins_per_aggregate bins
+    fr_df = _prepare_fr_data(binned_df, bin_width,
+                             bins_per_aggregate, time_array=time_array)
+
+    # Map cluster IDs to column names in binned_df/fr_df
+    selected_cluster_cols = [f"cluster_{c}" for c in selected_clusters]
+
+    # Sanity check for required columns
+    if 'time' not in fr_df.columns or not set(selected_cluster_cols).intersection(fr_df.columns):
+        logging.warning(
+            "Prepared firing rate DataFrame missing expected columns.")
+        return go.Figure()
+
+    fig = go.Figure()
+
+    # Generate a color palette for individual clusters
+    if len(selected_cluster_cols) > 1:
+        # Use a larger color palette that can handle many clusters
+        if len(selected_cluster_cols) <= 12:
+            # Use Set3 for up to 20 clusters
+            colors = pc.qualitative.Set3[:len(selected_cluster_cols)]
+        else:
+            # Generate colors using HSV color space for many clusters
+            colors = [f'hsl({i * 360 / len(selected_cluster_cols)}, 70%, 50%)'
+                      for i in range(len(selected_cluster_cols))]
+    else:
+        colors = ['#1f77b4']
+
+    # Plot each cluster's firing rate
+    for i, cluster_col in enumerate(selected_cluster_cols):
+        if cluster_col in fr_df.columns:
+            fig.add_trace(go.Scatter(
+                x=fr_df['time'],
+                y=fr_df[cluster_col],
+                mode='lines',
+                name=f'Cluster {selected_clusters[i]}',
+                line=dict(
+                    color=colors[i],
+                    width=1.5,
+                    shape='linear'
+                ),
+                opacity=0.8,
+                hovertemplate='<b>%{fullData.name}</b><br>' +
+                'Time: %{x:.3f}s<br>' +
+                'Firing Rate: %{y:.2f} Hz<extra></extra>'
+            ))
+
+    # Plot mean firing rate if multiple clusters
+    if len(selected_cluster_cols) > 1:
+        mean_fr = fr_df[selected_cluster_cols].mean(axis=1)
+        fig.add_trace(go.Scatter(
+            x=fr_df['time'],
+            y=mean_fr,
+            mode='lines',
+            name='Population Mean',
+            line=dict(
+                color='#d62728',
+                width=3,
+                dash='solid'
+            ),
+            opacity=1.0,
+            hovertemplate='<b>Population Mean</b><br>' +
+            'Time: %{x:.3f}s<br>' +
+            'Firing Rate: %{y:.2f} Hz<extra></extra>'
+        ))
+
+    # Set y-axis limits with some padding
+    y_min = 0
+    y_max = fr_df[selected_cluster_cols].max().max()
+    if y_max == 0:
+        y_max = 1
+    else:
+        y_max = y_max * 1.1  # Add 10% padding
+
+    # Add vertical reference line at 0 (relative time)
+    _add_vertical_line(fig, 0, y_min, y_max, color=plotly_for_time_series.GUIDE_LINE_COLOR,
+                       name='Reference Time', showlegend=False, width=2, dash='solid')
+
+    # Add optional hover vertical line (relative to reference_time)
+    if rel_hover_time is not None:
+        _add_vertical_line(fig, rel_hover_time, y_min, y_max, color=plotly_for_time_series.HOVER_LINE_COLOR,
+                           dash='dash', showlegend=False, name='Hover Time', width=2)
+
+    # Enhanced layout
+    fig.update_layout(
+        title=dict(
+            text='Firing Rate Over Time',
+            font=dict(size=14, color='#2c3e50'),
+            x=0.5,
+            xanchor='center'
+        ),
+        xaxis=dict(
+            title=dict(
+                text='Time (s) relative to reference',
+                font=dict(size=14, color='#34495e')
+            ),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='#ecf0f1',
+            zeroline=True,
+            zerolinecolor='#bdc3c7',
+            zerolinewidth=1,
+            showline=True,
+            linecolor='#34495e',
+            linewidth=1
+        ),
+        yaxis=dict(
+            title=dict(
+                text='Firing Rate (Hz)',
+                font=dict(size=14, color='#34495e')
+            ),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='#ecf0f1',
+            zeroline=True,
+            zerolinecolor='#bdc3c7',
+            zerolinewidth=1,
+            showline=True,
+            linecolor='#34495e',
+            linewidth=1,
+            range=[y_min, y_max]
+        ),
+        height=300,
+        showlegend=False,
+        legend=dict(
+            bgcolor='rgba(255,255,255,0.8)',
+            bordercolor='#bdc3c7',
+            borderwidth=1,
+            font=dict(size=12)
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(l=60, r=30, t=50, b=60),
+    )
+
+    return fig
+
+
+def create_raster_plot_for_one_duration_in_plotly(spikes_df, reference_time, start_time, end_time,
+                                                  max_clusters_to_plot=None, rel_hover_time=None):
+
+    filtered_spikes, selected_clusters = _select_clusters_and_spikes_in_time_window(
+        spikes_df, start_time, end_time, max_clusters_to_plot)
+
+    if filtered_spikes.empty:
+        return go.Figure()
+
+    filtered_spikes = filtered_spikes.copy()
+    filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - \
+        reference_time
+
+    fig = go.Figure()
+
+    # Create a color map for clusters
+    if len(selected_clusters) <= 12:
+        # Use Set3 for up to 20 clusters
+        colors = pc.qualitative.Set3[:len(selected_clusters)]
+    else:
+        # Generate colors using HSV color space for many clusters
+        colors = [f'hsl({i * 360 / len(selected_clusters)}, 70%, 50%)'
+                  for i in range(len(selected_clusters))]
+
+    for i, cluster_id in enumerate(selected_clusters):
+        group = filtered_spikes[filtered_spikes['cluster'] == cluster_id]
+        if not group.empty:
+            fig.add_trace(go.Scatter(
+                x=group['rel_spike_time'],
+                y=[cluster_id] * len(group),
+                mode='markers',
+                marker=dict(
+                    size=4,
+                    color=colors[i],
+                    opacity=0.8,
+                    line=dict(width=0.5, color='white')
+                ),
+                name=f'Cluster {cluster_id}',
+                showlegend=False,
+                hovertemplate='<b>Cluster %{y}</b><br>' +
+                'Time: %{x:.3f}s<extra></extra>'
+            ))
+
+    y_min, y_max = filtered_spikes['cluster'].min(
+    ), filtered_spikes['cluster'].max()
+
+    # Add some padding to y-axis
+    y_range = y_max - y_min
+    if y_range == 0:
+        y_min -= 0.5
+        y_max += 0.5
+    else:
+        y_min -= y_range * 0.1
+        y_max += y_range * 0.1
+
+    # Add vertical reference line at 0 (relative time)
+    _add_vertical_line(fig, 0, y_min, y_max, color=plotly_for_time_series.GUIDE_LINE_COLOR,
+                       name='Reference Time', showlegend=False, width=2, dash='solid')
+
+    # Add optional hover vertical line (relative to reference_time)
+    if rel_hover_time is not None:
+        _add_vertical_line(fig, rel_hover_time, y_min, y_max, color=plotly_for_time_series.HOVER_LINE_COLOR,
+                           dash='dash', showlegend=False, name='Hover Time', width=2)
+
+    # Enhanced layout
+    fig.update_xaxes(
+        range=[start_time - reference_time, end_time - reference_time],
+        title=dict(
+            text='Time (s) relative to reference',
+            font=dict(size=14, color='#34495e')
+        ),
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='#ecf0f1',
+        zeroline=True,
+        zerolinecolor='#bdc3c7',
+        zerolinewidth=1,
+        showline=True,
+        linecolor='#34495e',
+        linewidth=1
+    )
+
+    fig.update_yaxes(
+        title=dict(
+            text='Neuron ID',
+            font=dict(size=14, color='#34495e')
+        ),
+        showgrid=True,
+        gridwidth=1,
+        gridcolor='#ecf0f1',
+        zeroline=True,
+        zerolinecolor='#bdc3c7',
+        zerolinewidth=1,
+        showline=True,
+        linecolor='#34495e',
+        linewidth=1,
+        range=[y_min, y_max]
+    )
+
+    fig.update_layout(
+        title=dict(
+            text='Neural Raster Plot',
+            font=dict(size=14, color='#2c3e50'),
+            x=0.5,
+            xanchor='center'
+        ),
+        height=300,
+        showlegend=False,
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(l=60, r=30, t=50, b=60),
+    )
+
+    return fig
+
+
+def _select_clusters_and_spikes_in_time_window(spikes_df, start_time, end_time, max_clusters_to_plot=None):
     """
     Select spikes within a time window and limit clusters.
 
@@ -175,19 +316,22 @@ def _select_clusters_and_spikes_in_time_window(spikes_df, start_time, end_time, 
     Returns:
         Tuple of (filtered spikes DataFrame, array of selected clusters).
     """
-    unique_clusters = spikes_df['cluster'].unique()
-    if max_clusters_to_plot and len(unique_clusters) > max_clusters_to_plot:
-        selected_clusters = np.random.choice(
-            unique_clusters, max_clusters_to_plot, replace=False)
-    else:
-        selected_clusters = unique_clusters
-
     filtered_spikes = spikes_df[
-        (spikes_df['cluster'].isin(selected_clusters)) &
         (spikes_df['time'] >= start_time) &
         (spikes_df['time'] <= end_time)
     ].copy()
 
+    unique_clusters = filtered_spikes['cluster'].unique()
+    if max_clusters_to_plot and len(unique_clusters) > max_clusters_to_plot:
+        selected_clusters = np.random.choice(
+            unique_clusters, max_clusters_to_plot, replace=False)
+        # sort clusters by cluster id
+        selected_clusters = np.sort(selected_clusters)
+    else:
+        selected_clusters = unique_clusters
+
+    filtered_spikes = filtered_spikes[filtered_spikes['cluster'].isin(
+        selected_clusters)].copy()
     return filtered_spikes, selected_clusters
 
 
@@ -213,7 +357,8 @@ def _add_vertical_line(fig, x_val, y_min, y_max, color, width=2, dash=None, name
         mode='lines',
         line=dict(color=color, width=width, dash=dash),
         name=name,
-        showlegend=showlegend
+        showlegend=showlegend,
+        hoverinfo='skip'
     ))
 
 
