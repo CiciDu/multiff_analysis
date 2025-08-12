@@ -40,7 +40,6 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
 
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
 
-
     def _create_raster_plot_figure(self,
                                    max_clusters_to_plot=None):
         if not hasattr(self, 'spikes_df'):
@@ -50,7 +49,11 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             self.stops_near_ff_row['stop_time'],
             self.current_plotly_key_comp['duration_to_plot'][0],
             self.current_plotly_key_comp['duration_to_plot'][1],
-            max_clusters_to_plot=max_clusters_to_plot, rel_hover_time=self.monkey_hoverdata_value_s)
+            max_clusters_to_plot=max_clusters_to_plot, 
+            rel_hover_time=self.monkey_hoverdata_value_s,
+            # show_visible_segments=self.monkey_plot_params['show_visible_segments'],
+            # visible_segments_info=self.visible_segments_info
+            )
         return self.fig_raster
 
     def _create_firing_rate_plot_figure(self, max_clusters_to_plot=None):
@@ -61,19 +64,24 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
             self.stops_near_ff_row['stop_time'],
             self.current_plotly_key_comp['duration_to_plot'][0],
             self.current_plotly_key_comp['duration_to_plot'][1],
-            max_clusters_to_plot=max_clusters_to_plot, rel_hover_time=self.monkey_hoverdata_value_s)
+            max_clusters_to_plot=max_clusters_to_plot, 
+            rel_hover_time=self.monkey_hoverdata_value_s,
+            # show_visible_segments=self.monkey_plot_params['show_visible_segments'],
+            # visible_segments_info=self.visible_segments_info
+            )
         return self.fig_fr
 
     def _update_neural_plots_based_on_monkey_hover_data(self, rel_hover_time):
-        self.fig_raster.update_traces(overwrite=True, selector=dict(name='Hover Time'), x=[rel_hover_time, rel_hover_time])
-        self.fig_fr.update_traces(overwrite=True, selector=dict(name='Hover Time'), x=[rel_hover_time, rel_hover_time])
+        self.fig_raster.update_traces(overwrite=True, selector=dict(
+            name='Hover Time'), x=[rel_hover_time, rel_hover_time])
+        self.fig_fr.update_traces(overwrite=True, selector=dict(
+            name='Hover Time'), x=[rel_hover_time, rel_hover_time])
         return self.fig_raster, self.fig_fr
-    
+
     def _make_spikes_df(self):
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
         self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                                sampling_rate=self.sampling_rate)
-
 
     def _show_angle_to_nxt_ff_in_time_series(self):
         self.add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration()
@@ -257,9 +265,9 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         # also add y=-150 and y=-100 (for more reference points)
         y_range_for_v_line = [-200, 200]
         self.fig_time_series_cm = plotly_for_time_series.add_vertical_line_for_an_x_value(
-            self.fig_time_series_cm, x_value=-150, y_range=y_range_for_v_line, color='magenta', name='y=-150', dash=None)
+            self.fig_time_series_cm, x_value=-150, y_range=y_range_for_v_line, color=plotly_for_time_series.REF_POINT_COLOR, name='y=-150', dash=None)
         self.fig_time_series_cm = plotly_for_time_series.add_vertical_line_for_an_x_value(
-            self.fig_time_series_cm, x_value=-100, y_range=y_range_for_v_line, color='magenta', name='y=-100', dash=None)
+            self.fig_time_series_cm, x_value=-100, y_range=y_range_for_v_line, color=plotly_for_time_series.REF_POINT_COLOR, name='y=-100', dash=None)
 
         # self._turn_on_or_off_vertical_lines_in_each_time_series_plot_based_on_monkey_hoverdata_column()
         return self.fig_time_series_s, self.fig_time_series_cm
@@ -404,8 +412,6 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
                                         'hoverdata_multi_columns': self.hoverdata_multi_columns,
                                         })
 
-        self.monkey_plot_params['traj_portion'] = self.traj_portion if self.monkey_plot_params['show_traj_portion'] else None
-
         self._update_show_stop_point_indices()
 
         self._prepare_to_plot_eye_positions_for_dash()
@@ -435,7 +441,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         for i, trace in enumerate(self.fig.data):
             if trace.name == 'trajectory_data':
                 self.trajectory_data_trace_index = i
-            if trace.name == 'to_show_the_scope_for_curv':
+            if trace.name == 'to_show_traj_portion':
                 self.traj_portion_trace_index = i
 
         return self.fig

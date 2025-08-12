@@ -88,13 +88,13 @@ class DashComparison(dash_main_class.DashMainPlots):
 
         app.layout = self.prepare_dash_for_comparison_layout()
 
-        self.make_function_to_update_all_plots_based_on_new_info(app)
+        self.make_function_to_update_all_plots_based_on_hover_data(app)
         self.make_function_to_refresh_fig_scatter_2(app)
         self.make_function_to_refresh_fig_reg_2(app)
 
         app.run(debug=True, port=8055)
 
-    def make_function_to_update_all_plots_based_on_new_info(self, app):
+    def make_function_to_update_all_plots_based_on_hover_data(self, app):
 
         @app.callback(
             Output('correlation_plot', 'figure'),

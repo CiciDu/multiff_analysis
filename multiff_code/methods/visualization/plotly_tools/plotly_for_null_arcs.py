@@ -80,13 +80,21 @@ def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=Non
 
 def update_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, trace_name='null arc'):
 
+
+    if len(null_arc_info) == 0:
+        #print('Warning: null_arc_info is empty. No null arcs will be plotted.')
+        # temporarily hide the trace called trace_name
+        fig.update_traces(overwrite=True, selector=dict(name=trace_name),
+                          visible=False)
+        return fig
+    
     for index in null_arc_info.index:
         arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[index, 'center_x'], null_arc_info.loc[index, 'center_y'], null_arc_info.loc[index, 'all_arc_radius'],
                                                                   null_arc_info.loc[index, 'arc_starting_angle'], null_arc_info.loc[index, 'arc_ending_angle'], rotation_matrix=rotation_matrix)
 
         arc_xy_to_plot = arc_xy_rotated.reshape(2, -1)
 
-        fig.update_traces(overwrite=True, selector=dict(name=trace_name),
+        fig.update_traces(overwrite=True, selector=dict(name=trace_name), visible=True,
                           x=arc_xy_to_plot[0]-x0, y=arc_xy_to_plot[1]-y0)
 
     return fig

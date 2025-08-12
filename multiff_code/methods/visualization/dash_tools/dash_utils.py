@@ -211,10 +211,10 @@ def show_a_static_plot(fig_time_series):
 
 
 def update_marked_traj_portion_in_monkey_plot(fig, traj_portion, hoverdata_multi_columns=['rel_time']):
-    fig.update_traces(overwrite=True, marker={"size": 10, "opacity": 1, "color": 'orange'},
+    fig.update_traces(overwrite=True, marker={"size": 12, "opacity": 1, "color": 'orange'},
                       x=traj_portion['monkey_x'].values, y=traj_portion['monkey_y'].values,
                       customdata=traj_portion[hoverdata_multi_columns].values,
-                      selector=dict(name="to_show_the_scope_for_curv"))
+                      selector=dict(name="to_show_traj_portion"))
 
     return fig
 

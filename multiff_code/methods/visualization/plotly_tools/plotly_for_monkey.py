@@ -497,7 +497,7 @@ def connect_points_to_points(fig, connect_path_ff_df, show_traj_points_when_maki
     return fig
 
 
-def plot_a_portion_of_trajectory_to_show_the_scope_for_curv(fig, traj_portion, color='orange', hoverdata_multi_columns=['rel_time']):
+def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='orange', hoverdata_multi_columns=['rel_time']):
 
     plot_to_add = px.scatter(traj_portion, x='monkey_x', y='monkey_y',
                              hover_data=hoverdata_multi_columns,
@@ -508,13 +508,12 @@ def plot_a_portion_of_trajectory_to_show_the_scope_for_curv(fig, traj_portion, c
                              custom_data=hoverdata_multi_columns,
                              color_discrete_sequence=[color])
     fig.add_traces(plot_to_add.data)
-    fig.data[-1].name = 'to_show_the_scope_for_curv'
-    fig.update_traces(marker=dict(size=10, opacity=1),
-                      selector=dict(name='to_show_the_scope_for_curv'))
+    fig.data[-1].name = 'to_show_traj_portion'
     hovertemplate = ' <br>'.join(
         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
-    fig.update_traces(hovertemplate=hovertemplate,
-                      selector=dict(name='to_show_the_scope_for_curv'))
+    fig.update_traces(marker=dict(size=12, opacity=1),
+                      hovertemplate=hovertemplate,
+                      selector=dict(name='to_show_traj_portion'))
 
     return fig
 

@@ -179,9 +179,17 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                  'value': 'show_current_eye_positions'},
                              {'label': 'show eye positions for both eyes', 'value': 'show_eye_positions_for_both_eyes'}]
 
-        checklist_params = ['show_visible_fireflies', 'show_in_memory_fireflies', 'show_monkey_heading', 'show_visible_segments',
-                            'show_null_arcs_to_ff', 'show_extended_traj_arc', 'show_stops', 'show_all_eye_positions',
-                            'show_current_eye_positions', 'show_eye_positions_for_both_eyes']
+        checklist_params = ['show_visible_fireflies', 
+                            'show_in_memory_fireflies',
+                            'show_visible_segments',
+                            'show_monkey_heading', 
+                            'show_traj_portion',
+                            'show_null_arcs_to_ff', 
+                            'show_extended_traj_arc', 
+                            'show_stops', 
+                            'show_all_eye_positions',
+                            'show_current_eye_positions', 
+                            'show_eye_positions_for_both_eyes']
         checklist_values = [
             key for key in checklist_params if self.monkey_plot_params[key] is True]
 
@@ -252,10 +260,12 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         return fig
 
     def _update_dash_based_on_checklist_for_monkey_plot(self, checklist_for_monkey_plot):
+        print('checklist_for_monkey_plot: ', checklist_for_monkey_plot)
 
         old_checklist_params = {'show_visible_segments': self.monkey_plot_params['show_visible_segments'],
                                 'show_visible_fireflies': self.monkey_plot_params['show_visible_fireflies'],
                                 'show_in_memory_fireflies': self.monkey_plot_params['show_in_memory_fireflies'],
+                                'show_traj_portion': self.monkey_plot_params['show_traj_portion'],
                                 'show_null_arcs_to_ff': self.monkey_plot_params['show_null_arcs_to_ff'],
                                 'show_extended_traj_arc': self.monkey_plot_params['show_extended_traj_arc'],
                                 }
@@ -267,6 +277,15 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.monkey_plot_params[param] = True
             else:
                 self.monkey_plot_params[param] = False
+                
+        if self.monkey_plot_params['show_traj_portion'] != old_checklist_params['show_traj_portion']:
+            if self.monkey_plot_params['show_traj_portion']:
+                self._find_traj_portion()
+                self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(self.fig, self.traj_portion,
+                                                                                                 hoverdata_multi_columns=self.monkey_plot_params['hoverdata_multi_columns'])
+            else:
+                # remove the trace called to_show_traj_portion from self.fig
+                self.fig.data = [trace for trace in self.fig.data if trace.name != 'to_show_traj_portion']
 
         if (self.monkey_plot_params['show_null_arcs_to_ff'] != old_checklist_params['show_null_arcs_to_ff']):
             self.find_null_arcs_info_for_plotting_for_the_duration()

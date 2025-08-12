@@ -27,9 +27,26 @@ hex_colors = tuple(colors.values())
 PLOTLY_TIME_SERIES_TEMPLATE = 'plotly_white'
 GRID_COLOR = 'rgba(0,0,0,0.08)'
 AXIS_LINE_COLOR = 'rgba(0,0,0,0.35)'
-GUIDE_LINE_COLOR = '#ff7f0e' #'rgba(0,0,0,0.45)'
-HOVER_LINE_COLOR = '#2ca02c' #'#1f77b4'
+GUIDE_LINE_COLOR = '#ff7f0e'  # 'rgba(0,0,0,0.45)'
+REF_POINT_COLOR = '#e46696'
+HOVER_LINE_COLOR = '#2ca02c'  # '#1f77b4'
 CURVATURE_COLOR = '#ff7f0e'  # orange from Plotly default palette
+
+
+def make_the_plot_of_change_in_curv_of_traj_vs_time(curv_of_traj_in_duration, y_column_name='curv_of_traj_diff_over_distance', x_column_name='rel_time'):
+    curv_of_traj_in_duration = curv_of_traj_in_duration.copy()
+    plot_to_add = px.line(curv_of_traj_in_duration, x=x_column_name, y=y_column_name,
+                          title='Change in Curvature of Trajectory',
+                          hover_data=[x_column_name, y_column_name],
+                          labels={'rel_time': 'Relative Time(s)',
+                                  'rel_distance': 'Relative Distance(cm)',
+                                  'curv_of_traj_diff': 'Change in Curvature of Trajectory (deg/cm)',
+                                  'curv_of_traj_diff_over_dt': 'Change in Curv of Trajectory Over Time',
+                                  'curv_of_traj_diff_over_distance': 'Change in Curv of Trajectory Over Distance', },
+                          # width=1000, height=700,
+                          )
+
+    return plot_to_add
 
 
 def _apply_clean_time_series_theme(fig):
@@ -44,6 +61,7 @@ def _apply_clean_time_series_theme(fig):
         paper_bgcolor='white',
         plot_bgcolor='white',
         margin={'l': 60, 'b': 40, 't': 120, 'r': 60},
+        hoverdistance=-1,  # Distance in pixels for hover detection
     )
 
     # Only set legend if it's not already configured
@@ -106,7 +124,7 @@ def make_the_initial_fig_time_series(curv_of_traj_in_duration, monkey_hoverdata_
 
     # plot a vertical line at stop point (which is 0)
     fig_time_series = add_vertical_line_for_an_x_value(
-        fig_time_series, x_value=0, y_range=y_range_for_v_line, name='First stop point', color=GUIDE_LINE_COLOR)
+        fig_time_series, x_value=0, y_range=y_range_for_v_line, name='Stop point', color=GUIDE_LINE_COLOR)
     # also add a horizontal line at 0
     fig_time_series = add_horizontal_line_to_fig_time_series(
         fig_time_series, use_two_y_axes, x_range=x_range_for_h_line, y_value=0, showlegend=False)
@@ -175,22 +193,6 @@ def plot_curv_of_traj_vs_time_with_two_y_axes(curv_of_traj_in_duration, change_y
     fig = _apply_clean_time_series_theme(fig)
 
     return fig
-
-
-def make_the_plot_of_change_in_curv_of_traj_vs_time(curv_of_traj_in_duration, y_column_name='curv_of_traj_diff_over_distance', x_column_name='rel_time'):
-    curv_of_traj_in_duration = curv_of_traj_in_duration.copy()
-    plot_to_add = px.line(curv_of_traj_in_duration, x=x_column_name, y=y_column_name,
-                          title='Change in Curvature of Trajectory',
-                          hover_data=[x_column_name, y_column_name],
-                          labels={'rel_time': 'Relative Time(s)',
-                                  'rel_distance': 'Relative Distance(cm)',
-                                  'curv_of_traj_diff': 'Change in Curvature of Trajectory (deg/cm)',
-                                  'curv_of_traj_diff_over_dt': 'Change in Curv of Trajectory Over Time',
-                                  'curv_of_traj_diff_over_distance': 'Change in Curv of Trajectory Over Distance', },
-                          # width=1000, height=700,
-                          )
-
-    return plot_to_add
 
 
 def add_curv_of_traj_data_to_fig_time_series(fig, curv_of_traj_in_duration, x_column_name='rel_time', curv_of_traj_trace_name='Curvature of Trajectory'):
@@ -287,10 +289,10 @@ def mark_reference_point_in_time_series_plot(fig_time_series, x_column_name, tra
                          y='y',
                          )
     fig_time_series.add_traces(list(fig_traces.select_traces()))
-    fig_time_series.data[-1].name = 'First stop point'
+    fig_time_series.data[-1].name = 'Ref point'
     fig_time_series.data[-1].showlegend = True
-    fig_time_series.update_traces(opacity=1, selector=dict(name='First stop point'),
-                                  line=dict(color=GUIDE_LINE_COLOR, width=2, dash='solid'))
+    fig_time_series.update_traces(opacity=1, selector=dict(name='Ref point'),
+                                  line=dict(color=REF_POINT_COLOR, width=2, dash='dot'))
     fig_time_series = add_annotation_to_fig_time_series(
         fig_time_series, 'ref point', ref_point_value, -130)
     return fig_time_series
@@ -407,7 +409,7 @@ def plot_curv_of_traj_vs_time(curv_of_traj_in_duration, x_column_name='rel_time'
 
 def turn_visibility_of_vertical_lines_on_or_off_in_time_series_plot(fig_time_series,
                                                                     visible,
-                                                                    trace_names=['Monkey trajectory hover position', 'First stop point']):
+                                                                    trace_names=['Monkey trajectory hover position', 'Ref point']):
     for name in trace_names:
         fig_time_series.update_traces(
             visible=visible, selector=dict(name=name))
@@ -533,7 +535,10 @@ def plot_blocks_to_show_ff_visible_segments_in_fig_time_series(
     time_or_distance='time',
     y_range_for_v_line=[-200, 200],
     varying_colors=['#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64'],
-    ff_names=None
+    ff_names=None,
+    block_opacity=0.2,
+    show_annotation=True,
+    annotation_opacity=0.5,
 ):
     point_index_gap_threshold_to_sep_vis_intervals = 12
     unique_ff_indices = ff_info.ff_index.unique(
@@ -577,22 +582,23 @@ def plot_blocks_to_show_ff_visible_segments_in_fig_time_series(
                 y0=y_range_for_v_line[0],
                 y1=y_range_for_v_line[1],
                 fillcolor=color,
-                opacity=0.2,
+                opacity=block_opacity,
                 layer='below',
                 line=dict(width=0),
                 name=ff_names[i] + f' visible segment {j}'
             )
             # Optionally add annotation at the center of the block
-            center_x = (
-                all_starting_rel_values[j] + all_ending_rel_values[j]) / 2
-            fig_time_series.add_annotation(
-                x=center_x,
-                y=y_range_for_v_line[1],
-                text=ff_names[i],
-                showarrow=False,
-                font=dict(color=color),
-                opacity=0.5,
-                yanchor='bottom'
-            )
+            if show_annotation:
+                center_x = (
+                    all_starting_rel_values[j] + all_ending_rel_values[j]) / 2
+                fig_time_series.add_annotation(
+                    x=center_x,
+                    y=y_range_for_v_line[1],
+                    text=ff_names[i],
+                    showarrow=False,
+                    font=dict(color=color),
+                    opacity=annotation_opacity,
+                    yanchor='bottom'
+                )
 
     return fig_time_series
