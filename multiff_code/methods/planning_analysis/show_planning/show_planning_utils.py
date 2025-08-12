@@ -74,7 +74,8 @@ def _extend_arc_length_by_increasing_arc_ending_angle(null_arc_info):
 
 def get_opt_arc_end_points_closest_to_stop(null_arc_info, stop_and_ref_point_info, reward_boundary_radius=25):
     if len(null_arc_info) != len(stop_and_ref_point_info):
-        print('Warning: The number of rows in null_arc_info and stop_and_ref_point_info do not match.')
+        print('When calling get_opt_arc_end_points_closest_to_stop, the number of rows in null_arc_info and stop_and_ref_point_info do not match.'
+              'Some points do not have a valid null arc and might be missed.')
 
     # if cur_ff_index don't exist, then try renaming ff_index, ff_x, ff_y; if the latter don't exist, raise an error
     if 'cur_ff_index' not in stop_and_ref_point_info.columns:

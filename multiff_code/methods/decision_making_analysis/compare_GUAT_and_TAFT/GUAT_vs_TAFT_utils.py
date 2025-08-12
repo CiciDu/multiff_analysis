@@ -133,12 +133,12 @@ def combine_relevant_features(x_features_df, only_cur_ff_df, plan_x_df, plan_y_d
     if drop_columns_w_na:
         x_df = x_df.drop(columns=columns_with_na)
         print(
-            f'There are {len(columns_with_na)} columns with NA that are dropped. {x_df.shape[1]} columns are left.')
+            f'When preparing x_var to predict whether TAFT or GUAT, there are {len(columns_with_na)} columns with NA that are dropped. {x_df.shape[1]} columns are left.')
         print('Columns with NA that are dropped:', np.array(columns_with_na))
 
     else:
         print(
-            f'There are {len(columns_with_na)} out of {x_df.shape[1]} columns with NA.')
+            f'When preparing x_var to predict whether TAFT or GUAT, there are {len(columns_with_na)} out of {x_df.shape[1]} columns with NA.')
 
     print('The shape of x_df is:', x_df.shape)
 

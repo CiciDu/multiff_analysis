@@ -209,7 +209,15 @@ def PlotTrials(duration,
 
 
     """
-    sns.set_style(style="white")
+    # Set a more modern and attractive style
+    sns.set_style(style="whitegrid", rc={
+                  'axes.facecolor': '#f8f9fa', 'grid.color': '#e9ecef'})
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial',
+                                       'DejaVu Sans', 'Liberation Sans']
+    plt.rcParams['axes.spines.top'] = False
+    plt.rcParams['axes.spines.right'] = False
+
     legend_markers = []
     legend_names = []
 
@@ -294,10 +302,10 @@ def PlotTrials(duration,
 
     if fig is None:
         if show_eye_positions_on_the_right:
-            fig = plt.figure(figsize=(16, 7))
+            fig = plt.figure(figsize=(12, 6))
             axes = fig.add_subplot(1, 2, 1)
         else:
-            fig, axes = plt.subplots(figsize=(7, 7))
+            fig, axes = plt.subplots(figsize=(8, 8))
     elif axes is None:
         if show_eye_positions_on_the_right:
             axes = fig.add_subplot(121)
@@ -329,19 +337,21 @@ def PlotTrials(duration,
             axes, cum_mxy_rotated, left_end_xy_rotated, right_end_xy_rotated, linewidth=0.5)
 
     if show_start:
-        # Plot the start
-        start_size = {"agent": 220, "monkey": 150}
+        # Plot the start with improved styling
+        start_size = {"agent": 280, "monkey": 200, "combined": 120}
         marker = axes.scatter(cum_mxy_rotated[0, 0]-x0, cum_mxy_rotated[1, 0]-y0,
-                              marker='s', s=start_size[player], color="green", zorder=3, alpha=0.7)
+                              marker='s', s=start_size[player], color="#28a745", zorder=3, alpha=0.9,
+                              edgecolors='#1e7e34', linewidth=2)
         legend_markers.append(marker)
         legend_names.append('Start new section or begin using null agent')
 
     if show_stops:
-        stop_size = {"agent": 160, "monkey": 200, "combined": 40}
+        stop_size = {"agent": 200, "monkey": 250, "combined": 80}
         zerospeed_rotated = plot_behaviors_utils.find_stops_for_plotting(
             cum_mx, cum_my, cum_speeddummy, rotation_matrix=R)
         marker = axes.scatter(zerospeed_rotated[0]-x0, zerospeed_rotated[1]-y0,
-                              marker='*', s=stop_size[player], alpha=0.7, color="black", zorder=2)
+                              marker='*', s=stop_size[player], alpha=0.8, color="#dc3545", zorder=2,
+                              edgecolors='#c82333', linewidth=1)
         legend_markers.append(marker)
         legend_names.append('Low speed/stopping points')
 
@@ -354,7 +364,8 @@ def PlotTrials(duration,
         duration, ff_life_sorted, ff_real_position_sorted, rotation_matrix=R)
     if show_alive_fireflies:
         marker = axes.scatter(
-            alive_ff_position_rotated[0]-x0, alive_ff_position_rotated[1]-y0, marker='o', s=10, color="magenta", zorder=2)
+            alive_ff_position_rotated[0]-x0, alive_ff_position_rotated[1]-y0, marker='o', s=15,
+            color="#e83e8c", zorder=2, alpha=0.8, edgecolors='#d63384', linewidth=1)
         marker_name = ('Centers of alive fireflies')
         legend_markers.append(marker)
         legend_names.append(marker_name)
@@ -375,7 +386,8 @@ def PlotTrials(duration,
         ff_positions_rotated = np.matmul(
             R, ff_real_position_sorted[ff_to_be_plotted_in_a_basic_way].T)
         marker = axes.scatter(
-            ff_positions_rotated[0]-x0, ff_positions_rotated[1]-y0, marker='o', s=10, color="magenta", zorder=3)
+            ff_positions_rotated[0]-x0, ff_positions_rotated[1]-y0, marker='o', s=15,
+            color="#e83e8c", zorder=3, alpha=0.8, edgecolors='#d63384', linewidth=1)
         if show_visible_fireflies or show_in_memory_fireflies:
             legend_markers.append(marker)
             legend_names.append(marker_name)
@@ -384,14 +396,15 @@ def PlotTrials(duration,
     shown_ff_indices = ff_to_be_plotted_in_a_basic_way.copy()
 
     if show_believed_target_positions:
-        target_size = {"agent": 185, "monkey": 150, "combined": 30}
+        target_size = {"agent": 220, "monkey": 180, "combined": 50}
         marker = {"agent": "*", "monkey": "*", "combined": "o"}
         shown_ff_indices.extend(
             range(currentTrial - num_trials + 1, currentTrial + 1))
         believed_target_positions_rotated = plot_behaviors_utils.find_believed_target_positions(
             ff_believed_position_sorted, currentTrial, num_trials, rotation_matrix=R)
         marker = axes.scatter(believed_target_positions_rotated[0]-x0, believed_target_positions_rotated[1] -
-                              y0, marker=marker[player], s=target_size[player], color="red", alpha=0.75, zorder=4)
+                              y0, marker=marker[player], s=target_size[player], color="#fd7e14", alpha=0.9, zorder=4,
+                              edgecolors='#e55a00', linewidth=2)
         legend_markers.append(marker)
         legend_names.append('Catching-firefly positions')
 
@@ -561,22 +574,27 @@ def PlotTrials(duration,
                                                                                                                   currentTrial=currentTrial+trial_conversion[trial_to_show_cluster_around_target])
         shown_ff_indices.extend(cluster_ff_indices)
         axes.scatter(
-            cluster_around_target_rotated[0]-x0, cluster_around_target_rotated[1]-y0, marker='o', s=30, color="blue", zorder=4)
+            cluster_around_target_rotated[0]-x0, cluster_around_target_rotated[1]-y0, marker='o', s=40,
+            color="#0d6efd", zorder=4, alpha=0.8, edgecolors='#0b5ed7', linewidth=1)
         if show_path_when_cluster_visible:  # Find where on the path the monkey/agent can see any member of the cluster around the target
-            list_of_colors = ["navy", "magenta",
-                              "white", "gray", "brown", "black"]
-            path_size, path_alpha = {"agent": [80, 10], "monkey": [
-                15, 3]}, {"agent": 0.8, "monkey": 0.4}
-            ff_size, ff_alpha = {"agent": 140, "monkey": 100}, {
-                "agent": 0.8, "monkey": 0.5}
-            for index in cluster_ff_indices:
+            list_of_colors = ["#0d6efd", "#6610f2",
+                              "#6f42c1", "#d63384", "#dc3545", "#fd7e14"]
+            path_size, path_alpha = {"agent": [100, 15], "monkey": [
+                20, 5]}, {"agent": 0.9, "monkey": 0.6}
+            ff_size, ff_alpha = {"agent": 160, "monkey": 120}, {
+                "agent": 0.9, "monkey": 0.7}
+            for i, index in enumerate(cluster_ff_indices):
                 monkey_xy_rotated, ff_position_rotated = plot_behaviors_utils.find_path_when_ff_in_cluster_visible(
                     ff_dataframe_in_duration, index, rotation_matrix=R)
                 axes.scatter(monkey_xy_rotated[0]-x0, monkey_xy_rotated[1]-y0, s=path_size[player][0] -
-                             path_size[player][1] * i, color=list_of_colors[i], alpha=path_alpha[player], zorder=3+i)
+                             path_size[player][1] * i, color=list_of_colors[i % len(list_of_colors)],
+                             alpha=path_alpha[player], zorder=3+i)
                 # Use a circle with the corresponding color to show that ff
                 axes.scatter(ff_position_rotated[0]-x0, ff_position_rotated[1]-y0, marker='o',
-                             s=ff_size[player], alpha=ff_alpha[player], color=list_of_colors[i], zorder=3)
+                             s=ff_size[player], alpha=ff_alpha[player],
+                             color=list_of_colors[i %
+                                                  len(list_of_colors)], zorder=3,
+                             edgecolors='white', linewidth=1)
 
     shown_ff_indices = np.unique(np.array(shown_ff_indices)).astype(int)
     shown_ff_positions_rotated = ff_real_position_sorted[shown_ff_indices].T
@@ -590,7 +608,8 @@ def PlotTrials(duration,
             boundary_centers_rotated = shown_ff_positions_rotated
         for i in boundary_centers_rotated.T:
             circle = plt.Circle(
-                (i[0]-x0, i[1]-y0), 25, facecolor='grey', edgecolor='orange', alpha=0.45, zorder=1)
+                (i[0]-x0, i[1]-y0), 25, facecolor='#6c757d', edgecolor='#fd7e14',
+                alpha=0.6, zorder=1, linewidth=2)
             axes.add_patch(circle)
 
     if show_ff_indices:
@@ -598,7 +617,9 @@ def PlotTrials(duration,
         for num in range(len(shown_ff_indices)):
             ff_pos = shown_ff_positions_rotated[:, num]
             ff_index = shown_ff_indices[num]
-            axes.annotate(str(ff_index), (ff_pos[0], ff_pos[1]), fontsize=15)
+            axes.annotate(str(ff_index), (ff_pos[0], ff_pos[1]), fontsize=12,
+                          fontweight='bold', color='#495057',
+                          bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8, edgecolor='#dee2e6'))
 
     if show_eye_positions:
         if not show_eye_positions_for_both_eyes:
@@ -618,17 +639,28 @@ def PlotTrials(duration,
             monkey_subset_df, duration, rotation_matrix=R
         )
         axes2 = fig.add_subplot(1, 2, 2)
-        axes2.scatter(monkey_subset['gaze_mky_view_x'].values,
-                      monkey_subset['gaze_mky_view_y'].values,
-                      s=7, c=monkey_subset['time'].values, cmap='viridis')
+        scatter = axes2.scatter(monkey_subset['gaze_mky_view_x'].values,
+                                monkey_subset['gaze_mky_view_y'].values,
+                                s=10, c=monkey_subset['time'].values, cmap='plasma', alpha=0.7)
         mx_min, mx_max, my_min, my_max = plot_behaviors_utils.find_xy_min_max_for_plots(
             monkey_subset[['gaze_world_x_rotated', 'gaze_world_y_rotated']].values.T, x0, y0, temp_ff_positions=None)
         axes2 = plot_behaviors_utils.set_xy_limits_for_axes(
             axes2, mx_min, mx_max, my_min, my_max, minimal_margin, zoom_in)
         fig.tight_layout()
         # plot a horizontal and a vertical line at origin
-        axes2.axhline(y=0, color='k', linestyle='--', linewidth=1)
-        axes2.axvline(x=0, color='k', linestyle='--', linewidth=1)
+        axes2.axhline(y=0, color='#6c757d', linestyle='--',
+                      linewidth=1.5, alpha=0.7)
+        axes2.axvline(x=0, color='#6c757d', linestyle='--',
+                      linewidth=1.5, alpha=0.7)
+
+        # Improve the second subplot styling
+        axes2.set_title("Eye Gaze Positions", fontsize=16,
+                        fontweight='bold', color='#212529', pad=15)
+        axes2.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        axes2.spines['left'].set_color('#6c757d')
+        axes2.spines['bottom'].set_color('#6c757d')
+        axes2.spines['left'].set_linewidth(1.5)
+        axes2.spines['bottom'].set_linewidth(1.5)
 
     colorbar_max_value = None
     if show_trajectory:
@@ -638,7 +670,7 @@ def PlotTrials(duration,
         if trail_color_var is None:
             # make a proxy to use legend
             line = Line2D([0], [0], linestyle="-", alpha=0.9,
-                          linewidth=2, color="black")
+                          linewidth=3, color="#212529")
             legend_markers.append(line)
             legend_names.append('Monkey trajectory')
         elif trail_color_var == 'abs_ddw':
@@ -664,7 +696,9 @@ def PlotTrials(duration,
 
     if show_legend:
         axes.legend(legend_markers, legend_names, scatterpoints=1,
-                    bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+                    bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                    frameon=True, fancybox=True, shadow=True,
+                    fontsize=10, framealpha=0.95)
 
     # Set the limits of the x-axis and y-axis
     if adjust_xy_limits:
@@ -680,7 +714,8 @@ def PlotTrials(duration,
                 axes, mx_min, mx_max, my_min, my_max, minimal_margin=minimal_margin, zoom_in=zoom_in)
 
     if show_title:
-        axes.set_title(f"Trial {currentTrial}", fontsize=22)
+        axes.set_title(f"Trial {currentTrial}", fontsize=24, fontweight='bold',
+                       color='#212529', pad=20)
 
     if images_dir is not None:
         filename = "trial_" + str(currentTrial)
@@ -688,6 +723,15 @@ def PlotTrials(duration,
 
     whether_plotted = True
     axes.set_aspect('equal')
+
+    # Add subtle grid styling
+    axes.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+
+    # Improve axis styling
+    axes.spines['left'].set_color('#6c757d')
+    axes.spines['bottom'].set_color('#6c757d')
+    axes.spines['left'].set_linewidth(1.5)
+    axes.spines['bottom'].set_linewidth(1.5)
 
     if show_eye_world_speed_vs_monkey_speed:
         monkey_sub = monkey_information.iloc[cum_pos_index]

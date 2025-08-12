@@ -4,6 +4,7 @@ from decision_making_analysis import free_selection
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_trials, plot_behaviors_utils
 from pattern_discovery import pattern_by_points
+from data_wrangling import specific_utils, general_utils
 
 
 import os

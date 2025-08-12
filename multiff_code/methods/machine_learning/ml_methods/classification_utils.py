@@ -19,70 +19,124 @@ import statsmodels.api as sm
 from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
 from sklearn.model_selection import KFold, train_test_split
+from sklearn.linear_model import RidgeClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.ensemble import ExtraTreesClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import BaggingClassifier, AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import (
+    accuracy_score, confusion_matrix, classification_report,
+    precision_score, recall_score, f1_score, roc_auc_score,
+    balanced_accuracy_score, matthews_corrcoef
+)
+from sklearn.model_selection import cross_val_score
+import pandas as pd
+import numpy as np
 
 
 def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None, cv=None):
     """
-    If cv is None, use the original train/test split.
-    If cv is an integer, use k-fold cross-validation on the training set to select the best model.
+    Train and evaluate classification models with multiple metrics.
+    If cv is None, uses original train/test split.
+    If cv is an integer, performs k-fold cross-validation on the training set.
     """
+    metrics_list = []
+    
     if model is not None:
         model.fit(X_train, y_train)
         model_comparison_df = None
     else:
         models = [
-            ('gnb', GaussianNB()),
-            ('logreg', LogisticRegression()),
-            ('dt', DecisionTreeClassifier()),
-            ('bagging', BaggingClassifier(n_estimators=200, max_features=0.9,
-             bootstrap_features=True, bootstrap=True, random_state=42)),
-            ('boosting', AdaBoostClassifier(n_estimators=500, learning_rate=0.05)),
-            ('grad_boosting', GradientBoostingClassifier(learning_rate=0.05, max_depth=7, n_estimators=500,
-             subsample=0.5, max_features='sqrt', min_samples_split=7, min_samples_leaf=2)),
-            ('rf', RandomForestClassifier(
-                n_estimators=40, max_depth=10, random_state=0))
-        ]
+                ('gnb', GaussianNB()),
+                ('logreg', LogisticRegression(max_iter=200)),
+                ('ridge', RidgeClassifier()),
+                ('sgd', SGDClassifier(max_iter=1000, tol=1e-3, random_state=42)),
+                ('dt', DecisionTreeClassifier()),
+                ('bagging', BaggingClassifier(n_estimators=200, max_features=0.9,
+                                            bootstrap_features=True, bootstrap=True, random_state=42)),
+                ('rf', RandomForestClassifier(n_estimators=40, max_depth=10, random_state=0)),
+                ('extra_trees', ExtraTreesClassifier(n_estimators=200, random_state=42)),
+                ('boosting', AdaBoostClassifier(n_estimators=500, learning_rate=0.05)),
+                ('grad_boosting', GradientBoostingClassifier(learning_rate=0.05, max_depth=7, n_estimators=500,
+                                                            subsample=0.5, max_features='sqrt',
+                                                            min_samples_split=7, min_samples_leaf=2)),
+                ('xgb', XGBClassifier(use_label_encoder=False, eval_metric='mlogloss', random_state=42)),
+                ('lgbm', LGBMClassifier(random_state=42)),
+                ('catboost', CatBoostClassifier(verbose=0, random_state=42)),
+                ('knn', KNeighborsClassifier(n_neighbors=5)),
+                ('mlp', MLPClassifier(hidden_layer_sizes=(100,), max_iter=500, random_state=42))
+]
         if len(X_train) < 10000:
             models.append(('svm', SVC(probability=True)))
 
-        accuracy_list, cv_results = [], []
         for name, mdl in models:
-            print("model:", name)
+            print("Model:", name)
             if cv:
-                scores = cross_val_score(
-                    mdl, X_train, y_train, cv=cv, scoring='accuracy')
-                accuracy_list.append(scores.mean())
-                cv_results.append(scores)
-                print(
-                    f"CV mean accuracy: {scores.mean():.4f}, scores: {scores}")
+                scores = cross_val_score(mdl, X_train, y_train, cv=cv, scoring='accuracy')
+                metrics_list.append({
+                    'model': name,
+                    'accuracy': scores.mean(),
+                    'balanced_accuracy': None,
+                    'precision_macro': None,
+                    'recall_macro': None,
+                    'f1_macro': None,
+                    'mcc': None,
+                    'roc_auc': None,
+                    'cv_scores': scores
+                })
+                print(f"CV mean accuracy: {scores.mean():.4f}, scores: {scores}")
             else:
                 mdl.fit(X_train, y_train)
                 y_pred = mdl.predict(X_test)
-                accuracy_list.append(accuracy_score(y_test, y_pred))
-                cv_results.append(None)
+                
+                try:
+                    roc_auc = roc_auc_score(y_test, mdl.predict_proba(X_test), multi_class='ovr') \
+                        if len(np.unique(y_test)) > 2 else roc_auc_score(y_test, mdl.predict_proba(X_test)[:, 1])
+                except:
+                    roc_auc = None  # not supported for some models
+                
+                metrics_list.append({
+                    'model': name,
+                    'accuracy': accuracy_score(y_test, y_pred),
+                    'balanced_accuracy': balanced_accuracy_score(y_test, y_pred),
+                    'precision_macro': precision_score(y_test, y_pred, average='macro', zero_division=0),
+                    'recall_macro': recall_score(y_test, y_pred, average='macro', zero_division=0),
+                    'f1_macro': f1_score(y_test, y_pred, average='macro', zero_division=0),
+                    'mcc': matthews_corrcoef(y_test, y_pred),
+                    'roc_auc': roc_auc,
+                    'cv_scores': None
+                })
 
-        model_comparison_df = pd.DataFrame({
-            'model': [name for name, _ in models],
-            'accuracy': accuracy_list,
-            'cv_scores': cv_results if cv else None
-        }).sort_values(by='accuracy', ascending=False)
+        model_comparison_df = pd.DataFrame(metrics_list).sort_values(by='accuracy', ascending=False)
         print(model_comparison_df)
 
-        best_idx = np.argmax(accuracy_list)
-        model = models[best_idx][1]
-        print("\nThe model with the highest accuracy is:", model, '!!')
+        # Pick best model
+        best_idx = model_comparison_df['accuracy'].idxmax()
+        best_model_name = model_comparison_df.loc[best_idx, 'model']
+        model = [m for m in models if m[0] == best_model_name][0][1]
+        print("\nThe model with the highest accuracy is:", best_model_name, '!!')
         model.fit(X_train, y_train)
 
+    # Final evaluation of chosen model
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
-    print("chosen model accuracy:", accuracy)
-    print("chosen model confusion matrix:", confusion_matrix(y_test, y_pred))
+    print("\nChosen model accuracy:", accuracy)
+    print("\nClassification Report:\n", classification_report(y_test, y_pred, zero_division=0))
+    
     confusion_matrix_df = pd.DataFrame(confusion_matrix(y_test, y_pred))
-    confusion_matrix_df.columns = [
-        f'Predicted {num}' for num in range(1, confusion_matrix_df.shape[1]+1)]
-    confusion_matrix_df.index = [
-        f'Actual {num}' for num in range(1, confusion_matrix_df.shape[0]+1)]
-    print(confusion_matrix_df)
+    confusion_matrix_df.columns = [f'Predicted {num}' for num in range(1, confusion_matrix_df.shape[1]+1)]
+    confusion_matrix_df.index = [f'Actual {num}' for num in range(1, confusion_matrix_df.shape[0]+1)]
+    print("\nConfusion Matrix:\n", confusion_matrix_df)
+
     return model, y_pred, model_comparison_df
 
 
