@@ -251,6 +251,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             except Exception as e:
                 return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr, f"An error occurred. No update was made. Error: {e}"
 
+
     def make_function_to_update_based_on_correlation_plot(self, app):
         @app.callback(
             Output(self.id_prefix + 'monkey_plot',

@@ -266,7 +266,6 @@ def PlotTrials(duration,
                     duration, monkey_information)
             else:
                 print("The monkey crossed the arena edge at {} but the duration is long enough (more than 2/3 of the original duration) to include the crossing".format(cross_boundary_time))
-
     # # Make sure the duration is sufficient for assumed_memory_duration_of_agent
     # if show_null_agent_trajectory & show_ff_to_be_considered_by_first_null_trajectory:
     #     if null_agent_starting_time is None:
@@ -284,7 +283,7 @@ def PlotTrials(duration,
     # the below is no longer useful once we use ff_dataframe_sifted
     # if show_only_ff_that_monkey_has_passed_by_closely:
     #     ff_dataframe_in_duration = ff_dataframe_utils.keep_only_ff_that_monkey_has_passed_by_closely(ff_dataframe_in_duration, max_distance_to_ff=100)
-
+    print('duration:', duration)
     ff_dataframe_in_duration_in_memory = ff_dataframe_in_duration.loc[(ff_dataframe_in_duration['visible'] == 0) &
                                                                       (ff_dataframe_in_duration['ff_distance'] <= 400)]  # this condition can make the plot cleaner, and it's also believeable that when the ff is more than 400 cm away, monkey wouldn't care to remember it
     ff_dataframe_in_duration_visible = ff_dataframe_in_duration.loc[

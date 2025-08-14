@@ -411,6 +411,7 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
 
     # if there's any NA in curv_of_traj, then we recalculate them
     if 'curv_of_traj' in df.columns:
+        curv_of_traj_exists = True
         curv_traj_na_index = df['curv_of_traj'].isna()
         if curv_traj_na_index.any():
             if (ff_caught_T_new is None) or (curv_of_traj_df is None):
@@ -420,9 +421,21 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
                                        'point_index'].values
             curv_of_traj = trajectory_info.find_trajectory_arc_info(
                 point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
+            # we fill up the NAs for curv_of_traj
             df.loc[curv_traj_na_index, 'curv_of_traj'] = curv_of_traj
             df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
-
+    else:
+        # we temporarily add curv_of_traj to use it for filling up NAs for other columns. Then we'll drop it at the end.
+        curv_of_traj_exists = False
+        if (ff_caught_T_new is None) or (curv_of_traj_df is None):
+            raise ValueError(
+                "Please provide ff_caught_T_new and curv_of_traj_df, since it's needed to calculate curv_of_traj.")
+        point_index_array = df.point_index.values
+        curv_of_traj = trajectory_info.find_trajectory_arc_info(
+            point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
+        df['curv_of_traj'] = curv_of_traj
+        df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
+        
     # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the opt_arc_curv value shall be the same as curv_of_traj
     if 'opt_arc_curv' in df.columns:
         within_ff_na_index = (df['ff_distance'] <=
@@ -485,9 +498,14 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
 
     df['curv_diff'] = df['opt_arc_curv'].values - df['curv_of_traj'].values
     df['abs_curv_diff'] = np.abs(df['curv_diff'].values)
+    
+    if not curv_of_traj_exists:
+        df.drop(columns=['curv_of_traj'], inplace=True)
+        
+    return df
 
 
-def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['opt_arc_curv', 'curv_diff']):
+def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['opt_arc_curv', 'curv_diff'], ff_caught_T_new=None, curv_of_traj_df=None):
     if curvature_df is None:
         raise ValueError('curvature_df is None, but add_arc_info is True')
     curvature_df_sub = curvature_df[[
@@ -496,8 +514,8 @@ def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['opt_arc_curv', 'curv_
                            'ff_index', 'point_index'], how='left')
     # for the NAs (when ff_index is -10)
     df[arc_info_to_add] = arc_info_df[arc_info_to_add]
-    fill_up_NAs_in_columns_related_to_curvature(df)
-
+    df = fill_up_NAs_in_columns_related_to_curvature(df, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)
+    return df
 
 def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monkey_information):
     curvature_df = curvature_df.copy()

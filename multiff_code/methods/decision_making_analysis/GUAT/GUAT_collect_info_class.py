@@ -74,7 +74,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         return self.important_info
 
     def _try_retrieve_all_GUAT_info_from_one_session(self,
-                                                     df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info',
+                                                     df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df',
                                                                'curv_of_traj_df'
                                                                'GUAT_w_ff_df'],
                                                      ):
@@ -148,7 +148,6 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.get_trajectory_and_stop_info_for_machine_learning()
         self.get_more_trajectory_info_for_plotting(time_range_of_trajectory_to_plot=time_range_of_trajectory_to_plot,
                                                    num_time_points_for_trajectory_to_plot=num_time_points_for_trajectory_to_plot)
-        self.get_traj_ff_info()
 
         if include_ff_in_near_future:
             self.update_curvature_df_with_additional_curvature_df()
@@ -210,7 +209,6 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                           'traj_data_df': self.traj_data_df,
                           'more_traj_data_df': self.more_traj_data_df,
                           'more_ff_df': self.more_ff_df,
-                          'traj_ff_info': self.traj_ff_info,
                           }
         print('The following are the keys of the dictionary of important info:')
         print(important_info.keys())
@@ -226,7 +224,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
             pass
 
     def _save_important_info(self,
-                             df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info', 'curv_of_traj_df']):
+                             df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'curv_of_traj_df']):
         if not exists(self.GUAT_folder_path):
             os.makedirs(self.GUAT_folder_path)
         for df in df_names:

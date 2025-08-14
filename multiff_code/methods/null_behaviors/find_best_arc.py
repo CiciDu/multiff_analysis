@@ -30,11 +30,6 @@ def make_best_arc_df(curvature_df, monkey_information, ff_real_position_sorted):
     # Note that if two arcs are the same in abs_curv_diff, then we rank them by ff_distance
     # best_arc_df = curvature_df_sorted.groupby(['point_index']).first().reset_index()
 
-    # best_arc_df = best_arc_df.rename(columns = {'opt_arc_radius': 'opt_arc_radius',
-    #                                             'opt_arc_measure': 'opt_arc_measure',
-    #                                             'opt_arc_length': 'opt_arc_length',
-    #                                             'opt_arc_end_direction': 'opt_arc_end_direction'})
-
     best_arc_original_columns = best_arc_df.copy()
 
     best_arc_df = best_arc_df[['point_index', 'ff_index', 'ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff',

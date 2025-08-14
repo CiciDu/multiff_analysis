@@ -25,7 +25,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, num_ff_per_row=3, guarantee_including_target_info=True, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
+def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, ff_caught_T_new, num_ff_per_row=3, guarantee_including_target_info=True, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
                                 placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=0, placeholder_ff_angle_boundary=0, placeholder_time_since_last_vis=3, curv_of_traj_df=None,
                                 add_arc_info=False, curvature_df=None, arc_info_to_add=['opt_arc_curv', 'curv_diff']):
     if only_select_n_ff_case is not None:
@@ -60,8 +60,8 @@ def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_positio
     #     ff_dataframe_sub = ff_dataframe_sub.merge(curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
     if add_arc_info:
-        curvature_utils.add_arc_info_to_df(
-            ff_dataframe_sub, curvature_df, arc_info_to_add=arc_info_to_add)
+        ff_dataframe_sub = curvature_utils.add_arc_info_to_df(
+            ff_dataframe_sub, curvature_df, arc_info_to_add=arc_info_to_add, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)
 
     all_point_index = np.unique(
         free_selection_df.starting_point_index.values.astype(int))
@@ -94,125 +94,166 @@ def find_label_of_ff_in_obs_ff(sequence_of_obs_ff_indices, ff_index_to_label, na
     return labels
 
 
-def find_free_selection_x_from_info_of_n_ff_per_point(info_of_n_ff_per_point,
-                                                      monkey_information=None,
-                                                      ff_attributes=[
-                                                          'ff_distance', 'ff_angle', 'time_since_last_vis'],
-                                                      attributes_for_plotting=[
-                                                          'ff_distance', 'ff_angle', 'time_since_last_vis'],
-                                                      add_current_curv_of_traj=False,
-                                                      num_ff_per_row=5,
-                                                      ff_caught_T_new=None,
-                                                      curv_of_traj_df=None,
-                                                      window_for_curv_of_traj=[
-                                                          -25, 25],
-                                                      curv_of_traj_mode='distance',
-                                                      truncate_curv_of_traj_by_time_of_capture=False):
-
+def find_free_selection_x_from_info_of_n_ff_per_point(
+    info_of_n_ff_per_point,
+    monkey_information=None,
+    ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'],
+    attributes_for_plotting=['ff_distance', 'ff_angle', 'time_since_last_vis'],
+    add_current_curv_of_traj=False,
+    num_ff_per_row=5,
+    ff_caught_T_new=None,
+    curv_of_traj_df=None,
+    window_for_curv_of_traj=[-25, 25],
+    curv_of_traj_mode='distance',
+    truncate_curv_of_traj_by_time_of_capture=False
+):
     info_of_n_ff_per_point = info_of_n_ff_per_point.sort_values(
         ['point_index', 'order'], ascending=True)
-    point_index_array = info_of_n_ff_per_point[info_of_n_ff_per_point['order']
-                                               == 0].point_index.values
-    free_selection_x = pd.DataFrame()
+    point_index_array = info_of_n_ff_per_point.loc[info_of_n_ff_per_point['order']
+                                                   == 0, 'point_index'].values
+
+    free_selection_x_df = pd.DataFrame()
     free_selection_x_df_for_plotting = pd.DataFrame()
     pred_var = []
     sequence_of_obs_ff_indices = []
-    # Then, we break down info_of_n_ff_per_point based on order numbers
+
     for i in range(num_ff_per_row):
         current_info = info_of_n_ff_per_point[info_of_n_ff_per_point['order'] == i]
-        # make sure that the point_index is in the right order
-        if np.any(current_info.point_index.values != point_index_array):
+        if not np.array_equal(current_info['point_index'].values, point_index_array):
             raise ValueError(
-                'point_index_array is not in the right order for order number: ', i)
+                f'point_index_array is not in the right order for order number: {i}')
+
         info_to_add = current_info[ff_attributes].copy()
-        column_names = [x+'_'+str(i) for x in ff_attributes]
+        column_names = [f"{attr}_{i}" for attr in ff_attributes]
         column_for_plotting_names = [
-            x+'_for_plotting_'+str(i) for x in attributes_for_plotting]
-        # column_names = ['ff_distance_'+str(i), angle_var+'_'+str(i), 'time_since_last_vis_'+str(i)]
+            f"{attr}_for_plotting_{i}" for attr in attributes_for_plotting]
+
         pred_var.extend(column_names)
-        free_selection_x[column_names] = info_to_add.values
-        free_selection_x_df_for_plotting[column_for_plotting_names] = current_info[attributes_for_plotting].copy(
-        ).values
+        free_selection_x_df[column_names] = info_to_add.values
+        free_selection_x_df_for_plotting[column_for_plotting_names] = current_info[attributes_for_plotting].values
         sequence_of_obs_ff_indices.append(current_info['ff_index'].values)
+    free_selection_x_df['point_index'] = point_index_array
+    #free_selection_x_df_for_plotting['point_index'] = point_index_array
 
     if add_current_curv_of_traj:
         if monkey_information is None:
             raise ValueError(
                 'monkey_information is None, but add_current_curv_of_traj is True')
+
         if curv_of_traj_df is None:
-            curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, monkey_information, ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode,
-                                                                                                                  truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
-        curv_of_traj = trajectory_info.find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode,
-                                                                window_for_curv_of_traj=window_for_curv_of_traj)
-        free_selection_x['curv_of_traj'] = curv_of_traj
-        # since curv_of_traj depends completely on the point index, we just have to include this variable once.
+            curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(
+                window_for_curv_of_traj, monkey_information, ff_caught_T_new,
+                curv_of_traj_mode=curv_of_traj_mode,
+                truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture
+            )
+
+        curv_of_traj = trajectory_info.find_trajectory_arc_info(
+            point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new,
+            monkey_information=monkey_information, curv_of_traj_mode=curv_of_traj_mode,
+            window_for_curv_of_traj=window_for_curv_of_traj
+        )
+
+        free_selection_x_df['curv_of_traj'] = curv_of_traj
         pred_var.append('curv_of_traj')
 
-    # also add point_index
-    free_selection_x.reset_index(drop=True, inplace=True)
+    free_selection_x_df.reset_index(drop=True, inplace=True)
     sequence_of_obs_ff_indices = np.array(sequence_of_obs_ff_indices).T
 
-    return free_selection_x, free_selection_x_df_for_plotting, sequence_of_obs_ff_indices, point_index_array, pred_var
+    return free_selection_x_df, free_selection_x_df_for_plotting, sequence_of_obs_ff_indices, point_index_array, pred_var
 
 
-def organize_free_selection_x(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, only_select_n_ff_case=None, num_ff_per_row=5,
-                              guarantee_including_target_info=True, add_current_curv_of_traj=False, ff_caught_T_new=None,
-                              window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance',
-                              curvature_df=None, curv_of_traj_df=None, selection_criterion_if_too_many_ff='time_since_last_vis',
-                              ff_attributes=[
-                                  'ff_distance', 'ff_angle', 'time_since_last_vis'],
-                              add_arc_info=False,
-                              arc_info_to_add=[
-                                  'opt_arc_curv', 'curv_diff'],  # or []
-                              info_of_n_ff_per_point=None):
-
+def organize_free_selection_x(
+    free_selection_df,
+    ff_dataframe,
+    ff_real_position_sorted,
+    monkey_information,
+    only_select_n_ff_case=None,
+    num_ff_per_row=5,
+    guarantee_including_target_info=True,
+    add_current_curv_of_traj=False,
+    ff_caught_T_new=None,
+    window_for_curv_of_traj=[-25, 0],
+    curv_of_traj_mode='distance',
+    curvature_df=None,
+    curv_of_traj_df=None,
+    selection_criterion_if_too_many_ff='time_since_last_vis',
+    ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'],
+    add_arc_info=False,
+    arc_info_to_add=['opt_arc_curv', 'curv_diff'],
+    info_of_n_ff_per_point=None
+):
     if not add_arc_info:
         arc_info_to_add = []
 
     if info_of_n_ff_per_point is None:
         free_selection_df = free_selection_df.sort_values(
-            ['starting_point_index'], ascending=[True]).reset_index(drop=True)
-        info_of_n_ff_per_point = find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, num_ff_per_row=num_ff_per_row,
-                                                             guarantee_including_target_info=guarantee_including_target_info,
-                                                             only_select_n_ff_case=only_select_n_ff_case, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff,
-                                                             add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df)
+            ['starting_point_index'], ascending=True).reset_index(drop=True)
+        info_of_n_ff_per_point = find_info_of_n_ff_per_point(
+            free_selection_df,
+            ff_dataframe,
+            ff_real_position_sorted,
+            monkey_information,
+            ff_caught_T_new,
+            num_ff_per_row=num_ff_per_row,
+            guarantee_including_target_info=guarantee_including_target_info,
+            only_select_n_ff_case=only_select_n_ff_case,
+            selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff,
+            add_arc_info=add_arc_info,
+            arc_info_to_add=arc_info_to_add,
+            curvature_df=curvature_df,
+            curv_of_traj_df=curv_of_traj_df
+        )
         ff_attributes = list(set(ff_attributes) | set(arc_info_to_add))
     else:
-        print('Note: info_of_n_ff_per_point is not None, so the following parameters will be ignored: free_selection_df, num_ff_per_row, guarantee_including_target_info, only_select_n_ff_case, selection_criterion_if_too_many_ff')
+        print(
+            'Note: info_of_n_ff_per_point is not None, so some parameters will be ignored.')
 
-    free_selection_x_df, free_selection_x_df_for_plotting, sequence_of_obs_ff_indices, point_index_array, pred_var = find_free_selection_x_from_info_of_n_ff_per_point(info_of_n_ff_per_point, monkey_information, ff_attributes=ff_attributes, num_ff_per_row=num_ff_per_row,
-                                                                                                                                                                       add_current_curv_of_traj=add_current_curv_of_traj, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df,
-                                                                                                                                                                       curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj)
+    free_selection_x_df, free_selection_x_df_for_plotting, sequence_of_obs_ff_indices, point_index_array, pred_var = find_free_selection_x_from_info_of_n_ff_per_point(
+        info_of_n_ff_per_point,
+        monkey_information,
+        ff_attributes=ff_attributes,
+        num_ff_per_row=num_ff_per_row,
+        add_current_curv_of_traj=add_current_curv_of_traj,
+        ff_caught_T_new=ff_caught_T_new,
+        curv_of_traj_df=curv_of_traj_df,
+        curv_of_traj_mode=curv_of_traj_mode,
+        window_for_curv_of_traj=window_for_curv_of_traj
+    )
+
     free_selection_labels = find_label_of_ff_in_obs_ff(
-        sequence_of_obs_ff_indices, free_selection_df['ff_index'].values, na_filler=num_ff_per_row)
+        sequence_of_obs_ff_indices,
+        free_selection_df['ff_index'].values,
+        na_filler=num_ff_per_row
+    )
 
-    # find the cases where the ff_index in free_selection_df is not in sequence_of_obs_ff_indices
-    rows_with_no_matching_labels = np.where(
+    rows_with_mismatched_labels = np.where(
         free_selection_labels == num_ff_per_row)[0]
-    point_index_with_no_matching_labels = point_index_array[rows_with_no_matching_labels]
-    non_chosen_rows_of_df = free_selection_df[free_selection_df['starting_point_index'].isin(
-        point_index_with_no_matching_labels)].copy()
-    cases_for_inspection = {'cases_for_inspection_obs': sequence_of_obs_ff_indices[rows_with_no_matching_labels, :],
-                            'non_chosen_rows_of_df': non_chosen_rows_of_df}
+    point_index_with_mismatched_labels = point_index_array[rows_with_mismatched_labels]
 
-    # also find chosen_rows_of_df
+    non_chosen_rows_of_df = free_selection_df[free_selection_df['starting_point_index'].isin(
+        point_index_with_mismatched_labels)].copy()
+    cases_for_inspection = {
+        'cases_for_inspection_obs': sequence_of_obs_ff_indices[rows_with_mismatched_labels, :],
+        'non_chosen_rows_of_df': non_chosen_rows_of_df
+    }
+
     chosen_rows_of_df = free_selection_df[~free_selection_df['starting_point_index'].isin(
-        point_index_with_no_matching_labels)].copy()
+        point_index_with_mismatched_labels)].copy()
     chosen_row_indices = chosen_rows_of_df.index.values.tolist()
     sequence_of_obs_ff_indices = [
         sequence_of_obs_ff_indices[i] for i in chosen_row_indices]
+
     free_selection_x_df['point_index'] = point_index_array
     free_selection_x_df = free_selection_x_df[~free_selection_x_df['point_index'].isin(
-        point_index_with_no_matching_labels)].reset_index(drop=True)
+        point_index_with_mismatched_labels)].reset_index(drop=True)
+
     free_selection_labels = free_selection_labels[free_selection_x_df.index.values]
-    free_selection_x_df.drop(columns=['point_index'], inplace=True)
 
     return free_selection_x_df, free_selection_labels, cases_for_inspection, chosen_rows_of_df, sequence_of_obs_ff_indices, free_selection_x_df_for_plotting
 
 
 def make_free_selection_predictions_using_trained_model(trained_model, ff_indices, target_indices, ff_dataframe, ff_real_position_sorted, ff_caught_T_new, monkey_information, time_of_evaluation=None):
     # if time_of_evaluation is None, then it will be set to the beginning of the trial
-
     if time_of_evaluation is None:
         # here it denotes the beginning of a trial
         time_of_evaluation = ff_caught_T_new[target_indices-1]

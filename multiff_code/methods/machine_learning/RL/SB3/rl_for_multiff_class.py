@@ -1,10 +1,11 @@
 import sys
-from data_wrangling import specific_utils, base_processing_class, further_processing_class, retrieve_raw_data, process_monkey_information
+from data_wrangling import specific_utils, general_utils, base_processing_class, further_processing_class, retrieve_raw_data, process_monkey_information
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
 from visualization.matplotlib_tools import additional_plots, plot_statistics
 from visualization.animation import animation_class, animation_utils
 from machine_learning.RL.env_related import base_env, env_for_lstm, env_for_sb3, collect_agent_data_utils
 from machine_learning.RL.SB3 import interpret_neural_network, rl_for_multiff_utils, SB3_functions
+
 
 import time as time_package
 import os
@@ -291,7 +292,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         return
 
     def make_or_retrieve_ff_dataframe_for_agent(self, exists_ok=False, save_data=False):
-        self.ff_dataframe = None
+        # self.ff_dataframe = None
         self.ff_dataframe_path = os.path.join(os.path.join(
             self.processed_data_folder_path, 'ff_dataframe.csv'))
 

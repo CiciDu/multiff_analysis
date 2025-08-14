@@ -40,7 +40,8 @@ class ProcessCategoryData:
                  sort_1_ff_indices=None, sort_2_ff_indices=None,
                  sort_1_ff_positions=None, sort_2_ff_positions=None,
                  sort_1_trials_ending_time=None, sort_2_trials_ending_time=None,
-                 sort_1_time_for_predicting_ff=None, sort_2_time_for_predicting_ff=None):
+                 sort_1_time_for_predicting_ff=None, sort_2_time_for_predicting_ff=None,
+                 null_arc_info_for_plotting=None):
 
         # sort_1_trials_ending_time & sort_2_trials_ending_time: these don't have to be the real ending time, but just a time where a trial is *considered* over
 
@@ -106,7 +107,8 @@ class ProcessCategoryData:
                                      'minimal_margin': 50,
                                      'show_points_when_ff_stop_being_visible': False,
                                      'show_path_when_target_visible': True,
-                                     'truncate_part_before_crossing_arena_edge': False}
+                                     'truncate_part_before_crossing_arena_edge': False,
+                                     'null_arc_info_for_plotting': null_arc_info_for_plotting}
 
     def clean_out_cross_boundary_trials(self, min_time_no_crossing_boundary=2.5):
 

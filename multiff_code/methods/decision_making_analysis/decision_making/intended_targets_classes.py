@@ -6,13 +6,8 @@ import numpy as np
 
 
 class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
-    def __init__(self, ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted,
-                 time_range_of_trajectory=[-1, 1], num_time_points_for_trajectory=10):
-        super().__init__(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information,
-                         time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
-
-        self.ff_flash_sorted = ff_flash_sorted
-        self.ff_life_sorted = ff_life_sorted
+    def __init__(self, raw_data_folder_path=None, time_range_of_trajectory=[-1, 1], num_time_points_for_trajectory=10):
+        super().__init__(raw_data_folder_path=raw_data_folder_path, time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
 
     def retrieve_manual_anno(self):
         super().retrieve_manual_anno()
@@ -181,7 +176,8 @@ class ModelOfMultipleIntendedTargets(ModelOfIntendedTargets):
 # ==========================================================================
 
 
-def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, pseudo_manual_anno, pseudo_manual_anno_long,
+# this needs to be updated since ModelOfIntendedTargets was updated
+def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, auto_annot, auto_annot_long,
                               num_ff_per_row=5, keeping_1_out_of_n_rows=10, add_arc_info=True, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                               add_current_curv_of_traj=True, furnish_with_trajectory_data=True, keep_whole_chunks=False,
                               ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None, curv_of_traj_df=None,
@@ -194,8 +190,8 @@ def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_so
 
     moit = ModelOfIntendedTargets(ff_dataframe_truncated, ff_caught_T_new, ff_real_position_sorted,
                                   monkey_information, ff_flash_sorted, ff_life_sorted, time_range_of_trajectory=time_range_of_trajectory)
-    moit.manual_anno = pseudo_manual_anno
-    moit.manual_anno_long = pseudo_manual_anno_long
+    moit.manual_anno = auto_annot
+    moit.manual_anno_long = auto_annot_long
     moit.eliminate_crossing_boundary_cases(n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary,
                                            n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary)
     moit.get_input_data(num_ff_per_row=num_ff_per_row, keeping_1_out_of_n_rows=keeping_1_out_of_n_rows,

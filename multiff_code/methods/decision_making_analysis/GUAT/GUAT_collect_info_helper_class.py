@@ -56,7 +56,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                                              max_distance_to_stop=400,
                                              include_ff_in_near_future=True,
                                              duration_into_future=0.5):
-
+        
         print('Note, the current value for max_cluster_distance is', max_cluster_distance,
               '. Please make sure that this is the same value used to make the GUAT_w_ff_df.')
         GUAT_cur_ff_info = GUAT_and_TAFT.find_GUAT_cur_ff_info(self.GUAT_w_ff_df, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information,
@@ -91,7 +91,42 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
         self.point_index_all = self.GUAT_cur_ff_info.point_index.unique()
         self.time_all = self.monkey_information.loc[self.point_index_all, 'time'].values
+        return
 
+    def add_arc_info_to_each_df_of_ff_info(self, curvature_df):
+        # add best_arc_info to GUAT_cur_ff_info and GUAT_nxt_ff_info
+        curvature_df_temp = pd.concat([curvature_df, self.additional_curvature_df], axis=0).reset_index(drop=True)
+        curvature_df_temp = curvature_df_temp[~curvature_df_temp[['point_index', 'ff_index']].duplicated()]
+        arc_info = ['curv_of_traj', 'curvature_lower_bound',
+                    'curvature_upper_bound', 'opt_arc_curv', 'curv_diff', 'abs_curv_diff']
+
+        curvature_df_sub = curvature_df_temp[[
+            'ff_index', 'point_index'] + arc_info].copy()
+        for column in arc_info:
+            if column in self.GUAT_cur_ff_info.columns:
+                self.GUAT_cur_ff_info = self.GUAT_cur_ff_info.drop([
+                    column], axis=1)
+            if column in self.GUAT_nxt_ff_info.columns:
+                self.GUAT_nxt_ff_info = self.GUAT_nxt_ff_info.drop(
+                    [column], axis=1)
+            if column in self.more_ff_df.columns:
+                self.more_ff_df = self.more_ff_df.drop([column], axis=1)
+
+        self.GUAT_cur_ff_info = pd.merge(self.GUAT_cur_ff_info, curvature_df_sub, on=[
+            'ff_index', 'point_index'], how='left')
+        self.GUAT_nxt_ff_info = pd.merge(self.GUAT_nxt_ff_info, curvature_df_sub, on=[
+                                         'ff_index', 'point_index'], how='left')
+        self.more_ff_df = pd.merge(self.more_ff_df, curvature_df_sub, on=[
+                                   'ff_index', 'point_index'], how='left')
+
+        self.GUAT_cur_ff_info = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
+            self.GUAT_cur_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
+        self.GUAT_nxt_ff_info = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
+            self.GUAT_nxt_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
+        self.more_ff_df = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
+            self.more_ff_df, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
+        return 
+        
     def set_time_of_eval(self, GUAT_w_ff_df, time_with_respect_to_first_stop=None, time_with_respect_to_second_stop=None, time_with_respect_to_last_stop=None):
         self.GUAT_w_ff_df = GUAT_w_ff_df.copy()
 
@@ -178,74 +213,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.GUAT_w_ff_df['total_stop_time'] = self.GUAT_w_ff_df['last_stop_time'] - \
             self.GUAT_w_ff_df['first_stop_time']
 
-    def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,
-                        include_TAFT_data=False):
-        if (already_retrieved_ok is False) | (not hasattr(self, 'monkey_information')):
-            self.data_item = further_processing_class.FurtherProcessing(
-                raw_data_folder_path=self.raw_data_folder_path)
-            self.data_item.retrieve_or_make_monkey_data()
-            self.monkey_information = self.data_item.monkey_information
-            self.ff_life_sorted = self.data_item.ff_life_sorted
-            self.ff_real_position_sorted = self.data_item.ff_real_position_sorted
-            self.ff_believed_position_sorted = self.data_item.ff_believed_position_sorted
-            self.ff_caught_T_new = self.data_item.ff_caught_T_new
-
-        for df in ['monkey_information', 'ff_life_sorted', 'ff_real_position_sorted', 'ff_believed_position_sorted', 'ff_caught_T_new']:
-            setattr(self, df, getattr(self.data_item, df).copy())
-
-        if include_ff_dataframe:
-            if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
-                # if self.data_item is not called yet
-                if not hasattr(self, 'data_item'):
-                    self.data_item = further_processing_class.FurtherProcessing(
-                        raw_data_folder_path=self.raw_data_folder_path)
-                    self.data_item.retrieve_or_make_monkey_data()
-                if (already_retrieved_ok is False) | (not hasattr(self, 'ff_dataframe')):
-                    self.data_item.make_or_retrieve_ff_dataframe(
-                        exists_ok=True)
-                    self.ff_dataframe = self.data_item.ff_dataframe
-                    self.ff_dataframe_visible = self.ff_dataframe.loc[self.ff_dataframe['visible'] == 1].copy(
-                    )
-
-        if include_GUAT_data:
-            if not hasattr(self, 'GUAT_trials_df'):
-                if not hasattr(self, 'data_item'):
-                    self.data_item = further_processing_class.FurtherProcessing(
-                        raw_data_folder_path=self.raw_data_folder_path)
-                    self.data_item.retrieve_or_make_monkey_data()
-                    self.data_item.make_or_retrieve_ff_dataframe(
-                        exists_ok=True)
-                elif not hasattr(self, 'ff_dataframe'):
-                    self.data_item.make_or_retrieve_ff_dataframe(
-                        exists_ok=True)
-                self.data_item.get_give_up_after_trying_info()
-                self.give_up_after_trying_info_bundle = self.data_item.give_up_after_trying_info_bundle
-                self.GUAT_w_ff_df = self.data_item.GUAT_w_ff_df
-
-            for df in ['give_up_after_trying_trials', 'GUAT_indices_df', 'GUAT_trials_df', 'GUAT_point_indices_for_anim', 'GUAT_w_ff_df']:
-                setattr(self, df, getattr(self.data_item, df).copy())
-
-        if include_TAFT_data:
-            if not hasattr(self, 'TAFT_trials_df'):
-                if not hasattr(self, 'data_item'):
-                    self.data_item = further_processing_class.FurtherProcessing(
-                        raw_data_folder_path=self.raw_data_folder_path)
-                    self.data_item.retrieve_or_make_monkey_data()
-                    self.data_item.make_or_retrieve_ff_dataframe(
-                        exists_ok=True)
-                elif not hasattr(self, 'ff_dataframe'):
-                    self.data_item.make_or_retrieve_ff_dataframe(
-                        exists_ok=True)
-                self.data_item.get_try_a_few_times_info()
-
-            for df in ['try_a_few_times_trials', 'TAFT_indices_df', 'TAFT_trials_df', 'try_a_few_times_indices_for_anim']:
-                setattr(self, df, getattr(self.data_item, df).copy())
-
-        if include_ff_dataframe:
-            self.cluster_around_target_indices = None
-            self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted,
-                                    self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
-
     def retrieve_or_make_GUAT_trials_df(self, exists_ok=True):
         filepath = os.path.join(self.GUAT_folder_path, 'GUAT_trials_df.csv')
         if exists(filepath) & exists_ok:
@@ -256,11 +223,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 self.GUAT_w_ff_df, self.ff_life_sorted, self.ff_real_position_sorted, self.monkey_information)
             self.GUAT_trials_df.to_csv(filepath, index=False)
             print('Made and saved GUAT_trials_df')
-
-    def make_curvature_df(self, curv_of_traj_df=None, clean=True):
-
-        self.curvature_df = curvature_utils.make_curvature_df(
-            self.ff_dataframe, curv_of_traj_df, clean=clean)
 
     def add_curvature_info_to_ff_dataframe(self, column_exists_ok=False):
         # add the column abs_curv_diff to ff_dataframe through merging with curvature_df
@@ -275,6 +237,12 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                 [-1, 1], size=na_index.sum()) * 0.6
             self.ff_dataframe['abs_curv_diff'] = self.ff_dataframe['curv_diff'].abs(
             )
+
+            # # fill na of curv_diff, but randomly make half of them negative
+            # na_index = self.ff_dataframe['curv_diff'].isna()
+            # self.ff_dataframe.loc[na_index, 'curv_diff'] = np.random.choice([-1,1], size= na_index.sum()) * 0.6
+            # self.ff_dataframe['abs_curv_diff']  = self.ff_dataframe['curv_diff'].abs()
+
 
     def add_curv_of_traj_info_to_monkey_information(self, column_exists_ok=False):
         # add the column abs_curv_diff to ff_dataframe through merging with curvature_df
@@ -386,112 +354,3 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             self.more_traj_points_df = None
             self.more_traj_stops_df = None
 
-    def get_traj_ff_info(self):
-        traj_time_2d, trajectory_data_dict = trajectory_info.find_trajectory_data(
-            self.time_all, self.monkey_information, time_range_of_trajectory=self.time_range_of_trajectory, num_time_points_for_trajectory=self.gc_kwargs['num_time_points_for_trajectory'])
-
-        # convert traj_time_2d to point_index_2d use np.searchsorted
-        point_index_2d = np.searchsorted(
-            self.monkey_information.time.values, traj_time_2d)
-        # make sure no index is out of bound
-        point_index_2d[point_index_2d >= len(self.monkey_information)] = len(
-            self.monkey_information) - 1
-
-        GUAT_cur_ff_info = self.GUAT_cur_ff_info.copy()
-        GUAT_nxt_ff_info = self.GUAT_nxt_ff_info.copy()
-
-        GUAT_cur_ff_info.columns
-
-        GUAT_ff_info_combined = pd.concat([GUAT_cur_ff_info[['point_index', 'ff_index', 'ff_number']], GUAT_nxt_ff_info[[
-                                          'point_index', 'ff_index', 'ff_number']]], axis=0)
-        GUAT_ff_info_combined = GUAT_ff_info_combined[GUAT_ff_info_combined['ff_index'] > 0].copy(
-        )
-
-        list_of_point_index = []
-        list_of_ff_index = []
-        list_of_ff_number = []
-        list_of_traj_point_index = []
-        list_of_traj_relative_index = []
-        for i in range(len(self.point_index_all)):
-            current_point_index = self.point_index_all[i]
-            traj_point_index_array = point_index_2d[i, :]
-            relevant_ff = GUAT_ff_info_combined[GUAT_ff_info_combined['point_index']
-                                                == current_point_index]
-
-            for index, row in relevant_ff.iterrows():
-                ff = row['ff_index']
-                ff_number = row['ff_number']
-                num_traj_points = len(traj_point_index_array)
-                list_of_point_index.extend(
-                    [current_point_index] * num_traj_points)
-                list_of_ff_index.extend([ff] * num_traj_points)
-                list_of_ff_number.extend([ff_number] * num_traj_points)
-                list_of_traj_point_index.extend(traj_point_index_array)
-                traj_relative_index = np.arange(
-                    (ff_number-1)*num_traj_points, ff_number*num_traj_points)
-                list_of_traj_relative_index.extend(traj_relative_index)
-                # list_of_traj_relative_index.extend(np.arange(num_traj_points))
-
-        new_traj_df = pd.DataFrame({'point_index': list_of_point_index,
-                                    'ff_index': list_of_ff_index,
-                                    'ff_number': list_of_ff_number,
-                                    'traj_point_index': list_of_traj_point_index,
-                                    'traj_relative_index': list_of_traj_relative_index, })
-
-        ff_info = decision_making_utils.find_many_ff_info_anew(new_traj_df.ff_index.values, new_traj_df.traj_point_index.values, self.ff_real_position_sorted, self.ff_dataframe_visible, self.monkey_information, add_time_till_next_visible=True, add_curv_diff=True,
-                                                               ff_caught_T_new=self.curv_of_traj_df, truncate_curv_of_traj_by_time_of_capture=True, ff_radius=10, curv_of_traj_df=self.curv_of_traj_df)
-        ff_info = ff_info[['ff_index', 'point_index', 'time_since_last_vis',
-                           'curv_diff', 'ff_distance', 'ff_angle']].copy()
-        ff_info['traj_point_index'] = ff_info['point_index'].values.copy()
-        try:
-            ff_info['traj_relative_index'] = new_traj_df['traj_relative_index'].values.copy()
-        except ValueError:
-            print('ff_info and new_traj_df have different lengths. ff_info:',
-                  ff_info.shape, 'new_traj_df:', new_traj_df.shape)
-            print('ff_info head:')
-            print(ff_info.head())
-            print('new_traj_df head:')
-            print(new_traj_df.head())
-            print('ff_info tail:')
-            print(ff_info.tail())
-            print('new_traj_df tail:')
-            print(new_traj_df.tail())
-
-        ff_info['point_index'] = new_traj_df['point_index'].values
-        ff_info['ff_number'] = new_traj_df['ff_number'].values
-        self.traj_ff_info = ff_info.sort_values(
-            by=['point_index', 'ff_number', 'traj_point_index']).reset_index(drop=True)
-
-    def add_arc_info_to_each_df_of_ff_info(self, curvature_df):
-        # add best_arc_info to GUAT_cur_ff_info and GUAT_nxt_ff_info
-        curvature_df = pd.concat(
-            [curvature_df, self.additional_curvature_df], axis=0)
-        curvature_df_sub = curvature_df[['point_index', 'ff_index']].copy()
-        curvature_df = curvature_df[~curvature_df_sub.duplicated()]
-        arc_info = ['curv_of_traj', 'curvature_lower_bound',
-                    'curvature_upper_bound', 'opt_arc_curv', 'curv_diff', 'abs_curv_diff']
-
-        curvature_df_sub = curvature_df[[
-            'ff_index', 'point_index'] + arc_info].copy()
-        for column in arc_info:
-            if column in self.GUAT_cur_ff_info.columns:
-                self.GUAT_cur_ff_info = self.GUAT_cur_ff_info.drop([
-                    column], axis=1)
-            if column in self.GUAT_nxt_ff_info.columns:
-                self.GUAT_nxt_ff_info = self.GUAT_nxt_ff_info.drop(
-                    [column], axis=1)
-            if column in self.more_ff_df.columns:
-                self.more_ff_df = self.more_ff_df.drop([column], axis=1)
-
-        self.GUAT_cur_ff_info = pd.merge(self.GUAT_cur_ff_info, curvature_df_sub, on=[
-            'ff_index', 'point_index'], how='left')
-        self.GUAT_nxt_ff_info = pd.merge(self.GUAT_nxt_ff_info, curvature_df_sub, on=[
-                                         'ff_index', 'point_index'], how='left')
-        self.more_ff_df = pd.merge(self.more_ff_df, curvature_df_sub, on=[
-                                   'ff_index', 'point_index'], how='left')
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
-            self.GUAT_cur_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
-            self.GUAT_nxt_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
-            self.more_ff_df, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)

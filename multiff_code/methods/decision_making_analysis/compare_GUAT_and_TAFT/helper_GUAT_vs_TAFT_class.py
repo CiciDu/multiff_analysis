@@ -5,6 +5,7 @@ from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 from null_behaviors import curv_of_traj_utils
+from decision_making_analysis.decision_making import decision_making_class
 
 import os
 import sys
@@ -24,7 +25,10 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class HelperGUATavsTAFTclass():
+class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
+    
+    def __init__(self, raw_data_folder_path=None):
+        super().__init__(raw_data_folder_path=raw_data_folder_path, retrieve_monkey_data=False)
 
     def _get_stops_near_ff_df(self,
                               already_made_ok=True):

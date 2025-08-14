@@ -194,7 +194,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def _init_empty_vars(self):
         self.slope = None
-        self.ff_dataframe = None
+        # self.ff_dataframe = None
         self.nxt_ff_df_from_ref_test = None
         self.nxt_ff_df_from_ref_ctrl = None
         self.curv_of_traj_df = None

@@ -15,13 +15,13 @@ import pickle
 class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
 
     df_names = ['GUAT_nxt_ff_info', 'GUAT_cur_ff_info',
-                'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']
+                'traj_data_df', 'more_traj_data_df', 'more_ff_df']
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
     def __init__(self, gc_kwargs, monkey_name='monkey_Bruno'):
         self.gc_kwargs = gc_kwargs
         self.monkey_information = None
-        self.polar_plots_kwargs = None
+        self.polar_plots_kwargs = {}
         self.monkey_name = monkey_name
         self.combd_GUAT_info_folder_path = f"all_monkey_data/decision_making/{self.monkey_name}/combined_data/GUAT_info"
 
@@ -37,6 +37,7 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
                 self.combd_GUAT_info_folder_path, df_names=self.df_names)
         else:
             self.collect_info_flag = True
+
         self.trajectory_features = gc_kwargs['trajectory_features']
         if self.collect_info_flag:
             self.combined_info, self.all_traj_feature_names = self.collect_combined_info_for_GUAT(gc_kwargs, GUAT_w_ff_df_exists_ok=GUAT_w_ff_df_exists_ok,
@@ -149,7 +150,6 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         self.traj_data_df = self.combined_info['traj_data_df']
         self.more_traj_data_df = self.combined_info['more_traj_data_df']
         self.more_ff_df = self.combined_info['more_ff_df']
-        self.traj_ff_info = self.combined_info['traj_ff_info']
 
         # separate the trajectory data information
         self.traj_points_df = self.traj_data_df.loc[:,
@@ -210,8 +210,11 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
             ff_attributes = list(set(ff_attributes) | set(arc_info_to_add))
 
         # find free_selection_x_df and use it as input for machine learning
-        self.free_selection_x_df, self.free_selection_x_df_for_plotting, self.sequence_of_obs_ff_indices, self.point_index_array, self.pred_var = free_selection.find_free_selection_x_from_info_of_n_ff_per_point(self.GUAT_joined_ff_info,
-                                                                                                                                                                                                                   ff_attributes=ff_attributes, attributes_for_plotting=self.attributes_for_plotting, num_ff_per_row=self.num_old_ff_per_row + self.num_new_ff_per_row)
+        (self.free_selection_x_df, self.free_selection_x_df_for_plotting, self.sequence_of_obs_ff_indices,
+         self.point_index_array, self.pred_var) = free_selection.find_free_selection_x_from_info_of_n_ff_per_point(
+            self.GUAT_joined_ff_info, ff_attributes=ff_attributes,
+            attributes_for_plotting=self.attributes_for_plotting,
+            num_ff_per_row=self.num_old_ff_per_row + self.num_new_ff_per_row)
 
         if add_current_curv_of_traj:  # manually add trajectory arc info
             curv_of_traj = self.relevant_curv_of_traj_df.set_index(
@@ -232,15 +235,20 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         self.output = self.num_stops - 1
         # self.output[self.output > 2] = 2
 
-    def prepare_data_for_machine_learning(self, furnish_with_trajectory_data=True,
-                                          traj_ff_attributes_to_add=['time_since_last_vis', 'ff_distance', 'ff_angle', 'curv_diff'],):
+    def prepare_data_for_machine_learning(self, furnish_with_trajectory_data=False,
+                                          ):
         '''
         X_all: the input data for machine learning
         input_features: the names of the input features
         '''
+        self.free_selection_point_index = self.point_index_array
+        self.free_selection_labels = self.output.copy()
 
-        super().prepare_data_for_machine_learning(
-            furnish_with_trajectory_data=False, add_traj_stops=False)
+        self.time_range_of_trajectory = self.gc_kwargs['time_range_of_trajectory']
+        self.num_time_points_for_trajectory = self.gc_kwargs['num_time_points_for_trajectory']
+
+        super().prepare_data_for_machine_learning(kind="free selection", furnish_with_trajectory_data=furnish_with_trajectory_data,
+                                                  trajectory_data_kind="position", add_traj_stops=True)
 
         if furnish_with_trajectory_data:  # manually add trajectory and stops info
             self.furnish_with_trajectory_data = True
@@ -258,28 +266,7 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         else:
             self.furnish_with_trajectory_data = False
 
-        time_range_of_trajectory = self.gc_kwargs['time_range_of_trajectory']
-        num_time_points_for_trajectory = self.gc_kwargs['num_time_points_for_trajectory']
 
-        if traj_ff_attributes_to_add is not None:
-            # add the attributes of ff on each point of the trajectory
-            for attribute in traj_ff_attributes_to_add:
-                relative_time_points_of_trajectory = np.linspace(
-                    time_range_of_trajectory[0], time_range_of_trajectory[1], num_time_points_for_trajectory)
-                trajectory_feature_names = trajectory_info.generate_feature_names_given_relative_time_points(
-                    relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=[attribute+'_current', attribute+'_alt'])
-
-                # as of right now, let's just use 1 and 101 as the ff_number to be used
-                # note...i think the pivot table method only works well right now cause we only chose 2 ff_number to be used
-                traj_ff_info_temp = self.traj_ff_info[self.traj_ff_info['ff_number'].isin([
-                                                                                          1, 101])]
-                # collapse the data belonging to the same point_index into the same row, in the wide format
-                traj_ff_info_temp = traj_ff_info_temp.pivot(
-                    index='point_index', columns='traj_relative_index', values=attribute)
-                self.X_all = np.concatenate(
-                    [self.X_all, traj_ff_info_temp.values], axis=1)
-                self.input_features = np.concatenate(
-                    [self.input_features, trajectory_feature_names], axis=0)
 
     def add_additional_info_to_plot(self):
         self.more_ff_df = cluster_replacement_utils.eliminate_part_of_more_ff_inputs_already_in_observation(

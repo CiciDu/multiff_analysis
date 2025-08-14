@@ -21,7 +21,7 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
                                    data_category='decision_making',
                                    data_folder_name='GUAT_info',
                                    df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info',
-                                             'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info'],
+                                             'traj_data_df', 'more_traj_data_df', 'more_ff_df'],
                                    point_index_column_name='point_index'):
 
     all_important_info = dict()
@@ -64,7 +64,7 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
 def check_which_df_exists_for_each_session(sessions_df_for_one_monkey,
                                            data_category='decision_making',
                                            data_folder_name='GUAT_info',
-                                           df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']):
+                                           df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df']):
     # first assess which df need to be remade
     for name in df_names:
         sessions_df_for_one_monkey[name] = False
@@ -102,7 +102,7 @@ def turn_all_important_info_into_combined_info(all_important_info, folder_name, 
     return combined_info
 
 
-def try_to_retrieve_combined_info(folder_name, df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'traj_ff_info']):
+def try_to_retrieve_combined_info(folder_name, df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df']):
     combined_info = dict()
     # retrieve all the csv in raw_data_dir_name and put into combined_info
     collect_info_flag = False

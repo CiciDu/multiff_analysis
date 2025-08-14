@@ -114,7 +114,7 @@ def add_arc_info_to_old_and_new_ff_info(old_ff_info, new_ff_info, curvature_df, 
         arc_info_df = pd.merge(curvature_df_sub, temp_df, on=[
                                'ff_index', 'point_index'], how='right')
         # for the NAs (when ff_index is -10)
-        curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
+        arc_info_df = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
             arc_info_df, monkey_information, ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)
         # combine arc_info_df and result_df
         column_names = arc_info_to_add

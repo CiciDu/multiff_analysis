@@ -46,13 +46,6 @@ def find_best_arc_df_for_ff(ff_indices, point_indexes, curv_of_traj_df, monkey_i
     curvature_df = curvature_utils.make_curvature_df(ff_info, curv_of_traj_df, clean=True,
                                                           opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
     return curvature_df, ff_info
-    # mini_ff_dataframe = make_mini_ff_dataframe(
-    #     ff_indices, duration, monkey_information, ff_real_position_sorted, ff_radius=10, max_distance=400)
-    # temp_curvature_df = curvature_utils.make_curvature_df(mini_ff_dataframe, curv_of_traj_df, ff_radius_for_opt_arc=15, clean=True,
-    #                                                       opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
-    # ff_best_arc_df, best_arc_original_columns = find_best_arc.make_best_arc_df(
-    #     temp_curvature_df, monkey_information, ff_real_position_sorted)
-    #return ff_best_arc_df
 
 
 def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, linewidth=2,

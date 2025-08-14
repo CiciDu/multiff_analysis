@@ -29,8 +29,7 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
                  ref_point_value=-150,
                  stop_period_duration=2):
 
-        base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(
-            self, raw_data_folder_path)
+        super().__init__(raw_data_folder_path=raw_data_folder_path)
         self.curv_of_traj_df = None
         self.curv_of_traj_df_w_one_sided_window = None
 
@@ -58,8 +57,7 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
             except FileNotFoundError:
                 pass
 
-        self.get_relevant_monkey_data(
-            raw_data_folder_path=self.raw_data_folder_path)
+        self.get_relevant_monkey_data()
         self.get_GUAT_or_TAFT_df()
         self.get_GUAT_or_TAFT_x_df(save_data=save_data)
 
@@ -83,23 +81,14 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
 
     def get_relevant_monkey_data(self,
                                  already_retrieved_ok=True,
-                                 raw_data_folder_path='all_monkey_data/raw_monkey_data/monkey_Bruno/data_0330'
                                  ):
-        self.monkey_name = os.path.basename(raw_data_folder_path)
-        if not hasattr(self, 'gcc'):
-            self.gcc = GUAT_collect_info_class.GUATCollectInfoForSession(raw_data_folder_path=raw_data_folder_path,
-                                                                         gc_kwargs=helper_GUAT_vs_TAFT_class.gc_kwargs, new_point_index_start=0)
-
+        
         include_TAFT_data = True if self.GUAT_or_TAFT == 'TAFT' else False
         include_GUAT_data = True if self.GUAT_or_TAFT == 'GUAT' else False
-        self.gcc.get_monkey_data(already_retrieved_ok=already_retrieved_ok,
+        self.get_monkey_data(already_retrieved_ok=already_retrieved_ok,
                                  include_GUAT_data=include_GUAT_data, include_TAFT_data=include_TAFT_data)
 
-        for df in ['monkey_information', 'ff_dataframe', 'ff_flash_sorted', 'ff_real_position_sorted', 'ff_life_sorted',
-                   'ff_believed_position_sorted', 'ff_caught_T_new', 'closest_stop_to_capture_df']:
-            setattr(self, df, getattr(self.gcc.data_item, df).copy())
         if self.GUAT_or_TAFT == 'TAFT':
-            self.TAFT_trials_df = self.gcc.data_item.TAFT_trials_df.copy()
             self.TAFT_trials_df['first_stop_time'] = self.monkey_information.loc[
                 self.TAFT_trials_df['first_stop_point_index'], 'time'].values
             self.TAFT_trials_df['ff_index'] = self.TAFT_trials_df['trial']
@@ -108,8 +97,6 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
                 self.ff_caught_T_new) - 2]
             GUAT_vs_TAFT_utils.add_stop_point_index(
                 self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
-        elif self.GUAT_or_TAFT == 'GUAT':
-            self.GUAT_w_ff_df = self.gcc.data_item.GUAT_w_ff_df.copy()
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1]
 
     def get_GUAT_or_TAFT_df(self):

@@ -34,8 +34,8 @@ class BaseProcessing:
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
     def __init__(self):
-        self.monkey_information = None
-        self.ff_dataframe = None
+        # self.monkey_information = None
+        # self.ff_dataframe = None
         self.curv_of_traj_params = {}
 
     def load_raw_data(self, raw_data_folder_path=None, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):

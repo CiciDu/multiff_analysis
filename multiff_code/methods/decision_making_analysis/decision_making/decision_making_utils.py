@@ -552,31 +552,31 @@ def make_anno_and_pred_ff_indices_dict(moit2, y_pred_all=None, add_negative_labe
     return anno_ff_indices_dict, pred_ff_indices_dict
 
 
-def make_pseudo_manual_anno(best_arc_df, monkey_information, ff_caught_T_new):
+def make_auto_annot(best_arc_df, monkey_information, ff_caught_T_new):
 
     # organize best_arc_df_sub into manual_anno format to apply machine learning
-    pseudo_manual_anno_long = best_arc_df.copy()
-    pseudo_manual_anno_long.rename(
+    auto_annot_long = best_arc_df.copy()
+    auto_annot_long.rename(
         columns={'point_index': 'starting_point_index'}, inplace=True)
 
-    pseudo_manual_anno_long['time'] = monkey_information['time'].loc[pseudo_manual_anno_long.starting_point_index.values].values
-    pseudo_manual_anno_long['target_index'] = np.searchsorted(
-        ff_caught_T_new, pseudo_manual_anno_long['time'].values).astype(int)
-    pseudo_manual_anno_long['ff_index'] = pseudo_manual_anno_long['ff_index'].astype(
+    auto_annot_long['time'] = monkey_information['time'].loc[auto_annot_long.starting_point_index.values].values
+    auto_annot_long['target_index'] = np.searchsorted(
+        ff_caught_T_new, auto_annot_long['time'].values).astype(int)
+    auto_annot_long['ff_index'] = auto_annot_long['ff_index'].astype(
         int)
-    pseudo_manual_anno_long['starting_point_index'] = pseudo_manual_anno_long['starting_point_index'].astype(
+    auto_annot_long['starting_point_index'] = auto_annot_long['starting_point_index'].astype(
         int)
 
     # only keep the cases where the ff_index has appeared more than 5 times consecutively
-    pseudo_manual_anno = pseudo_manual_anno_long[pseudo_manual_anno_long['max_num_repetitions'] > 5]
+    auto_annot = auto_annot_long[auto_annot_long['max_num_repetitions'] > 5]
     # only keep the cases where the ff_index has appeared for the first time in the consecutive cases
-    pseudo_manual_anno = pseudo_manual_anno[pseudo_manual_anno['num_repetitions'] == 0]
-    pseudo_manual_anno = pseudo_manual_anno[[
+    auto_annot = auto_annot[auto_annot['num_repetitions'] == 0]
+    auto_annot = auto_annot[[
         'ff_index', 'starting_point_index', 'time', 'target_index']]
 
-    pseudo_manual_anno_long = pseudo_manual_anno_long[[
+    auto_annot_long = auto_annot_long[[
         'ff_index', 'starting_point_index', 'time', 'target_index']]
     # since all data are valid, each point is its own original starting point
-    pseudo_manual_anno_long['original_starting_point_index'] = pseudo_manual_anno_long['starting_point_index']
+    auto_annot_long['original_starting_point_index'] = auto_annot_long['starting_point_index']
 
-    return pseudo_manual_anno, pseudo_manual_anno_long
+    return auto_annot, auto_annot_long

@@ -122,6 +122,27 @@ class ProcessGUATtrials:
 
         plt.show()
 
+    def make_GUAT_cluster_df(self):
+        ff_indices_of_each_cluster = self.GUAT_w_ff_df['nearby_alive_ff_indices'].values
+        GUAT_last_stop_time = self.GUAT_w_ff_df['last_stop_time'].values
+
+        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_last_vis_df(
+            ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=self.GUAT_w_ff_df['cluster_index'].values)
+
+        self.GUAT_cluster_df.rename(
+            columns={'cluster_identifier': 'cluster_index'}, inplace=True)
+
+        self.GUAT_cluster_df = self.GUAT_cluster_df.merge(self.GUAT_w_ff_df[['cluster_index', 'first_stop_time', 'second_stop_time', 'last_stop_time', 'first_stop_point_index',
+                                                                             'second_stop_point_index', 'last_stop_point_index', 'target_index', 'num_stops']],
+                                                          on='cluster_index', how='left')
+
+        # to prepare for free selection
+        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = self.GUAT_cluster_df['last_stop_time'] - \
+            self.GUAT_cluster_df['time_since_last_vis']
+
+        # sort by last_stop_time (note that the order in GUAT_cluster_df will henceforward be different from other variables)
+        self.GUAT_cluster_df.sort_values(by='last_stop_time', inplace=True)
+
     def check_GUAT_object_with_manual_anno(self, verbose=True):
 
         clusters_w_o_ff_aimed_at = []
@@ -135,7 +156,7 @@ class ProcessGUATtrials:
                 self.GUAT_indices_df['cluster_index'].values == counter)[0]
             relevant_indices = self.GUAT_indices_df['point_index'].values[relevant_info]
 
-            trial = self.GUAT_expanded_trials_df.trial_index.values[i]
+            trial = self.GUAT_expanded_trials_df.trial.values[i]
             ff_near_stops = self.GUAT_expanded_trials_df['nearby_alive_ff_indices'].iloc[i]
             ff_aimed_at = self.GUAT_ff_aimed_at_from_manual_anno[i]
 
@@ -198,24 +219,3 @@ class ProcessGUATtrials:
                                      'indices_of_ff_to_mark_2nd_kind': ff_aimed_at}
                 self.make_GUAT_plot(
                     trial, ff_near_stops, relevant_indices, additional_kwargs=additional_kwargs)
-
-    def make_GUAT_cluster_df(self):
-        ff_indices_of_each_cluster = self.GUAT_w_ff_df['nearby_alive_ff_indices'].values
-        GUAT_last_stop_time = self.GUAT_w_ff_df['last_stop_time'].values
-
-        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_last_vis_df(
-            ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=self.GUAT_w_ff_df['cluster_index'].values)
-
-        self.GUAT_cluster_df.rename(
-            columns={'cluster_identifier': 'cluster_index'}, inplace=True)
-
-        self.GUAT_cluster_df = self.GUAT_cluster_df.merge(self.GUAT_w_ff_df[['cluster_index', 'first_stop_time', 'second_stop_time', 'last_stop_time', 'first_stop_point_index',
-                                                                             'second_stop_point_index', 'last_stop_point_index', 'target_index', 'num_stops']],
-                                                          on='cluster_index', how='left')
-
-        # to prepare for free selection
-        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = self.GUAT_cluster_df['last_stop_time'] - \
-            self.GUAT_cluster_df['time_since_last_vis']
-
-        # sort by last_stop_time (note that the order in GUAT_cluster_df will henceforward be different from other variables)
-        self.GUAT_cluster_df.sort_values(by='last_stop_time', inplace=True)
