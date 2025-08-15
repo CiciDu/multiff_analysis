@@ -70,7 +70,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15,
         raise ValueError(
             "At least one of include_cntr_arc_curv and include_opt_arc_curv should be True.")
 
-    curvature_df = ff_dataframe_sub[['point_index', 'ff_index', 'monkey_x', 'monkey_y', 'monkey_angle',
+    curvature_df = ff_dataframe_sub[['time', 'point_index', 'ff_index', 'monkey_x', 'monkey_y', 'monkey_angle',
                                     'ff_x', 'ff_y', 'ff_distance', 'ff_angle', 'ff_angle_boundary']].copy()
 
     curvature_df['curv_of_traj'] = curv_of_traj
@@ -549,15 +549,22 @@ def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monk
         # fill the column with NA
         duration_df.loc[duration_df['overlap_with_previous_duration']
                         == True, 'start_of_duration'] = np.nan
-        # forward fill the column
-        duration_df['start_of_duration'] = duration_df['start_of_duration'].ffill()
 
-        # deal with them similarly
-        duration_df['overlap_with_next_duration'] = duration_df['overlap_with_previous_duration'].shift(
-            -1).fillna(False)
-        duration_df.loc[duration_df['overlap_with_next_duration']
-                        == True, 'end_of_duration'] = np.nan
-        duration_df['end_of_duration'] = duration_df['end_of_duration'].bfill()
+        # Forward-fill start times
+        duration_df['start_of_duration'] = duration_df['start_of_duration'].fillna(method='ffill')
+
+        # Flag if the *next* row overlaps
+        duration_df['overlap_with_next_duration'] = (
+            duration_df['overlap_with_previous_duration']
+            .shift(-1)
+            .fillna(False)
+        )
+
+        # Set end_of_duration to NA where overlap exists
+        duration_df.loc[duration_df['overlap_with_next_duration'], 'end_of_duration'] = pd.NA
+
+        # Backward-fill end times
+        duration_df['end_of_duration'] = duration_df['end_of_duration'].fillna(method='bfill')
 
         # now, let's only keep unique rows
         duration_df = duration_df[['start_of_duration',

@@ -33,24 +33,23 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-
-def find_best_arc_df_for_ff(ff_indices, point_indexes, curv_of_traj_df, monkey_information, 
+def find_best_arc_df_for_ff(ff_indices, point_indexes, curv_of_traj_df, monkey_information,
                             ff_real_position_sorted, opt_arc_stop_first_vis_bdry=True):
 
     ff_info = find_cvn_utils.find_ff_info(
-            ff_indices,
-            point_indexes,
-            monkey_information,
-            ff_real_position_sorted)  
-    
+        ff_indices,
+        point_indexes,
+        monkey_information,
+        ff_real_position_sorted)
+
     curvature_df = curvature_utils.make_curvature_df(ff_info, curv_of_traj_df, clean=True,
-                                                          opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+                                                     opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
     return curvature_df, ff_info
 
 
 def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, linewidth=2,
                              opacity=None, color=None, trace_name='null arc'):
-    
+
     if len(null_arc_info) == 0:
         print('Warning: No null arc info to plot because null_arc_info is empty')
 
@@ -73,14 +72,13 @@ def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=Non
 
 def update_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, trace_name='null arc'):
 
-
     if len(null_arc_info) == 0:
-        #print('Warning: null_arc_info is empty. No null arcs will be plotted.')
+        # print('Warning: null_arc_info is empty. No null arcs will be plotted.')
         # temporarily hide the trace called trace_name
         fig.update_traces(overwrite=True, selector=dict(name=trace_name),
                           visible=False)
         return fig
-    
+
     for index in null_arc_info.index:
         arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[index, 'center_x'], null_arc_info.loc[index, 'center_y'], null_arc_info.loc[index, 'all_arc_radius'],
                                                                   null_arc_info.loc[index, 'arc_starting_angle'], null_arc_info.loc[index, 'arc_ending_angle'], rotation_matrix=rotation_matrix)
@@ -112,7 +110,7 @@ def make_mini_ff_dataframe(ff_indices, duration, monkey_information, ff_real_pos
             duration, monkey_information)
 
         # Find distances to ff
-        distances_to_ff = LA.norm(
+        distances_to_ff = np.linalg.norm(
             np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[i], axis=1)
         angles_to_ff = specific_utils.calculate_angles_to_ff_centers(
             ff_x=ff_real_position_sorted[i, 0], ff_y=ff_real_position_sorted[i, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)

@@ -108,7 +108,7 @@ def PlotPoints(point,
 
     if not hitting_arena_edge_ok:
         # Stop plotting for the trial if the monkey/agent has gone across the edge
-        cum_r = LA.norm(np.stack((cum_mx, cum_my)), axis=0)
+        cum_r = np.linalg.norm(np.stack((cum_mx, cum_my)), axis=0)
         if (np.any(cum_r > 949)):
             return
     if not trial_too_short_ok:

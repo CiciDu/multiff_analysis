@@ -491,7 +491,7 @@ def find_alive_ff_close_to_monkey(relevant_indices, monkey_information, ff_life_
 
     # find their distance to each stop
     for position in sampled_monkey_positions:
-        ff_distance = LA.norm(alive_ff_positions-position, axis=1)
+        ff_distance = np.linalg.norm(alive_ff_positions-position, axis=1)
         close_ff_indices = np.concatenate(
             [close_ff_indices, alive_ff_indices[ff_distance < max_ff_distance_to_include]])
 

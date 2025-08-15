@@ -220,7 +220,7 @@ def find_valid_view_points(monkey_information):
 
 def _find_valid_view_points(gaze_world_xy, ver_theta):
 
-    gaze_world_r = LA.norm(gaze_world_xy, axis=1)
+    gaze_world_r = np.linalg.norm(gaze_world_xy, axis=1)
     gaze_world_x = gaze_world_xy[:, 0]
 
     valid_ver_theta_points = np.where(ver_theta < 0)[0]
@@ -236,12 +236,12 @@ def _find_valid_view_points(gaze_world_xy, ver_theta):
 
 
 def find_eye_world_speed(monkey_information):
-    monkey_df = monkey_information[monkey_information['valid_view_point']==True].copy(
+    monkey_df = monkey_information[monkey_information['valid_view_point'] == True].copy(
     )
     delta_x = np.diff(monkey_df['gaze_mky_view_x'])
     delta_y = np.diff(monkey_df['gaze_mky_view_y'])
     delta_t = np.diff(monkey_df['time'])
-    delta_position = LA.norm(np.array([delta_x, delta_y]), axis=0)
+    delta_position = np.linalg.norm(np.array([delta_x, delta_y]), axis=0)
     eye_world_speed = delta_position / delta_t
     eye_world_speed = np.append(eye_world_speed[0], eye_world_speed)
     monkey_df['eye_world_speed'] = eye_world_speed

@@ -26,7 +26,7 @@ def find_relative_xy_positions(ff_x, ff_y, monkey_x, monkey_y, monkey_angle):
     # assume monkey is at origin and heading to the north
     ff_xy = np.stack((ff_x, ff_y), axis=1)
     monkey_xy = np.stack([monkey_x, monkey_y]).T
-    ff_distance = LA.norm(ff_xy-monkey_xy, axis=1)
+    ff_distance = np.linalg.norm(ff_xy-monkey_xy, axis=1)
     ff_angle = specific_utils.calculate_angles_to_ff_centers(
         ff_x=ff_x, ff_y=ff_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
     ff_x_relative = np.cos(ff_angle+pi/2)*ff_distance
@@ -35,7 +35,8 @@ def find_relative_xy_positions(ff_x, ff_y, monkey_x, monkey_y, monkey_angle):
 
 
 def turn_relative_xy_positions_to_absolute_xy_positions(ff_x_relative, ff_y_relative, monkey_x, monkey_y, monkey_angle):
-    ff_distance = LA.norm(np.stack([ff_x_relative, ff_y_relative]).T, axis=1)
+    ff_distance = np.linalg.norm(
+        np.stack([ff_x_relative, ff_y_relative]).T, axis=1)
     ff_angle = np.arctan2(ff_y_relative, ff_x_relative) - math.pi/2
     ff_angle_in_world_coord = ff_angle + monkey_angle
 
@@ -44,14 +45,14 @@ def turn_relative_xy_positions_to_absolute_xy_positions(ff_x_relative, ff_y_rela
     return ff_x, ff_y
 
 
-def find_shortest_arc_among_all_available_ff(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, verbose=True):
+def find_shortest_arc_among_all_available_ff(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, verbose=True, ignore_error=False):
     '''
     find the shortest arc among all available ff
     '''
 
     # need to eliminate the ff whose relative y positive to the monkey is negative (a.k.a. behind the monkey)
     ff_xy, ff_distance, ff_angle, ff_angle_boundary, arc_length, arc_radius = find_arc_length_and_radius(
-        ff_x, ff_y, monkey_x, monkey_y, monkey_angle, verbose=verbose)
+        ff_x, ff_y, monkey_x, monkey_y, monkey_angle, verbose=verbose, ignore_error=ignore_error)
 
     # Find the shortest arc length
     min_arc_length = min(arc_length)
@@ -70,7 +71,7 @@ def find_arc_length_and_radius(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ver
     monkey_xy = np.stack([monkey_x, monkey_y]).T
     ff_xy = np.stack([ff_x, ff_y]).T
 
-    ff_distance = LA.norm(ff_xy-monkey_xy, axis=1)
+    ff_distance = np.linalg.norm(ff_xy-monkey_xy, axis=1)
     ff_angle = specific_utils.calculate_angles_to_ff_centers(
         ff_x=ff_x, ff_y=ff_y, mx=monkey_x, my=monkey_y, m_angle=monkey_angle)
     ff_angle_boundary = specific_utils.calculate_angles_to_ff_boundaries(
@@ -305,8 +306,8 @@ def show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_i
 
     if show_null_agent_trajectory_2nd_time:
         if type == 'most_aligned':
-            raise ValueError(
-                'If type = \'most_alignt\', show_null_agent_trajectory_2nd_time cannot be True')
+            print(
+                'If type = \'most_alignt\', show_null_agent_trajectory_2nd_time cannot be True. This command is ignored.')
         elif type == 'shortest':
             print('2nd arch:')
             if min_arc_ff_xy is not None:
@@ -536,7 +537,7 @@ def eliminate_invalid_ff_for_null_arc(all_ff_index, all_point_index, ff_real_pos
     print('Both of these cases are eliminated.')
 
     remaining_index_of_array = np.where(
-        (ff_y_relative >= 0) & (np.abs(ff_angle) >= pi/4))[0]
+        (ff_y_relative >= 0) & (np.abs(ff_angle) <= pi/4))[0]
     remaining_all_ff_index = all_ff_index[remaining_index_of_array]
     remaining_all_point_index = all_point_index[remaining_index_of_array]
 
@@ -613,6 +614,7 @@ def make_pretty_plot_for_a_duration(duration_to_plot, best_arc_df, monkey_inform
                 point_indices_to_plot_null_arc)
     else:
         point_indices_to_plot_null_arc = [None]
+        skip_plots_with_no_null_arc = False
 
     if ff_indices_to_plot_null_arc is None:
         ff_indices_to_plot_null_arc = find_ff_indices_near_intended_target_to_plot_null_arc(
@@ -759,10 +761,11 @@ def make_plots_to_show_monkey_reaction_time(curvature_df,
                                             ):
 
     null_arcs_plotting_kwargs_temp = null_arcs_plotting_kwargs.copy()
-
+    
     curvature_df_sub = curvature_df[curvature_df.time.between(time-1, time)]
     if (len(np.unique(curvature_df_sub.ff_index.values)) > 1) or (len(np.unique(curvature_df_sub.ff_index.values)) == 0):
-        return
+        print(f'No ff or more than 1 ff in curvature_df_sub at time: {time}. No plot is made (to minimize ambiguity about which ff the monkey is going after).')
+        return None, None, False
 
     duration_to_plot = [time-2.5, time+2.5]
     returned_info = plot_trials.PlotTrials(
@@ -773,6 +776,7 @@ def make_plots_to_show_monkey_reaction_time(curvature_df,
     )
 
     R = returned_info['rotation_matrix']
+    fig = returned_info['fig']
     axes = returned_info['axes']
     whether_plotted = returned_info['whether_plotted']
 
@@ -789,4 +793,4 @@ def make_plots_to_show_monkey_reaction_time(curvature_df,
             fig, axes = show_percentile_by_color_func(
                 fig, axes, best_arc_sub_info_valid_ff, R)
 
-    return fig, axes
+    return fig, axes, whether_plotted

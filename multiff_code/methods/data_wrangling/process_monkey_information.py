@@ -127,7 +127,7 @@ def get_raw_signal_df(raw_data_folder_path):
 
 
 def get_monkey_speed_and_dw_from_smr_info(monkey_information):
-    monkey_information['monkey_speed_smr'] = LA.norm(
+    monkey_information['monkey_speed_smr'] = np.linalg.norm(
         monkey_information[['LateralV', 'ForwardV']].values, axis=1)
     monkey_information['monkey_dw_smr'] = monkey_information['monkey_dw_smr'] * pi/180
 

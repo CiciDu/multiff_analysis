@@ -1,7 +1,8 @@
 import sys
-from data_wrangling import specific_utils
+from data_wrangling import general_utils, specific_utils
 from visualization.matplotlib_tools import plot_polar, plot_trials
 from eye_position_analysis import eye_positions
+from pattern_discovery import pattern_by_points
 
 import os
 import sys
@@ -972,7 +973,7 @@ def find_ff_distance_and_angles(ff_index, duration, ff_real_position_sorted, mon
     cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = find_monkey_information_in_the_duration(
         duration, monkey_information)
 
-    distances_to_ff = LA.norm(
+    distances_to_ff = np.linalg.norm(
         np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[ff_index], axis=1)
     angles_to_ff = np.arctan2(
         ff_real_position_sorted[ff_index, 1]-cum_my, ff_real_position_sorted[ff_index, 0]-cum_mx)-cum_angle
@@ -1164,3 +1165,6 @@ def plot_eye_positions(axes, monkey_information, duration, cum_mxy_rotated, x0, 
             monkey_sub, axes, x0, y0, player, sample_ratio=sample_ratio)
 
     return axes
+
+
+

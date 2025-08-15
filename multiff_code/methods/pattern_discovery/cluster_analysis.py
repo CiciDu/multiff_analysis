@@ -74,7 +74,7 @@ def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey=500, max_clu
         ffxy_array = selected_ff[['ff_x', 'ff_y']].to_numpy()
 
         if ffxy_array.shape[0] == 2:
-            if LA.norm(ffxy_array[0, :]-ffxy_array[1, :]) <= max_cluster_distance:
+            if np.linalg.norm(ffxy_array[0, :]-ffxy_array[1, :]) <= max_cluster_distance:
                 ff_indices = selected_ff[['ff_index']].to_numpy()
                 trial = selected_ff[['target_index']].iloc[0].item()
                 for index in ff_indices:
@@ -205,7 +205,7 @@ def find_alive_ff_clusters(ff_positions, ff_real_position_sorted, array_of_start
         alive_ff_indices, alive_ff_position = plot_behaviors_utils.find_alive_ff(
             duration, ff_life_sorted, ff_real_position_sorted)
         alive_ff_indices_close_to_ff_of_interet = np.where(
-            LA.norm(alive_ff_position.T - ff_of_interet_position, axis=1) < max_distance)[0]
+            np.linalg.norm(alive_ff_position.T - ff_of_interet_position, axis=1) < max_distance)[0]
         ff_indices_close_to_ff_of_interet = alive_ff_indices[alive_ff_indices_close_to_ff_of_interet]
         if len(ff_indices_close_to_ff_of_interet) == 0:
             if not empty_cluster_ok:
@@ -327,7 +327,7 @@ def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff
     for i, caught_time in enumerate(ff_caught_T_new):
         ff_info_sub = visible_ff[visible_ff['time'].between(
             caught_time - duration_of_evaluation, caught_time)].copy()
-        ff_info_sub['ff_distance_to_target'] = LA.norm(
+        ff_info_sub['ff_distance_to_target'] = np.linalg.norm(
             ff_info_sub[['ff_x', 'ff_y']].values - ff_real_position_sorted[i], axis=1)
         relevant_df = ff_info_sub[ff_info_sub['ff_index'] == i].copy()
 
@@ -381,7 +381,7 @@ def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_
     """
 
     metrics = {
-        'last_vis_point_index': [], 'last_vis_ff_index': [], 'nearby_vis_ff_indices': [],
+        'last_vis_point_index': [], 'last_vis_time': [], 'last_vis_ff_index': [], 'nearby_vis_ff_indices': [],
         'time_since_last_vis': [], 'last_vis_dist': [], 'last_vis_cum_dist': [], 'last_vis_ang': [], 'last_vis_ang_to_bndry': [],
         'last_vis_target_dist': [], 'last_vis_target_ang': [], 'last_vis_target_ang_to_bndry': []
     }
@@ -393,7 +393,7 @@ def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_
     for i, caught_time in enumerate(ff_caught_T_new):
         ff_info_sub = visible_ff[visible_ff['time'].between(
             caught_time - duration_of_evaluation, caught_time)].copy()
-        ff_info_sub['ff_distance_to_target'] = LA.norm(
+        ff_info_sub['ff_distance_to_target'] = np.linalg.norm(
             ff_info_sub[['ff_x', 'ff_y']].values - ff_real_position_sorted[i], axis=1)
         relevant_df = ff_info_sub[ff_info_sub['ff_distance_to_target']
                                   < max_distance_to_target_in_cluster].copy()
@@ -403,6 +403,7 @@ def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_
                                     True, False], inplace=True)
             row = relevant_df.iloc[-1]
             metrics['last_vis_point_index'].append(row['point_index'])
+            metrics['last_vis_time'].append(row['time'])
             metrics['last_vis_ff_index'].append(row['ff_index'])
             metrics['time_since_last_vis'].append(caught_time - row['time'])
             metrics['last_vis_dist'].append(row['ff_distance'])
@@ -411,7 +412,7 @@ def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_
             metrics['last_vis_ang'].append(row['ff_angle'])
             metrics['last_vis_ang_to_bndry'].append(row['ff_angle_boundary'])
             metrics['last_vis_target_dist'].append(
-                LA.norm(row[['ff_x', 'ff_y']].values - ff_real_position_sorted[i]))
+                np.linalg.norm(row[['ff_x', 'ff_y']].values - ff_real_position_sorted[i]))
             metrics['last_vis_target_ang'].append(specific_utils.calculate_angles_to_ff_centers(
                 ff_x=ff_real_position_sorted[i][0], ff_y=ff_real_position_sorted[i][1],
                 mx=row['monkey_x'], my=row['monkey_y'], m_angle=row['monkey_angle']
@@ -435,5 +436,7 @@ def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_
         'abs_last_vis_target_ang': np.abs(metrics['last_vis_target_ang']),
         'abs_last_vis_target_ang_to_bndry': np.abs(metrics['last_vis_target_ang_to_bndry'])
     })
+
+    target_clust_last_vis_df['caught_time'] = ff_caught_T_new[target_clust_last_vis_df['target_index']]
 
     return target_clust_last_vis_df

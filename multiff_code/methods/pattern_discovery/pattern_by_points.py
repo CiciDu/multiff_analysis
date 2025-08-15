@@ -9,74 +9,149 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
 def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_new, n=2, n_max=None):
-    # Pull out all the segments where we can see aligned ff vs non-aligned ff
-    # Find segments involving the flashing on of >= 3 firefly (preferably 2ff vs 2ff on each side) and until 1.6s after.
-    point_vs_num_ff = ff_dataframe[['point_index', 'ff_index']].groupby(
-        'point_index').nunique()
-    point_vs_num_ff = point_vs_num_ff.rename(
-        columns={'ff_index': 'num_alive_ff'})
+    """
+    Identify points in time where a minimum number of fireflies are visible/alive 
+    and group consecutive points into chunks.
+
+    Parameters
+    ----------
+    ff_dataframe : pd.DataFrame
+        DataFrame containing firefly data, must include:
+        - 'point_index': frame/time index
+        - 'ff_index': firefly identity
+    monkey_information : pd.DataFrame
+        DataFrame containing monkey time series, must include 'time'.
+        Used to filter points based on firefly capture times.
+    ff_caught_T_new : array-like
+        Array of timestamps when fireflies were caught.
+    n : int, optional
+        Minimum number of alive fireflies for a point to be included. Default is 2.
+    n_max : int, optional
+        Maximum number of alive fireflies for a point to be included. Default is None.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing:
+        - 'point_index': the frame/time index
+        - 'num_alive_ff': number of fireflies alive at that point
+        - 'diff', 'diff_2': differences between consecutive points (helper columns)
+        - 'chunk': ID of consecutive segments (chunks) where enough fireflies are alive
+    """
+
+    # Count the number of unique fireflies at each point
+    point_vs_num_ff = ff_dataframe[['point_index', 'ff_index']].groupby('point_index').nunique()
+    point_vs_num_ff = point_vs_num_ff.rename(columns={'ff_index': 'num_alive_ff'})
     point_vs_num_ff.loc[:, 'point_index'] = point_vs_num_ff.index
-    points_w_more_than_n_ff = point_vs_num_ff[point_vs_num_ff['num_alive_ff'] > n].copy(
-    )
+
+    # Select points where the number of alive fireflies is greater than n
+    points_w_more_than_n_ff = point_vs_num_ff[point_vs_num_ff['num_alive_ff'] > n].copy()
+    
+    # Optionally filter points exceeding n_max fireflies
     if n_max is not None:
-        points_w_more_than_n_ff = points_w_more_than_n_ff[points_w_more_than_n_ff['num_alive_ff'] <= n_max].copy(
-        )
-    # Eliminate the points before the capture of the 1st firefly
-    valid_earliest_point = np.where(
-        monkey_information['time'] > ff_caught_T_new[0])[0][0]
-    points_w_more_than_n_ff = points_w_more_than_n_ff[points_w_more_than_n_ff['point_index'] >= valid_earliest_point].copy(
-    )
+        points_w_more_than_n_ff = points_w_more_than_n_ff[
+            points_w_more_than_n_ff['num_alive_ff'] <= n_max].copy()
+
+    # Exclude points before the first firefly was captured
+    valid_earliest_point = np.where(monkey_information['time'] > ff_caught_T_new[0])[0][0]
+    points_w_more_than_n_ff = points_w_more_than_n_ff[
+        points_w_more_than_n_ff['point_index'] >= valid_earliest_point].copy()
+
+    # Compute differences between consecutive point indices
     diff = np.diff(points_w_more_than_n_ff['point_index'])
-    # in the array, numbers not equal to 1 are starts of a chunk
+    
+    # 'diff' indicates gaps before a point (0 for first point)
     points_w_more_than_n_ff['diff'] = np.append(0, diff)
-    # in the array, numbers not equal to 1 are ends of a chunk
+    # 'diff_2' indicates gaps after a point (0 for last point)
     points_w_more_than_n_ff['diff_2'] = np.append(diff, 0)
-    points_w_more_than_n_ff['diff'] = points_w_more_than_n_ff['diff'].astype(
-        int)
-    points_w_more_than_n_ff['diff_2'] = points_w_more_than_n_ff['diff_2'].astype(
-        int)
-    points_w_more_than_n_ff['chunk'] = (
-        points_w_more_than_n_ff['diff'] != 1).cumsum()
-    points_w_more_than_n_ff['chunk'] = points_w_more_than_n_ff['chunk']-1
+    
+    points_w_more_than_n_ff['diff'] = points_w_more_than_n_ff['diff'].astype(int)
+    points_w_more_than_n_ff['diff_2'] = points_w_more_than_n_ff['diff_2'].astype(int)
+
+    # Label consecutive points as chunks
+    points_w_more_than_n_ff['chunk'] = (points_w_more_than_n_ff['diff'] != 1).cumsum()
+    # Start chunk numbering at 0
+    points_w_more_than_n_ff['chunk'] = points_w_more_than_n_ff['chunk'] - 1
 
     return points_w_more_than_n_ff
 
 
-def find_points_w_more_than_n_ff(chunk_df, monkey_information, ff_caught_T_new, chunk_interval=10, minimum_time_before_capturing=0.5):
+
+def find_changing_dw_info(chunk_df, monkey_information, ff_caught_T_new, 
+                                 chunk_interval=10, minimum_time_before_capturing=0.5):
+    """
+    Identify time points in a monkey tracking experiment where the monkey's 
+    angular velocity (dw) changes significantly, excluding times immediately 
+    before the monkey catches a firefly (ff).
+
+    Parameters
+    ----------
+    chunk_df : pd.DataFrame
+        DataFrame containing a chunk of points with at least a 'point_index' column.
+    monkey_information : pd.DataFrame
+        DataFrame with time series data for the monkey, must include:
+        - 'time': timestamps
+        - 'point_index': index of each point
+        - 'monkey_dw': angular velocity
+        - 'monkey_ddw': angular acceleration
+    ff_caught_T_new : array-like
+        Timestamps when the monkey caught a firefly.
+    chunk_interval : float, optional
+        Duration (in seconds) of the chunk to analyze from the first point. Default is 10.
+    minimum_time_before_capturing : float, optional
+        Time (in seconds) before a firefly catch to exclude from analysis. Default is 0.5.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with the following columns:
+        - 'point_index': the global point index
+        - 'time': timestamp of the significant angular change
+        - 'dw': angular velocity at that time
+        - 'ddw': angular acceleration at that time
+    """
+
+    # Get the first point in the chunk and define the time interval to analyze
     first_point = chunk_df['point_index'].min()
     duration = [monkey_information['time'][first_point],
-                monkey_information['time'][first_point]+chunk_interval]
-    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & (
-        monkey_information['time'] <= duration[1]))[0]
-    cum_point_index = np.array(
-        monkey_information['point_index'].iloc[cum_pos_index])
+                monkey_information['time'][first_point] + chunk_interval]
 
-    # Take out the part right before catching a ff
-    # First find ff caught in the interval and a little beyond the interval
-    relevant_ff_caught_T = ff_caught_T_new[(ff_caught_T_new >= duration[0]) & (
-        ff_caught_T_new <= duration[1]+minimum_time_before_capturing)]
+    # Find indices in monkey_information that fall within the interval
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & 
+                             (monkey_information['time'] <= duration[1]))[0]
+    cum_point_index = np.array(monkey_information['point_index'].iloc[cum_pos_index])
+
+    # Exclude periods right before firefly captures
+    relevant_ff_caught_T = ff_caught_T_new[(ff_caught_T_new >= duration[0]) & 
+                                           (ff_caught_T_new <= duration[1] + minimum_time_before_capturing)]
     for time in relevant_ff_caught_T:
-        duration_to_take_out = [time-minimum_time_before_capturing, time]
-        # Take out corresponding indices from cum_pos_index
-        cum_pos_index = cum_pos_index[~((cum_pos_index >= duration_to_take_out[0]) & (
-            cum_pos_index <= duration_to_take_out[1]))]
+        duration_to_take_out = [time - minimum_time_before_capturing, time]
+        cum_pos_index = cum_pos_index[~((cum_pos_index >= duration_to_take_out[0]) & 
+                                        (cum_pos_index <= duration_to_take_out[1]))]
 
+    # Extract the time, angular velocity, and acceleration for remaining indices
     cum_t = np.array(monkey_information['time'].iloc[cum_pos_index])
-    cum_dw, cum_ddw = np.array(monkey_information['monkey_dw'].iloc[cum_pos_index]), np.array(
-        monkey_information['monkey_ddw'].iloc[cum_pos_index])
+    cum_dw = np.array(monkey_information['monkey_dw'].iloc[cum_pos_index])
+    cum_ddw = np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index])
     cum_abs_ddw = np.abs(cum_ddw)
-    changing_dw_info = pd.DataFrame(
-        {'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
-    # find the first point of each sequence of consecutive points
+
+    # Identify indices where the angular acceleration exceeds a threshold
+    changing_dw_info = pd.DataFrame({'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
+
+    # Group consecutive points to avoid double-counting rapid sequences
     changing_dw_info['group'] = np.append(
         0, (np.diff(changing_dw_info['relative_pos_index']) != 1).cumsum())
     changing_dw_info = changing_dw_info.groupby('group').min()
     relative_pos_index = changing_dw_info['relative_pos_index'].astype(int)
+
+    # Map relative indices to global point indices and extract motion data
     changing_dw_info['point_index'] = cum_pos_index[relative_pos_index]
     changing_dw_info['time'] = cum_t[relative_pos_index]
     changing_dw_info['dw'] = cum_dw[relative_pos_index]
     changing_dw_info['ddw'] = cum_ddw[relative_pos_index]
+
     return changing_dw_info
+
 
 
 def increase_durations_between_points(df, min_duration=5):

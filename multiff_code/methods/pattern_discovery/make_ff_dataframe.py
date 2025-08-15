@@ -151,7 +151,7 @@ def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_r
         = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance', 'time', 'monkey_speeddummy']].values
     ff_dataframe[['ff_x', 'ff_y']
                  ] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
-    ff_dataframe['ff_distance'] = LA.norm(np.array(
+    ff_dataframe['ff_distance'] = np.linalg.norm(np.array(
         ff_dataframe[['monkey_x', 'monkey_y']])-np.array(ff_dataframe[['ff_x', 'ff_y']]), axis=1)
     ff_dataframe['ff_angle'] = specific_utils.calculate_angles_to_ff_centers(ff_x=ff_dataframe['ff_x'], ff_y=ff_dataframe['ff_y'], mx=ff_dataframe['monkey_x'],
                                                                              my=ff_dataframe['monkey_y'], m_angle=ff_dataframe['monkey_angle'])
@@ -191,7 +191,7 @@ def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new,
         ff_caught_T_new, ff_dataframe['time'])
     ff_dataframe[['target_x', 'target_y']
                  ] = ff_real_position_sorted[ff_dataframe['target_index'].values]
-    ff_dataframe['ffdistance2target'] = LA.norm(np.array(
+    ff_dataframe['ffdistance2target'] = np.linalg.norm(np.array(
         ff_dataframe[['ff_x', 'ff_y']])-np.array(ff_dataframe[['target_x', 'target_y']]), axis=1)
 
     # Analyze whether ffangle is decreasing as the monkey moves
@@ -289,7 +289,7 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_
             duration, monkey_information)
 
         # Find distances to ff
-        distances_to_ff = LA.norm(
+        distances_to_ff = np.linalg.norm(
             np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[i], axis=1)
         valid_distance_indices = np.where(distances_to_ff < max_distance)[0]
         angles_to_ff = specific_utils.calculate_angles_to_ff_centers(
@@ -353,8 +353,8 @@ def make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_
         ff_dataframe_v2['target_index'])][:, 0]
     ff_dataframe_v2['target_y'] = ff_real_position_sorted[np.array(
         ff_dataframe_v2['target_index'])][:, 1]
-    ff_dataframe_v2['ffdistance2target'] = LA.norm(np.array(ff_dataframe_v2[[
-                                                   'ff_x', 'ff_y']])-np.array(ff_dataframe_v2[['target_x', 'target_y']]), axis=1)
+    ff_dataframe_v2['ffdistance2target'] = np.linalg.norm(np.array(ff_dataframe_v2[[
+        'ff_x', 'ff_y']])-np.array(ff_dataframe_v2[['target_x', 'target_y']]), axis=1)
     ff_dataframe_v2['point_index_in_duration'] = ff_dataframe_v2['point_index'] - \
         monkey_information['point_index'].iloc[cum_pos_index[0]]
     ff_dataframe_v2['being_target'] = (

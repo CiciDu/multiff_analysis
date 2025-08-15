@@ -46,9 +46,10 @@ def calculate_angles_to_ff_centers(ff_x, ff_y, mx, my, m_angle):
 
     # if distance to ff is very small, make the angle 0:
     try:
-        distances_to_ff = LA.norm(np.stack([ff_x-mx, ff_y-my], axis=1), axis=1)
+        distances_to_ff = np.linalg.norm(
+            np.stack([ff_x-mx, ff_y-my], axis=1), axis=1)
     except Exception as e:
-        distances_to_ff = LA.norm(np.array([ff_x-mx, ff_y-my]), axis=0)
+        distances_to_ff = np.linalg.norm(np.array([ff_x-mx, ff_y-my]), axis=0)
     if np.any(distances_to_ff < 0.001):
         print(
             f'Note: when calculating angles to ff centers, {np.sum(distances_to_ff < 0.001)} rows are too close to the monkey/agent: less than 0.001 m. Their angles are set to 0.')
@@ -121,7 +122,7 @@ def calculate_change_in_abs_ff_angle(current_ff_index, angles_to_ff, angles_to_b
     # To also calculate delta_angles_to_ff and delta_angles_to_boundaries:
     prev_monkey_xy_relevant = np.stack(
         [monkey_x_array[in_memory_indices-1], monkey_y_array[in_memory_indices-1]], axis=1)
-    prev_ff_distance_relevant = LA.norm(
+    prev_ff_distance_relevant = np.linalg.norm(
         prev_monkey_xy_relevant-ff_real_position_sorted[current_ff_index], axis=1)
     prev_monkey_angles_relevant = monkey_angles_array[in_memory_indices-1]
     prev_angles_to_ff = calculate_angles_to_ff_centers(ff_x=ff_real_position_sorted[current_ff_index, 0], ff_y=ff_real_position_sorted[
@@ -168,7 +169,7 @@ def get_distance_between_two_points(currentTrial, ff_caught_T_new, monkey_inform
         if np.any(cum_mx[1:]-cum_mx[:-1] > 10) or np.any(cum_my[1:]-cum_my[:-1] > 10):
             displacement = 9999
         else:
-            displacement = LA.norm(
+            displacement = np.linalg.norm(
                 ff_believed_position_sorted[currentTrial]-ff_believed_position_sorted[currentTrial-1])
     return displacement
 
@@ -208,7 +209,7 @@ def get_cum_distance_traveled(currentTrial, ff_caught_T_new, monkey_information)
 def find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial=None, num_trials=None, duration=None):
     # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
     if duration is None:
-        duration = [ff_caught_T_new[currentTrial-num_trials],
+        duration = [ff_caught_T_new[max(0, currentTrial-num_trials)],
                     ff_caught_T_new[currentTrial]]
     # elif duration[1] > ff_caught_T_new[-1]:
     #    raise ValueError("The second element of duration must be smaller than the last element of ff_caught_T_new")
@@ -411,6 +412,7 @@ def calculate_ff_rel_x_and_y(distance, angle):
     rel_x = - distance * np.sin(angle)
     return rel_x, rel_y
 
+
 def find_lagged_versions_of_columns_in_df(columns, df):
     # also drop the lagged versions of the columns
     lagged_columns = []
@@ -421,4 +423,3 @@ def find_lagged_versions_of_columns_in_df(columns, df):
             col_name for col_name in df.columns if pattern.match(col_name)]
         lagged_columns.extend(matching_columns)
     return lagged_columns
-    

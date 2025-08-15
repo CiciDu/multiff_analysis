@@ -134,7 +134,7 @@ def find_monkey_info_on_trajectory_relative_to_origin(monkey_indices, monkey_inf
     # treat traj_xy_2d as ffxy, and use the real monkey_xy to calculate distance and angle, so that we can plot trajectory points on polar plot
     traj_xy_2d = np.concatenate(
         [traj_x_2d.reshape(-1, 1), traj_y_2d.reshape(-1, 1)], axis=1)
-    traj_distances = LA.norm(traj_xy_2d-monkey_xy, axis=1)
+    traj_distances = np.linalg.norm(traj_xy_2d-monkey_xy, axis=1)
     traj_angles = specific_utils.calculate_angles_to_ff_centers(ff_x=traj_x_2d.reshape(
         -1), ff_y=traj_y_2d.reshape(-1), mx=monkey_xy[:, 0], my=monkey_xy[:, 1], m_angle=monkey_angle)
     traj_distances = traj_distances.reshape(-1, num_time_points_for_trajectory)

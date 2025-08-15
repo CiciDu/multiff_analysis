@@ -227,21 +227,23 @@ def PlotTrials(duration,
     # If currentTrial is not given, then it will be calculated based on the duration
     currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
         ff_caught_T_new, currentTrial, num_trials, duration)
+    
     print('currentTrial:', currentTrial, 'num_trials:', num_trials)
 
     if duration[1] <= duration[0]:
-        raise ValueError("duration[1] must be greater than duration[0]")
+        raise ValueError(f"duration[1] must be greater than duration[0]. Now duration[0] = {duration[0]} and duration[1] = {duration[1]}")
 
     cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(
         duration, monkey_information)
     monkey_subset_df = monkey_information.loc[cum_pos_index]
 
-    cum_r = LA.norm(np.stack((cum_mx, cum_my)), axis=0)
+    cum_r = np.linalg.norm(np.stack((cum_mx, cum_my)), axis=0)
     if (np.any(cum_r > 949)):
         hitting_arena_edge = True
         if not hitting_arena_edge_ok:
             # Stop plotting for the trial if the monkey/agent has gone across the edge
             # the three outputs are whether_plotted, axes, R, cum_mxy_rotated, shown_ff_indices
+            print('Since the monkey has crossed the arena edge, the plot is omitted')
             return {'whether_plotted': False}
     else:
         hitting_arena_edge = False
@@ -291,12 +293,14 @@ def PlotTrials(duration,
 
     if len(cum_t) == 0:
         # the three outputs are whether_plotted, axes, R, cum_mxy_rotated, shown_ff_indices
+        print('Since there is no data in the duration, the plot is omitted')
         return {'whether_plotted': False}
 
     if not trial_too_short_ok:
         # Stop plotting for the trial if the trial is too short
         if (len(cum_t) < 5):
             # the three outputs are whether_plotted, axes, R, cum_mxy_rotated, shown_ff_indices
+            print('Since the trial is too short, the plot is omitted')
             return {'whether_plotted': False}
 
     if fig is None:

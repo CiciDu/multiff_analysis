@@ -270,12 +270,12 @@ class ProcessCategoryData:
     def make_histogram_of_distances_from_previous_targets(self):
         # distance between sort_1 targets from previous targets
         valid_indices_1 = np.where(self.sort_1_trials >= 1)[0]
-        self.sort_1_to_prev_target_distances = LA.norm(
+        self.sort_1_to_prev_target_distances = np.linalg.norm(
             self.sort_1_ff_positions[valid_indices_1] - self.ff_real_position_sorted[self.sort_1_trials-1][valid_indices_1], axis=1)
 
         # distance between non-sort_1 targets from previous targets
         valid_indices_2 = np.where(self.sort_2_trials > 0)[0]
-        self.sort_2_to_prev_target_distances = LA.norm(
+        self.sort_2_to_prev_target_distances = np.linalg.norm(
             self.sort_2_ff_positions[valid_indices_2] - self.ff_real_position_sorted[self.sort_2_trials-1][valid_indices_2], axis=1)
 
         fig, axes = plt.subplots()
@@ -443,7 +443,7 @@ class ProcessCategoryData:
                 # calculate ff_distance and ff_angle during the last flashing-on duration of the target
                 cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(
                     on_duration, self.monkey_information)
-                distances_to_ff = LA.norm(
+                distances_to_ff = np.linalg.norm(
                     np.stack([cum_mx, cum_my], axis=1)-self.ff_real_position_sorted[trial], axis=1)
                 angles_to_ff = specific_utils.calculate_angles_to_ff_centers(
                     ff_x=self.ff_real_position_sorted[trial, 0], ff_y=self.ff_real_position_sorted[trial, 1], mx=cum_mx, my=cum_my, m_angle=cum_angle)

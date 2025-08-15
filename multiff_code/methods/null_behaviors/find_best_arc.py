@@ -116,7 +116,12 @@ def furnish_best_arc_df(best_arc_df, monkey_information, ff_real_position_sorted
     best_arc_df['time'] = monkey_information.loc[best_arc_df['point_index'], 'time'].values
     best_arc_df['chunk_id'] = best_arc_df['whether_new_ff_cum_sum'] - 1
 
-    '''
+    best_arc_df.drop(columns=[
+                     'whether_new_ff', 'whether_continued', 'whether_new_ff_cum_sum'], inplace=True)
+    return best_arc_df
+
+
+def add_intended_target_id_to_best_arc_df(best_arc_df, time_gap_to_differentiate_intended_target_id=2.5):
     # to find intended_target_id
     best_arc_df['intended_target_id'] = best_arc_df['chunk_id'].copy()
     # for each ff_index
@@ -157,9 +162,7 @@ def furnish_best_arc_df(best_arc_df, monkey_information, ff_real_position_sorted
     chart_for_conversion = np.zeros(max(used_unique_intended_target_id)+1).astype(int)
     chart_for_conversion[used_unique_intended_target_id] = new_unique_intended_target_id
     best_arc_df['intended_target_id'] = chart_for_conversion[best_arc_df['intended_target_id'].values]
-    '''
 
-    ''' 
     # find the last time for each chunk_id
     last_time_df = best_arc_df.groupby('chunk_id').last()
 
@@ -177,14 +180,12 @@ def furnish_best_arc_df(best_arc_df, monkey_information, ff_real_position_sorted
         # if another chunk_id has the same ff_index, then replace the second intended_target_id with the first intended_target_id
         best_arc_df.loc[(best_arc_df['time'].between(duration[0], duration[1])) & (best_arc_df['ff_index'] == ff_index), 'intended_target_id'] = intended_target_id
         last_time_df.loc[(last_time_df['time'].between(duration[0], duration[1])) & (last_time_df['ff_index'] == ff_index), 'intended_target_id'] = intended_target_id    
-    '''
-
-    best_arc_df.drop(columns=[
-                     'whether_new_ff', 'whether_continued', 'whether_new_ff_cum_sum'], inplace=True)
     return best_arc_df
 
-
 def add_column_monkey_passed_by_to_best_arc_df(best_arc_df, ff_dataframe):
+    if 'intended_target_id' not in best_arc_df.columns:
+        best_arc_df = add_intended_target_id_to_best_arc_df(best_arc_df)
+    
     pass_by_within_next_n_seconds = 2.5
     pass_by_within_n_cm = 50
 
@@ -207,6 +208,8 @@ def add_column_monkey_passed_by_to_best_arc_df(best_arc_df, ff_dataframe):
             # print("ff_index", ff_index, "has been stopped by monkey within", pass_by_within_next_n_seconds, "seconds")
             best_arc_df.loc[best_arc_df['intended_target_id']
                             == id, 'monkey_passed_by'] = True
+            
+    return best_arc_df
 
 
 def find_point_on_ff_boundary_with_smallest_angle_to_monkey(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ff_radius=10):
@@ -215,7 +218,7 @@ def find_point_on_ff_boundary_with_smallest_angle_to_monkey(ff_x, ff_y, monkey_x
     diff_x = ff_x - monkey_x
     diff_y = ff_y - monkey_y
     diff_xy = np.stack((diff_x, diff_y), axis=1)
-    distances_to_ff = LA.norm(diff_xy, axis=1)
+    distances_to_ff = np.linalg.norm(diff_xy, axis=1)
     angles_to_boundaries = specific_utils.calculate_angles_to_ff_boundaries(
         angles_to_ff, distances_to_ff, ff_radius=ff_radius)
     dif_in_angles = angles_to_ff - angles_to_boundaries

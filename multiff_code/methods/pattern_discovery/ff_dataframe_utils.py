@@ -76,7 +76,7 @@ def find_visible_pos_indices(current_ff_index, ff_flash_sorted, ff_caught_T_new,
     if len(all_cum_indices) > 0:
         cum_mx, cum_my, cum_angle = monkey_x_array[all_cum_indices], monkey_y_array[
             all_cum_indices], monkey_angles_array[all_cum_indices]
-        distances_to_ff = LA.norm(
+        distances_to_ff = np.linalg.norm(
             np.stack([cum_mx, cum_my], axis=1)-ff_real_position_sorted[i], axis=1)
         valid_distance_indices = np.where(distances_to_ff < max_distance)[0]
         if len(valid_distance_indices) > 0:

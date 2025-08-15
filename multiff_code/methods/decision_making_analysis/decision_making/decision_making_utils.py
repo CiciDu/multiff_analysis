@@ -270,7 +270,7 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
     monkey_xy = monkey_info[['monkey_x', 'monkey_y']].values
     monkey_angle = monkey_info['monkey_angle'].values
     all_current_time = monkey_info['time'].values
-    ff_distance = LA.norm(ff_xy-monkey_xy, axis=1)
+    ff_distance = np.linalg.norm(ff_xy-monkey_xy, axis=1)
     ff_angle = specific_utils.calculate_angles_to_ff_centers(
         ff_x=ff_xy[:, 0], ff_y=ff_xy[:, 1], mx=monkey_xy[:, 0], my=monkey_xy[:, 1], m_angle=monkey_angle)
     ff_angle_boundary = specific_utils.calculate_angles_to_ff_boundaries(
@@ -316,7 +316,7 @@ def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_datafra
     monkey_xy = monkey_info[['monkey_x', 'monkey_y']].values.reshape(-1)
     monkey_angle = monkey_info['monkey_angle'].item()
     time = monkey_info['time'].item()
-    ff_distance = LA.norm(ff_xy-monkey_xy)
+    ff_distance = np.linalg.norm(ff_xy-monkey_xy)
     ff_angle = specific_utils.calculate_angles_to_ff_centers(
         ff_x=ff_xy[0], ff_y=ff_xy[1], mx=monkey_xy[0], my=monkey_xy[1], m_angle=monkey_angle)
     ff_angle_boundary = specific_utils.calculate_angles_to_ff_boundaries(
@@ -369,7 +369,7 @@ def get_distance_and_angle_from_previous_target(current_ff_positions, prev_targe
                                          >= prev_target_caught_T[i]].iloc[0]
         monkey_xy = monkey_info[['monkey_x', 'monkey_y']].values.reshape(-1)
         ffxy = current_ff_position
-        target_distances.append(LA.norm(monkey_xy - ffxy))
+        target_distances.append(np.linalg.norm(monkey_xy - ffxy))
         target_angles.append(specific_utils.calculate_angles_to_ff_centers(
             ff_x=ffxy[0], ff_y=ffxy[1], mx=monkey_xy[0], my=monkey_xy[1], m_angle=monkey_info['monkey_angle']))
     target_distances = np.array(target_distances)

@@ -16,21 +16,57 @@ from sklearn.linear_model import LinearRegression
 from matplotlib.ticker import MaxNLocator
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-def plot_distribution(var, xlim=None, x_of_vline=None, scale_factor=1, plot_cdf=True):
-    plt.figure(figsize=(10, 7))
+def plot_distribution(var, 
+                      xlim=None, 
+                      x_of_vline=None, 
+                      scale_factor=1, 
+                      plot_cdf=True, 
+                      bins=100, 
+                      xlabel=None, 
+                      ylabel='Density', 
+                      title=None):
+    """
+    Plot histogram (PDF) and optionally CDF of a variable.
+    """
+    
+    data = var * scale_factor
+    
+    # --- Histogram ---
+    fig, ax = plt.subplots(figsize=(8, 5))
+    sns.histplot(data, bins=bins, stat='density', binrange=xlim, ax=ax)
+    
     if xlim is not None:
-        plt.xlim(xlim)
-    sns.histplot(var*scale_factor)
+        ax.set_xlim(xlim)
+    if x_of_vline is not None:
+        ax.axvline(x=x_of_vline, color='k', linestyle='--', linewidth=1)
+    
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title is not None:
+        ax.set_title(title + ' (Histogram)')
+    
     plt.show()
-
+    
+    # --- CDF ---
     if plot_cdf:
-        plt.figure(figsize=(10, 7))
+        fig, ax = plt.subplots(figsize=(8, 5))
+        sns.ecdfplot(data, ax=ax)
+        
         if xlim is not None:
-            plt.xlim(xlim)
+            ax.set_xlim(xlim)
         if x_of_vline is not None:
-            plt.axvline(x=x_of_vline, color='k', linestyle='--', linewidth=1)
-        sns.ecdfplot(var*scale_factor)
+            ax.axvline(x=x_of_vline, color='k', linestyle='--', linewidth=1)
+        
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        ax.set_ylabel('CDF')
+        if title is not None:
+            ax.set_title(title + ' (CDF)')
+        
         plt.show()
 
 

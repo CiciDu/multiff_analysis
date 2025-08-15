@@ -38,7 +38,7 @@ n_ff_in_a_row[k] will denote the number of ff that the monkey has captured in a 
     count = 1
     caught_ff_num = len(ff_believed_position_sorted)
     for i in range(1, caught_ff_num):
-        if LA.norm(ff_believed_position_sorted[i]-ff_believed_position_sorted[i-1]) < distance_between_ff:
+        if np.linalg.norm(ff_believed_position_sorted[i]-ff_believed_position_sorted[i-1]) < distance_between_ff:
             count += 1
         else:
             # Restarting from 1
@@ -175,7 +175,7 @@ def cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_
 
         past_visible_ff_positions = ff_real_position_sorted[past_visible_ff_indices]
         # See if any one of it is within max_ff_distance_from_target (50 cm by default) of the target
-        distance2target = LA.norm(
+        distance2target = np.linalg.norm(
             past_visible_ff_positions - ff_real_position_sorted[i], axis=1)
         close_ff_indices = np.where(
             distance2target < max_ff_distance_from_target)[0]

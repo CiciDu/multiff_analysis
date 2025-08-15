@@ -409,13 +409,26 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.arc_end_angles[self.arc_end_direction < 0] = - \
             self.arc_end_angles[self.arc_end_direction < 0]
 
+    def make_or_retrieve_best_arc_df(self, exists_ok=True):
+        self.best_arc_df = self.try_retrieving_df(
+            df_name='best_arc_df', exists_ok=exists_ok, data_folder_name_for_retrieval=self.processed_data_folder_path)
+        if self.best_arc_df is None:
+            self.make_best_arc_df()
+            print("made best_arc_df")
+            self._save_best_arc_df()
+
     def make_best_arc_df(self):
         self.best_arc_df, self.best_arc_original_columns = find_best_arc.make_best_arc_df(
             self.curvature_df, self.monkey_information, self.ff_real_position_sorted)
 
+    def _save_best_arc_df(self):
+        general_utils.save_df_to_csv(self.best_arc_df, 'best_arc_df', self.processed_data_folder_path)
+
     def add_column_monkey_passed_by_to_best_arc_df(self):
-        find_best_arc.add_column_monkey_passed_by_to_best_arc_df(
-            self.best_arc_df, self.ff_dataframe)
+        if 'monkey_passed_by' not in self.best_arc_df.columns:
+            self.best_arc_df = find_best_arc.add_column_monkey_passed_by_to_best_arc_df(
+                self.best_arc_df, self.ff_dataframe)
+            
 
     def get_elements_for_plotting(self, opt_arc_stop_first_vis_bdry=False, ignore_error=False):
         arc_ff_xy = self.ff_real_position_sorted[self.all_ff_indices]

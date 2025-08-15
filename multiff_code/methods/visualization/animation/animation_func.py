@@ -332,7 +332,7 @@ def animate_polar(frame, ax, anim_indices, rmax, ff_in_time_frame, ff_visible, f
     """
 
     ax.cla()
-    ax = plot_behaviors.set_polar_background_for_animation(ax, rmax)
+    ax = plot_behaviors_utils.set_polar_background_for_animation(ax, rmax)
     index = anim_indices[frame]
     all_ff_info_now = ff_in_time_frame.loc[ff_in_time_frame['point_index'] == index]
     if all_ff_info_now.shape[0] > 0:
