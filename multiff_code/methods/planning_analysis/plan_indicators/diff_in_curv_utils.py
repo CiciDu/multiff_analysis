@@ -18,7 +18,7 @@ import sys
 
 def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
                                     use_curv_to_ff_center=False,
-                                    ff_radius_for_opt_arc=15):
+                                    ff_radius_for_opt_arc=10):
 
     df = _prepare_cur_end_to_next_ff_data(
         heading_info_df, nxt_ff_df_modified)
@@ -26,7 +26,8 @@ def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
         df, use_curv_to_ff_center=use_curv_to_ff_center)
     cur_end_to_next_ff_curv = _compute_curv_from_cur_end(mock_monkey_info,
                                                          ff_radius_for_opt_arc=ff_radius_for_opt_arc)
-    assert np.all(cur_end_to_next_ff_curv['nxt_ff_index'] == heading_info_df['nxt_ff_index'])
+    assert np.all(
+        cur_end_to_next_ff_curv['nxt_ff_index'] == heading_info_df['nxt_ff_index'])
     cur_end_to_next_ff_curv['ref_point_index'] = heading_info_df['ref_point_index'].values
     return cur_end_to_next_ff_curv
 
@@ -57,7 +58,8 @@ def _prepare_cur_end_to_next_ff_data(heading_info_df, nxt_ff_df_modified):
     }, inplace=True)
 
     # Merge on 'ref_point_index' and rename it to 'point_index'
-    merged_df = df.merge(nxt_ff_df, on=['point_index', 'nxt_ff_index'], how='left')
+    merged_df = df.merge(
+        nxt_ff_df, on=['point_index', 'nxt_ff_index'], how='left')
 
     return merged_df
 
@@ -93,7 +95,7 @@ def _build_mock_monkey_info(df, use_curv_to_ff_center=False):
 
 
 def _compute_curv_from_cur_end(mock_monkey_info,
-                               ff_radius_for_opt_arc=15,
+                               ff_radius_for_opt_arc=10,
                                ):
     '''
     df needs to contain:
@@ -123,7 +125,7 @@ def _compute_curv_from_cur_end(mock_monkey_info,
 
 
 def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                      curv_of_traj_mode='distance', curv_traj_window_before_stop=[-50, 0]):
+                                      curv_of_traj_mode='distance', curv_traj_window_before_stop=[-25, 0]):
     df = _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                             curv_of_traj_mode=curv_of_traj_mode, curv_traj_window_before_stop=curv_traj_window_before_stop)
     prev_stop_to_next_ff_curv = _compute_curv_from_prev_stop(
@@ -132,7 +134,7 @@ def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop,
 
 
 def _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                       curv_of_traj_mode='distance', curv_traj_window_before_stop=[-50, 0]):
+                                       curv_of_traj_mode='distance', curv_traj_window_before_stop=[-25, 0]):
     df = find_cvn_utils.find_ff_info(
         nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted)
 
@@ -149,7 +151,7 @@ def _compute_curv_from_prev_stop(monkey_info):
     monkey_curv_df = curvature_utils._make_curvature_df(
         monkey_info,
         monkey_info['curv_of_traj'].values,
-        ff_radius_for_opt_arc=15,
+        ff_radius_for_opt_arc=10,
         clean=False,
         invalid_curvature_ok=True,
         ignore_error=True,
@@ -214,7 +216,6 @@ def make_diff_in_curv_df(prev_stop_to_next_ff_curv, cur_end_to_next_ff_curv):
     diff_in_curv_df = furnish_diff_in_curv_df(diff_in_curv_df)
 
     return diff_in_curv_df
-
 
 
 def furnish_diff_in_curv_df(diff_in_curv_df):

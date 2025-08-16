@@ -50,7 +50,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.make_key_paths()
 
     def retrieve_all_plan_data_for_one_session(self, raw_data_folder_path, ref_point_mode='distance', ref_point_value=-150,
-                                               curv_traj_window_before_stop=[-50, 0]):
+                                               curv_traj_window_before_stop=[-25, 0]):
         self.pf = plan_factors_class.PlanFactors()
         self.pf.monkey_name = self.monkey_name
         base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(

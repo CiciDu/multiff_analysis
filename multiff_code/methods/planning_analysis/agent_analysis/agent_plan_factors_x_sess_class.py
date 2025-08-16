@@ -177,7 +177,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                 self._add_plan_features_to_combd_plan_features(data_name)
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-150,
-                                             curv_traj_window_before_stop=[-50, 0]):
+                                             curv_traj_window_before_stop=[-25, 0]):
         df_name_dict = {'control': 'ctrl_heading_info_df',
                         'test': 'test_heading_info_df'}
         for test_or_control in ['control', 'test']:
@@ -190,7 +190,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
 
     def make_combd_heading_df_x_sessions(self, num_datasets_to_collect=1,
                                          ref_point_mode='distance', ref_point_value=-150,
-                                         curv_traj_window_before_stop=[-50, 0],
+                                         curv_traj_window_before_stop=[-25, 0],
                                          heading_info_df_exists_ok=True,
                                          stops_near_ff_df_exists_ok=True,
                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],

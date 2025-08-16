@@ -31,6 +31,7 @@ def run_tests_over_monkeys(
     monkeys=['monkey_Schro', 'monkey_Bruno'],
     verbose=True,
     test='wilcoxon', # or 'permutation'
+    **kwargs
 ):
     assert test in ['wilcoxon', 'permutation']
     if test == 'wilcoxon':
@@ -62,7 +63,8 @@ def run_tests_over_monkeys(
             planner.get_combd_heading_df_x_sessions_across_sessions(
                 ref_point_mode=ref_point_mode,
                 ref_point_value=ref_point_value,
-                save_data=False
+                save_data=False,
+                **kwargs
             )
             
             # Process test and control data
@@ -122,8 +124,8 @@ def run_tests_over_monkeys(
     
     return pd.DataFrame(results)
 
-def mannwhitneyu_test(x, y):
-    _, p = mannwhitneyu(x, y, alternative='greater')
+def mannwhitneyu_test(x, y, alternative='greater'):
+    _, p = mannwhitneyu(x, y, alternative=alternative)
     return p
 
 

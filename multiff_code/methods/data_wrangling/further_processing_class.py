@@ -12,7 +12,6 @@ import math
 import numpy as np
 
 
-
 import os
 import sys
 import os
@@ -375,17 +374,16 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                 self.ff_dataframe, self.max_point_index, data_folder_name=self.patterns_and_features_data_folder_path)
             print("made target_angle_smallest")
 
-
-    def make_curvature_df(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False, ff_radius_for_opt_arc=15, clean=True,
+    def make_curvature_df(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False, ff_radius_for_opt_arc=10, clean=True,
                           include_cntr_arc_curv=True, include_opt_arc_curv=True,
                           opt_arc_stop_first_vis_bdry=False,  # whether optimal arc stop at visible boundary
                           ignore_error=False):
         ff_dataframe = self.ff_dataframe.copy()
-        self.window_for_curv_of_traj = window_for_curv_of_traj 
+        self.window_for_curv_of_traj = window_for_curv_of_traj
         self.curv_of_traj_mode = curv_of_traj_mode
         self.truncate_curv_of_traj_by_time_of_capture = truncate_curv_of_traj_by_time_of_capture
         self.ff_radius_for_opt_arc = ff_radius_for_opt_arc
- 
+
         self.curv_of_traj_df, traj_curv_descr = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(
             window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         self.curvature_df = curvature_utils.make_curvature_df(ff_dataframe, self.curv_of_traj_df, ff_radius_for_opt_arc=ff_radius_for_opt_arc, clean=clean,
@@ -422,13 +420,13 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.curvature_df, self.monkey_information, self.ff_real_position_sorted)
 
     def _save_best_arc_df(self):
-        general_utils.save_df_to_csv(self.best_arc_df, 'best_arc_df', self.processed_data_folder_path)
+        general_utils.save_df_to_csv(
+            self.best_arc_df, 'best_arc_df', self.processed_data_folder_path)
 
     def add_column_monkey_passed_by_to_best_arc_df(self):
         if 'monkey_passed_by' not in self.best_arc_df.columns:
             self.best_arc_df = find_best_arc.add_column_monkey_passed_by_to_best_arc_df(
                 self.best_arc_df, self.ff_dataframe)
-            
 
     def get_elements_for_plotting(self, opt_arc_stop_first_vis_bdry=False, ignore_error=False):
         arc_ff_xy = self.ff_real_position_sorted[self.all_ff_indices]
@@ -447,4 +445,5 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def make_auto_annot(self):
         if getattr(self, 'best_arc_df', None) is None:
             self.make_best_arc_df()
-        self.auto_annot, self.auto_annot_long = decision_making_utils.make_auto_annot(self.best_arc_df, self.monkey_information, self.ff_caught_T_new)
+        self.auto_annot, self.auto_annot_long = decision_making_utils.make_auto_annot(
+            self.best_arc_df, self.monkey_information, self.ff_caught_T_new)

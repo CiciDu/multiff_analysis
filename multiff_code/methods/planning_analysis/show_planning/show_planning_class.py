@@ -121,7 +121,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         return self.combd_heading_df_x_sessions
 
     def retrieve_combd_diff_in_curv_df(self, ref_point_mode='distance', ref_point_value=-100, test_or_control='both',
-                                       curv_traj_window_before_stop=[-50, 0]):
+                                       curv_traj_window_before_stop=[-25, 0]):
 
         folder_path = self.dict_of_combd_diff_in_curv_folder_path[test_or_control]
         df_name = find_cvn_utils.find_diff_in_curv_df_name(
@@ -207,7 +207,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                 columns=['Unnamed: 0'], inplace=True)
 
     def make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
-                                         curv_traj_window_before_stop=[-50, 0],
+                                         curv_traj_window_before_stop=[-25, 0],
                                          test_or_control='both', stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                          show_printed_output=False, sessions_df_for_one_monkey=None,
                                          use_curv_to_ff_center=False,
@@ -288,7 +288,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                     == row['data_name'], 'finished'] = True
         return self.combd_heading_df_x_sessions
 
-    def _make_heading_info_df_for_a_data_session(self, monkey_name, data_name, ref_point_mode='distance', ref_point_value=-150, curv_traj_window_before_stop=[-50, 0],
+    def _make_heading_info_df_for_a_data_session(self, monkey_name, data_name, ref_point_mode='distance', ref_point_value=-150, curv_traj_window_before_stop=[-25, 0],
                                                  test_or_control='test', heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                  use_curv_to_ff_center=False,
                                                  merge_diff_in_curv_df_to_heading_info=True):
@@ -344,7 +344,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         return self.test_heading_info_df, self.ctrl_heading_info_df
 
     def handle_heading_info_df(self, ref_point_mode, ref_point_value, combd_heading_df_x_sessions_exists_ok, heading_info_df_exists_ok, stops_near_ff_df_exists_ok, show_output, test_or_control,
-                               curv_traj_window_before_stop=[-50, 0],
+                               curv_traj_window_before_stop=[-25, 0],
                                use_curv_to_ff_center=False, save_data=True):
         df_name = "test_heading_info_df" if test_or_control == 'test' else "ctrl_heading_info_df"
         try:

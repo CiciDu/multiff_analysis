@@ -15,7 +15,7 @@ from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
-def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=15, clean=True,
+def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=10, clean=True,
                       monkey_information=None, ff_caught_T_new=None,
                       remove_invalid_rows=True, invalid_curvature_ok=False,
                       include_cntr_arc_curv=True, include_opt_arc_curv=True,
@@ -58,7 +58,7 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=1
     return curvature_df
 
 
-def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15, clean=False,
+def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=10, clean=False,
                        invalid_curvature_ok=False,
                        include_cntr_arc_curv=True, include_opt_arc_curv=True,
                        opt_arc_stop_first_vis_bdry=True, ignore_error=False):
@@ -72,7 +72,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15,
 
     curvature_df = ff_dataframe_sub[['point_index', 'ff_index', 'monkey_x', 'monkey_y', 'monkey_angle',
                                     'ff_x', 'ff_y', 'ff_distance', 'ff_angle', 'ff_angle_boundary']].copy()
-    
+
     if 'time' in ff_dataframe_sub.columns:
         curvature_df['time'] = ff_dataframe_sub['time'].values
 
@@ -92,7 +92,6 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15,
         # curvature_df = curvature_df.sort_values(
         #     by=['point_index', 'abs_curv_diff', 'ff_distance'], ascending=[True, True, True])
 
-
     if clean:
         clean_curvature_info(
             curvature_df, include_opt_arc_curv=include_opt_arc_curv)
@@ -100,7 +99,7 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=15,
     return curvature_df
 
 
-def supply_with_ff_curvature_info(curvature_df, ff_radius_for_opt_arc=15, invalid_curvature_ok=False,
+def supply_with_ff_curvature_info(curvature_df, ff_radius_for_opt_arc=10, invalid_curvature_ok=False,
                                   include_cntr_arc_curv=True, include_opt_arc_curv=True,
                                   opt_arc_stop_first_vis_bdry=True, ignore_error=False):
     if include_cntr_arc_curv:
@@ -438,7 +437,7 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
             point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
         df['curv_of_traj'] = curv_of_traj
         df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
-        
+
     # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the opt_arc_curv value shall be the same as curv_of_traj
     if 'opt_arc_curv' in df.columns:
         within_ff_na_index = (df['ff_distance'] <=
@@ -501,10 +500,10 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
 
     df['curv_diff'] = df['opt_arc_curv'].values - df['curv_of_traj'].values
     df['abs_curv_diff'] = np.abs(df['curv_diff'].values)
-    
+
     if not curv_of_traj_exists:
         df.drop(columns=['curv_of_traj'], inplace=True)
-        
+
     return df
 
 
@@ -517,8 +516,10 @@ def add_arc_info_to_df(df, curvature_df, arc_info_to_add=['opt_arc_curv', 'curv_
                            'ff_index', 'point_index'], how='left')
     # for the NAs (when ff_index is -10)
     df[arc_info_to_add] = arc_info_df[arc_info_to_add]
-    df = fill_up_NAs_in_columns_related_to_curvature(df, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)
+    df = fill_up_NAs_in_columns_related_to_curvature(
+        df, ff_caught_T_new=ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)
     return df
+
 
 def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monkey_information):
     curvature_df = curvature_df.copy()
@@ -554,7 +555,8 @@ def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monk
                         == True, 'start_of_duration'] = np.nan
 
         # Forward-fill start times
-        duration_df['start_of_duration'] = duration_df['start_of_duration'].fillna(method='ffill')
+        duration_df['start_of_duration'] = duration_df['start_of_duration'].fillna(
+            method='ffill')
 
         # Flag if the *next* row overlaps
         duration_df['overlap_with_next_duration'] = (
@@ -564,10 +566,12 @@ def add_column_monkey_passed_by_to_curvature_df(curvature_df, ff_dataframe, monk
         )
 
         # Set end_of_duration to NA where overlap exists
-        duration_df.loc[duration_df['overlap_with_next_duration'], 'end_of_duration'] = pd.NA
+        duration_df.loc[duration_df['overlap_with_next_duration'],
+                        'end_of_duration'] = pd.NA
 
         # Backward-fill end times
-        duration_df['end_of_duration'] = duration_df['end_of_duration'].fillna(method='bfill')
+        duration_df['end_of_duration'] = duration_df['end_of_duration'].fillna(
+            method='bfill')
 
         # now, let's only keep unique rows
         duration_df = duration_df[['start_of_duration',

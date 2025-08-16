@@ -817,7 +817,7 @@ def get_df_name_by_ref(monkey_name, ref_point_mode, ref_point_value):
     return df_name
 
 
-def find_diff_in_curv_df_name(ref_point_mode=None, ref_point_value=None, curv_traj_window_before_stop=[-50, 0]):
+def find_diff_in_curv_df_name(ref_point_mode=None, ref_point_value=None, curv_traj_window_before_stop=[-25, 0]):
     if (ref_point_mode is not None) & (ref_point_value is not None):
         ref_df_name = get_df_name_by_ref(None, ref_point_mode, ref_point_value)
         ref_df_name = ref_df_name + '_'

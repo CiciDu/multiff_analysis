@@ -51,7 +51,7 @@ def get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df):
 
 
 def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                           curv_traj_window_before_stop=[-50, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
+                           curv_traj_window_before_stop=[-25, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
 
     cur_end_to_next_ff_curv = find_curv_of_traj_info(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
@@ -65,7 +65,7 @@ def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_informa
     return diff_in_curv_df
 
 
-def find_curv_of_traj_info(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=15):
+def find_curv_of_traj_info(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
     mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center)
     cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(

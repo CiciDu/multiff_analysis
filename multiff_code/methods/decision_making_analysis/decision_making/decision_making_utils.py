@@ -200,7 +200,7 @@ def add_attributes_last_seen_or_next_seen_for_each_ff_in_df(df, ff_dataframe, at
     return df
 
 
-def add_curv_diff_to_df(df, monkey_information, curv_of_traj_df, ff_real_position_sorted=None, ff_radius_for_opt_arc=15):
+def add_curv_diff_to_df(df, monkey_information, curv_of_traj_df, ff_real_position_sorted=None, ff_radius_for_opt_arc=10):
     # Note: df should at least contain ff_index, point_index, ff_distance, ff_angle, ff_angle_boundary, monkey_x, monkey_y, monkey_angle
     df = df.copy()
     if 'monkey_x' not in df.columns:

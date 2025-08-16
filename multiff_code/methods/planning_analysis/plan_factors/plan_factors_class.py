@@ -50,7 +50,7 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
     def make_plan_features_df_both_test_and_ctrl(self, already_made_ok=True, plan_features_exists_ok=True,
                                                  ref_point_mode='time after cur ff visible',
-                                                 ref_point_value=0.0, curv_traj_window_before_stop=[-50, 0],
+                                                 ref_point_value=0.0, curv_traj_window_before_stop=[-25, 0],
                                                  use_curv_to_ff_center=False, heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                  use_eye_data=True, save_data=True):
 
@@ -187,7 +187,7 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
             self.specific_x_columns = specific_x_columns
         # note: self.pca will be None if use_pca is False
         self.x_var_df, self.y_var_df, self.pca = self.make_x_and_y_var_df(test_or_control=test_or_control,
-                                 to_predict_ff=to_predict_ff, for_classification=for_classification)
+                                                                          to_predict_ff=to_predict_ff, for_classification=for_classification)
         try:
             self.x_var_df = self.x_var_df[self.specific_x_columns].copy()
         except KeyError as e:
@@ -215,29 +215,32 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
         if selected_features is None:
             self.selected_features = plan_factors_utils.select_planning_features_for_modeling(x_df,
-                to_predict_ff=to_predict_ff, for_classification=for_classification)
+                                                                                              to_predict_ff=to_predict_ff, for_classification=for_classification)
         else:
             self.selected_features = selected_features
 
         x_df = x_df[self.selected_features].copy()
-        
+
         for column in ['d_from_cur_ff_to_nxt_ff', 'time_between_two_stops']:
             if column in x_df.columns:
                 x_df.drop(columns=[column], inplace=True)
-                
+
         # save a copy of x_df
         self.original_x_df = x_df.copy()
-                  
+
         x_df, y_df, pca = prep_ml_data_utils.make_x_and_y_var_df(
             x_df, y_df, drop_na=drop_na_rows, scale_x_var=scale_x_var, use_pca=use_pca, n_components_for_pca=pca_dim)
-        
+
         # drop columns with NA and print the names of these columns
         columns_with_na = x_df.columns[x_df.isna().any()].tolist()
         if drop_na_cols:
             x_df = x_df.drop(columns=columns_with_na)
-            print(f'When preparing x_var to predict ff, there are {len(columns_with_na)} columns with NA that are dropped. {x_df.shape[1]} columns are left.')
-            print('Columns with NA that are dropped:', np.array(columns_with_na))
+            print(
+                f'When preparing x_var to predict ff, there are {len(columns_with_na)} columns with NA that are dropped. {x_df.shape[1]} columns are left.')
+            print('Columns with NA that are dropped:',
+                  np.array(columns_with_na))
         else:
-            print(f'When preparing x_var to predict ff, there are {len(columns_with_na)} out of {x_df.shape[1]} columns with NA.')
+            print(
+                f'When preparing x_var to predict ff, there are {len(columns_with_na)} out of {x_df.shape[1]} columns with NA.')
 
         return x_df, y_df, pca
