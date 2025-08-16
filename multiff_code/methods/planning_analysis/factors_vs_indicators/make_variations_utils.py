@@ -432,7 +432,7 @@ def combine_overall_median_info_across_monkeys_and_opt_arc_types(overall_median_
 
 def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):
     all_perc_info = pd.DataFrame([])
-    curv_traj_window_before_stop = [-50, 0]
+    curv_traj_window_before_stop = [-25, 0]
     opt_arc_type = 'norm_opt_arc'
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
         with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):

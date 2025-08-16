@@ -33,7 +33,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                             curv_of_traj_mode='distance',
                                             window_for_curv_of_traj=[-25, 0],
                                             curv_traj_window_before_stop=[
-                                                -50, 0],
+                                                -25, 0],
                                             truncate_curv_of_traj_by_time_of_capture=True,
                                             planning_data_by_point_exists_ok=True,
                                             ):
@@ -193,14 +193,15 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         both_ff_df = pn_utils._merge_both_ff_df(cur_curv_df, nxt_ff_df)
         both_ff_df = both_ff_df.merge(self.heading_info_df[[
             'point_index_before_stop', 'cur_ff_index']], on='cur_ff_index', how='left')
-        
+
         columns_to_keep = time_columns + cur_columns_added + nxt_columns_added + cur_columns_added2 + nxt_columns_added2 + \
             ['stop_point_index', 'point_index', 'segment', 'target_index']
         # make sure there's no duplicate in columns_to_keep
         columns_to_keep = list(set(columns_to_keep))
         self.both_ff_across_time_df = all_info_to_add[columns_to_keep].copy()
 
-        self.add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(both_ff_df)
+        self.add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(
+            both_ff_df)
 
         self.add_diff_in_curv_info_to_both_ff_across_time_df(both_ff_df)
 
@@ -216,20 +217,21 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
     def add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(self, both_ff_df):
         angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df)
-        
+
         angle_df['angle_from_stop_to_nxt_ff'] = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, both_ff_df.point_index_before_stop.values,
-                                                                                 both_ff_df.nxt_ff_x.values, both_ff_df.nxt_ff_y.values)
+                                                                                             both_ff_df.nxt_ff_x.values, both_ff_df.nxt_ff_y.values)
         if 'diff_in_angle_to_nxt_ff' not in angle_df.columns:
-            angle_df= build_factor_comp.process_heading_info_df(
+            angle_df = build_factor_comp.process_heading_info_df(
                 angle_df)
 
         columns_to_merge = ['cur_opt_arc_end_heading', 'angle_opt_cur_end_to_nxt_ff', 'angle_from_stop_to_nxt_ff',
                             'diff_in_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff'
                             ]
-        self.both_ff_across_time_df.drop(columns=columns_to_merge, errors='ignore', inplace=True)
-        self.both_ff_across_time_df = self.both_ff_across_time_df.merge(angle_df[['point_index'] + columns_to_merge], on='point_index', how='left')
-        
-    
+        self.both_ff_across_time_df.drop(
+            columns=columns_to_merge, errors='ignore', inplace=True)
+        self.both_ff_across_time_df = self.both_ff_across_time_df.merge(
+            angle_df[['point_index'] + columns_to_merge], on='point_index', how='left')
+
     def add_diff_in_curv_info_to_both_ff_across_time_df(self, both_ff_df):
         self.both_ff_across_time_df = pn_utils.add_diff_in_curv_info(
             self.both_ff_across_time_df, both_ff_df, self.monkey_information, self.ff_real_position_sorted, self.ff_caught_T_new)

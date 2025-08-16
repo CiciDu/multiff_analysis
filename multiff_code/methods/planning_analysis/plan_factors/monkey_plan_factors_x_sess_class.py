@@ -28,8 +28,8 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
 
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
-    default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2, -0.1, 0, 0.1, 0.2],
-                                              'distance': [-100, -150]}
+    default_ref_point_params_based_on_mode = {
+        'distance': np.arange(-150, -30, 10)}
 
     # default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2]}
 
@@ -72,7 +72,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
                                              ref_point_mode='distance',
                                              ref_point_value=-150,
                                              curv_traj_window_before_stop=[
-                                                 -50, 0],
+                                                 -25, 0],
                                              save_data=True,
                                              **plan_features_tc_kwargs
                                              ):
@@ -169,7 +169,7 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
     def get_combd_heading_df_x_sessions_across_sessions(self,
                                                         ref_point_mode='distance', ref_point_value=-150,
                                                         curv_traj_window_before_stop=[
-                                                            -50, 0],
+                                                            -25, 0],
                                                         heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                         use_curv_to_ff_center=False,
                                                         exists_ok=True, save_data=True):

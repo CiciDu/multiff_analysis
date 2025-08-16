@@ -31,6 +31,7 @@ def run_tests_over_monkeys(
     monkeys=['monkey_Schro', 'monkey_Bruno'],
     verbose=True,
     test='wilcoxon', # or 'permutation'
+    num_permutations=10000,
     **kwargs
 ):
     assert test in ['wilcoxon', 'permutation']
@@ -39,9 +40,9 @@ def run_tests_over_monkeys(
         test_d_curv_func = lambda x, y: mannwhitneyu_test(x, y, alternative='greater')
         test_d_dir_func = lambda x, y: mannwhitneyu_test(x, y, alternative='greater')
     elif test == 'permutation':
-        test_angle_func = lambda x, y: permutation_test(x, y, num_permutations=10000, alternative='greater', statistic='median')
-        test_d_curv_func = lambda x, y: permutation_test(x, y, num_permutations=10000, alternative='greater', statistic='median')
-        test_d_dir_func = lambda x, y: permutation_test(x, y, num_permutations=10000, alternative='greater', statistic='mean')
+        test_angle_func = lambda x, y: permutation_test(x, y, num_permutations=num_permutations, alternative='greater', statistic='median')
+        test_d_curv_func = lambda x, y: permutation_test(x, y, num_permutations=num_permutations, alternative='greater', statistic='median')
+        test_d_dir_func = lambda x, y: permutation_test(x, y, num_permutations=num_permutations, alternative='greater', statistic='mean')
         
     results = []
     
@@ -101,15 +102,16 @@ def run_tests_over_monkeys(
             build_factor_comp.add_dir_from_cur_ff_same_side(test_df)
             build_factor_comp.add_dir_from_cur_ff_same_side(ctrl_df)
 
-            # Run d_dir test on cleaned data
-            d_dir_p = test_d_dir_func(
-                test_df['dir_from_cur_ff_same_side'].values,
-                ctrl_df['dir_from_cur_ff_same_side'].values
-            )
             
             # Filter NaNs for d_dir column
             test_df_clean, ctrl_df_clean = filter_and_report_nan(
                 test_df, ctrl_df, col_name='dir_from_cur_ff_same_side'
+            )
+            
+            # Run d_dir test on cleaned data
+            d_dir_p = test_d_dir_func(
+                test_df['dir_from_cur_ff_same_side'].values,
+                ctrl_df['dir_from_cur_ff_same_side'].values
             )
             
             # Collect results
@@ -120,6 +122,8 @@ def run_tests_over_monkeys(
                 'angle_p_value': angle_p,
                 'd_curv_p_value': d_curv_p,
                 'd_dir_p_value': d_dir_p,
+                'd_dir_test_sample_size': len(test_df_clean),
+                'd_dir_ctrl_sample_size': len(ctrl_df_clean),
             })
     
     return pd.DataFrame(results)

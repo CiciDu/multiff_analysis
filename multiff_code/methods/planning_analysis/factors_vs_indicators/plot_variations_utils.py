@@ -141,12 +141,15 @@ def _find_rest_of_x_for_hoverdata(sub_df, x_var_column, y_var_column, var_to_det
 
 
 def _process_x_var_columns(sub_df, x_var_column):
-    if x_var_column == 'ref_point_value':
-        sub_df['ref_point_value'] = sub_df['ref_point_value'].astype('str')
-    else:
-        # if the data type of sub_df[x_var_column], is bool, change it to str
-        if sub_df[x_var_column].dtype == 'bool':
-            sub_df[x_var_column] = sub_df[x_var_column].astype('str')
+    if sub_df[x_var_column].dtype == 'bool':
+        sub_df[x_var_column] = sub_df[x_var_column].astype('str')
+    
+    # if x_var_column == 'ref_point_value': # this is probably only useful when ref_point_mode is 'cur_ff_visible'
+    #     sub_df['ref_point_value'] = sub_df['ref_point_value'].astype('str')
+    # else:
+    #     # if the data type of sub_df[x_var_column], is bool, change it to str
+    #     if sub_df[x_var_column].dtype == 'bool':
+    #         sub_df[x_var_column] = sub_df[x_var_column].astype('str')
     return sub_df
 
 
@@ -174,16 +177,22 @@ def _process_columns_to_find_unique_combinations_for_color(columns_to_find_uniqu
 
 def _find_x_labels_to_values_map(sub_df, x_var_column):
     if x_var_column == 'ref_point_value':
-        desired_order = ['-150.0', '-125.0', '-100.0',
-                         '-75.0', '-50.0', '-0.2', '-0.1', '0.0', '0.1']
+        # desired_order = ['-150.0', '-125.0', '-100.0',
+        #                  '-75.0', '-50.0', '-0.2', '-0.1', '0.0', '0.1']
+        desired_order = np.arange(-200, 20, 10)
         unique_existing_values = sub_df[x_var_column].unique()
-        desired_order = [
-            value for value in desired_order if value in unique_existing_values]
+        # check if all unique_existing_values are in desired_order. If not, print a warning, and just use unique_existing_values
+        if not all(value in desired_order for value in unique_existing_values):
+            print('Warning: in calling find_x_labels_to_values_map, some values in ref_point_value are not in pre-determined list. Using unique existing values in ref_point_values instead.')
+            desired_order = np.sort(unique_existing_values)
+        else:
+            desired_order = [
+                value for value in desired_order if value in unique_existing_values]
         x_labels_to_values_map = dict(
             zip(desired_order, np.arange(len(desired_order))))
     else:
-        x_labels_to_values_map = dict(
-            zip(sub_df[x_var_column].unique(), np.arange(len(sub_df[x_var_column].unique()))))
+        unique_vals = sub_df[x_var_column].unique()
+        x_labels_to_values_map = dict(zip(unique_vals, range(len(unique_vals))))
     return x_labels_to_values_map
 
 

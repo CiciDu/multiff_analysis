@@ -92,7 +92,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
                                              curv_traj_window_before_stop=[
-                                                 -50, 0],
+                                                 -25, 0],
                                              test_or_control='both'):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
@@ -174,7 +174,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def retrieve_or_make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
                                                      curv_traj_window_before_stop=[
-                                                         -50, 0],
+                                                         -25, 0],
                                                      combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, show_printed_output=False,
                                                      test_or_control='both', sessions_df_for_one_monkey=None):
         if test_or_control is None:
@@ -251,7 +251,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
     def _make_combd_heading_df_x_sessions(self, test_or_control='test',
                                           ref_point_mode='distance', ref_point_value=-100,
                                           curv_traj_window_before_stop=[
-                                              -50, 0],
+                                              -25, 0],
                                           stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                           sessions_df_for_one_monkey=None,
                                           use_curv_to_ff_center=False):
@@ -333,7 +333,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(self, ref_point_mode='distance', ref_point_value=-100,
                                                                                 curv_traj_window_before_stop=[
-                                                                                    -50, 0],
+                                                                                    -25, 0],
                                                                                 combd_heading_df_x_sessions_exists_ok=True,
                                                                                 heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                                                 show_printed_output=False, use_curv_to_ff_center=False, save_data=True):

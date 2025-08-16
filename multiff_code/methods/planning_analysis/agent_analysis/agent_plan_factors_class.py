@@ -77,7 +77,7 @@ class PlanFactorsOfAgent():
 
     def get_plan_features_df_for_one_session(self, ref_point_mode='distance', ref_point_value=-150,
                                              curv_traj_window_before_stop=[
-                                                 -50, 0],
+                                                 -25, 0],
                                              monkey_data_exists_ok=True,
                                              plan_features_exists_ok=False,
                                              heading_info_df_exists_ok=False,
@@ -114,7 +114,7 @@ class PlanFactorsOfAgent():
 
     def get_test_and_ctrl_heading_info_df_for_one_session(self, ref_point_mode='distance', ref_point_value=-150,
                                                           curv_traj_window_before_stop=[
-                                                              -50, 0],
+                                                              -25, 0],
                                                           monkey_data_exists_ok=True,
                                                           heading_info_df_exists_ok=False,
                                                           stops_near_ff_df_exists_ok=False,

@@ -130,7 +130,7 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
     # note that the method below is only used for monkey; for agent, the method is defined in the agent class
     def get_test_and_ctrl_heading_info_df_across_sessions(self, ref_point_mode='distance', ref_point_value=-150,
                                                           curv_traj_window_before_stop=[
-                                                              -50, 0],
+                                                              -25, 0],
                                                           heading_info_df_exists_ok=True, combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, save_data=True):
         self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name,
                                                    opt_arc_type=self.opt_arc_type)

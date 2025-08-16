@@ -69,7 +69,7 @@ class _PlotVariations:
                                                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                                        'key_for_split': 'ff_seen',
                                                                                                        'whether_even_out_dist': False,
-                                                                                                       'curv_traj_window_before_stop': '[-50, 0]'
+                                                                                                       'curv_traj_window_before_stop': '[-25, 0]'
                                                                                                        },
                                                                          changeable_variables=[
                                                                              'ref_point_value', 'monkey_name'],
@@ -91,7 +91,7 @@ class _PlotVariations:
                                                                       fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                                                     'key_for_split': 'ff_seen',
                                                                                                     'whether_even_out_dist': False,
-                                                                                                    'curv_traj_window_before_stop': '[-50, 0]'
+                                                                                                    'curv_traj_window_before_stop': '[-25, 0]'
                                                                                                     },
                                                                       changeable_variables=[
                                                                           'ref_point_value', 'monkey_name'],

@@ -83,7 +83,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
         self.make_or_retrieve_overall_median_info(ref_point_params_based_on_mode={'time after cur ff visible': [0.1, 0],
                                                                                   'distance': [-150, -100, -50]},
                                                   list_of_curv_traj_window_before_stop=[
-                                                      [-50, 0]],
+                                                      [-25, 0]],
                                                   save_data=save_data,
                                                   exists_ok=final_products_exist_ok,
                                                   all_median_info_exists_ok=intermediate_products_exist_ok,
@@ -107,7 +107,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                              ref_point_mode='distance',
                                              ref_point_value=-150,
                                              curv_traj_window_before_stop=[
-                                                 -50, 0],
+                                                 -25, 0],
                                              exists_ok=True,
                                              plan_features_exists_ok=True,
 
@@ -243,7 +243,7 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                           num_datasets_to_collect=1,
                                                           ref_point_mode='distance', ref_point_value=-150,
                                                           curv_traj_window_before_stop=[
-                                                              -50, 0],
+                                                              -25, 0],
                                                           heading_info_df_exists_ok=True,
                                                           combd_heading_df_x_sessions_exists_ok=True,
                                                           stops_near_ff_df_exists_ok=True,

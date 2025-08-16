@@ -105,7 +105,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after cur ff visible', ref_point_value=0.0,
                                                   curv_traj_window_before_stop=[
-                                                      -50, 0],
+                                                      -25, 0],
                                                   use_curv_to_ff_center=False,
                                                   stops_near_ff_df_exists_ok=True,
                                                   heading_info_df_exists_ok=True,
