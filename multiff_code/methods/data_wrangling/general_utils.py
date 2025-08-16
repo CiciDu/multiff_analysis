@@ -300,65 +300,6 @@ def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
     return perfect_pairs
 
 
-def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=True):
-    """
-    Find and analyze rows with NA values in a DataFrame.
-
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        The DataFrame to analyze
-    df_name : str, optional
-        Name of the DataFrame for display purposes, defaults to "DataFrame"
-
-    Returns:
-    --------
-    tuple
-        (na_rows, na_cols) where:
-        - na_rows: DataFrame containing rows with any NA values
-        - na_cols: Index of columns containing any NA values
-    """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-
-    if df.empty:
-        print(f"\n{df_name} is empty")
-        return pd.DataFrame(), pd.Index([])
-
-    # Find rows and columns with NA values
-    na_rows = df[df.isna().any(axis=1)]
-    na_cols = df.columns[df.isna().any(axis=0)]
-
-    # Calculate NA statistics
-    na_sum = df.isna().sum()
-    na_df = na_sum[na_sum > 0]
-    total_rows = len(df)
-    na_row_count = len(na_rows)
-
-    # Print analysis if NA values exist
-    if na_row_count > 0:
-        print("\n" + "="*80)
-        print(f"NA Values Analysis for {df_name} ({total_rows:,} rows)")
-        print("="*80)
-        print(f"\nNumber of rows with at least one NA value: {na_row_count:,}")
-
-        # Print column-wise NA summary
-        print("\nColumns with NA values:")
-        print("-"*60)
-        for col, count in na_df.items():
-            percentage = (count / total_rows) * 100
-            print(f"{col:<40} {count:>8,} ({percentage:>6.1f}%)")
-        print("-"*60)
-
-    else:
-        print(f"\nNo NA values found in {df_name}")
-
-    if return_rows_and_columns:
-        return na_rows, na_cols
-    else:
-        return
-
-
 def drop_all_na_columns(df):
     """
     Drops columns from the DataFrame that contain only NaN values.
@@ -449,5 +390,68 @@ def setup_logging():
         stream=sys.stdout,  # or use `stream=sys.stdout` for console
     )
     print('Set up logging configuration.')
+
+
+def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=True):
+    """
+    Find and analyze rows with NA values in a DataFrame.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        The DataFrame to analyze
+    df_name : str, optional
+        Name of the DataFrame for display purposes, defaults to "DataFrame"
+
+    Returns:
+    --------
+    tuple
+        (na_rows, na_cols) where:
+        - na_rows: DataFrame containing rows with any NA values
+        - na_cols: Index of columns containing any NA values
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+
+    if df.empty:
+        print(f"\n{df_name} is empty")
+        return pd.DataFrame(), pd.Index([])
+
+    # Find rows and columns with NA values
+    na_rows = df[df.isna().any(axis=1)]
+    na_cols = df.columns[df.isna().any(axis=0)]
+
+    # Calculate NA statistics
+    na_sum = df.isna().sum()
+    na_df = na_sum[na_sum > 0]
+    total_rows = len(df)
+    na_row_count = len(na_rows)
+
+    # Print analysis if NA values exist
+    if na_row_count > 0:
+        print("\n" + "="*80)
+        print(f"NA Values Analysis for {df_name} ({total_rows:,} rows)")
+        print("="*80)
+        print(f"\nNumber of rows with at least one NA value: {na_row_count:,}")
+
+        # Print column-wise NA summary
+        print("\nColumns with NA values:")
+        print("-"*60)
+        for col, count in na_df.items():
+            percentage = (count / total_rows) * 100
+            print(f"{col:<40} {count:>8,} ({percentage:>6.1f}%)")
+        print("-"*60)
+
+    else:
+        print(f"\nNo NA values found in {df_name}")
+
+    if return_rows_and_columns:
+        return na_rows, na_cols
+    else:
+        return
     
 setup_logging()
+
+
+
+

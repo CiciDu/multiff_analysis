@@ -13,20 +13,14 @@ import pandas as pd
 from math import pi
 
 
-def change_control_data_to_conform_to_test_data(plan_x_ctrl, plan_y_ctrl, plan_x_test):
-    min_angle = plan_x_test['nxt_ff_angle_at_ref'].min()
-    max_angle = plan_x_test['nxt_ff_angle_at_ref'].max()
-    plan_x_ctrl = plan_x_ctrl.copy()
-    plan_y_ctrl = plan_y_ctrl.copy()
-    plan_x_ctrl['unique_id'] = np.arange(len(plan_x_ctrl))
-    plan_y_ctrl['unique_id'] = np.arange(len(plan_y_ctrl))
-    plan_x_ctrl2 = plan_x_ctrl[plan_x_ctrl['nxt_ff_angle_at_ref'].between(
-        min_angle, max_angle)].sort_values(by='unique_id')
-    plan_y_ctrl2 = plan_y_ctrl[plan_y_ctrl['unique_id'].isin(
-        plan_x_ctrl2['unique_id'])].sort_values(by='unique_id').drop(columns=['unique_id'])
-    plan_x_ctrl2 = plan_x_ctrl2.drop(columns=['unique_id'])
 
-    return plan_x_ctrl2, plan_y_ctrl2
+def change_control_data_to_conform_to_test_data(plan_features_test, plan_features_ctrl):
+    min_angle = plan_features_test['nxt_ff_angle_at_ref'].min()
+    max_angle = plan_features_test['nxt_ff_angle_at_ref'].max()
+    plan_features_ctrl = plan_features_ctrl[plan_features_ctrl['nxt_ff_angle_at_ref'].between(
+        min_angle, max_angle)].copy()
+
+    return plan_features_ctrl
 
 
 def make_the_distributions_of_a_column_more_similar_between_two_df(df_1, df_2, column_name='nxt_ff_angle_at_ref', bins=np.arange(-pi, pi, 0.025)):
@@ -60,50 +54,6 @@ def make_the_distributions_of_a_column_more_similar_between_two_df(df_1, df_2, c
         df_2, column_name, test_sample_ratio)
     return df_12, df_22
 
-
-def prune_out_data_with_large_curv_range(x_df, y_df, max_curv_range=100):
-
-    if ('curv_range' not in y_df.columns):
-        raise ValueError('curv_range must be a column in x_df and y_df')
-
-    x_df = x_df.copy()
-    y_df = y_df.copy()
-    x_df['unique_id'] = np.arange(len(x_df))
-    y_df['unique_id'] = np.arange(len(y_df))
-    # y_df['curv_range'] = y_df['curv_max'] - y_df['curv_min']
-    y_df2 = y_df[y_df['curv_range'] <= max_curv_range].copy()
-    x_df2 = x_df[x_df['unique_id'].isin(y_df2['unique_id'])].sort_values(
-        by='unique_id').drop(columns=['unique_id'])
-    # print the number of rows dropped out of number of total rows
-    print('Number of rows dropped out of total rows after prunning out data with large curv range:', len(
-        x_df) - len(x_df2), 'out of', len(x_df))
-
-    y_df2 = y_df2.drop(columns=['unique_id'])
-    return x_df2, y_df2
-
-
-def limit_cum_distance_between_two_stops(x_df, y_df, max_cum_distance_between_two_stops=400):
-    if ('cum_distance_between_two_stops' not in x_df.columns):
-        try:
-            x_df['cum_distance_between_two_stops'] = x_df['next_stop_cum_distance'] - \
-                x_df['stop_cum_distance']
-        except:
-            raise ValueError(
-                'cum_distance_between_two_stops must be a column in x_df and y_df; or else provide the columns stop_cum_distance and next_stop_cum_distance in x_df and y_df')
-
-    x_df = x_df.copy()
-    y_df = y_df.copy()
-    x_df['unique_id'] = np.arange(len(x_df))
-    y_df['unique_id'] = np.arange(len(y_df))
-    x_df2 = x_df[x_df['cum_distance_between_two_stops']
-                 <= max_cum_distance_between_two_stops].copy()
-    y_df2 = y_df[y_df['unique_id'].isin(x_df2['unique_id'])].sort_values(
-        by='unique_id').drop(columns=['unique_id'])
-    x_df2 = x_df2.drop(columns=['unique_id'])
-    print('Number of rows dropped out of total rows after limiting cum distance between two stops:', len(
-        x_df) - len(x_df2), 'out of', len(x_df))
-
-    return x_df2, y_df2
 
 
 def sample_rows_based_on_ratio_for_each_bin(df, column, sample_ratio):
@@ -344,14 +294,15 @@ def make_the_distributions_of_angle_more_similar_in_df(test_df, ctrl_df, verbose
     return test_df, ctrl_df
 
 
-def process_combd_plan_x_and_y_combd(combd_plan_x_tc, combd_plan_y_tc, curv_columns=['curv_min', 'curv_max', 'curv_range']):
-    combd_plan_x_tc['d_heading_of_traj'] = combd_plan_y_tc['d_heading_of_traj'].values
-    combd_plan_x_tc['cur_ff_angle_diff_boundary_at_ref'] = combd_plan_x_tc['cur_ff_angle_at_ref'] - \
-        combd_plan_x_tc['cur_ff_angle_boundary_at_ref']
-    combd_plan_y_tc['dir_from_cur_ff_to_stop'] = (
-        (combd_plan_y_tc['dir_from_cur_ff_to_stop'] + 1)/2).astype(int)
-    combd_plan_y_tc['dir_from_cur_ff_same_side'] = (
-        (combd_plan_y_tc['dir_from_cur_ff_same_side'] + 1)/2).astype(int)
-    combd_plan_x_tc['dir_from_cur_ff_to_nxt_ff'] = (
-        (combd_plan_y_tc['dir_from_cur_ff_to_nxt_ff'] + 1)/2).astype(int)
-    combd_plan_x_tc[curv_columns] = combd_plan_y_tc[curv_columns].values
+def process_combd_plan_features(combd_plan_features_tc, curv_columns=['curv_min', 'curv_max', 'curv_range']):
+    combd_plan_features_tc['d_heading_of_traj'] = combd_plan_features_tc['d_heading_of_traj'].values
+    combd_plan_features_tc['cur_ff_angle_diff_boundary_at_ref'] = combd_plan_features_tc['cur_ff_angle_at_ref'] - \
+        combd_plan_features_tc['cur_ff_angle_boundary_at_ref']
+    combd_plan_features_tc['dir_from_cur_ff_to_stop'] = (
+        (combd_plan_features_tc['dir_from_cur_ff_to_stop'] + 1)/2).astype(int)
+    combd_plan_features_tc['dir_from_cur_ff_same_side'] = (
+        (combd_plan_features_tc['dir_from_cur_ff_same_side'] + 1)/2).astype(int)
+    combd_plan_features_tc['dir_from_cur_ff_to_nxt_ff'] = (
+        (combd_plan_features_tc['dir_from_cur_ff_to_nxt_ff'] + 1)/2).astype(int)
+    combd_plan_features_tc[curv_columns] = combd_plan_features_tc[curv_columns].values
+    return combd_plan_features_tc

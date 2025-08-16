@@ -46,6 +46,7 @@ def add_interaction_terms_to_df(df, specific_columns=None):
 def make_x_and_y_var_df(x_df, y_df, drop_na=True, scale_x_var=True, use_pca=False, n_components_for_pca=None):
     x_var_df = x_df.copy()
     y_var_df = y_df.copy()
+    pca = None
 
     # scale the variables
     if scale_x_var:
@@ -74,7 +75,7 @@ def make_x_and_y_var_df(x_df, y_df, drop_na=True, scale_x_var=True, use_pca=Fals
 
     if use_pca:
         if n_components_for_pca is None:
-            n_components_for_pca = min(x_var_df.shape[0], x_var_df.shape[1])
+            n_components_for_pca = min(x_var_df.shape[1], 10)
         # 'mle' automatically selects the number of components or choose a fixed number
         pca = PCA(n_components=n_components_for_pca)
         x_var_df = pca.fit_transform(x_var_df)
@@ -85,7 +86,7 @@ def make_x_and_y_var_df(x_df, y_df, drop_na=True, scale_x_var=True, use_pca=Fals
     x_var_df.reset_index(drop=True, inplace=True)
     y_var_df.reset_index(drop=True, inplace=True)
 
-    return x_var_df, y_var_df
+    return x_var_df, y_var_df, pca
 
 
 def further_prepare_x_var_and_y_var(x_var_df, y_var_df, y_var_column='d_monkey_angle_since_cur_ff_first_seen', remove_outliers=True):

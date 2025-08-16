@@ -40,12 +40,9 @@ class PlanFactorsOfAgent():
     def _copy_df_from_pn_to_self(self):
 
         try:
-            self.plan_y_tc = self.pf.plan_y_tc
-            self.plan_x_tc = self.pf.plan_x_tc
-            self.plan_x_test = self.pf.plan_x_test
-            self.plan_y_test = self.pf.plan_y_test
-            self.plan_x_ctrl = self.pf.plan_x_ctrl
-            self.plan_y_ctrl = self.pf.plan_y_ctrl
+            self.plan_features_tc = self.pf.plan_features_tc
+            self.plan_features_test = self.pf.plan_features_test
+            self.plan_features_ctrl = self.pf.plan_features_ctrl
         except AttributeError:
             pass
         try:
@@ -78,25 +75,23 @@ class PlanFactorsOfAgent():
         self.pf.decision_making_folder_path = self.decision_making_folder_path
         self.pf.monkey_name = 'monkey_agent'
 
-    def get_plan_x_and_plan_y_for_one_session(self, ref_point_mode='distance', ref_point_value=-150,
-                                              curv_traj_window_before_stop=[
-                                                  -50, 0],
-                                              monkey_data_exists_ok=True,
-                                              plan_x_exists_ok=False,
-                                              plan_y_exists_ok=False,
-                                              heading_info_df_exists_ok=False,
-                                              stops_near_ff_df_exists_ok=False,
-                                              use_curv_to_ff_center=False,
-                                              save_data=True,
-                                              curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
-                                              n_steps=8000,
-                                              **env_kwargs):
+    def get_plan_features_df_for_one_session(self, ref_point_mode='distance', ref_point_value=-150,
+                                             curv_traj_window_before_stop=[
+                                                 -50, 0],
+                                             monkey_data_exists_ok=True,
+                                             plan_features_exists_ok=False,
+                                             heading_info_df_exists_ok=False,
+                                             stops_near_ff_df_exists_ok=False,
+                                             use_curv_to_ff_center=False,
+                                             save_data=True,
+                                             curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
+                                             n_steps=8000,
+                                             **env_kwargs):
 
         self._initialize_pf(curv_of_traj_mode=curv_of_traj_mode,
                             window_for_curv_of_traj=window_for_curv_of_traj)
 
-        kwargs = dict(plan_x_exists_ok=plan_x_exists_ok,
-                      plan_y_exists_ok=plan_y_exists_ok,
+        kwargs = dict(plan_features_exists_ok=plan_features_exists_ok,
                       heading_info_df_exists_ok=heading_info_df_exists_ok,
                       stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                       ref_point_mode=ref_point_mode,
@@ -108,13 +103,13 @@ class PlanFactorsOfAgent():
                       save_data=save_data)
 
         try:  # needs agent data
-            self.pf.make_plan_x_and_y_for_both_test_and_ctrl(**kwargs)
+            self.pf.make_plan_features_df_both_test_and_ctrl(**kwargs)
         except AttributeError as e:
             print('Data missing. Will get agent data first. Error message: ', e)
             self.get_agent_data(
                 n_steps=n_steps, exists_ok=monkey_data_exists_ok, save_data=save_data, **env_kwargs)
             self._load_agent_data_onto_pf()
-            self.pf.make_plan_x_and_y_for_both_test_and_ctrl(**kwargs)
+            self.pf.make_plan_features_df_both_test_and_ctrl(**kwargs)
         self._copy_df_from_pn_to_self()
 
     def get_test_and_ctrl_heading_info_df_for_one_session(self, ref_point_mode='distance', ref_point_value=-150,

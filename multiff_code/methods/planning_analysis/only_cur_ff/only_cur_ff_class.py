@@ -155,9 +155,10 @@ class OnlyStopFF(base_processing_class.BaseProcessing):
         for column in ['data_name', 'stop_point_index']:
             if column in x_features_df_temp.columns:
                 x_features_df_temp.drop(columns=[column], inplace=True)
-        self.original_x_var_df = self.x_var_df.copy()
-        self.x_var_df, self.y_var_df = prep_ml_data_utils.make_x_and_y_var_df(x_features_df_temp, self.only_cur_ff_df, scale_x_var=scale_x_var,
-                                                                              use_pca=use_pca, n_components_for_pca=n_components_for_pca)
+        self.original_x_df = self.x_var_df.copy()
+        # note: self.pca will be None if use_pca is False
+        self.x_var_df, self.y_var_df, self.pca = prep_ml_data_utils.make_x_and_y_var_df(x_features_df_temp, self.only_cur_ff_df, scale_x_var=scale_x_var,
+                                                                                        use_pca=use_pca, n_components_for_pca=n_components_for_pca)
 
     def use_ref_columns_only(self):
         self.x_features_df = self.x_features_df[[

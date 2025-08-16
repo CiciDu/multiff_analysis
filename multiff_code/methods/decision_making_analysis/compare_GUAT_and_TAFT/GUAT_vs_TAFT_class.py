@@ -82,11 +82,11 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
     def get_relevant_monkey_data(self,
                                  already_retrieved_ok=True,
                                  ):
-        
+
         include_TAFT_data = True if self.GUAT_or_TAFT == 'TAFT' else False
         include_GUAT_data = True if self.GUAT_or_TAFT == 'GUAT' else False
         self.get_monkey_data(already_retrieved_ok=already_retrieved_ok,
-                                 include_GUAT_data=include_GUAT_data, include_TAFT_data=include_TAFT_data)
+                             include_GUAT_data=include_GUAT_data, include_TAFT_data=include_TAFT_data)
 
         if self.GUAT_or_TAFT == 'TAFT':
             self.TAFT_trials_df['first_stop_time'] = self.monkey_information.loc[
@@ -111,9 +111,7 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
 
     def get_GUAT_or_TAFT_x_df(self, save_data=True):
         self._get_stops_near_ff_df(already_made_ok=True)
-        self._make_plan_y_df()
-        self._make_plan_x_df(list_of_cur_ff_cluster_radius=[100],
-                             list_of_nxt_ff_cluster_radius=[200])
+        self._make_plan_features_df()
 
         self._get_x_features_df(list_of_cur_ff_cluster_radius=[],
                                 list_of_cur_ff_ang_cluster_radius=[20],

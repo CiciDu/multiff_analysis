@@ -167,33 +167,33 @@ def get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df_from_ref, ff_dataframe_
     return nxt_ff_last_seen_info
 
 
-def add_d_monkey_angle(plan_y_df, cur_ff_df_from_ref, stops_near_ff_df):
-    plan_y_df = plan_y_df.merge(stops_near_ff_df[[
-                                'stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left')
+def add_d_monkey_angle(plan_features1, cur_ff_df_from_ref, stops_near_ff_df):
+    plan_features1 = plan_features1.merge(stops_near_ff_df[[
+        'stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left')
     cur_ff_df_from_ref['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df_from_ref['monkey_angle'] * 180 / math.pi
-    if 'monkey_angle_when_cur_ff_first_seen' not in plan_y_df.columns:
-        plan_y_df = plan_y_df.merge(cur_ff_df_from_ref[[
-                                    'ff_index', 'monkey_angle_when_cur_ff_first_seen']], left_on='cur_ff_index', right_on='ff_index', how='left')
-    plan_y_df['stop_monkey_angle'] = plan_y_df['stop_monkey_angle'] * 180/math.pi
-    plan_y_df['monkey_angle_before_stop'] = plan_y_df['monkey_angle_before_stop'] * 180/math.pi
-    plan_y_df['d_monkey_angle_since_cur_ff_first_seen'] = plan_y_df['stop_monkey_angle'] - \
-        plan_y_df['monkey_angle_when_cur_ff_first_seen']
-    plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'] = plan_y_df['monkey_angle_before_stop'] - \
-        plan_y_df['monkey_angle_when_cur_ff_first_seen']
-    plan_y_df['d_monkey_angle_since_cur_ff_first_seen'] = find_cvn_utils.confine_angle_to_within_180(
-        plan_y_df['d_monkey_angle_since_cur_ff_first_seen'].values)
-    plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'] = find_cvn_utils.confine_angle_to_within_180(
-        plan_y_df['d_monkey_angle_since_cur_ff_first_seen2'].values)
-    return plan_y_df
+    if 'monkey_angle_when_cur_ff_first_seen' not in plan_features1.columns:
+        plan_features1 = plan_features1.merge(cur_ff_df_from_ref[[
+            'ff_index', 'monkey_angle_when_cur_ff_first_seen']], left_on='cur_ff_index', right_on='ff_index', how='left')
+    plan_features1['stop_monkey_angle'] = plan_features1['stop_monkey_angle'] * 180/math.pi
+    plan_features1['monkey_angle_before_stop'] = plan_features1['monkey_angle_before_stop'] * 180/math.pi
+    plan_features1['d_monkey_angle_since_cur_ff_first_seen'] = plan_features1['stop_monkey_angle'] - \
+        plan_features1['monkey_angle_when_cur_ff_first_seen']
+    plan_features1['d_monkey_angle_since_cur_ff_first_seen2'] = plan_features1['monkey_angle_before_stop'] - \
+        plan_features1['monkey_angle_when_cur_ff_first_seen']
+    plan_features1['d_monkey_angle_since_cur_ff_first_seen'] = find_cvn_utils.confine_angle_to_within_180(
+        plan_features1['d_monkey_angle_since_cur_ff_first_seen'].values)
+    plan_features1['d_monkey_angle_since_cur_ff_first_seen2'] = find_cvn_utils.confine_angle_to_within_180(
+        plan_features1['d_monkey_angle_since_cur_ff_first_seen2'].values)
+    return plan_features1
 
 
-def add_dir_from_cur_ff_same_side(plan_y_df):
-    plan_y_df['dir_from_cur_ff_to_stop'] = np.sign(
-        plan_y_df['angle_from_cur_ff_to_stop'])
-    plan_y_df['dir_from_cur_ff_to_nxt_ff'] = np.sign(
-        plan_y_df['angle_from_cur_ff_to_nxt_ff'])
-    plan_y_df['dir_from_cur_ff_same_side'] = plan_y_df['dir_from_cur_ff_to_stop'] == plan_y_df['dir_from_cur_ff_to_nxt_ff']
-    plan_y_df['dir_from_cur_ff_same_side'] = plan_y_df['dir_from_cur_ff_same_side'].astype(
+def add_dir_from_cur_ff_same_side(plan_features1):
+    plan_features1['dir_from_cur_ff_to_stop'] = np.sign(
+        plan_features1['angle_from_cur_ff_to_stop'])
+    plan_features1['dir_from_cur_ff_to_nxt_ff'] = np.sign(
+        plan_features1['angle_from_cur_ff_to_nxt_ff'])
+    plan_features1['dir_from_cur_ff_same_side'] = plan_features1['dir_from_cur_ff_to_stop'] == plan_features1['dir_from_cur_ff_to_nxt_ff']
+    plan_features1['dir_from_cur_ff_same_side'] = plan_features1['dir_from_cur_ff_same_side'].astype(
         int)
 
 

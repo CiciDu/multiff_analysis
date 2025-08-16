@@ -26,19 +26,7 @@
             │       ├── ...
             │   └── opt_arc_stop_first_vis_bdry
             │       ├── ...
-            ├── plan_x_df
-            │   ├── norm_opt_arc
-            │   │   ├── control
-            │   │   │   ├── dist_100_window_-100cm_0cm
-            │   │   │   ├── dist_100_window_-25cm_0cm
-            │   │   └── test
-            │   │       ├── dist_100_window_-100cm_0cm
-            │   │       ├── dist_100_window_-25cm_0cm
-            │   ├── opt_arc_stop_closest
-            │       ├── ...
-            │   └── opt_arc_stop_first_vis_bdry
-            │       ├── ...
-            ├── plan_y_df
+            ├── plan_features_df
             │   ├── norm_opt_arc
             │   │   ├── control
             │   │   │   ├── dist_100_window_-100cm_0cm
@@ -63,8 +51,7 @@
                 │   │   ├── opt_arc_stop_closest
                 │   │   └── opt_arc_stop_first_vis_bdry
                 │   ├── combd_heading_info
-                │   ├── combd_plan_x_tc
-                │   └── combd_plan_y_tc
+                │   └── combd_plan_features_tc
                 ├── data_comparison
                 │   ├── norm_opt_arc
                 │   │   ├── all_median_info

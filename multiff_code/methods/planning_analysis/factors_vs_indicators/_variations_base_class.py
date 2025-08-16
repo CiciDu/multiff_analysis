@@ -158,17 +158,12 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                                                                                                       )
         return self.all_cur_and_nxt_lr_df
 
-    def quickly_get_plan_x_and_y_control_and_test_data(self, ref_point_mode, ref_point_value, to_predict_ff=False, keep_monkey_info=False, for_classification=False):
-        self.get_plan_x_and_plan_y_across_sessions(
+    def quickly_get_plan_features_control_and_test_data(self, ref_point_mode, ref_point_value, to_predict_ff=False, keep_monkey_info=False, for_classification=False):
+        self.get_plan_features_df_across_sessions(
             ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
-        self.process_combd_plan_x_tc_and_plan_y_tc()
-        self.further_process_combd_plan_x_tc(
-            to_predict_ff, for_classification=for_classification)
-        if keep_monkey_info is False:
-            self.combd_plan_x_tc = plan_factors_utils.delete_monkey_info_in_plan_x(
-                self.combd_plan_x_tc)
-        self.plan_xy_test, self.plan_xy_ctrl = plan_factors_utils.make_plan_xy_test_and_plan_xy_ctrl(
-            self.combd_plan_x_tc, self.combd_plan_y_tc)
+        self.process_combd_plan_features()
+        self.plan_features_test, self.plan_features_ctrl = plan_factors_utils.make_plan_features_test_and_plan_features_ctrl(
+            self.combd_plan_features_tc)
         return
 
     def _make_cur_and_nxt_variations_df(self, ref_point_mode, ref_point_value,
@@ -184,12 +179,12 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         for keep_monkey_info in keep_monkey_info_choices:
 
             print('keep_monkey_info:', keep_monkey_info)
-            self.quickly_get_plan_x_and_y_control_and_test_data(ref_point_mode, ref_point_value, to_predict_ff=to_predict_ff,
-                                                                keep_monkey_info=keep_monkey_info)
-            print('Have successfully run get_plan_x_and_plan_y_across_sessions.')
+            self.quickly_get_plan_features_control_and_test_data(ref_point_mode, ref_point_value, to_predict_ff=to_predict_ff,
+                                                                 keep_monkey_info=keep_monkey_info)
+            print('Have successfully run get_plan_features_df_across_sessions.')
 
-            temp_df = make_variations_utils.make_regrouped_info(self.plan_xy_test,
-                                                                self.plan_xy_ctrl,
+            temp_df = make_variations_utils.make_regrouped_info(self.plan_features_test,
+                                                                self.plan_features_ctrl,
                                                                 agg_regrouped_info_func,
                                                                 agg_regrouped_info_kwargs=agg_regrouped_info_kwargs,
                                                                 **make_regrouped_info_kwargs)
@@ -199,14 +194,10 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         df.reset_index(drop=True, inplace=True)
         return df
 
-    def separate_plan_xy_test_and_plan_xy_ctrl(self):
-        self.plan_x_test = self.plan_xy_test[self.combd_plan_x_tc.columns].copy(
+    def separate_plan_features_test_and_plan_features_ctrl(self):
+        self.plan_features_test = self.plan_features_test[self.combd_plan_features_tc.columns].copy(
         )
-        self.plan_y_test = self.plan_xy_test[self.combd_plan_y_tc.columns].copy(
-        )
-        self.plan_x_ctrl = self.plan_xy_ctrl[self.combd_plan_x_tc.columns].copy(
-        )
-        self.plan_y_ctrl = self.plan_xy_ctrl[self.combd_plan_y_tc.columns].copy(
+        self.plan_features_ctrl = self.plan_features_ctrl[self.combd_plan_features_tc.columns].copy(
         )
 
     def process_both_heading_info_df(self):
@@ -219,41 +210,28 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         self.test_heading_info_df, self.ctrl_heading_info_df = test_vs_control_utils.filter_both_df(
             self.test_heading_info_df, self.ctrl_heading_info_df, **kwargs)
 
-    def process_combd_plan_x_tc_and_plan_y_tc(self):
-        test_vs_control_utils.process_combd_plan_x_and_y_combd(
-            self.combd_plan_x_tc, self.combd_plan_y_tc, curv_columns=self.curv_columns)
-        self.ref_columns = [column for column in self.combd_plan_x_tc.columns if (
+    def process_combd_plan_features(self):
+        self.combd_plan_features_tc = test_vs_control_utils.process_combd_plan_features(
+            self.combd_plan_features_tc, curv_columns=self.curv_columns)
+        self.ref_columns = [column for column in self.combd_plan_features_tc.columns if (
             'ref' in column) & ('cur_ff' in column)]
         # note that it will include d_heading_of_traj
 
-        # drop columns with NA in self.combd_plan_x_tc and print them
-        columns_with_null_info = self.combd_plan_x_tc.isnull().sum(
-            axis=0)[self.combd_plan_x_tc.isnull().sum(axis=0) > 0]
+        # drop columns with NA in self.combd_plan_features_tc and print them
+        columns_with_null_info = self.combd_plan_features_tc.isnull().sum(
+            axis=0)[self.combd_plan_features_tc.isnull().sum(axis=0) > 0]
         if len(columns_with_null_info) > 0:
             print('Columns with nulls are dropped:')
             print(columns_with_null_info)
-        self.combd_plan_x_tc.dropna(axis=1, inplace=True)
-
-        # Also drop the columns that can't be put into x_var
-        for column in ['data_name', 'stop_point_index']:
-            if column in self.combd_plan_x_tc.columns:
-                self.combd_plan_x_tc.drop(columns=[column], inplace=True)
-
-    def further_process_combd_plan_x_tc(self, to_predict_ff, for_classification=False):
-        if to_predict_ff:
-            self.combd_plan_x_tc = plan_factors_utils.process_plan_x_to_predict_ff_info(
-                self.combd_plan_x_tc, self.combd_plan_y_tc)
-        else:
-            self.combd_plan_x_tc = plan_factors_utils.process_plan_x_to_predict_monkey_info(
-                self.combd_plan_x_tc, for_classification=for_classification)
+        self.combd_plan_features_tc.dropna(axis=1, inplace=True)
 
     def _use_a_method_on_test_and_ctrl_data_data_respectively(self,
-                                                              plan_xy_test,
-                                                              plan_xy_ctrl,
+                                                              plan_features_test,
+                                                              plan_features_ctrl,
                                                               method,
                                                               method_kwargs={}):
-        self.plan_xy_test = plan_xy_test.copy()
-        self.plan_xy_ctrl = plan_xy_ctrl.copy()
+        self.plan_features_test = plan_features_test.copy()
+        self.plan_features_ctrl = plan_features_ctrl.copy()
         regrouped_info = pd.DataFrame()
 
         for test_or_control in ['control', 'test']:

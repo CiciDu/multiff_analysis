@@ -102,53 +102,50 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                             save_data=save_data)
         self.agent_all_perc_df = self.all_perc_info.copy()
 
-    def get_plan_x_and_plan_y_across_sessions(self,
-                                              num_datasets_to_collect=1,
-                                              ref_point_mode='distance',
-                                              ref_point_value=-150,
-                                              curv_traj_window_before_stop=[
-                                                  -50, 0],
-                                              exists_ok=True,
-                                              plan_x_exists_ok=True,
-                                              plan_y_exists_ok=True,
-                                              heading_info_df_exists_ok=True,
-                                              stops_near_ff_df_exists_ok=True,
-                                              curv_of_traj_mode='distance',
-                                              window_for_curv_of_traj=[-25, 0],
-                                              use_curv_to_ff_center=False,
-                                              save_data=True,
-                                              **env_kwargs
-                                              ):
-        plan_xy_tc_kwargs = dict(num_datasets_to_collect=num_datasets_to_collect,
-                                 save_data=save_data,
-                                 **env_kwargs)
+    def get_plan_features_df_across_sessions(self,
+                                             num_datasets_to_collect=1,
+                                             ref_point_mode='distance',
+                                             ref_point_value=-150,
+                                             curv_traj_window_before_stop=[
+                                                 -50, 0],
+                                             exists_ok=True,
+                                             plan_features_exists_ok=True,
 
-        monkey_plan_factors_x_sess_class.PlanAcrossSessions.get_plan_x_and_plan_y_across_sessions(self,
-                                                                                                  ref_point_mode=ref_point_mode,
-                                                                                                  ref_point_value=ref_point_value,
-                                                                                                  curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                                                  exists_ok=exists_ok,
-                                                                                                  plan_x_exists_ok=plan_x_exists_ok,
-                                                                                                  plan_y_exists_ok=plan_y_exists_ok,
-                                                                                                  heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                                                  stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                                                  curv_of_traj_mode=curv_of_traj_mode,
-                                                                                                  window_for_curv_of_traj=window_for_curv_of_traj,
-                                                                                                  use_curv_to_ff_center=use_curv_to_ff_center,
-                                                                                                  **plan_xy_tc_kwargs)
+                                             heading_info_df_exists_ok=True,
+                                             stops_near_ff_df_exists_ok=True,
+                                             curv_of_traj_mode='distance',
+                                             window_for_curv_of_traj=[-25, 0],
+                                             use_curv_to_ff_center=False,
+                                             save_data=True,
+                                             **env_kwargs
+                                             ):
+        plan_features_tc_kwargs = dict(num_datasets_to_collect=num_datasets_to_collect,
+                                       save_data=save_data,
+                                       **env_kwargs)
 
-    def make_combd_plan_xy_tc(self,
-                              plan_x_exists_ok=True,
-                              plan_y_exists_ok=True,
-                              heading_info_df_exists_ok=True,
-                              stops_near_ff_df_exists_ok=True,
-                              num_datasets_to_collect=1,
-                              save_data=True,
-                              **env_kwargs
-                              ):
+        monkey_plan_factors_x_sess_class.PlanAcrossSessions.get_plan_features_df_across_sessions(self,
+                                                                                                 ref_point_mode=ref_point_mode,
+                                                                                                 ref_point_value=ref_point_value,
+                                                                                                 curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                                                 exists_ok=exists_ok,
+                                                                                                 plan_features_exists_ok=plan_features_exists_ok,
+                                                                                                 heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                                                                 stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                                                                 curv_of_traj_mode=curv_of_traj_mode,
+                                                                                                 window_for_curv_of_traj=window_for_curv_of_traj,
+                                                                                                 use_curv_to_ff_center=use_curv_to_ff_center,
+                                                                                                 **plan_features_tc_kwargs)
 
-        self.combd_plan_y_tc = pd.DataFrame()
-        self.combd_plan_x_tc = pd.DataFrame()
+    def make_combd_plan_features_tc(self,
+                                    plan_features_exists_ok=True,
+                                    heading_info_df_exists_ok=True,
+                                    stops_near_ff_df_exists_ok=True,
+                                    num_datasets_to_collect=1,
+                                    save_data=True,
+                                    **env_kwargs
+                                    ):
+
+        self.combd_plan_features_tc = pd.DataFrame()
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -164,21 +161,20 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                                        )
                 print(' ')
                 print('Getting plan x and plan y data ......')
-                self.pfa.get_plan_x_and_plan_y_for_one_session(ref_point_mode=self.ref_point_mode,
-                                                               ref_point_value=self.ref_point_value,
-                                                               curv_traj_window_before_stop=self.curv_traj_window_before_stop,
-                                                               plan_x_exists_ok=plan_x_exists_ok,
-                                                               plan_y_exists_ok=plan_y_exists_ok,
-                                                               heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                               stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                               curv_of_traj_mode=self.curv_of_traj_mode,
-                                                               window_for_curv_of_traj=self.window_for_curv_of_traj,
-                                                               use_curv_to_ff_center=self.use_curv_to_ff_center,
-                                                               save_data=save_data,
-                                                               n_steps=self.num_steps_per_dataset,
-                                                               **env_kwargs)
+                self.pfa.get_plan_features_df_for_one_session(ref_point_mode=self.ref_point_mode,
+                                                              ref_point_value=self.ref_point_value,
+                                                              curv_traj_window_before_stop=self.curv_traj_window_before_stop,
+                                                              plan_features_exists_ok=plan_features_exists_ok,
+                                                              heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                              stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                              curv_of_traj_mode=self.curv_of_traj_mode,
+                                                              window_for_curv_of_traj=self.window_for_curv_of_traj,
+                                                              use_curv_to_ff_center=self.use_curv_to_ff_center,
+                                                              save_data=save_data,
+                                                              n_steps=self.num_steps_per_dataset,
+                                                              **env_kwargs)
 
-                self._add_plan_xy_to_combd_plan_xy(data_name)
+                self._add_plan_features_to_combd_plan_features(data_name)
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-150,
                                              curv_traj_window_before_stop=[-50, 0]):
@@ -278,15 +274,11 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                   save_data=save_data,
                                                   **env_kwargs)
 
-    def _add_plan_xy_to_combd_plan_xy(self, data_name):
-        plan_x_tc = self.pfa.plan_x_tc.copy()
-        plan_y_tc = self.pfa.plan_y_tc.copy()
-        plan_x_tc['data_name'] = data_name
-        plan_y_tc['data_name'] = data_name
-        self.combd_plan_x_tc = pd.concat(
-            [self.combd_plan_x_tc, plan_x_tc], axis=0)
-        self.combd_plan_y_tc = pd.concat(
-            [self.combd_plan_y_tc, plan_y_tc], axis=0)
+    def _add_plan_features_to_combd_plan_features(self, data_name):
+        plan_features_tc = self.pfa.plan_features_tc.copy()
+        plan_features_tc['data_name'] = data_name
+        self.combd_plan_features_tc = pd.concat(
+            [self.combd_plan_features_tc, plan_features_tc], axis=0)
 
     def _add_heading_info_to_combd_heading_info(self, data_name):
         self.test_heading_info_df = self.pfa.test_heading_info_df.copy()

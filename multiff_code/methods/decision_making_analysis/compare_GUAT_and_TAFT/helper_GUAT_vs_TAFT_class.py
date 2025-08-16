@@ -26,7 +26,7 @@ np.set_printoptions(suppress=True)
 
 
 class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
-    
+
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path, retrieve_monkey_data=False)
 
@@ -95,7 +95,15 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         self.stops_near_ff_df = nxt_ff_utils._add_stop_or_nxt_ff_first_seen_and_last_seen_info_bbas(
             self.stops_near_ff_df, self.ff_dataframe_visible, self.monkey_information, cur_or_nxt='cur')
 
-    def _make_plan_y_df(self):
+    def _make_plan_features_df(self):
+        self._make_plan_features_step_1()
+        self._make_plan_features_step_2(
+            list_of_cur_ff_cluster_radius=[100],
+            list_of_nxt_ff_cluster_radius=[200]
+        )
+        self.plan_features_df = plan_factors_utils.merge_plan_features1_and_plan_features2(self.plan_features1, self.plan_features2)
+
+    def _make_plan_features_step_1(self):
         test_or_ctrl = 'test'
 
         self._make_heading_info_df()
@@ -105,7 +113,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         plan_factors_helper_class.PlanFactorsHelpClass._make_curv_of_traj_df_w_one_sided_window_if_not_already_made(
             self)
 
-        self.plan_y_df = plan_factors_utils.make_plan_y_df(
+        self.plan_features1 = plan_factors_utils.make_plan_features1(
             self.heading_info_df, self.curv_of_traj_df, self.curv_of_traj_df_w_one_sided_window)
 
         # time_columns = ['NXT_time_ff_last_seen_bbas',
@@ -118,21 +126,23 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         #         'nxt_ff_cluster_last_flash_time_bsans']
 
         # for col in time_columns:
-        #     self.plan_y_df[f'{col}_rel_to_stop'] = self.plan_y_df[col] - self.plan_y_df['stop_time']
+        #     self.plan_features1[f'{col}_rel_to_stop'] = self.plan_features1[col] - self.plan_features1['stop_time']
 
         return
 
-    def _make_plan_x_df(self, use_eye_data=True, use_speed_data=True, ff_radius=10,
-                        list_of_cur_ff_cluster_radius=[100, 200, 300],
-                        list_of_nxt_ff_cluster_radius=[100, 200, 300],
-                        ):
+    def _make_plan_features_step_2(self, use_eye_data=True, use_speed_data=True, ff_radius=10,
+                                   list_of_cur_ff_cluster_radius=[
+                                       100, 200, 300],
+                                   list_of_nxt_ff_cluster_radius=[
+                                       100, 200, 300],
+                                   ):
 
         self._get_stops_near_ff_df(already_made_ok=True)
 
         self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
         self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df_from_ref['stop_point_index'].values
-
-        if self.ff_dataframe is None:
+        
+        if getattr(self, 'ff_dataframe', None) is None:
             cvn_from_ref_class.CurVsNxtFfFromRefClass.get_more_monkey_data(
                 self)
 
@@ -142,16 +152,14 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
                 self.stops_near_ff_df)
             self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref()
 
-        self.plan_x_df = plan_factors_utils.make_plan_x_df(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
-                                                           stop_period_duration=self.stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
-                                                           list_of_cur_ff_cluster_radius=list_of_cur_ff_cluster_radius, list_of_nxt_ff_cluster_radius=list_of_nxt_ff_cluster_radius,
-                                                           use_speed_data=use_speed_data, use_eye_data=use_eye_data,
-                                                           guarantee_cur_ff_info_for_cluster=True,
-                                                           guarantee_nxt_ff_info_for_cluster=True,
-                                                           flash_or_vis=None,
-                                                           )
-
-        return self.plan_x_df
+        self.plan_features2 = plan_factors_utils.make_plan_features2(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
+                                                                     stop_period_duration=self.stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
+                                                                     list_of_cur_ff_cluster_radius=list_of_cur_ff_cluster_radius, list_of_nxt_ff_cluster_radius=list_of_nxt_ff_cluster_radius,
+                                                                     use_speed_data=use_speed_data, use_eye_data=use_eye_data,
+                                                                     guarantee_cur_ff_info_for_cluster=True,
+                                                                     guarantee_nxt_ff_info_for_cluster=True,
+                                                                     flash_or_vis=None,
+                                                                     )
 
     def _make_ff_info_at_start_df(self):
         df = self.TAFT_df2 if (self.GUAT_or_TAFT == 'TAFT') else self.GUAT_df2
@@ -308,7 +316,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
 
     def _get_GUAT_or_TAFT_x_df(self, save_data=True):
         self.GUAT_or_TAFT_x_df = GUAT_vs_TAFT_utils.combine_relevant_features(
-            self.x_features_df, self.only_cur_ff_df, self.plan_x_df, self.plan_y_df)
+            self.x_features_df, self.only_cur_ff_df, self.plan_features_df)
 
         # add num_stops
         trials_df = self.TAFT_trials_df if self.GUAT_or_TAFT == 'TAFT' else self.GUAT_w_ff_df

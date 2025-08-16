@@ -87,16 +87,13 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         self.dict_of_combd_diff_in_curv_folder_path = {'test': self.combd_cur_and_nxt_folder_path + f'/data/combd_diff_in_curv/{self.opt_arc_type}/test',
                                                        'control': self.combd_cur_and_nxt_folder_path + f'/data/combd_diff_in_curv/{self.opt_arc_type}/control'}
 
-        self.combd_plan_x_tc_folder_path = self.combd_cur_and_nxt_folder_path + \
-            f'/data/combd_plan_x_tc/{self.opt_arc_type}'
-
-        self.combd_plan_y_tc_folder_path = self.combd_cur_and_nxt_folder_path + \
-            f'/data/combd_plan_y_tc/{self.opt_arc_type}'
+        self.combd_plan_features_tc_folder_path = self.combd_cur_and_nxt_folder_path + \
+            f'/data/combd_plan_features_tc/{self.opt_arc_type}'
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
                                              curv_traj_window_before_stop=[
                                                  -50, 0],
-                                             test_or_control=None):
+                                             test_or_control='both'):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
         self.curv_traj_window_before_stop = curv_traj_window_before_stop
@@ -123,7 +120,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
         return self.combd_heading_df_x_sessions
 
-    def retrieve_combd_diff_in_curv_df(self, ref_point_mode='distance', ref_point_value=-100, test_or_control=None,
+    def retrieve_combd_diff_in_curv_df(self, ref_point_mode='distance', ref_point_value=-100, test_or_control='both',
                                        curv_traj_window_before_stop=[-50, 0]):
 
         folder_path = self.dict_of_combd_diff_in_curv_folder_path[test_or_control]
@@ -139,7 +136,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             print('Successfully retrieved combd_diff_in_curv_df from: ', df_path)
         return self.combd_diff_in_curv_df
 
-    def _store_combd_heading_df_x_sessions(self, test_or_control=None):
+    def _store_combd_heading_df_x_sessions(self, test_or_control='both'):
         if test_or_control is None:
             test_or_control = self.test_or_control
         df_name = find_cvn_utils.get_df_name_by_ref(
@@ -151,7 +148,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         print(f'Stored {df_name} in the folder: ',
               self.dict_of_combd_heading_info_folder_path[test_or_control])
 
-    def _store_combd_diff_in_curv_df(self, test_or_control=None):
+    def _store_combd_diff_in_curv_df(self, test_or_control='both'):
         df_name = find_cvn_utils.find_diff_in_curv_df_name(
             self.ref_point_mode, self.ref_point_value, self.curv_traj_window_before_stop)
         os.makedirs(
@@ -179,7 +176,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
                                                      curv_traj_window_before_stop=[
                                                          -50, 0],
                                                      combd_heading_df_x_sessions_exists_ok=True, stops_near_ff_df_exists_ok=True, show_printed_output=False,
-                                                     test_or_control=None, sessions_df_for_one_monkey=None):
+                                                     test_or_control='both', sessions_df_for_one_monkey=None):
         if test_or_control is None:
             test_or_control = self.test_or_control
 
@@ -211,7 +208,7 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def make_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-100,
                                          curv_traj_window_before_stop=[-50, 0],
-                                         test_or_control=None, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
+                                         test_or_control='both', stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                          show_printed_output=False, sessions_df_for_one_monkey=None,
                                          use_curv_to_ff_center=False,
                                          merge_diff_in_curv_df_to_heading_info=True,
@@ -253,8 +250,9 @@ class ShowPlanning(base_processing_class.BaseProcessing):
 
     def _make_combd_heading_df_x_sessions(self, test_or_control='test',
                                           ref_point_mode='distance', ref_point_value=-100,
-                                          curv_traj_window_before_stop=[-50, 0], 
-                                          stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True, 
+                                          curv_traj_window_before_stop=[
+                                              -50, 0],
+                                          stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                           sessions_df_for_one_monkey=None,
                                           use_curv_to_ff_center=False):
         self.ref_point_mode = ref_point_mode

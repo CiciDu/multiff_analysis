@@ -89,7 +89,6 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                     f'stop_point_index: {stop_point_index} is not in stops_near_ff_df_counted. Using the first instance in stops_near_ff_df_counted to plot.')
         self.stop_point_index = self.stops_near_ff_row['stop_point_index']
 
-
     def _put_down_trajectory_time_series_plot(self, layout, id_prefix=''):
         # Add time series plot conditionally
         if self.show_trajectory_time_series:
@@ -100,10 +99,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             layout.append(dash_utils.put_down_empty_plot_that_takes_no_space(
                 id=id_prefix+'time_series_plot_combined'
             ))
-            
+
         return layout
-    
-        
+
     def _put_down_neural_plots(self, layout, id_prefix=''):
         # Add neural plots conditionally
         if self.show_neural_plots:
@@ -179,16 +177,16 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                  'value': 'show_current_eye_positions'},
                              {'label': 'show eye positions for both eyes', 'value': 'show_eye_positions_for_both_eyes'}]
 
-        checklist_params = ['show_visible_fireflies', 
+        checklist_params = ['show_visible_fireflies',
                             'show_in_memory_fireflies',
                             'show_visible_segments',
-                            'show_monkey_heading', 
+                            'show_monkey_heading',
                             'show_traj_portion',
-                            'show_null_arcs_to_ff', 
-                            'show_extended_traj_arc', 
-                            'show_stops', 
+                            'show_null_arcs_to_ff',
+                            'show_extended_traj_arc',
+                            'show_stops',
                             'show_all_eye_positions',
-                            'show_current_eye_positions', 
+                            'show_current_eye_positions',
                             'show_eye_positions_for_both_eyes']
         checklist_values = [
             key for key in checklist_params if self.monkey_plot_params[key] is True]
@@ -277,15 +275,16 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.monkey_plot_params[param] = True
             else:
                 self.monkey_plot_params[param] = False
-                
+
         if self.monkey_plot_params['show_traj_portion'] != old_checklist_params['show_traj_portion']:
             if self.monkey_plot_params['show_traj_portion']:
                 self._find_traj_portion()
                 self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(self.fig, self.traj_portion,
-                                                                                                 hoverdata_multi_columns=self.monkey_plot_params['hoverdata_multi_columns'])
+                                                                                               hoverdata_multi_columns=self.monkey_plot_params['hoverdata_multi_columns'])
             else:
                 # remove the trace called to_show_traj_portion from self.fig
-                self.fig.data = [trace for trace in self.fig.data if trace.name != 'to_show_traj_portion']
+                self.fig.data = [
+                    trace for trace in self.fig.data if trace.name != 'to_show_traj_portion']
 
         if (self.monkey_plot_params['show_null_arcs_to_ff'] != old_checklist_params['show_null_arcs_to_ff']):
             self.find_null_arcs_info_for_plotting_for_the_duration()
@@ -381,7 +380,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if self.show_trajectory_time_series:
             self.fig_time_series_combd = dash_utils.update_fig_time_series_combd_plot_based_on_monkey_hoverdata(
                 self.fig_time_series_combd, self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm)
-            
+
         if self.show_neural_plots:
             self.fig_raster, self.fig_fr = self._update_neural_plots_based_on_monkey_hover_data(
                 self.monkey_hoverdata_value_s)
@@ -440,8 +439,6 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                        == self.stop_point_index].iloc[0]
         self._update_after_changing_stop_point_index()
-        
-
 
     def _update_dash_after_clicking_previous_or_next_plot_button(self, previous_or_next='next'):
         rank_var = 'rank_by_angle_to_nxt_ff'
@@ -478,7 +475,6 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if self.show_neural_plots:
             self.fig_raster = self._create_raster_plot_figure()
             self.fig_fr = self._create_firing_rate_plot_figure()
-
 
     def _update_dash_based_on_curv_of_traj_df(self, curv_of_traj_mode, curv_of_traj_lower_end, curv_of_traj_upper_end):
         self.curv_of_traj_params['curv_of_traj_mode'] = curv_of_traj_mode
@@ -605,7 +601,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         return self.other_messages
 
     def _prepare_to_make_plotly_fig_for_dash_given_stop_point_index(self, stop_point_index):
-        if self.ff_dataframe is None:
+        if getattr(self, 'ff_dataframe', None) is None:
             self.get_more_monkey_data()
 
         self.stop_point_index = stop_point_index

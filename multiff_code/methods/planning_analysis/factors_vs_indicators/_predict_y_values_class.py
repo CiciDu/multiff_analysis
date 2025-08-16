@@ -134,7 +134,7 @@ class _PredictYValues:
 
         return self.cur_and_nxt_clf_df
 
-    def use_clf_to_predict_monkey_info(self, plan_xy_test, plan_xy_ctrl, **agg_regrouped_info_kwargs):
+    def use_clf_to_predict_monkey_info(self, plan_features_test, plan_features_ctrl, **agg_regrouped_info_kwargs):
 
         method_kwargs = dict(y_columns_of_interest=['dir_from_cur_ff_to_stop',
                                                     'dir_from_cur_ff_same_side',
@@ -155,14 +155,14 @@ class _PredictYValues:
 
         self.ml_inst = ml_methods_class.MlMethods()
 
-        regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_xy_test, plan_xy_ctrl,
+        regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_features_test, plan_features_ctrl,
                                                                                     self.ml_inst.try_different_combinations_for_classification,
                                                                                     method_kwargs=method_kwargs,
                                                                                     )
 
         return regrouped_info
 
-    def use_lr_to_predict_monkey_info(self, plan_xy_test, plan_xy_ctrl):
+    def use_lr_to_predict_monkey_info(self, plan_features_test, plan_features_ctrl):
 
         method_kwargs = dict(y_columns_of_interest=['diff_in_d_heading_to_cur_ff',
                                                     'diff_in_abs_angle_to_nxt_ff',
@@ -191,13 +191,13 @@ class _PredictYValues:
         )
         self.ml_inst = ml_methods_class.MlMethods()
 
-        regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_xy_test, plan_xy_ctrl,
+        regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_features_test, plan_features_ctrl,
                                                                                     self.ml_inst.try_different_combinations_for_linear_regressions,
                                                                                     method_kwargs=method_kwargs,
                                                                                     )
         return regrouped_info
 
-    def use_lr_to_predict_ff_info(self, plan_xy_test, plan_xy_ctrl):
+    def use_lr_to_predict_ff_info(self, plan_features_test, plan_features_ctrl):
         method_kwargs = dict(y_columns_of_interest=['nxt_ff_angle_at_ref',
                                                     'nxt_ff_distance_at_ref',
                                                     ],
@@ -212,7 +212,7 @@ class _PredictYValues:
 
         self.ml_inst = ml_for_planning_class.MlForPlanning()
 
-        regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_xy_test, plan_xy_ctrl,
+        regrouped_info = self._use_a_method_on_test_and_ctrl_data_data_respectively(plan_features_test, plan_features_ctrl,
                                                                                     self.ml_inst.try_different_combinations_for_linear_regressions,
                                                                                     method_kwargs=method_kwargs,
                                                                                     )
@@ -229,19 +229,17 @@ class _PredictYValues:
                                     use_combd_features_for_cluster_only=False,
                                     for_classification=False):
 
-        self.separate_plan_xy_test_and_plan_xy_ctrl()
+        self.separate_plan_features_test_and_plan_features_ctrl()
 
         if self.test_or_control == 'test':
-            self.plan_x = self.plan_x_test.copy()
-            self.plan_y = self.plan_y_test.copy()
+            self.plan_features = self.plan_features_test.copy()
         else:
-            self.plan_x = self.plan_x_ctrl.copy()
-            self.plan_y = self.plan_y_ctrl.copy()
+            self.plan_features = self.plan_features_ctrl.copy()
 
         print('test_or_control:', self.test_or_control)
 
-        self.x_var_df, self.y_var_df = ml_for_planning_utils.streamline_preparing_for_ml(self.plan_x,
-                                                                                         self.plan_y,
+        self.x_var_df, self.y_var_df = ml_for_planning_utils.streamline_preparing_for_ml(self.plan_features,
+                                                                                         self.plan_features,
                                                                                          y_var_column,
                                                                                          ref_columns_only=ref_columns_only,
                                                                                          cluster_to_keep=cluster_to_keep,

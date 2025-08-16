@@ -336,7 +336,5 @@ class BaseProcessing:
         self.opt_arc_type = opt_arc_type
         self.heading_info_partial_path = f'heading_info_df/{opt_arc_type}'
         self.diff_in_curv_partial_path = f'diff_in_curv_df/{opt_arc_type}'
-        self.plan_x_partial_path = f'plan_x_df/{opt_arc_type}'
-        self.plan_y_partial_path = f'plan_y_df/{opt_arc_type}'
-        # this can plater replace plan_x and plan_y
+        self.plan_features_partial_path = f'plan_features_df/{opt_arc_type}'
         self.planning_data_by_point_partial_path = f'planning_data_by_point/{opt_arc_type}'

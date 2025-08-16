@@ -39,10 +39,10 @@ class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         base_processing_class.BaseProcessing.get_related_folder_names_from_raw_data_folder_path(
             self, raw_data_folder_path)
 
-    def _make_plan_x(self, stops_near_ff_df_exists_ok=True, save_stops_near_ff_df=True, use_eye_data=True,
-                     use_speed_data=True, stop_period_duration=2, ff_radius=10,
-                     list_of_cur_ff_cluster_radius=[100, 200, 300],
-                     list_of_nxt_ff_cluster_radius=[100, 200, 300]):
+    def _make_plan_features2(self, stops_near_ff_df_exists_ok=True, save_stops_near_ff_df=True, use_eye_data=True,
+                             use_speed_data=True, stop_period_duration=2, ff_radius=10,
+                             list_of_cur_ff_cluster_radius=[100, 200, 300],
+                             list_of_nxt_ff_cluster_radius=[100, 200, 300], **kwargs):
 
         if getattr(self, 'monkey_dataframe', None) is None:
             self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=self.curv_of_traj_mode,
@@ -54,21 +54,21 @@ class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
         self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df_from_ref['stop_point_index']
 
-        if self.ff_dataframe is None:
+        if getattr(self, 'ff_dataframe', None) is None:
             self.get_more_monkey_data()
 
         if not hasattr(self, 'heading_info_df'):
             self.make_heading_info_df_without_long_process(test_or_control=self.test_or_control, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
                                                            curv_traj_window_before_stop=self.curv_traj_window_before_stop, use_curv_to_ff_center=self.use_curv_to_ff_center)
 
-        plan_x = plan_factors_utils.make_plan_x_df(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
-                                                   stop_period_duration=stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
-                                                   list_of_cur_ff_cluster_radius=list_of_cur_ff_cluster_radius, list_of_nxt_ff_cluster_radius=list_of_nxt_ff_cluster_radius,
-                                                   use_speed_data=use_speed_data, use_eye_data=use_eye_data)
+        plan_features2 = plan_factors_utils.make_plan_features2(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
+                                                                stop_period_duration=stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
+                                                                list_of_cur_ff_cluster_radius=list_of_cur_ff_cluster_radius, list_of_nxt_ff_cluster_radius=list_of_nxt_ff_cluster_radius,
+                                                                use_speed_data=use_speed_data, use_eye_data=use_eye_data)
 
-        return plan_x
+        return plan_features2
 
-    def _make_plan_y(self, heading_info_df_exists_ok=False, stops_near_ff_df_exists_ok=False, save_data=True):
+    def _make_plan_features1(self, heading_info_df_exists_ok=False, stops_near_ff_df_exists_ok=False, save_data=True, **kwargs):
 
         if getattr(self, 'monkey_dataframe', None) is None:
             self.load_raw_data(self.raw_data_folder_path, monkey_data_exists_ok=True, curv_of_traj_mode=self.curv_of_traj_mode,
@@ -92,22 +92,22 @@ class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         self.cur_ff_df_temp = find_cvn_utils.find_ff_info(self.cur_ff_df_modified.ff_index.values, self.cur_ff_df_modified['point_index_ff_first_seen'].values,
                                                           self.monkey_information, self.ff_real_position_sorted)
 
-        plan_y = plan_factors_utils.make_plan_y_df(
+        plan_features1 = plan_factors_utils.make_plan_features1(
             self.heading_info_df, self.curv_of_traj_df, self.curv_of_traj_df_w_one_sided_window)
 
-        plan_y = build_factor_comp.add_d_monkey_angle(
-            plan_y, self.cur_ff_df_temp, self.stops_near_ff_df)
+        plan_features1 = build_factor_comp.add_d_monkey_angle(
+            plan_features1, self.cur_ff_df_temp, self.stops_near_ff_df)
 
-        return plan_y
+        return plan_features1
 
-    def _get_file_names_for_plan_x_or_y(self, plan_type):
+    def _get_file_names_for_plan_features_df(self, plan_type):
         df_name = find_cvn_utils.find_diff_in_curv_df_name(
             ref_point_mode=self.ref_point_mode,
             ref_point_value=self.ref_point_value,
             curv_traj_window_before_stop=self.curv_traj_window_before_stop
         )
 
-        partial_path = self.plan_x_partial_path if plan_type == 'plan_x' else self.plan_y_partial_path
+        partial_path = self.plan_features_partial_path
         folder_name = os.path.join(
             self.planning_data_folder_path,
             partial_path,
@@ -119,44 +119,29 @@ class PlanFactorsHelpClass(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
         return df_name, csv_path
 
-    def make_plan_x(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
-        df_name, csv_path = self._get_file_names_for_plan_x_or_y('plan_x')
-        attr_name = f'plan_x_{self.test_or_ctrl}'
+    def make_plan_features_df(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
+        df_name, csv_path = self._get_file_names_for_plan_features_df(
+            'plan_features')
+        attr_name = f'plan_features_{self.test_or_ctrl}'
 
         if already_made_ok & (getattr(self, attr_name, None) is not None):
             return getattr(self, attr_name)
-
         if exists_ok and os.path.exists(csv_path):
-            plan_data = pd.read_csv(csv_path).reset_index(drop=True)
+            plan_features_df = pd.read_csv(csv_path).reset_index(drop=True)
             print(f'Successfully retrieved {attr_name} ({df_name})')
         else:
             print(f'Making new: {attr_name} ({df_name})')
-            plan_data = self._make_plan_x(**make_plan_func_kwargs)
+            plan_feature1 = self._make_plan_features1(**make_plan_func_kwargs)
+            plan_feature2 = self._make_plan_features2(**make_plan_func_kwargs)
+            plan_features_df = plan_factors_utils.merge_plan_features1_and_plan_features2(
+                plan_feature1, plan_feature2)
             if save_data:
-                plan_data.to_csv(csv_path, index=False)
+                plan_features_df.to_csv(csv_path, index=False)
                 print(f'Made {attr_name} and saved to {csv_path}')
-        setattr(self, attr_name, plan_data)
-        return plan_data
-
-    def make_plan_y(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
-
-        df_name, csv_path = self._get_file_names_for_plan_x_or_y('plan_y')
-        attr_name = f'plan_y_{self.test_or_ctrl}'
-
-        if already_made_ok & (getattr(self, attr_name, None) is not None):
-            return getattr(self, attr_name)
-
-        if exists_ok and os.path.exists(csv_path):
-            plan_data = pd.read_csv(csv_path).reset_index(drop=True)
-            print(f'Successfully retrieved {attr_name} ({df_name})')
-        else:
-            print(f'Making new: {attr_name} ({df_name})')
-            plan_data = self._make_plan_y(**make_plan_func_kwargs, save_data=save_data)
-            if save_data:
-                plan_data.to_csv(csv_path, index=False)
-                print(f'Made {attr_name} and saved to {csv_path}')
-        setattr(self, attr_name, plan_data)
-        return plan_data
+        # drop any columns with 'Unnamed: ' in the name
+        plan_features_df = plan_features_df.loc[:, ~plan_features_df.columns.str.contains('Unnamed: ')]
+        setattr(self, attr_name, plan_features_df)
+        return plan_features_df
 
     def _make_curv_of_traj_df_w_one_sided_window_if_not_already_made(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance'):
         # One-sided window: Unlike the regular curv_of_traj_df which uses a symmetric window (e.g., [-25, 25] cm), this uses an asymmetric window that only looks backward from the current point (e.g., [-25, 0] cm).

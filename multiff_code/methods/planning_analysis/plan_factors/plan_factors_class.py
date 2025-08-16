@@ -48,22 +48,22 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
                 curv_of_traj_mode=self.curv_of_traj_mode,
                 window_for_curv_of_traj=self.window_for_curv_of_traj)
 
-    def make_plan_x_and_y_for_both_test_and_ctrl(self, already_made_ok=True, plan_x_exists_ok=True, plan_y_exists_ok=True,
+    def make_plan_features_df_both_test_and_ctrl(self, already_made_ok=True, plan_features_exists_ok=True,
                                                  ref_point_mode='time after cur ff visible',
                                                  ref_point_value=0.0, curv_traj_window_before_stop=[-50, 0],
                                                  use_curv_to_ff_center=False, heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                  use_eye_data=True, save_data=True):
 
         if already_made_ok:
-            if hasattr(self, 'plan_x_test') & hasattr(self, 'plan_x_ctrl') & hasattr(self, 'plan_y_test') & hasattr(self, 'plan_y_ctrl'):
-                self.get_plan_x_and_y_tc()
+            if hasattr(self, 'plan_features_test') & hasattr(self, 'plan_features_ctrl'):
+                self.get_plan_features_tc()
                 return
 
-        if plan_x_exists_ok & plan_y_exists_ok:
+        if plan_features_exists_ok:
             try:
                 self.retrieve_all_plan_data_for_one_session(
                     ref_point_mode, ref_point_value, curv_traj_window_before_stop)
-                self.get_plan_x_and_y_tc()
+                self.get_plan_features_tc()
                 return
             except FileNotFoundError:
                 pass
@@ -76,178 +76,89 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
             obj.curv_traj_window_before_stop = curv_traj_window_before_stop
             obj.use_curv_to_ff_center = use_curv_to_ff_center
 
-        self.make_plan_y_test_and_ctrl(
-            exists_ok=plan_y_exists_ok,
-            already_made_ok=already_made_ok,
-            save_data=save_data,
-            heading_info_df_exists_ok=heading_info_df_exists_ok,
-            stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-        )
-
-        self.make_plan_x_test_and_ctrl(
-            exists_ok=plan_x_exists_ok,
+        self.make_plan_features_test_and_ctrl(
+            exists_ok=plan_features_exists_ok,
             already_made_ok=already_made_ok,
             save_data=save_data,
             use_eye_data=use_eye_data,
             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
         )
 
-        self.get_plan_x_and_y_tc()
+        self.get_plan_features_tc()
+
+    # def make_plan_features_df_test_and_ctrl(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
+    #     self.make_test_and_ctrl_inst()
+    #     self.plan_features_test = self.test_inst.make_plan_features_df(
+    #         exists_ok=exists_ok,
+    #         already_made_ok=already_made_ok,
+    #         save_data=save_data,
+    #         **make_plan_func_kwargs)
+    #     self.plan_features_ctrl = self.ctrl_inst.make_plan_features_df(
+    #         exists_ok=exists_ok,
+    #         already_made_ok=already_made_ok,
+    #         save_data=save_data,
+    #         **make_plan_func_kwargs)
+    #     self.get_plan_features_tc()
 
     def retrieve_all_plan_data_for_one_session(self, ref_point_mode, ref_point_value, curv_traj_window_before_stop):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
         self.curv_traj_window_before_stop = curv_traj_window_before_stop
 
-        for plan_type in ['plan_x', 'plan_y']:
-            for test_or_ctrl in ['test', 'ctrl']:
-                test_or_control = 'test' if test_or_ctrl == 'test' else 'control'
-                df_name = find_cvn_utils.find_diff_in_curv_df_name(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                                   curv_traj_window_before_stop=curv_traj_window_before_stop)
+        for test_or_ctrl in ['test', 'ctrl']:
+            test_or_control = 'test' if test_or_ctrl == 'test' else 'control'
+            df_name = find_cvn_utils.find_diff_in_curv_df_name(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                               curv_traj_window_before_stop=curv_traj_window_before_stop)
 
-                if plan_type == 'plan_x':
-                    folder_name = os.path.join(
-                        self.planning_data_folder_path, self.plan_x_partial_path, test_or_control)
-                elif plan_type == 'plan_y':
-                    folder_name = os.path.join(
-                        self.planning_data_folder_path, self.plan_y_partial_path, test_or_control)
+            folder_name = os.path.join(
+                self.planning_data_folder_path, self.plan_features_partial_path, test_or_control)
 
-                csv_path = os.path.join(folder_name, df_name)
-                plan_data = pd.read_csv(csv_path).drop(
-                    columns=['Unnamed: 0'], errors='ignore').reset_index(drop=True)
-                setattr(self, f'{plan_type}_{test_or_ctrl}', plan_data)
-                print(f'Retrieved {plan_type}_{test_or_ctrl} from {csv_path}')
+            csv_path = os.path.join(folder_name, df_name)
+            plan_data = pd.read_csv(csv_path).drop(
+                columns=['Unnamed: 0'], errors='ignore').reset_index(drop=True)
+            setattr(self, f'plan_features_{test_or_ctrl}', plan_data)
+            print(f'Retrieved plan_features_{test_or_ctrl} from {csv_path}')
 
-    def make_plan_x_test_and_ctrl(self, exists_ok=True, save_data=True,
-                                  already_made_ok=True, use_eye_data=True,
-                                  stops_near_ff_df_exists_ok=True,
-                                  **make_plan_func_kwargs):
-
+    def make_plan_features_test_and_ctrl(self, exists_ok=True, already_made_ok=True, save_data=True, **make_plan_func_kwargs):
         self.make_test_and_ctrl_inst()
-
-        self.plan_x_test = self.test_inst.make_plan_x(
+        self.plan_features_test = self.test_inst.make_plan_features_df(
             exists_ok=exists_ok,
             already_made_ok=already_made_ok,
             save_data=save_data,
-            use_eye_data=use_eye_data,
-            stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-            **make_plan_func_kwargs
-        )
-        self.plan_x_ctrl = self.ctrl_inst.make_plan_x(
+            **make_plan_func_kwargs)
+        self.plan_features_ctrl = self.ctrl_inst.make_plan_features_df(
             exists_ok=exists_ok,
             already_made_ok=already_made_ok,
             save_data=save_data,
-            use_eye_data=use_eye_data,
-            stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-            **make_plan_func_kwargs
-        )
-
-    def make_plan_y_test_and_ctrl(self, exists_ok=True, already_made_ok=True,
-                                  save_data=True,
-                                  heading_info_df_exists_ok=True,
-                                  stops_near_ff_df_exists_ok=True,
-                                  **make_plan_func_kwargs):
-
-        self.make_test_and_ctrl_inst()
-
-        self.plan_y_test = self.test_inst.make_plan_y(
-            exists_ok=exists_ok,
-            already_made_ok=already_made_ok,
-            save_data=save_data,
-            heading_info_df_exists_ok=heading_info_df_exists_ok,
-            stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-            **make_plan_func_kwargs
-        )
-        self.plan_y_ctrl = self.ctrl_inst.make_plan_y(
-            exists_ok=exists_ok,
-            already_made_ok=already_made_ok,
-            save_data=save_data,
-            heading_info_df_exists_ok=heading_info_df_exists_ok,
-            stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-            **make_plan_func_kwargs
-        )
+            **make_plan_func_kwargs)
+        self.get_plan_features_tc()
 
     def get_test_and_ctrl_data_from_combd_data(self):
-        self.plan_x_test = self.plan_x_tc[self.plan_x_tc['whether_test'] == 1].drop(
+        self.plan_features_test = self.plan_features_tc[self.plan_features_tc['whether_test'] == 1].drop(
             columns='whether_test').copy()
-        self.plan_x_ctrl = self.plan_x_tc[self.plan_x_tc['whether_test'] == 0].drop(
-            columns='whether_test').copy()
-        self.plan_y_test = self.plan_y_tc[self.plan_y_tc['whether_test'] == 1].drop(
-            columns='whether_test').copy()
-        self.plan_y_ctrl = self.plan_y_tc[self.plan_y_tc['whether_test'] == 0].drop(
+        self.plan_features_ctrl = self.plan_features_tc[self.plan_features_tc['whether_test'] == 0].drop(
             columns='whether_test').copy()
 
-    def get_plan_x_and_y_tc(self):
-        self.plan_x_test['whether_test'] = 1
-        self.plan_x_ctrl['whether_test'] = 0
-        self.plan_y_test['whether_test'] = 1
-        self.plan_y_ctrl['whether_test'] = 0
-        self.plan_x_tc = pd.concat(
-            [self.plan_x_test, self.plan_x_ctrl], ignore_index=True)
-        self.plan_y_tc = pd.concat(
-            [self.plan_y_test, self.plan_y_ctrl], ignore_index=True)
+    def get_plan_features_tc(self):
+        self.plan_features_test['whether_test'] = 1
+        self.plan_features_ctrl['whether_test'] = 0
+        self.plan_features_tc = pd.concat(
+            [self.plan_features_test, self.plan_features_ctrl], ignore_index=True)
 
-        build_factor_comp.add_dir_from_cur_ff_same_side(self.plan_y_tc)
+        build_factor_comp.add_dir_from_cur_ff_same_side(self.plan_features_tc)
         plan_factors_utils.drop_columns_that_contain_both_nxt_and_bbas(
-            self.plan_y_tc)
-        general_utils.convert_bool_to_int(self.plan_y_tc)
+            self.plan_features_tc)
+        general_utils.convert_bool_to_int(self.plan_features_tc)
 
     def change_control_data_to_conform_to_test_data(self):
-        self.plan_x_ctrl, self.plan_y_ctrl = test_vs_control_utils.change_control_data_to_conform_to_test_data(
-            self.plan_x_ctrl, self.plan_y_ctrl, self.plan_x_test)
-        self.get_plan_x_and_y_tc()
-
-    def make_the_distributions_of_angles_more_similar(self):
-        self.plan_x_ctrl['unique_id'] = np.arange(len(self.plan_x_ctrl))
-        self.plan_y_ctrl['unique_id'] = np.arange(len(self.plan_x_ctrl))
-
-        self.plan_x_ctrl, self.plan_x_test = test_vs_control_utils.make_the_distributions_of_angles_more_similar(
-            self.plan_x_ctrl, self.plan_x_test, column_name='cur_ff_angle_at_ref')
-        self.plan_y_ctrl = self.plan_y_ctrl[self.plan_y_ctrl['unique_id'].isin(
-            self.plan_x_ctrl['unique_id'])].sort_values(by='unique_id').drop(columns=['unique_id'])
-        self.plan_x_ctrl = self.plan_x_ctrl.drop(columns=['unique_id'])
-
-        self.get_plan_x_and_y_tc()
-
-    def limit_curv_range(self, max_curv_range=100):
-        self.plan_x_tc, self.plan_y_tc = test_vs_control_utils.prune_out_data_with_large_curv_range(
-            self.plan_x_tc, self.plan_y_tc, max_curv_range=max_curv_range)
-        self.get_test_and_ctrl_data_from_combd_data()
+        self.plan_features_ctrl = test_vs_control_utils.change_control_data_to_conform_to_test_data(
+            self.plan_features_test, self.plan_features_ctrl)
+        self.get_plan_features_tc()
 
     def limit_cum_distance_between_two_stops(self, max_cum_distance_between_two_stops=400):
-        self.plan_x_tc, self.plan_y_tc = test_vs_control_utils.limit_cum_distance_between_two_stops(
-            self.plan_x_tc, self.plan_y_tc, max_cum_distance_between_two_stops=max_cum_distance_between_two_stops)
+        self.plan_features_tc = self.plan_features_tc[self.plan_features_tc['cum_distance_between_two_stops']
+                                                      <= max_cum_distance_between_two_stops].copy()
         self.get_test_and_ctrl_data_from_combd_data()
-
-    def make_x_and_y_var_df(self, test_data_only=False, control_data_only=False, drop_na=False, scale_x_var=True, use_pca=False):
-        if test_data_only & control_data_only:
-            raise ValueError(
-                'Both test_data_only and control_data_only are True')
-        if test_data_only:
-            x_df = self.plan_x_test
-            y_df = self.plan_y_test
-        elif control_data_only:
-            x_df = self.plan_x_ctrl
-            y_df = self.plan_y_ctrl
-        else:
-            x_df = self.plan_x_tc
-            y_df = self.plan_y_tc
-
-        for column in ['d_from_cur_ff_to_nxt_ff', 'time_between_two_stops']:
-            if column in x_df.columns:
-                x_df.drop(columns=[column], inplace=True)
-        self.x_var_df, self.y_var_df = prep_ml_data_utils.make_x_and_y_var_df(
-            x_df, y_df, drop_na=drop_na, scale_x_var=scale_x_var, use_pca=use_pca)
-
-    def get_x_and_y_for_lr(self, test_or_control='test', scale_x_var=True, use_pca=False):
-        if test_or_control == 'test':
-            self.make_x_and_y_var_df(
-                test_data_only=True, scale_x_var=scale_x_var, use_pca=use_pca)
-        elif test_or_control == 'control':
-            self.make_x_and_y_var_df(
-                control_data_only=True, scale_x_var=scale_x_var, use_pca=use_pca)
-        else:
-            self.make_x_and_y_var_df(scale_x_var=scale_x_var, use_pca=use_pca)
 
     def run_lr(self, y_var_column, x_var_df=None, y_var_df=None, test_size=0.2):
         if x_var_df is None:
@@ -258,21 +169,75 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
             x_var_df, y_var_df[y_var_column], test_size=test_size)
         self.summary_df = self.ml_inst.summary_df
 
-    def use_lr_on_all(self, test_or_control='test', y_var_column='d_monkey_angle_since_cur_ff_first_seen2', use_pca=False):
-        self.get_x_and_y_for_lr(
-            test_or_control=test_or_control, use_pca=use_pca)
+    def use_lr_on_all(self, test_or_control='test', y_var_column='d_monkey_angle_since_cur_ff_first_seen2', use_pca=False, pca_dim=10,
+                      to_predict_ff=False, for_classification=False, drop_na_rows=False, drop_na_cols=True, scale_x_var=True,
+                      selected_features=None):
+        # note: self.pca will be None if use_pca is False
+        self.x_var_df, self.y_var_df, self.pca = self.make_x_and_y_var_df(
+            test_or_control=test_or_control, use_pca=use_pca, pca_dim=pca_dim, to_predict_ff=to_predict_ff, for_classification=for_classification,
+            drop_na_rows=drop_na_rows, drop_na_cols=drop_na_cols, scale_x_var=scale_x_var, selected_features=selected_features)
         self.run_lr(y_var_column)
 
-    def use_lr_on_specific_x_columns(self, specific_x_columns=None, test_or_control='test', y_var_column='d_monkey_angle_since_cur_ff_first_seen2'):
+    def use_lr_on_specific_x_columns(self, specific_x_columns=None, test_or_control='test', y_var_column='d_monkey_angle_since_cur_ff_first_seen2',
+                                     to_predict_ff=False, for_classification=False):
         if specific_x_columns is None:
             self.specific_x_columns = self.summary_df[self.summary_df['p_value']
                                                       < 0.05].index.values
         else:
             self.specific_x_columns = specific_x_columns
-        self.get_x_and_y_for_lr(test_or_control=test_or_control)
+        # note: self.pca will be None if use_pca is False
+        self.x_var_df, self.y_var_df, self.pca = self.make_x_and_y_var_df(test_or_control=test_or_control,
+                                 to_predict_ff=to_predict_ff, for_classification=for_classification)
         try:
             self.x_var_df = self.x_var_df[self.specific_x_columns].copy()
         except KeyError as e:
             print(e)
             return
         self.run_lr(y_var_column)
+
+    def make_x_and_y_var_df(self, test_or_control='both', drop_na_rows=False, drop_na_cols=True, scale_x_var=True, use_pca=False, pca_dim=10,
+                            to_predict_ff=False, for_classification=False, selected_features=None):
+        # test_or_control can be 'test', 'control', or 'both'
+        pca = None
+
+        if test_or_control == 'test':
+            x_df = self.plan_features_test.copy()
+            y_df = self.plan_features_test.copy()
+        elif test_or_control == 'control':
+            x_df = self.plan_features_ctrl.copy()
+            y_df = self.plan_features_ctrl.copy()
+        elif test_or_control == 'both':
+            x_df = self.plan_features_tc.copy()
+            y_df = self.plan_features_tc.copy()
+        else:
+            raise ValueError(
+                f'test_or_control must be "test", "control", or "both". Got {test_or_control}')
+
+        if selected_features is None:
+            self.selected_features = plan_factors_utils.select_planning_features_for_modeling(x_df,
+                to_predict_ff=to_predict_ff, for_classification=for_classification)
+        else:
+            self.selected_features = selected_features
+
+        x_df = x_df[self.selected_features].copy()
+        
+        for column in ['d_from_cur_ff_to_nxt_ff', 'time_between_two_stops']:
+            if column in x_df.columns:
+                x_df.drop(columns=[column], inplace=True)
+                
+        # save a copy of x_df
+        self.original_x_df = x_df.copy()
+                  
+        x_df, y_df, pca = prep_ml_data_utils.make_x_and_y_var_df(
+            x_df, y_df, drop_na=drop_na_rows, scale_x_var=scale_x_var, use_pca=use_pca, n_components_for_pca=pca_dim)
+        
+        # drop columns with NA and print the names of these columns
+        columns_with_na = x_df.columns[x_df.isna().any()].tolist()
+        if drop_na_cols:
+            x_df = x_df.drop(columns=columns_with_na)
+            print(f'When preparing x_var to predict ff, there are {len(columns_with_na)} columns with NA that are dropped. {x_df.shape[1]} columns are left.')
+            print('Columns with NA that are dropped:', np.array(columns_with_na))
+        else:
+            print(f'When preparing x_var to predict ff, there are {len(columns_with_na)} out of {x_df.shape[1]} columns with NA.')
+
+        return x_df, y_df, pca

@@ -26,6 +26,7 @@ from scipy.stats import pearsonr
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.linear_model import Ridge, Lasso, ElasticNet, RidgeCV, LassoCV, ElasticNetCV
 from sklearn.metrics import r2_score
+import colorcet
 
 
 import numpy as np

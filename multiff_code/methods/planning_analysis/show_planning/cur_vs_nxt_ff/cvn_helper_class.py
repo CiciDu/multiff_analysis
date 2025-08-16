@@ -75,7 +75,7 @@ class _FindCurVsNxtFF(base_processing_class.BaseProcessing):
                                    'window_for_curv_of_traj'],
                                truncate_curv_of_traj_by_time_of_capture=self.curv_of_traj_params['truncate_curv_of_traj_by_time_of_capture'])
 
-        if self.ff_dataframe is None:
+        if getattr(self, 'ff_dataframe', None) is None:
             self.get_more_monkey_data()
 
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1].copy(

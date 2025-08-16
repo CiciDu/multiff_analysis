@@ -18,7 +18,7 @@ class _PlotCurVsNxtFF():
 
     def prepare_to_plot_stops_near_ff(self, use_fixed_arc_length=False, fixed_arc_length=None):
         # self.slope, self.intercept, self.r_value, self.p_value, self.std_err = stats.linregress(self.traj_curv_counted, self.nxt_curv_counted)
-        if self.ff_dataframe is None:
+        if getattr(self, 'ff_dataframe', None) is None:
             self.get_more_monkey_data()
         self.stop_point_index_counted = self.stops_near_ff_df_counted['stop_point_index'].values
         self.heading_info_df_counted = self.heading_info_df.set_index(

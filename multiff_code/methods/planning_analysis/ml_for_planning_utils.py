@@ -85,7 +85,7 @@ def streamline_preparing_for_ml(x_df,
         x_df = winsorize_x_df(x_df)
 
     y_var_df = y_df[[y_var_column]].copy()
-    x_var_df, y_var_df = prep_ml_data_utils.make_x_and_y_var_df(
+    x_var_df, y_var_df, _ = prep_ml_data_utils.make_x_and_y_var_df(
         x_df, y_var_df, use_pca=use_pca)
 
     print('num_features_before_lasso:', x_var_df.shape[1])

@@ -114,19 +114,16 @@ def further_make_trials_df(processed_df, monkey_information, ff_real_position_so
     return processed_df2
 
 
-def combine_relevant_features(x_features_df, only_cur_ff_df, plan_x_df, plan_y_df, drop_columns_w_na=False):
+def combine_relevant_features(x_features_df, only_cur_ff_df, plan_features_df, drop_columns_w_na=False):
     x_features_df = x_features_df[non_cluster_columns_to_keep_from_x_features_df + ['stop_point_index'] +
                                   [col for col in x_features_df.columns if 'cluster' in col]].copy()
     only_cur_ff_df = only_cur_ff_df[columns_to_keep_from_only_cur_ff_df + [
         'stop_point_index']].copy()
-    plan_x_df = plan_x_df[non_cluster_columns_to_keep_from_plan_x_df + ['stop_point_index'] +
-                          [col for col in plan_x_df.columns if 'cluster' in col]].copy()
-    plan_y_df = plan_y_df[columns_to_keep_from_plan_y_df +
-                          ['stop_point_index']].copy()
+    plan_features_df = plan_features_df[non_cluster_columns_to_keep_from_plan_features_df + ['stop_point_index'] +
+                          [col for col in plan_features_df.columns if 'cluster' in col]].copy()
     x_df = pd.merge(x_features_df, only_cur_ff_df,
                     on='stop_point_index', how='inner')
-    x_df = pd.merge(x_df, plan_x_df, on='stop_point_index', how='inner')
-    x_df = pd.merge(x_df, plan_y_df, on='stop_point_index', how='inner')
+    x_df = pd.merge(x_df, plan_features_df, on='stop_point_index', how='inner')
 
     # drop columns with NA and print the names of these columns
     columns_with_na = x_df.columns[x_df.isna().any()].tolist()
@@ -170,7 +167,7 @@ non_cluster_columns_to_keep_from_x_features_df = [
     'cur_ff_earliest_flash_rel_time_at_ref',
     'cur_ff_latest_flash_rel_time_at_ref']
 
-non_cluster_columns_to_keep_from_plan_x_df = ['d_from_cur_ff_to_nxt_ff',
+non_cluster_columns_to_keep_from_plan_features_df = ['d_from_cur_ff_to_nxt_ff',
                                               'distance_between_stop_and_arena_edge',
                                               'cum_distance_between_two_stops',
                                               'time_between_two_stops',
@@ -204,36 +201,33 @@ non_cluster_columns_to_keep_from_plan_x_df = ['d_from_cur_ff_to_nxt_ff',
                                               'RDy_range',
                                               'RDy_iqr',
                                               'RDz_range',
-                                              'RDz_iqr']
-
-
-columns_to_keep_from_plan_y_df = [
-    'cur_ff_cluster_50_size',
-    'monkey_angle_before_stop',
-    #  'NXT_time_ff_last_seen_bbas_rel_to_stop',
-    #  'NXT_time_ff_last_seen_bsans_rel_to_stop',
-    #  'nxt_ff_last_flash_time_bbas_rel_to_stop',
-    #  'nxt_ff_last_flash_time_bsans_rel_to_stop',
-    #  'nxt_ff_cluster_last_seen_time_bbas_rel_to_stop',
-    #  'nxt_ff_cluster_last_seen_time_bsans_rel_to_stop',
-    #  'nxt_ff_cluster_last_flash_time_bbas_rel_to_stop',
-    #  'nxt_ff_cluster_last_flash_time_bsans_rel_to_stop',
-    'd_heading_of_traj',
-    'ref_curv_of_traj',
-    # 'angle_from_m_before_stop_to_cur_ff',
-    'angle_from_stop_to_nxt_ff',
-    # 'angle_from_cur_ff_to_stop',
-    'angle_from_cur_ff_to_nxt_ff',
-    'curv_mean',
-    'curv_std',
-    'curv_min',
-    'curv_Q1',
-    'curv_median',
-    'curv_Q3',
-    'curv_max',
-    #  'curv_iqr', # this will cause perfect correlation
-    #  'curv_range', # this will cause perfect correlation
-    'curv_of_traj_before_stop',
-    # 'dir_from_cur_ff_to_stop', # this has high correlation with dir_from_cur_ff_to_nxt_ff
-    'dir_from_cur_ff_to_nxt_ff',
-    'dir_from_cur_ff_same_side']
+                                              'RDz_iqr',
+                                            'cur_ff_cluster_50_size',
+                                            'monkey_angle_before_stop',
+                                            #  'NXT_time_ff_last_seen_bbas_rel_to_stop',
+                                            #  'NXT_time_ff_last_seen_bsans_rel_to_stop',
+                                            #  'nxt_ff_last_flash_time_bbas_rel_to_stop',
+                                            #  'nxt_ff_last_flash_time_bsans_rel_to_stop',
+                                            #  'nxt_ff_cluster_last_seen_time_bbas_rel_to_stop',
+                                            #  'nxt_ff_cluster_last_seen_time_bsans_rel_to_stop',
+                                            #  'nxt_ff_cluster_last_flash_time_bbas_rel_to_stop',
+                                            #  'nxt_ff_cluster_last_flash_time_bsans_rel_to_stop',
+                                            'd_heading_of_traj',
+                                            'ref_curv_of_traj',
+                                            # 'angle_from_m_before_stop_to_cur_ff',
+                                            'angle_from_stop_to_nxt_ff',
+                                            # 'angle_from_cur_ff_to_stop',
+                                            'angle_from_cur_ff_to_nxt_ff',
+                                            'curv_mean',
+                                            'curv_std',
+                                            'curv_min',
+                                            'curv_Q1',
+                                            'curv_median',
+                                            'curv_Q3',
+                                            'curv_max',
+                                            #  'curv_iqr', # this will cause perfect correlation
+                                            #  'curv_range', # this will cause perfect correlation
+                                            'curv_of_traj_before_stop',
+                                            # 'dir_from_cur_ff_to_stop', # this has high correlation with dir_from_cur_ff_to_nxt_ff
+                                            'dir_from_cur_ff_to_nxt_ff',
+                                            'dir_from_cur_ff_same_side']
