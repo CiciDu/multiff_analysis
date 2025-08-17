@@ -74,6 +74,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         self._prepare_static_main_plots()
 
+
     def _get_stops_near_ff_row(self, stop_point_index):
         if stop_point_index is None:
             # we use the first instance in stops_near_ff_df_counted to plot for now.

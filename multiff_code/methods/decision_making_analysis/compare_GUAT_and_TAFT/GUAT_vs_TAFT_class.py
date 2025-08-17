@@ -37,7 +37,7 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         self.ref_point_value = ref_point_value
         self.stop_period_duration = stop_period_duration
 
-    def streamline_getting_GUAT_or_TAFT_x_df(self, GUAT_or_TAFT='TAFT',
+    def streamline_getting_GUAT_or_TAFT_x_df(self, GUAT_or_TAFT='GUAT',
                                              save_data=True,
                                              exists_ok=True,
                                              ):

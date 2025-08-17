@@ -103,15 +103,15 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         )
         self.plan_features_df = plan_factors_utils.merge_plan_features1_and_plan_features2(self.plan_features1, self.plan_features2)
 
-    def _make_plan_features_step_1(self):
+    def _make_plan_features_step_1(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         test_or_ctrl = 'test'
 
-        self._make_heading_info_df()
+        self._make_heading_info_df_for_GUAT_vs_TAFT()
         setattr(self, f'{test_or_ctrl}_heading_info_df', self.heading_info_df)
         cvn_from_ref_class.CurVsNxtFfFromRefClass._make_curv_of_traj_df_if_not_already_made(
-            self)
+            self, window_for_curv_of_traj=window_for_curv_of_traj, curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         plan_factors_helper_class.PlanFactorsHelpClass._make_curv_of_traj_df_w_one_sided_window_if_not_already_made(
-            self)
+            self, window_for_curv_of_traj=window_for_curv_of_traj, curv_of_traj_mode=curv_of_traj_mode)
 
         self.plan_features1 = plan_factors_utils.make_plan_features1(
             self.heading_info_df, self.curv_of_traj_df, self.curv_of_traj_df_w_one_sided_window)
@@ -150,7 +150,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
             self._get_stops_near_ff_df(already_made_ok=True)
             self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
                 self.stops_near_ff_df)
-            self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref()
+            self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
 
         self.plan_features2 = plan_factors_utils.make_plan_features2(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
                                                                      stop_period_duration=self.stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
@@ -199,7 +199,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
                                                                    self.curv_of_traj_df, self.ff_dataframe_visible, stop_period_duration=self.stop_period_duration,
                                                                    ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
 
-    def find_nxt_ff_df_and_cur_ff_df_from_ref(self):
+    def find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT(self):
 
         # then get the actual nxt_ff_df_from_ref and cur_ff_df_from_ref
         self.nxt_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.nxt_ff_df, self.monkey_information, self.ff_real_position_sorted,
@@ -211,7 +211,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         return self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref
 
     def get_both_ff_at_ref_df(self):
-        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref()
+        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
         self.both_ff_at_ref_df = self.nxt_ff_df_from_ref[[
             'ff_distance', 'ff_angle']].copy()
         self.both_ff_at_ref_df.rename(columns={'ff_distance': 'nxt_ff_distance_at_ref',
@@ -227,10 +227,10 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         #                                             'cur_ff_angle_boundary_at_ref']].copy()
         return self.both_ff_at_ref_df
 
-    def _make_heading_info_df(self):
+    def _make_heading_info_df_for_GUAT_vs_TAFT(self):
 
         self._get_stops_near_ff_df(already_made_ok=True)
-        self._get_nxt_ff_and_cur_ff_info_based_on_ref_point()
+        self._get_nxt_ff_and_cur_ff_info_based_on_ref_point_for_GUAT_vs_TAFT()
         self.cur_and_nxt_ff_from_ref_df = show_planning_utils.make_cur_and_nxt_ff_from_ref_df(
             self.nxt_ff_df_final, self.cur_ff_df_final)
 
@@ -260,10 +260,10 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         self.stops_near_ff_df = build_factor_comp_utils._add_stat_columns_to_df(
             self.curv_of_traj_stat_df, self.stops_near_ff_df, ['curv'], 'stop_point_index')
 
-    def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self):
+    def _get_nxt_ff_and_cur_ff_info_based_on_ref_point_for_GUAT_vs_TAFT(self):
         self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
             self.stops_near_ff_df)
-        self.find_nxt_ff_df_and_cur_ff_df_from_ref()
+        self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
         self.nxt_ff_df_modified = self.nxt_ff_df_from_ref.copy()
         self.cur_ff_df_modified = self.cur_ff_df_from_ref.copy()
 
@@ -296,6 +296,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         # Apply to both final DataFrames
         self.nxt_ff_df_final = _merge_and_compute_heading(self.nxt_ff_df_final)
         self.cur_ff_df_final = _merge_and_compute_heading(self.cur_ff_df_final)
+
 
     def _get_TAFT_df(self):
         self.TAFT_df = GUAT_vs_TAFT_utils.process_trials_df(
