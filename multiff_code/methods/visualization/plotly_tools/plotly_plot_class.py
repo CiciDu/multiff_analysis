@@ -12,11 +12,10 @@ import plotly.graph_objects as go
 import copy
 
 
-
 class PlotlyPlotter(base_plot_class.BasePlotter):
 
-    cur_ff_color = 'red' #'purple' #'brown'
-    nxt_ff_color = 'green' #'olivedrab' #'limegreen' #'darkgreen' #'violet'
+    cur_ff_color = 'red'  # 'purple' #'brown'
+    nxt_ff_color = 'green'  # 'olivedrab' #'limegreen' #'darkgreen' #'violet'
     traj_arc_color = 'purple'
     # more options: '#AE76A3' - light purple
 
@@ -28,7 +27,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         # only meaningful when show_alive_fireflies is False
         "show_in_memory_fireflies": False,
         "show_visible_segments": True,
-        "show_stops": True,
+        "show_stops": False,
+        "show_cur_and_nxt_stops": True,
         "show_all_eye_positions": False,
         "show_current_eye_positions": True,
         "show_eye_positions_for_both_eyes": False,
@@ -42,6 +42,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "show_extended_traj_arc": False,
         "show_traj_color_as_speed": True,
         "show_stop_point_indices": None,
+        "show_capture_stop_point_indices": None,
         "hoverdata_multi_columns": ['rel_time'],
         "eye_positions_trace_name": 'eye_positions',
         "use_arrow_to_show_eye_positions": False,
@@ -74,8 +75,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         if self.current_plotly_key_comp['show_visible_segments']:
             varying_colors = [self.cur_ff_color, self.nxt_ff_color, '#33BBFF', '#FF337D', '#FF33D7', '#8D33FF', '#33FF64',
-                                '#FF5733', '#FFB533', '#33FFBE', '#3933FF', '#FF3346',
-                                '#FC33FF', '#FFEC33', '#FF5E33', '#B06B58']
+                              '#FF5733', '#FFB533', '#33FFBE', '#3933FF', '#FF3346',
+                              '#FC33FF', '#FFEC33', '#FF5E33', '#B06B58']
             self.fig = plotly_for_monkey.plot_horizontal_lines_to_show_ff_visible_segments_plotly(self.fig,
                                                                                                   self.current_plotly_key_comp[
                                                                                                       'ff_dataframe_in_duration_visible_qualified'],
@@ -87,13 +88,19 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                                                   unique_ff_indices=None,
                                                                                                   varying_colors=varying_colors)
 
-        if m_params['show_traj_portion']:
-            self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(self.fig, self.traj_portion,
-                                                                                                 hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
         if m_params['show_reward_boundary']:
             self.fig = plotly_for_monkey.plot_reward_boundary_in_plotly(
                 self.fig, self.current_plotly_key_comp['ff_df'])
+
+        self.fig = plotly_for_monkey.plot_trajectory_data(self.fig, self.current_plotly_key_comp['trajectory_df'],
+                                                          hoverdata_multi_columns=m_params['hoverdata_multi_columns'],
+                                                          show_color_as_time=m_params['show_all_eye_positions'],
+                                                          show_traj_color_as_speed=m_params['show_traj_color_as_speed'])
+
+        if m_params['show_traj_portion']:
+            self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(self.fig, self.traj_portion,
+                                                                                           hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
         if m_params['show_all_eye_positions']:
             self.fig = plotly_for_monkey.plot_eye_positions_in_plotly(self.fig, self.current_plotly_key_comp,
@@ -102,10 +109,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                       trace_name=m_params['eye_positions_trace_name'],
                                                                       use_arrow_to_show_eye_positions=m_params['use_arrow_to_show_eye_positions'])
 
-        self.fig = plotly_for_monkey.plot_trajectory_data(self.fig, self.current_plotly_key_comp['trajectory_df'],
-                                                          hoverdata_multi_columns=m_params['hoverdata_multi_columns'],
-                                                          show_color_as_time=m_params['show_all_eye_positions'],
-                                                          show_traj_color_as_speed=m_params['show_traj_color_as_speed'])
 
         if m_params['show_cur_ff']:
             self._show_cur_ff()
@@ -119,6 +122,10 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
+        if m_params['show_cur_and_nxt_stops'] | (m_params['show_capture_stop_point_indices'] is not None):
+            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_capture_stop_point_indices'],
+                                                              hoverdata_multi_columns=m_params['hoverdata_multi_columns'], is_capture_stops=True)
+
         self.fig = plotly_for_monkey.update_layout_and_x_and_y_limit(self.fig, self.current_plotly_key_comp,
                                                                      m_params['show_current_eye_positions'] or m_params['show_all_eye_positions'])
 
@@ -129,15 +136,14 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                               scaleratio=1)
 
         return self.fig
-    
-    
+
     def make_individual_plots_for_stops_near_ff_in_plotly(self, current_i, max_num_plot_to_make=5, show_fig=True,
                                                           **additional_plotting_kwargs):
 
         self.monkey_plot_params.update(additional_plotting_kwargs)
 
-        for i in range(len(self.stops_near_ff_df_counted))[current_i: current_i+max_num_plot_to_make]:
-            self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[i]
+        for i in range(len(self.stops_near_ff_df))[current_i: current_i+max_num_plot_to_make]:
+            self.stops_near_ff_row = self.stops_near_ff_df.iloc[i]
 
             diff_in_abs = self.heading_info_df_counted.iloc[i]['diff_in_abs_angle_to_nxt_ff']
             print(f'diff_in_abs: {diff_in_abs}')
@@ -145,7 +151,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             if self.monkey_plot_params['show_null_arcs_to_ff']:
                 self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_counted_points(
                     i=i)
-                
+
             current_i = i+1
             self.current_plotly_key_comp, self.fig = self.plot_cvn_in_plotly_func(
                 self.monkey_plot_params,
@@ -183,7 +189,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
-                
 
         self.fig.update_layout(
             autosize=False,
@@ -193,7 +198,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         )
 
         return self.current_plotly_key_comp, self.fig
-
 
     def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']

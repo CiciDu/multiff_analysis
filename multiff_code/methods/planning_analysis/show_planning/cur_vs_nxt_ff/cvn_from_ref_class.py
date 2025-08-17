@@ -81,9 +81,13 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.overall_params['remove_i_o_modify_rows_with_big_ff_angles'] = remove_i_o_modify_rows_with_big_ff_angles
         self.overall_params['use_curv_to_ff_center'] = use_curv_to_ff_center
 
-        self._get_nxt_ff_and_cur_ff_info_based_on_ref_point(ref_point_mode, ref_point_value,
-                                                            deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
-                                                            remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
+
+
+        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
+            ref_point_value, ref_point_mode)
+        self.add_info_to_nxt_ff_and_cur_ff_df(deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
+                                               remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
+
 
         self._take_out_info_counted()
         self._find_curv_of_traj_counted()
@@ -98,10 +102,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(
             test_or_control, heading_info_df_exists_ok)
-
-        if 'rank_by_angle_to_nxt_ff' not in self.stops_near_ff_df.columns:
-            self.stops_near_ff_df = self.stops_near_ff_df.merge(self.heading_info_df[[
-                                                                'stop_point_index', 'rank_by_angle_to_nxt_ff']], on='stop_point_index', how='left')
 
     def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after cur ff visible', ref_point_value=0.0,
                                                   curv_traj_window_before_stop=[
@@ -123,18 +123,20 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         self.make_stops_near_ff_and_ff_comparison_dfs(
             test_or_control=test_or_control, exists_ok=stops_near_ff_df_exists_ok, save_data=True)
-        self._get_nxt_ff_and_cur_ff_info_based_on_ref_point(ref_point_mode, ref_point_value,
-                                                            deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
-                                                            remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
+
+        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
+            ref_point_value, ref_point_mode)
+        self.add_info_to_nxt_ff_and_cur_ff_df(deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
+                                               remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
+
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
                                                                                            merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
-    def _get_nxt_ff_and_cur_ff_info_based_on_ref_point(self, ref_point_mode, ref_point_value,
-                                                       deal_with_rows_with_big_ff_angles=True,
-                                                       remove_i_o_modify_rows_with_big_ff_angles=False):
-        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
-            ref_point_value, ref_point_mode)
+
+
+    def add_info_to_nxt_ff_and_cur_ff_df(self, deal_with_rows_with_big_ff_angles=True,
+                                        remove_i_o_modify_rows_with_big_ff_angles=False):
         if deal_with_rows_with_big_ff_angles:
             self._deal_with_rows_with_big_ff_angles(
                 remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
@@ -234,7 +236,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                 raise ValueError(
                     'ref_point_value must be negative for ref_point_mode = "distance"')
             self.ref_point_descr = 'based on %d cm into past' % ref_point_value
-            self.ref_point_column = 'rel_distance'
+            # self.ref_point_column = 'rel_distance'
+            self.ref_point_column = 'rel_time' # now, for the sake of the neural plots, we'll just use 'rel_time'
             self.used_points_n_seconds_or_cm_ago = True
         elif ref_point_mode == 'time after cur ff visible':
             self.ref_point_descr = 'based on %d s ' % ref_point_value + \
@@ -266,12 +269,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
             method='first')
         self.curv_for_correlation_df['rank_by_traj_curv'] = self.curv_for_correlation_df['rank_by_traj_curv'].astype(
             'int')
-        # add the column rank_by_angle_to_nxt_ff to stops_near_ff_df
-        if 'rank_by_traj_curv' in self.stops_near_ff_df.columns:
-            self.stops_near_ff_df.drop(
-                columns=['rank_by_traj_curv'], inplace=True)
-        self.stops_near_ff_df = self.stops_near_ff_df.merge(self.curv_for_correlation_df[[
-                                                            'stop_point_index', 'rank_by_traj_curv']], on='stop_point_index', how='left')
 
     def find_relationships_from_info(self, normalize=False,
                                      change_units_to_degrees_per_m=True,
@@ -402,14 +399,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                     f'Failed to retrieve heading_info_df because {e}; will make new heading_info_df')
             self.heading_info_df = show_planning_utils.make_heading_info_df(
                 self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
-            self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['angle_from_stop_to_nxt_ff'].rank(
-                method='first')
-            self.heading_info_df['rank_by_angle_to_nxt_ff'] = self.heading_info_df['rank_by_angle_to_nxt_ff'].astype(
-                'int')
-            # add the column rank_by_angle_to_nxt_ff to stops_near_ff_df
-            if 'rank_by_angle_to_nxt_ff' not in self.stops_near_ff_df.columns:
-                self.stops_near_ff_df = self.stops_near_ff_df.merge(self.heading_info_df[[
-                                                                    'stop_point_index', 'rank_by_angle_to_nxt_ff']], on='stop_point_index', how='left')
 
             if 'nxt_ff_angle_at_ref' not in self.heading_info_df.columns:
                 self.add_both_ff_at_ref_to_heading_info_df()
@@ -472,7 +461,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
             self.curv_of_traj_df, _ = curv_of_traj_utils.find_curv_of_traj_df_based_on_curv_of_traj_mode(window_for_curv_of_traj, self.monkey_information, self.ff_caught_T_new,
                                                                                                          curv_of_traj_mode=curv_of_traj_mode, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
 
-    def _add_curvature_info(self):
+    def _add_curvature_info(self, invalid_curvature_of_cur_ff_ok=False):
 
         self._make_curv_of_traj_df_if_not_already_made(
             **self.curv_of_traj_params)
@@ -485,7 +474,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                              invalid_curvature_ok=True, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
         self.cur_curv_df = curvature_utils.make_curvature_df(self.cur_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information,
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
-                                                             invalid_curvature_ok=False, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
+                                                             invalid_curvature_ok=invalid_curvature_of_cur_ff_ok, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
 
         if self.opt_arc_type == 'opt_arc_stop_closest':
             stop_and_ref_point_info = self.cur_ff_df_modified[[

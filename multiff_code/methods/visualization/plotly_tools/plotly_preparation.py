@@ -125,18 +125,39 @@ def prepare_to_plot_a_planning_instance_in_plotly(row, PlotTrials_args, monkey_p
 
 
 def _find_duration_to_plot(row, monkey_information, eliminate_irrelevant_points_beyond_boundaries=False):
-    # if row is a one-row df, then make it a series
-    if isinstance(row, pd.DataFrame) and row.shape[0] == 1:
-        row = row.iloc[0]
-    time = row.stop_time
-    duration_to_plot = [time-4, max(time+2.5, row.next_stop_time+1.5)]
+
+    # Make 1-row DataFrame into a Series
+    if isinstance(row, pd.DataFrame):
+        row = row.squeeze()
+
+    # Coerce to scalars
+    stop_time = float(np.asarray(getattr(row, "stop_time", np.nan)).squeeze())
+    nxt = getattr(row, "next_stop_time", np.nan)
+    nxt = float(np.asarray(nxt).squeeze()) if np.size(nxt) else np.nan
+
+    if not np.isfinite(stop_time):
+        raise ValueError("stop_time is missing or non-finite")
+
+    start = stop_time - 4.0
+    # If nxt is NaN, use -inf so fmax picks stop_time+2.5
+    end = float(np.fmax(stop_time + 2.5, (nxt + 1.5) if np.isfinite(nxt) else -np.inf))
+
+    duration = [start, end]
+
     if eliminate_irrelevant_points_beyond_boundaries:
-        relevant_point_indices = [
-            row.stop_point_index, row.next_stop_point_index]
-        duration_to_plot = show_null_trajectory.eliminate_irrelevant_points_before_or_after_crossing_boundary(
-            duration_to_plot, relevant_point_indices, monkey_information, verbose=False)
-    print('duration_to_plot:', duration_to_plot)
-    return duration_to_plot
+        spi = getattr(row, "stop_point_index", None)
+        nspi = getattr(row, "next_stop_point_index", None)
+        idxs = [int(x) for x in (spi, nspi) if x is not None and pd.notna(x)]
+        duration = show_null_trajectory.eliminate_irrelevant_points_before_or_after_crossing_boundary(
+            duration, idxs, monkey_information, verbose=False
+        )
+
+    # Ensure valid ordering
+    if duration[1] < duration[0]:
+        duration = [duration[1], duration[0]]
+
+    print("duration_to_plot:", duration)
+    return duration
 
 
 def _make_trajectory_df(PlotTrials_args,

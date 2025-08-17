@@ -406,7 +406,8 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
     return fig
 
 
-def plot_stops_in_plotly(fig, trajectory_df, show_stop_point_indices, hoverdata_multi_columns=['rel_time']):
+def plot_stops_in_plotly(fig, trajectory_df, show_stop_point_indices, hoverdata_multi_columns=['rel_time'], is_capture_stops=False):
+    name = 'stops' if not is_capture_stops else 'capture_stops'
     trajectory_df_sub = trajectory_df[trajectory_df['point_index'].isin(
         show_stop_point_indices)]
     plot_to_add = px.scatter(trajectory_df_sub, x='monkey_x', y='monkey_y',
@@ -419,12 +420,16 @@ def plot_stops_in_plotly(fig, trajectory_df, show_stop_point_indices, hoverdata_
                              )
 
     fig.add_traces(plot_to_add.data)
-    fig.data[-1].name = 'stops'
+    fig.data[-1].name = name
     fig.update_traces(marker=dict(size=13, opacity=1,
-                      symbol="star"), selector=dict(name='stops'))
+                      symbol="star"), selector=dict(name=name))
     hovertemplate = ' <br>'.join(
         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
-    fig.update_traces(hovertemplate=hovertemplate, selector=dict(name='stops'))
+    fig.update_traces(hovertemplate=hovertemplate, selector=dict(name=name))
+    
+    if is_capture_stops:
+        # change color to red
+        fig.update_traces(marker=dict(color='red'), selector=dict(name=name))
     return fig
 
 
@@ -497,7 +502,7 @@ def connect_points_to_points(fig, connect_path_ff_df, show_traj_points_when_maki
     return fig
 
 
-def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='orange', hoverdata_multi_columns=['rel_time']):
+def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='purple', hoverdata_multi_columns=['rel_time']):
 
     plot_to_add = px.scatter(traj_portion, x='monkey_x', y='monkey_y',
                              hover_data=hoverdata_multi_columns,
@@ -511,7 +516,7 @@ def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='
     fig.data[-1].name = 'to_show_traj_portion'
     hovertemplate = ' <br>'.join(
         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
-    fig.update_traces(marker=dict(size=12, opacity=1),
+    fig.update_traces(marker=dict(size=9, opacity=1),
                       hovertemplate=hovertemplate,
                       selector=dict(name='to_show_traj_portion'))
 

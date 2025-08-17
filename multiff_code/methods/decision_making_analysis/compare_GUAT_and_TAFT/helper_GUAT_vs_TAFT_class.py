@@ -150,7 +150,8 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
             self._get_stops_near_ff_df(already_made_ok=True)
             self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
                 self.stops_near_ff_df)
-            self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
+            self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = cvn_from_ref_class.CurVsNxtFfFromRefClass.find_nxt_ff_df_and_cur_ff_df_from_ref(
+                self, self.ref_point_value, self.ref_point_mode)
 
         self.plan_features2 = plan_factors_utils.make_plan_features2(self.stops_near_ff_df, self.heading_info_df, self.both_ff_at_ref_df, self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted,
                                                                      stop_period_duration=self.stop_period_duration, ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value, ff_radius=ff_radius,
@@ -199,19 +200,9 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
                                                                    self.curv_of_traj_df, self.ff_dataframe_visible, stop_period_duration=self.stop_period_duration,
                                                                    ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
 
-    def find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT(self):
-
-        # then get the actual nxt_ff_df_from_ref and cur_ff_df_from_ref
-        self.nxt_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.nxt_ff_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                 ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value,
-                                                                                 point_index_cur_ff_first_seen=self.cur_ff_df['point_index_ff_first_seen'].values)
-        self.cur_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.cur_ff_df, self.monkey_information, self.ff_real_position_sorted,
-                                                                                 ref_point_mode=self.ref_point_mode, ref_point_value=self.ref_point_value)
-
-        return self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref
-
     def get_both_ff_at_ref_df(self):
-        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
+        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = cvn_from_ref_class.CurVsNxtFfFromRefClass.find_nxt_ff_df_and_cur_ff_df_from_ref(
+                self, self.ref_point_value, self.ref_point_mode)
         self.both_ff_at_ref_df = self.nxt_ff_df_from_ref[[
             'ff_distance', 'ff_angle']].copy()
         self.both_ff_at_ref_df.rename(columns={'ff_distance': 'nxt_ff_distance_at_ref',
@@ -236,6 +227,8 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
 
         self.heading_info_df = show_planning_utils.make_heading_info_df(
             self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
+
+
 
     def _add_nxt_ff_index(self):
         if self.GUAT_or_TAFT == 'TAFT':
@@ -263,7 +256,8 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
     def _get_nxt_ff_and_cur_ff_info_based_on_ref_point_for_GUAT_vs_TAFT(self):
         self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
             self.stops_near_ff_df)
-        self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
+        self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = cvn_from_ref_class.CurVsNxtFfFromRefClass.find_nxt_ff_df_and_cur_ff_df_from_ref(
+                self, self.ref_point_value, self.ref_point_mode)
         self.nxt_ff_df_modified = self.nxt_ff_df_from_ref.copy()
         self.cur_ff_df_modified = self.cur_ff_df_from_ref.copy()
 

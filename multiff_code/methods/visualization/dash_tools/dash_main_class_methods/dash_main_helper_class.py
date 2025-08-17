@@ -77,17 +77,21 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
     def _get_stops_near_ff_row(self, stop_point_index):
         if stop_point_index is None:
-            # we use the first instance in stops_near_ff_df_counted to plot for now.
-            self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[0]
+            # we use the first instance in stops_near_ff_df to plot for now.
+            self.stops_near_ff_row = self.stops_near_ff_df.iloc[0]
         else:
             try:
-                self.stops_near_ff_row = self.stops_near_ff_df_counted[self.stops_near_ff_df_counted['stop_point_index']
+                self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                                        == stop_point_index].iloc[0]
                 logging.info(
                     f'Successfully retrieved stop_point_index: {stop_point_index}.')
-            except:
+            except IndexError:
+                self.stops_near_ff_row = self.stops_near_ff_df.iloc[0]
                 logging.warning(
-                    f'stop_point_index: {stop_point_index} is not in stops_near_ff_df_counted. Using the first instance in stops_near_ff_df_counted to plot.')
+                    f'stop_point_index: {stop_point_index} is not in stops_near_ff_df. Using the first instance in stops_near_ff_df to plot.')
+        if len(self.stops_near_ff_row) == 0:
+            raise ValueError('self.stops_near_ff_row is empty')
+        
         self.stop_point_index = self.stops_near_ff_row['stop_point_index']
 
     def _put_down_trajectory_time_series_plot(self, layout, id_prefix=''):
@@ -421,52 +425,71 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr
 
-    def _update_dash_based_on_neural_plot_hoverdata(self, neural_plot_hoverdata):
-        neural_plot_hoverdata_values = neural_plot_hoverdata['points'][0]['x']
-
-        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_time_series.find_monkey_hoverdata_value_for_both_fig_time_series(
-            'rel_time', neural_plot_hoverdata_values, self.current_plotly_key_comp['trajectory_df'])
-
-        self.monkey_hoverdata_value = self.monkey_hoverdata_value_s
-
-        self.fig, self.fig_time_series_combd = self._update_fig_and_fig_time_series_based_on_monkey_hover_data()
-        self.fig_raster, self.fig_fr = self._update_neural_plots_based_on_monkey_hover_data(
-            self.monkey_hoverdata_value_s)
-
-        return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr
 
     def _update_dash_based_on_correlation_plot_clickdata(self, hoverData):
         self.stop_point_index = hoverData['points'][0]['customdata']
         self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                        == self.stop_point_index].iloc[0]
+        if len(self.stops_near_ff_row) == 0:
+            raise ValueError('self.stops_near_ff_row is empty')
         self._update_after_changing_stop_point_index()
 
     def _update_dash_after_clicking_previous_or_next_plot_button(self, previous_or_next='next'):
-        rank_var = 'rank_by_angle_to_nxt_ff'
-        stops_near_ff_df = self.stops_near_ff_df
         if previous_or_next == 'previous':
-            self._get_previous_stops_near_ff_row(stops_near_ff_df, rank_var)
+            self._get_previous_or_next_stops_near_ff_row(previous_or_next='previous')
         elif previous_or_next == 'next':
-            self._get_next_stops_near_ff_row(stops_near_ff_df, rank_var)
+            self._get_previous_or_next_stops_near_ff_row(previous_or_next='next')
         else:
             raise ValueError('previous_or_next should be previous or next')
         self._update_after_changing_stop_point_index()
 
-    def _get_previous_stops_near_ff_row(self, stops_near_ff_df, rank_var):
-        old_rank = self.stops_near_ff_row[rank_var].item()
-        if old_rank == stops_near_ff_df[rank_var].min():
-            old_rank = stops_near_ff_df[rank_var].max()
-        self.stops_near_ff_row = stops_near_ff_df[self.stops_near_ff_df[rank_var]
-                                                  == old_rank - 1].iloc[0]
-        self.stop_point_index = self.stops_near_ff_row['stop_point_index']
 
-    def _get_next_stops_near_ff_row(self, stops_near_ff_df, rank_var):
-        old_rank = self.stops_near_ff_row[rank_var].item()
-        if old_rank == stops_near_ff_df[rank_var].max():
-            old_rank = stops_near_ff_df[rank_var].min()
-        self.stops_near_ff_row = stops_near_ff_df[self.stops_near_ff_df[rank_var]
-                                                  == old_rank + 1].iloc[0]
-        self.stop_point_index = self.stops_near_ff_row['stop_point_index']
+    def _get_previous_or_next_stops_near_ff_row(self, previous_or_next: str = "previous", order_by: str | None = None):
+        df = self.stops_near_ff_df
+        if df is None or df.empty:
+            raise ValueError("stops_near_ff_df is empty")
+
+        if previous_or_next not in {"previous", "next"}:
+            raise ValueError("previous_or_next should be 'previous' or 'next'")
+
+        # Optional ordering
+        if order_by is not None:
+            if order_by not in df.columns:
+                raise ValueError(f"order_by column '{order_by}' not in DataFrame")
+            df = df.sort_values(order_by, kind="mergesort").reset_index(drop=True)
+
+        # Current row may be a Series or a 1-row DataFrame
+        cur = self.stops_near_ff_row
+        if isinstance(cur, pd.DataFrame):
+            if len(cur) != 1:
+                raise ValueError("self.stops_near_ff_row is a DataFrame with != 1 row")
+            cur = cur.iloc[0]
+
+        cur_idx = getattr(cur, "stop_point_index", None)
+        if cur_idx is None or (isinstance(cur_idx, float) and np.isnan(cur_idx)):
+            raise ValueError("self.stops_near_ff_row.stop_point_index is missing")
+
+        # Coerce to scalar int
+        cur_idx = int(np.asarray(cur_idx).squeeze())
+
+        # Compare against numpy array to avoid index alignment issues
+        col_vals = df["stop_point_index"].to_numpy()
+        mask = (col_vals == cur_idx)
+        if not mask.any():
+            raise ValueError(f"stop_point_index {cur_idx} not found in DataFrame")
+
+        pos = int(np.flatnonzero(mask)[0])
+        step = -1 if previous_or_next == "previous" else 1
+        new_pos = (pos + step) % len(df)
+
+        new_row = df.iloc[new_pos]
+        self.stops_near_ff_row = new_row
+        self.stop_point_index = int(new_row["stop_point_index"])
+        
+        if len(self.stops_near_ff_row) == 0:
+            raise ValueError('self.stops_near_ff_row is empty after updating to previous or next row')
+        return new_row  # handy to return it
+
 
     def _update_after_changing_stop_point_index(self):
         self._prepare_to_make_plotly_fig_for_dash_given_stop_point_index(
@@ -496,7 +519,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         if ref_point_mode == 'distance':
             self.ref_point_descr = 'based on %d cm into past' % ref_point_value
-            self.ref_point_column = 'rel_distance'
+            # self.ref_point_column = 'rel_distance'
+            self.ref_point_column = 'rel_time' # now, for the sake of the neural plots, we'll just use 'rel_time'
         elif ref_point_mode == 'time':
             self.ref_point_descr = 'based on %d s into past' % ref_point_value
             self.ref_point_column = 'rel_time'
@@ -512,11 +536,11 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         self.streamline_organizing_info(
             **self.snf_streamline_organizing_info_kwargs)
-        if len(self.stops_near_ff_df_counted) == 0:
+        if len(self.stops_near_ff_df) == 0:
             print(
-                'Warning: After update, stops_near_ff_df_counted is empty! So no update is made')
+                'Warning: After update, stops_near_ff_df is empty! So no update is made')
             raise PreventUpdate(
-                "No update was made because stops_near_ff_df_counted is empty after update.")
+                "No update was made because stops_near_ff_df is empty after update.")
         self._prepare_static_main_plots()
 
         print(
@@ -530,6 +554,21 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         except IndexError:
             self.point_index_to_show_traj_curv = int(
                 self.current_plotly_key_comp['trajectory_df'].iloc[-1]['point_index'])
+
+    def _update_dash_based_on_neural_plot_hoverdata(self, neural_plot_hoverdata):
+        neural_plot_hoverdata_values = neural_plot_hoverdata['points'][0]['x']
+
+        self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_time_series.find_monkey_hoverdata_value_for_both_fig_time_series(
+            'rel_time', neural_plot_hoverdata_values, self.current_plotly_key_comp['trajectory_df'])
+
+        self.hoverdata_column = 'rel_time'
+        self.monkey_hoverdata_value = self.monkey_hoverdata_value_s
+
+        self.fig, self.fig_time_series_combd = self._update_fig_and_fig_time_series_based_on_monkey_hover_data()
+        self.fig_raster, self.fig_fr = self._update_neural_plots_based_on_monkey_hover_data(
+            self.monkey_hoverdata_value_s)
+
+        return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr
 
     def _update_fig_and_fig_time_series_based_on_monkey_hover_data(self):
         self.fig_time_series_combd = dash_utils.update_fig_time_series_combd_plot_based_on_monkey_hoverdata(
@@ -583,14 +622,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
     def generate_other_messages(self, decimals=2):
 
-        current_traj_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
-                                                                   == self.stop_point_index, 'traj_curv_counted'].item() * (180/np.pi) * 100, decimals)
-        current_nxt_curv = round(self.curv_for_correlation_df.loc[self.curv_for_correlation_df['stop_point_index']
-                                                                  == self.stop_point_index, 'nxt_curv_counted'].item() * (180/np.pi) * 100, decimals)
-        self.other_messages = f"Trajectory curvature: {current_traj_curv}, \n     Nxt FF curvature: {current_nxt_curv}"
-
         # Add other info
-        self.other_messages += ", \n Curv range: " + str(round(self.stops_near_ff_row['curv_range'], decimals)) + ", \n Cum distance between two stops: " + \
+        self.other_messages = "Curv range: " + str(round(self.stops_near_ff_row['curv_range'], decimals)) + ", \n Cum distance between two stops: " + \
             str(round(
                 self.stops_near_ff_row['cum_distance_between_two_stops'], decimals))
 
@@ -606,8 +639,10 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             self.get_more_monkey_data()
 
         self.stop_point_index = stop_point_index
-        self.stops_near_ff_row = self.stops_near_ff_df_counted[
-            self.stops_near_ff_df_counted['stop_point_index'] == self.stop_point_index].copy()
+        self.stops_near_ff_row = self.stops_near_ff_df[
+            self.stops_near_ff_df['stop_point_index'] == self.stop_point_index].copy()
+        if len(self.stops_near_ff_row) == 0:
+            raise ValueError('self.stops_near_ff_row is empty')
         self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted,
                                 self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
 

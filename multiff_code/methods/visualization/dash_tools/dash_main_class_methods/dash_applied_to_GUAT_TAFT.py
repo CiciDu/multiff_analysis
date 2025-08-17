@@ -9,7 +9,7 @@ from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
 from planning_analysis.plan_factors import plan_factors_helper_class
 from planning_analysis.show_planning import show_planning_utils
-from decision_making_analysis.compare_GUAT_and_TAFT import nxt_ff_utils
+from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 
 import os
 import sys
@@ -116,44 +116,39 @@ class DashForGUATandTAFT(GUAT_vs_TAFT_class.GUATvsTAFTclass, dash_main_class.Das
         
         self.ref_point_mode = kwargs['ref_point_mode']
         self.ref_point_value = kwargs['ref_point_value']
-        self.deal_with_rows_with_big_ff_angles = kwargs['deal_with_rows_with_big_ff_angles']
         self.remove_i_o_modify_rows_with_big_ff_angles = kwargs['remove_i_o_modify_rows_with_big_ff_angles']
-        
+        self.curv_traj_window_before_stop = kwargs.get('curv_traj_window_before_stop', [-25, 0])
+
         self.get_relevant_monkey_data()
         self.get_GUAT_or_TAFT_df()
         self._get_stops_near_ff_df(already_made_ok=True)
         
         self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
             self.stops_near_ff_df)
-        self._get_nxt_ff_and_cur_ff_info_based_on_ref_point2(self.ref_point_mode, self.ref_point_value,
-                                                            deal_with_rows_with_big_ff_angles=self.deal_with_rows_with_big_ff_angles,
-                                                            remove_i_o_modify_rows_with_big_ff_angles=self.remove_i_o_modify_rows_with_big_ff_angles)
-
+        self.find_nxt_ff_df_and_cur_ff_df_from_ref(self.ref_point_value, self.ref_point_mode)
+        self.add_info_to_nxt_ff_and_cur_ff_df(remove_i_o_modify_rows_with_big_ff_angles=self.remove_i_o_modify_rows_with_big_ff_angles)
+        
         self.cur_and_nxt_ff_from_ref_df = show_planning_utils.make_cur_and_nxt_ff_from_ref_df(
            self.nxt_ff_df_final, self.cur_ff_df_final)
-
-        self.heading_info_df = show_planning_utils.make_heading_info_df(
-           self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
-
-        setattr(self, f'{self.test_or_ctrl}_heading_info_df', self.heading_info_df)
         
-        if 'rank_by_angle_to_nxt_ff' not in self.stops_near_ff_df.columns:
-            self.stops_near_ff_df = self.stops_near_ff_df.merge(self.heading_info_df[[
-                                                                'stop_point_index', 'rank_by_angle_to_nxt_ff']], on='stop_point_index', how='left')
+        self.make_heading_info_df_2()
+        self._take_out_info_counted()
 
 
-    def _get_nxt_ff_and_cur_ff_info_based_on_ref_point2(self):
-        self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
-            self.stops_near_ff_df)
-        self.find_nxt_ff_df_and_cur_ff_df_from_ref_for_GUAT_vs_TAFT()
-        self.nxt_ff_df_modified = self.nxt_ff_df_from_ref.copy()
-        self.cur_ff_df_modified = self.cur_ff_df_from_ref.copy()
+    def make_heading_info_df_2(self, merge_diff_in_curv_df_to_heading_info=True):
+        self.heading_info_df = show_planning_utils.make_heading_info_df(
+            self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
 
-        self.stop_point_index_modified = self.nxt_ff_df_modified.stop_point_index.values.copy()
-        self.stops_near_ff_df_modified = self.stops_near_ff_df.copy()
+        if 'nxt_ff_angle_at_ref' not in self.heading_info_df.columns:
+            self.add_both_ff_at_ref_to_heading_info_df()
 
-        self._add_curvature_info()
-        self._add_d_heading_info()
+        self.diff_in_curv_df = self.make_diff_in_curv_df(
+                    curv_traj_window_before_stop=self.curv_traj_window_before_stop)
+        
+        if merge_diff_in_curv_df_to_heading_info:
+            if hasattr(self, 'heading_info_df'):
+                columns_to_add = [
+                    col for col in self.diff_in_curv_df.columns if col not in self.heading_info_df.columns]
+                self.heading_info_df = self.heading_info_df.merge(
+                    self.diff_in_curv_df[['ref_point_index'] + columns_to_add], on='ref_point_index', how='left')
 
- 
-    
