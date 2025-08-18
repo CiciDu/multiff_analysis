@@ -40,28 +40,31 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
     time_array = (time_bins[:-1] + time_bins[1:]) / 2
     fr_df = _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=time_array)
 
+
     selected_cluster_cols = [f"cluster_{c}" for c in selected_clusters]
     if 'time' not in fr_df.columns or not set(selected_cluster_cols).intersection(fr_df.columns):
         logging.warning("Prepared firing rate DataFrame missing expected columns.")
         return go.Figure()
 
-    colors = get_colors_utils._get_colors(len(selected_cluster_cols))
     fig = go.Figure()
 
-    for i, cluster_col in enumerate(selected_cluster_cols):
+    for c in selected_clusters:
+        cluster_col = f"cluster_{c}"
         if cluster_col in fr_df.columns:
             fig.add_trace(go.Scatter(
                 x=fr_df['time'],
                 y=fr_df[cluster_col],
                 mode='lines',
-                name=f'Cluster {selected_clusters[i]}',
-                line=dict(color=colors[i], width=1.5, shape='linear'),
+                name=f'Cluster {c}',
+                legendgroup=f'cluster-{c}',
+                line=dict(color=get_colors_utils._color_for_cluster(c), width=1.5, shape='linear'),
                 opacity=0.8,
-                customdata=[selected_clusters[i]] * len(fr_df),
+                customdata=[c] * len(fr_df),
                 hovertemplate='<b>Cluster %{customdata}</b><br>'
                               'Time: %{x:.3f}s<br>'
                               'Firing Rate: %{y:.2f} Hz<extra></extra>'
             ))
+
 
     if len(selected_cluster_cols) > 1:
         mean_fr = fr_df[selected_cluster_cols].mean(axis=1)
@@ -89,31 +92,39 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
 
 
 def create_raster_plot_for_one_duration_in_plotly(
-        spikes_df, reference_time, start_time, end_time,
-        max_clusters_to_plot=None, rel_hover_time=None,
-        show_visible_segments=False, visible_segments_info=None):
-
+    spikes_df, reference_time, start_time, end_time,
+    max_clusters_to_plot=None, rel_hover_time=None,
+    show_visible_segments=False, visible_segments_info=None
+):
     filtered_spikes, selected_clusters = _select_clusters_and_spikes_in_time_window(
-        spikes_df, start_time, end_time, max_clusters_to_plot)
+        spikes_df, start_time, end_time, max_clusters_to_plot
+    )
     if filtered_spikes.empty:
         return go.Figure()
 
     filtered_spikes = filtered_spikes.copy()
     filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - reference_time
 
-    colors = get_colors_utils._get_colors(len(selected_clusters))
     fig = go.Figure()
 
-    for i, cluster_id in enumerate(selected_clusters):
+    # Use stable color per cluster ID
+    for cluster_id in selected_clusters:
         group = filtered_spikes[filtered_spikes['cluster'] == cluster_id]
         if not group.empty:
+            c = get_colors_utils._color_for_cluster(cluster_id)  # <- stable, normalized color
             fig.add_trace(go.Scatter(
                 x=group['rel_spike_time'],
                 y=[cluster_id] * len(group),
                 mode='markers',
-                marker=dict(size=4, color=colors[i], opacity=0.8, line=dict(width=0.5, color='white')),
+                marker=dict(
+                    size=4,
+                    color=c,
+                    opacity=0.8,
+                    line=dict(width=0.5, color='white')  # thin halo for visibility
+                ),
                 name=f'Cluster {cluster_id}',
-                showlegend=False,
+                legendgroup=f'cluster-{cluster_id}',
+                showlegend=False,  # keep raster legend clean; toggle to True if you want a legend
                 customdata=[cluster_id] * len(group),
                 hovertemplate='<b>Cluster %{customdata}</b><br>Time: %{x:.3f}s<extra></extra>'
             ))
@@ -129,7 +140,12 @@ def create_raster_plot_for_one_duration_in_plotly(
 
     _add_reference_lines(fig, y_min, y_max, rel_hover_time)
     fig = _add_firefly_segments(fig, y_min, y_max, show_visible_segments, visible_segments_info)
-    fig.update_layout(_common_layout('Neural Raster Plot', 'Time (s) relative to reference', 'Neuron ID', [y_min, y_max]))
+    fig.update_layout(_common_layout(
+        'Neural Raster Plot',
+        'Time (s) relative to reference',
+        'Neuron ID',
+        [y_min, y_max]
+    ))
 
     return fig
 

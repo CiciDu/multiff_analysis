@@ -48,6 +48,13 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         empty_fig.update_layout(height=10, width=10)
         return empty_fig
 
+    def _clone_fig(self, fig):
+        # go.Figure acts like a shallow copy constructor; fast and safe to serialize
+        return go.Figure(fig) if isinstance(fig, go.Figure) else fig
+
+    def _clone_all(self, *figs):
+        return tuple(self._clone_fig(f) for f in figs)
+
     def prepare_dash_for_main_plots_layout(self, id_prefix='main_plots_'):
         self.id_prefix = id_prefix
         self.other_messages = self.generate_other_messages()
@@ -161,11 +168,21 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     raise PreventUpdate(
                         "No update was made for the current trigger.")
 
-                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, 'Updated successfully'
+                return self._clone_all(
+                    self.fig,
+                    self.fig_time_series_combd,
+                    self.fig_scatter_or_reg,
+                    self.fig_scatter_or_reg2
+                ) + ('Updated successfully',)
 
             except Exception as e:
-                return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, f"An error occurred. No update was made. Error: {e}"
-
+                return self._clone_all(
+                    self.fig,
+                    self.fig_time_series_combd,
+                    self.fig_scatter_or_reg,
+                    self.fig_scatter_or_reg2
+                ) + (f"An error occurred. No update was made. Error: {e}",)
+    
     def make_function_to_update_all_plots_based_on_hover_data(self, app):
         @app.callback(
             Output(self.id_prefix + 'monkey_plot',
@@ -246,11 +263,20 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     raise PreventUpdate(
                         "No update was made for the current trigger.")
 
-                return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr, 'Updated successfully'
+                return self._clone_all(
+                    self.fig,
+                    self.fig_time_series_combd,
+                    self.fig_raster,
+                    self.fig_fr
+                ) + ('Updated successfully',)
 
             except Exception as e:
-                return self.fig, self.fig_time_series_combd, self.fig_raster, self.fig_fr, f"An error occurred. No update was made. Error: {e}"
-
+                return self._clone_all(
+                    self.fig,
+                    self.fig_time_series_combd,
+                    self.fig_raster,
+                    self.fig_fr
+                ) + (f"An error occurred. No update was made. Error: {e}",)
 
     def make_function_to_update_based_on_correlation_plot(self, app):
         @app.callback(
@@ -300,7 +326,15 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
             self.other_messages = self.generate_other_messages()
 
-            return self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg, self.fig_scatter_or_reg2, self.fig_raster, self.fig_fr, self.other_messages
+            return self._clone_all(
+                self.fig,
+                self.fig_time_series_combd,
+                self.fig_scatter_or_reg,
+                self.fig_scatter_or_reg2,
+                self.fig_raster,
+                self.fig_fr,
+                self.other_messages
+            )
 
     def make_function_to_show_or_hind_visible_segments(self, app):
         @app.callback(
@@ -327,7 +361,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     trace.visible = 'legendonly' if trace.visible != 'legendonly' else True
                     #logging.info(f'ff {data} is now {trace.visible}.')
 
-            return self.fig
+            return self._clone_fig(self.fig)
 
     def make_function_to_update_curv_of_traj(self, app):
         @app.callback(
@@ -378,15 +412,25 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                 if not self.show_trajectory_time_series:
                     self.fig_time_series_combd = self._get_empty_figure()
 
-                return (self.curv_of_traj_params['curv_of_traj_mode'],
-                        self.curv_of_traj_params['window_for_curv_of_traj'][0],
-                        self.curv_of_traj_params['window_for_curv_of_traj'][1],
-                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg,
-                        self.fig_scatter_or_reg2, 'Updated successfully')
+                return (
+                    self.curv_of_traj_params['curv_of_traj_mode'],
+                    self.curv_of_traj_params['window_for_curv_of_traj'][0],
+                    self.curv_of_traj_params['window_for_curv_of_traj'][1],
+                    self._clone_fig(self.fig),
+                    self._clone_fig(self.fig_time_series_combd),
+                    self._clone_fig(self.fig_scatter_or_reg),
+                    self._clone_fig(self.fig_scatter_or_reg2),
+                    'Updated successfully'
+                )
 
             except Exception as e:
-                return (self.curv_of_traj_params['curv_of_traj_mode'],
-                        self.curv_of_traj_params['window_for_curv_of_traj'][0],
-                        self.curv_of_traj_params['window_for_curv_of_traj'][1],
-                        self.fig, self.fig_time_series_combd, self.fig_scatter_or_reg,
-                        self.fig_scatter_or_reg2, f"An error occurred. No update was made. Error: {e}")
+                return (
+                    self.curv_of_traj_params['curv_of_traj_mode'],
+                    self.curv_of_traj_params['window_for_curv_of_traj'][0],
+                    self.curv_of_traj_params['window_for_curv_of_traj'][1],
+                    self._clone_fig(self.fig),
+                    self._clone_fig(self.fig_time_series_combd),
+                    self._clone_fig(self.fig_scatter_or_reg),
+                    self._clone_fig(self.fig_scatter_or_reg2),
+                    f"An error occurred. No update was made. Error: {e}"
+                )

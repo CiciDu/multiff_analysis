@@ -2,11 +2,23 @@ import re
 import colorsys
 import plotly.colors as pc
 
+
+import hashlib
+from plotly.colors import qualitative as qual
+
+
+
 try:
     # nice-to-have: resolves CSS names to RGB
     from matplotlib.colors import to_rgb as _mpl_to_rgb  # returns floats 0..1
 except Exception:
     _mpl_to_rgb = None
+
+# You can exclude lighter sets if you prefer darker/vivid: remove Set3/Light24
+_FIXED_PALETTE_RAW = (
+    qual.D3 + qual.Set1 + qual.Set2 + qual.Set3 + qual.Dark24 + qual.Light24 +
+    qual.T10 + qual.Plotly + qual.Alphabet
+)
 
 def _rgb01_to_hex(r, g, b):
     return "#{:02x}{:02x}{:02x}".format(
@@ -19,7 +31,6 @@ def _parse_color_to_rgb01(c):
     """Return (r,g,b) floats in 0..1 from hex, css name, rgb(), or hsl()."""
     if isinstance(c, (tuple, list)) and len(c) == 3:
         r, g, b = c
-        # assume 0..1, but auto-scale if looks like 0..255
         if max(r, g, b) > 1:
             r, g, b = r/255.0, g/255.0, b/255.0
         return float(r), float(g), float(b)
@@ -57,7 +68,7 @@ def _parse_color_to_rgb01(c):
         r, g, b = colorsys.hls_to_rgb(h/360.0, L, S)
         return r, g, b
 
-    # CSS color names (e.g., "yellow", "rebeccapurple")
+    # CSS names
     if _mpl_to_rgb is not None:
         try:
             r, g, b = _mpl_to_rgb(s)
@@ -70,11 +81,20 @@ def _parse_color_to_rgb01(c):
 def _normalize_color(c, min_light=0.25, max_light=0.45, min_sat=0.55):
     """Clamp lightness/saturation so colors aren’t too light/washed out."""
     r, g, b = _parse_color_to_rgb01(c)
-    h, l, s = colorsys.rgb_to_hls(r, g, b)  # HLS order
+    h, l, s = colorsys.rgb_to_hls(r, g, b)  # HLS
     l = max(min(l, max_light), min_light)
     s = max(s, min_sat)
     r2, g2, b2 = colorsys.hls_to_rgb(h, l, s)
     return _rgb01_to_hex(r2, g2, b2)
+
+# Cache the normalized palette once
+_NORMALIZED_FIXED_PALETTE = tuple(_normalize_color(c) for c in _FIXED_PALETTE_RAW)
+
+def _color_for_cluster(cluster_id, palette=_NORMALIZED_FIXED_PALETTE):
+    """Deterministic color for a cluster ID, using a cached normalized palette."""
+    h = hashlib.md5(str(cluster_id).encode("utf-8")).hexdigest()
+    idx = int(h, 16) % len(palette)
+    return palette[idx]
 
 
 
