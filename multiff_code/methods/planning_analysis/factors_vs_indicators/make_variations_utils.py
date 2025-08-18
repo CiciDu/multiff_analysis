@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import os
 import contextlib
+import logging
 
 
 def make_regrouped_info(test_df,
@@ -143,6 +144,8 @@ def make_all_median_info_from_test_and_ctrl_heading_info_df(test_heading_info_df
         test_heading_info_df)
     ctrl_heading_info_df = build_factor_comp.process_heading_info_df(
         ctrl_heading_info_df)
+    
+    logging.info(f'Make all median info from test and ctrl heading info df, based on various combinations of factors...')
     all_median_info = make_regrouped_info(test_heading_info_df,
                                           ctrl_heading_info_df,
                                           make_temp_median_info_func,

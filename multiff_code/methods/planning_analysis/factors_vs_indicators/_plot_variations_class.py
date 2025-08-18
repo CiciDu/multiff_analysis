@@ -19,11 +19,15 @@ class _PlotVariations:
                                             columns_to_find_unique_combinations_for_line=[],
                                             add_error_bars=False,
                                             use_subplots_based_on_changeable_variables=False,
+                                            all_median_info_heading=None,
                                             ):
 
         se_column = 'diff_in_abs_angle_to_nxt_ff_boot_med_std' if add_error_bars else None
+        
+        if all_median_info_heading is None:
+            all_median_info_heading = self.all_median_info_heading
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(self.all_median_info_heading,
+        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_median_info_heading,
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
@@ -62,6 +66,7 @@ class _PlotVariations:
                                                                                         use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
 
     def plot_heading_in_overall_median_info_across_monkeys_and_arc_types(self,
+                                                                         all_median_info_heading=None,
                                                                          x_var_column_list=[
                                                                              'opt_arc_type'],
                                                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
@@ -81,7 +86,8 @@ class _PlotVariations:
                                                  columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
                                                  columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
                                                  add_error_bars=True,
-                                                 use_subplots_based_on_changeable_variables=True)
+                                                 use_subplots_based_on_changeable_variables=True,
+                                                 all_median_info_heading=all_median_info_heading)
 
     def plot_curv_in_overall_median_info_across_monkeys_and_arc_types(self,
                                                                       x_var_column_list=[
