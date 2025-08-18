@@ -225,7 +225,8 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         self.stops_near_ff_row = self.stops_near_ff_df[self.stops_near_ff_df['stop_point_index']
                                                        == self.stop_point_index].iloc[0]
         if len(self.stops_near_ff_row) == 0:
-            raise ValueError('self.stop_point_index is not in self.stops_near_ff_df')
+            raise ValueError(
+                'self.stop_point_index is not in self.stops_near_ff_df')
         self.curv_of_traj_in_duration = curv_of_traj_utils.find_curv_of_traj_in_duration(
             self.curv_of_traj_df, self.current_plotly_key_comp['duration_to_plot'])
         self.curv_of_traj_in_duration['rel_time'] = np.round(
@@ -458,19 +459,22 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
         """
         Update stop indices to visualize:
         - 'show_stop_point_indices': all stop points (speed==0) OR just the capture pair when that's the only thing shown
-        - 'show_capture_stop_point_indices': the specific two indices around the fast–forward (capture) event
+        - 'show_cur_and_nxt_stops_indices': the specific two indices around the fast–forward (capture) event
+        - 'show_capture_stops_indices': all capture points
 
         Expects:
         - trajectory_df has columns ['monkey_speeddummy', 'point_index']
         - self.stops_near_ff_row has attributes stop_point_index, next_stop_point_index (when used)
         """
         params = self.monkey_plot_params
-        show_stops = bool(params.get('show_stops'))
-        show_capture = bool(params.get('show_cur_and_nxt_stops'))
+        show_stops = bool(params.get('show_stops', False))
+        show_capture = bool(params.get('show_cur_and_nxt_stops', False))
+        show_capture_stops = bool(params.get('show_capture_stops', False))
 
         # Defaults
         stop_indices = None
-        capture_indices = None
+        cur_and_nxt_stop_indices = None
+        capture_stop_indices = None
 
         # Helper to compute the two capture indices safely
         def _capture_pair():
@@ -493,14 +497,20 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
                 .astype(int)
                 .to_numpy()
             )
+            
+        if show_capture_stops:
+            capture_df = self.closest_stop_to_capture_df
+            capture_stop_indices = capture_df[capture_df['time'].between(
+                self.current_plotly_key_comp['duration_to_plot'][0], self.current_plotly_key_comp['duration_to_plot'][1])]['point_index'].values
 
         # Specific capture pair
         if show_capture:
-            capture_indices = _capture_pair()
+            cur_and_nxt_stop_indices = _capture_pair()
 
         # Write back
         params['show_stop_point_indices'] = stop_indices
-        params['show_capture_stop_point_indices'] = capture_indices
+        params['show_cur_and_nxt_stops_indices'] = cur_and_nxt_stop_indices
+        params['show_capture_stops_indices'] = capture_stop_indices
 
 # def _update_eye_positions_based_on_monkey_hoverdata(fig, point_index_to_show_traj_curv, current_plotly_key_comp, show_eye_positions_for_both_eyes=False):
 #     current_plotly_key_comp_2 = copy.deepcopy(current_plotly_key_comp)

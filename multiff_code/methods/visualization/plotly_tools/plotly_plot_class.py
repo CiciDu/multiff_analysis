@@ -29,6 +29,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "show_visible_segments": True,
         "show_stops": False,
         "show_cur_and_nxt_stops": True,
+        "show_capture_stops": True,
         "show_all_eye_positions": False,
         "show_current_eye_positions": True,
         "show_eye_positions_for_both_eyes": False,
@@ -42,7 +43,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "show_extended_traj_arc": False,
         "show_traj_color_as_speed": True,
         "show_stop_point_indices": None,
-        "show_capture_stop_point_indices": None,
+        "show_cur_and_nxt_stops_indices": None,
         "hoverdata_multi_columns": ['rel_time'],
         "eye_positions_trace_name": 'eye_positions',
         "use_arrow_to_show_eye_positions": False,
@@ -88,7 +89,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                                                   unique_ff_indices=None,
                                                                                                   varying_colors=varying_colors)
 
-
         if m_params['show_reward_boundary']:
             self.fig = plotly_for_monkey.plot_reward_boundary_in_plotly(
                 self.fig, self.current_plotly_key_comp['ff_df'])
@@ -109,7 +109,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                       trace_name=m_params['eye_positions_trace_name'],
                                                                       use_arrow_to_show_eye_positions=m_params['use_arrow_to_show_eye_positions'])
 
-
         if m_params['show_cur_ff']:
             self._show_cur_ff()
 
@@ -122,9 +121,14 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
-        if m_params['show_cur_and_nxt_stops'] | (m_params['show_capture_stop_point_indices'] is not None):
-            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_capture_stop_point_indices'],
-                                                              hoverdata_multi_columns=m_params['hoverdata_multi_columns'], is_capture_stops=True)
+        if m_params['show_cur_and_nxt_stops'] | (m_params['show_cur_and_nxt_stops_indices'] is not None):
+            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_cur_and_nxt_stops_indices'],
+                                                              hoverdata_multi_columns=m_params['hoverdata_multi_columns'], name='cur_and_nxt_stops', color='red')
+
+
+        if m_params['show_capture_stops']:
+            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_capture_stops_indices'],
+                                                              hoverdata_multi_columns=m_params['hoverdata_multi_columns'], name='capture_stops', color="#D2691E")
 
         self.fig = plotly_for_monkey.update_layout_and_x_and_y_limit(self.fig, self.current_plotly_key_comp,
                                                                      m_params['show_current_eye_positions'] or m_params['show_all_eye_positions'])

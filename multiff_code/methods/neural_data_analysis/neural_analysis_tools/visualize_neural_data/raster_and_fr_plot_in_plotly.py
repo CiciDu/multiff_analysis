@@ -4,12 +4,16 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.colors as pc
+import colorsys
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, get_colors_utils
 from visualization.plotly_tools import plotly_for_time_series
 from visualization.plotly_tools.plotly_for_time_series import plot_blocks_to_show_ff_visible_segments_in_fig_time_series
 from visualization.plotly_tools import plotly_plot_class
+
+
+
 
 
 def create_firing_rate_plot_for_one_duration_in_plotly(
@@ -41,7 +45,7 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
         logging.warning("Prepared firing rate DataFrame missing expected columns.")
         return go.Figure()
 
-    colors = _get_colors(len(selected_cluster_cols))
+    colors = get_colors_utils._get_colors(len(selected_cluster_cols))
     fig = go.Figure()
 
     for i, cluster_col in enumerate(selected_cluster_cols):
@@ -52,7 +56,7 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
                 mode='lines',
                 name=f'Cluster {selected_clusters[i]}',
                 line=dict(color=colors[i], width=1.5, shape='linear'),
-                opacity=0.7,
+                opacity=0.8,
                 customdata=[selected_clusters[i]] * len(fr_df),
                 hovertemplate='<b>Cluster %{customdata}</b><br>'
                               'Time: %{x:.3f}s<br>'
@@ -67,7 +71,7 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
             mode='lines',
             name='Population Mean',
             line=dict(color='#d62728', width=3, dash='solid'),
-            opacity=0.8,
+            opacity=0.9,
             hovertemplate='<b>Population Mean</b><br>'
                           'Time: %{x:.3f}s<br>'
                           'Firing Rate: %{y:.2f} Hz<extra></extra>'
@@ -97,7 +101,7 @@ def create_raster_plot_for_one_duration_in_plotly(
     filtered_spikes = filtered_spikes.copy()
     filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - reference_time
 
-    colors = _get_colors(len(selected_clusters))
+    colors = get_colors_utils._get_colors(len(selected_clusters))
     fig = go.Figure()
 
     for i, cluster_id in enumerate(selected_clusters):
@@ -130,11 +134,7 @@ def create_raster_plot_for_one_duration_in_plotly(
     return fig
 
 
-def _get_colors(num_colors):
-    if num_colors <= 12:
-        return pc.qualitative.Set3[:num_colors]
-    else:
-        return [f'hsl({i * 360 / num_colors}, 70%, 50%)' for i in range(num_colors)]
+
 
 def _add_reference_lines(fig, y_min, y_max, rel_hover_time=None):
     _add_vertical_line(fig, 0, y_min, y_max,
