@@ -5,13 +5,11 @@ from visualization.matplotlib_tools import plot_behaviors_utils
 from null_behaviors import curvature_utils
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-from numpy import linalg as LA
 import math
 
 plt.rcParams["animation.html"] = "html5"

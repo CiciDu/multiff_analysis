@@ -1,18 +1,11 @@
-import sys
-from tkinter import font
 
 from visualization.matplotlib_tools import plot_behaviors_utils
-from visualization.animation import animation_func, animation_utils
-from null_behaviors import show_null_trajectory, find_best_arc
+from visualization.animation import animation_utils
 
 
 import os
-import sys
 import numpy as np
-import matplotlib.pyplot as plt
 from math import pi
-from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 retrieve_buffer = False
 n_steps = 1000
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

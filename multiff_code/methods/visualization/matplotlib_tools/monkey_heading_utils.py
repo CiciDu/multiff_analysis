@@ -1,28 +1,17 @@
 
-import sys
-from data_wrangling import specific_utils
-from visualization.animation import animation_func, animation_utils
-from null_behaviors import curvature_utils, curv_of_traj_utils
-from decision_making_analysis.decision_making import decision_making_utils
-from decision_making_analysis.GUAT import GUAT_and_TAFT
+from visualization.animation import animation_utils
 from decision_making_analysis import trajectory_info
-from visualization.plotly_tools import plotly_for_monkey
 
 import numpy as np
 import math
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-from math import pi
-from numpy import linalg as LA
 import math
-from math import pi
 import seaborn as sns
-import plotly.graph_objects as go
 
 
 plt.rcParams["animation.html"] = "html5"

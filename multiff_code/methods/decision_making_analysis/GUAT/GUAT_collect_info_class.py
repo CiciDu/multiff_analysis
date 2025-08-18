@@ -4,7 +4,6 @@ from null_behaviors import curvature_utils
 from data_wrangling import base_processing_class
 
 import os
-import sys
 import copy
 import numpy as np
 import matplotlib

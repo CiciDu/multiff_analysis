@@ -1,13 +1,8 @@
-import sys
-from planning_analysis.agent_analysis import agent_plan_factors_x_sess_class
 import os
-import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 from os.path import exists
-import time as time_package
 import math
-import csv
 import json
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False

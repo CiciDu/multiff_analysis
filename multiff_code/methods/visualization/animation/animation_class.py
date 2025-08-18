@@ -1,14 +1,9 @@
-from data_wrangling import specific_utils, base_processing_class, further_processing_class
-from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
-from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
+from data_wrangling import specific_utils, further_processing_class
+from visualization.matplotlib_tools import plot_trials
 from visualization.animation import animation_utils, animation_func
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
-from decision_making_analysis.GUAT import GUAT_utils
-from data_wrangling import specific_utils, process_monkey_information
-from pattern_discovery import pattern_by_points
+from data_wrangling import specific_utils
 
 import os
-import sys
 import os
 import os.path
 import pandas as pd

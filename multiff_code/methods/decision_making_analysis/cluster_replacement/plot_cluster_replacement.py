@@ -1,8 +1,6 @@
-import sys
 from decision_making_analysis.decision_making import plot_decision_making
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

@@ -6,7 +6,6 @@ import sys
 from math import pi
 import matplotlib.pyplot as plt
 import pandas as pd
-from numpy import linalg as LA
 from contextlib import contextmanager
 from os.path import exists
 import logging

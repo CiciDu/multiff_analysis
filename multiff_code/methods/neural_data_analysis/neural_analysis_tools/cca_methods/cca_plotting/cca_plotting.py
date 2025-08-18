@@ -1,38 +1,17 @@
-import sys
-from data_wrangling import process_monkey_information, specific_utils, further_processing_class
-from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_monkey_data, prep_monkey_data, prep_target_data
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils, ml_plotting_utils
-import os
-import sys
+from machine_learning.ml_methods import ml_plotting_utils
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import seaborn as sns
 import logging
-from matplotlib import rc
-from os.path import exists
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from sklearn.cross_decomposition import CCA
-import rcca
-from sklearn.preprocessing import StandardScaler
-import matplotlib.gridspec as gridspec
 from scipy.stats import pearsonr
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.linear_model import Ridge, Lasso, ElasticNet, RidgeCV, LassoCV, ElasticNetCV
-from sklearn.metrics import r2_score
 import colorcet
 
 
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-from sklearn.cluster import AgglomerativeClustering
 
 
 def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X',

@@ -1,4 +1,3 @@
-import sys
 from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
 from decision_making_analysis import free_selection
 from data_wrangling import specific_utils
@@ -8,7 +7,6 @@ from data_wrangling import specific_utils, general_utils
 
 
 import os
-import sys
 from math import pi
 import os
 import os.path
@@ -19,7 +17,6 @@ from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
 from math import pi
-from numpy import linalg as LA
 import seaborn as sns
 
 

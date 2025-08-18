@@ -1,19 +1,10 @@
 
 from data_wrangling import specific_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils, find_cvn_utils
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from null_behaviors import curv_of_traj_utils, curvature_utils
 
-import seaborn as sns
-import statsmodels.api as sm
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from itertools import product
-import plotly.graph_objects as go
-import plotly.express as px
 import math
-import os
-import sys
 
 
 def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,

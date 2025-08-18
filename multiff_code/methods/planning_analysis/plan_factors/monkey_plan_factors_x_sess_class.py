@@ -5,7 +5,6 @@ from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.factors_vs_indicators import _variations_base_class
 from data_wrangling import specific_utils, combine_info_utils, base_processing_class
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

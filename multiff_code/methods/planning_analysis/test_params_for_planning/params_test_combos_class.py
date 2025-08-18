@@ -1,4 +1,3 @@
-import sys
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from planning_analysis.test_params_for_planning import params_utils
 from visualization.dash_tools import dash_prep_class

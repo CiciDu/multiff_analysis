@@ -1,22 +1,17 @@
 
-import sys
 from data_wrangling import specific_utils
-from visualization.animation import animation_func, animation_utils
-from null_behaviors import curvature_utils, curv_of_traj_utils
+from null_behaviors import curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT
 
 import numpy as np
 import math
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-from math import pi
-from numpy import linalg as LA
 import math
 import pickle
 

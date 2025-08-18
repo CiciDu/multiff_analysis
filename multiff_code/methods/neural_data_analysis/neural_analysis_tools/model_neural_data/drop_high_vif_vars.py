@@ -1,27 +1,14 @@
-import sys
-from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, drop_high_corr_vars
+from neural_data_analysis.neural_analysis_tools.model_neural_data import drop_high_corr_vars
 import os
-import sys
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 import pandas as pd
-import math
-import seaborn as sns
-import logging
-from matplotlib import rc
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import r2_score
-from scipy.stats import linregress
-import statsmodels.api as sm
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.preprocessing import StandardScaler
 from os.path import exists
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 
-import re
 
 
 def drop_columns_with_high_vif(y_var_lags, vif_threshold=5, vif_threshold_for_initial_subset=5, verbose=True,

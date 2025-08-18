@@ -1,45 +1,11 @@
-import sys
-from machine_learning.ml_methods import ml_methods_class
 import pandas as pd
-from plotly.subplots import make_subplots
-import plotly.graph_objs as go
-import pprint
-from scipy import stats
-import torch
-import torch.optim as optim
-import torch.nn as nn
-from sklearn.metrics import accuracy_score
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.model_selection import cross_validate
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier, BaggingClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import mean_squared_error
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
-from sklearn.metrics import r2_score
-import math
-from sklearn.metrics import make_scorer
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
-from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
-from sklearn.linear_model import Lasso, LogisticRegression
-from sklearn.model_selection import KFold, train_test_split
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd

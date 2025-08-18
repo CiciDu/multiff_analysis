@@ -1,5 +1,4 @@
 
-import sys
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from dash import html, dcc
 import pandas as pd

@@ -1,15 +1,10 @@
-from scipy import stats
 import math
 import pandas as pd
-import sys
 from decision_making_analysis import trajectory_info
-from null_behaviors import find_best_arc, curv_of_traj_utils, opt_arc_utils
-from planning_analysis.show_planning import show_planning_utils
+from null_behaviors import opt_arc_utils
 from scipy.stats import rankdata
 
 import os
-import sys
-import warnings
 import numpy as np
 from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

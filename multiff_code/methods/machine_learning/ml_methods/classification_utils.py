@@ -18,7 +18,7 @@ from sklearn.model_selection import cross_val_score
 import statsmodels.api as sm
 from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import RidgeClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import ExtraTreesClassifier

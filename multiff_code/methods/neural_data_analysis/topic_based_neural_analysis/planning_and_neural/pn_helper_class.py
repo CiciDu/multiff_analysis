@@ -1,17 +1,14 @@
-import sys
-from data_wrangling import process_monkey_information, specific_utils, general_utils
+from data_wrangling import specific_utils
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from null_behaviors import curvature_utils
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, neural_vs_behavioral_class
-from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars, base_neural_class
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
+from neural_data_analysis.neural_analysis_tools.model_neural_data import base_neural_class
+from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.show_planning import show_planning_utils
 import numpy as np
 import pandas as pd
 import os
-import sys
 
 
 class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):

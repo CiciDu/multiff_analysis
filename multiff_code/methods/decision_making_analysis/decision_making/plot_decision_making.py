@@ -1,14 +1,10 @@
 
-import sys
-from decision_making_analysis import trajectory_info
 from visualization.matplotlib_tools import plot_behaviors_utils, monkey_heading_utils
 from null_behaviors import show_null_trajectory
 
 
 import os
-import sys
 import numpy as np
-import seaborn as sns
 import matplotlib
 from matplotlib import rc, cm
 import matplotlib.pyplot as plt

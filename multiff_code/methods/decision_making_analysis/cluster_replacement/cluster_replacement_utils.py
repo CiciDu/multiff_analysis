@@ -1,18 +1,14 @@
-import sys
 from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT
 from decision_making_analysis import free_selection, replacement, trajectory_info
-from data_wrangling import specific_utils
 from pattern_discovery import cluster_analysis
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-import math
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

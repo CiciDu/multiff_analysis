@@ -2,7 +2,6 @@ from decision_making_analysis.GUAT import GUAT_and_TAFT
 from data_wrangling import specific_utils
 
 import os
-import sys
 from os.path import exists
 import pandas as pd
 import gc

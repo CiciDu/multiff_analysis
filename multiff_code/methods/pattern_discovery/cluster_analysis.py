@@ -1,15 +1,10 @@
-import sys
 from visualization.matplotlib_tools import plot_behaviors_utils
-from pattern_discovery import ff_dataframe_utils
 from data_wrangling import specific_utils
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features
 
 import os
-import sys
 import numpy as np
 import pandas as pd
 import math
-from numpy import linalg as LA
 from scipy.cluster.hierarchy import linkage
 from sklearn.cluster import AgglomerativeClustering
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

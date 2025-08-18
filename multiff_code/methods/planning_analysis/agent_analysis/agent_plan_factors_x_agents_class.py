@@ -1,21 +1,10 @@
-import sys
-from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class, find_cvn_utils
-from planning_analysis.show_planning import show_planning_class
-from planning_analysis.plan_factors import plan_factors_class, monkey_plan_factors_x_sess_class
-from planning_analysis.factors_vs_indicators import make_variations_utils, plot_variations_utils, process_variations_utils
-from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_class, agent_plan_factors_x_sess_class
-from planning_analysis.factors_vs_indicators import make_variations_utils, _variations_base_class
-from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_utils
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from planning_analysis.factors_vs_indicators import plot_variations_utils, process_variations_utils
+from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
+from machine_learning.RL.SB3 import rl_for_multiff_utils
 
-from data_wrangling import specific_utils, combine_info_utils
-from data_wrangling import specific_utils
 import pandas as pd
 import os
-import sys
-import matplotlib.pyplot as plt
-import warnings
-import gc
-from os.path import exists
 
 
 class PlanFactorsAcrossAgents():

@@ -1,13 +1,9 @@
-import os
 import logging
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
-import plotly.colors as pc
-import colorsys
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, get_colors_utils
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import get_colors_utils
 from visualization.plotly_tools import plotly_for_time_series
 from visualization.plotly_tools.plotly_for_time_series import plot_blocks_to_show_ff_visible_segments_in_fig_time_series
 from visualization.plotly_tools import plotly_plot_class
@@ -18,7 +14,7 @@ from visualization.plotly_tools import plotly_plot_class
 
 def create_firing_rate_plot_for_one_duration_in_plotly(
         spikes_df, reference_time, start_time, end_time,
-        bin_width=0.1, bins_per_aggregate=3,
+        bin_width=0.1, bins_per_aggregate=1,
         max_clusters_to_plot=None, rel_hover_time=None,
         show_visible_segments=False, visible_segments_info=None):
 

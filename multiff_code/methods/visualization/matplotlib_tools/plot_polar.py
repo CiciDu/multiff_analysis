@@ -1,10 +1,8 @@
-import sys
 from data_wrangling import specific_utils
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe
+from pattern_discovery import make_ff_dataframe
 from visualization.matplotlib_tools import plot_behaviors_utils
 
 import os
-import sys
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt

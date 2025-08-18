@@ -1,6 +1,5 @@
-import sys
 from planning_analysis.plan_indicators import diff_in_curv_utils
-from null_behaviors import curvature_utils, curv_of_traj_utils, show_null_trajectory, opt_arc_utils
+from null_behaviors import curvature_utils, curv_of_traj_utils, opt_arc_utils
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_cvn_class, cvn_helper_class
 from planning_analysis.plan_factors import plan_factors_utils
@@ -8,7 +7,6 @@ from visualization.matplotlib_tools import monkey_heading_utils
 from planning_analysis.plan_factors import build_factor_comp
 import pandas as pd
 import os
-import sys
 import copy
 
 

@@ -1,22 +1,12 @@
-from data_wrangling import specific_utils, further_processing_class, general_utils, retrieve_raw_data, time_calib_utils
-from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
-from visualization.matplotlib_tools import plot_behaviors_utils
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
-from decision_making_analysis.GUAT import GUAT_utils
-from data_wrangling import specific_utils, process_monkey_information
-from pattern_discovery import pattern_by_points
+from data_wrangling import further_processing_class, retrieve_raw_data, time_calib_utils
 
 import os
-import sys
 import os
 import os.path
 import pandas as pd
 import numpy as np
-import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-from os.path import exists
 import seaborn as sns
 
 

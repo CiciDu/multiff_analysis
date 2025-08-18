@@ -1,24 +1,17 @@
-import sys
 from data_wrangling import time_calib_utils, retrieve_raw_data, general_utils
-from pattern_discovery import pattern_by_trials, pattern_by_trials
 
 import os
-import sys
 import math
 from math import pi
-import re
 import os
 import os.path
-import neo
 import pandas as pd
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-from numpy import linalg as LA
 from os.path import exists
-from scipy.ndimage import gaussian_filter1d
 from eye_position_analysis import eye_positions
 
 plt.rcParams["animation.html"] = "html5"

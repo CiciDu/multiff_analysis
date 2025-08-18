@@ -1,11 +1,6 @@
-import sys
-from visualization.plotly_tools import plotly_for_monkey, plotly_for_time_series, plotly_for_correlation
-from null_behaviors import curv_of_traj_utils
-from eye_position_analysis import eye_positions
-from null_behaviors import curvature_utils, curv_of_traj_utils
+from null_behaviors import curvature_utils
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
@@ -15,10 +10,6 @@ from dash import html, dcc
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib
-import random
-from dash import Input, Output, State
-from dash.exceptions import PreventUpdate
-import copy
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

@@ -1,23 +1,17 @@
-import sys
-from data_wrangling import specific_utils, base_processing_class, combine_info_utils, further_processing_class
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, organize_patterns_and_features, monkey_landing_in_ff
-from visualization.matplotlib_tools import plot_trials, plot_behaviors_utils, plot_statistics, plot_change_over_time
-from visualization.animation import animation_func, animation_utils, animation_class
-from data_wrangling import base_processing_class
+from data_wrangling import combine_info_utils, further_processing_class
+from pattern_discovery import organize_patterns_and_features
+from visualization.matplotlib_tools import plot_statistics, plot_change_over_time
 
 import os
-import sys
 import os
 import os.path
 import pandas as pd
 import numpy as np
 import matplotlib
-from functools import partial
-from matplotlib import rc, animation
+from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
 from os.path import exists
-from functools import partial
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -55,7 +49,6 @@ class PatternsAndFeatures():
             except FileNotFoundError:
                 print('Failed to retrieve combd_pattern_frequencies, combd_feature_statistics, combd_all_trial_features, '
                       'agg_pattern_frequencies, agg_feature_statistics, and combd_scatter_around_target_df. Will make them anew.')
-                pass
 
         if not verbose:
             # with general_utils.suppress_stdout():

@@ -1,21 +1,12 @@
-from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import planning_and_neural_class, pn_utils
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
 
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib
-import seaborn as sns
-import logging
-import statsmodels.api as sm
 from matplotlib import rc
-import scipy.interpolate as interpolate
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import r2_score
-from scipy.stats import linregress
-import plotly.graph_objects as go
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

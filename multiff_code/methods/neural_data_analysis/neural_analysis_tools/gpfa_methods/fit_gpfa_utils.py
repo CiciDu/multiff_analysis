@@ -1,8 +1,5 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import quantities as pq
-import neo
 
 
 def make_spike_segs_df(spikes_df, new_seg_info):

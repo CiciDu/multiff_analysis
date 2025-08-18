@@ -1,11 +1,9 @@
-import sys
 from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_utils
 from pattern_discovery import cluster_analysis
 from visualization.matplotlib_tools import plot_trials
 
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

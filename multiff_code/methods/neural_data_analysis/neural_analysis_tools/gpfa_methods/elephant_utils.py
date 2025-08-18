@@ -3,9 +3,6 @@ from scipy.integrate import odeint
 import quantities as pq
 import neo
 from elephant.spike_train_generation import inhomogeneous_poisson_process
-from elephant.gpfa import GPFA
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from scipy.integrate import odeint
 import quantities as pq

@@ -1,5 +1,4 @@
 
-import sys
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
 from planning_analysis.factors_vs_indicators import make_variations_utils
@@ -9,7 +8,6 @@ from data_wrangling import combine_info_utils, base_processing_class
 
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

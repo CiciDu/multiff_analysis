@@ -1,11 +1,10 @@
 from decision_making_analysis.cluster_replacement import cluster_replacement_utils
 from decision_making_analysis import free_selection, trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
-from decision_making_analysis.decision_making import decision_making_utils, decision_making_class, plot_decision_making
+from decision_making_analysis.decision_making import decision_making_class, plot_decision_making
 from decision_making_analysis.cluster_replacement import plot_cluster_replacement
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

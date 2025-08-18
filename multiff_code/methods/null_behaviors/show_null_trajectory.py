@@ -2,22 +2,19 @@
 from matplotlib import cm
 import math
 import pandas as pd
-import sys
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
-from visualization.animation import animation_func, animation_utils
+from visualization.animation import animation_utils
 from null_behaviors import find_best_arc, curvature_utils, opt_arc_utils
 from pattern_discovery import ff_dataframe_utils
 
 import os
-import sys
 import warnings
 import numpy as np
 import numbers
 from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
 import matplotlib
-from numpy import linalg as LA
 from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 

@@ -1,12 +1,6 @@
-import sys
-from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
-from decision_making_analysis import free_selection, replacement
-from data_wrangling import specific_utils
-from pattern_discovery import cluster_analysis
 from visualization.plotly_polar_tools import plotly_for_trajectory_polar
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

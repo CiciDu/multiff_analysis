@@ -1,14 +1,11 @@
 
-import plotly.graph_objects as go
 import plotly.express as px
 import seaborn as sns
-import sys
 from visualization.matplotlib_tools import plot_behaviors_utils, plot_trials
 from null_behaviors import show_null_trajectory
 from pattern_discovery import ff_dataframe_utils
 
 import os
-import sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt

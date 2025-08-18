@@ -1,12 +1,8 @@
-import sys
 from visualization.dash_tools import dash_utils
 from visualization.dash_tools.dash_main_class_methods import dash_main_helper_class
 from visualization.dash_tools.dash_config import DEFAULT_PORT, DEFAULT_EXTERNAL_STYLESHEETS
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_and_fr_plot_in_plotly
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
@@ -15,10 +11,8 @@ import pandas as pd
 from dash import Dash, html, Input, State, Output, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
-import logging
 
 # Import neural data visualization tools
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_plot, plot_neural_data
 
 # Import shared configuration
 from visualization.dash_tools.dash_config import configure_plotting_environment

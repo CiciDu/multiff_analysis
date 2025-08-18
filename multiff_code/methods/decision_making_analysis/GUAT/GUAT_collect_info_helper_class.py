@@ -3,10 +3,8 @@ from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_helper_class, GUAT_utils
 from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
-from data_wrangling import further_processing_class
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

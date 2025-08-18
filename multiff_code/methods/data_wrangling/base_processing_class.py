@@ -1,6 +1,5 @@
 from data_wrangling import specific_utils, process_monkey_information, retrieve_raw_data, time_calib_utils
 from pattern_discovery import make_ff_dataframe
-from eye_position_analysis import eye_positions
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.test_params_for_planning import params_utils
 from planning_analysis.show_planning import nxt_ff_utils
@@ -8,7 +7,6 @@ from pattern_discovery import cluster_analysis
 
 
 import os
-import sys
 import os
 import os.path
 import pandas as pd
@@ -280,10 +278,11 @@ class BaseProcessing:
                                                                                                  exists_ok=exists_ok, save_data=save_data, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
         return
 
-    def get_more_monkey_data(self, exists_ok=True):
-        self.make_or_retrieve_ff_dataframe(
-            exists_ok=exists_ok, to_furnish_ff_dataframe=False)
-        self.crudely_furnish_ff_dataframe()
+    def get_more_monkey_data(self, exists_ok=True, already_made_ok=True):
+        if (not already_made_ok) | (getattr(self, 'ff_dataframe', None) is None):
+            self.make_or_retrieve_ff_dataframe(
+                exists_ok=exists_ok, to_furnish_ff_dataframe=False)
+            self.crudely_furnish_ff_dataframe()
         # self.find_patterns()
         self.cluster_around_target_indices = None
         self.make_PlotTrials_args()

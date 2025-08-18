@@ -1,11 +1,8 @@
-import sys
-from tkinter import NO
 
 from visualization.matplotlib_tools import plot_behaviors_utils
 from null_behaviors import show_null_trajectory, find_best_arc
 from matplotlib.lines import Line2D
 import os
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt

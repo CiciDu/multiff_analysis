@@ -1,18 +1,8 @@
-import select
-import sys
-from turtle import fillcolor
 
-from data_wrangling import specific_utils
-from visualization.matplotlib_tools import plot_behaviors_utils, monkey_heading_utils
-from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils
-from decision_making_analysis.decision_making import plot_decision_making
-from visualization.plotly_tools import plotly_preparation, plotly_for_monkey
-from decision_making_analysis import trajectory_info
+from visualization.matplotlib_tools import plot_behaviors_utils
 from eye_position_analysis import eye_positions
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
@@ -20,9 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import seaborn as sns
 import matplotlib.colors as mcolors
-import logging
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

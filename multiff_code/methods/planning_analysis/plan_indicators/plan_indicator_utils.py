@@ -1,25 +1,14 @@
 
 from data_wrangling import specific_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils, find_cvn_utils
-from null_behaviors import curv_of_traj_utils, curvature_utils
 from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-from planning_analysis.plan_indicators import diff_in_curv_utils
-from planning_analysis.plan_indicators import plan_indicator_utils
 
 
 
 import seaborn as sns
-import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from itertools import product
-import plotly.graph_objects as go
-import plotly.express as px
-import math
-import os
-import sys
 from scipy.stats import mannwhitneyu
 
 import numpy as np

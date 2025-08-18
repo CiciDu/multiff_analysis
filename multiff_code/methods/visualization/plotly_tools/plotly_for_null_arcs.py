@@ -1,28 +1,17 @@
-import sys
-from turtle import fillcolor
 
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_behaviors_utils
-from null_behaviors import show_null_trajectory, curvature_utils, find_best_arc
-from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils
-from decision_making_analysis.decision_making import plot_decision_making
-from visualization.plotly_tools import plotly_preparation, plotly_for_monkey
-from decision_making_analysis import trajectory_info
-from pattern_discovery import make_ff_dataframe
+from null_behaviors import show_null_trajectory, curvature_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
-import seaborn as sns
 from math import pi
-from numpy import linalg as LA
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

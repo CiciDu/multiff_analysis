@@ -1,23 +1,14 @@
-from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result, find_tuning_curves, raster_plot, trial_aligned_tuning_curves
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import find_tuning_curves
 
 
-import sys
 import os
-import sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
-import math
-import seaborn as sns
-import logging
-import statsmodels.api as sm
 from matplotlib import rc
-import scipy.interpolate as interpolate
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from scipy.stats import linregress
 from sklearn.linear_model import LinearRegression
 
 plt.rcParams["animation.html"] = "html5"

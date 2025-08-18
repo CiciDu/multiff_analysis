@@ -1,4 +1,3 @@
-import sys
 from data_wrangling import specific_utils
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
@@ -8,8 +7,6 @@ from null_behaviors import curvature_utils, curv_of_traj_utils, opt_arc_utils
 import numpy as np
 import pandas as pd
 import math
-import statsmodels.api as sm
-from sklearn.preprocessing import StandardScaler
 import copy
 from null_behaviors import curv_of_traj_utils
 import numpy as np

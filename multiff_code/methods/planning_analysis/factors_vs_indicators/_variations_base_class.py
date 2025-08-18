@@ -4,7 +4,6 @@ from planning_analysis.factors_vs_indicators import make_variations_utils, _pred
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

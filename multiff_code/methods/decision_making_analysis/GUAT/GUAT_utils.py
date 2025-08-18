@@ -1,7 +1,6 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

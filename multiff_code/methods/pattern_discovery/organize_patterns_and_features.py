@@ -2,10 +2,9 @@ from data_wrangling import specific_utils, general_utils
 from pattern_discovery import pattern_by_trials
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from pattern_discovery import pattern_by_trials, cluster_analysis
-from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
+from planning_analysis.show_planning import nxt_ff_utils
 
 import os
-import sys
 import numpy as np
 import pandas as pd
 from datetime import datetime

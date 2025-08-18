@@ -1,18 +1,15 @@
 
-import sys
 from data_wrangling import specific_utils
 from null_behaviors import curvature_utils, curv_of_traj_utils
 import math
 
 import os
-import sys
 import torch
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
-from numpy import linalg as LA
 import warnings
 
 plt.rcParams["animation.html"] = "html5"

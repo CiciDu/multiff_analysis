@@ -1,10 +1,7 @@
-import sys
 from data_wrangling import specific_utils, general_utils
-from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning import examine_null_arcs, nxt_ff_utils
+from planning_analysis.show_planning import examine_null_arcs
 
 import os
-import sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -13,8 +10,6 @@ import pandas as pd
 from matplotlib import rc
 from math import pi
 import os
-import sys
-import sys
 import math
 
 plt.rcParams["animation.html"] = "html5"
@@ -83,14 +78,19 @@ def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
                                ff_real_position_sorted,
                                starting_trial=0,
                                max_trials=100,
-                               reward_boundary_radius=25):
+                               reward_boundary_radius=25,
+                               ax=None,
+                               color='blue',
+                               plot_path_to_landing=True,
+                               show_plot=True):
 
     # for each point_index & corresponding ff_index, find the point where monkey first enters the reward boundary
     # then make a polar plot, using that entry point as the reference, and let the ff center to be to the north
     # then plot the monkey's trajectory into the circle
 
     trial_counter = 1
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
 
     for index, row in closest_stop_to_capture_df.iloc[starting_trial:].iterrows():
         # point_index = int(row.point_index)
@@ -106,23 +106,28 @@ def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
         mxy_rotated, x0, y0 = find_mxy_rotated_w_ff_center_to_the_north(
             monkey_sub, ff_center=ff_real_position_sorted[int(row.cur_ff_index)], reward_boundary_radius=reward_boundary_radius)
 
-        ax = examine_null_arcs.show_xy_overlapped(ax, mxy_rotated, x0, y0)
+        ax = examine_null_arcs.show_xy_overlapped(ax, mxy_rotated, x0, y0, color=color, plot_path_to_landing=plot_path_to_landing)
 
         if trial_counter > max_trials:
             break
         trial_counter += 1
 
     # plot the ff center
-    ax.plot(0, 0, 'r*', markersize=10)
+    ax.plot(0, 0, '*', markersize=10, color='brown')
+    
+    # show the reward boundary
     ax = examine_null_arcs._make_a_circle_to_show_reward_boundary(
-        ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=True)
+        ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=True, color='purple')
 
     # also plot the visible boundary
     ax = examine_null_arcs._make_a_circle_to_show_reward_boundary(
         ax, reward_boundary_radius=10, set_xy_limit=False, color='g')
 
-    plt.show()
-    return
+    if show_plot:
+        plt.show()
+        return
+    else:
+        return ax
 
 
 def add_distance_from_ff_to_stop(closest_stop_to_capture_df, monkey_information, ff_real_position_sorted):
@@ -263,3 +268,6 @@ def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df
             scatter_around_target_df, 'scatter_around_target_df', data_folder_name)
 
     return scatter_around_target_df
+
+
+

@@ -1,4 +1,3 @@
-import sys
 from machine_learning.RL.lstm import LSTM_functions
 import torch
 import numpy as np

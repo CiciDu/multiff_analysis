@@ -1,8 +1,6 @@
 
 from planning_analysis.factors_vs_indicators import plot_variations_utils
 
-import os
-import sys
 
 
 class _PlotVariations:

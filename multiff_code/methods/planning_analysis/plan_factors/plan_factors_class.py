@@ -1,16 +1,11 @@
 from machine_learning.ml_methods import ml_methods_class, prep_ml_data_utils
-from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp, test_vs_control_utils
-from null_behaviors import curvature_utils
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
 from data_wrangling import base_processing_class, general_utils
 from planning_analysis.plan_factors import plan_factors_helper_class
 import pandas as pd
 import os
-import sys
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 
 

@@ -1,14 +1,6 @@
-import sys
-from null_behaviors import show_null_trajectory
-from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_helper_class, find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
-from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
-from visualization.matplotlib_tools import plot_behaviors_utils
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_cvn_utils, plot_monkey_heading_helper_class
 from visualization import base_plot_class
-from matplotlib.lines import Line2D
-import numpy as np
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
 
 
 class MatplotlibPlotter(base_plot_class.BasePlotter):

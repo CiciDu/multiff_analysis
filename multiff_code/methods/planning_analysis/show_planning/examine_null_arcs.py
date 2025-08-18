@@ -1,20 +1,14 @@
-import sys
-from data_wrangling import specific_utils
 from null_behaviors import show_null_trajectory
+from data_wrangling import general_utils
 
 import os
-import sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib import rc
-from math import pi
 import os
-import sys
-import sys
-import math
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -122,32 +116,33 @@ def plot_null_arc_ends_in_ff(null_arc_info,
         trial_counter += 1
 
     ax = _make_a_circle_to_show_reward_boundary(
-        ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=(not include_arc_portion_before_entering_ff))
+        ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=(not include_arc_portion_before_entering_ff), circle_center=(0, 25))
 
     plt.show()
     return
 
 
-def _make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=25, set_xy_limit=True, color='b'):
+def _make_a_circle_to_show_reward_boundary(ax, reward_boundary_radius=25, set_xy_limit=True, color='b', circle_center=(0, 0)):
     # plot a circle with radius reward_boundary_radius that centers at (0, reward_boundary_radius)
-    circle = plt.Circle((0, 0), reward_boundary_radius,
+    circle = plt.Circle(circle_center, reward_boundary_radius,
                         color=color, fill=False)
     ax.add_artist(circle)
     ax.set_aspect('equal')
 
     if set_xy_limit:
-        ax.set_xlim(-reward_boundary_radius, reward_boundary_radius)
-        ax.set_ylim(-reward_boundary_radius, reward_boundary_radius)
+        ax.set_xlim(circle_center[0]-reward_boundary_radius, circle_center[0]+reward_boundary_radius)
+        ax.set_ylim(circle_center[1]-reward_boundary_radius, circle_center[1]+reward_boundary_radius)
     return ax
 
 
-def show_xy_overlapped(ax, mxy_rotated, x0, y0):
-    # plot mxy_rotated
-    ax.plot(mxy_rotated[0]-x0, mxy_rotated[1]-y0, alpha=0.5)
-    # also plot individual dots on the lines
-    ax.plot(mxy_rotated[0]-x0, mxy_rotated[1] -
-            y0, 'ro', markersize=2, alpha=0.3)
-    # plot the ending point of the monkey's trajectory
+def show_xy_overlapped(ax, mxy_rotated, x0, y0, color='blue', plot_path_to_landing=True):
+    if plot_path_to_landing:
+        # plot paths to landing
+        ax.plot(mxy_rotated[0]-x0, mxy_rotated[1]-y0, alpha=0.2, color=color, linewidth=1)
+        # # also plot individual points on the paths
+        # ax.plot(mxy_rotated[0]-x0, mxy_rotated[1] -
+        #         y0, 'o', markersize=1, alpha=0.2, color=color)
+        # plot the ending point of the monkey's trajectory
     ax.plot(mxy_rotated[0, -1]-x0, mxy_rotated[1, -1] -
-            y0, 'ro', markersize=3, alpha=0.3)
+            y0, 'o', markersize=3, alpha=0.5, color=color)
     return ax

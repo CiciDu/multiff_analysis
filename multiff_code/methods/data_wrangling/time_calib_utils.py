@@ -1,15 +1,9 @@
 from data_wrangling import process_monkey_information, retrieve_raw_data
 
-import sys
 import os
-import sys
 import numpy as np
-import sys
-from math import pi
 import matplotlib.pyplot as plt
 import pandas as pd
-from numpy import linalg as LA
-from contextlib import contextmanager
 from os.path import exists
 import numpy as np
 import matplotlib.pyplot as plt

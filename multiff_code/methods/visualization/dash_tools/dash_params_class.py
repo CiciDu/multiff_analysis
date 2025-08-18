@@ -1,4 +1,3 @@
-import sys
 from planning_analysis.test_params_for_planning import params_utils, params_test_combos_class
 from visualization.dash_tools import dash_utils
 from dash import Dash, html, Input, Output, ctx, dcc

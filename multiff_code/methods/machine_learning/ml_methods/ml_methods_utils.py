@@ -1,21 +1,8 @@
-from machine_learning.ml_methods import ml_methods_utils, classification_utils, regression_utils
+from machine_learning.ml_methods import classification_utils, regression_utils
 import pandas as pd
-import torch
-import torch.optim as optim
-import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
-from sklearn.metrics import r2_score
-from sklearn.metrics import make_scorer
-from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
-import statsmodels.api as sm
-from scipy.stats import pearsonr
 from sklearn.model_selection import GroupKFold
 import math
 

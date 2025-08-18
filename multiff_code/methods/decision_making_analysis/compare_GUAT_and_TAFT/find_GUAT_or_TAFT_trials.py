@@ -1,7 +1,6 @@
 from decision_making_analysis.GUAT import GUAT_utils
 
 import os
-import sys
 import numpy as np
 import pandas as pd
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

@@ -1,11 +1,8 @@
-import sys
-from data_wrangling import general_utils, specific_utils
+from data_wrangling import general_utils
 from visualization.matplotlib_tools import plot_polar, plot_trials
 from eye_position_analysis import eye_positions
-from pattern_discovery import pattern_by_points
 
 import os
-import sys
 import math
 import seaborn as sns
 import numpy as np
@@ -15,7 +12,6 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.lines import Line2D
 from matplotlib_scalebar.scalebar import ScaleBar
-from numpy import linalg as LA
 from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 

@@ -4,7 +4,6 @@ from planning_analysis.show_planning import show_planning_utils
 from null_behaviors import show_null_trajectory
 
 import os
-import sys
 import warnings
 import numpy as np
 from math import pi

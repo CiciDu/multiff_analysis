@@ -1,22 +1,10 @@
-import sys
-from planning_analysis.show_planning import nxt_ff_utils, show_planning_class, show_planning_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_helper_class, find_cvn_utils, plot_cvn_class, plot_cvn_utils, plot_monkey_heading_helper_class, cvn_from_ref_class
-from planning_analysis.only_cur_ff import only_cur_ff_utils
-from planning_analysis.plan_factors import test_vs_control_utils
-from planning_analysis.factors_vs_indicators import make_variations_utils, plot_variations_utils
-from data_wrangling import specific_utils, general_utils
-from sklearn.preprocessing import StandardScaler
+from planning_analysis.factors_vs_indicators import plot_variations_utils
+from data_wrangling import general_utils
 import numpy as np
 import pandas as pd
-import math
-import statsmodels.api as sm
-from math import pi
 import itertools
-import plotly.graph_objects as go
-import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.linear_model import LinearRegression
 
 
 all_x_vars_of_interest = ['test_or_control',

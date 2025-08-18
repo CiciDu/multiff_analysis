@@ -1,20 +1,13 @@
 
 from data_wrangling import specific_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import plot_cvn_utils, find_cvn_utils
-from null_behaviors import curv_of_traj_utils, curvature_utils
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
+from planning_analysis.plan_factors import build_factor_comp
 
-import seaborn as sns
 import statsmodels.api as sm
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from itertools import product
-import plotly.graph_objects as go
-import plotly.express as px
 import math
 import os
-import sys
 
 
 def get_points_on_each_arc(null_arc_info, num_points_on_each_arc=2000, extend_arc_angle=False):

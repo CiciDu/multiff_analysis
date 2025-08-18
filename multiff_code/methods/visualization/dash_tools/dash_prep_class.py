@@ -1,26 +1,22 @@
 
-import sys
-from visualization.plotly_tools import plotly_preparation, plotly_for_time_series, plotly_for_null_arcs, plotly_for_correlation, plotly_for_monkey, plotly_plot_class
+from visualization.plotly_tools import plotly_for_time_series, plotly_for_null_arcs, plotly_for_correlation, plotly_for_monkey, plotly_plot_class
 from visualization.dash_tools import dash_utils, dash_utils
 from null_behaviors import curv_of_traj_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, cvn_from_ref_class
+from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
 from visualization.matplotlib_tools import monkey_heading_utils
 from eye_position_analysis import eye_positions
-from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_helper_class, find_cvn_utils, plot_cvn_class, plot_cvn_utils, plot_monkey_heading_helper_class
-from null_behaviors import find_best_arc, curv_of_traj_utils, opt_arc_utils
+from planning_analysis.show_planning.cur_vs_nxt_ff import plot_monkey_heading_helper_class
+from null_behaviors import curv_of_traj_utils, opt_arc_utils
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_and_fr_plot_in_plotly
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
 import pandas as pd
 import pandas as pd
-import plotly.graph_objects as go
-import copy
 
 
 plt.rcParams["animation.html"] = "html5"

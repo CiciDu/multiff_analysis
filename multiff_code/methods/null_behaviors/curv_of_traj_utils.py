@@ -1,18 +1,10 @@
-from scipy import stats
 import math
 import pandas as pd
-from re import search
-import sys
-from decision_making_analysis import trajectory_info
-from null_behaviors import find_best_arc, curvature_utils, curvature_utils
-from visualization.plotly_tools import plotly_preparation
 from visualization.matplotlib_tools import monkey_heading_utils
 
 import os
-import sys
 import warnings
 import numpy as np
-from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 

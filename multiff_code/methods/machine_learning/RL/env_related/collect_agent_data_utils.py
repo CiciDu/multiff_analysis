@@ -1,10 +1,8 @@
-import sys
-from data_wrangling import general_utils, specific_utils, process_monkey_information
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe
+from data_wrangling import general_utils, process_monkey_information
+from pattern_discovery import pattern_by_trials, make_ff_dataframe
 from machine_learning.RL.env_related import env_for_lstm, env_for_sb3
 
 import os, shutil
-import sys
 import numpy as np
 import matplotlib
 import pandas as pd

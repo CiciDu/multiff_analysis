@@ -4,7 +4,6 @@ Centralizes matplotlib, pandas, and other configuration settings.
 """
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc

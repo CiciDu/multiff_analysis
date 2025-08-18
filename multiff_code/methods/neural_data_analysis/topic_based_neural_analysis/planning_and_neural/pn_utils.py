@@ -1,6 +1,4 @@
-import sys
-from data_wrangling import process_monkey_information, specific_utils
-from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling
+from data_wrangling import specific_utils
 from planning_analysis.plan_indicators import diff_in_curv_utils
 import numpy as np
 import pandas as pd

@@ -1,15 +1,10 @@
-import sys
-from data_wrangling import process_monkey_information, specific_utils, time_calib_utils
-from pattern_discovery import pattern_by_trials, pattern_by_points, make_ff_dataframe, ff_dataframe_utils, pattern_by_trials, pattern_by_points, cluster_analysis, organize_patterns_and_features, category_class
+from data_wrangling import time_calib_utils
 import os
-import sys
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import math
-import seaborn as sns
-import logging
 from matplotlib import rc
 import scipy.interpolate as interpolate
 import subprocess

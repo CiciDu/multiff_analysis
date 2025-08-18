@@ -1,21 +1,5 @@
-import sys
-from data_wrangling import specific_utils, base_processing_class
-from null_behaviors import show_null_trajectory, curvature_utils, curv_of_traj_utils
-from planning_analysis.show_planning import show_planning_utils, nxt_ff_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_cvn_utils, plot_cvn_utils
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
-from visualization.plotly_tools import plotly_for_monkey, plotly_preparation, plotly_for_null_arcs
-from visualization.dash_tools import dash_utils
-from visualization.matplotlib_tools import monkey_heading_utils, plot_behaviors_utils
-from planning_analysis.test_params_for_planning import params_utils
-from eye_position_analysis import eye_positions
-from matplotlib.lines import Line2D
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import os
-import sys
-import plotly.graph_objects as go
+from visualization.plotly_tools import plotly_for_monkey
+from visualization.matplotlib_tools import monkey_heading_utils
 
 
 class PlotMonkeyHeadingHelper():

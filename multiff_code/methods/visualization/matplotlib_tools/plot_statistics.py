@@ -1,11 +1,8 @@
 from scipy.stats import pearsonr
 from matplotlib.ticker import FixedLocator
 from scipy import stats
-import sys
 import os
-import sys
 import seaborn as sns
-import sys
 import math
 import numpy as np
 import matplotlib

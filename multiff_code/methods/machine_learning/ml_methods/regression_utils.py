@@ -13,7 +13,6 @@ from sklearn.ensemble import RandomForestRegressor, BaggingRegressor, AdaBoostRe
 from sklearn.metrics import r2_score
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold
 import statsmodels.api as sm
 from scipy.stats import pearsonr
 from sklearn.model_selection import cross_validate

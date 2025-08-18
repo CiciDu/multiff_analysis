@@ -1,6 +1,5 @@
 from machine_learning.ml_methods import regression_utils, ml_methods_class
 import pandas as pd
-import matplotlib.pyplot as plt
 import gc
 
 

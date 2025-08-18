@@ -1,14 +1,11 @@
-import sys
 from data_wrangling import specific_utils
 from pattern_discovery import ff_dataframe_utils
 from visualization.matplotlib_tools import plot_behaviors_utils
 
 import os
-import sys
 import numpy as np
 import pandas as pd
 from math import pi
-from numpy import linalg as LA
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)

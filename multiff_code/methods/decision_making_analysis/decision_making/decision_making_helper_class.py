@@ -1,21 +1,13 @@
 # ------------------------------
 # System & Utilities
 # ------------------------------
-import sys
 import os
-import warnings
-from os.path import exists
-import copy
 
 # ------------------------------
 # Project-specific modules
 # ------------------------------
-from decision_making_analysis.cluster_replacement import cluster_replacement_utils
-from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
-from decision_making_analysis import free_selection, replacement, trajectory_info
-from visualization.matplotlib_tools import plot_trials, monkey_heading_utils
-from machine_learning.ml_methods import regression_utils, classification_utils, prep_ml_data_utils
-from data_wrangling import base_processing_class
+from decision_making_analysis.decision_making import decision_making_utils
+from decision_making_analysis import free_selection, replacement
 from data_wrangling import further_processing_class
 
 # ------------------------------
@@ -26,47 +18,22 @@ import pandas as pd
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
-import statsmodels.api as sm
 
 # ------------------------------
 # Scikit-learn: Model Selection
 # ------------------------------
-from sklearn.model_selection import (
-    train_test_split, cross_val_score, cross_validate, KFold
-)
-from sklearn.preprocessing import StandardScaler
 
 # ------------------------------
 # Scikit-learn: Metrics
 # ------------------------------
-from sklearn.metrics import (
-    accuracy_score, hamming_loss, multilabel_confusion_matrix,
-    fbeta_score, precision_score, recall_score, confusion_matrix,
-    classification_report, f1_score, roc_auc_score,
-    balanced_accuracy_score, matthews_corrcoef
-)
 
 # ------------------------------
 # Scikit-learn: Models
 # ------------------------------
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression, RidgeClassifier, SGDClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.ensemble import (
-    BaggingClassifier, AdaBoostClassifier, GradientBoostingClassifier,
-    RandomForestClassifier, ExtraTreesClassifier
-)
-from sklearn.svm import SVC
-from sklearn.multioutput import MultiOutputClassifier
 
 # ------------------------------
 # External Gradient Boosting Libraries (optional)
 # ------------------------------
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
-from catboost import CatBoostClassifier
 
 # ------------------------------
 # Matplotlib & Display Settings

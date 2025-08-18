@@ -1,63 +1,31 @@
 # Standard library imports
-import sys
 import os
-import sys
-import math
-import copy
-import pprint
-import logging
-from os.path import exists
 
 # Third-party imports
 import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 from matplotlib import rc
-import seaborn as sns
-from plotly.subplots import make_subplots
-import plotly.graph_objs as go
 
 # Scientific computing
 from scipy import stats
-from scipy.stats import pearsonr
 
 # Machine learning - sklearn
 from sklearn.metrics import (
-    accuracy_score, confusion_matrix, mean_squared_error, mean_absolute_error,
-    r2_score, explained_variance_score, max_error
+    mean_squared_error, mean_absolute_error, r2_score, explained_variance_score,
+    max_error
 )
 from sklearn.linear_model import (
-    LinearRegression, LogisticRegression, Ridge, Lasso, ElasticNet,
-    RidgeCV, LassoCV, ElasticNetCV
+    Ridge, Lasso, ElasticNet, RidgeCV, LassoCV
 )
-from sklearn.svm import SVC, SVR
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.ensemble import (
-    AdaBoostClassifier, RandomForestClassifier, BaggingClassifier, GradientBoostingClassifier,
-    RandomForestRegressor, BaggingRegressor, AdaBoostRegressor, GradientBoostingRegressor
-)
-from sklearn.naive_bayes import GaussianNB
-from sklearn.preprocessing import StandardScaler
-from sklearn.cross_decomposition import CCA
-from sklearn.cluster import AgglomerativeClustering
 
 # Statistics
 import statsmodels.api as sm
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 # Deep learning
-import torch
-import torch.optim as optim
-import torch.nn as nn
 
 # Custom imports
-from machine_learning.ml_methods import (
-    ml_methods_class, regression_utils, classification_utils,
-    prep_ml_data_utils, ml_plotting_utils
-)
-import rcca
 
 # Set matplotlib parameters
 plt.rcParams["animation.html"] = "html5"

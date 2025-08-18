@@ -3,9 +3,6 @@
 # GPFA requires all trials to have the same number of time bins
 
 import numpy as np
-import pandas as pd
-import quantities as pq
-import neo
 
 
 def analyze_trial_lengths(spiketrains):

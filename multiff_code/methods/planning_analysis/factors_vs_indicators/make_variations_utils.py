@@ -1,23 +1,13 @@
 
 from planning_analysis.show_planning import show_planning_utils
-from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
+from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
 from data_wrangling import specific_utils
-import seaborn as sns
 import pandas as pd
 import numpy as np
-import math
-import plotly.graph_objects as go
-import plotly.express as px
-from matplotlib import rc
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import sys
-from math import pi
 import contextlib
-import plotly.express as px
-import plotly.graph_objects as go
 
 
 def make_regrouped_info(test_df,

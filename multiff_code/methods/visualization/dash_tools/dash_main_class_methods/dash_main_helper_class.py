@@ -1,4 +1,3 @@
-import sys
 from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_time_series
 from visualization.dash_tools import dash_prep_class, dash_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_monkey_heading_helper_class
@@ -10,7 +9,6 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 from planning_analysis.plan_factors import build_factor_comp
 
 import os
-import sys
 import numpy as np
 import matplotlib
 from matplotlib import rc
@@ -20,7 +18,6 @@ from dash import html
 from dash.exceptions import PreventUpdate
 import pandas as pd
 from dash import dcc
-import plotly.graph_objects as go
 import copy
 import logging
 
