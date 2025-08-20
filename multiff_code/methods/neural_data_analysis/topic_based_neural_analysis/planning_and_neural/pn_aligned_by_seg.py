@@ -44,6 +44,7 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
         self.get_new_seg_info(segment_duration=segment_duration)
         self._rebin_data_in_new_segments(
             rebinned_max_x_lag_number=rebinned_max_x_lag_number)
+        print('Made rebinned_x_var, rebinned_y_var, rebinned_x_var_lags, and rebinned_y_var_lags.')
 
     def _rebin_data_in_new_segments(self, rebinned_max_x_lag_number=2):
         # rebin y_var (behavioral data)

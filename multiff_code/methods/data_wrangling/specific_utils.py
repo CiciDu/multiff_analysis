@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from math import pi
+import math
 import pandas as pd
 import re
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -416,3 +417,10 @@ def find_lagged_versions_of_columns_in_df(columns, df):
             col_name for col_name in df.columns if pattern.match(col_name)]
         lagged_columns.extend(matching_columns)
     return lagged_columns
+
+
+def confine_angles_to_range(df, angle_col):
+    df = df.copy()  # optional: avoid modifying caller inplace
+    df[angle_col] = np.mod(df[angle_col], 2*math.pi)
+    df.loc[df[angle_col] > math.pi, angle_col] -= 2*math.pi
+    return df

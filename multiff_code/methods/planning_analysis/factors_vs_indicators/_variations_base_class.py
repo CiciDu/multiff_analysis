@@ -109,12 +109,16 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
     def make_key_paths(self):
         self.cur_and_nxt_data_comparison_path = os.path.join(
             self.combd_cur_and_nxt_folder_path, 'data_comparison')
-        self.all_perc_info_path = os.path.join(
-            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/all_perc_info.csv')
-        self.all_median_info_folder_path = os.path.join(
-            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/all_median_info')
-        self.overall_median_info_path = os.path.join(
-            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/overall_median_info.csv')
+        self.pooled_perc_info_path = os.path.join(
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/pooled_perc_info.csv')
+        self.pooled_median_info_folder_path = os.path.join(
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/pooled_median_info')
+        self.per_sess_median_info_folder_path = os.path.join(
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/per_sess_median_info')
+        self.all_ref_pooled_median_info_path = os.path.join(
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/all_ref_pooled_median_info.csv')
+        self.all_ref_per_sess_median_info_folder_path = os.path.join(
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/all_ref_per_sess_median_info.csv')
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
 
         self.cur_and_nxt_lr_df_path = os.path.join(

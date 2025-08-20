@@ -851,7 +851,8 @@ def find_ff_info_based_on_ref_point(ff_info, monkey_information, ff_real_positio
         if point_index_cur_ff_first_seen is None:
             point_index_cur_ff_first_seen = ff_info['point_index_ff_first_seen'].values
             
-        if point_index_cur_ff_first_seen.isna().any():
+        arr = np.asarray(point_index_cur_ff_first_seen)
+        if np.isnan(arr).any():
             raise ValueError("NaN found in point_index_cur_ff_first_seen. Consider using a different ref_point_mode.")
 
         all_time = monkey_information.loc[point_index_cur_ff_first_seen.astype(int),

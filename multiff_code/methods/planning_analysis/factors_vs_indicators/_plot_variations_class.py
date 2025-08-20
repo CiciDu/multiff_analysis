@@ -2,13 +2,13 @@
 from planning_analysis.factors_vs_indicators import plot_variations_utils
 
 
-
 class _PlotVariations:
 
     def __init__(self):
         pass
 
-    def plot_heading_in_overall_median_info(self,
+    def plot_heading_in_all_ref_median_info(self,
+                                            all_ref_median_info=None,
                                             x_var_column_list=[
                                                 'ref_point_value'],
                                             fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
@@ -19,15 +19,14 @@ class _PlotVariations:
                                             columns_to_find_unique_combinations_for_line=[],
                                             add_error_bars=False,
                                             use_subplots_based_on_changeable_variables=False,
-                                            all_median_info_heading=None,
                                             ):
 
         se_column = 'diff_in_abs_angle_to_nxt_ff_boot_med_std' if add_error_bars else None
-        
-        if all_median_info_heading is None:
-            all_median_info_heading = self.all_median_info_heading
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_median_info_heading,
+        if all_ref_median_info is None:
+            all_ref_median_info = self.all_ref_pooled_median_info_heading
+
+        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
@@ -39,7 +38,8 @@ class _PlotVariations:
                                                                                         columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
                                                                                         use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
 
-    def plot_curv_in_overall_median_info(self,
+    def plot_curv_in_all_ref_median_info(self,
+                                         all_ref_median_info=None,
                                          x_var_column_list=['ref_point_value'],
                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                                                        'key_for_split': 'ff_seen'},
@@ -53,7 +53,10 @@ class _PlotVariations:
 
         se_column = 'diff_in_abs_d_curv_boot_med_std' if add_error_bars else None
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(self.all_median_info_curv,
+        if all_ref_median_info is None:
+            all_ref_median_info = self.all_ref_pooled_median_info_curv
+
+        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
@@ -65,8 +68,8 @@ class _PlotVariations:
                                                                                         columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
                                                                                         use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
 
-    def plot_heading_in_overall_median_info_across_monkeys_and_arc_types(self,
-                                                                         all_median_info_heading=None,
+    def plot_heading_in_all_ref_median_info_across_monkeys_and_arc_types(self,
+                                                                         all_ref_median_info=None,
                                                                          x_var_column_list=[
                                                                              'opt_arc_type'],
                                                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
@@ -78,18 +81,24 @@ class _PlotVariations:
                                                                              'ref_point_value', 'monkey_name'],
                                                                          columns_to_find_unique_combinations_for_color=[],
                                                                          columns_to_find_unique_combinations_for_line=[],
+                                                                         add_error_bars=True,
                                                                          ):
 
-        self.plot_heading_in_overall_median_info(x_var_column_list=x_var_column_list,
+        if all_ref_median_info is None:
+            all_ref_median_info = self.all_ref_pooled_median_info_heading
+
+        self.plot_heading_in_all_ref_median_info(all_ref_median_info=all_ref_median_info,
+                                                 x_var_column_list=x_var_column_list,
                                                  fixed_variable_values_to_use=fixed_variable_values_to_use,
                                                  changeable_variables=changeable_variables,
                                                  columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
                                                  columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-                                                 add_error_bars=True,
+                                                 add_error_bars=add_error_bars,
                                                  use_subplots_based_on_changeable_variables=True,
-                                                 all_median_info_heading=all_median_info_heading)
+                                                 )
 
-    def plot_curv_in_overall_median_info_across_monkeys_and_arc_types(self,
+    def plot_curv_in_all_ref_median_info_across_monkeys_and_arc_types(self,
+                                                                      all_ref_median_info=None,
                                                                       x_var_column_list=[
                                                                           'opt_arc_type'],
                                                                       fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
@@ -101,30 +110,35 @@ class _PlotVariations:
                                                                           'ref_point_value', 'monkey_name'],
                                                                       columns_to_find_unique_combinations_for_color=[],
                                                                       columns_to_find_unique_combinations_for_line=[],
+                                                                      add_error_bars=True,
                                                                       ):
 
-        self.plot_curv_in_overall_median_info(x_var_column_list=x_var_column_list,
+        if all_ref_median_info is None:
+            all_ref_median_info = self.all_ref_pooled_median_info_curv
+
+        self.plot_curv_in_all_ref_median_info(all_ref_median_info=all_ref_median_info,
+                                              x_var_column_list=x_var_column_list,
                                               fixed_variable_values_to_use=fixed_variable_values_to_use,
                                               changeable_variables=changeable_variables,
                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
                                               columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-                                              add_error_bars=True,
+                                              add_error_bars=add_error_bars,
                                               use_subplots_based_on_changeable_variables=True,
                                               )
 
-    def plot_direction_in_all_perc_info(self,
-                                        x_var_column_list=['key_for_split'],
-                                        fixed_variable_values_to_use={
-                                            'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
-                                        changeable_variables=[
-                                            'whether_even_out_dist'],
-                                        columns_to_find_unique_combinations_for_color=[],
-                                        add_error_bars=False,
-                                        use_subplots_based_on_changeable_variables=False):
+    def plot_direction_in_pooled_perc_info(self,
+                                           x_var_column_list=['key_for_split'],
+                                           fixed_variable_values_to_use={
+                                               'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
+                                           changeable_variables=[
+                                               'whether_even_out_dist'],
+                                           columns_to_find_unique_combinations_for_color=[],
+                                           add_error_bars=False,
+                                           use_subplots_based_on_changeable_variables=False):
 
         se_column = 'perc_se' if add_error_bars else None
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(self.all_perc_info_new,
+        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(self.pooled_perc_info_new,
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
@@ -135,19 +149,21 @@ class _PlotVariations:
                                                                                         use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
                                                                                         )
 
-    def plot_direction_in_all_perc_info_across_monkeys(self,
-                                                       x_var_column_list=[
-                                                           'monkey_name'],
-                                                       fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-                                                                                     'key_for_split': 'ff_seen',
-                                                                                     'whether_even_out_dist': False,
-                                                                                     },
-                                                       changeable_variables=[],  # 'key_for_split'
-                                                       columns_to_find_unique_combinations_for_color=[]):
+    def plot_direction_in_pooled_perc_info_across_monkeys(self,
+                                                          x_var_column_list=[
+                                                              'monkey_name'],
+                                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
+                                                                                        'key_for_split': 'ff_seen',
+                                                                                        'whether_even_out_dist': False,
+                                                                                        },
+                                                          changeable_variables=[],  # 'key_for_split'
+                                                          columns_to_find_unique_combinations_for_color=[],
+                                                          add_error_bars=True,
+                                                          ):
 
-        self.plot_direction_in_all_perc_info(x_var_column_list=x_var_column_list,
-                                             fixed_variable_values_to_use=fixed_variable_values_to_use,
-                                             changeable_variables=changeable_variables,
-                                             columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                             add_error_bars=True,
-                                             use_subplots_based_on_changeable_variables=True)
+        self.plot_direction_in_pooled_perc_info(x_var_column_list=x_var_column_list,
+                                                fixed_variable_values_to_use=fixed_variable_values_to_use,
+                                                changeable_variables=changeable_variables,
+                                                columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                add_error_bars=add_error_bars,
+                                                use_subplots_based_on_changeable_variables=True)

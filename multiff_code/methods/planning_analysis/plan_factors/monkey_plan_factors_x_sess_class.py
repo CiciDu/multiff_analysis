@@ -165,23 +165,6 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
             self.raw_data_dir_name, self.monkey_name)
 
-    def get_combd_heading_df_x_sessions_across_sessions(self,
-                                                        ref_point_mode='distance', ref_point_value=-150,
-                                                        curv_traj_window_before_stop=[
-                                                            -25, 0],
-                                                        heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
-                                                        use_curv_to_ff_center=False,
-                                                        exists_ok=True, save_data=True):
-
-        self.sp = show_planning_class.ShowPlanning(monkey_name=self.monkey_name,
-                                                   opt_arc_type=self.opt_arc_type,
-                                                   )
-        self.combd_heading_df_x_sessions_test, self.combd_heading_df_x_sessions_ctrl = self.sp.make_or_retrieve_combd_heading_df_x_sessions_from_both_test_and_control(ref_point_mode, ref_point_value,
-                                                                                                                                                                       curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                                                                                                                       combd_heading_df_x_sessions_exists_ok=exists_ok, use_curv_to_ff_center=use_curv_to_ff_center,
-                                                                                                                                                                       show_printed_output=True, heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                                                                                                                       stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data)
-
     def _add_new_plan_data_to_combd_data(self, data_name):
         self.pf.plan_features_tc['data_name'] = data_name
         self.combd_plan_features_tc = pd.concat(
@@ -189,12 +172,17 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.sessions_df_for_one_monkey.loc[self.sessions_df_for_one_monkey['data_name']
                                             == data_name, 'finished'] = True
 
-    def combine_overall_median_info_across_monkeys_and_opt_arc_types(self):
-        self.overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_opt_arc_types()
-        self.process_overall_median_info_to_plot_heading_and_curv()
-        return self.overall_median_info
+    def combine_all_ref_pooled_median_info_across_monkeys_and_opt_arc_types(self):
+        self.all_ref_pooled_median_info = make_variations_utils.combine_all_ref_pooled_median_info_across_monkeys_and_opt_arc_types()
+        self.process_all_ref_pooled_median_info_to_plot_heading_and_curv()
+        return self.all_ref_pooled_median_info
 
-    def combine_all_perc_info_across_monkeys(self):
-        self.all_perc_info = make_variations_utils.combine_all_perc_info_across_monkeys()
-        self.process_all_perc_info_to_plot_direction()
-        return self.all_perc_info
+    def combine_all_ref_per_sess_median_info_across_monkeys_and_opt_arc_types(self):
+        self.all_ref_per_sess_median_info = make_variations_utils.combine_all_ref_per_sess_median_info_across_monkeys_and_opt_arc_types()
+        self.process_all_ref_per_sess_median_info_to_plot_heading_and_curv()
+        return self.all_ref_per_sess_median_info
+
+    def combine_pooled_perc_info_across_monkeys(self):
+        self.pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys()
+        self.process_pooled_perc_info_to_plot_direction()
+        return self.pooled_perc_info

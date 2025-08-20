@@ -54,17 +54,17 @@
                 │   └── combd_plan_features_tc
                 ├── data_comparison
                 │   ├── norm_opt_arc
-                │   │   ├── all_median_info
+                │   │   ├── pooled_median_info
                 │   │   │   ├── dist_100_window_-100cm_0cm
                 │   │   │   ├── dist_100_window_-25cm_0cm
-                │   │   ├── all_perc_info.csv
-                │   │   └── overall_median_info.csv
+                │   │   ├── pooled_perc_info.csv
+                │   │   └── all_ref_pooled_median_info.csv
                 │   ├── opt_arc_stop_closest
-                │   │   ├── all_median_info
+                │   │   ├── pooled_median_info
                 │   │   │   ├── dist_100_window_-100cm_0cm
                 │   │   │   ├── dist_100_window_-25cm_0cm
-                │   │   ├── all_perc_info.csv
-                │   │   └── overall_median_info.csv
+                │   │   ├── pooled_perc_info.csv
+                │   │   └── all_ref_pooled_median_info.csv
                 │   └── opt_arc_stop_first_vis_bdry
                 └── ml_results
                     └── lr_variations

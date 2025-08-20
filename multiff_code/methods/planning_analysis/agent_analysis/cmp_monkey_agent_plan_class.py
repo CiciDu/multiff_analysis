@@ -15,20 +15,20 @@ class CompareMonkeyAgentPlan(_variations_base_class._VariationsBase):
         self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
             model_folder_name=self.model_folder_name, opt_arc_type=opt_arc_type)
 
-    def get_monkey_and_agent_overall_median_info(self):
-        self.monkey_overall_median_info = make_variations_utils.combine_overall_median_info_across_monkeys_and_opt_arc_types()
-        self.agent_overall_median_info = self.pfas.make_or_retrieve_overall_median_info(
+    def get_monkey_and_agent_all_ref_pooled_median_info(self):
+        self.monkey_all_ref_pooled_median_info = make_variations_utils.combine_all_ref_pooled_median_info_across_monkeys_and_opt_arc_types()
+        self.agent_all_ref_pooled_median_info = self.pfas.make_or_retrieve_all_ref_pooled_median_info(
             process_info_for_plotting=False)
 
-        self.overall_median_info = compare_monkey_and_agent_utils.make_both_players_df(
-            self.monkey_overall_median_info, self.agent_overall_median_info)
-        self.process_overall_median_info_to_plot_heading_and_curv()
+        self.all_ref_pooled_median_info = compare_monkey_and_agent_utils.make_both_players_df(
+            self.monkey_all_ref_pooled_median_info, self.agent_all_ref_pooled_median_info)
+        self.process_all_ref_pooled_median_info_to_plot_heading_and_curv()
 
-    def get_monkey_and_agent_all_perc_info(self):
-        self.monkey_all_perc_info = make_variations_utils.combine_all_perc_info_across_monkeys()
-        self.agent_all_perc_info = self.pfas.make_or_retrieve_all_perc_info(
+    def get_monkey_and_agent_pooled_perc_info(self):
+        self.monkey_pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys()
+        self.agent_pooled_perc_info = self.pfas.make_or_retrieve_pooled_perc_info(
             process_info_for_plotting=False)
 
-        self.all_perc_info = compare_monkey_and_agent_utils.make_both_players_df(
-            self.monkey_all_perc_info, self.agent_all_perc_info)
-        self.process_all_perc_info_to_plot_direction()
+        self.pooled_perc_info = compare_monkey_and_agent_utils.make_both_players_df(
+            self.monkey_pooled_perc_info, self.agent_pooled_perc_info)
+        self.process_pooled_perc_info_to_plot_direction()

@@ -38,11 +38,11 @@
 │   │           │       │               ├── agent_dist_150
 │   │           │       ├── data_comparison
 │   │           │       │   └── norm_opt_arc
-│   │           │       │       ├── all_median_info
+│   │           │       │       ├── pooled_median_info
 │   │           │       │       │   ├── dist_100_window_-50cm_0cm
 │   │           │       │       │   ├── dist_150_window_-50cm_0cm
-│   │           │       │       ├── all_perc_info.csv
-│   │           │       │       └── overall_median_info.csv
+│   │           │       │       ├── pooled_perc_info.csv
+│   │           │       │       └── all_ref_pooled_median_info.csv
 │   │           │       └── ml_results
 │   │           │           └── lr_variations
 │   │           │               └── norm_opt_arc

@@ -71,7 +71,8 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
         all_subplot_titles = _get_all_subplot_titles(combinations)
 
         fig = make_subplots(rows=first_dim, cols=second_dim,
-                            subplot_titles=all_subplot_titles)
+                            subplot_titles=all_subplot_titles,
+                            vertical_spacing=0.05, horizontal_spacing=0.05)
         # change the font size of the subplot titles
         for annotation in fig['layout']['annotations']:
             annotation['font'] = dict(size=14, family='Arial')
@@ -125,7 +126,7 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                 fig.show()
 
     if use_subplots_based_on_changeable_variables:
-        fig.update_layout(height=400 * first_dim, width=450 * second_dim)
+        fig.update_layout(height=600 * first_dim, width=675 * second_dim)
         fig.show()
 
 
@@ -143,7 +144,7 @@ def _find_rest_of_x_for_hoverdata(sub_df, x_var_column, y_var_column, var_to_det
 def _process_x_var_columns(sub_df, x_var_column):
     if sub_df[x_var_column].dtype == 'bool':
         sub_df[x_var_column] = sub_df[x_var_column].astype('str')
-    
+
     # if x_var_column == 'ref_point_value': # this is probably only useful when ref_point_mode is 'cur_ff_visible'
     #     sub_df['ref_point_value'] = sub_df['ref_point_value'].astype('str')
     # else:
@@ -192,7 +193,8 @@ def _find_x_labels_to_values_map(sub_df, x_var_column):
             zip(desired_order, np.arange(len(desired_order))))
     else:
         unique_vals = sub_df[x_var_column].unique()
-        x_labels_to_values_map = dict(zip(unique_vals, range(len(unique_vals))))
+        x_labels_to_values_map = dict(
+            zip(unique_vals, range(len(unique_vals))))
     return x_labels_to_values_map
 
 
@@ -541,7 +543,7 @@ def _add_line_type_legends(fig, sub_df,
                           )
 
 
-def compare_diff_in_abs_in_overall_median_info(sub_df, x, plotly=True):
+def compare_diff_in_abs_in_all_ref_pooled_median_info(sub_df, x, plotly=True):
     if plotly:
         make_plotly_plots_for_test_and_control_data_comparison(
             sub_df, x, 'test_diff_in_abs_angle_to_nxt_ff', 'ctrl_diff_in_abs_angle_to_nxt_ff', title='test vs ctrl diff_in_abs_angle_to_nxt_ff')
@@ -555,7 +557,7 @@ def compare_diff_in_abs_in_overall_median_info(sub_df, x, plotly=True):
     return
 
 
-def compare_test_and_ctrl_in_all_perc_info(sub_df, x, plotly=True):
+def compare_test_and_ctrl_in_pooled_perc_info(sub_df, x, plotly=True):
     if plotly:
         make_plotly_plots_for_test_and_control_data_comparison(
             sub_df, x, 'test_perc', 'ctrl_perc', title='test perc vs ctrl perc')

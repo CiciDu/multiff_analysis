@@ -2,6 +2,8 @@ from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from planning_analysis.only_cur_ff import only_cur_ff_utils
 from planning_analysis.plan_factors import build_factor_comp_utils
+from planning_analysis.plan_factors import plan_factors_utils
+from data_wrangling import specific_utils
 import numpy as np
 import math
 
@@ -55,8 +57,8 @@ def process_heading_info_df(heading_info_df):
     heading_info_df = heading_info_df.copy()
     # add some columns
     if 'angle_opt_cur_end_to_nxt_ff' in heading_info_df.columns:
-        heading_info_df[['angle_from_stop_to_nxt_ff', 'angle_opt_cur_end_to_nxt_ff', 'angle_cntr_cur_end_to_nxt_ff']] = heading_info_df[[
-            'angle_from_stop_to_nxt_ff', 'angle_opt_cur_end_to_nxt_ff', 'angle_cntr_cur_end_to_nxt_ff']] * (180/np.pi)
+        # heading_info_df[['angle_from_stop_to_nxt_ff', 'angle_opt_cur_end_to_nxt_ff', 'angle_cntr_cur_end_to_nxt_ff']] = heading_info_df[[
+        #     'angle_from_stop_to_nxt_ff', 'angle_opt_cur_end_to_nxt_ff', 'angle_cntr_cur_end_to_nxt_ff']] * (180/np.pi)
         _add_diff_in_d_heading_to_cur_ff(heading_info_df)
         _add_diff_in_abs_angle_to_nxt_ff(heading_info_df)
         heading_info_df['ratio_of_angle_to_nxt_ff'] = heading_info_df['angle_opt_cur_end_to_nxt_ff'] / \
@@ -94,13 +96,22 @@ def _add_diff_in_abs_angle_to_nxt_ff(heading_info_df):
 
 
 def _add_diff_in_d_heading_to_cur_ff(heading_info_df):
+    if 'd_heading_of_traj' not in heading_info_df.columns:
+        heading_info_df = plan_factors_utils.add_d_heading_of_traj_to_df(heading_info_df)
+    # heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['d_heading_of_traj'] - \
+    #     heading_info_df['cur_opt_arc_d_heading']
+    # heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['diff_in_d_heading_to_cur_ff'] * 180/math.pi % 360
+    # heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > 180,
+    #                     'diff_in_d_heading_to_cur_ff'] = heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > 180,
+    #                                                                          'diff_in_d_heading_to_cur_ff'] - 360
+
     heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['d_heading_of_traj'] - \
         heading_info_df['cur_opt_arc_d_heading']
-    heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['diff_in_d_heading_to_cur_ff'] * 180/math.pi % 360
-    heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > 180,
-                        'diff_in_d_heading_to_cur_ff'] = heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > 180,
-                                                                             'diff_in_d_heading_to_cur_ff'] - 360
-
+    heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['diff_in_d_heading_to_cur_ff'] % (2*math.pi)
+    heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > math.pi,
+                        'diff_in_d_heading_to_cur_ff'] = heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > math.pi,
+                                                                             'diff_in_d_heading_to_cur_ff'] - (2*math.pi)
+    heading_info_df = specific_utils.confine_angles_to_range(heading_info_df, 'diff_in_d_heading_to_cur_ff')
 
 def find_ff_visible_info_in_a_period(list_of_ff_index, ff_dataframe_visible, start_point_index=None, end_point_index=None, start_time=None, end_time=None):
     if (start_point_index is not None) & (end_point_index is not None):

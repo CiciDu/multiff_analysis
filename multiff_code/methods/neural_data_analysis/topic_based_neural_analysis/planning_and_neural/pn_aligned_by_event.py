@@ -128,6 +128,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
                               pre_event_window=pre_event_window, post_event_window=post_event_window)
         self._rebin_data_in_new_segments(
             rebinned_max_x_lag_number=rebinned_max_x_lag_number)
+        print('Made rebinned_x_var, rebinned_y_var, rebinned_x_var_lags, and rebinned_y_var_lags.')
 
         # add bin_mid_time_rel_to_event
         # first use merge to get event time

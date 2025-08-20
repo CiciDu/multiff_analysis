@@ -120,66 +120,67 @@ def make_regrouped_info(test_df,
     return regrouped_info
 
 
-def make_all_median_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
-                                                            ctrl_heading_info_df,
-                                                            verbose=True,
-                                                            key_for_split_choices=[
-                                                                'ff_seen'],
-                                                            whether_filter_info_choices=[
-                                                                True],
-                                                            # whether_even_out_distribution_choices=[True, False],
-                                                            whether_even_out_distribution_choices=[
-                                                                False],
-                                                            whether_test_nxt_ff_flash_after_stop_choices=[
-                                                                'yes', 'no', 'flexible'],
-                                                            whether_limit_cur_ff_cluster_50_size_choices=[
-                                                                False],
-                                                            ctrl_flash_compared_to_test_choices=[
-                                                                'flexible'],
-                                                            max_curv_range_choices=[
-                                                                200],
-                                                            ):
+def make_pooled_median_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
+                                                               ctrl_heading_info_df,
+                                                               verbose=True,
+                                                               key_for_split_choices=[
+                                                                   'ff_seen'],
+                                                               whether_filter_info_choices=[
+                                                                   True],
+                                                               # whether_even_out_distribution_choices=[True, False],
+                                                               whether_even_out_distribution_choices=[
+                                                                   False],
+                                                               whether_test_nxt_ff_flash_after_stop_choices=[
+                                                                   'yes', 'no', 'flexible'],
+                                                               whether_limit_cur_ff_cluster_50_size_choices=[
+                                                                   False],
+                                                               ctrl_flash_compared_to_test_choices=[
+                                                                   'flexible'],
+                                                               max_curv_range_choices=[
+                                                                   200],
+                                                               ):
 
     test_heading_info_df = build_factor_comp.process_heading_info_df(
         test_heading_info_df)
     ctrl_heading_info_df = build_factor_comp.process_heading_info_df(
         ctrl_heading_info_df)
-    
-    logging.info(f'Make all median info from test and ctrl heading info df, based on various combinations of factors...')
-    all_median_info = make_regrouped_info(test_heading_info_df,
-                                          ctrl_heading_info_df,
-                                          make_temp_median_info_func,
-                                          key_for_split_choices=key_for_split_choices,
-                                          whether_filter_info_choices=whether_filter_info_choices,
-                                          whether_even_out_distribution_choices=whether_even_out_distribution_choices,
-                                          whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
-                                          whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
-                                          ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
-                                          max_curv_range_choices=max_curv_range_choices,
-                                          verbose=verbose)
 
-    return all_median_info
+    logging.info(
+        f'Make all median info from test and ctrl heading info df, based on various combinations of factors...')
+    pooled_median_info = make_regrouped_info(test_heading_info_df,
+                                             ctrl_heading_info_df,
+                                             make_temp_median_info_func,
+                                             key_for_split_choices=key_for_split_choices,
+                                             whether_filter_info_choices=whether_filter_info_choices,
+                                             whether_even_out_distribution_choices=whether_even_out_distribution_choices,
+                                             whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
+                                             whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
+                                             ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
+                                             max_curv_range_choices=max_curv_range_choices,
+                                             verbose=verbose)
+
+    return pooled_median_info
 
 
-def make_all_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
-                                                          ctrl_heading_info_df,
-                                                          verbose=True,
-                                                          key_for_split_choices=[
-                                                              'ff_seen'],
-                                                          whether_filter_info_choices=[
-                                                              True],
-                                                          whether_even_out_distribution_choices=[
-                                                              False],
-                                                          whether_test_nxt_ff_flash_after_stop_choices=[
-                                                              'yes', 'no', 'flexible'],
-                                                          # whether_test_nxt_ff_flash_after_stop_choices=['flexible'],
-                                                          whether_limit_cur_ff_cluster_50_size_choices=[
-                                                              False],
-                                                          ctrl_flash_compared_to_test_choices=[
-                                                              'flexible'],
-                                                          max_curv_range_choices=[
-                                                              200],
-                                                          ):
+def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
+                                                             ctrl_heading_info_df,
+                                                             verbose=True,
+                                                             key_for_split_choices=[
+                                                                 'ff_seen'],
+                                                             whether_filter_info_choices=[
+                                                                 True],
+                                                             whether_even_out_distribution_choices=[
+                                                                 False],
+                                                             whether_test_nxt_ff_flash_after_stop_choices=[
+                                                                 'yes', 'no', 'flexible'],
+                                                             # whether_test_nxt_ff_flash_after_stop_choices=['flexible'],
+                                                             whether_limit_cur_ff_cluster_50_size_choices=[
+                                                                 False],
+                                                             ctrl_flash_compared_to_test_choices=[
+                                                                 'flexible'],
+                                                             max_curv_range_choices=[
+                                                                 200],
+                                                             ):
 
     test_heading_info_df = build_factor_comp.process_heading_info_df(
         test_heading_info_df)
@@ -196,19 +197,19 @@ def make_all_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
     ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff'] = np.sign(
         ctrl_heading_info_df['angle_from_cur_ff_to_nxt_ff'])
 
-    all_perc_info = make_regrouped_info(test_heading_info_df,
-                                        ctrl_heading_info_df,
-                                        make_temp_perc_info_func,
-                                        key_for_split_choices=key_for_split_choices,
-                                        whether_filter_info_choices=whether_filter_info_choices,
-                                        whether_even_out_distribution_choices=whether_even_out_distribution_choices,
-                                        whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
-                                        whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
-                                        ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
-                                        max_curv_range_choices=max_curv_range_choices,
-                                        verbose=verbose)
+    pooled_perc_info = make_regrouped_info(test_heading_info_df,
+                                           ctrl_heading_info_df,
+                                           make_temp_perc_info_func,
+                                           key_for_split_choices=key_for_split_choices,
+                                           whether_filter_info_choices=whether_filter_info_choices,
+                                           whether_even_out_distribution_choices=whether_even_out_distribution_choices,
+                                           whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
+                                           whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
+                                           ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
+                                           max_curv_range_choices=max_curv_range_choices,
+                                           verbose=verbose)
 
-    return all_perc_info
+    return pooled_perc_info
 
 
 def extract_key_info_from_stat_df(stat_df, metrics=['Q1', 'median', 'Q3']):
@@ -404,27 +405,47 @@ def make_combd_only_cur_ff_path(monkey_name):
     return combd_only_cur_ff_path
 
 
-def combine_overall_median_info_across_monkeys_and_opt_arc_types(overall_median_info_exists_ok=True,
-                                                                 all_median_info_exists_ok=True):
-    overall_median_info = pd.DataFrame([])
+def combine_all_ref_per_sess_median_info_across_monkeys_and_opt_arc_types(all_ref_per_sess_median_info_exists_ok=True,
+                                                                        pooled_median_info_exists_ok=True):
+    all_ref_per_sess_median_info = _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=all_ref_per_sess_median_info_exists_ok,
+                                                                                                pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                                                                                                per_sess=True,
+                                                                                                )
+    return all_ref_per_sess_median_info
+
+def combine_all_ref_pooled_median_info_across_monkeys_and_opt_arc_types(all_ref_pooled_median_info_exists_ok=True,
+                                                                        pooled_median_info_exists_ok=True):
+    all_ref_pooled_median_info = _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=all_ref_pooled_median_info_exists_ok,
+                                                                                                pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                                                                                                per_sess=False,
+                                                                                                )
+    return all_ref_pooled_median_info
+
+def _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=True,
+                                                                        pooled_median_info_exists_ok=True,
+                                                                        per_sess=False,
+                                                                        ):
+    all_info = pd.DataFrame([])
+    
     for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
         for opt_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
             # suppress printed output
             with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
                 ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
                                                                          opt_arc_type=opt_arc_type)
-                temp_overall_median_info = ps.make_or_retrieve_overall_median_info(exists_ok=overall_median_info_exists_ok,
-                                                                                   all_median_info_exists_ok=all_median_info_exists_ok,
-                                                                                   process_info_for_plotting=False
-                                                                                   )
-                overall_median_info = pd.concat(
-                    [overall_median_info, temp_overall_median_info], axis=0)
-    overall_median_info.reset_index(drop=True, inplace=True)
-    return overall_median_info
+                func = ps.make_or_retrieve_all_ref_pooled_median_info if not per_sess else ps.make_or_retrieve_all_ref_per_sess_median_info                                                         
+                temp_info = func(exists_ok=exists_ok,
+                                pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                                process_info_for_plotting=False
+                                )
+                all_info = pd.concat(
+                    [all_info, temp_info], axis=0)
+    all_info.reset_index(drop=True, inplace=True)
+    return all_info
 
 
-def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):
-    all_perc_info = pd.DataFrame([])
+def combine_pooled_perc_info_across_monkeys(pooled_perc_info_exists_ok=True):
+    pooled_perc_info = pd.DataFrame([])
     curv_traj_window_before_stop = [-25, 0]
     opt_arc_type = 'norm_opt_arc'
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
@@ -432,9 +453,87 @@ def combine_all_perc_info_across_monkeys(all_perc_info_exists_ok=True):
             ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
                                                                      opt_arc_type=opt_arc_type
                                                                      )
-            temp_all_perc_info = ps.make_or_retrieve_all_perc_info(exists_ok=all_perc_info_exists_ok,
-                                                                   process_info_for_plotting=False)
-            all_perc_info = pd.concat(
-                [all_perc_info, temp_all_perc_info], axis=0)
-    all_perc_info.reset_index(drop=True, inplace=True)
-    return all_perc_info
+            temp_pooled_perc_info = ps.make_or_retrieve_pooled_perc_info(exists_ok=pooled_perc_info_exists_ok,
+                                                                         process_info_for_plotting=False)
+            pooled_perc_info = pd.concat(
+                [pooled_perc_info, temp_pooled_perc_info], axis=0)
+    pooled_perc_info.reset_index(drop=True, inplace=True)
+    return pooled_perc_info
+
+
+# def get_per_sess_median_info_for_ref_point_params(planner, ref_point_mode, ref_point_value):
+#     per_sess_median_info = pd.DataFrame()
+#     for data_name in planner.test_heading_info_df['data_name'].unique():
+#         print(f'Processing data_name: {data_name}')
+#         session_test_heading_info_df = planner.test_heading_info_df[planner.test_heading_info_df['data_name'] == data_name]
+#         session_ctrl_heading_info_df = planner.ctrl_heading_info_df[planner.ctrl_heading_info_df['data_name'] == data_name]
+
+#         session_median_info = make_pooled_median_info_from_test_and_ctrl_heading_info_df(session_test_heading_info_df,
+#                                                                                                         session_ctrl_heading_info_df, verbose=False)
+
+#         session_median_info['data_name'] = data_name
+#         per_sess_median_info = pd.concat([per_sess_median_info, session_median_info], axis=0)
+
+#     per_sess_median_info['ref_point_mode'] = ref_point_mode
+#     per_sess_median_info['ref_point_value'] = ref_point_value
+#     return per_sess_median_info
+
+
+def make_per_sess_median_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
+                                                                 ctrl_heading_info_df,
+                                                                 verbose=True,
+                                                                 key_for_split_choices=[
+                                                                     'ff_seen'],
+                                                                 whether_filter_info_choices=[
+                                                                     True],
+                                                                 # whether_even_out_distribution_choices=[True, False],
+                                                                 whether_even_out_distribution_choices=[
+                                                                     False],
+                                                                 whether_test_nxt_ff_flash_after_stop_choices=[
+                                                                     'yes', 'no', 'flexible'],
+                                                                 whether_limit_cur_ff_cluster_50_size_choices=[
+                                                                     False],
+                                                                 ctrl_flash_compared_to_test_choices=[
+                                                                     'flexible'],
+                                                                 max_curv_range_choices=[
+                                                                     200],
+                                                                 ):
+
+    per_sess_median_info = pd.DataFrame()
+    for data_name in test_heading_info_df['data_name'].unique():
+        print(f'Processing data_name: {data_name}')
+        session_test_heading_info_df = test_heading_info_df[
+            test_heading_info_df['data_name'] == data_name]
+        session_ctrl_heading_info_df = ctrl_heading_info_df[
+            ctrl_heading_info_df['data_name'] == data_name]
+
+        session_median_info = make_pooled_median_info_from_test_and_ctrl_heading_info_df(session_test_heading_info_df,
+                                                                                         session_ctrl_heading_info_df,
+                                                                                         verbose=verbose,
+                                                                                         key_for_split_choices=key_for_split_choices,
+                                                                                         whether_filter_info_choices=whether_filter_info_choices,
+                                                                                         whether_even_out_distribution_choices=whether_even_out_distribution_choices,
+                                                                                         whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
+                                                                                         whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
+                                                                                         ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
+                                                                                         max_curv_range_choices=max_curv_range_choices,
+                                                                                         )
+
+        session_median_info['data_name'] = data_name
+        per_sess_median_info = pd.concat(
+            [per_sess_median_info, session_median_info], axis=0)
+        
+    per_sess_median_info = per_sess_median_info.reset_index(drop=True)
+    
+    # Map sorted data_names to session IDs
+    per_sess_median_info = assign_session_id(per_sess_median_info)
+
+    return per_sess_median_info
+
+
+def assign_session_id(df):
+    # Map sorted data_names to session IDs
+    unique_data_names = sorted(df['data_name'].unique())
+    data_name_to_session_id = {name: idx for idx, name in enumerate(unique_data_names)}
+    df['session_id'] = df['data_name'].map(data_name_to_session_id)
+    return df

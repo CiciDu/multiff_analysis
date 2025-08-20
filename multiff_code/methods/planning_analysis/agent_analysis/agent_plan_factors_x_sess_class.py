@@ -78,27 +78,27 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
 
         print(' ')
         print('Making overall all median info ......')
-        self.make_or_retrieve_overall_median_info(ref_point_params_based_on_mode={'time after cur ff visible': [0.1, 0],
+        self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode={'time after cur ff visible': [0.1, 0],
                                                                                   'distance': [-150, -100, -50]},
                                                   list_of_curv_traj_window_before_stop=[
                                                       [-25, 0]],
                                                   save_data=save_data,
                                                   exists_ok=final_products_exist_ok,
-                                                  all_median_info_exists_ok=intermediate_products_exist_ok,
+                                                  pooled_median_info_exists_ok=intermediate_products_exist_ok,
                                                   combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
                                                   stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
                                                   heading_info_df_exists_ok=intermediate_products_exist_ok)
 
-        self.agent_overall_median_info = self.overall_median_info.copy()
+        self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
         print(' ')
         print('Making all perc info ......')
-        self.make_or_retrieve_all_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+        self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                             verbose=True,
                                             exists_ok=final_products_exist_ok,
                                             stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
                                             heading_info_df_exists_ok=intermediate_products_exist_ok,
                                             save_data=save_data)
-        self.agent_all_perc_df = self.all_perc_info.copy()
+        self.agent_all_perc_df = self.pooled_perc_info.copy()
 
     def get_plan_features_df_across_sessions(self,
                                              num_datasets_to_collect=1,
@@ -196,8 +196,8 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                          save_data=True,
                                          **env_kwargs
                                          ):
-        self.test_combd_heading_df_x_sessions = pd.DataFrame()
-        self.ctrl_combd_heading_df_x_sessions = pd.DataFrame()
+        self.test_heading_info_df = pd.DataFrame()
+        self.ctrl_heading_info_df = pd.DataFrame()
         for i in range(num_datasets_to_collect):
             data_name = f'data_{i}'
             print(' ')
@@ -285,17 +285,17 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
         self.ctrl_heading_info_df['data_name'] = data_name
         self.test_heading_info_df['whether_test'] = 1
         self.ctrl_heading_info_df['whether_test'] = 0
-        self.test_combd_heading_df_x_sessions = pd.concat(
-            [self.test_combd_heading_df_x_sessions, self.test_heading_info_df], axis=0)
-        self.ctrl_combd_heading_df_x_sessions = pd.concat(
-            [self.ctrl_combd_heading_df_x_sessions, self.ctrl_heading_info_df], axis=0)
+        self.test_heading_info_df = pd.concat(
+            [self.test_heading_info_df, self.test_heading_info_df], axis=0)
+        self.ctrl_heading_info_df = pd.concat(
+            [self.ctrl_heading_info_df, self.ctrl_heading_info_df], axis=0)
 
-    def make_or_retrieve_overall_median_info(self, **kwargs):
-        self.overall_median_info = super().make_or_retrieve_overall_median_info(**kwargs)
-        self.overall_median_info['monkey_name'] = 'agent'
-        return self.overall_median_info
+    def make_or_retrieve_all_ref_pooled_median_info(self, **kwargs):
+        self.all_ref_pooled_median_info = super().make_or_retrieve_all_ref_pooled_median_info(**kwargs)
+        self.all_ref_pooled_median_info['monkey_name'] = 'agent'
+        return self.all_ref_pooled_median_info
 
-    def make_or_retrieve_all_perc_info(self, **kwargs):
-        self.all_perc_info = super().make_or_retrieve_all_perc_info(**kwargs)
-        self.all_perc_info['monkey_name'] = 'agent'
-        return self.all_perc_info
+    def make_or_retrieve_pooled_perc_info(self, **kwargs):
+        self.pooled_perc_info = super().make_or_retrieve_pooled_perc_info(**kwargs)
+        self.pooled_perc_info['monkey_name'] = 'agent'
+        return self.pooled_perc_info

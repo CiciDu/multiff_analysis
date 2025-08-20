@@ -213,10 +213,12 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         return self.both_ff_across_time_df
 
     def add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(self, both_ff_df):
-        angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df)
+        angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df).copy()
 
-        angle_df['angle_from_stop_to_nxt_ff'] = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, both_ff_df.point_index_before_stop.values,
+        angle_df['monkey_angle_before_stop'], angle_df['angle_from_stop_to_nxt_ff'] = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, both_ff_df.point_index_before_stop.values,
                                                                                              both_ff_df.nxt_ff_x.values, both_ff_df.nxt_ff_y.values)
+        angle_df['point_index_before_stop'] = both_ff_df.point_index_before_stop.values
+        angle_df['monkey_angle'] = angle_df['cur_monkey_angle']
         if 'diff_in_angle_to_nxt_ff' not in angle_df.columns:
             angle_df = build_factor_comp.process_heading_info_df(
                 angle_df)

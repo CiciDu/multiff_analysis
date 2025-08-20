@@ -705,7 +705,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
     def add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration(self):
         self._add_angle_to_nxt_ff_curv_of_traj_in_duration()
 
-        angle_from_stop_to_nxt_ff = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, self.stops_near_ff_row.point_index_before_stop,
+        m_angle_before_stop, angle_from_stop_to_nxt_ff = pn_utils.calculate_angle_from_stop_to_nxt_ff(self.monkey_information, self.stops_near_ff_row.point_index_before_stop,
                                                                                  self.stops_near_ff_row.nxt_ff_x, self.stops_near_ff_row.nxt_ff_y)
         self.curv_of_traj_in_duration['angle_from_stop_to_nxt_ff'] = angle_from_stop_to_nxt_ff
 

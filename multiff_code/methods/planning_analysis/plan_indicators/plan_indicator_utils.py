@@ -50,7 +50,7 @@ def run_tests_over_monkeys(
             # Initialize sessions
             planner = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name)
             planner.initialize_monkey_sessions_df_for_one_monkey()
-            planner.get_combd_heading_df_x_sessions_across_sessions(
+            planner.get_test_and_ctrl_heading_info_df_across_sessions(
                 ref_point_mode=ref_point_mode,
                 ref_point_value=ref_point_value,
                 save_data=False,
@@ -59,10 +59,10 @@ def run_tests_over_monkeys(
             
             # Process test and control data
             test_df = build_factor_comp.process_heading_info_df(
-                planner.combd_heading_df_x_sessions_test.copy()
+                planner.test_heading_info_df.copy()
             )
             ctrl_df = build_factor_comp.process_heading_info_df(
-                planner.combd_heading_df_x_sessions_ctrl.copy()
+                planner.ctrl_heading_info_df.copy()
             )
             
             # Filter NaNs for d_curv column

@@ -288,4 +288,4 @@ def calculate_angle_from_stop_to_nxt_ff(monkey_information, point_index_before_s
         'monkey_x', 'monkey_y', 'monkey_angle']].values.T
     angle_from_stop_to_nxt_ff = specific_utils.calculate_angles_to_ff_centers(
         nxt_ff_x, nxt_ff_y, mx_before_stop, my_before_stop, m_angle_before_stop)
-    return angle_from_stop_to_nxt_ff
+    return m_angle_before_stop, angle_from_stop_to_nxt_ff
