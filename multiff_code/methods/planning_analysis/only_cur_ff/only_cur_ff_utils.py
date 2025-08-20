@@ -55,7 +55,7 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
 
     # Compute curvature features
     curv_df = curvature_utils.make_curvature_df(
-        ff_info, curv_of_traj_df, clean=False,
+        ff_info, curv_of_traj_df, clean=True,
         monkey_information=monkey_information,
         opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry
     )

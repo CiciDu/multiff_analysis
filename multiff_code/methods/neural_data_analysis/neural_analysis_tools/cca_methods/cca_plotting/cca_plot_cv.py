@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 def plot_cca_cv_results(
     stats_df, data_type='X1', component=1,
     filter_significant=False, sort_by_significance=False,
-    significance_threshold=2, max_vars_per_plot=20
+    significance_threshold=2, max_vars_per_plot=20,
 ):
     """
     Plot results from cross-validated CCA:
@@ -40,11 +40,17 @@ def plot_cca_cv_results(
 
     title = f"Canonical Loading - {data_type} - Component {component}" if not use_cross_view_corr else f"Cross-View Correlation - {data_type}"
 
+    if filter_significant:
+        flip_y_axis = True
+    else:
+        flip_y_axis = False
+
     _plot_bars(
         values_train, values_test, errors_train, errors_test, final_labels,
         title=title,
         use_cross_view_corr=use_cross_view_corr,
-        max_vars_per_plot=max_vars_per_plot
+        max_vars_per_plot=max_vars_per_plot,
+        flip_y_axis=flip_y_axis,
     )
 
 
@@ -96,6 +102,7 @@ def _extract_plot_data(
         errors_test = errors_test[mask]
 
     if sort_by_significance:
+        print('sorting by significance')
         # sig_score = np.abs(values_test) / errors_test
         sig_score = np.abs(values_test)
         sorted_idx = np.argsort(-sig_score)
@@ -108,7 +115,8 @@ def _extract_plot_data(
     return values_train, values_test, errors_train, errors_test, labels
 
 
-def _plot_bars(values_train, values_test, errors_train, errors_test, labels, title, use_cross_view_corr, max_vars_per_plot=20):
+def _plot_bars(values_train, values_test, errors_train, errors_test, labels, title, use_cross_view_corr, max_vars_per_plot=20,
+               flip_y_axis=False):
     """
     Bar plot with train/test mean ± std. Split into multiple subplots if too many variables.
     """
@@ -127,30 +135,75 @@ def _plot_bars(values_train, values_test, errors_train, errors_test, labels, tit
             ylabel, title, use_cross_view_corr=use_cross_view_corr
         )
     else:
-        # Multiple subplots case
-        fig, axes = plt.subplots(n_plots, 1, figsize=(
-            7, (max(5, len(labels) * 0.2)) * n_plots))
-        if n_plots == 1:
-            axes = [axes]
-
+                # Multiple subplots case
         for i in range(n_plots):
             start_idx = i * max_vars_per_plot
             end_idx = min((i + 1) * max_vars_per_plot, n_vars)
 
             subplot_title = f"{title} (Part {i+1}/{n_plots})"
 
+            # Create a fresh figure/axis for each part
+            fig, ax = plt.subplots(
+                1, 1,
+                figsize=(8, max(5, 3 + len(values_train[start_idx:end_idx]) * 0.3))
+            )
+
+            # Slice values for this chunk
+            vtr = values_train[start_idx:end_idx]
+            vte = values_test[start_idx:end_idx]
+            etr = errors_train[start_idx:end_idx]
+            ete = errors_test[start_idx:end_idx]
+            lbl = labels[start_idx:end_idx]
+
+            if flip_y_axis:
+                vtr, vte, etr, ete, lbl = vtr[::-1], vte[::-1], etr[::-1], ete[::-1], lbl[::-1]
+
             _plot_single_bar_subplot(
-                values_train[start_idx:end_idx],
-                values_test[start_idx:end_idx],
-                errors_train[start_idx:end_idx],
-                errors_test[start_idx:end_idx],
-                labels[start_idx:end_idx],
-                ylabel, subplot_title, ax=axes[i],
+                vtr, vte, etr, ete, lbl,
+                ylabel, subplot_title, ax=ax,
                 use_cross_view_corr=use_cross_view_corr
             )
 
-        plt.tight_layout()
-        plt.show()
+            plt.tight_layout()
+            plt.show()
+
+        
+        # # Multiple subplots case
+        # fig, axes = plt.subplots(n_plots, 1, figsize=(
+        #     9, (max(5, 3 + len(labels) * 0.1)) * n_plots))
+        # if n_plots == 1:
+        #     axes = [axes]
+
+        # for i in range(n_plots):
+        #     start_idx = i * max_vars_per_plot
+        #     end_idx = min((i + 1) * max_vars_per_plot, n_vars)
+
+        #     subplot_title = f"{title} (Part {i+1}/{n_plots})"
+
+        #     if flip_y_axis:
+        #         _plot_single_bar_subplot(
+        #             values_train[start_idx:end_idx][::-1],
+        #             values_test[start_idx:end_idx][::-1],
+        #             errors_train[start_idx:end_idx][::-1],
+        #             errors_test[start_idx:end_idx][::-1],
+        #             labels[start_idx:end_idx][::-1],
+        #             ylabel, subplot_title, ax=axes[i],
+        #             use_cross_view_corr=use_cross_view_corr
+        #         )
+        #     else:
+        #         _plot_single_bar_subplot(
+        #             values_train[start_idx:end_idx],
+        #             values_test[start_idx:end_idx],
+        #             errors_train[start_idx:end_idx],
+        #             errors_test[start_idx:end_idx],
+        #             labels[start_idx:end_idx],
+        #             ylabel, subplot_title, ax=axes[i],
+        #             use_cross_view_corr=use_cross_view_corr
+        #         )
+
+        # plt.tight_layout()
+        # plt.show()
+
 
 
 def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_test, labels, ylabel, title, ax=None, use_cross_view_corr=True):
@@ -174,9 +227,9 @@ def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_tes
         errors_train = None
         errors_test = None
     ax.barh(y - bar_width/2, values_train, bar_width, xerr=errors_train,
-            label='Train', alpha=0.7, capsize=3.5)
+            label='Train', alpha=0.7, capsize=2)
     ax.barh(y + bar_width/2, values_test, bar_width, xerr=errors_test,
-            label='Test', alpha=0.7, capsize=3.5)
+            label='Test', alpha=0.7, capsize=2)
 
     ax = _add_lines(ax, y, use_cross_view_corr)
 

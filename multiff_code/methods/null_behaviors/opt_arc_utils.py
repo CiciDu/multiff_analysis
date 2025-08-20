@@ -7,7 +7,15 @@ import os
 import warnings
 import numpy as np
 from math import pi
+import matplotlib.pyplot as plt
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
+
+def winsorize_curv(data):
+    # this is based on 5 std of curv_of_traj of all time points in Bruno 0328's data
+    low = -0.02
+    high = 0.02
+    return data.clip(lower=low, upper=high)
 
 
 def extend_arc_from_curv_of_traj(curv_of_traj_df, monkey_information, arc_length=300):
@@ -318,40 +326,57 @@ def _supply_curvature_df_with_opt_arc_info(curvature_df, ff_radius_for_opt_arc, 
 
 
 def find_curvature_lower_and_upper_bound(ff_angle, ff_distance, ff_radius=10):
+    """
+    Compute lower and upper curvature bounds for arcs that just graze
+    the reward boundary around a firefly (modeled as a disk).
 
-    # calculate_ff_angle_boundaries
+    Args:
+        ff_angle (np.ndarray): Angle to firefly center (radians).
+        ff_distance (np.ndarray): Distance to firefly center.
+        ff_radius (float, optional): Firefly disk radius (default=10).
+
+    Returns:
+        (np.ndarray, np.ndarray): Lower and upper curvature bounds.
+    """
+
+    # --- Step 1: Angular spread of firefly disk ---
+    # Firefly subtends an angular half-width θ = arcsin(r / d)
+    # where r = ff_radius, d = distance to center.
     side_opposite = ff_radius
-    # hypotenuse cannot be smaller than side_opposite
-    hypotenuse = np.clip(ff_distance, a_min=side_opposite, a_max=2000)
-    theta = np.arcsin(np.divide(side_opposite, hypotenuse))
+    hypotenuse = np.clip(ff_distance, a_min=side_opposite, a_max=2000)  
+    # ensure hypotenuse >= radius to avoid invalid arcsin
+    theta = np.arcsin(side_opposite / hypotenuse)
 
+    # Angular interval [center - θ, center + θ]
     all_ff_angle_lower_bound = ff_angle - np.abs(theta)
     all_ff_angle_upper_bound = ff_angle + np.abs(theta)
 
-    # also make sure that the angles are within (-pi/4, pi/4)
-    all_ff_angle_lower_bound = np.clip(
-        all_ff_angle_lower_bound, a_min=-pi/4, a_max=pi/4)
-    all_ff_angle_upper_bound = np.clip(
-        all_ff_angle_upper_bound, a_min=-pi/4, a_max=pi/4)
+    # --- Step 2: Clip to field of view ---
+    # Task constraint: monkey only considers arcs within [-π/4, π/4].
+    all_ff_angle_lower_bound = np.clip(all_ff_angle_lower_bound, -pi/4, pi/4)
+    all_ff_angle_upper_bound = np.clip(all_ff_angle_upper_bound, -pi/4, pi/4)
 
-    # if the lower bound equals the upper bound for any ff, then there's a problem. One needs to raise an error.
+    # Warn if angular interval collapsed (e.g. target too far sideways).
     if np.any(all_ff_angle_lower_bound == all_ff_angle_upper_bound):
-        print("Warnings: At least one ff has a lower bound of ff_angle_boundary equal to its upper bound after clipping, meaning that the ff's angle to boundary is greater than 90 degrees. Please check the input.")
+        print("Warning: At least one firefly has lower == upper angle bound "
+              "after clipping (likely > 90° to boundary). Check input.")
 
-    # get ff_distance respectively for the lower-bound and upper-bound angles
-    # ff_distance_to_edge = np.abs(np.cos(theta)*ff_distance) # and this should be the same for both lower and upper bound
-    # ff_distance_to_edge[ff_distance <= ff_radius] = 0
-
+    # --- Step 3: Effective distance to boundary ---
+    # Project distance to the left/right edges of the disk, relative to center.
     lower_theta = np.abs(all_ff_angle_lower_bound - ff_angle)
     upper_theta = np.abs(all_ff_angle_upper_bound - ff_angle)
-    ff_distance_to_edge_for_lower_bound = np.abs(
-        np.cos(lower_theta)*ff_distance)
-    ff_distance_to_edge_for_upper_bound = np.abs(
-        np.cos(upper_theta)*ff_distance)
+
+    # Distance from monkey to boundary point at each angle.
+    ff_distance_to_edge_for_lower_bound = np.abs(np.cos(lower_theta) * ff_distance)
+    ff_distance_to_edge_for_upper_bound = np.abs(np.cos(upper_theta) * ff_distance)
+
+    # If monkey is already inside the firefly disk, boundary distance = 0.
     ff_distance_to_edge_for_lower_bound[ff_distance <= ff_radius] = 0
     ff_distance_to_edge_for_upper_bound[ff_distance <= ff_radius] = 0
 
-    # supress warnings because invalid values might occur
+    # --- Step 4: Convert (angle, distance) → curvature ---
+    # For each bound, compute arc curvature that would exactly reach
+    # the firefly boundary point. Suppress warnings for invalid geometry.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         curvature_lower_bound, _ = find_arc_curvature(
@@ -359,14 +384,19 @@ def find_curvature_lower_and_upper_bound(ff_angle, ff_distance, ff_radius=10):
         curvature_upper_bound, _ = find_arc_curvature(
             all_ff_angle_upper_bound, ff_distance_to_edge_for_upper_bound)
 
-    # deal with the case where the monkey is within the reward boundary of the ff
-
+    # --- Step 5: Inside-boundary case ---
+    # If the monkey is already within ff_radius, any curvature in the FOV is valid.
     curvature_lower_bound[ff_distance <= ff_radius] = -math.pi/4
     curvature_upper_bound[ff_distance <= ff_radius] = math.pi/4
 
-    # if either of the bound is of a different sign from ff_angle, then it will become 0, with the same sign as ff_angle
+
+    # --- Step 6: Enforce sign consistency ---
+    # Ensure curvatures bend toward the firefly:
+    # If curvature sign mismatches firefly angle, reset bound to 0
+    # (arc straight toward firefly).
     curvature_lower_bound = np.where(
-        np.sign(curvature_lower_bound) != np.sign(ff_angle), 0, curvature_lower_bound)
+        np.sign(curvature_lower_bound) != np.sign(ff_angle), 0, curvature_lower_bound
+    )
     curvature_upper_bound = np.where(
         np.sign(curvature_upper_bound) != np.sign(ff_angle), 0, curvature_upper_bound)
 
@@ -418,8 +448,46 @@ def find_arc_curvature(ff_angle, ff_distance, invalid_curvature_ok=False):
     # # for ff to the right
     # delta_monkey_angle[ff_angle < 0] = -delta_monkey_angle[ff_angle < 0]
     # curvature = delta_monkey_angle/uniform_arc_length
+    
 
     return curvature, all_arc_radius
+
+
+def winsorize_func(data, method="std", n=4, lower_pct=1, upper_pct=99):
+    """
+    Winsorize data either by standard deviations from the mean or by percentiles.
+    
+    Parameters
+    ----------
+    data : array-like
+        Input data (list, numpy array, or pandas Series).
+    method : {"std", "percentile"}, default="std"
+        Method for winsorization:
+        - "std": cap values beyond n standard deviations from the mean.
+        - "percentile": cap values outside [lower_pct, upper_pct] percentiles.
+    n : int or float, default=3
+        Number of standard deviations from the mean (used if method="std").
+    lower_pct : float, default=1
+        Lower percentile for winsorization (used if method="percentile").
+    upper_pct : float, default=99
+        Upper percentile for winsorization (used if method="percentile").
+        
+    Returns
+    -------
+    winsorized : np.ndarray
+        Winsorized data as numpy array.
+    """
+    arr = np.asarray(data)
+    
+    if method == "std":
+        mean, std = arr.mean(), arr.std()
+        lower, upper = mean - n * std, mean + n * std
+    elif method == "percentile":
+        lower, upper = np.percentile(arr, [lower_pct, upper_pct])
+    else:
+        raise ValueError("method must be 'std' or 'percentile'")
+    
+    return np.clip(arr, lower, upper)
 
 
 def _find_cartesian_arc_starting_and_ending_angle(angle_from_center_to_monkey, angle_from_center_to_stop, ff_distance, ff_angle, arc_end_direction, whether_ff_behind=None,
@@ -533,3 +601,41 @@ def _deal_with_delta_angles_greater_than_90_degrees(df, reward_boundary_radius=2
             df.loc[too_big_angle & ff_at_right, 'arc_ending_angle'] = df.loc[too_big_angle &
                                                                              ff_at_right, 'arc_starting_angle'] - (pi/2 - 0.00001)
     return df
+
+
+def plot_winsorization_with_cutoffs(data, method="std", n=3, lower_pct=1, upper_pct=99, bins=50):
+    """
+    Plot histogram of original vs winsorized data,
+    with vertical cutoff lines and marked clipped points.
+    """
+    winsorized = winsorize_func(data, method=method, n=n, 
+                           lower_pct=lower_pct, upper_pct=upper_pct)
+    
+    # Find cutoffs
+    arr = np.asarray(data)
+    if method == "std":
+        mean, std = arr.mean(), arr.std()
+        lower, upper = mean - n * std, mean + n * std
+        title = f"std, n={n}"
+    elif method == "percentile":
+        lower, upper = np.percentile(arr, [lower_pct, upper_pct])
+        title = f"percentile, pct={lower_pct}-{upper_pct}"
+    
+    # Plot histogram
+    counts, bins_hist, _ = plt.hist(arr, bins=bins, alpha=0.5, label="Original", density=True)
+    plt.hist(winsorized, bins=bins, alpha=0.5, label="Winsorized", density=True)
+    
+    # Vertical lines for cutoffs
+    plt.axvline(lower, color="red", linestyle="--", label="Lower cutoff")
+    plt.axvline(upper, color="green", linestyle="--", label="Upper cutoff")
+    
+    # Mark clipped points (original values outside cutoffs)
+    clipped_points = arr[(arr < lower) | (arr > upper)]
+    if len(clipped_points) > 0:
+        y_max = counts.max()
+        plt.scatter(clipped_points, np.full_like(clipped_points, y_max*0.05),
+                    color="red", marker="x", label="Clipped points")
+    
+    plt.legend()
+    plt.title(title)
+    plt.show()

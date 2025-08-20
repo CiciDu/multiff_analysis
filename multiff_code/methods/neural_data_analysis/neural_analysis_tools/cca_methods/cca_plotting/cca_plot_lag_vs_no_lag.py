@@ -44,7 +44,7 @@ def plot_cca_lag_vs_nolag_and_train_vs_test(
         plt.tight_layout()
         plt.show()
         # print("=" * 150)
-        break
+
 
 
 def get_plot_config(mode, train_test_statuses, lag_statuses):

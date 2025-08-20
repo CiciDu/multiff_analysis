@@ -129,7 +129,7 @@ def add_target_opt_arc_dheading_to_target_df(target_df, curv_of_traj_df, monkey_
         ff_df = ff_df.rename(columns={'target_x': 'ff_x', 'target_y': 'ff_y', 'target_angle': 'ff_angle',
                                       'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
 
-        curv_df = curvature_utils.make_curvature_df(ff_df, curv_of_traj_df, clean=False,
+        curv_df = curvature_utils.make_curvature_df(ff_df, curv_of_traj_df, clean=True,
                                                     remove_invalid_rows=False,
                                                     invalid_curvature_ok=True,
                                                     ignore_error=True,
@@ -274,7 +274,7 @@ def _add_curv_info_to_behav_data_by_point(behav_data_by_bin, curv_of_traj_df, mo
     ff_df = ff_df.rename(columns={'target_x': 'ff_x', 'target_y': 'ff_y', 'target_angle': 'ff_angle',
                                   'target_index': 'ff_index', 'target_distance': 'ff_distance', 'target_angle_to_boundary': 'ff_angle_boundary'})
 
-    curv_df = curvature_utils.make_curvature_df(ff_df, curv_of_traj_df, clean=False,
+    curv_df = curvature_utils.make_curvature_df(ff_df, curv_of_traj_df, clean=True,
                                                 remove_invalid_rows=False,
                                                 invalid_curvature_ok=True,
                                                 ignore_error=True,

@@ -53,7 +53,7 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=1
     return curvature_df
 
 
-def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=10, clean=False,
+def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=10, clean=True,
                        invalid_curvature_ok=False,
                        include_cntr_arc_curv=True, include_opt_arc_curv=True,
                        opt_arc_stop_first_vis_bdry=True, ignore_error=False):
@@ -143,7 +143,7 @@ def add_d_heading_info(curvature_df, include_cntr_arc_curv=True, include_opt_arc
             curvature_df['opt_arc_end_direction'].values
 
 
-def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df, ff_caught_T_new=None, clean=False):
+def find_curvature_df_for_ff_in_duration(ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df, ff_caught_T_new=None, clean=True):
     if curv_of_traj_df is None:
         raise ValueError(
             "Please provide curv_of_traj_df, since it's needed to calculate the curvature of the trajectory.")
@@ -363,22 +363,35 @@ def _find_polar_arc_starting_and_ending_angles(arc_radius, arc_measure, arc_end_
     return arc_starting_angle, arc_ending_angle
 
 
+# def clean_curvature_info(curvature_df, include_opt_arc_curv=True):
+#     curvature_df['curv_of_traj'] = curvature_df['curv_of_traj'].clip(
+#         lower=-0.5, upper=0.5)
+#     if include_opt_arc_curv:
+#         curvature_df['curvature_lower_bound'] = curvature_df['curvature_lower_bound'].clip(
+#             lower=-20, upper=2)
+#         curvature_df['curvature_upper_bound'] = curvature_df['curvature_upper_bound'].clip(
+#             lower=-2, upper=20)
+#         curvature_df['opt_arc_curv'] = curvature_df['opt_arc_curv'].clip(
+#             lower=-0.2, upper=0.2)
+#         if 'curv_diff' in curvature_df.columns:
+#             curvature_df['curv_diff'] = curvature_df['curv_diff'].clip(
+#                 lower=-0.6, upper=0.6)
+#         if 'abs_curv_diff' in curvature_df.columns:
+#             curvature_df['abs_curv_diff'] = np.abs(
+#                 curvature_df['curv_diff'].values)
+
 def clean_curvature_info(curvature_df, include_opt_arc_curv=True):
-    curvature_df['curv_of_traj'] = curvature_df['curv_of_traj'].clip(
-        lower=-0.5, upper=0.5)
+    cols_to_winsorize = ['curv_of_traj']
+    curvature_df['curv_of_traj'] = opt_arc_utils.winsorize_curv(
+        curvature_df['curv_of_traj'])
     if include_opt_arc_curv:
-        curvature_df['curvature_lower_bound'] = curvature_df['curvature_lower_bound'].clip(
-            lower=-20, upper=2)
-        curvature_df['curvature_upper_bound'] = curvature_df['curvature_upper_bound'].clip(
-            lower=-20, upper=-2)
-        curvature_df['opt_arc_curv'] = curvature_df['opt_arc_curv'].clip(
-            lower=-0.2, upper=0.2)
-        if 'curv_diff' in curvature_df.columns:
-            curvature_df['curv_diff'] = curvature_df['curv_diff'].clip(
-                lower=-0.6, upper=0.6)
-        if 'abs_curv_diff' in curvature_df.columns:
-            curvature_df['abs_curv_diff'] = np.abs(
-                curvature_df['curv_diff'].values)
+        for col in ['curvature_lower_bound', 'curvature_upper_bound', 'opt_arc_curv', 'curv_diff', 'abs_curv_diff']:
+            if col in curvature_df.columns:
+                cols_to_winsorize.append(col)
+                curvature_df[col] = opt_arc_utils.winsorize_curv(
+                    curvature_df[col])
+    print(f'Note: Winsorized {cols_to_winsorize}')
+    return curvature_df
 
 
 def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_information=None, ff_caught_T_new=None, curv_of_traj_df=None):
@@ -420,7 +433,8 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
                 point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
             # we fill up the NAs for curv_of_traj
             df.loc[curv_traj_na_index, 'curv_of_traj'] = curv_of_traj
-            df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
+            df['curv_of_traj'] = opt_arc_utils.winsorize_curv(
+                df['curv_of_traj'])
     else:
         # we temporarily add curv_of_traj to use it for filling up NAs for other columns. Then we'll drop it at the end.
         curv_of_traj_exists = False
@@ -431,7 +445,8 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
         curv_of_traj = trajectory_info.find_trajectory_arc_info(
             point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
         df['curv_of_traj'] = curv_of_traj
-        df['curv_of_traj'] = df['curv_of_traj'].clip(lower=-0.5, upper=0.5)
+        df['curv_of_traj'] = opt_arc_utils.winsorize_curv(
+            df['curv_of_traj'])
 
     # Take into account the cases where the monkey is inside the reward boundary of a ff, in which case the opt_arc_curv value shall be the same as curv_of_traj
     if 'opt_arc_curv' in df.columns:
@@ -471,8 +486,8 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
     if 'curvature_lower_bound' in df.columns:  # this should mean that curvature_lower_bound is also in df.columns
         ff_left_na_index = (df['ff_angle_boundary'] >
                             0) & df['curvature_lower_bound'].isna()
-        df.loc[ff_left_na_index, ['curvature_lower_bound', 'curvature_upper_bound']] = np.array(
-            [0, 200])  # note: positive number is to the left
+        df.loc[ff_left_na_index, ['curvature_lower_bound',
+                                  'curvature_upper_bound']] = np.array([0, 200])  # note: positive number is to the left
         ff_right_na_index = (df['ff_angle_boundary'] <
                              0) & df['curvature_lower_bound'].isna()
         df.loc[ff_right_na_index, ['curvature_lower_bound',

@@ -293,7 +293,7 @@ def _find_ff_curv_df(ff_index, current_plotly_key_comp, ff_dataframe, monkey_inf
     duration_to_plot = current_plotly_key_comp['duration_to_plot']
     row = current_plotly_key_comp['row']
     ff_curv_df = curvature_utils.find_curvature_df_for_ff_in_duration(
-        ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df,  ff_caught_T_new=ff_caught_T_new, clean=False)
+        ff_dataframe, ff_index, duration_to_plot, monkey_information, curv_of_traj_df,  ff_caught_T_new=ff_caught_T_new, clean=True)
     ff_curv_df['rel_time'] = ff_curv_df['time'] - row.stop_time
     ff_curv_df = ff_curv_df.merge(
         monkey_information[['point_index', 'cum_distance']], on='point_index', how='left')

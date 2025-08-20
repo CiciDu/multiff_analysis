@@ -79,13 +79,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.overall_params['remove_i_o_modify_rows_with_big_ff_angles'] = remove_i_o_modify_rows_with_big_ff_angles
         self.overall_params['use_curv_to_ff_center'] = use_curv_to_ff_center
 
-
-
         self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
             ref_point_value, ref_point_mode)
         self.add_info_to_nxt_ff_and_cur_ff_df(deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
-                                               remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
-
+                                              remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
 
         self._take_out_info_counted()
         self._find_curv_of_traj_counted()
@@ -125,16 +122,14 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
             ref_point_value, ref_point_mode)
         self.add_info_to_nxt_ff_and_cur_ff_df(deal_with_rows_with_big_ff_angles=deal_with_rows_with_big_ff_angles,
-                                               remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
+                                              remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
 
         self.cur_and_nxt_ff_from_ref_df = self._make_cur_and_nxt_ff_from_ref_df()
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok, save_data=save_data,
                                                                                            merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
-
-
     def add_info_to_nxt_ff_and_cur_ff_df(self, deal_with_rows_with_big_ff_angles=True,
-                                        remove_i_o_modify_rows_with_big_ff_angles=False):
+                                         remove_i_o_modify_rows_with_big_ff_angles=False):
         if deal_with_rows_with_big_ff_angles:
             self._deal_with_rows_with_big_ff_angles(
                 remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
@@ -235,7 +230,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                     'ref_point_value must be negative for ref_point_mode = "distance"')
             self.ref_point_descr = 'based on %d cm into past' % ref_point_value
             # self.ref_point_column = 'rel_distance'
-            self.ref_point_column = 'rel_time' # now, for the sake of the neural plots, we'll just use 'rel_time'
+            # now, for the sake of the neural plots, we'll just use 'rel_time'
+            self.ref_point_column = 'rel_time'
             self.used_points_n_seconds_or_cm_ago = True
         elif ref_point_mode == 'time after cur ff visible':
             self.ref_point_descr = 'based on %d s ' % ref_point_value + \
@@ -467,10 +463,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         opt_arc_stop_first_vis_bdry = True if (
             self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
 
-        self.nxt_curv_df = curvature_utils.make_curvature_df(self.nxt_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information,
+        self.nxt_curv_df = curvature_utils.make_curvature_df(self.nxt_ff_df_modified, self.curv_of_traj_df, clean=True, monkey_information=self.monkey_information,
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
                                                              invalid_curvature_ok=True, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
-        self.cur_curv_df = curvature_utils.make_curvature_df(self.cur_ff_df_modified, self.curv_of_traj_df, clean=False, monkey_information=self.monkey_information,
+        self.cur_curv_df = curvature_utils.make_curvature_df(self.cur_ff_df_modified, self.curv_of_traj_df, clean=True, monkey_information=self.monkey_information,
                                                              ff_caught_T_new=self.ff_caught_T_new, remove_invalid_rows=False,
                                                              invalid_curvature_ok=invalid_curvature_of_cur_ff_ok, ignore_error=True, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
 

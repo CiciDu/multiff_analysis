@@ -3,6 +3,7 @@ from data_wrangling import specific_utils
 from null_behaviors import curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils
 from decision_making_analysis.GUAT import GUAT_and_TAFT
+from null_behaviors import opt_arc_utils
 
 import numpy as np
 import math
@@ -48,6 +49,8 @@ def find_trajectory_arc_info(point_index_array, curv_of_traj_df, ff_caught_T_new
                                            'curv_of_traj'].values
     except:
         print('Other errors?')
+
+    curv_of_traj = opt_arc_utils.winsorize_curv(curv_of_traj)
 
     return curv_of_traj
 

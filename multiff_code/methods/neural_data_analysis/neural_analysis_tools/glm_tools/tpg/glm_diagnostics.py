@@ -99,7 +99,7 @@ def single_block_fit(prefix: str, design_df: pd.DataFrame, y: np.ndarray, dt: fl
         prefix + '_rc')] or [prefix]
     X = design_df[cols]
     res = fit_poisson_glm_trials(
-        X, y, dt, trial_ids, add_const=True, l2=0.0, cluster_se=FalseTrue)
+        X, y, dt, trial_ids, add_const=True, l2=0.0, cluster_se=False)
     mu = predict_mu(res, X, dt)
     dev = poisson_deviance(y, mu)
     null = poisson_deviance(y, np.full_like(y, y.mean()))
