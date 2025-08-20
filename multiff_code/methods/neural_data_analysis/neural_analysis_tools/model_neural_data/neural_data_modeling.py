@@ -69,7 +69,7 @@ def get_y_var_lr_df(binned_spikes_matrix, final_behavioral_data, verbose=False):
     return y_var_lr_df
 
 
-def conduct_cca(X1_sc, X2_sc, n_components=10, plot_correlations=True, reg=0.0):
+def conduct_cca(X1_sc, X2_sc, n_components=10, plot_correlations=True, reg=1e-2):
     cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
     cca.train([X1_sc, X2_sc])
     print('Canonical Correlation Per Component Pair:', cca.cancorrs)

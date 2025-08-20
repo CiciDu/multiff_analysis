@@ -22,7 +22,7 @@ class CCAclass():
         self.X1_sc_df = pd.DataFrame(self.X1_sc, columns=self.X1.columns)
         self.X2_sc_df = pd.DataFrame(self.X2_sc, columns=self.X2.columns)
 
-    def conduct_cca(self, n_components=10, plot_correlations=True, reg=0.0):
+    def conduct_cca(self, n_components=10, plot_correlations=True, reg=1e-2):
         # make sure components are not more than the number of features
         n_components = min(n_components, len(
             self.X1.columns), len(self.X2.columns))
