@@ -283,7 +283,7 @@ def _add_curv_info_to_behav_data_by_point(behav_data_by_bin, curv_of_traj_df, mo
     behav_data_by_bin = behav_data_by_bin.merge(curv_df[[
         'point_index', 'curv_of_traj', 'opt_arc_d_heading']].drop_duplicates(), on='point_index', how='left')
     behav_data_by_bin.rename(columns={
-        'curv_of_traj': 'traj_curv', 'opt_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
+        'opt_arc_d_heading': 'target_opt_arc_dheading'}, inplace=True)
 
     return behav_data_by_bin
 

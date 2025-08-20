@@ -94,12 +94,12 @@ def single_block_fit(prefix: str, design_df: pd.DataFrame, y: np.ndarray, dt: fl
 
     Returns a dict with deviance and pseudo-R^2 vs the null model.
     """
-    from glm_fit_metrics import fit_poisson_glm_trials, predict_mu, poisson_deviance
+    from glm_fit import fit_poisson_glm_trials, predict_mu, poisson_deviance
     cols = [c for c in design_df.columns if c.startswith(
         prefix + '_rc')] or [prefix]
     X = design_df[cols]
     res = fit_poisson_glm_trials(
-        X, y, dt, trial_ids, add_const=True, l2=0.0, cluster_se=True)
+        X, y, dt, trial_ids, add_const=True, l2=0.0, cluster_se=FalseTrue)
     mu = predict_mu(res, X, dt)
     dev = poisson_deviance(y, mu)
     null = poisson_deviance(y, np.full_like(y, y.mean()))

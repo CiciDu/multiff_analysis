@@ -96,7 +96,7 @@ def build_glm_design_with_trials(
     spike_counts: Optional[np.ndarray] = None,
     history_basis: Optional[np.ndarray] = None,
     extra_covariates: Optional[Dict[str, np.ndarray]] = None,
-    use_trial_FE: bool = False,
+    use_trial_FE: bool = True,
 ) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
     """Combine stimulus, history, and extra covariates into a DataFrame design.
 

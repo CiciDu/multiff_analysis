@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg.glm_fit_metrics import fit_poisson_glm_trials, predict_mu, poisson_deviance, pseudo_R2
+from neural_data_analysis.neural_analysis_tools.glm_tools.tpg.glm_fit import fit_poisson_glm_trials, predict_mu, poisson_deviance, pseudo_R2
 
 
 def trialwise_folds(
@@ -46,8 +46,8 @@ def fit_and_score_cv(
     *,
     n_splits: int = 5,
     l2: float = 0.0,
-    use_trial_FE: bool = False,
-    cluster_se: bool = True,
+    use_trial_FE: bool = True,
+    cluster_se: bool = False,
     random_state: Optional[int] = 0,
 ) -> pd.DataFrame:
     """Run trial-wise K-fold CV and return per-fold deviance and pseudo-R^2.
@@ -68,7 +68,7 @@ def fit_and_score_cv(
         y_val = y[val_mask]
 
         res = fit_poisson_glm_trials(
-            X_train, y_train, dt, trial_ids[train_mask], add_const=True, l2=l2, cluster_se=cluster_se
+            X_train, y_train, dt, trial_ids[train_mask], add_const=True, l2=l2, cluster_se=False
         )
         mu_val = predict_mu(res, X_val, dt)
         mu_null = np.full_like(y_val, y_train.mean(), dtype=float)

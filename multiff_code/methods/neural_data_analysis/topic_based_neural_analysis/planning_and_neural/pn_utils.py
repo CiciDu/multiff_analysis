@@ -289,3 +289,29 @@ def calculate_angle_from_stop_to_nxt_ff(monkey_information, point_index_before_s
     angle_from_stop_to_nxt_ff = specific_utils.calculate_angles_to_ff_centers(
         nxt_ff_x, nxt_ff_y, mx_before_stop, my_before_stop, m_angle_before_stop)
     return m_angle_before_stop, angle_from_stop_to_nxt_ff
+
+def add_ff_visible_dummy(df, ff_index_col, ff_dataframe):
+    # Keep only rows where the FF is visible
+    
+    right = (
+        ff_dataframe.loc[ff_dataframe['visible'].astype(bool), ['ff_index', 'point_index']]
+        .rename(columns={'ff_index': ff_index_col})   # align key name
+        .drop_duplicates()                            # avoid merge blow-up
+        .assign(whether_ff_visible_dummy=1)
+    )
+
+    out = df.merge(right, on=[ff_index_col, 'point_index'], how='left')
+    out['whether_ff_visible_dummy'] = out['whether_ff_visible_dummy'].fillna(0).astype('uint8')
+    return out
+
+def add_ff_in_memory_dummy(df, ff_index_col, ff_dataframe, max_in_memory_time_since_seen=2):
+    # Keep only rows where the FF is in memory
+    ff_dataframe_in_memory = ff_dataframe[ff_dataframe['time_since_last_vis'] < max_in_memory_time_since_seen].copy()
+
+    ff_dataframe_in_memory = ff_dataframe_in_memory[['ff_index', 'point_index']].rename(columns={'ff_index': ff_index_col}).drop_duplicates()   # align key name
+    ff_dataframe_in_memory['whether_ff_in_memory_dummy'] = 1
+    
+    out = df.merge(ff_dataframe_in_memory, on=[ff_index_col, 'point_index'], how='left')
+    out['whether_ff_in_memory_dummy'] = out['whether_ff_in_memory_dummy'].fillna(0).astype('uint8')
+    
+    return out

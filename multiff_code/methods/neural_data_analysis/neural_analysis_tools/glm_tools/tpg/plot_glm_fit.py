@@ -4,7 +4,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from scipy import signal
-
+import matplotlib.pyplot as plt
 
 def _coef_series(result, design_df):
     """Extract coefficients as a Pandas Series indexed by column names."""
@@ -261,7 +261,6 @@ def angle_tuning_vs_time(result, design_df, meta, base_prefix: str = 'cur_angle'
 
 def plot_angle_tuning(result, design_df, meta, dt):
     """Plot sin/cos kernels, amplitude, and preferred angle trajectories."""
-    import matplotlib.pyplot as plt
     t_idx, k_sin, k_cos, A, phi = angle_tuning_vs_time(result, design_df, meta)
 
     plt.figure()
@@ -286,3 +285,52 @@ def plot_angle_tuning(result, design_df, meta, dt):
     plt.ylabel("Preferred angle (rad)")
     plt.title("Preferred angle vs lag")
     plt.show()
+
+
+def plot_history_kernels_population(hist_df, *, overlay_mean=True, heatmap=False, max_overlays=60):
+    """Population viz for spike-history kernels.
+
+    Parameters
+    ----------
+    hist_df : DataFrame
+        Output of collect_history_kernels_across_neurons.
+    overlay_mean : bool
+        If True, overlay per-neuron curves (limited to max_overlays) plus mean ± 95% CI.
+    heatmap : bool
+        If True, also show a neuron × lag heatmap of kernel means.
+    max_overlays : int
+        Cap number of individual overlays for readability.
+    """
+
+    # Mean ± 95% CI across neurons at each lag
+    grp = hist_df.groupby('lag_idx', as_index=False).agg(
+        lag_s=('lag_s', 'first'),
+        mean=('mean', 'mean'),
+        lo=('mean', lambda x: x.mean() - 1.96 * x.std(ddof=1) / np.sqrt(len(x))),
+        hi=('mean', lambda x: x.mean() + 1.96 * x.std(ddof=1) / np.sqrt(len(x))),
+    )
+
+    # Overlays
+    if overlay_mean:
+        plt.figure()
+        # thin overlays
+        for nid, df_n in hist_df.groupby('neuron'):
+            if nid >= max_overlays:
+                break
+            plt.plot(df_n['lag_s'], df_n['mean'], alpha=0.3)
+        # mean band
+        plt.plot(grp['lag_s'], grp['mean'], linewidth=2, label='population mean')
+        plt.fill_between(grp['lag_s'], grp['lo'], grp['hi'], alpha=0.2, label='95% CI (across neurons)')
+        plt.xlabel('Time lag (s)'); plt.ylabel('History weight'); plt.title('Spike-history kernels (population)')
+        plt.legend(); plt.show()
+
+    # Heatmap (neuron × lag)
+    if heatmap:
+        # pivot to (neuron × lag_idx)
+        pivot = hist_df.pivot(index='neuron', columns='lag_idx', values='mean').sort_index()
+        plt.figure()
+        plt.imshow(pivot.values, aspect='auto', origin='lower',
+                   extent=[hist_df['lag_s'].min(), hist_df['lag_s'].max(), pivot.index.min(), pivot.index.max()])
+        plt.colorbar(label='History weight')
+        plt.xlabel('Time lag (s)'); plt.ylabel('Neuron'); plt.title('Spike-history kernels (heatmap)')
+        plt.show()

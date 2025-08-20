@@ -18,7 +18,7 @@ from scipy import signal
 
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg.glm_bases import raised_cosine_basis, onset_from_mask_trials, angle_sin_cos, wrap_angle, _unique_trials, safe_poisson_lambda
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg.glm_design import build_glm_design_with_trials, lagged_design_from_signal_trials
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg.glm_fit_metrics import fit_poisson_glm_trials, predict_mu, poisson_deviance, pseudo_R2, per_trial_deviance
+from neural_data_analysis.neural_analysis_tools.glm_tools.tpg.glm_fit import fit_poisson_glm_trials, predict_mu, poisson_deviance, pseudo_R2, per_trial_deviance
 
 
 # -------- MultiFF glm_design builder --------
@@ -37,7 +37,7 @@ def build_multiff_design(
     speed: Optional[np.ndarray] = None,
     curvature: Optional[np.ndarray] = None,
     spike_counts: Optional[np.ndarray] = None,
-    use_trial_FE: bool = False,
+    use_trial_FE: bool = True,
 ) -> Tuple[pd.DataFrame, Optional[np.ndarray], Dict[str, np.ndarray]]:
     """Construct the MultiFF GLM glm_design and return ``(design_df, y, meta)``.
 
@@ -138,8 +138,8 @@ def fit_multiff_glm(
     curvature: Optional[np.ndarray] = None,
     spike_counts: np.ndarray,
     l2: float = 0.0,
-    use_trial_FE: bool = False,
-    cluster_se: bool = True,
+    use_trial_FE: bool = True,
+    cluster_se: bool = False,
 ):
     """End-to-end: build MultiFF glm_design, fit GLM, and compute basic metrics."""
     design_df, y, meta = build_multiff_design(
@@ -151,7 +151,7 @@ def fit_multiff_glm(
         spike_counts=spike_counts, use_trial_FE=use_trial_FE,
     )
     res = fit_poisson_glm_trials(
-        design_df, y, dt, trial_ids, add_const=True, l2=l2, cluster_se=cluster_se)
+        design_df, y, dt, trial_ids, add_const=True, l2=l2, cluster_se=False)
     mu = predict_mu(res, design_df, dt)
     mu_null = np.full_like(y, y.mean(), dtype=float)
     metrics = {
@@ -288,7 +288,7 @@ def simulate_multiff_trials(
         cur_dist=cur_dist, nxt_dist=nxt_dist,
         cur_angle=cur_angle, nxt_angle=nxt_angle,
         heading=heading, speed=speed, curvature=curvature,
-        spike_counts=None, use_trial_FE=False,
+        spike_counts=None, use_trial_FE=True,
     )
 
     cols = list(design_nohist.columns)

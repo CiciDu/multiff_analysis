@@ -207,10 +207,28 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             self.both_ff_across_time_df)
 
         self._check_for_duplicate_point_index()
+        
+        self.add_ff_visible_dummy_to_both_ff_across_time_df()
+        self.add_ff_in_memory_dummy_to_both_ff_across_time_df()
 
         self.both_ff_across_time_df.reset_index(drop=True, inplace=True)
-
+        
+    
         return self.both_ff_across_time_df
+    
+    def add_ff_visible_dummy_to_both_ff_across_time_df(self):
+        self.make_or_retrieve_ff_dataframe()
+        self.both_ff_across_time_df = pn_utils.add_ff_visible_dummy(self.both_ff_across_time_df, 'cur_ff_index', self.ff_dataframe)
+        self.both_ff_across_time_df.rename(columns={'whether_ff_visible_dummy': 'cur_ff_visible_dummy'}, inplace=True)
+        self.both_ff_across_time_df = pn_utils.add_ff_visible_dummy(self.both_ff_across_time_df, 'nxt_ff_index', self.ff_dataframe)
+        self.both_ff_across_time_df.rename(columns={'whether_ff_visible_dummy': 'nxt_ff_visible_dummy'}, inplace=True)
+        
+    def add_ff_in_memory_dummy_to_both_ff_across_time_df(self):
+        self.make_or_retrieve_ff_dataframe()
+        self.both_ff_across_time_df = pn_utils.add_ff_in_memory_dummy(self.both_ff_across_time_df, 'cur_ff_index', self.ff_dataframe)
+        self.both_ff_across_time_df.rename(columns={'whether_ff_in_memory_dummy': 'cur_ff_in_memory_dummy'}, inplace=True)
+        self.both_ff_across_time_df = pn_utils.add_ff_in_memory_dummy(self.both_ff_across_time_df, 'nxt_ff_index', self.ff_dataframe)
+        self.both_ff_across_time_df.rename(columns={'whether_ff_in_memory_dummy': 'nxt_ff_in_memory_dummy'}, inplace=True)
 
     def add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(self, both_ff_df):
         angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df).copy()
@@ -314,7 +332,6 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     def _add_traj_curv_to_df(self, df):
         df = df.merge(self.curv_of_traj_df[[
                       'point_index', 'curv_of_traj']], on='point_index', how='left')
-        df.rename(columns={'curv_of_traj': 'traj_curv'}, inplace=True)
         return df
 
     def _add_rel_x_and_y_to_both_ff_across_time_df(self):

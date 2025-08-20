@@ -52,9 +52,9 @@ target_columns = [
     'target_last_seen_distance',
     'target_last_seen_angle',
     'target_last_seen_angle_to_boundary',
-    #'target_visible_dummy', # this has 0 for all cells in decoding targets
+    # 'target_visible_dummy', # this has 0 for all cells in decoding targets
     'time_since_last_capture',
-    'traj_curv',
+    'curv_of_traj',
     'target_opt_arc_dheading',
     'time_target_last_seen',
     'distance_from_monkey_pos_target_last_seen',
@@ -114,4 +114,4 @@ behav_features_to_drop = [
     'trial',
     'turning_right',
     'valid_view_point'
-    ]
+]
