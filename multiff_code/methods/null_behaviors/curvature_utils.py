@@ -87,9 +87,9 @@ def _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=10,
         # curvature_df = curvature_df.sort_values(
         #     by=['point_index', 'abs_curv_diff', 'ff_distance'], ascending=[True, True, True])
 
-    if clean:
-        clean_curvature_info(
-            curvature_df, include_opt_arc_curv=include_opt_arc_curv)
+    # if clean:
+    #     clean_curvature_info(
+    #         curvature_df, include_opt_arc_curv=include_opt_arc_curv)
 
     return curvature_df
 
@@ -381,11 +381,13 @@ def _find_polar_arc_starting_and_ending_angles(arc_radius, arc_measure, arc_end_
 #                 curvature_df['curv_diff'].values)
 
 def clean_curvature_info(curvature_df, include_opt_arc_curv=True):
+    # seems like this is no longer needed because all the columns here will be cleaned in the process of being made
+    
     cols_to_winsorize = ['curv_of_traj']
     curvature_df['curv_of_traj'] = opt_arc_utils.winsorize_curv(
         curvature_df['curv_of_traj'])
     if include_opt_arc_curv:
-        for col in ['curvature_lower_bound', 'curvature_upper_bound', 'opt_arc_curv', 'curv_diff', 'abs_curv_diff']:
+        for col in ['curvature_lower_bound', 'curvature_upper_bound', 'opt_arc_curv']:
             if col in curvature_df.columns:
                 cols_to_winsorize.append(col)
                 curvature_df[col] = opt_arc_utils.winsorize_curv(
@@ -464,8 +466,8 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
     if 'opt_arc_curv' in df.columns:
         df.loc[within_ff_na_index,
                'opt_arc_curv'] = df.loc[within_ff_na_index, 'curv_of_traj'].values
-        df.loc[within_ff_na_index, 'opt_arc_curv'] = df.loc[within_ff_na_index,
-                                                            'opt_arc_curv'].clip(lower=-0.1, upper=0.1)
+        df.loc[within_ff_na_index, 'opt_arc_curv'] = opt_arc_utils.winsorize_curv(
+            df.loc[within_ff_na_index, 'opt_arc_curv'])
 
     # Fill NA values for other columns
     for column in ['curvature_lower_bound', 'curvature_upper_bound', 'curv_diff', 'abs_curv_diff']:
@@ -500,10 +502,10 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
     if 'opt_arc_curv' in df.columns:
         ff_left_na_index = (df['ff_angle_boundary'] >
                             0) & df['opt_arc_curv'].isna()
-        df.loc[ff_left_na_index, 'opt_arc_curv'] = 0.1
+        df.loc[ff_left_na_index, 'opt_arc_curv'] = opt_arc_utils.CURV_OR_TRAJ_UPPER_BOUND
         ff_right_na_index = (df['ff_angle_boundary'] <
                              0) & df['opt_arc_curv'].isna()
-        df.loc[ff_right_na_index, 'opt_arc_curv'] = -0.1
+        df.loc[ff_right_na_index, 'opt_arc_curv'] = opt_arc_utils.CURV_OR_TRAJ_LOWER_BOUND
         middle_ff_na_index = (df['ff_angle_boundary']
                               == 0) & df['opt_arc_curv'].isna()
         df.loc[middle_ff_na_index, 'opt_arc_curv'] = 0

@@ -1,7 +1,7 @@
 import math
 import pandas as pd
 from planning_analysis.show_planning import show_planning_utils
-from null_behaviors import show_null_trajectory
+from null_behaviors import show_null_trajectory, opt_arc_utils
 
 import os
 import warnings
@@ -10,12 +10,14 @@ from math import pi
 import matplotlib.pyplot as plt
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
+CURV_OR_TRAJ_UPPER_BOUND = 0.02
+CURV_OR_TRAJ_LOWER_BOUND = -0.02
 
 def winsorize_curv(data):
     # this is based on 5 std of curv_of_traj of all time points in Bruno 0328's data
-    low = -0.02
-    high = 0.02
-    return data.clip(lower=low, upper=high)
+    low = CURV_OR_TRAJ_LOWER_BOUND
+    high = CURV_OR_TRAJ_UPPER_BOUND
+    return np.clip(np.array(data), low, high)
 
 
 def extend_arc_from_curv_of_traj(curv_of_traj_df, monkey_information, arc_length=300):
@@ -298,8 +300,10 @@ def _supply_curvature_df_with_opt_arc_info(curvature_df, ff_radius_for_opt_arc, 
     all_ff_distance = curvature_df['ff_distance'].values.copy()
     curvature_lower_bound, curvature_upper_bound = find_curvature_lower_and_upper_bound(
         all_ff_angle, all_ff_distance, ff_radius=ff_radius_for_opt_arc)
-    curvature_df['curvature_lower_bound'] = curvature_lower_bound
-    curvature_df['curvature_upper_bound'] = curvature_upper_bound
+    curvature_df['curvature_lower_bound'] = opt_arc_utils.winsorize_curv(
+        curvature_lower_bound)
+    curvature_df['curvature_upper_bound'] = opt_arc_utils.winsorize_curv(
+        curvature_upper_bound)
     # clip curvature to be between lower and upper bound
     curvature_df['opt_arc_curv'] = np.clip(
         curvature_df['curv_of_traj'], curvature_df['curvature_lower_bound'], curvature_df['curvature_upper_bound'])

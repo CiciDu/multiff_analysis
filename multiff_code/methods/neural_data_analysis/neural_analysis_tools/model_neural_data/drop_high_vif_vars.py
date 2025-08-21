@@ -129,6 +129,16 @@ def get_vif_df(var_df, verbose=False) -> pd.DataFrame:
         inv_corr = np.linalg.pinv(corr)
 
     vif_values = np.diag(inv_corr)
+    
+    # VIF theory: must be >= 1 (since VIF = 1 / (1 - R^2), and 0 <= R^2 < 1).
+    # If numerical issues produce VIF < 1, it means collinearity/instability.
+    # Replace those with ∞ (infinite collinearity) and warn the user.
+    if (vif_values < 1.0).any():
+        print("⚠️ Warning: VIF values below 1 detected. "
+            "This indicates numerical instability or near-singular design. "
+            "They are being set to ∞.")
+    vif_values = np.where(vif_values < 1.0, np.inf, vif_values)
+
 
     vif_df = pd.DataFrame({
         'feature': X.columns,
