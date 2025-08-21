@@ -16,7 +16,7 @@ import math
 
 def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X',
                          max_components=20, features_per_fig=30, base_width=0.75, base_height=0.3,
-                         annotation_threshold=0.3, pval_threshold=0.05):
+                         annotation_threshold=0.2, pval_threshold=0.05):
     """
     Plots a heatmap of canonical loadings with features on y-axis and components on x-axis,
     split across multiple figures if needed. Adds asterisk for significant p-values and annotates

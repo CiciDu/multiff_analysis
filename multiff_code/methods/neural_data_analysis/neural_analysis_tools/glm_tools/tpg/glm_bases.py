@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, List, Optional, Tuple
 import numpy as np
+from typing import Tuple
+from scipy.interpolate import BSpline
 
 # -----------------
 # Trial helpers
@@ -115,6 +117,117 @@ def raised_cosine_basis(
     B = np.column_stack(B_cols) if B_cols else np.zeros((len(lags), 0))
     return lags, B
 
+
+
+
+def spline_basis(n_basis: int,
+                 t_max: float,
+                 dt: float,
+                 *,
+                 t_min: float = 0.0,
+                 degree: int = 3,
+                 log_spaced: bool = True,
+                 eps: float = 1e-3) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Causal clamped B-spline basis that tiles [t_min, t_max].
+
+    Parameters
+    ----------
+    n_basis : int
+        Number of spline basis functions (K).
+    t_max : float
+        Maximum lag (inclusive) in same units as dt.
+    dt : float
+        Step size for the lag grid.
+    t_min : float, optional
+        Minimum lag (default 0.0). Basis is causal if t_min >= 0.
+    degree : int, optional
+        B-spline degree (3 = cubic). Must satisfy n_basis >= degree+1.
+    log_spaced : bool, optional
+        If True, place knots uniformly in a warped (log) time axis to get
+        higher resolution near t_min and coarser far in the past.
+    eps : float, optional
+        Small offset to avoid log(0) when log_spaced=True.
+
+    Returns
+    -------
+    lags : (L,) ndarray
+        Lag grid from t_min to t_max (inclusive).
+    B : (L, K) ndarray
+        Basis matrix; each column integrates to 1 (sum * dt = 1).
+
+    Notes
+    -----
+    - Uses a *clamped* knot vector (end knots repeated degree+1 times),
+      producing K = n_knots - degree - 1 basis functions.
+    - If n_basis < degree+1, the function reduces `degree` to n_basis-1.
+    - With log_spaced=True, knots are uniform in the warped axis W = log(t + eps).
+      Evaluation is done at W(lags), so support is non-uniform in real time.
+    """
+    # Build lag grid
+    lags = np.arange(t_min, t_max + 1e-12, dt)
+    L = lags.size
+    K = int(n_basis)
+
+    if K < 1:
+        raise ValueError("n_basis must be >= 1")
+    # Ensure degree is compatible
+    deg = int(min(max(0, degree), max(0, K - 1)))
+
+    # Define warp (for knot placement only)
+    def warp(x):
+        return np.log(x + eps) if log_spaced else x
+
+    # Knot placement: clamped uniform knots in warped axis
+    W_min, W_max = warp(t_min), warp(t_max + 1e-12)
+
+    # Number of internal (distinct) knots (without multiplicity)
+    # For a clamped spline: K = n_knots - deg - 1  => n_knots = K + deg + 1
+    # We’ll construct a knot vector with:
+    #   [W_min repeated (deg+1)] + (M internal knots) + [W_max repeated (deg+1)]
+    # where M = K - deg - 1 (can be 0)
+    M = max(0, K - deg - 1)
+
+    if M > 0:
+        internal = np.linspace(W_min, W_max, M + 2)[1:-1]  # exclude endpoints
+        t_warp = np.concatenate([
+            np.full(deg + 1, W_min),
+            internal,
+            np.full(deg + 1, W_max)
+        ])
+    else:
+        # No internal knots: just clamped ends
+        t_warp = np.concatenate([
+            np.full(deg + 1, W_min),
+            np.full(deg + 1, W_max)
+        ])
+
+    # Verify knot vector length: should be K + deg + 1
+    assert t_warp.size == K + deg + 1, "Knot vector size mismatch."
+
+    # Evaluate B-spline basis at warped evaluation points
+    W_eval = warp(lags)
+    B = np.empty((L, K), dtype=float)
+
+    # Coefficient vectors to pick out each basis function
+    # Each basis function corresponds to a coefficient vector with a single 1
+    # (standard basis in coefficient space)
+    for k in range(K):
+        coeff = np.zeros(K)
+        coeff[k] = 1.0
+        spline_k = BSpline(t_warp, coeff, deg, extrapolate=False)
+        B[:, k] = spline_k(W_eval)
+        # Replace NaNs (outside support) with 0
+        B[:, k] = np.nan_to_num(B[:, k], nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Enforce non-negativity (numerical safety)
+    B[B < 0] = 0.0
+
+    # Normalize columns to unit area (sum * dt = 1)
+    col_sums = B.sum(axis=0, keepdims=True) * dt + 1e-12
+    B /= col_sums
+
+    return lags, B
 
 # -----------------
 # Link / intensity utilities

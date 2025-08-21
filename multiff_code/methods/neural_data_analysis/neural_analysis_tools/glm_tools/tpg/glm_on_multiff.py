@@ -149,7 +149,7 @@ def fit_multiff_glm(
         cur_angle=cur_angle, nxt_angle=nxt_angle,
         heading=heading, speed=speed, curvature=curvature,
         spike_counts=spike_counts, use_trial_FE=use_trial_FE,
-    )
+    ) 
     res = fit_poisson_glm_trials(
         design_df, y, dt, trial_ids, add_const=True, l2=l2, cluster_se=False)
     mu = predict_mu(res, design_df, dt)

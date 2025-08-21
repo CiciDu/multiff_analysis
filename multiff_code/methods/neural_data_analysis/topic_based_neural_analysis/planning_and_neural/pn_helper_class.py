@@ -357,7 +357,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref
         ff_df2 = ff_df[ff_df['ff_angle_boundary']
                        .between(-np.pi/4, np.pi/4)].copy()
-        curv_df = curvature_utils.make_curvature_df(ff_df2, self.curv_of_traj_df, clean=False,
+        curv_df = curvature_utils.make_curvature_df(ff_df2, self.curv_of_traj_df, clean= True,
                                                     remove_invalid_rows=False,
                                                     invalid_curvature_ok=True,
                                                     monkey_information=self.monkey_information,
@@ -465,7 +465,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                     opt_arc_stop_first_vis_bdry = True if (
                         self.opt_arc_type == 'opt_arc_stop_first_vis_bdry') else False
 
-                    curv_df = curvature_utils.make_curvature_df(ff_df_modified, self.curv_of_traj_df, clean=False,
+                    curv_df = curvature_utils.make_curvature_df(ff_df_modified, self.curv_of_traj_df, clean= True,
                                                                 monkey_information=self.monkey_information,
                                                                 ff_caught_T_new=self.ff_caught_T_new,
                                                                 remove_invalid_rows=False,

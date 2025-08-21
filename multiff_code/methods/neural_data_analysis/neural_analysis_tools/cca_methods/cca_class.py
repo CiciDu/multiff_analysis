@@ -1,5 +1,9 @@
 from neural_data_analysis.neural_analysis_tools.model_neural_data import neural_data_modeling
 from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plotting
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
+from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
+from neural_data_analysis.topic_based_neural_analysis.target_decoder import prep_target_decoder
+
 from statsmodels.multivariate.cancorr import CanCorr
 
 import numpy as np
@@ -50,6 +54,9 @@ class CCAclass():
             'X1_loading': self.X1_loading,
             'X2_loading': self.X2_loading,
         }
+        
+    # def conduct_cca_cv(self, n_components=10, plot_correlations=True, reg=1e-2, n_splits=10, random_state=42):
+    #     cca_cv_utils.combine_cca_cv_results(self, n_components=n_components, plot_correlations=plot_correlations, reg=reg, n_splits=n_splits, random_state=random_state)
 
     def get_loading_df(self):
         self.X1_loading_df = neural_data_modeling.make_loading_or_weight_df(
@@ -159,3 +166,6 @@ class CCAclass():
                                                                              keep_one_value_for_each_feature=keep_one_value_for_each_feature,
                                                                              max_features_to_show_per_plot=max_features_to_show_per_plot
                                                                              )
+
+
+

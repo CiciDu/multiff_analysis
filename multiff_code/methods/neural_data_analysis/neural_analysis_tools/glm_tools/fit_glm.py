@@ -4,6 +4,10 @@ from scipy.special import gammaln
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import PoissonRegressor
 from sklearn.model_selection import KFold
+import numpy as np
+from typing import Tuple
+from scipy.interpolate import BSpline
+
 
 # -------------------- Bases & design helpers --------------------
 
@@ -31,6 +35,7 @@ def raised_cosine_basis(n_basis, t_max, dt, t_min=0.0, log_spaced=True, eps=1e-3
     B = np.stack(B, axis=1)
     B /= (B.sum(axis=0, keepdims=True) * dt + 1e-12)  # unit area
     return lags, B
+
 
 def convolve_causal(x, k):
     """

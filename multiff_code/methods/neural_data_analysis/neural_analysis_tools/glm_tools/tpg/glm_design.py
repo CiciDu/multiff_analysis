@@ -88,6 +88,10 @@ def spike_history_design_with_trials(y_counts: np.ndarray, basis: np.ndarray, tr
     return Xh
 
 
+import numpy as np
+import pandas as pd
+from typing import Tuple, Dict, Optional, List  # keep your existing imports
+
 def build_glm_design_with_trials(
     dt: float,
     trial_ids: np.ndarray,
@@ -100,59 +104,38 @@ def build_glm_design_with_trials(
 ) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
     """Combine stimulus, history, and extra covariates into a DataFrame design.
 
-    "Trial fixed effects" can be added as one-hot columns with ``use_trial_FE``.
-
-    Parameters
-    ----------
-    dt : float
-        Bin width (seconds). Included for completeness and future checks.
-    trial_ids : ndarray of shape (T,)
-        Trial index per bin.
-    stimulus_dict : dict[str, ndarray], optional
-        Map from *stimulus name* → raw regressor (length T). If a name appears
-        in ``stimulus_basis_dict``, a lagged design is constructed using that basis.
-        Otherwise the raw column is included.
-    stimulus_basis_dict : dict[str, ndarray], optional
-        Map stimulus name → basis (L×K). Only names present here are expanded.
-    spike_counts : ndarray, optional
-        Spike counts; required if ``history_basis`` is provided.
-    history_basis : ndarray, optional
-        Basis for spike-history; if provided with ``spike_counts``, adds columns
-        ``hist_rc1, hist_rc2, ...``.
-    extra_covariates : dict[str, ndarray], optional
-        Additional columns (no lagging) such as speed/curvature.
-    use_trial_FE : bool, default=False
-        Whether to append one-hot trial indicators (drop_first=True to avoid
-        perfect collinearity with intercept).
-
-    Returns
-    -------
-    design_df : pandas.DataFrame
-        Model matrix with named columns, suitable for ``statsmodels``.
-    y : ndarray or None
-        ``spike_counts`` if provided, else ``None``.
+    If `stimulus_basis_dict[name]` is a list/tuple of bases, we expand that stimulus
+    with multiple bases, appending columns with suffixes `__b{idx}_rc{k}`.
     """
     T = len(trial_ids)
     cols: List[np.ndarray] = []
     names: List[str] = []
 
-    # Stimuli (possibly lagged via basis)
+    # Stimuli (possibly lagged via one or multiple bases)
     if stimulus_dict is not None:
         for name, x in stimulus_dict.items():
             if stimulus_basis_dict is not None and name in stimulus_basis_dict:
-                B = stimulus_basis_dict[name]
-                Xk = lagged_design_from_signal_trials(x, B, trial_ids)
-                for k in range(Xk.shape[1]):
-                    cols.append(Xk[:, k])
-                    names.append(f"{name}_rc{k+1}")
+                B_entry = stimulus_basis_dict[name]
+                # Allow a single basis or a list/tuple of bases
+                if isinstance(B_entry, (list, tuple)):
+                    for bi, Bi in enumerate(B_entry):
+                        Xk = lagged_design_from_signal_trials(x, Bi, trial_ids)
+                        for k in range(Xk.shape[1]):
+                            cols.append(Xk[:, k])
+                            names.append(f"{name}__b{bi}_rc{k+1}")
+                else:
+                    B = B_entry
+                    Xk = lagged_design_from_signal_trials(x, B, trial_ids)
+                    for k in range(Xk.shape[1]):
+                        cols.append(Xk[:, k])
+                        names.append(f"{name}_rc{k+1}")
             else:
                 cols.append(x)
                 names.append(name)
 
     # Spike history
     if spike_counts is not None and history_basis is not None:
-        Xh = spike_history_design_with_trials(
-            spike_counts, history_basis, trial_ids)
+        Xh = spike_history_design_with_trials(spike_counts, history_basis, trial_ids)
         for k in range(Xh.shape[1]):
             cols.append(Xh[:, k])
             names.append(f"hist_rc{k+1}")
@@ -166,7 +149,7 @@ def build_glm_design_with_trials(
     X = np.column_stack(cols) if cols else np.zeros((T, 0))
     design_df = pd.DataFrame(X, columns=names)
 
-    # Optionally add trial fixed effects (drop_first avoids dummy trap with intercept)
+    # Trial fixed effects
     if use_trial_FE:
         trial_FE = pd.get_dummies(trial_ids, prefix="trial", drop_first=True)
         design_df = pd.concat([design_df, trial_FE], axis=1)
