@@ -2,6 +2,8 @@
 import numpy as np
 import plotly.graph_objects as go
 from null_behaviors import show_null_trajectory
+from planning_analysis.plan_indicators import diff_in_curv_utils
+from visualization.plotly_tools import plotly_for_null_arcs, plotly_for_monkey
 
 
 def plot_with_additional_elements(snf,
@@ -244,3 +246,45 @@ def find_arc_info_for_plotting(null_arc_curv_df, stops_near_ff_row, nxt_ff_df_mo
                 null_arc_curv_df[null_arc_curv_df['ref_point_index']==ref_point_index], monkey_information)
     # arc_info = arc_info_for_plotting[arc_info_for_plotting['arc_point_index']==ref_point_index]
     return arc_info_for_plotting
+
+
+def prepare_to_illustrate_diff_in_d_curv(snf):
+    df = diff_in_curv_utils._prepare_cur_end_to_next_ff_data(
+        snf.heading_info_df, snf.nxt_ff_df_modified)
+    mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
+        df, use_curv_to_ff_center=False)
+    null_arc_curv_df = diff_in_curv_utils._make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=10)
+    null_arc_curv_df['ref_point_index'] = snf.heading_info_df['ref_point_index'].values
+    arc_from_cur_arc_end_to_next_ff = find_arc_info_for_plotting(null_arc_curv_df, snf.stops_near_ff_row, snf.nxt_ff_df_modified, snf.monkey_information)
+
+    monkey_info = diff_in_curv_utils._prepare_prev_stop_to_next_ff_data(snf.heading_info_df['nxt_ff_index'].values, snf.heading_info_df['point_index_before_stop'].values, snf.monkey_information, snf.ff_real_position_sorted, snf.ff_caught_T_new)
+    monkey_curv_df = diff_in_curv_utils._make_null_arc_curv_df(monkey_info, ff_radius_for_opt_arc=10)
+    monkey_curv_df['ref_point_index'] = snf.heading_info_df['ref_point_index'].values
+    arc_from_stop_to_nxt_ff = find_arc_info_for_plotting(monkey_curv_df, snf.stops_near_ff_row, snf.nxt_ff_df_modified, snf.monkey_information)
+
+    trajectory_df = snf.current_plotly_key_comp['trajectory_df'].copy()
+    window_for_curv_of_traj = [-25, 0]
+    trajectory_df.sort_values(by='rel_distance', inplace=True)
+    traj_portion_before_stop = trajectory_df[trajectory_df['rel_distance'].between(window_for_curv_of_traj[0], window_for_curv_of_traj[1])]
+    
+    return arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop
+
+
+def illustrate_diff_in_d_curv(snf):
+    arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop = prepare_to_illustrate_diff_in_d_curv(snf)
+    # plot the cur null arc
+    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(snf.fig, snf.cur_null_arc_info_for_the_point, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
+                                                                color='lightsalmon', trace_name='cur null arc', linewidth=3, opacity=0.9)
+    # plot the cur arc end to next ff null arc
+    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(snf.fig, arc_from_cur_arc_end_to_next_ff, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
+                                                                color='red', trace_name='cur arc end to next ff null arc', linewidth=3, opacity=0.9)
+
+
+    # plot the traj portion before stop
+    snf.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(snf.fig, traj_portion_before_stop, color='deepskyblue',
+                                                                                    hoverdata_multi_columns=['rel_time'], linewidth=7)
+
+    # plot the monkey stop to nxt ff null arc
+    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(snf.fig, arc_from_stop_to_nxt_ff, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
+                                                                color='blue', trace_name='monkey stop to nxt ff null arc', linewidth=2, opacity=0.9)
+    return snf.fig

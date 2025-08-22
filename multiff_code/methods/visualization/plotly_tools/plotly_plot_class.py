@@ -31,6 +31,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "show_monkey_heading": False,  # not used yet
         "show_traj_portion": False,
         "show_null_arcs_to_ff": False,
+        "show_null_arc_to_cur_ff": False,
         "show_extended_traj_arc": False,
         "show_traj_color_as_speed": True,
         "show_stops": False,
@@ -145,7 +146,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             diff_in_abs = self.heading_info_df_counted.iloc[i]['diff_in_abs_angle_to_nxt_ff']
             print(f'diff_in_abs: {diff_in_abs}')
 
-            if self.monkey_plot_params['show_null_arcs_to_ff']:
+            if self.monkey_plot_params['show_null_arcs_to_ff'] | self.monkey_plot_params['show_null_arc_to_cur_ff']:
                 self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_counted_points(
                     i=i)
 
@@ -186,6 +187,9 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
+            
+        if self.monkey_plot_params['show_null_arc_to_cur_ff']:
+            self._show_null_arc_to_cur_ff_in_plotly()
 
         self.fig.update_layout(
             autosize=False,
@@ -255,9 +259,14 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
 
     def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
+        self._show_null_arc_to_cur_ff_in_plotly()
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
-        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                 color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=4)
+        self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
+                                                                 color=self.cur_ff_color, trace_name='cur null arc', linewidth=3, opacity=0.9)
+        return self.fig
+
+    def _show_null_arc_to_cur_ff_in_plotly(self):
+        rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
         self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
                                                                  color=self.cur_ff_color, trace_name='cur null arc', linewidth=3, opacity=0.9)
         return self.fig
