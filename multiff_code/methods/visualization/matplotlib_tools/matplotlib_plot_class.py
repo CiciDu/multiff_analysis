@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 
 class MatplotlibPlotter(base_plot_class.BasePlotter):
 
-    def __init__(self, PlotTrials_args):
-        super().__init__(PlotTrials_args)
 
     def make_individual_plots_for_stops_near_ff_in_mpl(self, current_i, max_num_plot_to_make=5, additional_plotting_kwargs={'show_connect_path_ff_specific_indices': None, 'show_ff_indices': True},
                                                        show_position_in_scatter_plot=True, show_monkey_heading=True, show_null_arcs=True):

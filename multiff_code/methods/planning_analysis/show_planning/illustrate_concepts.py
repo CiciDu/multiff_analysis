@@ -1,8 +1,7 @@
 
 import numpy as np
 import plotly.graph_objects as go
-
-
+from null_behaviors import show_null_trajectory
 
 
 def plot_with_additional_elements(snf,
@@ -10,7 +9,6 @@ def plot_with_additional_elements(snf,
                                   arc_xy,
                                   arc_label='Angle from monkey stop to next ff'
                                   ):
-
 
     # Add traces to the figure
     traces = [
@@ -25,7 +23,7 @@ def plot_with_additional_elements(snf,
             name='Arc between stop heading and next ff'
         ),
         go.Scatter(
-            x=[(arc_xy[0, 0] + arc_xy[0, 1]) / 2 + 210], 
+            x=[(arc_xy[0, 0] + arc_xy[0, 1]) / 2 + 210],
             y=[(arc_xy[1, 0] + arc_xy[1, 1]) / 2],
             mode="text", name="Text",
             text=[arc_label],
@@ -41,10 +39,10 @@ def plot_with_additional_elements(snf,
 
     # Add all traces to the figure
     for trace in traces:
-        snf.plotly_inst.fig.add_trace(trace)
+        snf.fig.add_trace(trace)
 
     # Update the layout to make the background very light grey
-    snf.plotly_inst.fig.update_layout(
+    snf.fig.update_layout(
         plot_bgcolor='white',
         # Remove x-axis grid lines and zero line
         xaxis=dict(showgrid=False, zeroline=False),
@@ -53,10 +51,9 @@ def plot_with_additional_elements(snf,
     )
 
     # update fig size so that it is 1.5 times as wide as it is tall
-    snf.plotly_inst.fig.update_layout(
-        width=snf.plotly_inst.fig.layout.height * 1.5
+    snf.fig.update_layout(
+        width=snf.fig.layout.height * 1.5
     )
-
 
 
 def _calculate_rotated_line(start_x, start_y, end_x, end_y, rotation_matrix):
@@ -116,7 +113,7 @@ def _find_line_between_points(snf, fixed_current_i, start_point, end_point):
     end_y = stops_near_ff_row[end_point + '_y']
 
     # Apply rotation matrix to the line
-    rotation_matrix = snf.plotly_inst.current_plotly_key_comp['rotation_matrix']
+    rotation_matrix = snf.current_plotly_key_comp['rotation_matrix']
     return _calculate_rotated_line(start_x, start_y, end_x, end_y, rotation_matrix)
 
 
@@ -176,3 +173,65 @@ def calculate_arc_to_show_angle(arc_center, arc_end_1, arc_end_2, arc_radius, ro
     arc_xy_rotated = np.matmul(rotation_matrix, arc_xy)
 
     return arc_xy_rotated
+
+
+def prepare_to_show_angle_from_monkey_stop_to_next_ff(snf, fixed_current_i):
+    line_stop_nxt_ff = find_line_between_stop_and_nxt_ff(snf, fixed_current_i)
+
+    # Calculate the length of the line
+    line_length = np.linalg.norm(
+        line_stop_nxt_ff[:, 0] - line_stop_nxt_ff[:, 1])
+
+    # Calculate the line representing the monkey's heading direction at the stop point
+    # Extract stop coordinates and monkey's heading angle
+    stop_x = snf.stops_near_ff_df_counted.iloc[fixed_current_i]['stop_x']
+    stop_y = snf.stops_near_ff_df_counted.iloc[fixed_current_i]['stop_y']
+    monkey_angle = snf.stops_near_ff_df_counted.iloc[fixed_current_i]['stop_monkey_angle']
+
+    line_of_stop_heading = find_line_of_heading(stop_x, stop_y, monkey_angle,
+                                                line_length=line_length, rotation_matrix=snf.current_plotly_key_comp[
+                                                    'rotation_matrix']
+                                                )
+
+    arc_radius = line_length / 2
+    arc_center = line_stop_nxt_ff[:, 0]
+    arc_end_1 = line_stop_nxt_ff[:, 1]
+    arc_end_2 = line_of_stop_heading[:, 1]
+    arc_xy = calculate_arc_to_show_angle(
+        arc_center, arc_end_1, arc_end_2, arc_radius, None
+    )
+
+    return line_stop_nxt_ff, line_of_stop_heading, arc_xy
+
+def prepare_to_show_angle_from_null_arc_end_to_next_ff(snf, fixed_current_i):
+    # Calculate the line between the stop point and the next firefly
+    line_stop_nxt_ff = find_line_between_stop_and_nxt_ff(snf, fixed_current_i)
+    # Calculate the length of the line
+    line_length = np.linalg.norm(line_stop_nxt_ff[:, 0] - line_stop_nxt_ff[:, 1])
+
+    # Prepare to draw lines 
+    null_arc_info = snf.cur_null_arc_info_for_the_point    
+    null_arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[fixed_current_i, 'center_x'], null_arc_info.loc[fixed_current_i, 'center_y'], null_arc_info.loc[fixed_current_i, 'all_arc_radius'],
+                                                                    null_arc_info.loc[fixed_current_i, 'arc_starting_angle'], null_arc_info.loc[fixed_current_i, 'arc_ending_angle'], rotation_matrix=None)
+
+    null_arc_end_x = null_arc_xy_rotated[0, -1]
+    null_arc_end_y = null_arc_xy_rotated[1, -1]
+    null_arc_end_angle = snf.mheading_for_cur_ff_for_all_counted_points['monkey_angle'][fixed_current_i, 1]
+
+    line_of_cur_null_heading = find_line_of_heading(null_arc_end_x, null_arc_end_y, null_arc_end_angle, line_length=line_length, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'])
+
+    line_cur_and_nxt_ff = _calculate_rotated_line(null_arc_end_x, null_arc_end_y, 
+                                                snf.stops_near_ff_df_counted.iloc[fixed_current_i]['nxt_ff_x'], 
+                                                snf.stops_near_ff_df_counted.iloc[fixed_current_i]['nxt_ff_y'], 
+                                                snf.current_plotly_key_comp['rotation_matrix'])
+
+    # Prepare to draw a small arc to show the angle from null arc end to next ff
+    arc_radius = line_length / 2
+    arc_center = line_cur_and_nxt_ff[:, 0]
+    arc_end_1 = line_cur_and_nxt_ff[:, 1]
+    arc_end_2 = line_of_cur_null_heading[:, 1]
+    arc_xy = calculate_arc_to_show_angle(
+        arc_center, arc_end_1, arc_end_2, arc_radius, None
+    )
+    
+    return line_of_cur_null_heading, line_cur_and_nxt_ff, arc_xy

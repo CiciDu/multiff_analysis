@@ -396,6 +396,11 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
 
 def plot_stops_in_plotly(fig, trajectory_df, show_stop_point_indices, hoverdata_multi_columns=['rel_time'], 
                          name='stops', color='black'):
+    
+    # if show_stop_point_indices is int, make it a list
+    if isinstance(show_stop_point_indices, int):
+        show_stop_point_indices = [show_stop_point_indices]
+    
     trajectory_df_sub = trajectory_df[trajectory_df['point_index'].isin(
         show_stop_point_indices)]
     plot_to_add = px.scatter(trajectory_df_sub, x='monkey_x', y='monkey_y',

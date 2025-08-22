@@ -21,9 +21,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         # only meaningful when show_alive_fireflies is False
         "show_in_memory_fireflies": False,
         "show_visible_segments": True,
-        "show_stops": False,
-        "show_cur_and_nxt_stops": True,
-        "show_capture_stops": True,
         "show_all_eye_positions": False,
         "show_current_eye_positions": True,
         "show_eye_positions_for_both_eyes": False,
@@ -36,8 +33,12 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "show_null_arcs_to_ff": False,
         "show_extended_traj_arc": False,
         "show_traj_color_as_speed": True,
+        "show_stops": False,
+        "show_cur_and_nxt_stops": True,
+        "show_capture_stops": True,
         "show_stop_point_indices": None,
         "show_cur_and_nxt_stops_indices": None,
+        "show_capture_stops_indices": None,
         "hoverdata_multi_columns": ['rel_time'],
         "eye_positions_trace_name": 'eye_positions',
         "use_arrow_to_show_eye_positions": False,
@@ -46,9 +47,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "plot_arena_edge": True,
     }
 
-    def __init__(self, PlotTrials_args):
-        super().__init__(PlotTrials_args)
-        self.make_or_retrieve_closest_stop_to_capture_df()
 
     def make_one_monkey_plotly_plot(self,
                                     monkey_plot_params={}):
@@ -113,9 +111,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         self._update_show_stop_point_indices(self.current_plotly_key_comp['trajectory_df'])
 
         if m_params['show_stops'] & (m_params['show_stop_point_indices'] is not None):
-            show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(
-                self.monkey_plot_params, self.current_plotly_key_comp)
-            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
+            self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_stop_point_indices'],
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
         if m_params['show_cur_and_nxt_stops'] & (m_params['show_cur_and_nxt_stops_indices'] is not None):
@@ -123,7 +119,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'], name='cur_and_nxt_stops', color='red')
 
 
-        if m_params['show_capture_stops']:
+        if m_params['show_capture_stops'] & (m_params['show_capture_stops_indices'] is not None):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_capture_stops_indices'],
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'], name='capture_stops', color="#D2691E")
 
@@ -266,19 +262,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                  color=self.cur_ff_color, trace_name='cur null arc', linewidth=3, opacity=0.9)
         return self.fig
 
-    def find_show_stop_point_indices(self):
-        show_stop_point_indices = self.monkey_plot_params.get(
-            'show_stop_point_indices')
-
-        if show_stop_point_indices is None:
-            if self.monkey_plot_params['show_stops']:
-                trajectory_df = self.current_plotly_key_comp['trajectory_df']
-                show_stop_point_indices = trajectory_df[
-                    trajectory_df['monkey_speeddummy'] == 0]['point_index'].values
-
-        show_stop_point_indices = np.array(show_stop_point_indices).reshape(-1)
-
-        return show_stop_point_indices
 
     def _show_cur_ff(self):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index

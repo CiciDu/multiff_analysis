@@ -28,7 +28,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly_plot_class.PlotlyPlotter):
+class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
     def __init__(self,
                  raw_data_folder_path=None,
@@ -416,8 +416,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
 
         self._prepare_to_plot_eye_positions_for_dash()
 
-        self.fig = plotly_plot_class.PlotlyPlotter.make_one_monkey_plotly_plot(self,
-                                                                               monkey_plot_params=self.monkey_plot_params)
+        self.fig = self.make_one_monkey_plotly_plot(monkey_plot_params=self.monkey_plot_params)
 
         if self.monkey_plot_params['show_monkey_heading']:
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper._get_all_triangle_df_for_the_point_from_triangle_df_in_duration(
@@ -427,8 +426,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass, plotly
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
-            self.fig = plotly_plot_class.PlotlyPlotter._show_null_arcs_for_cur_and_nxt_ff_in_plotly(
-                self)
+            self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
 
         if self.monkey_plot_params['show_extended_traj_arc']:
             self._plot_extended_traj_arc()

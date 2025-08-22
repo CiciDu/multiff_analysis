@@ -1,5 +1,6 @@
 from null_behaviors import show_null_trajectory
 from planning_analysis.show_planning.cur_vs_nxt_ff import plot_monkey_heading_helper_class
+from data_wrangling import further_processing_class
 
 
 class BasePlotter():
@@ -25,25 +26,11 @@ class BasePlotter():
                                  'zoom_in': False,
                                  'truncate_part_before_crossing_arena_edge': True}
 
-    def __init__(self, PlotTrials_args):
-
-        self.PlotTrials_args = PlotTrials_args
-
-        self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted, \
-            self.ff_believed_position_sorted, _, self.ff_caught_T_new \
-            = PlotTrials_args
 
     def add_additional_info_for_plotting(self, **kwargs):
         # put each element of kargs into self
         for key, value in kwargs.items():
             setattr(self, key, value)
-
-    def prepare_to_plot_stops_near_ff(self, use_fixed_arc_length=False, fixed_arc_length=None):
-        # self.slope, self.intercept, self.r_value, self.p_value, self.std_err = stats.linregress(self.traj_curv_counted, self.nxt_curv_counted)
-        self.get_null_arc_info_for_counted_points(
-            fixed_arc_length=fixed_arc_length, use_fixed_arc_length=use_fixed_arc_length)
-        plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_for_counted_points(
-            self)
 
     def get_null_arc_info_for_counted_points(self, use_fixed_arc_length=False, fixed_arc_length=None, use_curv_to_ff_center=False):
 
