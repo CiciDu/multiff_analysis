@@ -77,32 +77,35 @@ class CCAclass():
             self.X2_loading**2, self.X2.columns, lagging_included=self.lagging_included)
 
     def test_for_p_values(self, X1=None, X2=None):
-        if X1 is None:
-            X1 = self.X1_sc
-        if X2 is None:
-            X2 = self.X2_sc
-        # Run canonical correlation analysis
-        stats_cca = CanCorr(X1, X2)
-        self.test_results = stats_cca.corr_test()
-        self.CanCorr_canonical_corrs = self.test_results.stats['Canonical Correlation'].values.astype(
-            float)
-        self.p_values = self.test_results.stats['Pr > F'].values.astype(float)
-        print(self.test_results)
-        # check if self.CanCorr_canonical_corrs and self.canon_corr are the same (with shared components).
-        # If not, raise an warning and print the components that are different.
-        num_components = min(
-            len(self.CanCorr_canonical_corrs), len(self.canon_corr))
-        if not np.allclose(self.CanCorr_canonical_corrs[:num_components], self.canon_corr[:num_components]):
-            component_diff = np.where(
-                self.CanCorr_canonical_corrs[:num_components] != self.canon_corr[:num_components])[0]
-            print("Warning: self.CanCorr_canonical_corrs and self.canon_corr are not the same (with shared components), possibly due to the use of regularization in rcca.")
-            print(
-                f"Components that are different: {component_diff + 1}, {self.CanCorr_canonical_corrs[component_diff]} vs {self.canon_corr[component_diff]}")
-
+        try:
+            if X1 is None:
+                X1 = self.X1_sc
+            if X2 is None:
+                X2 = self.X2_sc
+            # Run canonical correlation analysis
+            stats_cca = CanCorr(X1, X2)
+            self.test_results = stats_cca.corr_test()
+            self.CanCorr_canonical_corrs = self.test_results.stats['Canonical Correlation'].values.astype(
+                float)
+            self.p_values = self.test_results.stats['Pr > F'].values.astype(float)
+            print(self.test_results)
+            # check if self.CanCorr_canonical_corrs and self.canon_corr are the same (with shared components).
+            # If not, raise an warning and print the components that are different.
+            num_components = min(
+                len(self.CanCorr_canonical_corrs), len(self.canon_corr))
+            if not np.allclose(self.CanCorr_canonical_corrs[:num_components], self.canon_corr[:num_components]):
+                component_diff = np.where(
+                    self.CanCorr_canonical_corrs[:num_components] != self.canon_corr[:num_components])[0]
+                print("Warning: self.CanCorr_canonical_corrs and self.canon_corr are not the same (with shared components), possibly due to the use of regularization in rcca.")
+                print(
+                    f"Components that are different: {component_diff + 1}, {self.CanCorr_canonical_corrs[component_diff]} vs {self.canon_corr[component_diff]}")
+        except ValueError as e:
+            print("Warning: p_values not found. Error message:", e)
+                
     def plot_X1_loadings(self, max_components=20, features_per_fig=30):
         if not hasattr(self, 'p_values'):
             self.test_for_p_values()
-
+            
         cca_plotting.plot_loading_heatmap(
             loadings=self.X1_loading,
             feature_names=self.X1_loading_df.feature.values,

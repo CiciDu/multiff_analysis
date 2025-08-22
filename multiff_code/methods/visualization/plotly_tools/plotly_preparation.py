@@ -311,17 +311,3 @@ def _modify_current_plotly_key_comp_based_on_whether_show_visible_segments(show_
         )
     return current_plotly_key_comp
 
-
-def find_show_stop_point_indices(monkey_plot_params, current_plotly_key_comp):
-    show_stop_point_indices = monkey_plot_params.get(
-        'show_stop_point_indices')
-
-    if show_stop_point_indices is None:
-        if monkey_plot_params['show_stops']:
-            trajectory_df = current_plotly_key_comp['trajectory_df']
-            show_stop_point_indices = trajectory_df[
-                trajectory_df['monkey_speeddummy'] == 0]['point_index'].values
-
-    show_stop_point_indices = np.array(show_stop_point_indices).reshape(-1)
-
-    return show_stop_point_indices

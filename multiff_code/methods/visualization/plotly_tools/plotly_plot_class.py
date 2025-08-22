@@ -48,6 +48,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
     def __init__(self, PlotTrials_args):
         super().__init__(PlotTrials_args)
+        self.make_or_retrieve_closest_stop_to_capture_df()
 
     def make_one_monkey_plotly_plot(self,
                                     monkey_plot_params={}):
@@ -109,13 +110,15 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         if m_params['show_nxt_ff']:
             self._show_nxt_ff()
 
-        if m_params['show_stops'] | (m_params['show_stop_point_indices'] is not None):
+        self._update_show_stop_point_indices(self.current_plotly_key_comp['trajectory_df'])
+
+        if m_params['show_stops'] & (m_params['show_stop_point_indices'] is not None):
             show_stop_point_indices = plotly_preparation.find_show_stop_point_indices(
                 self.monkey_plot_params, self.current_plotly_key_comp)
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), show_stop_point_indices,
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'])
 
-        if m_params['show_cur_and_nxt_stops'] | (m_params['show_cur_and_nxt_stops_indices'] is not None):
+        if m_params['show_cur_and_nxt_stops'] & (m_params['show_cur_and_nxt_stops_indices'] is not None):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), m_params['show_cur_and_nxt_stops_indices'],
                                                               hoverdata_multi_columns=m_params['hoverdata_multi_columns'], name='cur_and_nxt_stops', color='red')
 
@@ -140,8 +143,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         self.monkey_plot_params.update(additional_plotting_kwargs)
 
-        for i in range(len(self.stops_near_ff_df))[current_i: current_i+max_num_plot_to_make]:
-            self.stops_near_ff_row = self.stops_near_ff_df.iloc[i]
+        for i in range(len(self.stops_near_ff_df_counted))[current_i: current_i+max_num_plot_to_make]:
+            self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[i]
 
             diff_in_abs = self.heading_info_df_counted.iloc[i]['diff_in_abs_angle_to_nxt_ff']
             print(f'diff_in_abs: {diff_in_abs}')
@@ -196,6 +199,64 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         )
 
         return self.current_plotly_key_comp, self.fig
+
+
+    def _update_show_stop_point_indices(self, trajectory_df):
+        """
+        Update stop indices to visualize:
+        - 'show_stop_point_indices': all stop points (speed==0) OR just the capture pair when that's the only thing shown
+        - 'show_cur_and_nxt_stops_indices': the specific two indices around the fast–forward (capture) event
+        - 'show_capture_stops_indices': all capture points
+
+        Expects:
+        - trajectory_df has columns ['monkey_speeddummy', 'point_index']
+        - self.stops_near_ff_row has attributes stop_point_index, next_stop_point_index (when used)
+        """
+        show_stops = bool(self.monkey_plot_params.get('show_stops', False))
+        show_capture = bool(self.monkey_plot_params.get('show_cur_and_nxt_stops', False))
+        show_capture_stops = bool(self.monkey_plot_params.get('show_capture_stops', False))
+
+        # Defaults
+        stop_indices = None
+        cur_and_nxt_stop_indices = None
+        capture_stop_indices = None
+
+        # Helper to compute the two capture indices safely
+        def _capture_pair():
+            row = getattr(self, 'stops_near_ff_row', None)
+            if row is None:
+                return None
+            try:
+                i = int(row.stop_point_index)
+                j = int(row.next_stop_point_index)
+                return [i, j]
+            except (AttributeError, TypeError, ValueError):
+                return None
+
+        # All stop points (speed == 0)
+        if show_stops:
+            stop_indices = (
+                trajectory_df.loc[trajectory_df['monkey_speeddummy'].eq(
+                    0), 'point_index']
+                .dropna()
+                .astype(int)
+                .to_numpy()
+            )
+            
+        if show_capture_stops:
+            capture_df = self.closest_stop_to_capture_df
+            capture_stop_indices = capture_df[capture_df['time'].between(
+                self.current_plotly_key_comp['duration_to_plot'][0], self.current_plotly_key_comp['duration_to_plot'][1])]['point_index'].values
+
+        # Specific capture pair
+        if show_capture:
+            cur_and_nxt_stop_indices = _capture_pair()
+
+        # Write back
+        self.monkey_plot_params['show_stop_point_indices'] = stop_indices
+        self.monkey_plot_params['show_cur_and_nxt_stops_indices'] = cur_and_nxt_stop_indices
+        self.monkey_plot_params['show_capture_stops_indices'] = capture_stop_indices
+
 
     def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']

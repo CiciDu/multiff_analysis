@@ -3,38 +3,45 @@ from sklearn.model_selection import GroupKFold, KFold
 import rcca
 
 def cv_cca_perm_importance(
-    X1_all, X2, feature_names, *,
+    X1, X2, feature_names, *,
     n_components=5, reg=1e-2, n_splits=5, random_state=0, groups=None,
-    max_components_for_score=None
+    max_components_for_score=None, sanity_checks=True, tol=1e-6, verbose=True
 ):
     """
-    Cross-validated permutation importance for CCA.
-    Returns a DataFrame with per-feature mean drop in test canonical correlations.
+    Cross-validated permutation importance for CCA with sanity checks.
+    Uses a rank-1 update when permuting each feature to avoid re-multiplying the full matrix.
 
-    X1_all, X2: numpy arrays (n_samples x p), preprocessed the same way you used in your CCA.
-    feature_names: list[str] length p (for X1_all).
-    groups: optional array of trial ids for GroupKFold.
+    Returns:
+      importance_df: per-feature drops (mean over folds) + summary columns, including:
+          - drop_comp{k}: absolute drop in test corr for comp k
+          - mean_drop_firstK: mean absolute drop over first K comps
+          - pct_drop_comp{k}: percent drop (drop_comp{k} / baseline_mean{k})
+          - pct_drop_firstK: mean percent drop over first K comps
+          - frac_neg_drop_firstK: fraction of (feature, comp≤K) where permutation increased corr
+          - frac_drop_gt_base_firstK: fraction where drop > baseline (perm corr < 0)
+      diagnostics: dict with baseline means, stds, and sanity flags.
     """
-    import pandas as pd
+    import numpy as np, pandas as pd
+    from sklearn.model_selection import GroupKFold, KFold
+    import rcca
 
-    n, p = X1_all.shape
     rng = np.random.default_rng(random_state)
+    n, p = X1.shape
 
     # splitter
     if groups is not None and len(np.unique(groups)) >= n_splits:
-        splitter = GroupKFold(n_splits=n_splits).split(np.arange(n), groups=groups)
+        split_iter = GroupKFold(n_splits=n_splits).split(np.arange(n), groups=groups)
     else:
-        splitter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state).split(np.arange(n))
+        split_iter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state).split(np.arange(n))
 
     # helpers
-    def _fit(Xtr1, Xtr2):
+    def _fit(X1_tr, X2_tr):
         cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
-        cca.train([Xtr1, Xtr2])
+        cca.train([X1_tr, X2_tr])
         return cca
 
     def _corr_cols(A, B):
-        A = A - A.mean(axis=0, keepdims=True)
-        B = B - B.mean(axis=0, keepdims=True)
+        A = A - A.mean(0, keepdims=True); B = B - B.mean(0, keepdims=True)
         num = np.sum(A * B, axis=0)
         den = np.sqrt(np.sum(A**2, axis=0) * np.sum(B**2, axis=0))
         c = np.divide(num, den, out=np.zeros_like(num), where=den > 0)
@@ -43,47 +50,156 @@ def cv_cca_perm_importance(
     drops = np.zeros((p, n_components), dtype=float)
     counts = np.zeros((p,), dtype=int)
 
-    for tr_idx, te_idx in splitter:
-        X1_tr, X2_tr = X1_all[tr_idx], X2[tr_idx]
-        X1_te, X2_te = X1_all[te_idx], X2[te_idx]
+    # --- sanity trackers ---
+    bases = []                                # baseline test corr per fold (K,)
+    neg_drop_counts = np.zeros((p, n_components), dtype=int)  # times cperm > base
+    drop_gt_base_counts = np.zeros((p, n_components), dtype=int)  # times (base - cperm) > base
+    nonfinite_baseline_folds = []
+    overlap_flagged_folds = []
+
+    for fold_id, (tr_idx, te_idx) in enumerate(split_iter):
+        # No overlap between train/test
+        if sanity_checks and np.intersect1d(tr_idx, te_idx).size > 0:
+            overlap_flagged_folds.append(fold_id)
+
+        X1_tr, X2_tr = X1[tr_idx], X2[tr_idx]
+        X1_te, X2_te = X1[te_idx], X2[te_idx]
 
         cca = _fit(X1_tr, X2_tr)
-        Z1_te = X1_te @ cca.ws[0]
-        Z2_te = X2_te @ cca.ws[1]
-        base = _corr_cols(Z1_te, Z2_te)  # baseline test corr per component
+        ws0 = cca.ws[0]  # (p, K)
+        ws1 = cca.ws[1]  # (q, K)
 
-        # permute one X1 feature at a time on the test split
+        # --- Precompute baseline Z1_te and Z2_te once per fold (rank-1 update uses these) ---
+        Z1_base = X1_te @ ws0            # (n_test, K)
+        Z2_te   = X2_te @ ws1            # (n_test, K)
+
+        base = _corr_cols(Z1_base, Z2_te)  # (K,)
+        bases.append(base)
+
+        if sanity_checks:
+            if (not np.all(np.isfinite(base))) or np.any(np.abs(base) > 1 + 1e-8):
+                nonfinite_baseline_folds.append(fold_id)
+            if verbose and base[0] > 0.98:
+                print(f"[WARN] Fold {fold_id}: baseline first CC ~{base[0]:.3f} (check leakage/overfit)")
+
+        # permute each feature on test, recompute corr using a rank-1 update
         for j in range(p):
-            X1_perm = X1_te.copy()
-            rng.shuffle(X1_perm[:, j])  # in-place shuffle of that column
-            Z1_perm = X1_perm @ cca.ws[0]
+            # For feature j, after shuffling X1_te[:, j] -> xj_perm:
+            xj_perm = X1_te[:, j].copy()
+            rng.shuffle(xj_perm)
+            delta = (xj_perm - X1_te[:, j])[:, None]                # (n_test, 1)
+
+            # Rank-1 update: Z1_perm = Z1_base + delta * ws0[j, :]
+            Z1_perm = Z1_base + delta * ws0[j, :][None, :]          # (n_test, K)
+
             cperm = _corr_cols(Z1_perm, Z2_te)
-            drops[j] += (base - cperm)
+
+            diff = base - cperm
+            drops[j] += diff
             counts[j] += 1
 
+            if sanity_checks:
+                neg_drop_counts[j] += (cperm > base + tol)          # permutation improved corr
+                drop_gt_base_counts[j] += (diff > base + tol)       # drop larger than baseline
+
+    # average drop over folds
     drops = drops / np.maximum(1, counts)[:, None]
+
+    # choose K for summaries
     K = n_components if max_components_for_score is None else min(max_components_for_score, n_components)
-    score = drops[:, :K].mean(axis=1)  # average contribution over first K comps
+    mean_drop_firstK = drops[:, :K].mean(axis=1)
 
-    out = (pd.DataFrame(drops, columns=[f"drop_comp{k+1}" for k in range(n_components)])
-             .assign(feature=feature_names, mean_drop_firstK=score)
-             .sort_values("mean_drop_firstK", ascending=False)
-             .reset_index(drop=True))
-    return out
+    # --- percent drops (needs baseline means) ---
+    baseline_means = np.mean(np.vstack(bases), axis=0) if bases else np.zeros(n_components)
+    eps = 1e-8
+    base_safe = np.maximum(eps, baseline_means)           # avoid divide-by-zero
+    pct_drops = drops / base_safe[None, :]                # (p, K)
+    pct_drop_firstK = pct_drops[:, :K].mean(axis=1)
 
-def summarize_percent_drop(drops_vec, base_vec, K=3):
-    pct = (drops_vec[:K] / np.maximum(base_vec[:K], 1e-8)).mean()
-    return float(pct)
+    # package outputs
+    drop_cols = {f"drop_comp{k+1}": drops[:, k] for k in range(n_components)}
+    pct_cols  = {f"pct_drop_comp{k+1}": pct_drops[:, k] for k in range(n_components)}
+
+    importance_df = (pd.DataFrame({**drop_cols, **pct_cols})
+                     .assign(feature=feature_names,
+                             mean_drop_firstK=mean_drop_firstK,
+                             pct_drop_firstK=pct_drop_firstK,
+                             frac_neg_drop_firstK=(neg_drop_counts[:, :K].sum(1) / (counts * K + 1e-12)),
+                             frac_drop_gt_base_firstK=(drop_gt_base_counts[:, :K].sum(1) / (counts * K + 1e-12)))
+                     .sort_values("mean_drop_firstK", ascending=False)
+                     .reset_index(drop=True))
+
+    diagnostics = {
+        "baseline_means": baseline_means,
+        "baseline_stds": np.std(np.vstack(bases), axis=0) if bases else np.zeros(n_components),
+        "overlap_flagged_folds": overlap_flagged_folds,
+        "nonfinite_baseline_folds": nonfinite_baseline_folds,
+        "notes": [
+            "pct_drop_comp{k} = drop_comp{k} / baseline_mean{k}",
+            "pct_drop_firstK = mean of pct_drop_comp1..K",
+            "frac_neg_drop_firstK: fraction of (feature,component) in first K where permutation increased corr.",
+            "frac_drop_gt_base_firstK: fraction where drop > baseline (implies perm corr < 0)."
+        ],
+    }
+
+    if verbose:
+        print("[SANITY] Mean baseline test correlations:", np.round(baseline_means, 3))
+        if baseline_means[0] > 0.95:
+            print("[SANITY] First CC baseline unusually high on average; check grouping/leakage.")
+        if overlap_flagged_folds:
+            print(f"[SANITY] Overlapping train/test indices in folds: {overlap_flagged_folds}")
+        if nonfinite_baseline_folds:
+            print(f"[SANITY] Non-finite/|corr|>1 baseline in folds: {nonfinite_baseline_folds}")
+
+    return importance_df, diagnostics
+
+
+
+# One-shot runner for X1-only permutation importance (uses your cv_cca_perm_importance)
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def cv_cca_leave1out_delta(
     X1_all, X2, feature_names, *,
     n_components=5, reg=1e-2, n_splits=5, random_state=0, groups=None,
-    max_components_for_score=None
+    max_components_for_score=None,
+    parallelize=True,            # NEW: on/off switch
+    n_jobs=-1,                   # number of workers if parallelize=True (-1 = all cores)
+    backend="loky",              # joblib backend
+    blas_threads=1,              # cap BLAS threads inside workers to avoid oversubscription
 ):
+    """
+    Cross-validated leave-one-out importance for X1_all features.
+    Parallelizes per-feature refits within each fold when `parallelize=True`.
+
+    Returns a DataFrame with:
+      - drop_comp{k}: absolute drop in test corr for component k
+      - mean_drop_firstK: mean absolute drop over first K comps
+      - pct_drop_comp{k}: percent drop (normalized by baseline mean corr for comp k)
+      - pct_drop_firstK: mean of pct_drop_comp{1..K}
+    """
+    import os
     import numpy as np, pandas as pd
     from sklearn.model_selection import GroupKFold, KFold
     import rcca
+
+    # joblib (optional)
+    try:
+        from joblib import Parallel, delayed
+        have_joblib = True
+    except Exception:
+        have_joblib = False
+
+    # Decide whether to use parallel
+    use_parallel = parallelize and have_joblib and (n_jobs is not None) and (n_jobs != 1)
+
+    # Avoid BLAS oversubscription *only* if we parallelize
+    if use_parallel and (blas_threads is not None):
+        os.environ.setdefault("MKL_NUM_THREADS", str(blas_threads))
+        os.environ.setdefault("OPENBLAS_NUM_THREADS", str(blas_threads))
+        os.environ.setdefault("OMP_NUM_THREADS", str(blas_threads))
 
     n, p = X1_all.shape
     if groups is not None and len(np.unique(groups)) >= n_splits:
@@ -93,7 +209,8 @@ def cv_cca_leave1out_delta(
 
     def _fit(Xtr1, Xtr2):
         cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
-        cca.train([Xtr1, Xtr2]); return cca
+        cca.train([Xtr1, Xtr2])
+        return cca
 
     def _corr_cols(A, B):
         A = A - A.mean(0, keepdims=True); B = B - B.mean(0, keepdims=True)
@@ -102,29 +219,121 @@ def cv_cca_leave1out_delta(
         c = np.divide(num, den, out=np.zeros_like(num), where=den > 0)
         return np.clip(c, -1.0, 1.0)
 
-    drops = np.zeros((p, n_components)); counts = np.zeros(p, int)
+    # Per-feature drop storage
+    drops = np.zeros((p, n_components), dtype=float)
+    counts = np.zeros(p, dtype=int)
+    bases = []  # baseline test correlations per fold
+
+    # Worker: drop one feature (within a fold)
+    def _drop_one_feature(j, X1_tr, X2_tr, X1_te, X2_te):
+        keep = [k for k in range(X1_tr.shape[1]) if k != j]
+        cca_lo = _fit(X1_tr[:, keep], X2_tr)
+        Z1_te = X1_te[:, keep] @ cca_lo.ws[0]
+        Z2_te = X2_te @ cca_lo.ws[1]
+        return _corr_cols(Z1_te, Z2_te)
 
     for tr, te in split:
         X1_tr, X2_tr = X1_all[tr], X2[tr]
         X1_te, X2_te = X1_all[te], X2[te]
 
+        # Baseline with all features
         cca_full = _fit(X1_tr, X2_tr)
-        base = _corr_cols(X1_te @ cca_full.ws[0], X2_te @ cca_full.ws[1])
+        base = _corr_cols(X1_te @ cca_full.ws[0], X2_te @ cca_full.ws[1])  # (K,)
+        bases.append(base)
 
-        for j in range(p):
-            keep = [k for k in range(p) if k != j]
-            cca_lo = _fit(X1_tr[:, keep], X2_tr)
-            corr_lo = _corr_cols(X1_te[:, keep] @ cca_lo.ws[0], X2_te @ cca_lo.ws[1])
-            drops[j] += (base - corr_lo); counts[j] += 1
+        if use_parallel:
+            # Parallel per-feature refits
+            results = Parallel(n_jobs=n_jobs, backend=backend, prefer="processes")(
+                delayed(_drop_one_feature)(j, X1_tr, X2_tr, X1_te, X2_te) for j in range(p)
+            )
+            results = np.asarray(results)  # (p, K)
+            drops += (base[None, :] - results)
+            counts += 1  # each feature measured once in this fold
+        else:
+            # Sequential loop
+            for j in range(p):
+                corr_lo = _drop_one_feature(j, X1_tr, X2_tr, X1_te, X2_te)
+                drops[j] += (base - corr_lo)
+                counts[j] += 1
 
+    # Average over folds
     drops = drops / np.maximum(1, counts)[:, None]
+    base_means = np.mean(np.vstack(bases), axis=0) if bases else np.zeros(n_components)
+
+    # Summaries over first K components
     K = n_components if max_components_for_score is None else min(max_components_for_score, n_components)
-    score = drops[:, :K].mean(axis=1)
-    import pandas as pd
-    return (pd.DataFrame(drops, columns=[f"drop_comp{k+1}" for k in range(n_components)])
-              .assign(feature=feature_names, mean_drop_firstK=score)
-              .sort_values("mean_drop_firstK", ascending=False)
-              .reset_index(drop=True))
+    mean_drop_firstK = drops[:, :K].mean(axis=1)
+
+    # Percent drops (safe divide by baseline means)
+    eps = 1e-8
+    pct_drops = drops / np.maximum(eps, base_means)[None, :]
+    pct_drop_firstK = pct_drops[:, :K].mean(axis=1)
+
+    # Build DataFrame
+    drop_cols = {f"drop_comp{k+1}": drops[:, k] for k in range(n_components)}
+    pct_cols  = {f"pct_drop_comp{k+1}": pct_drops[:, k] for k in range(n_components)}
+    out = (pd.DataFrame({**drop_cols, **pct_cols})
+             .assign(feature=feature_names,
+                     mean_drop_firstK=mean_drop_firstK,
+                     pct_drop_firstK=pct_drop_firstK)
+             .sort_values("mean_drop_firstK", ascending=False)
+             .reset_index(drop=True))
+    return out
+
+
+
+# def cv_cca_leave1out_delta(
+#     X1_all, X2, feature_names, *,
+#     n_components=5, reg=1e-2, n_splits=5, random_state=0, groups=None,
+#     max_components_for_score=None
+# ):
+#     import numpy as np, pandas as pd
+#     from sklearn.model_selection import GroupKFold, KFold
+#     import rcca
+
+#     n, p = X1_all.shape
+#     if groups is not None and len(np.unique(groups)) >= n_splits:
+#         split = GroupKFold(n_splits=n_splits).split(np.arange(n), groups=groups)
+#     else:
+#         split = KFold(n_splits=n_splits, shuffle=True, random_state=random_state).split(np.arange(n))
+
+#     def _fit(Xtr1, Xtr2):
+#         cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
+#         cca.train([Xtr1, Xtr2]); return cca
+
+#     def _corr_cols(A, B):
+#         A = A - A.mean(0, keepdims=True); B = B - B.mean(0, keepdims=True)
+#         num = np.sum(A * B, axis=0)
+#         den = np.sqrt(np.sum(A**2, axis=0) * np.sum(B**2, axis=0))
+#         c = np.divide(num, den, out=np.zeros_like(num), where=den > 0)
+#         return np.clip(c, -1.0, 1.0)
+
+#     drops = np.zeros((p, n_components)); counts = np.zeros(p, int)
+
+#     for tr, te in split:
+#         X1_tr, X2_tr = X1_all[tr], X2[tr]
+#         X1_te, X2_te = X1_all[te], X2[te]
+
+#         cca_full = _fit(X1_tr, X2_tr)
+#         base = _corr_cols(X1_te @ cca_full.ws[0], X2_te @ cca_full.ws[1])
+
+#         for j in range(p):
+#             keep = [k for k in range(p) if k != j]
+#             cca_lo = _fit(X1_tr[:, keep], X2_tr)
+#             corr_lo = _corr_cols(X1_te[:, keep] @ cca_lo.ws[0], X2_te @ cca_lo.ws[1])
+#             drops[j] += (base - corr_lo); counts[j] += 1
+
+#     drops = drops / np.maximum(1, counts)[:, None]
+#     K = n_components if max_components_for_score is None else min(max_components_for_score, n_components)
+#     score = drops[:, :K].mean(axis=1)
+#     import pandas as pd
+#     return (pd.DataFrame(drops, columns=[f"drop_comp{k+1}" for k in range(n_components)])
+#               .assign(feature=feature_names, mean_drop_firstK=score)
+#               .sort_values("mean_drop_firstK", ascending=False)
+#               .reset_index(drop=True))
+
+
+
 
 
 def cv_structure_coefficients(X1_all, X2, feature_names, *,
