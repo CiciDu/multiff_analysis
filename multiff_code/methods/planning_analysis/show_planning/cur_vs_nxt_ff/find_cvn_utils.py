@@ -12,17 +12,22 @@ import plotly.graph_objects as go
 from math import pi
 import warnings
 
+
 def _add_basic_monkey_info(stops_near_ff_df, monkey_information):
     stops_near_ff_df[['stop_x', 'stop_y', 'monkey_angle', 'stop_time', 'stop_cum_distance']] = \
         monkey_information.loc[stops_near_ff_df['stop_point_index'],
                                ['monkey_x', 'monkey_y', 'monkey_angle', 'time', 'cum_distance']].values
     return stops_near_ff_df
 
+
 def _add_ff_xy(stops_near_ff_df, ff_real_position_sorted):
-    stops_near_ff_df[['cur_ff_x', 'cur_ff_y']] = ff_real_position_sorted[stops_near_ff_df['cur_ff_index'].values]
+    stops_near_ff_df[['cur_ff_x', 'cur_ff_y']
+                     ] = ff_real_position_sorted[stops_near_ff_df['cur_ff_index'].values]
     if 'nxt_ff_index' in stops_near_ff_df.columns:
-        stops_near_ff_df[['nxt_ff_x', 'nxt_ff_y']] = ff_real_position_sorted[stops_near_ff_df['nxt_ff_index'].values]
+        stops_near_ff_df[['nxt_ff_x', 'nxt_ff_y']
+                         ] = ff_real_position_sorted[stops_near_ff_df['nxt_ff_index'].values]
     return stops_near_ff_df
+
 
 def _add_distance_info(stops_near_ff_df, monkey_information, ff_real_position_sorted):
     stops_near_ff_df['next_stop_cum_distance'] = monkey_information.loc[
@@ -37,9 +42,10 @@ def _add_distance_info(stops_near_ff_df, monkey_information, ff_real_position_so
         axis=1
     )
     stops_near_ff_df['d_from_cur_ff_to_nxt_ff'] = np.linalg.norm(ff_real_position_sorted[stops_near_ff_df['cur_ff_index'].values] -
-                                                                    ff_real_position_sorted[stops_near_ff_df['nxt_ff_index'].values], axis=1)
+                                                                 ff_real_position_sorted[stops_near_ff_df['nxt_ff_index'].values], axis=1)
 
     return stops_near_ff_df
+
 
 def make_shared_stops_near_ff_df_and_all_nxt_ff_df(
     monkey_information, ff_dataframe_visible,
@@ -61,7 +67,8 @@ def make_shared_stops_near_ff_df_and_all_nxt_ff_df(
         stop_period_duration=stop_period_duration
     )
 
-    shared_stops_near_ff_df = _add_basic_monkey_info(shared_stops_near_ff_df, monkey_information)
+    shared_stops_near_ff_df = _add_basic_monkey_info(
+        shared_stops_near_ff_df, monkey_information)
 
     shared_stops_near_ff_df = nxt_ff_utils.rename_first_and_last_seen_info_columns(
         shared_stops_near_ff_df, prefix='CUR_'
@@ -92,8 +99,8 @@ def make_shared_stops_near_ff_df_and_all_nxt_ff_df(
         on='cur_ff_index',
         how='inner'
     )
-    
-    ## the printed statement below might be unnecessary because when calling all_nxt_ff_df, info of removed rows are already printed
+
+    # the printed statement below might be unnecessary because when calling all_nxt_ff_df, info of removed rows are already printed
     # print(
     #     f'{original_length - len(shared_stops_near_ff_df)} rows out of {original_length} '
     #     f'rows in shared_stops_near_ff_df have been removed because the nxt_ff was not found.'
@@ -107,10 +114,12 @@ def make_shared_stops_near_ff_df_and_all_nxt_ff_df(
     #     shared_stops_near_ff_df['next_stop_cum_distance'] -
     #     shared_stops_near_ff_df['stop_cum_distance']
     # )
-    
-    shared_stops_near_ff_df = _add_ff_xy(shared_stops_near_ff_df, ff_real_position_sorted)
-    
-    shared_stops_near_ff_df = _add_distance_info(shared_stops_near_ff_df, monkey_information, ff_real_position_sorted)
+
+    shared_stops_near_ff_df = _add_ff_xy(
+        shared_stops_near_ff_df, ff_real_position_sorted)
+
+    shared_stops_near_ff_df = _add_distance_info(
+        shared_stops_near_ff_df, monkey_information, ff_real_position_sorted)
 
     if len(shared_stops_near_ff_df['cur_ff_index'].unique()) != len(shared_stops_near_ff_df):
         warnings.warn(
@@ -125,7 +134,6 @@ def make_shared_stops_near_ff_df_and_all_nxt_ff_df(
     shared_stops_near_ff_df = add_monkey_info_before_stop(
         monkey_information, shared_stops_near_ff_df
     )
-
 
     shared_stops_near_ff_df = nxt_ff_utils.add_if_nxt_ff_and_nxt_ff_cluster_flash_bbas(
         shared_stops_near_ff_df, ff_real_position_sorted,
@@ -407,7 +415,7 @@ def add_monkey_info_before_stop(monkey_information, stops_near_ff_df):
 
 def modify_position_of_ff_with_big_angle_for_finding_null_arc(
     ff_df,
-    remove_i_o_modify_rows_with_big_ff_angles=False,
+    remove_i_o_modify_rows_with_big_ff_angles=True,
     verbose=True
 ):
     """
@@ -423,14 +431,14 @@ def modify_position_of_ff_with_big_angle_for_finding_null_arc(
     Returns:
         Tuple[pd.DataFrame, np.ndarray]: Filtered/modified DataFrame and indices of kept rows.
     """
-    
+
     ff_df = ff_df.copy()
     original_ff_df = ff_df.copy()
 
     if not remove_i_o_modify_rows_with_big_ff_angles and verbose:
         print(
             "[Note] When calling modify_position_of_ff_with_big_angle_for_finding_null_arc, "
-            "Even with `remove_i_o_modify_rows_with_big_ff_angles=False`, "
+            "Even with `remove_i_o_modify_rows_with_big_ff_angles=True`, "
             "some rows may still be removed (e.g., negative ff_y_relative). "
             "Use this function mainly for curvature calculation."
         )
@@ -543,7 +551,7 @@ def find_ff_info_n_cm_ago(ff_df, monkey_information, ff_real_position_sorted, n_
 def find_ff_info(all_ff_index, all_point_index, monkey_information, ff_real_position_sorted):
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # Turn warnings into errors
-    
+
         ff_df = pd.DataFrame(
             {'ff_index': np.array(all_ff_index).astype(int), 'point_index': np.array(all_point_index).astype(int)})
 
@@ -750,8 +758,7 @@ def _get_monkey_sub_for_polar_plot(monkey_information, row, nxt_ff_df_from_ref, 
                         'ref_point_index': nxt_ff_df_from_ref.loc[nxt_ff_df_from_ref['ff_index'] == row['nxt_ff_index'], 'point_index'].item()
                         }
 
-    monkey_sub = monkey_information.loc[point_index_dict[start]
-        : point_index_dict[end] + 1].copy()
+    monkey_sub = monkey_information.loc[point_index_dict[start]: point_index_dict[end] + 1].copy()
 
     # rotated monkey_x and monkey_y in reference to monkey angle at the reference point
     monkey_ref_xy = monkey_sub.loc[point_index_dict[start], [
@@ -850,10 +857,11 @@ def find_ff_info_based_on_ref_point(ff_info, monkey_information, ff_real_positio
     elif ref_point_mode == 'time after cur ff visible':
         if point_index_cur_ff_first_seen is None:
             point_index_cur_ff_first_seen = ff_info['point_index_ff_first_seen'].values
-            
+
         arr = np.asarray(point_index_cur_ff_first_seen)
         if np.isnan(arr).any():
-            raise ValueError("NaN found in point_index_cur_ff_first_seen. Consider using a different ref_point_mode.")
+            raise ValueError(
+                "NaN found in point_index_cur_ff_first_seen. Consider using a different ref_point_mode.")
 
         all_time = monkey_information.loc[point_index_cur_ff_first_seen.astype(int),
                                           'time'].values + ref_point_value

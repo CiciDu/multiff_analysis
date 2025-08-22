@@ -21,6 +21,108 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
+import plotly.graph_objects as go
+
+def plot_a_portion_of_trajectory_to_show_traj_portion(
+    fig,
+    traj_portion,
+    color='purple',
+    hoverdata_multi_columns=None,
+    linewidth=9,
+    trace_name='Trajectory portion before stop',
+    legendgroup='Pair B',
+    dash='solid',
+    order_by=None  # e.g., 'rel_time' to ensure correct draw order
+):
+    # Defaults
+    if hoverdata_multi_columns is None:
+        hoverdata_multi_columns = ['rel_time']
+
+    # Optional ordering to ensure the line connects in time order
+    if order_by is not None and order_by in traj_portion.columns:
+        traj_portion = traj_portion.sort_values(by=order_by)
+
+    # Build custom hover template
+    hovertemplate = ' <br>'.join(
+        [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)]
+    )
+
+    # Add as a line trace
+    fig.add_trace(
+        go.Scatter(
+            x=traj_portion['monkey_x'],
+            y=traj_portion['monkey_y'],
+            mode='lines',
+            line=dict(color=color, width=linewidth, dash=dash),
+            name=trace_name,
+            legendgroup=legendgroup,
+            showlegend=True,
+            customdata=traj_portion[hoverdata_multi_columns],
+            hovertemplate=hovertemplate
+        )
+    )
+
+    return fig
+
+
+# def plot_a_portion_of_trajectory_to_show_traj_portion(
+#     fig, traj_portion, color='purple', hoverdata_multi_columns=['rel_time'],
+#     linewidth=9, trace_name='to_show_traj_portion', legendgroup='Pair B'):
+
+#     plot_to_add = px.scatter(
+#         traj_portion, x='monkey_x', y='monkey_y',
+#         hover_data=hoverdata_multi_columns,
+#         labels={'monkey_x': 'monkey x after rotation (cm)',
+#                 'monkey_y': 'monkey y after rotation (cm)',
+#                 'rel_time': 'relative time (s)',
+#                 'rel_distance': 'relative distance (cm)'},
+#         custom_data=hoverdata_multi_columns,
+#         color_discrete_sequence=[color]
+#     )
+
+#     # add the scatter trace
+#     fig.add_traces(plot_to_add.data)
+
+#     # rename it, force legend, and set legend group
+#     fig.data[-1].name = trace_name
+#     fig.data[-1].showlegend = True
+#     fig.data[-1].legendgroup = legendgroup
+
+#     # custom hover
+#     hovertemplate = ' <br>'.join(
+#         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)]
+#     )
+#     fig.update_traces(
+#         marker=dict(size=linewidth, opacity=1),
+#         hovertemplate=hovertemplate,
+#         selector=dict(name=trace_name)
+#     )
+
+#     return fig
+
+
+
+
+# def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='purple', hoverdata_multi_columns=['rel_time'], linewidth=9):
+
+#     plot_to_add = px.scatter(traj_portion, x='monkey_x', y='monkey_y',
+#                              hover_data=hoverdata_multi_columns,
+#                              labels={'monkey_x': 'monkey x after rotation (cm)',
+#                                      'monkey_y': 'monkey y after rotation (cm)',
+#                                      'rel_time': 'relative time (s)',
+#                                      'rel_distance': 'relative distance (cm)'},
+#                              custom_data=hoverdata_multi_columns,
+#                              color_discrete_sequence=[color])
+#     fig.add_traces(plot_to_add.data)
+#     fig.data[-1].name = 'to_show_traj_portion'
+#     hovertemplate = ' <br>'.join(
+#         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
+#     fig.update_traces(marker=dict(size=linewidth, opacity=1),
+#                       hovertemplate=hovertemplate,
+#                       selector=dict(name='to_show_traj_portion'))
+
+#     return fig
+
 def update_layout_and_x_and_y_limit(fig, current_plotly_key_comp, show_eye_positions):
     x_min, x_max, y_min, y_max = find_monkey_xy_min_max(
         current_plotly_key_comp['trajectory_df'])
@@ -491,26 +593,6 @@ def connect_points_to_points(fig, connect_path_ff_df, show_traj_points_when_maki
 
     return fig
 
-
-def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='purple', hoverdata_multi_columns=['rel_time'], linewidth=9):
-
-    plot_to_add = px.scatter(traj_portion, x='monkey_x', y='monkey_y',
-                             hover_data=hoverdata_multi_columns,
-                             labels={'monkey_x': 'monkey x after rotation (cm)',
-                                     'monkey_y': 'monkey y after rotation (cm)',
-                                     'rel_time': 'relative time (s)',
-                                     'rel_distance': 'relative distance (cm)'},
-                             custom_data=hoverdata_multi_columns,
-                             color_discrete_sequence=[color])
-    fig.add_traces(plot_to_add.data)
-    fig.data[-1].name = 'to_show_traj_portion'
-    hovertemplate = ' <br>'.join(
-        [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
-    fig.update_traces(marker=dict(size=linewidth, opacity=1),
-                      hovertemplate=hovertemplate,
-                      selector=dict(name='to_show_traj_portion'))
-
-    return fig
 
 
 def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monkey_information, rotation_matrix, x0, y0,

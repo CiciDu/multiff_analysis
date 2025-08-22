@@ -142,13 +142,15 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         for i in range(len(self.stops_near_ff_df_counted))[current_i: current_i+max_num_plot_to_make]:
             self.stops_near_ff_row = self.stops_near_ff_df_counted.iloc[i]
+            self.stop_point_index = self.stops_near_ff_row.stop_point_index
+            print(f'stop_point_index: {self.stop_point_index}')
 
             diff_in_abs = self.heading_info_df_counted.iloc[i]['diff_in_abs_angle_to_nxt_ff']
             print(f'diff_in_abs: {diff_in_abs}')
 
-            if self.monkey_plot_params['show_null_arcs_to_ff'] | self.monkey_plot_params['show_null_arc_to_cur_ff']:
-                self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_counted_points(
-                    i=i)
+            # if self.monkey_plot_params['show_null_arcs_to_ff'] | self.monkey_plot_params['show_null_arc_to_cur_ff']:
+            self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_counted_points(
+                i=i)
 
             current_i = i+1
             self.current_plotly_key_comp, self.fig = self.plot_cvn_in_plotly_func(
@@ -158,7 +160,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             if show_fig is True:
                 self.fig.show()
 
-        return current_i
 
     def plot_cvn_in_plotly_func(self,
                                 monkey_plot_params={},

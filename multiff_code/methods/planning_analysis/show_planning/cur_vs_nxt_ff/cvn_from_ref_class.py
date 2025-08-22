@@ -53,7 +53,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                    eliminate_outliers=False,
                                    use_curv_to_ff_center=False,
                                    deal_with_rows_with_big_ff_angles=True,
-                                   remove_i_o_modify_rows_with_big_ff_angles=False,
+                                   remove_i_o_modify_rows_with_big_ff_angles=True,
                                    stops_near_ff_df_exists_ok=True,
                                    heading_info_df_exists_ok=True,
                                    test_or_control='test',
@@ -107,7 +107,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                   save_data=True,
                                                   merge_diff_in_curv_df_to_heading_info=True,
                                                   deal_with_rows_with_big_ff_angles=True,
-                                                  remove_i_o_modify_rows_with_big_ff_angles=False):
+                                                  remove_i_o_modify_rows_with_big_ff_angles=True):
 
         self.ref_point_params = {
             'ref_point_mode': ref_point_mode, 'ref_point_value': ref_point_value}
@@ -129,7 +129,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                                                            merge_diff_in_curv_df_to_heading_info=merge_diff_in_curv_df_to_heading_info)
 
     def add_info_to_nxt_ff_and_cur_ff_df(self, deal_with_rows_with_big_ff_angles=True,
-                                         remove_i_o_modify_rows_with_big_ff_angles=False):
+                                         remove_i_o_modify_rows_with_big_ff_angles=True):
         if deal_with_rows_with_big_ff_angles:
             self._deal_with_rows_with_big_ff_angles(
                 remove_i_o_modify_rows_with_big_ff_angles=remove_i_o_modify_rows_with_big_ff_angles)
@@ -423,7 +423,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.heading_info_df = self.heading_info_df.merge(
             self.both_ff_at_ref_df[columns_to_add + ['stop_point_index']], on='stop_point_index', how='left')
 
-    def _deal_with_rows_with_big_ff_angles(self, remove_i_o_modify_rows_with_big_ff_angles=False, verbose=True, delete_the_same_rows=True):
+    def _deal_with_rows_with_big_ff_angles(self, remove_i_o_modify_rows_with_big_ff_angles=True, verbose=True, delete_the_same_rows=True):
 
         if 'heading_instead_of_curv' in self.overall_params:
             if not self.overall_params['heading_instead_of_curv']:

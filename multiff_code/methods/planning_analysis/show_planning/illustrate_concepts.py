@@ -270,21 +270,228 @@ def prepare_to_illustrate_diff_in_d_curv(snf):
     return arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop
 
 
+# def illustrate_diff_in_d_curv(snf):
+#     arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop = prepare_to_illustrate_diff_in_d_curv(snf)
+    
+#     # plot the cur null arc (deep orange)
+#     snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
+#         snf.fig, snf.cur_null_arc_info_for_the_point,
+#         rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
+#         color='#ff6f00', trace_name='cur null arc',
+#         linewidth=3, opacity=0.9
+#     )
+
+#     # plot the cur arc end to next ff null arc (bright cyan)
+#     snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
+#         snf.fig, arc_from_cur_arc_end_to_next_ff,
+#         rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
+#         color='#00bcd4', trace_name='cur arc end to next ff null arc',
+#         linewidth=3, opacity=0.9
+#     )
+
+#     # plot the traj portion before stop (dark navy)
+#     snf.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(
+#         snf.fig, traj_portion_before_stop,
+#         color='#1f3b73',
+#         hoverdata_multi_columns=['rel_time'], linewidth=7
+#     )
+
+#     # plot the monkey stop to nxt ff null arc (deep purple)
+#     snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
+#         snf.fig, arc_from_stop_to_nxt_ff,
+#         rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
+#         color='#8e44ad', trace_name='monkey stop to nxt ff null arc',
+#         linewidth=2, opacity=0.9
+#     )
+    
+#     return snf.fig
+
 def illustrate_diff_in_d_curv(snf):
-    arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop = prepare_to_illustrate_diff_in_d_curv(snf)
-    # plot the cur null arc
-    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(snf.fig, snf.cur_null_arc_info_for_the_point, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
-                                                                color='lightsalmon', trace_name='cur null arc', linewidth=3, opacity=0.9)
-    # plot the cur arc end to next ff null arc
-    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(snf.fig, arc_from_cur_arc_end_to_next_ff, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
-                                                                color='red', trace_name='cur arc end to next ff null arc', linewidth=3, opacity=0.9)
+    arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop = \
+        prepare_to_illustrate_diff_in_d_curv(snf)
 
+    rot = snf.current_plotly_key_comp['rotation_matrix']
 
-    # plot the traj portion before stop
-    snf.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(snf.fig, traj_portion_before_stop, color='deepskyblue',
-                                                                                    hoverdata_multi_columns=['rel_time'], linewidth=7)
+    # ---------------------------
+    # Pair A (orange family)
+    # ---------------------------
+    color_A_main   = '#E66100'  # solid
+    color_A_alt    = '#FDB863'  # dashed
+    legend_A       = 'Pair A: current target arcs'
 
-    # plot the monkey stop to nxt ff null arc
-    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(snf.fig, arc_from_stop_to_nxt_ff, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'],
-                                                                color='blue', trace_name='monkey stop to nxt ff null arc', linewidth=2, opacity=0.9)
+    # A1: Current null arc (solid)
+    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
+        snf.fig, snf.cur_null_arc_info_for_the_point,
+        rotation_matrix=rot, color=color_A_main,
+        trace_name='cur null arc', linewidth=3, opacity=0.95,
+        dash='solid', legendgroup=legend_A
+    )
+
+    # A2: Cur arc end -> next ff (dashed)
+    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
+        snf.fig, arc_from_cur_arc_end_to_next_ff,
+        rotation_matrix=rot, color=color_A_alt,
+        trace_name='cur arc end → next ff null arc', linewidth=3, opacity=0.95,
+        dash='dash', legendgroup=legend_A
+    )
+
+    # Δκ for Pair A
+    kA1, (ax1, ay1) = _arc_length_weighted_kappa(snf.cur_null_arc_info_for_the_point)
+    kA2, _          = _arc_length_weighted_kappa(arc_from_cur_arc_end_to_next_ff)
+    dA = kA2 - kA1
+    snf.fig = _add_delta_annotation(
+        snf.fig, ax1, ay1,
+        text=f"Δκ(A) = {dA:.3f} (1/cm)", color=color_A_main
+    )
+
+    # ---------------------------
+    # Pair B (blue family)
+    # ---------------------------
+    color_B_main   = '#1F78B4'  # solid navy
+    color_B_alt    = '#A6CEE3'  # dashed light blue
+    legend_B       = 'Pair B: movement vs stop→next'
+
+    # B1: Trajectory portion before stop (solid)
+    snf.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(
+        snf.fig, traj_portion_before_stop,
+        color=color_B_main, hoverdata_multi_columns=['rel_time'], linewidth=7
+    )
+    # (keeps your markers; visually distinct color family)
+
+    # B2: Monkey stop -> next ff null arc (dashed)
+    snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
+        snf.fig, arc_from_stop_to_nxt_ff,
+        rotation_matrix=rot, color=color_B_alt,
+        trace_name='stop → next ff null arc', linewidth=3, opacity=0.95,
+        dash='dash', legendgroup=legend_B
+    )
+
+    # Δκ for Pair B
+    # For trajectory portion we don't have an arc radius—use the stop→next arc only for κ,
+    # and set the traj κ as NaN unless you have an equivalent arc estimate for the traj portion.
+    # If you *do* have a null-arc surrogate for the traj portion, plug it in here.
+    kB2, (bx2, by2) = _arc_length_weighted_kappa(arc_from_stop_to_nxt_ff)
+    kB1 = np.nan  # replace if you have an arc-based proxy for the traj portion
+    # If kB1 is unavailable, just show κ for the stop→next arc:
+    if np.isnan(kB1):
+        snf.fig = _add_delta_annotation(
+            snf.fig, bx2, by2, text=f"κ(stop→next) = {kB2:.3f} (1/cm)", color=color_B_main
+        )
+    else:
+        dB = kB2 - kB1
+        snf.fig = _add_delta_annotation(
+            snf.fig, bx2, by2, text=f"Δκ(B) = {dB:.3f} (1/cm)", color=color_B_main
+        )
+
+    # ---------------------------
+    # Contrast the pairs (Δκ(A) vs Δκ(B))
+    # ---------------------------
+    if not np.isnan(kA1) and not np.isnan(kA2) and not np.isnan(kB2) and not np.isnan(kB1):
+        dA = kA2 - kA1
+        dB = kB2 - kB1
+        contrast = dA - dB
+        # Put a compact summary box in a corner
+        snf.fig.add_annotation(
+            xref='paper', yref='paper', x=0.02, y=0.98, showarrow=False,
+            align='left',
+            text=(f"<b>Curvature summary</b><br>"
+                  f"Δκ(A) = {dA:.3f}<br>"
+                  f"Δκ(B) = {dB:.3f}<br>"
+                  f"<b>Contrast</b> = Δκ(A)−Δκ(B) = {contrast:.3f}"),
+            font=dict(size=12, color='#222'),
+            bgcolor='rgba(255,255,255,0.7)', bordercolor='#888', borderwidth=1
+        )
+
+    # Cleaner legend grouping names
+    snf.fig.update_layout(legend_title_text='Arc groups')
+
     return snf.fig
+
+
+
+def _arc_length_weighted_kappa(null_arc_info):
+    """Return length-weighted mean curvature and a representative (x, y) for annotation."""
+    if len(null_arc_info) == 0:
+        return np.nan, (None, None)
+
+    num, den = 0.0, 0.0
+    ann_x, ann_y = None, None
+
+    for idx in null_arc_info.index:
+        R = float(null_arc_info.loc[idx, 'all_arc_radius'])
+        th0 = float(null_arc_info.loc[idx, 'arc_starting_angle'])
+        th1 = float(null_arc_info.loc[idx, 'arc_ending_angle'])
+        dth = abs(th1 - th0)
+        length = R * dth
+        if R > 0 and dth > 0:
+            num += (1.0 / R) * length
+            den += length
+
+        # mid-arc point for labeling (in world coords)
+        cx = float(null_arc_info.loc[idx, 'center_x'])
+        cy = float(null_arc_info.loc[idx, 'center_y'])
+        th_mid = (th0 + th1) / 2.0
+        # pick the first segment’s mid-point as label anchor
+        if ann_x is None:
+            ann_x = cx + R * np.cos(th_mid)
+            ann_y = cy + R * np.sin(th_mid)
+
+    kappa = (num / den) if den > 0 else np.nan
+    return kappa, (ann_x, ann_y)
+
+
+def _add_delta_annotation(fig, x, y, text, color):
+    if x is None or y is None:  # no-op if we failed to compute a location
+        return fig
+    fig.add_annotation(
+        x=x, y=y, text=text, showarrow=True, arrowhead=2,
+        ax=20, ay=-20, font=dict(size=12, color=color),
+        bgcolor='rgba(255,255,255,0.7)',  # must be string
+        bordercolor=color, borderwidth=1
+    )
+    return fig
+
+
+# def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, linewidth=2,
+#                              opacity=None, color=None, trace_name='null arc'):
+
+#     if len(null_arc_info) == 0:
+#         print('Warning: No null arc info to plot because null_arc_info is empty')
+
+#     for index in null_arc_info.index:
+#         arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[index, 'center_x'], null_arc_info.loc[index, 'center_y'], null_arc_info.loc[index, 'all_arc_radius'],
+#                                                                   null_arc_info.loc[index, 'arc_starting_angle'], null_arc_info.loc[index, 'arc_ending_angle'], rotation_matrix=rotation_matrix)
+
+#         arc_xy_to_plot = arc_xy_rotated.reshape(2, -1)
+#         if opacity is None:
+#             opacity = 0.8
+#         plot_to_add = go.Scatter(x=arc_xy_to_plot[0]-x0, y=arc_xy_to_plot[1]-y0, mode='lines',
+#                                  line=dict(color=color, width=linewidth), opacity=opacity,
+#                                  name=trace_name,
+#                                  hoverinfo='name',
+#                                  showlegend=True)
+#         fig.add_trace(plot_to_add)
+
+#     return fig
+
+
+# def plot_a_portion_of_trajectory_to_show_traj_portion(fig, traj_portion, color='purple', hoverdata_multi_columns=['rel_time'], linewidth=9,
+#                                                       trace_name='to_show_traj_portion'):
+
+#     plot_to_add = px.scatter(traj_portion, x='monkey_x', y='monkey_y',
+#                              hover_data=hoverdata_multi_columns,
+#                              labels={'monkey_x': 'monkey x after rotation (cm)',
+#                                      'monkey_y': 'monkey y after rotation (cm)',
+#                                      'rel_time': 'relative time (s)',
+#                                      'rel_distance': 'relative distance (cm)'},
+#                              custom_data=hoverdata_multi_columns,
+#                              color_discrete_sequence=[color])
+#     fig.add_traces(plot_to_add.data)
+#     fig.data[-1].name = trace_name
+#     hovertemplate = ' <br>'.join(
+#         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
+#     fig.update_traces(marker=dict(size=linewidth, opacity=1),
+#                       hovertemplate=hovertemplate,
+#                       selector=dict(name=trace_name))
+
+#     return fig

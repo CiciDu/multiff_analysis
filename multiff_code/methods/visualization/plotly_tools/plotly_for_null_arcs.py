@@ -35,28 +35,60 @@ def find_best_arc_df_for_ff(ff_indices, point_indexes, curv_of_traj_df, monkey_i
                                                      opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry)
     return curvature_df, ff_info
 
-
-def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, linewidth=2,
-                             opacity=None, color=None, trace_name='null arc'):
+def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None,
+                             linewidth=2, opacity=None, color=None, trace_name='null arc',
+                             dash='solid', legendgroup=None):
 
     if len(null_arc_info) == 0:
         print('Warning: No null arc info to plot because null_arc_info is empty')
 
     for index in null_arc_info.index:
-        arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[index, 'center_x'], null_arc_info.loc[index, 'center_y'], null_arc_info.loc[index, 'all_arc_radius'],
-                                                                  null_arc_info.loc[index, 'arc_starting_angle'], null_arc_info.loc[index, 'arc_ending_angle'], rotation_matrix=rotation_matrix)
+        arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(
+            null_arc_info.loc[index, 'center_x'],
+            null_arc_info.loc[index, 'center_y'],
+            null_arc_info.loc[index, 'all_arc_radius'],
+            null_arc_info.loc[index, 'arc_starting_angle'],
+            null_arc_info.loc[index, 'arc_ending_angle'],
+            rotation_matrix=rotation_matrix
+        )
 
         arc_xy_to_plot = arc_xy_rotated.reshape(2, -1)
         if opacity is None:
             opacity = 0.8
-        plot_to_add = go.Scatter(x=arc_xy_to_plot[0]-x0, y=arc_xy_to_plot[1]-y0, mode='lines',
-                                 line=dict(color=color, width=linewidth), opacity=opacity,
-                                 name=trace_name,
-                                 hoverinfo='name',
-                                 showlegend=True)
+
+        plot_to_add = go.Scatter(
+            x=arc_xy_to_plot[0]-x0, y=arc_xy_to_plot[1]-y0, mode='lines',
+            line=dict(color=color, width=linewidth, dash=dash),
+            opacity=opacity, name=trace_name, hoverinfo='name',
+            showlegend=True, legendgroup=legendgroup
+        )
         fig.add_trace(plot_to_add)
 
     return fig
+
+
+
+# def plot_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, linewidth=2,
+#                              opacity=None, color=None, trace_name='null arc'):
+
+#     if len(null_arc_info) == 0:
+#         print('Warning: No null arc info to plot because null_arc_info is empty')
+
+#     for index in null_arc_info.index:
+#         arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[index, 'center_x'], null_arc_info.loc[index, 'center_y'], null_arc_info.loc[index, 'all_arc_radius'],
+#                                                                   null_arc_info.loc[index, 'arc_starting_angle'], null_arc_info.loc[index, 'arc_ending_angle'], rotation_matrix=rotation_matrix)
+
+#         arc_xy_to_plot = arc_xy_rotated.reshape(2, -1)
+#         if opacity is None:
+#             opacity = 0.8
+#         plot_to_add = go.Scatter(x=arc_xy_to_plot[0]-x0, y=arc_xy_to_plot[1]-y0, mode='lines',
+#                                  line=dict(color=color, width=linewidth), opacity=opacity,
+#                                  name=trace_name,
+#                                  hoverinfo='name',
+#                                  showlegend=True)
+#         fig.add_trace(plot_to_add)
+
+#     return fig
 
 
 def update_null_arcs_in_plotly(fig, null_arc_info, x0=0, y0=0, rotation_matrix=None, trace_name='null arc'):

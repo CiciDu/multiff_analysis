@@ -296,7 +296,6 @@ class _CompareYValues:
 
         # Build prerequisites then compute
         self._ensure_heading_info(
-            self,
             ref_point_mode=ref_point_mode,
             ref_point_value=ref_point_value,
             curv_traj_window_before_stop=curv_traj_window_before_stop,
@@ -331,7 +330,9 @@ class _CompareYValues:
                                 combd_heading_df_x_sessions_exists_ok=True,
                                 stops_near_ff_df_exists_ok=True,
                                 heading_info_df_exists_ok=True,
-                                verbose=False, save_data=True):
+                                verbose=False, save_data=True,
+                                **kwargs
+                                ):
         return self._make_median_info(
             kind="pooled",
             ref_point_mode=ref_point_mode,
