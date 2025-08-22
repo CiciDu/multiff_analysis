@@ -28,14 +28,7 @@ class _PlotCurVsNxtFF(plotly_plot_class.PlotlyPlotter, matplotlib_plot_class.Mat
             fixed_arc_length=fixed_arc_length, use_fixed_arc_length=use_fixed_arc_length)
         plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_for_counted_points(
             self)
-        
-    def make_individual_plots_for_stops_near_ff_in_mpl(self, current_i, max_num_plot_to_make=5, additional_plotting_kwargs={'show_connect_path_ff_specific_indices': None, 'show_ff_indices': True},
-                                                       show_position_in_scatter_plot=True, show_monkey_heading=True, show_null_arcs=True):
-        current_i = self.make_individual_plots_for_stops_near_ff_in_mpl(current_i, max_num_plot_to_make, additional_plotting_kwargs,
-                                                                        show_position_in_scatter_plot, show_monkey_heading, show_null_arcs
-                                                                        )
 
-        return current_i
 
     def compare_test_and_control_in_polar_plots(self, max_instances_each=10, test_color='green', ctrl_color='purple',
                                                 start='stop_point_index', end='next_stop_point_index', rmax=400):

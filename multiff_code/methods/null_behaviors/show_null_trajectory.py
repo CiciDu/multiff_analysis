@@ -113,6 +113,7 @@ def find_arc_length_and_radius(ff_x, ff_y, monkey_x, monkey_y, monkey_angle, ver
 
 def find_and_package_opt_arc_info_for_plotting(best_arc_df, monkey_information=None, column_for_color=None, mode='cartesian',
                                                ignore_error=False):
+    
     arc_radius = best_arc_df.opt_arc_radius.values
     arc_end_direction = best_arc_df.opt_arc_end_direction.values
     arc_point_index = best_arc_df.point_index.values
@@ -129,10 +130,14 @@ def find_and_package_opt_arc_info_for_plotting(best_arc_df, monkey_information=N
             whether_ff_behind = best_arc_df.whether_ff_behind.values
         else:
             whether_ff_behind = (np.abs(best_arc_df['ff_angle']) > math.pi/2)
-        monkey_xy = monkey_information.loc[arc_point_index, [
-            'monkey_x', 'monkey_y']].values
-        monkey_angle = monkey_information.loc[arc_point_index,
-                                              'monkey_angle'].values
+        try:
+            monkey_xy = best_arc_df[['monkey_x', 'monkey_y']].values
+            monkey_angle = best_arc_df['monkey_angle'].values
+        except KeyError:
+            monkey_xy = monkey_information.loc[arc_point_index, [
+                'monkey_x', 'monkey_y']].values
+            monkey_angle = monkey_information.loc[arc_point_index,
+                                                'monkey_angle'].values
         center_x, center_y, arc_starting_angle, arc_ending_angle = opt_arc_utils.find_cartesian_arc_center_and_angle_for_opt_arc_to_arc_end(arc_end_xy, arc_point_index, monkey_xy, monkey_angle, ff_distance, ff_angle, arc_radius,
                                                                                                                                             arc_end_direction, whether_ff_behind=whether_ff_behind,
                                                                                                                                             ignore_error=ignore_error)

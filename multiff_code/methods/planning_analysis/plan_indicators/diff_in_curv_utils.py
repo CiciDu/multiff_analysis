@@ -23,6 +23,16 @@ def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
     return cur_end_to_next_ff_curv
 
 
+def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
+                                      curv_of_traj_mode='distance', curv_traj_window_before_stop=[-25, 0]):
+    
+    monkey_info = _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
+                                            curv_of_traj_mode=curv_of_traj_mode, curv_traj_window_before_stop=curv_traj_window_before_stop)
+    prev_stop_to_next_ff_curv = _compute_curv_from_prev_stop(
+        monkey_info)
+    return prev_stop_to_next_ff_curv
+
+
 def _prepare_cur_end_to_next_ff_data(heading_info_df, nxt_ff_df_modified):
     # Select relevant columns from heading_info_df
     heading_cols = [
@@ -85,6 +95,20 @@ def _build_mock_monkey_info(df, use_curv_to_ff_center=False):
     return mock_monkey_info
 
 
+def _make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=10):
+    null_arc_curv_df = curvature_utils._make_curvature_df(
+        mock_monkey_info,
+        mock_monkey_info['curv_of_traj'].values,
+        ff_radius_for_opt_arc=ff_radius_for_opt_arc,
+        clean=True,
+        invalid_curvature_ok=True,
+        ignore_error=True,
+        include_cntr_arc_curv=False,
+        opt_arc_stop_first_vis_bdry=False,
+    )
+    return null_arc_curv_df
+
+
 def _compute_curv_from_cur_end(mock_monkey_info,
                                ff_radius_for_opt_arc=10,
                                ):
@@ -95,33 +119,13 @@ def _compute_curv_from_cur_end(mock_monkey_info,
 
     '''
 
-    null_arc_curv_df = curvature_utils._make_curvature_df(
-        mock_monkey_info,
-        mock_monkey_info['curv_of_traj'].values,
-        ff_radius_for_opt_arc=ff_radius_for_opt_arc,
-        clean=True,
-        invalid_curvature_ok=True,
-        ignore_error=True,
-        include_cntr_arc_curv=False,
-        # this doesn't matter since we only care about the curvature to nxt ff, not the null arc landing point inside nxt ff;
-        opt_arc_stop_first_vis_bdry=False,
-        # and whether the arc ends at start of the visible boundary doesn't change the curvature to nxt ff
-    )
+    null_arc_curv_df = _make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
 
     result_df = null_arc_curv_df[['point_index', 'ff_angle_boundary']].copy()
     result_df['opt_curv_to_cur_ff'] = mock_monkey_info['curv_of_traj'].values
     result_df['nxt_ff_index'] = mock_monkey_info['ff_index'].values
     result_df['curv_from_cur_end_to_nxt_ff'] = null_arc_curv_df['opt_arc_curv'].values
     return result_df
-
-
-def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                      curv_of_traj_mode='distance', curv_traj_window_before_stop=[-25, 0]):
-    df = _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                            curv_of_traj_mode=curv_of_traj_mode, curv_traj_window_before_stop=curv_traj_window_before_stop)
-    prev_stop_to_next_ff_curv = _compute_curv_from_prev_stop(
-        df)
-    return prev_stop_to_next_ff_curv
 
 
 def _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
@@ -137,8 +141,7 @@ def _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop
     df['curv_of_traj'] = monkey_curv_before_stop
     return df
 
-
-def _compute_curv_from_prev_stop(monkey_info):
+def _make_monkey_curv_df(monkey_info):
     monkey_curv_df = curvature_utils._make_curvature_df(
         monkey_info,
         monkey_info['curv_of_traj'].values,
@@ -149,6 +152,10 @@ def _compute_curv_from_prev_stop(monkey_info):
         include_cntr_arc_curv=False,
         opt_arc_stop_first_vis_bdry=False,
     )
+    return monkey_curv_df
+
+def _compute_curv_from_prev_stop(monkey_info):
+    monkey_curv_df = _make_monkey_curv_df(monkey_info)
 
     result_df = monkey_curv_df[['point_index', 'ff_angle_boundary']].copy()
     result_df['ff_angle_boundary'] = monkey_info['ff_angle_boundary'].values

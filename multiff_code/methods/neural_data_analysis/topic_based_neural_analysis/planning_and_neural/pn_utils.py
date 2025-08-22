@@ -51,7 +51,7 @@ def get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df):
 def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                            curv_traj_window_before_stop=[-25, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
 
-    cur_end_to_next_ff_curv = find_curv_of_traj_info(
+    cur_end_to_next_ff_curv = compute_cur_end_to_next_ff_curv_for_pn(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
     prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_ff_df['nxt_ff_index'].values, point_indexes_before_stop,
                                                                                      monkey_information, ff_real_position_sorted, ff_caught_T_new,
@@ -63,7 +63,7 @@ def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_informa
     return diff_in_curv_df
 
 
-def find_curv_of_traj_info(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
+def compute_cur_end_to_next_ff_curv_for_pn(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
     mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center)
     cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(
@@ -290,28 +290,36 @@ def calculate_angle_from_stop_to_nxt_ff(monkey_information, point_index_before_s
         nxt_ff_x, nxt_ff_y, mx_before_stop, my_before_stop, m_angle_before_stop)
     return m_angle_before_stop, angle_from_stop_to_nxt_ff
 
+
 def add_ff_visible_dummy(df, ff_index_col, ff_dataframe):
     # Keep only rows where the FF is visible
-    
+
     right = (
-        ff_dataframe.loc[ff_dataframe['visible'].astype(bool), ['ff_index', 'point_index']]
+        ff_dataframe.loc[ff_dataframe['visible'].astype(
+            bool), ['ff_index', 'point_index']]
         .rename(columns={'ff_index': ff_index_col})   # align key name
         .drop_duplicates()                            # avoid merge blow-up
         .assign(whether_ff_visible_dummy=1)
     )
 
     out = df.merge(right, on=[ff_index_col, 'point_index'], how='left')
-    out['whether_ff_visible_dummy'] = out['whether_ff_visible_dummy'].fillna(0).astype('uint8')
+    out['whether_ff_visible_dummy'] = out['whether_ff_visible_dummy'].fillna(
+        0).astype('uint8')
     return out
+
 
 def add_ff_in_memory_dummy(df, ff_index_col, ff_dataframe, max_in_memory_time_since_seen=2):
     # Keep only rows where the FF is in memory
-    ff_dataframe_in_memory = ff_dataframe[ff_dataframe['time_since_last_vis'] < max_in_memory_time_since_seen].copy()
+    ff_dataframe_in_memory = ff_dataframe[ff_dataframe['time_since_last_vis']
+                                          < max_in_memory_time_since_seen].copy()
 
-    ff_dataframe_in_memory = ff_dataframe_in_memory[['ff_index', 'point_index']].rename(columns={'ff_index': ff_index_col}).drop_duplicates()   # align key name
+    ff_dataframe_in_memory = ff_dataframe_in_memory[['ff_index', 'point_index']].rename(
+        columns={'ff_index': ff_index_col}).drop_duplicates()   # align key name
     ff_dataframe_in_memory['whether_ff_in_memory_dummy'] = 1
-    
-    out = df.merge(ff_dataframe_in_memory, on=[ff_index_col, 'point_index'], how='left')
-    out['whether_ff_in_memory_dummy'] = out['whether_ff_in_memory_dummy'].fillna(0).astype('uint8')
-    
+
+    out = df.merge(ff_dataframe_in_memory, on=[
+                   ff_index_col, 'point_index'], how='left')
+    out['whether_ff_in_memory_dummy'] = out['whether_ff_in_memory_dummy'].fillna(
+        0).astype('uint8')
+
     return out

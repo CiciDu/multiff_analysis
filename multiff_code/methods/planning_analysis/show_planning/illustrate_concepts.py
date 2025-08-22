@@ -235,3 +235,12 @@ def prepare_to_show_angle_from_null_arc_end_to_next_ff(snf, fixed_current_i):
     )
     
     return line_of_cur_null_heading, line_cur_and_nxt_ff, arc_xy
+
+
+def find_arc_info_for_plotting(null_arc_curv_df, stops_near_ff_row, nxt_ff_df_modified, monkey_information):
+    stop_point_index = stops_near_ff_row['stop_point_index']
+    ref_point_index = nxt_ff_df_modified.loc[nxt_ff_df_modified['stop_point_index']==stop_point_index, 'point_index'].item()
+    arc_info_for_plotting = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
+                null_arc_curv_df[null_arc_curv_df['ref_point_index']==ref_point_index], monkey_information)
+    # arc_info = arc_info_for_plotting[arc_info_for_plotting['arc_point_index']==ref_point_index]
+    return arc_info_for_plotting
