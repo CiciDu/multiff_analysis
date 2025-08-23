@@ -29,7 +29,7 @@ def make_best_arc_df(curvature_df, monkey_information, ff_real_position_sorted):
 
     best_arc_df = best_arc_df[['point_index', 'ff_index', 'ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff',
                                'opt_arc_radius', 'opt_arc_measure', 'opt_arc_length', 'opt_arc_end_direction',
-                               'opt_arc_end_x', 'opt_arc_end_y']]
+                               'opt_arc_curv', 'opt_arc_end_x', 'opt_arc_end_y']]
     best_arc_df['whether_ff_behind'] = False
     best_arc_df.loc[np.abs(best_arc_df['ff_angle']) >
                     math.pi/2, 'whether_ff_behind'] = True

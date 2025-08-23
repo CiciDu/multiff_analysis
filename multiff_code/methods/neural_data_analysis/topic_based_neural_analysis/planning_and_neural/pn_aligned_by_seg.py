@@ -11,7 +11,7 @@ import os
 class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeural, gpfa_helper_class.GPFAHelperClass):
 
     def __init__(self, raw_data_folder_path=None,
-                 bin_width=0.1,
+                 bin_width=0.05,
                  one_point_index_per_bin=False):
         super().__init__(raw_data_folder_path=raw_data_folder_path,
                          bin_width=bin_width,

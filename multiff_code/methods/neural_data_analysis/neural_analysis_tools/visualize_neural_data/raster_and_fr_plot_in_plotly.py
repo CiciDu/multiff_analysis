@@ -9,12 +9,9 @@ from visualization.plotly_tools.plotly_for_time_series import plot_blocks_to_sho
 from visualization.plotly_tools import plotly_plot_class
 
 
-
-
-
 def create_firing_rate_plot_for_one_duration_in_plotly(
         spikes_df, reference_time, start_time, end_time,
-        bin_width=0.1, bins_per_aggregate=1,
+        bin_width=0.05, bins_per_aggregate=1,
         max_clusters_to_plot=None, rel_hover_time=None,
         show_visible_segments=False, visible_segments_info=None):
 
@@ -24,7 +21,8 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
         return go.Figure()
 
     filtered_spikes = filtered_spikes.copy()
-    filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - reference_time
+    filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - \
+        reference_time
 
     rel_start_time = start_time - reference_time
     rel_end_time = end_time - reference_time
@@ -34,12 +32,13 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
         min_time=rel_start_time, max_time=rel_end_time
     )
     time_array = (time_bins[:-1] + time_bins[1:]) / 2
-    fr_df = _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=time_array)
-
+    fr_df = _prepare_fr_data(binned_df, bin_width,
+                             bins_per_aggregate, time_array=time_array)
 
     selected_cluster_cols = [f"cluster_{c}" for c in selected_clusters]
     if 'time' not in fr_df.columns or not set(selected_cluster_cols).intersection(fr_df.columns):
-        logging.warning("Prepared firing rate DataFrame missing expected columns.")
+        logging.warning(
+            "Prepared firing rate DataFrame missing expected columns.")
         return go.Figure()
 
     fig = go.Figure()
@@ -53,14 +52,14 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
                 mode='lines',
                 name=f'Cluster {c}',
                 legendgroup=f'cluster-{c}',
-                line=dict(color=get_colors_utils._color_for_cluster(c), width=1.5, shape='linear'),
+                line=dict(color=get_colors_utils._color_for_cluster(
+                    c), width=1.5, shape='linear'),
                 opacity=0.8,
                 customdata=[c] * len(fr_df),
                 hovertemplate='<b>Cluster %{customdata}</b><br>'
                               'Time: %{x:.3f}s<br>'
                               'Firing Rate: %{y:.2f} Hz<extra></extra>'
             ))
-
 
     if len(selected_cluster_cols) > 1:
         mean_fr = fr_df[selected_cluster_cols].mean(axis=1)
@@ -81,8 +80,10 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
     y_max = (y_max * 1.1) if y_max != 0 else 1
 
     _add_reference_lines(fig, y_min, y_max, rel_hover_time)
-    fig = _add_firefly_segments(fig, y_min, y_max, show_visible_segments, visible_segments_info)
-    fig.update_layout(_common_layout('Firing Rate Over Time', 'Time (s) relative to reference', 'Firing Rate (Hz)', [y_min, y_max]))
+    fig = _add_firefly_segments(
+        fig, y_min, y_max, show_visible_segments, visible_segments_info)
+    fig.update_layout(_common_layout('Firing Rate Over Time',
+                      'Time (s) relative to reference', 'Firing Rate (Hz)', [y_min, y_max]))
 
     return fig
 
@@ -99,7 +100,8 @@ def create_raster_plot_for_one_duration_in_plotly(
         return go.Figure()
 
     filtered_spikes = filtered_spikes.copy()
-    filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - reference_time
+    filtered_spikes['rel_spike_time'] = filtered_spikes['time'] - \
+        reference_time
 
     fig = go.Figure()
 
@@ -107,7 +109,8 @@ def create_raster_plot_for_one_duration_in_plotly(
     for cluster_id in selected_clusters:
         group = filtered_spikes[filtered_spikes['cluster'] == cluster_id]
         if not group.empty:
-            c = get_colors_utils._color_for_cluster(cluster_id)  # <- stable, normalized color
+            c = get_colors_utils._color_for_cluster(
+                cluster_id)  # <- stable, normalized color
             fig.add_trace(go.Scatter(
                 x=group['rel_spike_time'],
                 y=[cluster_id] * len(group),
@@ -116,7 +119,8 @@ def create_raster_plot_for_one_duration_in_plotly(
                     size=4,
                     color=c,
                     opacity=0.8,
-                    line=dict(width=0.5, color='white')  # thin halo for visibility
+                    # thin halo for visibility
+                    line=dict(width=0.5, color='white')
                 ),
                 name=f'Cluster {cluster_id}',
                 legendgroup=f'cluster-{cluster_id}',
@@ -125,7 +129,8 @@ def create_raster_plot_for_one_duration_in_plotly(
                 hovertemplate='<b>Cluster %{customdata}</b><br>Time: %{x:.3f}s<extra></extra>'
             ))
 
-    y_min, y_max = filtered_spikes['cluster'].min(), filtered_spikes['cluster'].max()
+    y_min, y_max = filtered_spikes['cluster'].min(
+    ), filtered_spikes['cluster'].max()
     y_range = y_max - y_min
     if y_range == 0:
         y_min -= 0.5
@@ -135,7 +140,8 @@ def create_raster_plot_for_one_duration_in_plotly(
         y_max += y_range * 0.1
 
     _add_reference_lines(fig, y_min, y_max, rel_hover_time)
-    fig = _add_firefly_segments(fig, y_min, y_max, show_visible_segments, visible_segments_info)
+    fig = _add_firefly_segments(
+        fig, y_min, y_max, show_visible_segments, visible_segments_info)
     fig.update_layout(_common_layout(
         'Neural Raster Plot',
         'Time (s) relative to reference',
@@ -144,8 +150,6 @@ def create_raster_plot_for_one_duration_in_plotly(
     ))
 
     return fig
-
-
 
 
 def _add_reference_lines(fig, y_min, y_max, rel_hover_time=None):
@@ -157,15 +161,18 @@ def _add_reference_lines(fig, y_min, y_max, rel_hover_time=None):
                            color=plotly_for_time_series.HOVER_LINE_COLOR,
                            dash='dash', showlegend=False, name='Hover Time', width=2)
 
+
 def _add_firefly_segments(fig, y_min, y_max, show_visible_segments, visible_segments_info):
     if show_visible_segments and visible_segments_info is not None:
         stops_near_ff_row = visible_segments_info['stops_near_ff_row']
         fig = plot_blocks_to_show_ff_visible_segments_in_fig_time_series(
             fig, visible_segments_info['ff_info'], visible_segments_info['monkey_information'],
             stops_near_ff_row,
-            unique_ff_indices=[stops_near_ff_row.cur_ff_index, stops_near_ff_row.nxt_ff_index],
+            unique_ff_indices=[stops_near_ff_row.cur_ff_index,
+                               stops_near_ff_row.nxt_ff_index],
             time_or_distance='time', y_range_for_v_line=[y_min, y_max],
-            varying_colors=[plotly_plot_class.PlotlyPlotter.cur_ff_color, plotly_plot_class.PlotlyPlotter.nxt_ff_color], 
+            varying_colors=[plotly_plot_class.PlotlyPlotter.cur_ff_color,
+                            plotly_plot_class.PlotlyPlotter.nxt_ff_color],
             ff_names=['cur ff', 'nxt ff'],
             block_opacity=0.1,
             show_annotation=False
@@ -186,7 +193,8 @@ def _common_layout(title, xaxis_title, yaxis_title, y_range):
         paper_bgcolor='white',
         margin=dict(l=60, r=30, t=50, b=60),
     )
-    
+
+
 def _select_clusters_and_spikes_in_time_window(spikes_df, start_time, end_time, max_clusters_to_plot=None):
     """
     Select spikes within a time window and limit clusters.

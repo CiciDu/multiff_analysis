@@ -140,6 +140,9 @@ def combine_relevant_features(x_features_df, only_cur_ff_df, plan_features_df, d
 
     x_df['dir_from_cur_ff_same_side'] = x_df['dir_from_cur_ff_same_side'].astype(
         int)
+    
+    # drop duplicated columns
+    x_df = x_df.loc[:, ~x_df.columns.duplicated()]
 
     return x_df
 

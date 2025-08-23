@@ -43,11 +43,11 @@ import pandas as pd
 import numpy as np
 
 
-def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None, cv=None):
+def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None, kfold_cv=None):
     """
     Train and evaluate classification models with multiple metrics.
-    If cv is None, uses original train/test split.
-    If cv is an integer, performs k-fold cross-validation on the training set.
+    If kfold_cv is None, uses original train/test split.
+    If kfold_cv is an integer, performs k-fold cross-validation on the training set.
     """
     metrics_list = []
     
@@ -80,8 +80,8 @@ def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None
 
         for name, mdl in models:
             print("Model:", name)
-            if cv:
-                scores = cross_val_score(mdl, X_train, y_train, cv=cv, scoring='accuracy')
+            if kfold_cv:
+                scores = cross_val_score(mdl, X_train, y_train, cv=kfold_cv, scoring='accuracy')
                 metrics_list.append({
                     'model': name,
                     'accuracy': scores.mean(),

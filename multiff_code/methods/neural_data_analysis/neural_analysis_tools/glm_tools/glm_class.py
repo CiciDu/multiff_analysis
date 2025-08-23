@@ -1,6 +1,7 @@
 
 import sys
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_feature_selection
 
 import os
 import sys
@@ -14,8 +15,6 @@ from sklearn.preprocessing import StandardScaler
 class GLMclass():
 
     # for
-    temporal_vars = ['capture_ff', 'any_ff_visible', 'any_ff_in_memory', 'turning_right',
-                    'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
     # for the original neural vs behavior analysis
     # temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
@@ -48,75 +47,24 @@ class GLMclass():
         self._categorize_features(temporal_vars)
         self._scale_features()
         self._get_mock_trials_df(num_total_trials)
-        self.sm_handler = gdh.smooths_handler()
 
-    def run_pgam(self, neural_cluster_number=5):
-        self.neural_cluster_number = neural_cluster_number
-        link = sm.genmod.families.links.log()
-        self.poissFam = sm.genmod.families.family.Poisson(link=link)
-        if neural_cluster_number is not None:
-            self.spk_counts = self.x_var.iloc[:, neural_cluster_number].values
-        else:
-            self.spk_counts = self.x_var.values
-
-        # create the pgam model
-        self.pgam = general_additive_model(self.sm_handler,
-                                           self.sm_handler.smooths_var,  # list of covariate we want to include in the model
-                                           self.spk_counts,  # vector of spike counts
-                                           self.poissFam  # poisson family with exponential link from statsmodels.api
-                                           )
-
-        # with all covariate, remove according to stat testing, and then refit
-        self.full, self.reduced = self.pgam.fit_full_and_reduced(self.sm_handler.smooths_var,
-                                                                 th_pval=0.001,  # pval for significance of covariate icluseioon
-                                                                 max_iter=10 ** 2,  # max number of iteration
-                                                                 use_dgcv=True,  # learn the smoothing penalties by dgcv
-                                                                 trial_num_vec=self.trial_ids,
-                                                                 filter_trials=self.train_trials,
-                                                                 )
-
-        print('Minimal subset of variables driving the activity:')
-        print(self.reduced.var_list)
-
-    def post_processing(self):
-        # string with the neuron identifier
-        neuron_id = 'neuron_000_session_1_monkey_001'
-        # dictionary containing some information about the neuron, keys must be strings and values can be anything since are stored with type object.
-        info_save = {'x': 100,
-                     'y': 801.2,
-                     'brain_region': 'V1',
-                     'subject': 'monkey_001'
-                     }
-
-        # assume that we used 90% of the trials for training, 10% for evaluation
-        self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, self.train_trials, self.sm_handler, self.poissFam, self.trial_ids,
-                                       var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
-
-        # find which variables in res['variable'] are in reduced.var_list
-        # and then plot the corresponding x_rate_Hz
-        indices_of_vars_to_plot = np.where(
-            np.isin(self.res['variable'], self.reduced.var_list))[0]
-
-        self._rename_variables_in_results()
-        plot_modeling_result.plot_pgam_tuning_curvetions(
-            self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
-
-    def save_results(self):
-        res_path = os.path.join(
-            self.processed_neural_data_folder_path, 'pgam_res')
-        os.makedirs(res_path, exist_ok=True)
-        save_name = f'neuron_{self.neural_cluster_number}'
-        np.savez(os.path.join(res_path, save_name+'.npz'), results=self.res)
 
     def _categorize_features(self, temporal_vars):
-        self.temporal_vars = [
-            x for x in temporal_vars if x in self.y_var.columns]
-        self.spatial_vars = [
-            x for x in self.y_var.columns if x not in temporal_vars]
-        print('Spatial variables:', np.array(self.spatial_vars))
+        # Keep only valid temporal variables that exist in y_var
+        self.temporal_vars = [x for x in temporal_vars if x in self.y_var.columns]
 
-        self.temporal_sub = self.y_var[self.temporal_vars]
-        self.spatial_sub_unscaled = self.y_var[self.spatial_vars]
+        # Convert to set for subtraction
+        rest_of_vars = set(pn_feature_selection.all_features) - set(self.temporal_vars)
+
+        # Spatial vars are those in y_var that are in the "rest"
+        self.spatial_vars = [x for x in self.y_var.columns if x in rest_of_vars]
+
+        print("Spatial variables:", np.array(self.spatial_vars))
+
+        # Sub-dataframes
+        self.temporal_sub = self.y_var.loc[:, self.temporal_vars]
+        self.spatial_sub_unscaled = self.y_var.loc[:, self.spatial_vars]
+
 
     def _scale_features(self):
         # since temporal variables are all dummy variables, we only need to scale the spatial variables

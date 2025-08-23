@@ -11,7 +11,7 @@ import os
 class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
     def __init__(self, raw_data_folder_path=None,
-                 bin_width=0.1,
+                 bin_width=0.05,
                  one_point_index_per_bin=False):
         super().__init__(raw_data_folder_path=raw_data_folder_path,
                          bin_width=bin_width,
@@ -265,7 +265,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
     def get_x_and_y_var(self, exists_ok=True):
         original_len = len(self.planning_data_by_bin)
         cols = list(dict.fromkeys(['bin', 'segment', 'whether_test'] + pn_feature_selection.all_features))
-        self.y_var = self.planning_data_by_bin[cols].reset_index(drop=True)
+        self.y_var = self.planning_data_by_bin[cols]
         self.y_var = self.y_var.dropna().sort_values(by=['segment', 'bin']).reset_index(drop=True)
         self.y_var['bin'] = self.y_var['bin'].astype(int)
         print(f"{round(1 - len(self.y_var) / original_len, 2)}% of rows are dropped in planning_data_by_bin due to having missing values")
