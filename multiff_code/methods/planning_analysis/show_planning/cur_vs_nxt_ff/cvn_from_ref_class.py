@@ -151,7 +151,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
             ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         df_path = os.path.join(folder_path, df_name)
         if exists_ok & os.path.exists(df_path):
-            self.diff_in_curv_df = pd.read_csv(df_path)
+            self.diff_in_curv_df = pd.read_csv(df_path).drop(columns=['Unnamed: 0'], errors='ignore')
             print(f'Successfully retrieved diff_in_curv_df from {df_path}')
         else:
             if not only_try_retrieving:
@@ -174,12 +174,13 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         return self.diff_in_curv_df
 
     def make_diff_in_curv_df(self, curv_traj_window_before_stop=[-25, 0]):
-        self.cur_end_to_next_ff_curv = diff_in_curv_utils.compute_cur_end_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df,
+        self.cur_end_to_next_ff_curv, self.null_arc_curv_df = diff_in_curv_utils.compute_cur_end_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df,
                                                                                           use_curv_to_ff_center=False)
-        self.prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.heading_info_df['nxt_ff_index'].values, self.heading_info_df['point_index_before_stop'].values,
+        self.prev_stop_to_next_ff_curv, self.monkey_curv_df = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.heading_info_df['nxt_ff_index'].values, self.heading_info_df['point_index_before_stop'].values,
                                                                                               self.monkey_information,
                                                                                               self.ff_real_position_sorted, self.ff_caught_T_new,
                                                                                               curv_traj_window_before_stop=curv_traj_window_before_stop)
+        self.monkey_curv_df['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.prev_stop_to_next_ff_curv['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
             self.prev_stop_to_next_ff_curv, self.cur_end_to_next_ff_curv)

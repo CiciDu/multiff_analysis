@@ -154,6 +154,8 @@ def find_and_package_opt_arc_info_for_plotting(best_arc_df, monkey_information=N
     else:
         null_arc_info_for_plotting['values_for_color'] = None
     null_arc_info_for_plotting = pd.DataFrame(null_arc_info_for_plotting)
+    
+    null_arc_info_for_plotting['opt_arc_curv'] = best_arc_df['opt_arc_curv'].values
 
     return null_arc_info_for_plotting
 

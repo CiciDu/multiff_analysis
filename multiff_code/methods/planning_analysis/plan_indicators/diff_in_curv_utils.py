@@ -15,12 +15,15 @@ def compute_cur_end_to_next_ff_curv(nxt_ff_df_modified, heading_info_df,
         heading_info_df, nxt_ff_df_modified)
     mock_monkey_info = _build_mock_monkey_info(
         df, use_curv_to_ff_center=use_curv_to_ff_center)
-    cur_end_to_next_ff_curv = _compute_curv_from_cur_end(mock_monkey_info,
-                                                         ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    null_arc_curv_df = _make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    
+    cur_end_to_next_ff_curv = _compute_curv_from_cur_end(null_arc_curv_df, mock_monkey_info)
     assert np.all(
         cur_end_to_next_ff_curv['nxt_ff_index'] == heading_info_df['nxt_ff_index'])
+    
+    null_arc_curv_df['ref_point_index'] = heading_info_df['ref_point_index'].values
     cur_end_to_next_ff_curv['ref_point_index'] = heading_info_df['ref_point_index'].values
-    return cur_end_to_next_ff_curv
+    return cur_end_to_next_ff_curv, null_arc_curv_df
 
 
 def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
@@ -28,9 +31,11 @@ def compute_prev_stop_to_next_ff_curv(nxt_ff_indexes, point_indexes_before_stop,
     
     monkey_info = _prepare_prev_stop_to_next_ff_data(nxt_ff_indexes, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                             curv_of_traj_mode=curv_of_traj_mode, curv_traj_window_before_stop=curv_traj_window_before_stop)
+    monkey_curv_df = _make_monkey_curv_df(monkey_info)
+    
     prev_stop_to_next_ff_curv = _compute_curv_from_prev_stop(
-        monkey_info)
-    return prev_stop_to_next_ff_curv
+        monkey_curv_df, monkey_info)
+    return prev_stop_to_next_ff_curv, monkey_curv_df
 
 
 def _prepare_cur_end_to_next_ff_data(heading_info_df, nxt_ff_df_modified):
@@ -109,8 +114,7 @@ def _make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=10):
     return null_arc_curv_df
 
 
-def _compute_curv_from_cur_end(mock_monkey_info,
-                               ff_radius_for_opt_arc=10,
+def _compute_curv_from_cur_end(null_arc_curv_df, mock_monkey_info
                                ):
     '''
     df needs to contain:
@@ -118,9 +122,6 @@ def _compute_curv_from_cur_end(mock_monkey_info,
     cur_opt_arc_end_x, cur_opt_arc_end_y, cur_opt_arc_end_heading, cur_opt_arc_curv (or cur_cntr_arc_end_x, cur_cntr_arc_end_y, cur_cntr_arc_end_heading, cur_cntr_arc_curv if using arc to ff center)
 
     '''
-
-    null_arc_curv_df = _make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
-
     result_df = null_arc_curv_df[['point_index', 'ff_angle_boundary']].copy()
     result_df['opt_curv_to_cur_ff'] = mock_monkey_info['curv_of_traj'].values
     result_df['nxt_ff_index'] = mock_monkey_info['ff_index'].values
@@ -154,8 +155,8 @@ def _make_monkey_curv_df(monkey_info):
     )
     return monkey_curv_df
 
-def _compute_curv_from_prev_stop(monkey_info):
-    monkey_curv_df = _make_monkey_curv_df(monkey_info)
+def _compute_curv_from_prev_stop(monkey_curv_df, monkey_info):
+    
 
     result_df = monkey_curv_df[['point_index', 'ff_angle_boundary']].copy()
     result_df['ff_angle_boundary'] = monkey_info['ff_angle_boundary'].values

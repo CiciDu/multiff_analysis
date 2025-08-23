@@ -497,7 +497,7 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
 
 
 def plot_stops_in_plotly(fig, trajectory_df, show_stop_point_indices, hoverdata_multi_columns=['rel_time'], 
-                         name='stops', color='black'):
+                         name='stops', color='black', show_legend=False):
     
     # if show_stop_point_indices is int, make it a list
     if isinstance(show_stop_point_indices, int):
@@ -517,7 +517,9 @@ def plot_stops_in_plotly(fig, trajectory_df, show_stop_point_indices, hoverdata_
     fig.add_traces(plot_to_add.data)
     fig.data[-1].name = name
     fig.update_traces(marker=dict(size=13, opacity=1, color=color,
-                      symbol="star"), selector=dict(name=name))
+                      symbol="star"), 
+                      showlegend=show_legend,
+                      selector=dict(name=name))
     hovertemplate = ' <br>'.join(
         [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
     fig.update_traces(hovertemplate=hovertemplate, selector=dict(name=name))

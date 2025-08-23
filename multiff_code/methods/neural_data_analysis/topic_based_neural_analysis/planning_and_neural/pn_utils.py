@@ -51,9 +51,9 @@ def get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df):
 def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                            curv_traj_window_before_stop=[-25, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
 
-    cur_end_to_next_ff_curv = compute_cur_end_to_next_ff_curv_for_pn(
+    cur_end_to_next_ff_curv, _ = compute_cur_end_to_next_ff_curv_for_pn(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
-    prev_stop_to_next_ff_curv = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_ff_df['nxt_ff_index'].values, point_indexes_before_stop,
+    prev_stop_to_next_ff_curv, _ = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_ff_df['nxt_ff_index'].values, point_indexes_before_stop,
                                                                                      monkey_information, ff_real_position_sorted, ff_caught_T_new,
                                                                                      curv_traj_window_before_stop=curv_traj_window_before_stop)
     prev_stop_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index'].values

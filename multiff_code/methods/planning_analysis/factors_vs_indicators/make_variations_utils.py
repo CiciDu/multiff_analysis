@@ -187,15 +187,8 @@ def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_d
     ctrl_heading_info_df = build_factor_comp.process_heading_info_df(
         ctrl_heading_info_df)
 
-    test_heading_info_df['dir_from_cur_ff_to_stop'] = np.sign(
-        test_heading_info_df['angle_from_cur_ff_to_stop'])
-    test_heading_info_df['dir_from_cur_ff_to_nxt_ff'] = np.sign(
-        test_heading_info_df['angle_from_cur_ff_to_nxt_ff'])
-
-    ctrl_heading_info_df['dir_from_cur_ff_to_stop'] = np.sign(
-        ctrl_heading_info_df['angle_from_cur_ff_to_stop'])
-    ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff'] = np.sign(
-        ctrl_heading_info_df['angle_from_cur_ff_to_nxt_ff'])
+    test_heading_info_df = add_dir_from_cur_ff(test_heading_info_df)
+    ctrl_heading_info_df = add_dir_from_cur_ff(ctrl_heading_info_df)
 
     pooled_perc_info = make_regrouped_info(test_heading_info_df,
                                            ctrl_heading_info_df,
@@ -210,6 +203,14 @@ def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_d
                                            verbose=verbose)
 
     return pooled_perc_info
+
+
+def add_dir_from_cur_ff(df):
+    df['dir_from_cur_ff_to_stop'] = np.sign(
+        df['angle_from_cur_ff_to_stop'])
+    df['dir_from_cur_ff_to_nxt_ff'] = np.sign(
+        df['angle_from_cur_ff_to_nxt_ff'])
+    return df
 
 
 def extract_key_info_from_stat_df(stat_df, metrics=['Q1', 'median', 'Q3']):
