@@ -206,7 +206,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                               ):
 
         # first get the description labels
-        self.get_ref_point_descr_and_column(ref_point_mode, ref_point_value)
+        self.ref_point_descr, self.ref_point_column, self.used_points_n_seconds_or_cm_ago = find_cvn_utils.get_ref_point_descr_and_column(ref_point_mode, ref_point_value)
 
         # then get the actual nxt_ff_df_from_ref and cur_ff_df_from_ref
         self.nxt_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.nxt_ff_df, self.monkey_information, self.ff_real_position_sorted,
@@ -217,32 +217,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         return self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref
 
-    def get_ref_point_descr_and_column(self, ref_point_mode, ref_point_value):
-        if ref_point_mode == 'time':
-            if ref_point_value >= 0:
-                raise ValueError(
-                    'ref_point_value must be negative for ref_point_mode = "time"')
-            self.ref_point_descr = 'based on %d s into past' % ref_point_value
-            self.ref_point_column = 'rel_time'
-            self.used_points_n_seconds_or_cm_ago = True
-        elif ref_point_mode == 'distance':
-            if ref_point_value >= 0:
-                raise ValueError(
-                    'ref_point_value must be negative for ref_point_mode = "distance"')
-            self.ref_point_descr = 'based on %d cm into past' % ref_point_value
-            # self.ref_point_column = 'rel_distance'
-            # now, for the sake of the neural plots, we'll just use 'rel_time'
-            self.ref_point_column = 'rel_time'
-            self.used_points_n_seconds_or_cm_ago = True
-        elif ref_point_mode == 'time after cur ff visible':
-            self.ref_point_descr = 'based on %d s ' % ref_point_value + \
-                ref_point_mode[5:]
-            self.ref_point_column = 'rel_time'
-            self.used_points_n_seconds_or_cm_ago = True
-        else:
-            raise ValueError(
-                'ref_point_mode must be either "time" or "distance" or "time after cur ff visible"')
-        return
 
     def find_relative_curvature(self):
 

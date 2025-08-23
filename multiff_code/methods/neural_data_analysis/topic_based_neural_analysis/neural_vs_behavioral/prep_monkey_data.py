@@ -47,7 +47,7 @@ def strict_median(series, method='lower'):
 
 
 def _bin_behav_data_by_point(ori_df):
-    col_max = ['target_visible_dummy', 'target_cluster_visible_dummy', 'capture_target_dummy',
+    col_max = ['target_visible_dummy', 'target_cluster_visible_dummy', 'capture_ff',
                # 'num_visible_ff', 'any_ff_visible', 'catching_ff' # these features are merged into df after binning later
                ]
     col_strict_median = ['point_index', 'valid_view_point']

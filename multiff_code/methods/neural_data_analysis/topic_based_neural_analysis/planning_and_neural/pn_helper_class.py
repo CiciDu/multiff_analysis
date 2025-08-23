@@ -6,6 +6,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 from neural_data_analysis.neural_analysis_tools.model_neural_data import base_neural_class
 from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.show_planning import show_planning_utils
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
 import numpy as np
 import pandas as pd
 import os
@@ -131,34 +132,44 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     def add_heading_info_to_planning_data_by_point(self):
         self.add_rel_time_info_to_heading_info_df()
 
-        heading_columns_to_add = [
-            'stop_point_index', 'angle_from_m_before_stop_to_cur_ff', 'angle_from_stop_to_nxt_ff']
-        # Note: variables like 'angle_opt_cur_end_to_nxt_ff', 'angle_cntr_cur_end_to_nxt_ff' in heading_info_df are based on ref points.
-        # However, in both_ff_across_time_df, they are based on each point in the trajectory. So we use the variables in both_ff_across_time_df.
+        base_cols = ['stop_point_index',
+                    'angle_from_m_before_stop_to_cur_ff',
+                    'angle_from_stop_to_nxt_ff']
 
+        more_cols = [
+            'dir_from_cur_ff_to_stop', 'dir_from_cur_ff_to_nxt_ff', 'dir_from_cur_ff_same_side',
+            'angle_from_cur_ff_to_stop', 'angle_from_cur_ff_to_nxt_ff',
+            'nxt_ff_distance_at_ref', 'nxt_ff_angle_at_ref',
+            'cur_ff_distance_at_ref', 'cur_ff_angle_at_ref', 'cur_ff_angle_boundary_at_ref',
+            'curv_range', 'curv_iqr', 'cur_ff_cluster_50_size',
+            'rel_cur_ff_last_seen_time_bbas', 'rel_cur_ff_first_seen_time_bbas'
+        ]
+
+        # ensure the helper added its columns
         build_factor_comp.add_dir_from_cur_ff_same_side(self.heading_info_df)
-        temp_more_columns_to_try = ['dir_from_cur_ff_to_stop', 'dir_from_cur_ff_to_nxt_ff', 'dir_from_cur_ff_same_side',
-                                    'angle_from_cur_ff_to_stop', 'angle_from_cur_ff_to_nxt_ff',
-                                    'nxt_ff_distance_at_ref', 'nxt_ff_angle_at_ref',
-                                    'cur_ff_distance_at_ref', 'cur_ff_angle_at_ref', 'cur_ff_angle_boundary_at_ref',
-                                    'curv_range', 'curv_iqr', 'cur_ff_cluster_50_size',
-                                    # 'rel_nxt_ff_last_flash_time_bbas', 'rel_nxt_ff_last_seen_time_bbas',
-                                    # 'rel_nxt_ff_cluster_last_flash_time_bbas', 'rel_nxt_ff_cluster_last_seen_time_bbas',
-                                    'rel_cur_ff_last_seen_time_bbas', 'rel_cur_ff_first_seen_time_bbas',
-                                    ]
-        all_columns_to_add = heading_columns_to_add + temp_more_columns_to_try
-        # print the columns that are not in heading_info_df
-        missing_columns = set(all_columns_to_add) - \
-            set(self.heading_info_df.columns)
-        if missing_columns:
-            print(
-                f'Note: The following columns are not in the new heading_info_df: {missing_columns}')
 
-        all_columns_to_add = [
-            col for col in all_columns_to_add if col in self.heading_info_df.columns]
+        # 1) only request columns that actually exist in heading_info_df
+        requested = list({*base_cols, *more_cols} & set(self.heading_info_df.columns))
+
+        # 2) make sure 'stop_point_index' is first and NOT duplicated
+        cols_right = ['stop_point_index'] + [c for c in requested if c != 'stop_point_index']
+
+        # 3) avoid bringing in columns that already exist on the left (except the key)
+        existing_left = set(self.planning_data_by_point.columns)
+        cols_right = ['stop_point_index'] + [c for c in cols_right[1:] if c not in existing_left]
+
+        # 4) guard against accidental duplicate names in the right slice
+        right_slice = self.heading_info_df[cols_right].loc[:, ~self.heading_info_df[cols_right].columns.duplicated()]
+
+        # Optional: sanity checks to catch shape issues early
+        # - key uniqueness on both sides (change to 'one_to_many' if appropriate)
+        # assert self.planning_data_by_point['stop_point_index'].is_unique, "Left key not unique"
+        # assert right_slice['stop_point_index'].is_unique, "Right key not unique"
 
         self.planning_data_by_point = self.planning_data_by_point.merge(
-            self.heading_info_df[heading_columns_to_add + temp_more_columns_to_try], on='stop_point_index', how='left')
+            right_slice, on='stop_point_index', how='left', validate='many_to_one'
+        )
+
 
     def get_both_ff_across_time_df(self, n_seconds_before_stop=2.5):
 
@@ -210,6 +221,11 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
         self.add_ff_visible_dummy_to_both_ff_across_time_df()
         self.add_ff_in_memory_dummy_to_both_ff_across_time_df()
+        # add any_ff_visible, any_ff_in_memory, num_ff_visible, num_ff_in_memory
+        self.both_ff_across_time_df = pn_utils.add_ff_visible_or_in_memory_info_by_point(
+            self.both_ff_across_time_df, self.ff_dataframe)
+
+        self.both_ff_across_time_df = prep_target_data.add_capture_target(self.both_ff_across_time_df, self.ff_caught_T_new)
 
         self.both_ff_across_time_df.reset_index(drop=True, inplace=True)
 
@@ -220,22 +236,22 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.both_ff_across_time_df = pn_utils.add_ff_visible_dummy(
             self.both_ff_across_time_df, 'cur_ff_index', self.ff_dataframe)
         self.both_ff_across_time_df.rename(
-            columns={'whether_ff_visible_dummy': 'cur_ff_visible_dummy'}, inplace=True)
+            columns={'whether_ff_visible_dummy': 'cur_vis'}, inplace=True)
         self.both_ff_across_time_df = pn_utils.add_ff_visible_dummy(
             self.both_ff_across_time_df, 'nxt_ff_index', self.ff_dataframe)
         self.both_ff_across_time_df.rename(
-            columns={'whether_ff_visible_dummy': 'nxt_ff_visible_dummy'}, inplace=True)
+            columns={'whether_ff_visible_dummy': 'nxt_vis'}, inplace=True)
 
     def add_ff_in_memory_dummy_to_both_ff_across_time_df(self):
         self.make_or_retrieve_ff_dataframe()
         self.both_ff_across_time_df = pn_utils.add_ff_in_memory_dummy(
             self.both_ff_across_time_df, 'cur_ff_index', self.ff_dataframe)
         self.both_ff_across_time_df.rename(
-            columns={'whether_ff_in_memory_dummy': 'cur_ff_in_memory_dummy'}, inplace=True)
+            columns={'whether_ff_in_memory_dummy': 'cur_in_memory'}, inplace=True)
         self.both_ff_across_time_df = pn_utils.add_ff_in_memory_dummy(
             self.both_ff_across_time_df, 'nxt_ff_index', self.ff_dataframe)
         self.both_ff_across_time_df.rename(
-            columns={'whether_ff_in_memory_dummy': 'nxt_ff_in_memory_dummy'}, inplace=True)
+            columns={'whether_ff_in_memory_dummy': 'nxt_in_memory'}, inplace=True)
 
     def add_diff_in_abs_angle_to_nxt_ff_to_both_ff_across_time_df(self, both_ff_df):
         angle_df = pn_utils.get_angle_from_cur_arc_end_to_nxt_ff(
@@ -371,7 +387,6 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
                                                     monkey_information=self.monkey_information,
                                                     ff_caught_T_new=self.ff_caught_T_new)
 
-        print('curv_df.columns:', np.unique(curv_df.columns))
         df, columns_added = pn_utils.add_curv_info(
             df, curv_df, which_ff_info)
 

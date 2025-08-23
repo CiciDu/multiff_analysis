@@ -2,6 +2,7 @@ from neural_data_analysis.topic_based_neural_analysis.target_decoder import targ
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils, pn_helper_class
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data
 from neural_data_analysis.neural_analysis_tools.model_neural_data import base_neural_class
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_feature_selection
 import numpy as np
 import pandas as pd
 import os
@@ -18,6 +19,28 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
         self.planning_and_neural_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'planning_and_neural')
 
+    def get_planning_data_by_bin(self):
+        self.planning_data_by_bin = self.bin_info[['point_index', 'bin']].merge(
+            self.planning_data_by_point, on='point_index', how='right')
+        # drop rows with na in bin
+        self.planning_data_by_bin = self.planning_data_by_bin.dropna(subset=[
+            'bin'])
+        self._check_for_duplicate_bins()
+
+            
+        self.planning_data_by_bin.rename(columns={'monkey_speeddummy': 'stop',
+                                'monkey_dw': 'angular_speed',
+                                }, inplace=True, errors='ignore')
+
+
+        cols = ['cur_vis', 'nxt_vis',
+                'cur_in_memory', 'nxt_in_memory',
+                'any_ff_visible', 'any_ff_in_memory']
+        self.planning_data_by_bin[cols] = self.planning_data_by_bin[cols].fillna(
+            0).gt(0).astype('uint8')
+        
+        
+        
     def prep_data_to_analyze_planning(self,
                                       ref_point_mode='time after cur ff visible',
                                       ref_point_value=0.1,
@@ -92,13 +115,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
             print(f'There are {self.bin_info["point_index"].duplicated().sum()} duplicated point_index in bin_info. '
                   f'Note: one_point_index_per_bin is {self.one_point_index_per_bin}')
 
-    def get_planning_data_by_bin(self):
-        self.planning_data_by_bin = self.bin_info[['point_index', 'bin']].merge(
-            self.planning_data_by_point, on='point_index', how='right')
-        # drop rows with na in bin
-        self.planning_data_by_bin = self.planning_data_by_bin.dropna(subset=[
-            'bin'])
-        self._check_for_duplicate_bins()
+
 
     def fill_na_in_cur_and_nxt_opt_arc_dheading(self):
         df = self.planning_data_by_point
@@ -247,13 +264,15 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
     def get_x_and_y_var(self, exists_ok=True):
         original_len = len(self.planning_data_by_bin)
-        self.y_var = self.planning_data_by_bin.dropna().drop(
-            columns={'stop_point_index', 'point_index'}, errors='ignore').reset_index(drop=True)
+        cols = list(dict.fromkeys(['bin', 'segment', 'whether_test'] + pn_feature_selection.all_features))
+        self.y_var = self.planning_data_by_bin[cols].reset_index(drop=True)
+        self.y_var = self.y_var.dropna().sort_values(by=['segment', 'bin']).reset_index(drop=True)
         self.y_var['bin'] = self.y_var['bin'].astype(int)
         print(f"{round(1 - len(self.y_var) / original_len, 2)}% of rows are dropped in planning_data_by_bin due to having missing values")
 
         self.x_var = self.y_var[['segment', 'bin']].merge(
-            self.binned_spikes_df, on=['bin'], how='left').reset_index(drop=True)
+            self.binned_spikes_df, on=['bin'], how='left')
+        self.x_var = self.x_var.sort_values(by=['segment', 'bin']).reset_index(drop=True)
         print('binned_spikes_df.shape:', self.binned_spikes_df.shape)
         print('self.x_var.shape:', self.x_var.shape)
         print('self.y_var.shape:', self.y_var.shape)

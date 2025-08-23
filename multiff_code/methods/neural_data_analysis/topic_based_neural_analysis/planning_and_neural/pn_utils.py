@@ -51,7 +51,7 @@ def get_angle_from_cur_arc_end_to_nxt_ff(both_ff_df):
 def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_information, ff_real_position_sorted, ff_caught_T_new,
                            curv_traj_window_before_stop=[-25, 0], use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
 
-    cur_end_to_next_ff_curv, _ = compute_cur_end_to_next_ff_curv_for_pn(
+    cur_end_to_next_ff_curv = compute_cur_end_to_next_ff_curv_for_pn(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
     prev_stop_to_next_ff_curv, _ = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_ff_df['nxt_ff_index'].values, point_indexes_before_stop,
                                                                                      monkey_information, ff_real_position_sorted, ff_caught_T_new,
@@ -66,8 +66,8 @@ def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_informa
 def compute_cur_end_to_next_ff_curv_for_pn(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
     mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center)
-    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(
-        mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    null_arc_curv_df = diff_in_curv_utils._make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(null_arc_curv_df, mock_monkey_info)
     cur_end_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index']
     return cur_end_to_next_ff_curv
 
@@ -289,6 +289,62 @@ def calculate_angle_from_stop_to_nxt_ff(monkey_information, point_index_before_s
     angle_from_stop_to_nxt_ff = specific_utils.calculate_angles_to_ff_centers(
         nxt_ff_x, nxt_ff_y, mx_before_stop, my_before_stop, m_angle_before_stop)
     return m_angle_before_stop, angle_from_stop_to_nxt_ff
+
+
+def add_ff_visible_or_in_memory_info_by_point(df, ff_dataframe, max_in_memory_time_since_seen=2):
+    """
+    For each point_index, add:
+      - any_ff_visible (0/1),  num_ff_visible (uint8): unique visible FFs at that point
+      - any_ff_in_memory (0/1), num_ff_in_memory (uint8): unique in-memory FFs at that point
+
+    Expects in ff_dataframe: ['ff_index', 'point_index', 'visible', 'time_since_last_vis'].
+    Merges onto df['point_index'].
+    """
+
+    required = {'ff_index', 'point_index', 'visible', 'time_since_last_vis'}
+    missing = required - set(ff_dataframe.columns)
+    if missing:
+        raise KeyError(f"ff_dataframe missing columns: {sorted(missing)}")
+
+    # Visible: filter by visible==True, then count unique ff_index per point_index
+    visible_pairs = (
+        ff_dataframe.loc[ff_dataframe['visible'].astype(bool), ['ff_index', 'point_index']]
+        .drop_duplicates()
+    )
+    vis_counts = (
+        visible_pairs.groupby('point_index')['ff_index']
+        .nunique()
+        .reset_index(name='num_ff_visible')
+    )
+    vis_counts['any_ff_visible'] = (vis_counts['num_ff_visible'] > 0).astype('uint8')
+
+    # In-memory: time_since_last_vis < threshold, then count unique ff_index per point_index
+    mem_pairs = (
+        ff_dataframe.loc[ff_dataframe['time_since_last_vis'] < max_in_memory_time_since_seen,
+                         ['ff_index', 'point_index']]
+        .drop_duplicates()
+    )
+    mem_counts = (
+        mem_pairs.groupby('point_index')['ff_index']
+        .nunique()
+        .reset_index(name='num_ff_in_memory')
+    )
+    mem_counts['any_ff_in_memory'] = (mem_counts['num_ff_in_memory'] > 0).astype('uint8')
+
+    # Merge onto df
+    out = (
+        df.merge(vis_counts, on='point_index', how='left')
+          .merge(mem_counts, on='point_index', how='left')
+    )
+
+    # Fill + compact dtypes
+    for col in ['any_ff_visible', 'any_ff_in_memory', 'num_ff_visible', 'num_ff_in_memory']:
+        if col not in out:
+            out[col] = 0
+        out[col] = out[col].fillna(0).astype('uint8')
+
+    return out
+
 
 
 def add_ff_visible_dummy(df, ff_index_col, ff_dataframe):

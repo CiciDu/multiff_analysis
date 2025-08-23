@@ -42,16 +42,6 @@ class _CompareYValues:
         if process_info_for_plotting:
             self.process_all_ref_per_sess_median_info_to_plot_heading_and_curv()
         return self.all_ref_per_sess_median_info
-    
-    
-    def make_or_retrieve_per_sess_perc_info(self,
-                                            process_info_for_plotting=True,
-                                            **kwargs):
-        self.per_sess_perc_info = self._make_or_retrieve_perc_info(**kwargs)
-        if process_info_for_plotting:
-            self.process_per_sess_perc_info_to_plot_direction()
-        return self.per_sess_perc_info
-    
 
     def _make_or_retrieve_all_ref_median_info(self,
                                               per_sess=False,
@@ -112,8 +102,39 @@ class _CompareYValues:
 
         return all_info
 
+    def make_or_retrieve_per_sess_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
+                                            ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
+                                            filter_shared_stops_across_refs=True,
+                                            ):
+        # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
+        # since the results are the same regardless
+
+        if exists_ok & exists(self.per_sess_perc_info_path):
+            self.per_sess_perc_info = pd.read_csv(self.per_sess_perc_info_path).drop(
+                ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+        else:
+            self.get_test_and_ctrl_heading_info_df_across_sessions2(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                                    heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                                    filter_shared_stops_across_refs=filter_shared_stops_across_refs)
+            self.per_sess_perc_info = make_variations_utils.make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(self.test_heading_info_df,
+                                                                                                                       self.ctrl_heading_info_df, verbose=verbose)
+
+        self.per_sess_perc_info['monkey_name'] = self.monkey_name
+        self.per_sess_perc_info['opt_arc_type'] = self.opt_arc_type
+        # this doesn't matter for perc info
+        self.per_sess_perc_info['curv_traj_window_before_stop'] = '[-25, 0]'
+
+        if save_data:
+            self.per_sess_perc_info.to_csv(self.per_sess_perc_info_path)
+        print('Stored new per_sess_perc_info in ',
+              self.per_sess_perc_info_path)
+
+        return self.per_sess_perc_info
+
     def make_or_retrieve_pooled_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
-                                          ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True, process_info_for_plotting=True):
+                                          ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
+                                          filter_shared_stops_across_refs=True,
+                                          ):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
 
@@ -121,8 +142,9 @@ class _CompareYValues:
             self.pooled_perc_info = pd.read_csv(self.pooled_perc_info_path).drop(
                 ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
         else:
-            self.get_test_and_ctrl_heading_info_df_across_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                                   heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok)
+            self.get_test_and_ctrl_heading_info_df_across_sessions2(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                                    heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                                    filter_shared_stops_across_refs=filter_shared_stops_across_refs)
             self.pooled_perc_info = make_variations_utils.make_pooled_perc_info_from_test_and_ctrl_heading_info_df(self.test_heading_info_df,
                                                                                                                    self.ctrl_heading_info_df, verbose=verbose)
 
@@ -133,9 +155,6 @@ class _CompareYValues:
 
         self.pooled_perc_info['monkey_name'] = self.monkey_name
         self.pooled_perc_info['opt_arc_type'] = self.opt_arc_type
-
-        if process_info_for_plotting:
-            self.process_pooled_perc_info_to_plot_direction()
 
         return self.pooled_perc_info
 
@@ -152,11 +171,6 @@ class _CompareYValues:
         self.all_ref_per_sess_median_info_curv[
             'sample_size'] = self.all_ref_per_sess_median_info_curv['sample_size_for_curv']
 
-    def process_pooled_perc_info_to_plot_direction(self):
-        self.pooled_perc_info_new = process_variations_utils.make_new_df_for_plotly_comparison(self.pooled_perc_info,
-                                                                                               match_rows_based_on_ref_columns_only=False)
-
-
     def _make_median_info(self,
                           kind: str = "pooled",
                           ref_point_mode: str = "time after cur ff visible",
@@ -168,6 +182,7 @@ class _CompareYValues:
                           heading_info_df_exists_ok: bool = True,
                           verbose: bool = False,
                           save_data: bool = True,
+                          filter_shared_stops_across_refs=True,
                           **kwargs):
         """
         Unified builder for median-info DataFrames.
@@ -213,7 +228,7 @@ class _CompareYValues:
             print(f"Successfully retrieved {cfg['human_name']} from {path}")
             return df
 
-        self.get_test_and_ctrl_heading_info_df_across_sessions(
+        self.get_test_and_ctrl_heading_info_df_across_sessions2(
             ref_point_mode=ref_point_mode,
             ref_point_value=ref_point_value,
             curv_traj_window_before_stop=curv_traj_window_before_stop,
@@ -221,8 +236,8 @@ class _CompareYValues:
             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
             save_data=save_data,
             combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
+            filter_shared_stops_across_refs=filter_shared_stops_across_refs,
         )
-
 
         df = cfg["make_fn"](self.test_heading_info_df,
                             self.ctrl_heading_info_df, verbose=verbose)
@@ -240,6 +255,39 @@ class _CompareYValues:
         print(f"Stored new {cfg['human_name']} in {folder}")
         return df
 
+    def get_test_and_ctrl_heading_info_df_across_sessions2(self, ref_point_mode='distance', ref_point_value=-150,
+                                                           curv_traj_window_before_stop=[
+                                                               -25, 0],
+                                                           heading_info_df_exists_ok=True,
+                                                           combd_heading_df_x_sessions_exists_ok=True,
+                                                           stops_near_ff_df_exists_ok=True,
+                                                           save_data=True,
+                                                           filter_shared_stops_across_refs=True,
+                                                           **kwargs
+                                                           ):
+        if filter_shared_stops_across_refs:
+            self.get_test_and_ctrl_heading_info_df_across_sessions_filtered()
+            self.test_heading_info_df = self.all_test_heading_info_df_filtered
+            self.ctrl_heading_info_df = self.all_ctrl_heading_info_df_filtered
+
+            def _filter_by_ref(df, mode, value):
+                return df[(df["ref_point_mode"] == mode) &
+                        (df["ref_point_value"] == value)].copy()
+
+            self.test_heading_info_df = _filter_by_ref(self.test_heading_info_df, ref_point_mode, ref_point_value)
+            print('self.test_heading_info_df.shape', self.test_heading_info_df.shape)
+            self.ctrl_heading_info_df = _filter_by_ref(self.ctrl_heading_info_df, ref_point_mode, ref_point_value)
+
+        else:
+            self.get_test_and_ctrl_heading_info_df_across_sessions(
+                ref_point_mode=ref_point_mode,
+                ref_point_value=ref_point_value,
+                curv_traj_window_before_stop=curv_traj_window_before_stop,
+                heading_info_df_exists_ok=heading_info_df_exists_ok,
+                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                save_data=save_data,
+                combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
+            )
     # --- Thin wrappers for backward compatibility ---
 
     def make_pooled_median_info(self,
@@ -289,7 +337,6 @@ class _CompareYValues:
             save_data=save_data,
             **kwargs,
         )
-        
 
     def combine_test_and_ctrl_heading_info_df_across_sessions_and_ref_point_params(
         self,
@@ -337,7 +384,8 @@ class _CompareYValues:
                     .assign(
                         ref_point_mode=ref_point_mode,
                         ref_point_value=ref_point_value,
-                        curv_traj_window_before_stop=tuple(curv_traj_window_before_stop),
+                        curv_traj_window_before_stop=str(
+                            curv_traj_window_before_stop),
                         monkey_name=self.monkey_name,
                         opt_arc_type=self.opt_arc_type,
                     )
@@ -348,7 +396,8 @@ class _CompareYValues:
                     .assign(
                         ref_point_mode=ref_point_mode,
                         ref_point_value=ref_point_value,
-                        curv_traj_window_before_stop=tuple(curv_traj_window_before_stop),
+                        curv_traj_window_before_stop=str(
+                            curv_traj_window_before_stop),
                         monkey_name=self.monkey_name,
                         opt_arc_type=self.opt_arc_type,
                     )
@@ -358,9 +407,7 @@ class _CompareYValues:
                 test_chunks.append(test_labeled)
                 ctrl_chunks.append(ctrl_labeled)
 
-        self.all_test_heading_info_df = pd.concat(test_chunks, axis=0, ignore_index=True) if test_chunks else pd.DataFrame()
-        self.all_ctrl_heading_info_df = pd.concat(ctrl_chunks, axis=0, ignore_index=True) if ctrl_chunks else pd.DataFrame()
-
-        return self.all_test_heading_info_df, self.all_ctrl_heading_info_df
-
-    
+        self.all_test_heading_info_df = pd.concat(
+            test_chunks, axis=0, ignore_index=True) if test_chunks else pd.DataFrame()
+        self.all_ctrl_heading_info_df = pd.concat(
+            ctrl_chunks, axis=0, ignore_index=True) if ctrl_chunks else pd.DataFrame()

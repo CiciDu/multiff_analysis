@@ -21,6 +21,7 @@ def run_tests_over_monkeys(
     verbose=True,
     test='wilcoxon', # or 'permutation'
     num_permutations=10000,
+    filter_shared_stops_across_refs=False,
     **kwargs
 ):
     assert test in ['wilcoxon', 'permutation']
@@ -50,10 +51,11 @@ def run_tests_over_monkeys(
             # Initialize sessions
             planner = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name)
             planner.initialize_monkey_sessions_df_for_one_monkey()
-            planner.get_test_and_ctrl_heading_info_df_across_sessions(
+            planner.get_test_and_ctrl_heading_info_df_across_sessions2(
                 ref_point_mode=ref_point_mode,
                 ref_point_value=ref_point_value,
                 save_data=False,
+                filter_shared_stops_across_refs=filter_shared_stops_across_refs,
                 **kwargs
             )
             

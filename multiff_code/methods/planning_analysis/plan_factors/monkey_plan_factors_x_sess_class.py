@@ -4,6 +4,8 @@ from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_class
 from planning_analysis.factors_vs_indicators import _variations_base_class
 from data_wrangling import specific_utils, combine_info_utils, base_processing_class
+from planning_analysis.factors_vs_indicators import process_variations_utils
+
 import os
 import numpy as np
 import matplotlib
@@ -184,5 +186,8 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
 
     def combine_pooled_perc_info_across_monkeys(self):
         self.pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys()
-        self.process_pooled_perc_info_to_plot_direction()
         return self.pooled_perc_info
+
+    def combine_per_sess_perc_info_across_monkeys(self):
+        self.per_sess_perc_info = make_variations_utils.combine_per_sess_perc_info_across_monkeys()
+        return self.per_sess_perc_info

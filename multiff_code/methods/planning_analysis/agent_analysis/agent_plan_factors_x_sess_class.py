@@ -250,10 +250,11 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                           save_data=True,
                                                           **env_kwargs
                                                           ):
+        
         try:
             if combd_heading_df_x_sessions_exists_ok:
                 self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                          curv_traj_window_before_stop=curv_traj_window_before_stop)
+                                                        curv_traj_window_before_stop=curv_traj_window_before_stop)
                 if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
                     raise Exception('Empty combd_heading_df_x_sessions.')
             else:
@@ -263,14 +264,14 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
             print(
                 f'Will make new combd_heading_df_x_sessions for the agent because {e}.')
             self.make_combd_heading_df_x_sessions(num_steps_per_dataset=self.num_steps_per_dataset, num_datasets_to_collect=num_datasets_to_collect,
-                                                  ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                  curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                  heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                  stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                  curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,
-                                                  use_curv_to_ff_center=use_curv_to_ff_center,
-                                                  save_data=save_data,
-                                                  **env_kwargs)
+                                                ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,
+                                                use_curv_to_ff_center=use_curv_to_ff_center,
+                                                save_data=save_data,
+                                                **env_kwargs)
 
     def _add_plan_features_to_combd_plan_features(self, data_name):
         plan_features_tc = self.pfa.plan_features_tc.copy()

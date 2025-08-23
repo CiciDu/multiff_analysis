@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, Dict, Optional
 
+
 def design_bases_for_behav_data(
     *,
     dt: float,
@@ -38,24 +39,33 @@ def design_bases_for_behav_data(
     T = len(trial_ids)
 
     # --- glm_bases ---
-    _, B_event = raised_cosine_basis(n_basis=6, t_max=0.60, dt=dt, t_min=0.0, log_spaced=True)
-    _, B_short = raised_cosine_basis(n_basis=5, t_max=0.30, dt=dt, t_min=0.0, log_spaced=True)
-    _, B_hist  = raised_cosine_basis(n_basis=5, t_max=0.20, dt=dt, t_min=dt,  log_spaced=True)
+    _, B_event = raised_cosine_basis(
+        n_basis=6, t_max=0.60, dt=dt, t_min=0.0, log_spaced=True)
+    _, B_short = raised_cosine_basis(
+        n_basis=5, t_max=0.30, dt=dt, t_min=0.0, log_spaced=True)
+    _, B_hist = raised_cosine_basis(
+        n_basis=5, t_max=0.20, dt=dt, t_min=dt,  log_spaced=True)
 
-    _, B_spline_event = spline_basis(n_basis=6, t_max=0.60, dt=dt, t_min=0.0, degree=3, log_spaced=True)
-    _, B_spline_short = spline_basis(n_basis=5, t_max=0.30, dt=dt, t_min=0.0, degree=3, log_spaced=False)
-    _, B_spline_hist  = spline_basis(n_basis=5, t_max=0.20, dt=dt, t_min=dt,  degree=3, log_spaced=True)
-
+    _, B_spline_event = spline_basis(
+        n_basis=6, t_max=0.60, dt=dt, t_min=0.0, degree=3, log_spaced=True)
+    _, B_spline_short = spline_basis(
+        n_basis=5, t_max=0.30, dt=dt, t_min=0.0, degree=3, log_spaced=False)
+    _, B_spline_hist = spline_basis(
+        n_basis=5, t_max=0.20, dt=dt, t_min=dt,  degree=3, log_spaced=True)
 
     # --- Onsets and gated features ---
-    data['cur_on'] = onset_from_mask_trials(data["cur_ff_in_memory_dummy"], trial_ids)
-    data['nxt_on'] = onset_from_mask_trials(data["nxt_ff_in_memory_dummy"], trial_ids)
-    data['cur_dist'] = data['cur_ff_distance'] * (data['cur_ff_in_memory_dummy'] > 0)
-    data['nxt_dist'] = data['nxt_ff_distance'] * (data['nxt_ff_in_memory_dummy'] > 0)
-    data['cur_angle_sin'] = np.sin(data['cur_ff_angle']) * (data['cur_ff_in_memory_dummy'] > 0)
-    data['cur_angle_cos'] = np.cos(data['cur_ff_angle']) * (data['cur_ff_in_memory_dummy'] > 0)
-    data['nxt_angle_sin'] = np.sin(data['nxt_ff_angle']) * (data['nxt_ff_in_memory_dummy'] > 0)
-    data['nxt_angle_cos'] = np.cos(data['nxt_ff_angle']) * (data['nxt_ff_in_memory_dummy'] > 0)
+    data['cur_on'] = onset_from_mask_trials(data["cur_in_memory"], trial_ids)
+    data['nxt_on'] = onset_from_mask_trials(data["nxt_in_memory"], trial_ids)
+    data['cur_dist'] = data['cur_ff_distance'] * (data['cur_in_memory'] > 0)
+    data['nxt_dist'] = data['nxt_ff_distance'] * (data['nxt_in_memory'] > 0)
+    data['cur_angle_sin'] = np.sin(
+        data['cur_ff_angle']) * (data['cur_in_memory'] > 0)
+    data['cur_angle_cos'] = np.cos(
+        data['cur_ff_angle']) * (data['cur_in_memory'] > 0)
+    data['nxt_angle_sin'] = np.sin(
+        data['nxt_ff_angle']) * (data['nxt_in_memory'] > 0)
+    data['nxt_angle_cos'] = np.cos(
+        data['nxt_ff_angle']) * (data['nxt_in_memory'] > 0)
     data['speed'] = data['monkey_speed']
     data['angular_speed'] = data['monkey_dw']
     data['curvature'] = data['curv_of_traj']
@@ -73,24 +83,22 @@ def design_bases_for_behav_data(
 # 'abs_cur_ff_rel_x',
 # 'abs_nxt_ff_rel_x',
 
-
     cur_sin, cur_cos = angle_sin_cos(cur_angle)
     nxt_sin, nxt_cos = angle_sin_cos(nxt_angle)
-    cur_sin *= (cur_vis > 0); cur_cos *= (cur_vis > 0)
-    nxt_sin *= (nxt_vis > 0); nxt_cos *= (nxt_vis > 0)
+    cur_sin *= (cur_vis > 0)
+    cur_cos *= (cur_vis > 0)
+    nxt_sin *= (nxt_vis > 0)
+    nxt_cos *= (nxt_vis > 0)
 
-    data.rename(columns={'cur_ff_in_memory_dummy': 'cur_on', 
-                         'nxt_ff_in_memory_dummy': 'nxt_on',
+    data.rename(columns={'cur_in_memory': 'cur_on',
+                         'nxt_in_memory': 'nxt_on',
                          'monkey_speeddummy': 'stop',
                          'monkey_speed': 'speed',
                          'monkey_dw': 'angular_speed',
                          'curv_of_traj': 'curvature',
-                         'capture_target_dummy': 'capture',
+                         'capture_ff': 'capture_ff',
                          }, inplace=True)
-    
-    
-    
-    
+
     stimulus_dict: Dict[str, np.ndarray] = {
         "cur_on": cur_on,
         "nxt_on": nxt_on,
@@ -106,9 +114,10 @@ def design_bases_for_behav_data(
     }
 
     extra_covariates: Dict[str, np.ndarray] = {}
-    if speed is not None:     extra_covariates["speed"] = speed
-    if curvature is not None: extra_covariates["curvature"] = curvature
-
+    if speed is not None:
+        extra_covariates["speed"] = speed
+    if curvature is not None:
+        extra_covariates["curvature"] = curvature
 
     # ✅ Minimal change: allow any value to be either a single basis or a list of bases.
     # Example below: give cur_on both B_event and B_short; others keep a single basis.
@@ -153,12 +162,11 @@ def design_bases_for_behav_data(
     return design_df, y, meta
 
 
-
 def reduce_df(df, corr_threshold_for_lags_of_a_feature=0.9,
-                        vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
-                        filter_corr_by_all_columns=True,
-                        filter_vif_by_all_columns=True,
-                        ):
+              vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
+              filter_corr_by_all_columns=True,
+              filter_vif_by_all_columns=True,
+              ):
     # adapted from _reduce_y_var_base
 
     df_reduced = prep_target_decoder.remove_zero_var_cols(
@@ -166,17 +174,17 @@ def reduce_df(df, corr_threshold_for_lags_of_a_feature=0.9,
 
     # Call the function to iteratively drop lags with high correlation for each feature
     df_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(df_reduced,
-                                                                        corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
-                                                                        verbose=verbose,
-                                                                        filter_by_feature=False,
-                                                                        filter_by_subsets=False,
-                                                                        filter_by_all_columns=filter_corr_by_all_columns)
+                                                                      corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
+                                                                      verbose=verbose,
+                                                                      filter_by_feature=False,
+                                                                      filter_by_subsets=False,
+                                                                      filter_by_all_columns=filter_corr_by_all_columns)
 
     df_reduced = drop_high_vif_vars.drop_columns_with_high_vif(df_reduced_corr,
-                                                                        vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
-                                                                        vif_threshold=vif_threshold,
-                                                                        verbose=verbose,
-                                                                        filter_by_feature=False,
-                                                                        filter_by_subsets=False,
-                                                                        filter_by_all_columns=filter_vif_by_all_columns)
+                                                               vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
+                                                               vif_threshold=vif_threshold,
+                                                               verbose=verbose,
+                                                               filter_by_feature=False,
+                                                               filter_by_subsets=False,
+                                                               filter_by_all_columns=filter_vif_by_all_columns)
     return df_reduced

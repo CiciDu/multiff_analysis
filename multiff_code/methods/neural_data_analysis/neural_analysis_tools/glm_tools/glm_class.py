@@ -13,15 +13,20 @@ from sklearn.preprocessing import StandardScaler
 
 class GLMclass():
 
-    temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
-                     'min_target_has_disappeared_for_last_time_dummy',
-                     'min_target_cluster_has_disappeared_for_last_time_dummy',
-                     'max_target_visible_dummy', 'max_target_cluster_visible_dummy',
-                     'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
-                     'ignore_sudden_flash_indice_dummy', 'two_in_a_row', 'waste_cluster_around_target',
-                     'visible_before_last_one', 'disappear_latest', 'ignore_sudden_flash',
-                     'try_a_few_times', 'give_up_after_trying', 'cluster_around_target',
-                     ]
+    # for
+    temporal_vars = ['capture_ff', 'any_ff_visible', 'any_ff_in_memory', 'turning_right',
+                    'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
+
+    # for the original neural vs behavior analysis
+    # temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
+    #                  'min_target_has_disappeared_for_last_time_dummy',
+    #                  'min_target_cluster_has_disappeared_for_last_time_dummy',
+    #                  'max_target_visible_dummy', 'max_target_cluster_visible_dummy',
+    #                  'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
+    #                  'ignore_sudden_flash_indice_dummy', 'two_in_a_row', 'waste_cluster_around_target',
+    #                  'visible_before_last_one', 'disappear_latest', 'ignore_sudden_flash',
+    #                  'try_a_few_times', 'give_up_after_trying', 'cluster_around_target',
+    #                  ]
 
     def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):
         self.x_var = x_var
@@ -45,11 +50,14 @@ class GLMclass():
         self._get_mock_trials_df(num_total_trials)
         self.sm_handler = gdh.smooths_handler()
 
-    def run_pgam(self, neural_cluster_number=10):
+    def run_pgam(self, neural_cluster_number=5):
         self.neural_cluster_number = neural_cluster_number
         link = sm.genmod.families.links.log()
         self.poissFam = sm.genmod.families.family.Poisson(link=link)
-        self.spk_counts = self.x_var.iloc[:, neural_cluster_number].values
+        if neural_cluster_number is not None:
+            self.spk_counts = self.x_var.iloc[:, neural_cluster_number].values
+        else:
+            self.spk_counts = self.x_var.values
 
         # create the pgam model
         self.pgam = general_additive_model(self.sm_handler,

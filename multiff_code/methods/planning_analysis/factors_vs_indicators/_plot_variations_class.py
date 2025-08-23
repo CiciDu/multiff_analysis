@@ -1,5 +1,6 @@
 
 from planning_analysis.factors_vs_indicators import plot_variations_utils
+from planning_analysis.factors_vs_indicators import process_variations_utils
 
 
 class _PlotVariations:
@@ -126,19 +127,26 @@ class _PlotVariations:
                                               use_subplots_based_on_changeable_variables=True,
                                               )
 
-    def plot_direction_in_pooled_perc_info(self,
-                                           x_var_column_list=['key_for_split'],
-                                           fixed_variable_values_to_use={
-                                               'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
-                                           changeable_variables=[
-                                               'whether_even_out_dist'],
-                                           columns_to_find_unique_combinations_for_color=[],
-                                           add_error_bars=False,
-                                           use_subplots_based_on_changeable_variables=False):
+    def plot_direction_in_perc_info(self,
+                                    perc_info=None,
+                                    x_var_column_list=['key_for_split'],
+                                    fixed_variable_values_to_use={
+                                        'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
+                                    changeable_variables=[
+                                        'whether_even_out_dist'],
+                                    columns_to_find_unique_combinations_for_color=[],
+                                    add_error_bars=False,
+                                    use_subplots_based_on_changeable_variables=False):
 
         se_column = 'perc_se' if add_error_bars else None
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(self.pooled_perc_info_new,
+        if perc_info is None:
+            perc_info = self.pooled_perc_info
+
+        perc_info = process_variations_utils.make_new_df_for_plotly_comparison(
+            perc_info, match_rows_based_on_ref_columns_only=False)
+
+        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(perc_info,
                                                                                         fixed_variable_values_to_use,
                                                                                         changeable_variables,
                                                                                         x_var_column_list,
@@ -149,21 +157,23 @@ class _PlotVariations:
                                                                                         use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
                                                                                         )
 
-    def plot_direction_in_pooled_perc_info_across_monkeys(self,
-                                                          x_var_column_list=[
-                                                              'monkey_name'],
-                                                          fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-                                                                                        'key_for_split': 'ff_seen',
-                                                                                        'whether_even_out_dist': False,
-                                                                                        },
-                                                          changeable_variables=[],  # 'key_for_split'
-                                                          columns_to_find_unique_combinations_for_color=[],
-                                                          add_error_bars=True,
-                                                          ):
+    def plot_direction_in_perc_info_across_monkeys(self,
+                                                   perc_info=None,
+                                                   x_var_column_list=[
+                                                       'monkey_name'],
+                                                   fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
+                                                                                 'key_for_split': 'ff_seen',
+                                                                                 'whether_even_out_dist': False,
+                                                                                 },
+                                                   changeable_variables=[],  # 'key_for_split'
+                                                   columns_to_find_unique_combinations_for_color=[],
+                                                   add_error_bars=True,
+                                                   ):
 
-        self.plot_direction_in_pooled_perc_info(x_var_column_list=x_var_column_list,
-                                                fixed_variable_values_to_use=fixed_variable_values_to_use,
-                                                changeable_variables=changeable_variables,
-                                                columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                add_error_bars=add_error_bars,
-                                                use_subplots_based_on_changeable_variables=True)
+        self.plot_direction_in_perc_info(perc_info=perc_info,
+                                         x_var_column_list=x_var_column_list,
+                                         fixed_variable_values_to_use=fixed_variable_values_to_use,
+                                         changeable_variables=changeable_variables,
+                                         columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                         add_error_bars=add_error_bars,
+                                         use_subplots_based_on_changeable_variables=True)

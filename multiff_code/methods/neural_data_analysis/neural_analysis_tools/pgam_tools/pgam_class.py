@@ -1,39 +1,52 @@
+import sys
+for path in ['/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/external/pgam/src/',
+             '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/external/pgam/src/PGAM']:
+    if not path in sys.path:
+        sys.path.append(path)
+    
+from sklearn.preprocessing import StandardScaler
+import math
+import numpy as np
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
+from scipy.io import savemat
 from post_processing import postprocess_results
+import pandas as pd
+import matplotlib.pylab as plt
 import PGAM.gam_data_handlers as gdh
 from PGAM.GAM_library import *
 import sys
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
-
-import os
-import sys
-import numpy as np
-import pandas as pd
-import math
-from sklearn.preprocessing import StandardScaler
-
-pgam_path = '/Users/dusiyi/Documents/Multifirefly-Project/multiff_analysis/external/pgam/src/'
-if not pgam_path in sys.path:
-    sys.path.append(pgam_path)
 
 
 class PGAMclass():
 
-    temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
-                     'min_target_has_disappeared_for_last_time_dummy',
-                     'min_target_cluster_has_disappeared_for_last_time_dummy',
-                     'max_target_visible_dummy', 'max_target_cluster_visible_dummy',
-                     'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
-                     'ignore_sudden_flash_indice_dummy', 'two_in_a_row', 'waste_cluster_around_target',
-                     'visible_before_last_one', 'disappear_latest', 'ignore_sudden_flash',
-                     'try_a_few_times', 'give_up_after_trying', 'cluster_around_target',
-                     ]
+    # temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
+    #                  'min_target_has_disappeared_for_last_time_dummy',
+    #                  'min_target_cluster_has_disappeared_for_last_time_dummy',
+    #                  'max_target_visible_dummy', 'max_target_cluster_visible_dummy',
+    #                  'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
+    #                  'ignore_sudden_flash_indice_dummy', 'two_in_a_row', 'waste_cluster_around_target',
+    #                  'visible_before_last_one', 'disappear_latest', 'ignore_sudden_flash',
+    #                  'try_a_few_times', 'give_up_after_trying', 'cluster_around_target',
+    #                  ]
+
+    temporal_vars = ['capture_ff', 'any_ff_visible', 'any_ff_in_memory', 'cluster_around_target',
+                     'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis']
 
     def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):
         self.x_var = x_var
         self.y_var = y_var
         self.bin_width = bin_width
         self.processed_neural_data_folder_path = processed_neural_data_folder_path
+
+    def _categorize_features(self, temporal_vars):
+        self.temporal_vars = [
+            x for x in temporal_vars if x in self.y_var.columns]
+        self.spatial_vars = [
+            x for x in self.y_var.columns if x not in temporal_vars]
+        print('Spatial variables:', np.array(self.spatial_vars))
+
+        self.temporal_sub = self.y_var[self.temporal_vars]
+        self.spatial_sub_unscaled = self.y_var[self.spatial_vars]
 
     def streamline_pgam(self, temporal_vars=None, neural_cluster_number=10, num_total_trials=10):
         self.prepare_for_pgam(temporal_vars, num_total_trials)
@@ -51,11 +64,14 @@ class PGAMclass():
         self._get_mock_trials_df(num_total_trials)
         self.sm_handler = gdh.smooths_handler()
 
-    def run_pgam(self, neural_cluster_number=10):
+    def run_pgam(self, neural_cluster_number=5):
         self.neural_cluster_number = neural_cluster_number
         link = sm.genmod.families.links.log()
         self.poissFam = sm.genmod.families.family.Poisson(link=link)
-        self.spk_counts = self.x_var.iloc[:, neural_cluster_number].values
+        if neural_cluster_number is not None:
+            self.spk_counts = self.x_var.iloc[:, neural_cluster_number].values
+        else:
+            self.spk_counts = self.x_var.values
 
         # create the pgam model
         self.pgam = general_additive_model(self.sm_handler,
@@ -105,16 +121,6 @@ class PGAMclass():
         os.makedirs(res_path, exist_ok=True)
         save_name = f'neuron_{self.neural_cluster_number}'
         np.savez(os.path.join(res_path, save_name+'.npz'), results=self.res)
-
-    def _categorize_features(self, temporal_vars):
-        self.temporal_vars = [
-            x for x in temporal_vars if x in self.y_var.columns]
-        self.spatial_vars = [
-            x for x in self.y_var.columns if x not in temporal_vars]
-        print('Spatial variables:', np.array(self.spatial_vars))
-
-        self.temporal_sub = self.y_var[self.temporal_vars]
-        self.spatial_sub_unscaled = self.y_var[self.spatial_vars]
 
     def _scale_features(self):
         # since temporal variables are all dummy variables, we only need to scale the spatial variables

@@ -895,3 +895,31 @@ def process_shared_stops_near_ff_df(shared_stops_near_ff_df):
     print(f'Removed {original_len - len(shared_stops_near_ff_df)} rows out of {original_len} rows where cur_ff was not visible bbas or nxt_ff was not visible both bbas and bsans')
     print(f'shared_stops_near_ff_df has {len(shared_stops_near_ff_df)} rows')
     return shared_stops_near_ff_df
+
+
+def get_ref_point_descr_and_column(ref_point_mode, ref_point_value):
+    if ref_point_mode == 'time':
+        if ref_point_value >= 0:
+            raise ValueError(
+                'ref_point_value must be negative for ref_point_mode = "time"')
+        ref_point_descr = 'based on %d s into past' % ref_point_value
+        ref_point_column = 'rel_time'
+        used_points_n_seconds_or_cm_ago = True
+    elif ref_point_mode == 'distance':
+        if ref_point_value >= 0:
+            raise ValueError(
+                'ref_point_value must be negative for ref_point_mode = "distance"')
+        ref_point_descr = 'based on %d cm into past' % ref_point_value
+        # ref_point_column = 'rel_distance'
+        # now, for the sake of the neural plots, we'll just use 'rel_time'
+        ref_point_column = 'rel_time'
+        used_points_n_seconds_or_cm_ago = True
+    elif ref_point_mode == 'time after cur ff visible':
+        ref_point_descr = 'based on %d s ' % ref_point_value + \
+            ref_point_mode[5:]
+        ref_point_column = 'rel_time'
+        used_points_n_seconds_or_cm_ago = True
+    else:
+        raise ValueError(
+            'ref_point_mode must be either "time" or "distance" or "time after cur ff visible"')
+    return ref_point_descr, ref_point_column, used_points_n_seconds_or_cm_ago

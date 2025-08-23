@@ -111,6 +111,8 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
             self.combd_cur_and_nxt_folder_path, 'data_comparison')
         self.pooled_perc_info_path = os.path.join(
             self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/pooled_perc_info.csv')
+        self.per_sess_perc_info_path = os.path.join(
+            self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/per_sess_perc_info.csv')
         self.pooled_median_info_folder_path = os.path.join(
             self.cur_and_nxt_data_comparison_path, f'{self.opt_arc_type}/pooled_median_info')
         self.per_sess_median_info_folder_path = os.path.join(
@@ -142,6 +144,55 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                                                                                                                                                combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
                                                                                                                                                show_printed_output=True, heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                                                                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok, save_data=save_data)
+
+    def get_test_and_ctrl_heading_info_df_across_sessions_filtered(self,
+                                                                   ):
+        """
+        This is a filtered variant of `get_test_and_ctrl_heading_info_df_across_sessions`.
+        In addition to combining heading information across sessions, it restricts the results
+        by only keeping rows where stop_point_index is shared across all reference points.
+        """
+        if hasattr(self, 'all_test_heading_info_df_filtered') and hasattr(self, 'all_ctrl_heading_info_df_filtered'):
+            return
+        
+        df_name = 'all_heading_info_filtered.csv'
+        test_df_path = os.path.join(
+            self.dict_of_combd_heading_info_folder_path['test'], df_name)
+        ctrl_df_path = os.path.join(
+            self.dict_of_combd_heading_info_folder_path['control'], df_name)
+        if exists(test_df_path) and exists(ctrl_df_path):
+            self.all_test_heading_info_df_filtered = pd.read_csv(test_df_path)
+            self.all_ctrl_heading_info_df_filtered = pd.read_csv(ctrl_df_path)
+            print(f'Successfully retrieved filtered heading info df across sessions at {test_df_path} and {ctrl_df_path}')
+        else:
+            print('Filtered heading info df across sessions does not exist. Will recreate it.')
+            self.combine_test_and_ctrl_heading_info_df_across_sessions_and_ref_point_params()
+            self.filter_heading_info_df()
+            self.all_test_heading_info_df_filtered.to_csv(
+                test_df_path, index=False)
+            self.all_ctrl_heading_info_df_filtered.to_csv(
+                ctrl_df_path, index=False)
+            print(
+                f'Successfully stored filtered heading info df across sessions at {test_df_path} and {ctrl_df_path}')
+        return
+
+    def filter_heading_info_df(self):
+        """
+        Filter the heading info DataFrame to only include rows where stop_point_index is shared across all reference points.
+        """
+
+        def filter_df(df):
+            shared_stop_points = set.intersection(
+                *df.groupby("ref_point_value")["stop_point_index"].apply(set)
+            )
+            df_shared = df[df["stop_point_index"].isin(
+                shared_stop_points)].copy()
+            return df_shared
+
+        self.all_test_heading_info_df_filtered = filter_df(
+            self.all_test_heading_info_df)
+        self.all_ctrl_heading_info_df_filtered = filter_df(
+            self.all_ctrl_heading_info_df)
 
     def make_or_retrieve_all_cur_and_nxt_lr_df(self, ref_point_params_based_on_mode=None, exists_ok=True):
         df_path = self.cur_and_nxt_lr_df_path
