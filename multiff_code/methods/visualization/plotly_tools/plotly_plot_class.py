@@ -263,14 +263,14 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
     def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
         self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                 color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=3, opacity=0.9)
+                                                                 color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=3.3, opacity=0.8)
         self._show_null_arc_to_cur_ff_in_plotly()                                                         
         return self.fig
 
     def _show_null_arc_to_cur_ff_in_plotly(self):
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
         self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
-                                                                 color=self.cur_ff_color, trace_name='cur null arc', linewidth=3, opacity=0.9)
+                                                                 color=self.cur_ff_color, trace_name='cur null arc', linewidth=2.8, opacity=0.8)
         return self.fig
 
 

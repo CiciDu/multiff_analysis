@@ -42,12 +42,8 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         empty_fig.update_layout(height=10, width=10)
         return empty_fig
 
-    def _clone_fig(self, fig):
-        # go.Figure acts like a shallow copy constructor; fast and safe to serialize
-        return go.Figure(fig) if isinstance(fig, go.Figure) else fig
-
     def _clone_all(self, *figs):
-        return tuple(self._clone_fig(f) for f in figs)
+        return tuple(f for f in figs)
 
     def prepare_dash_for_main_plots_layout(self, id_prefix='main_plots_'):
         self.id_prefix = id_prefix
@@ -176,7 +172,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     self.fig_scatter_or_reg,
                     self.fig_scatter_or_reg2
                 ) + (f"An error occurred. No update was made. Error: {e}",)
-    
+
     def make_function_to_update_all_plots_based_on_hover_data(self, app):
         @app.callback(
             Output(self.id_prefix + 'monkey_plot',
@@ -353,9 +349,9 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
             for trace in self.fig.data:
                 if trace.legendgroup == legendgroup:
                     trace.visible = 'legendonly' if trace.visible != 'legendonly' else True
-                    #logging.info(f'ff {data} is now {trace.visible}.')
+                    # logging.info(f'ff {data} is now {trace.visible}.')
 
-            return self._clone_fig(self.fig)
+            return self.fig
 
     def make_function_to_update_curv_of_traj(self, app):
         @app.callback(
@@ -410,10 +406,10 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     self.curv_of_traj_params['curv_of_traj_mode'],
                     self.curv_of_traj_params['window_for_curv_of_traj'][0],
                     self.curv_of_traj_params['window_for_curv_of_traj'][1],
-                    self._clone_fig(self.fig),
-                    self._clone_fig(self.fig_time_series_combd),
-                    self._clone_fig(self.fig_scatter_or_reg),
-                    self._clone_fig(self.fig_scatter_or_reg2),
+                    self.fig,
+                    self.fig_time_series_combd,
+                    self.fig_scatter_or_reg,
+                    self.fig_scatter_or_reg2,
                     'Updated successfully'
                 )
 
@@ -422,9 +418,9 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     self.curv_of_traj_params['curv_of_traj_mode'],
                     self.curv_of_traj_params['window_for_curv_of_traj'][0],
                     self.curv_of_traj_params['window_for_curv_of_traj'][1],
-                    self._clone_fig(self.fig),
-                    self._clone_fig(self.fig_time_series_combd),
-                    self._clone_fig(self.fig_scatter_or_reg),
-                    self._clone_fig(self.fig_scatter_or_reg2),
+                    self.fig,
+                    self.fig_time_series_combd,
+                    self.fig_scatter_or_reg,
+                    self.fig_scatter_or_reg2,
                     f"An error occurred. No update was made. Error: {e}"
                 )

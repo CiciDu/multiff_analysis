@@ -284,9 +284,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                 self.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(self.fig, self.traj_portion,
                                                                                                hoverdata_multi_columns=self.monkey_plot_params['hoverdata_multi_columns'])
             else:
-                # remove the trace called to_show_traj_portion from self.fig
+                # remove the trace called trajectory before stop from self.fig
                 self.fig.data = [
-                    trace for trace in self.fig.data if trace.name != 'to_show_traj_portion']
+                    trace for trace in self.fig.data if trace.name != 'trajectory before stop']
 
         if (self.monkey_plot_params['show_null_arcs_to_ff'] != old_checklist_params['show_null_arcs_to_ff']):
             self.find_null_arcs_info_for_plotting_for_the_duration()

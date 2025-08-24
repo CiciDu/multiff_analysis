@@ -42,10 +42,10 @@ def plot_with_additional_elements(snf,
     # Add all traces to the figure
     for trace in traces:
         snf.fig.add_trace(trace)
-        
+
     _update_layout(snf)
 
-    
+
 def _update_layout(snf):
     # Update the layout to make the background very light grey
     snf.fig.update_layout(
@@ -60,6 +60,7 @@ def _update_layout(snf):
     snf.fig.update_layout(
         width=snf.fig.layout.height * 1.5
     )
+
 
 def _calculate_rotated_line(start_x, start_y, end_x, end_y, rotation_matrix):
     """
@@ -208,27 +209,31 @@ def prepare_to_show_angle_from_monkey_stop_to_next_ff(snf, fixed_current_i):
 
     return line_stop_nxt_ff, line_of_stop_heading, arc_xy
 
+
 def prepare_to_show_angle_from_null_arc_end_to_next_ff(snf, fixed_current_i):
     # Calculate the line between the stop point and the next firefly
     line_stop_nxt_ff = find_line_between_stop_and_nxt_ff(snf, fixed_current_i)
     # Calculate the length of the line
-    line_length = np.linalg.norm(line_stop_nxt_ff[:, 0] - line_stop_nxt_ff[:, 1])
+    line_length = np.linalg.norm(
+        line_stop_nxt_ff[:, 0] - line_stop_nxt_ff[:, 1])
 
-    # Prepare to draw lines 
-    null_arc_info = snf.cur_null_arc_info_for_the_point    
+    # Prepare to draw lines
+    null_arc_info = snf.cur_null_arc_info_for_the_point
     null_arc_xy_rotated = show_null_trajectory.find_arc_xy_rotated(null_arc_info.loc[fixed_current_i, 'center_x'], null_arc_info.loc[fixed_current_i, 'center_y'], null_arc_info.loc[fixed_current_i, 'all_arc_radius'],
-                                                                    null_arc_info.loc[fixed_current_i, 'arc_starting_angle'], null_arc_info.loc[fixed_current_i, 'arc_ending_angle'], rotation_matrix=None)
+                                                                   null_arc_info.loc[fixed_current_i, 'arc_starting_angle'], null_arc_info.loc[fixed_current_i, 'arc_ending_angle'], rotation_matrix=None)
 
     null_arc_end_x = null_arc_xy_rotated[0, -1]
     null_arc_end_y = null_arc_xy_rotated[1, -1]
-    null_arc_end_angle = snf.mheading_for_cur_ff_for_all_counted_points['monkey_angle'][fixed_current_i, 1]
+    null_arc_end_angle = snf.mheading_for_cur_ff_for_all_counted_points[
+        'monkey_angle'][fixed_current_i, 1]
 
-    line_of_cur_null_heading = find_line_of_heading(null_arc_end_x, null_arc_end_y, null_arc_end_angle, line_length=line_length, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'])
+    line_of_cur_null_heading = find_line_of_heading(
+        null_arc_end_x, null_arc_end_y, null_arc_end_angle, line_length=line_length, rotation_matrix=snf.current_plotly_key_comp['rotation_matrix'])
 
-    line_cur_and_nxt_ff = _calculate_rotated_line(null_arc_end_x, null_arc_end_y, 
-                                                snf.stops_near_ff_df_counted.iloc[fixed_current_i]['nxt_ff_x'], 
-                                                snf.stops_near_ff_df_counted.iloc[fixed_current_i]['nxt_ff_y'], 
-                                                snf.current_plotly_key_comp['rotation_matrix'])
+    line_cur_and_nxt_ff = _calculate_rotated_line(null_arc_end_x, null_arc_end_y,
+                                                  snf.stops_near_ff_df_counted.iloc[fixed_current_i]['nxt_ff_x'],
+                                                  snf.stops_near_ff_df_counted.iloc[fixed_current_i]['nxt_ff_y'],
+                                                  snf.current_plotly_key_comp['rotation_matrix'])
 
     # Prepare to draw a small arc to show the angle from null arc end to next ff
     arc_radius = line_length / 2
@@ -238,7 +243,7 @@ def prepare_to_show_angle_from_null_arc_end_to_next_ff(snf, fixed_current_i):
     arc_xy = calculate_arc_to_show_angle(
         arc_center, arc_end_1, arc_end_2, arc_radius, None
     )
-    
+
     return line_of_cur_null_heading, line_cur_and_nxt_ff, arc_xy
 
 
@@ -252,40 +257,42 @@ def prepare_to_show_angle_from_null_arc_end_to_next_ff(snf, fixed_current_i):
 
 
 def prepare_to_illustrate_diff_in_d_curv(snf):
-    
+
     if not hasattr(snf, 'diff_in_curv_df'):
-        snf.make_diff_in_curv_df() # doing this can automatically compute the null_arc_curv_df and monkey_curv_df
-    
-    
+        # doing this can automatically compute the null_arc_curv_df and monkey_curv_df
+        snf.make_diff_in_curv_df()
+
     stop_point_index = snf.stops_near_ff_row['stop_point_index']
-    ref_point_index = snf.nxt_ff_df_modified.loc[snf.nxt_ff_df_modified['stop_point_index']==stop_point_index, 'point_index'].item()
+    ref_point_index = snf.nxt_ff_df_modified.loc[snf.nxt_ff_df_modified['stop_point_index']
+                                                 == stop_point_index, 'point_index'].item()
 
     # get the arc from cur arc end to next ff
     if (not hasattr(snf, 'null_arc_curv_df')) or (not hasattr(snf, 'monkey_curv_df')):
         snf.make_diff_in_curv_df()
     arc_from_cur_arc_end_to_next_ff = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
-                snf.null_arc_curv_df[snf.null_arc_curv_df['ref_point_index']==ref_point_index], snf.monkey_information)
-    #arc_from_cur_arc_end_to_next_ff['opt_arc_curv'] = snf.null_arc_curv_df.loc[snf.null_arc_curv_df['ref_point_index']==ref_point_index, 'opt_arc_curv'].values[0]
-
+        snf.null_arc_curv_df[snf.null_arc_curv_df['ref_point_index'] == ref_point_index], snf.monkey_information)
+    # arc_from_cur_arc_end_to_next_ff['opt_arc_curv'] = snf.null_arc_curv_df.loc[snf.null_arc_curv_df['ref_point_index']==ref_point_index, 'opt_arc_curv'].values[0]
 
     arc_from_stop_to_nxt_ff = show_null_trajectory.find_and_package_opt_arc_info_for_plotting(
-                snf.monkey_curv_df[snf.monkey_curv_df['ref_point_index']==ref_point_index], snf.monkey_information)
+        snf.monkey_curv_df[snf.monkey_curv_df['ref_point_index'] == ref_point_index], snf.monkey_information)
     # also find curv_of_traj_before_stop
-    #arc_from_stop_to_nxt_ff['opt_arc_curv'] = snf.monkey_curv_df.loc[snf.monkey_curv_df['ref_point_index']==ref_point_index, 'opt_arc_curv'].values[0]
+    # arc_from_stop_to_nxt_ff['opt_arc_curv'] = snf.monkey_curv_df.loc[snf.monkey_curv_df['ref_point_index']==ref_point_index, 'opt_arc_curv'].values[0]
 
-    # get the trajectory portion before stop
+    # get the trajectory before stop
     trajectory_df = snf.current_plotly_key_comp['trajectory_df'].copy()
     window_for_curv_of_traj = [-25, 0]
     trajectory_df.sort_values(by='rel_distance', inplace=True)
-    traj_portion_before_stop = trajectory_df[trajectory_df['rel_distance'].between(window_for_curv_of_traj[0], window_for_curv_of_traj[1])].copy()
-    traj_portion_before_stop['curv_of_traj'] = snf.monkey_curv_df[snf.monkey_curv_df['ref_point_index']==ref_point_index]['curv_of_traj'].values[0]
-    
+    traj_portion_before_stop = trajectory_df[trajectory_df['rel_distance'].between(
+        window_for_curv_of_traj[0], window_for_curv_of_traj[1])].copy()
+    traj_portion_before_stop['curv_of_traj'] = snf.monkey_curv_df[snf.monkey_curv_df['ref_point_index']
+                                                                  == ref_point_index]['curv_of_traj'].values[0]
+
     return arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop
 
 
 # def illustrate_diff_in_d_curv(snf):
 #     arc_from_cur_arc_end_to_next_ff, arc_from_stop_to_nxt_ff, traj_portion_before_stop, curv_of_traj_before_stop = prepare_to_illustrate_diff_in_d_curv(snf)
-    
+
 #     # plot the cur null arc (deep orange)
 #     snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
 #         snf.fig, snf.cur_null_arc_info_for_the_point,
@@ -316,7 +323,7 @@ def prepare_to_illustrate_diff_in_d_curv(snf):
 #         color='#8e44ad', trace_name='monkey stop to nxt ff null arc',
 #         linewidth=2, opacity=0.9
 #     )
-    
+
 #     return snf.fig
 
 def illustrate_diff_in_d_curv(snf):
@@ -329,8 +336,8 @@ def illustrate_diff_in_d_curv(snf):
     # Pair A (orange family)
     # ---------------------------
     color_A_main = '#D55E00'  # deep vermillion (solid)
-    color_A_alt  = '#FF7F0E'  # vivid orange (dashed)
-    legend_A       = 'Pair A: current target arcs'
+    color_A_alt = '#FF7F0E'  # vivid orange (dashed)
+    legend_A = 'Pair A: current target arcs'
 
     # A1: Current null arc (solid)
     snf.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(
@@ -349,21 +356,19 @@ def illustrate_diff_in_d_curv(snf):
     )
 
     # Δκ for Pair A
-    kA1 = snf.cur_null_arc_info_for_the_point['opt_arc_curv'].values[0]  # curvature of the current null arc
-    kA2 = arc_from_cur_arc_end_to_next_ff['opt_arc_curv'].values[0]  # curvature of the cur arc end to next ff null arc
-    
-
+    # curvature of the current null arc
+    kA1 = snf.cur_null_arc_info_for_the_point['opt_arc_curv'].values[0]
+    # curvature of the cur arc end to next ff null arc
+    kA2 = arc_from_cur_arc_end_to_next_ff['opt_arc_curv'].values[0]
 
     # ---------------------------
     # Pair B (blue family)
     # ---------------------------
     color_B_main = '#1F78B4'   # navy (trajectory portion)
-    color_B_alt  = '#00A8E8'   # vivid azure (stop→next, dashed)
-    legend_B       = 'Pair B: movement vs stop→next'
+    color_B_alt = '#00A8E8'   # vivid azure (stop→next, dashed)
+    legend_B = 'Pair B: movement vs stop→next'
 
-
-
-    # B1: Trajectory portion before stop (solid)
+    # B1: trajectory before stop (solid)
     snf.fig = plotly_for_monkey.plot_a_portion_of_trajectory_to_show_traj_portion(
         snf.fig, traj_portion_before_stop,
         trace_name='trajectory before stop',
@@ -379,7 +384,8 @@ def illustrate_diff_in_d_curv(snf):
         dash='dash', legendgroup=legend_B
     )
 
-    kB2 = arc_from_stop_to_nxt_ff['opt_arc_curv'].values[0]  # curvature of the monkey stop to next ff null arc
+    # curvature of the monkey stop to next ff null arc
+    kB2 = arc_from_stop_to_nxt_ff['opt_arc_curv'].values[0]
     kB1 = traj_portion_before_stop['curv_of_traj'].values[0]
 
     # ---------------------------
@@ -391,12 +397,12 @@ def illustrate_diff_in_d_curv(snf):
         kA2 = kA2 * 180 / np.pi * 100
         kB2 = kB2 * 180 / np.pi * 100
         kB1 = kB1 * 180 / np.pi * 100
-        
+
         dA = kA2 - kA1
         dB = kB2 - kB1
         contrast = abs(dA) - abs(dB)
 
-        ## annotate individual values
+        # annotate individual values
         # snf.fig = _add_corner_annotation(snf.fig, f"kA1 = {kA1:.3f}", color='#E66100', corner='top-right')
         # snf.fig = _add_corner_annotation(snf.fig, f"kA2 = {kA2:.3f}", color='#E66100', corner='top-right')
         # snf.fig = _add_corner_annotation(snf.fig, f"kB2 = {kB2:.3f}", color='#1F78B4', corner='top-right')
@@ -405,7 +411,6 @@ def illustrate_diff_in_d_curv(snf):
         # snf.fig = _add_corner_annotation(snf.fig, f"Δκ(A) = {dA:.3f}", color='#E66100', corner='top-right')
         # snf.fig = _add_corner_annotation(snf.fig, f"Δκ(B) = {dB:.3f}", color='#1F78B4', corner='top-right')
         # snf.fig = _add_corner_annotation(snf.fig, f"Contrast = {contrast:.3f}", color='#333333', corner='top-right')
-
 
         minus = "\u2212"  # Unicode minus
 
@@ -418,12 +423,10 @@ def illustrate_diff_in_d_curv(snf):
             f"<b>{contrast:.3f}</b>"
         )
 
-
         snf.fig = _add_corner_annotation(
             snf.fig, summary_html, color='#222',
             corner='top-left', bordercolor='#888', font_size=12
         )
-
 
     # Cleaner legend grouping names
     snf.fig.update_layout(legend_title_text='Arc groups')
@@ -432,14 +435,14 @@ def illustrate_diff_in_d_curv(snf):
     return snf.fig
 
 
-
 def _add_corner_annotation(
     fig,
     text,
     color='#222',
     corner='top-right',   # 'top-right', 'top-left', 'bottom-right', 'bottom-left'
     vspace=0.055,         # vertical spacing between stacked notes
-    hspace=0.0,           # (rarely needed) horizontal spacing if you want columns
+    # (rarely needed) horizontal spacing if you want columns
+    hspace=0.0,
     bgcolor='rgba(255,255,255,0.7)',
     bordercolor='#888',
     borderwidth=1,
@@ -447,11 +450,11 @@ def _add_corner_annotation(
 ):
     # Corner presets
     corners = {
-        'top-right'   : {'x': 0.98, 'y': 0.98, 'xanchor': 'right', 'yanchor': 'top',    'dir': -1},
-        'top-left'    : {'x': 0.02, 'y': 0.98, 'xanchor': 'left',  'yanchor': 'top',    'dir': -1},
-        #'top-left'    : {'x': 0.1, 'y': 0.8, 'xanchor': 'left',  'yanchor': 'top',    'dir': -1},
+        'top-right': {'x': 0.98, 'y': 0.98, 'xanchor': 'right', 'yanchor': 'top',    'dir': -1},
+        'top-left': {'x': 0.02, 'y': 0.98, 'xanchor': 'left',  'yanchor': 'top',    'dir': -1},
+        # 'top-left'    : {'x': 0.1, 'y': 0.8, 'xanchor': 'left',  'yanchor': 'top',    'dir': -1},
         'bottom-right': {'x': 0.98, 'y': 0.02, 'xanchor': 'right', 'yanchor': 'bottom', 'dir': +1},
-        'bottom-left' : {'x': 0.02, 'y': 0.02, 'xanchor': 'left',  'yanchor': 'bottom', 'dir': +1},
+        'bottom-left': {'x': 0.02, 'y': 0.02, 'xanchor': 'left',  'yanchor': 'bottom', 'dir': +1},
     }
     cfg = corners[corner]
     base_x, base_y, xanchor, yanchor, sign = cfg['x'], cfg['y'], cfg['xanchor'], cfg['yanchor'], cfg['dir']

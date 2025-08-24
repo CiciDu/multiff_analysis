@@ -312,7 +312,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         self.fig = plotly_for_null_arcs.update_null_arcs_in_plotly(
             self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix, trace_name='cur null arc')
         return self.fig
-    
+
     def _update_null_arc_to_cur_ff_in_plotly(self):
         self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
@@ -423,7 +423,8 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
 
         self._prepare_to_plot_eye_positions_for_dash()
 
-        self.fig = self.make_one_monkey_plotly_plot(monkey_plot_params=self.monkey_plot_params)
+        self.fig = self.make_one_monkey_plotly_plot(
+            monkey_plot_params=self.monkey_plot_params)
 
         if self.monkey_plot_params['show_monkey_heading']:
             plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper._get_all_triangle_df_for_the_point_from_triangle_df_in_duration(
@@ -434,7 +435,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
-            
+
         if self.monkey_plot_params['show_null_arc_to_cur_ff']:
             self.fig = self._show_null_arc_to_cur_ff_in_plotly()
 
@@ -449,7 +450,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         for i, trace in enumerate(self.fig.data):
             if trace.name == 'trajectory_data':
                 self.trajectory_data_trace_index = i
-            if trace.name == 'to_show_traj_portion':
+            if trace.name == 'trajectory before stop':
                 self.traj_portion_trace_index = i
 
         return self.fig

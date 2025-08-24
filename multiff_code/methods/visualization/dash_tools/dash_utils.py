@@ -205,7 +205,7 @@ def update_marked_traj_portion_in_monkey_plot(fig, traj_portion, hoverdata_multi
     fig.update_traces(overwrite=True, marker={"size": 9, "opacity": 1, "color": 'purple'},
                       x=traj_portion['monkey_x'].values, y=traj_portion['monkey_y'].values,
                       customdata=traj_portion[hoverdata_multi_columns].values,
-                      selector=dict(name="to_show_traj_portion"))
+                      selector=dict(name="trajectory before stop"))
 
     return fig
 
