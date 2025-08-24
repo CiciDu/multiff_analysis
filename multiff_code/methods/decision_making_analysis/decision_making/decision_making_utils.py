@@ -502,7 +502,7 @@ def make_anno_ff_indices_dict(moit2, add_negative_labels=True):
 
     # moit2 is used instead of moit because this function was originally designed to be just used on moit2
     print('Note: if not using moit2, then make sure to provide y_pred_all that corresponds to chosen_rows_of_df. \
-          Please also make sure that all rows of data are used and labeled. In other words, if keeping_1_out_of_n_rows is used, \
+          Please also make sure that all rows of data are used and labeled. In other words, if select_every_nth_row is used, \
           then it should be 1. Otherwise, in the animation, the blue and red circles, for predicted ff and annotated ff respectively, will flash on and off.')
 
     anno_ff_indices_dict = {}
@@ -539,7 +539,7 @@ def make_anno_ff_indices_dict(moit2, add_negative_labels=True):
 def make_anno_and_pred_ff_indices_dict(moit2, y_pred_all=None, add_negative_labels=True):
     # moit2 is used instead of moit because this function was originally designed to be just used on moit2
     print('Note: if not using moit2, then make sure to provide y_pred_all that corresponds to chosen_rows_of_df. \
-          Please also make sure that all rows of data are used and labeled. In other words, if keeping_1_out_of_n_rows is used, \
+          Please also make sure that all rows of data are used and labeled. In other words, if select_every_nth_row is used, \
           then it should be 1. Otherwise, in the animation, the blue and red circles, for predicted ff and annotated ff respectively, will flash on and off.')
 
     anno_ff_indices_dict = make_anno_ff_indices_dict(

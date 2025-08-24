@@ -104,9 +104,11 @@ class PGAMclass():
                                                                  trial_num_vec=self.trial_ids,
                                                                  filter_trials=self.train_trials,
                                                                  )
-
-        print('Minimal subset of variables driving the activity:')
-        print(self.reduced.var_list)
+        try:
+            print('Minimal subset of variables driving the activity:')
+            print(self.reduced.var_list)
+        except Exception as e:
+            print(f"Error occurred while printing reduced variable list: {e}")
 
     def post_processing_results(self):
         # string with the neuron identifier

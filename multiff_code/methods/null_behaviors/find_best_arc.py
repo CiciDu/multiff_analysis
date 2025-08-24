@@ -123,8 +123,8 @@ def add_intended_target_id_to_best_arc_df(best_arc_df, time_gap_to_differentiate
     best_arc_df = best_arc_df.sort_values(by='point_index')
     unique_id_counter = 0
     for ff_index in best_arc_df.ff_index.unique():
-    # take out all the rows that belong to it
-        same_ff_rows = best_arc_df[best_arc_df.ff_index==ff_index]
+        # take out all the rows that belong to it
+        same_ff_rows = best_arc_df[best_arc_df.ff_index == ff_index]
         unique_intended_target_id = same_ff_rows.intended_target_id.unique()
         # separate them into chunks. If any two has time part greater than 5s, then begin a new chunk
         # It's similar to the concept of sticks and stones in combinatorics
@@ -132,7 +132,8 @@ def add_intended_target_id_to_best_arc_df(best_arc_df, time_gap_to_differentiate
         diff_in_time = np.diff(all_time)
         # add a 0 in the beginning of diff_in_time
         diff_in_time = np.append(0, diff_in_time)
-        where_gaps = np.where(diff_in_time > time_gap_to_differentiate_intended_target_id)[0]
+        where_gaps = np.where(
+            diff_in_time > time_gap_to_differentiate_intended_target_id)[0]
         # again add a 0 in the beginning so that we can use np.diff later
         # see the number of repeats for each intended_target_id
         where_gaps = np.append(0, where_gaps)
@@ -140,21 +141,27 @@ def add_intended_target_id_to_best_arc_df(best_arc_df, time_gap_to_differentiate
         # if there are more rows left for the last gap
         if len(where_gaps) > 0:
             if where_gaps[-1] < len(diff_in_time):
-                num_repeats_for_each_intended_target_id = np.append(num_repeats_for_each_intended_target_id, len(diff_in_time)-where_gaps[-1])
+                num_repeats_for_each_intended_target_id = np.append(
+                    num_repeats_for_each_intended_target_id, len(diff_in_time)-where_gaps[-1])
         else:
-            num_repeats_for_each_intended_target_id = np.array([len(diff_in_time)])
+            num_repeats_for_each_intended_target_id = np.array(
+                [len(diff_in_time)])
         # we take the needed number of target_id to assign to the new target chunks (we'll re-organize all the id at the end)
         num_unique_id_needed = len(num_repeats_for_each_intended_target_id)
-        unique_intended_target_id = np.arange(unique_id_counter, unique_id_counter+num_unique_id_needed)
+        unique_intended_target_id = np.arange(
+            unique_id_counter, unique_id_counter+num_unique_id_needed)
         unique_id_counter += num_unique_id_needed
-        new_intended_target_id = np.repeat(unique_intended_target_id, num_repeats_for_each_intended_target_id)
-        best_arc_df.loc[best_arc_df['ff_index']==ff_index, 'intended_target_id'] = new_intended_target_id
+        new_intended_target_id = np.repeat(
+            unique_intended_target_id, num_repeats_for_each_intended_target_id)
+        best_arc_df.loc[best_arc_df['ff_index'] == ff_index,
+                        'intended_target_id'] = new_intended_target_id
 
     # now, re-organize all the intended_target_id so that they can at least be continuous
     best_arc_df = best_arc_df.sort_values(by='point_index').copy()
     used_unique_intended_target_id = best_arc_df['intended_target_id'].unique()
     new_unique_intended_target_id = range(len(used_unique_intended_target_id))
-    chart_for_conversion = np.zeros(max(used_unique_intended_target_id)+1).astype(int)
+    chart_for_conversion = np.zeros(
+        max(used_unique_intended_target_id)+1).astype(int)
     chart_for_conversion[used_unique_intended_target_id] = new_unique_intended_target_id
     best_arc_df['intended_target_id'] = chart_for_conversion[best_arc_df['intended_target_id'].values]
 
@@ -165,22 +172,27 @@ def add_intended_target_id_to_best_arc_df(best_arc_df, time_gap_to_differentiate
     for index in last_time_df.index:
         intended_target_row = last_time_df.loc[index]
         if (index > 0) & (index % 5000 == 0):
-            print('Progress of finding intended_target_id to furnish best_arc_df:', index, 'out of', last_time_df.index.max())
+            print('Progress of finding intended_target_id to furnish best_arc_df:',
+                  index, 'out of', last_time_df.index.max())
         # go to the last row associated with it
         time = intended_target_row.time
         ff_index = intended_target_row.ff_index
-        intended_target_id = intended_target_row['intended_target_id'].astype(int)
+        intended_target_id = intended_target_row['intended_target_id'].astype(
+            int)
         # and project to future 5s
         duration = [time, time+5]
         # if another chunk_id has the same ff_index, then replace the second intended_target_id with the first intended_target_id
-        best_arc_df.loc[(best_arc_df['time'].between(duration[0], duration[1])) & (best_arc_df['ff_index'] == ff_index), 'intended_target_id'] = intended_target_id
-        last_time_df.loc[(last_time_df['time'].between(duration[0], duration[1])) & (last_time_df['ff_index'] == ff_index), 'intended_target_id'] = intended_target_id    
+        best_arc_df.loc[(best_arc_df['time'].between(duration[0], duration[1])) & (
+            best_arc_df['ff_index'] == ff_index), 'intended_target_id'] = intended_target_id
+        last_time_df.loc[(last_time_df['time'].between(duration[0], duration[1])) & (
+            last_time_df['ff_index'] == ff_index), 'intended_target_id'] = intended_target_id
     return best_arc_df
+
 
 def add_column_monkey_passed_by_to_best_arc_df(best_arc_df, ff_dataframe):
     if 'intended_target_id' not in best_arc_df.columns:
         best_arc_df = add_intended_target_id_to_best_arc_df(best_arc_df)
-    
+
     pass_by_within_next_n_seconds = 2.5
     pass_by_within_n_cm = 50
 
@@ -203,7 +215,7 @@ def add_column_monkey_passed_by_to_best_arc_df(best_arc_df, ff_dataframe):
             # print("ff_index", ff_index, "has been stopped by monkey within", pass_by_within_next_n_seconds, "seconds")
             best_arc_df.loc[best_arc_df['intended_target_id']
                             == id, 'monkey_passed_by'] = True
-            
+
     return best_arc_df
 
 
@@ -226,7 +238,7 @@ def find_point_on_ff_boundary_with_smallest_angle_to_monkey(ff_x, ff_y, monkey_x
 
 
 def combine_manual_anno_and_best_arc_df_info_for_comparison(best_arc_df, chosen_rows_of_df, sequence_of_obs_ff_indices):
-    # Note that we didn't use all manual_anno info, but instead only used the info of the chosen rows, which might depend on factors such as keeping_1_out_of_n_rows
+    # Note that we didn't use all manual_anno info, but instead only used the info of the chosen rows, which might depend on factors such as select_every_nth_row
 
     # incorporate data from best_arc_df into chosen_rows so we can compare the two
     chosen_rows = chosen_rows_of_df[[

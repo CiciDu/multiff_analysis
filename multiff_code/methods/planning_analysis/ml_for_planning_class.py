@@ -127,7 +127,8 @@ class MlForPlanning(ml_methods_class.MlMethods):
                                     param_info_to_record={}):
 
         # also work simply on train and test set
-        self.use_linear_regression(show_plot=False, y_var_name=self.y_test.name)
+        self.use_linear_regression(
+            show_plot=False, y_var_name=self.y_test.name)
         print('num_features:', self.X_train.shape[1])
 
         temp_info = {'num_features': [self.X_train.shape[1]],
@@ -157,7 +158,7 @@ class MlForPlanning(ml_methods_class.MlMethods):
                                     param_info_to_record={},
                                     ):
 
-        self.use_ml(model_names=model_names, use_cv=True)
+        self.use_ml_model_for_regression(model_names=model_names, use_cv=True)
         print('num_features:', self.X_train.shape[1])
 
         temp_info = {'num_features': [self.X_train.shape[1]],

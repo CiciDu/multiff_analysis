@@ -114,8 +114,16 @@ def find_free_selection_x_from_info_of_n_ff_per_point(
     free_selection_x_df_for_plotting = pd.DataFrame()
     pred_var = []
     sequence_of_obs_ff_indices = []
+    
+    if ('mask' in info_of_n_ff_per_point.columns
+        and (info_of_n_ff_per_point['mask'].sum() / len(info_of_n_ff_per_point)) > 0
+        and (info_of_n_ff_per_point['mask'].sum() / len(info_of_n_ff_per_point)) < 1
+    ):
+        ff_attributes.append('mask')
 
     for i in range(num_ff_per_row):
+        # as each row (or point_index) has num_ff_per_row ff, we order the ff by order number
+        # we iterate through the order number, and for each order number n, we add all the nth ff info to the free_selection_x_df (for all rows)
         current_info = info_of_n_ff_per_point[info_of_n_ff_per_point['order'] == i]
         if not np.array_equal(current_info['point_index'].values, point_index_array):
             raise ValueError(
@@ -131,7 +139,7 @@ def find_free_selection_x_from_info_of_n_ff_per_point(
         free_selection_x_df_for_plotting[column_for_plotting_names] = current_info[attributes_for_plotting].values
         sequence_of_obs_ff_indices.append(current_info['ff_index'].values)
     free_selection_x_df['point_index'] = point_index_array
-    #free_selection_x_df_for_plotting['point_index'] = point_index_array
+    # free_selection_x_df_for_plotting['point_index'] = point_index_array
 
     if add_current_curv_of_traj:
         if monkey_information is None:
@@ -366,6 +374,8 @@ def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_i
             9999, ff_dataframe_sub[selection_criterion_if_too_many_ff].max()+1000)
 
         # combine the info and the placeholders
+        ff_dataframe_sub['mask'] = 1
+        df_to_add['mask'] = 0
         ff_dataframe_sub = pd.concat([ff_dataframe_sub, df_to_add], axis=0)
         # now, we keep only num_ff_per_row ff for each point_index, and we sort them by selection_criterion_if_too_many_ff
         ff_dataframe_sub.sort_values(

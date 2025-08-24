@@ -254,7 +254,7 @@ class DecisionMakingHelper(further_processing_class.FurtherProcessing):
             ['whether_changed'], axis=1).values
         self.replacement_labels = replacement_x_df['whether_changed'].values
 
-    def get_free_selection_x(self, num_ff_per_row=5, keeping_1_out_of_n_rows=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
+    def get_free_selection_x(self, num_ff_per_row=5, select_every_nth_row=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                              curvature_df=None, curv_of_traj_df=None, **kwargs):
         '''
         free_selection_x_df: df, the input features for machine learning
@@ -266,8 +266,8 @@ class DecisionMakingHelper(further_processing_class.FurtherProcessing):
 
         self.num_ff_per_row = num_ff_per_row
 
-        if keeping_1_out_of_n_rows > 1:
-            self.free_selection_df_sample = self.free_selection_df.iloc[::keeping_1_out_of_n_rows]
+        if select_every_nth_row > 1:
+            self.free_selection_df_sample = self.free_selection_df.iloc[::select_every_nth_row]
         else:
             self.free_selection_df_sample = self.free_selection_df.copy()
 

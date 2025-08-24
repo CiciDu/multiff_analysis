@@ -305,7 +305,7 @@ def PlotTrials(duration,
             fig = plt.figure(figsize=(12, 6))
             axes = fig.add_subplot(1, 2, 1)
         else:
-            fig, axes = plt.subplots(figsize=(8, 8))
+            fig, axes = plt.subplots(figsize=(7, 7))
     elif axes is None:
         if show_eye_positions_on_the_right:
             axes = fig.add_subplot(121)
@@ -350,8 +350,8 @@ def PlotTrials(duration,
         zerospeed_rotated = plot_behaviors_utils.find_stops_for_plotting(
             cum_mx, cum_my, cum_speeddummy, rotation_matrix=R)
         marker = axes.scatter(zerospeed_rotated[0]-x0, zerospeed_rotated[1]-y0,
-                              marker='*', s=stop_size[player], alpha=0.8, color="#dc3545", zorder=2,
-                              edgecolors='#c82333', linewidth=1)
+                              marker='*', s=stop_size[player], alpha=0.8, color="#C4B4B5", zorder=2,
+                              edgecolors="#726F6F", linewidth=1)
         legend_markers.append(marker)
         legend_names.append('Low speed/stopping points')
 
@@ -396,15 +396,15 @@ def PlotTrials(duration,
     shown_ff_indices = ff_to_be_plotted_in_a_basic_way.copy()
 
     if show_believed_target_positions:
-        target_size = {"agent": 220, "monkey": 180, "combined": 50}
+        target_size = {"agent": 220, "monkey": 300, "combined": 50}
         marker = {"agent": "*", "monkey": "*", "combined": "o"}
         shown_ff_indices.extend(
             range(currentTrial - num_trials + 1, currentTrial + 1))
         believed_target_positions_rotated = plot_behaviors_utils.find_believed_target_positions(
             ff_believed_position_sorted, currentTrial, num_trials, rotation_matrix=R)
         marker = axes.scatter(believed_target_positions_rotated[0]-x0, believed_target_positions_rotated[1] -
-                              y0, marker=marker[player], s=target_size[player], color="#fd7e14", alpha=0.9, zorder=4,
-                              edgecolors='#e55a00', linewidth=2)
+                              y0, marker=marker[player], s=target_size[player], color="#CD701E", alpha=0.9, zorder=4,
+                              edgecolors="#e50000", linewidth=2)
         legend_markers.append(marker)
         legend_names.append('Catching-firefly positions')
 

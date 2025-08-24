@@ -7,7 +7,8 @@ import numpy as np
 
 class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
     def __init__(self, raw_data_folder_path=None, time_range_of_trajectory=[-1, 1], num_time_points_for_trajectory=10):
-        super().__init__(raw_data_folder_path=raw_data_folder_path, time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
+        super().__init__(raw_data_folder_path=raw_data_folder_path, time_range_of_trajectory=time_range_of_trajectory,
+                         num_time_points_for_trajectory=num_time_points_for_trajectory)
 
     def retrieve_manual_anno(self):
         super().retrieve_manual_anno()
@@ -125,9 +126,9 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
 
         self.manual_anno_long['ff_index'] = manual_anno_long['sub_ff_index']
 
-    def get_input_data(self, num_ff_per_row=5, keeping_1_out_of_n_rows=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'], curvature_df=None, curv_of_traj_df=None, **kwargs):
+    def get_input_data(self, num_ff_per_row=5, select_every_nth_row=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'], curvature_df=None, curv_of_traj_df=None, **kwargs):
         self.free_selection_df = self.manual_anno_long
-        super().get_free_selection_x(num_ff_per_row=num_ff_per_row, keeping_1_out_of_n_rows=keeping_1_out_of_n_rows,
+        super().get_free_selection_x(num_ff_per_row=num_ff_per_row, select_every_nth_row=select_every_nth_row,
                                      add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, **kwargs)
 
     def prepare_data_for_machine_learning(self, furnish_with_trajectory_data=True, trajectory_data_kind="position", add_traj_stops=True):
@@ -178,7 +179,7 @@ class ModelOfMultipleIntendedTargets(ModelOfIntendedTargets):
 
 # this needs to be updated since ModelOfIntendedTargets was updated
 def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_sorted, monkey_information, ff_flash_sorted, ff_life_sorted, auto_annot, auto_annot_long,
-                              num_ff_per_row=5, keeping_1_out_of_n_rows=10, add_arc_info=True, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
+                              num_ff_per_row=5, select_every_nth_row=10, add_arc_info=True, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                               add_current_curv_of_traj=True, furnish_with_trajectory_data=True, keep_whole_chunks=False,
                               ff_attributes=['ff_distance', 'ff_angle', 'time_since_last_vis'], trajectory_data_kind=['position'], curvature_df=None, curv_of_traj_df=None,
                               time_range_of_trajectory=[-0.8, 0], n_seconds_before_crossing_boundary=0, n_seconds_after_crossing_boundary=0.8,):
@@ -194,7 +195,7 @@ def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_so
     moit.manual_anno_long = auto_annot_long
     moit.eliminate_crossing_boundary_cases(n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary,
                                            n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary)
-    moit.get_input_data(num_ff_per_row=num_ff_per_row, keeping_1_out_of_n_rows=keeping_1_out_of_n_rows,
+    moit.get_input_data(num_ff_per_row=num_ff_per_row, select_every_nth_row=select_every_nth_row,
                         add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, add_current_curv_of_traj=add_current_curv_of_traj,
                         curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, ff_attributes=ff_attributes)
 
@@ -202,6 +203,6 @@ def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_so
         furnish_with_trajectory_data=furnish_with_trajectory_data, trajectory_data_kind=trajectory_data_kind)
     moit.split_data_to_train_and_test(
         scaling_data=True, keep_whole_chunks=keep_whole_chunks)
-    moit.use_machine_learning_model(model=None)
+    moit.use_machine_learning_model_for_classification(model=None)
 
     return moit.model_comparison_df

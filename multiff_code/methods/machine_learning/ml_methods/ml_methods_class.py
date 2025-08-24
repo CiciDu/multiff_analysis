@@ -27,13 +27,15 @@ class MlMethods():
         if y_var_df is not None:
             self.y_var_df = y_var_df
 
-    def use_train_test_split(self, x_var_df, y_var_df, y_var_column='d_monkey_angle_since_cur_ff_first_seen', remove_outliers=True):
+    def use_train_test_split(self, x_var_df, y_var_df, y_var_column=None, remove_outliers=True):
+        if y_var_column is None:
+            y_var_column = self.y_var_df.columns[0]
         self.x_var_prepared, self.y_var_prepared = prep_ml_data_utils.further_prepare_x_var_and_y_var(
             x_var_df, y_var_df, y_var_column=y_var_column, remove_outliers=remove_outliers)
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             self.x_var_prepared, self.y_var_prepared, test_size=0.2)
 
-    def use_ml(self, model_names=['linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'], use_cv=False):
+    def use_ml_model_for_regression(self, model_names=['linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'], use_cv=False):
         self.model_comparison_df, self.chosen_model_info = regression_utils.use_ml_model_for_regression(self.X_train, self.y_train, self.X_test, self.y_test,
                                                                                                         model_names=model_names, use_cv=use_cv)
 

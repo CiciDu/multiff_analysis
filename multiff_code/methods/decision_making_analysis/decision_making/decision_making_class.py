@@ -98,8 +98,9 @@ class DecisionMaking(decision_making_helper_class.DecisionMakingHelper):
         self.trajectory_data_kind = trajectory_data_kind
 
         if kind == "free selection":
-            self.X_all = self.free_selection_x_df.drop(
-                columns=['point_index'], errors='ignore').values
+            self.X_all_df = self.free_selection_x_df.drop(
+                columns=['point_index'], errors='ignore')
+            self.X_all = self.X_all_df.values
             self.X_all_to_plot = self.free_selection_x_df_for_plotting.copy().values
             self.y_all = self.free_selection_labels.copy()
             self.indices = np.arange(len(self.free_selection_x_df))
@@ -110,6 +111,7 @@ class DecisionMaking(decision_making_helper_class.DecisionMakingHelper):
         elif kind == "replacement":
             self.replacement_x_df = self.changing_pursued_ff_data_diff.drop(
                 ['whether_changed'], axis=1)
+            self.X_all_df = self.replacement_x_df.copy()
             self.X_all = self.replacement_x_df.values
             self.X_all_to_plot = self.replacement_inputs_for_plotting
             self.y_all = self.replacement_labels
@@ -232,8 +234,9 @@ class DecisionMaking(decision_making_helper_class.DecisionMakingHelper):
                                                                                                                                                                trajectory_data_kind=trajectory_data_kind, time_range_of_trajectory=self.time_range_of_trajectory, num_time_points_for_trajectory=self.gc_kwargs['num_time_points_for_trajectory'], add_traj_stops=add_traj_stops)
         self.input_features = np.concatenate(
             [self.input_features, self.trajectory_feature_names], axis=0)
+        self.X_all_df = pd.concat([self.X_all_df, pd.DataFrame(self.traj_points, columns=self.trajectory_feature_names)], axis=1)
 
-    def use_machine_learning_model(self, model=None):
+    def use_machine_learning_model_for_classification(self, model=None):
 
         self.model, self.y_pred, self.model_comparison_df = classification_utils.use_ml_model_for_classification(
             self.X_train, self.y_train, self.X_test, self.y_test, model=model,
@@ -490,6 +493,6 @@ def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_p
     dm.prepare_data_for_machine_learning(
         kind="replacement", furnish_with_trajectory_data=furnish_with_trajectory_data, trajectory_data_kind=trajectory_data_kind)
     dm.split_data_to_train_and_test(scaling_data=True)
-    dm.use_machine_learning_model(model=None)
+    dm.use_machine_learning_model_for_classification(model=None)
 
     return dm.model_comparison_df
