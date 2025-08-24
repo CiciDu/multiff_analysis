@@ -587,6 +587,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
 
         if self.monkey_plot_params['show_null_arcs_to_ff']:
             self.fig = self._update_null_arcs_for_cur_and_nxt_ff_in_plotly()
+        elif self.monkey_plot_params['show_null_arc_to_cur_ff']:
+            self.fig = self._update_null_arc_to_cur_ff_in_plotly()
 
         if self.monkey_plot_params['show_extended_traj_arc']:
             self.fig = self._update_extended_traj_arc_in_plotly()

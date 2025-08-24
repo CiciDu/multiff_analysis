@@ -312,6 +312,13 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         self.fig = plotly_for_null_arcs.update_null_arcs_in_plotly(
             self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix, trace_name='cur null arc')
         return self.fig
+    
+    def _update_null_arc_to_cur_ff_in_plotly(self):
+        self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
+        rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
+        self.fig = plotly_for_null_arcs.update_null_arcs_in_plotly(
+            self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix, trace_name='cur null arc')
+        return self.fig
 
     def _update_extended_traj_arc_in_plotly(self):
         self._get_ext_traj_arc_info_for_the_point()
