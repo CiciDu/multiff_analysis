@@ -19,6 +19,19 @@ connection_linewidth = {"agent": 0.25, "monkey": 0.5, "combined": 0.3}
 connection_alpha = {"agent": 0.6, "monkey": 0.7, "combined": 0.8}
 
 
+def get_varying_colors_for_ff():
+    #custom_colors = [(1, 0.75, 0.8)]  # blue, pink
+    # Define your existing palettes
+    palette1 = sns.color_palette("tab10", 3)
+    palette2 = sns.color_palette("tab10", 14)[4:]
+    # Combine
+    # varying_colors = np.concatenate(
+    #     [custom_colors, palette1, palette2], axis=0
+    # )
+    varying_colors = np.concatenate([palette1, palette2], axis=0)
+    return varying_colors
+
+
 def plot_a_trial(currentTrial, num_trials, ff_caught_T_new, PlotTrials_args, additional_kwargs=None, images_dir=None):
 
     plot_kwargs = {'player': 'monkey',
@@ -193,10 +206,10 @@ def show_trajectory_func(axes, player, cum_pos_index, cum_mxy_rotated, cum_t, cu
     elif trail_color_var is None:
         if not hitting_arena_edge:
             axes.plot(cum_mxy_rotated[0]-x0, cum_mxy_rotated[1]-y0,
-                      alpha=trail_alpha[player], c="black", zorder=3, linewidth=2)
+                      alpha=trail_alpha[player], c="#708090", zorder=3, linewidth=2)
         else:
             axes.scatter(cum_mxy_rotated[0]-x0, cum_mxy_rotated[1]-y0,
-                         marker='o', s=2, alpha=trail_alpha[player], c="black", zorder=3)
+                         marker='o', s=2, alpha=trail_alpha[player], c="#708090", zorder=3)
     else:  # then trail_color_var will be considered as a color
         if not hitting_arena_edge:
             axes.plot(cum_mxy_rotated[0]-x0, cum_mxy_rotated[1]-y0,
@@ -372,13 +385,24 @@ def plot_lines_to_connect_path_and_ff(axes, ff_info, rotation_matrix, x0, y0, li
     # if vary_color_for_connecting_path_ff is True, then line_color is useless
     # if show_connect_path_ff_except_targets is False, then target_indices is useless
 
+    # Define blue and pink (as RGB tuples in [0,1])
+    custom_colors = [(1, 0.75, 0.8)]  # blue, pink
+    # Define your existing palettes
+    palette1 = sns.color_palette("tab10", 3)
+    palette2 = sns.color_palette("tab10", 14)[4:]
+    # Combine
+    varying_colors = np.concatenate(
+        [custom_colors, palette1, palette2], axis=0
+    )
+    print(varying_colors.shape)  # should be (15, 3) since 2 + 3 + 10
+
+
     legend_flag = False
     temp_ff_positions = np.array([])
     temp_monkey_positions = np.array([])
     if vary_color_for_connecting_path_ff:
         unique_ff_index = ff_info.ff_index.unique()
-        varying_colors = np.concatenate(
-            [sns.color_palette("tab10", 3), sns.color_palette("tab10", 14)[4:]], axis=0)
+        varying_colors = get_varying_colors_for_ff()
         # varying_colors = sns.color_palette("tab10", 10)
         # varying_colors = np.delete(varying_colors, 2, 0)   # take out the 3rd color (green from varying_colors)
         for i in range(len(unique_ff_index)):
@@ -507,8 +531,7 @@ def plot_horizontal_lines_to_show_ff_visible_segments(axes, ff_info, monkey_info
     ) if unique_ff_indices is None else np.array(unique_ff_indices)
 
     # Define color palette, avoiding red
-    varying_colors = np.concatenate(
-        [sns.color_palette("tab10", 3), sns.color_palette("tab10", 14)[4:]], axis=0)
+    varying_colors = get_varying_colors_for_ff()
 
     # Initialize dictionary to store visible segments of fireflies
     show_visible_segments_of_ff_dict = dict()
@@ -557,7 +580,7 @@ def plot_horizontal_lines_to_show_ff_visible_segments(axes, ff_info, monkey_info
 
             # Plot points when firefly stops being visible
             marker2 = axes.plot([one_perp_dict['ending_left_x'], one_perp_dict['ending_right_x']],
-                                [one_perp_dict['ending_left_y'], one_perp_dict['ending_right_y']], ls=':', color=color, lw=2.5)
+                                [one_perp_dict['ending_left_y'], one_perp_dict['ending_right_y']], ls=':', color=color, lw=3)
 
             # Store color of visible segments for current firefly
             show_visible_segments_of_ff_dict[ff_index] = color

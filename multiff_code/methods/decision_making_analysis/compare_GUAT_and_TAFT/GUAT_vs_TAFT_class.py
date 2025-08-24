@@ -33,30 +33,30 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
         self.stop_period_duration = stop_period_duration
+        
+        self.GUAT_vs_TAFT_folder_path = os.path.join(
+            self.decision_making_folder_path, 'GUAT_vs_TAFT')
+        os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
+
 
     def streamline_getting_GUAT_or_TAFT_x_df(self, GUAT_or_TAFT='GUAT',
                                              save_data=True,
                                              exists_ok=True,
                                              ):
+        self.streamline_getting_GUAT_or_TAFT_df(GUAT_or_TAFT=GUAT_or_TAFT,
+                                                                   exists_ok=exists_ok)
+        self.get_GUAT_or_TAFT_x_df(save_data=save_data)
+        
+    def streamline_getting_GUAT_or_TAFT_df(self, GUAT_or_TAFT='GUAT',
+                                                    exists_ok=True,
+                                                    ):
         self.GUAT_or_TAFT = GUAT_or_TAFT
-        # delete self.stops_near_ff_df
+        
         if hasattr(self, 'stops_near_ff_df'):
-            del self.stops_near_ff_df
-
-        self.GUAT_vs_TAFT_folder_path = os.path.join(
-            self.decision_making_folder_path, 'GUAT_vs_TAFT')
-        os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
-
-        if exists_ok:
-            try:
-                self.try_retrieving_GUAT_or_TAFT_x_df()
-                return
-            except FileNotFoundError:
-                pass
-
+            del self.stops_near_ff_df  
         self.get_relevant_monkey_data()
         self.get_GUAT_or_TAFT_df()
-        self.get_GUAT_or_TAFT_x_df(save_data=save_data)
+
 
     def try_retrieving_GUAT_or_TAFT_x_df(self):
         if self.GUAT_or_TAFT == 'TAFT':

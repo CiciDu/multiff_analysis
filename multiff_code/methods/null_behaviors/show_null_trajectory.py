@@ -582,7 +582,10 @@ def make_pretty_plot_for_a_duration(duration_to_plot, best_arc_df, monkey_inform
                                     ff_max_distance_to_intended_target=2000, ff_max_distance_to_path=100, plot_null_arcs=True, time_between_every_two_null_arcs=1, time_to_begin_plotting_null_arc=None, time_to_end_plotting_null_arc=None, max_num_plot_to_make=30,
                                     show_intended_target=False, show_ff_indices=False, point_indices_to_plot_null_arc=None, ff_indices_to_plot_null_arc=None, whether_mark_path_where_intended_target_has_best_arc_among_all_ff=False,
                                     add_intended_target_ff_index_to_title=True, add_duration_to_plot_to_title=False, eliminate_irrelevant_points_for_intended_target_before_or_after_crossing_boundary=True, only_plot_when_null_arc_exists=False,
-                                    additional_plotting_kwargs={}, title=None,
+                                    additional_plotting_kwargs={'truncate_part_before_crossing_arena_edge': True,
+                                                                'show_start': False,
+                                                                'show_scale_bar': False}, 
+                                    title=None,
                                     skip_plots_with_no_null_arc=True,
                                     ):
 

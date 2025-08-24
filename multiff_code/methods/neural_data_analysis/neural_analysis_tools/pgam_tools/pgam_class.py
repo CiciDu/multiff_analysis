@@ -1,4 +1,3 @@
-# edited from cluster
 from pathlib import Path
 from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
 import sys

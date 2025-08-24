@@ -53,11 +53,6 @@ class DashForGUATandTAFT(GUAT_vs_TAFT_class.GUATvsTAFTclass, dash_main_class.Das
         self.GUAT_or_TAFT = GUAT_or_TAFT
         self.test_or_ctrl = 'test' # this is more like a placeholder
         self.opt_arc_type = opt_arc_type
-        
-        
-        self.GUAT_vs_TAFT_folder_path = os.path.join(
-            self.decision_making_folder_path, 'GUAT_vs_TAFT')
-        os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
 
 
 
