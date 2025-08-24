@@ -142,7 +142,7 @@ class PGAMclass():
 
 
 
-    def load_pgam_results(self, neural_cluster_number):
+    def load_pgam_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
         
         self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
