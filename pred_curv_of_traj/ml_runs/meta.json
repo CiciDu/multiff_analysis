@@ -1,7 +1,0 @@
-{
-  "created_at": "2025-08-23T23:10:16",
-  "sklearn_version": "1.7.1",
-  "cv_splits": 5,
-  "use_cv": false,
-  "random_state": 42
-}
