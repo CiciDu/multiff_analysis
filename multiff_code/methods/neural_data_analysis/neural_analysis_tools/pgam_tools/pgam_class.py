@@ -131,8 +131,12 @@ class PGAMclass():
         # find which variables in res['variable'] are in reduced.var_list
         # and then plot the corresponding x_rate_Hz
         if plot_vars_in_reduced_list_only:
-            indices_of_vars_to_plot = np.where(
-                np.isin(self.res['variable'], self.reduced.var_list))[0]
+            try:
+                indices_of_vars_to_plot = np.where(
+                    np.isin(self.res['variable'], self.reduced.var_list))[0]
+            except Exception as e:
+                print(f"Error occurred while plotting results: {e}. Skipping...")
+                return
         else:
             indices_of_vars_to_plot = np.arange(self.res.shape[0])
 
@@ -285,4 +289,22 @@ class PGAMclass():
         variable[variable == 'avg_target_cluster_last_seen_distance'] = 'distance of target cluster last seen'
         variable[variable ==
                  'avg_target_cluster_last_seen_angle'] = 'angle of target cluster last seen'
+        variable[variable ==
+                 'target_cluster_has_disappeared_for_last_time_dummy'] = 'whether target cluster has disappeared for last time'
+        self.res['variable'] = variable
+
+    def _rename_variables_in_results(self):
+        variable = self.res['variable']
+        # rename each variable to the corresponding label
+        variable[variable == 'catching_ff'] = 'caught firefly (this bin)'
+        variable[variable == 'min_target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (first time)'
+        variable[variable == 'max_target_cluster_visible_dummy'] = 'target cluster visible'
+        variable[variable == 'gaze_world_y'] = 'gaze position (y)'
+        variable[variable == 'monkey_speed'] = 'monkey speed'
+        variable[variable == 'monkey_dw'] = 'monkey acceleration'
+        variable[variable == 'monkey_ddw'] = 'change in acceleration (jerk)'
+        variable[variable == 'monkey_ddv'] = 'change in angular accel'
+        variable[variable == 'avg_target_cluster_last_seen_distance'] = 'distance to last-seen target cluster'
+        variable[variable == 'avg_target_cluster_last_seen_angle'] = 'angle to last-seen target cluster'
+        variable[variable == 'target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (final time)'
         self.res['variable'] = variable

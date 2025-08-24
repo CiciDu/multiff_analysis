@@ -1,6 +1,9 @@
 # Python cache
 __pycache__/
 *.py[cod]
+**/__pycache__/
+*.pyc
+*.pyo
 
 # Virtual environments
 .venv/
@@ -11,14 +14,14 @@ __pycache__/
 
 # Logs
 *.log
-
-# OS files
-.DS_Store
-
+    
 # OS junk
 .DS_Store
+**/.DS_Store
 
 # Python caches
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
