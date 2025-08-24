@@ -15,3 +15,10 @@ __pycache__/
 # OS files
 .DS_Store
 
+# OS junk
+.DS_Store
+
+# Python caches
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/

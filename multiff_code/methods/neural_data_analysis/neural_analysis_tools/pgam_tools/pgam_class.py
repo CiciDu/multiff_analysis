@@ -1,4 +1,5 @@
 from pathlib import Path
+from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
 import sys
 import os
 
@@ -71,7 +72,7 @@ class PGAMclass():
         self._add_temporal_features_to_model(plot_each_feature=False)
         self._add_spatial_features_to_model(plot_each_feature=False)
         self.run_pgam(neural_cluster_number=neural_cluster_number)
-        self.post_processing()
+        self.post_processing_results()
         self.save_results()
 
     def prepare_for_pgam(self, temporal_vars=None, num_total_trials=10):
@@ -138,26 +139,51 @@ class PGAMclass():
         plot_modeling_result.plot_pgam_tuning_curvetions(
             self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
 
-    def save_results(self):
-        res_path = os.path.join(
-            self.processed_neural_data_folder_path, 'pgam_res')
-        os.makedirs(res_path, exist_ok=True)
-        save_name = f'neuron_{self.cluster_name}'
-        np.savez(os.path.join(res_path, save_name+'.npz'), results=self.res)
 
-    def load_results(self, neural_cluster_number):
+
+    def load_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
-        res_path = os.path.join(self.processed_neural_data_folder_path, 'pgam_res')
-        save_name = f'neuron_{self.cluster_name}'
-        filepath = os.path.join(res_path, save_name + '.npz')
-
-        # Load npz file
-        data = np.load(filepath, allow_pickle=True)
         
-        # Retrieve the saved results
-        results = data["results"].item() if data["results"].dtype == object else data["results"]
-        return results
-    
+        self.res_struct, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
+                                                            self.cluster_name)
+
+
+    def save_results(self):
+                # after you compute self.res = postprocess_results(...):
+        extra_meta = {
+            "bin_width": float(self.bin_width),
+            "neuron_index": int(self.neural_cluster_number),
+            "trial_count": int(len(np.unique(self.trial_ids))),
+            "reduced_AIC": float(getattr(self.reduced, "AIC", np.nan)) if hasattr(self.reduced, "AIC") else np.nan,
+            "full_AIC": float(getattr(self.full, "AIC", np.nan)) if hasattr(self.full, "AIC") else np.nan,
+        }
+        pgam_utils.save_full_results_npz(self.processed_neural_data_folder_path,
+                            self.cluster_name,
+                            self.res,                       # the structured array
+                            getattr(self.reduced, "var_list", []),
+                            extra_meta)
+
+
+
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
     def _scale_features(self):
         # since temporal variables are all dummy variables, we only need to scale the spatial variables
         scaler = StandardScaler()
