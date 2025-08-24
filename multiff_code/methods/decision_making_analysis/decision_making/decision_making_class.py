@@ -126,7 +126,7 @@ class DecisionMaking(decision_making_helper_class.DecisionMakingHelper):
                 "kind can only be 'free selection', 'replacement', or None")
 
         if furnish_with_trajectory_data:
-            self.furnish_machine_learning_data_with_trajectory_data(
+            self.X_all_df, self.X_all = self.furnish_machine_learning_data_with_trajectory_data(
                 trajectory_data_kind=trajectory_data_kind, add_traj_stops=add_traj_stops)
 
     def turn_y_label_into_multi_class(self, allow_multi_label=True, manual_anno_mul=None):
@@ -234,11 +234,13 @@ class DecisionMaking(decision_making_helper_class.DecisionMakingHelper):
                                                                                                                                                                trajectory_data_kind=trajectory_data_kind, time_range_of_trajectory=self.time_range_of_trajectory, num_time_points_for_trajectory=self.gc_kwargs['num_time_points_for_trajectory'], add_traj_stops=add_traj_stops)
         self.input_features = np.concatenate(
             [self.input_features, self.trajectory_feature_names], axis=0)
-        self.X_all_df = pd.concat([self.X_all_df, pd.DataFrame(self.traj_points, columns=self.trajectory_feature_names)], axis=1)
+        self.X_all_df = pd.concat([self.X_all_df, pd.DataFrame(
+            self.traj_points, columns=self.trajectory_feature_names)], axis=1)
+        return self.X_all_df, self.X_all
 
     def use_machine_learning_model_for_classification(self, model=None):
 
-        self.model, self.y_pred, self.model_comparison_df = classification_utils.use_ml_model_for_classification(
+        self.model, self.y_pred, self.model_comparison_df = classification_utils.ml_model_for_classification(
             self.X_train, self.y_train, self.X_test, self.y_test, model=model,
         )
         self.y_pred = self.y_pred.ravel()
@@ -493,6 +495,6 @@ def test_dm_replacement_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_p
     dm.prepare_data_for_machine_learning(
         kind="replacement", furnish_with_trajectory_data=furnish_with_trajectory_data, trajectory_data_kind=trajectory_data_kind)
     dm.split_data_to_train_and_test(scaling_data=True)
-    dm.use_machine_learning_model_for_classification(model=None)
+    # dm.use_machine_learning_model_for_classification(model=None) # needs to change
 
     return dm.model_comparison_df

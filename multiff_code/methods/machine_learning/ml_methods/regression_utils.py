@@ -88,7 +88,7 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
     return summary_df, y_pred, results, r2_test
 
 
-def use_ml_model_for_regression(X_train, y_train, X_test, y_test,
+def ml_model_for_regression(X_train, y_train, X_test, y_test,
                                 model_names=[
                                     'linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'],
                                 use_cv=False):
@@ -111,6 +111,9 @@ def use_ml_model_for_regression(X_train, y_train, X_test, y_test,
                                           n_jobs=-1,
                                           ),
               }
+    
+    if model_names is None:
+        model_names = list(models.keys())
 
     model_comparison_df, model_list, mse_list = _get_model_comparison_df(
         X_train, y_train, X_test, y_test, model_names, models, use_cv)

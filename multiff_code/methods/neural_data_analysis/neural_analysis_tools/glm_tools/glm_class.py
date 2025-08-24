@@ -39,7 +39,7 @@ class GLMclass():
         self._add_spatial_features_to_model(plot_each_feature=False)
         self.run_pgam(neural_cluster_number=neural_cluster_number)
         self.post_processing()
-        self.save_results()
+
 
     def prepare_for_pgam(self, temporal_vars=None, num_total_trials=10):
         if temporal_vars is None:

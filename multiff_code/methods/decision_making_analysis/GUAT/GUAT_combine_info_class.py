@@ -229,8 +229,8 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         self.num_stops = self.num_stops_df.set_index(
             'point_index').loc[self.point_index_array, 'num_stops'].values
 
-        self.output = self.num_stops - 1
-        # self.output[self.output > 2] = 2
+        self.y_value = self.num_stops
+        # self.y_value[self.y_value > 3] = 3
 
     def prepare_data_for_machine_learning(self, furnish_with_trajectory_data=False,
                                           ):
@@ -239,7 +239,7 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         input_features: the names of the input features
         '''
         self.free_selection_point_index = self.point_index_array
-        self.free_selection_labels = self.output.copy()
+        self.free_selection_labels = self.y_value.copy()
 
         self.time_range_of_trajectory = self.gc_kwargs['time_range_of_trajectory']
         self.num_time_points_for_trajectory = self.gc_kwargs['num_time_points_for_trajectory']
@@ -262,8 +262,6 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
             self.traj_stops = self.traj_stops_df.values
         else:
             self.furnish_with_trajectory_data = False
-
-
 
     def add_additional_info_to_plot(self):
         self.more_ff_df = cluster_replacement_utils.eliminate_part_of_more_ff_inputs_already_in_observation(

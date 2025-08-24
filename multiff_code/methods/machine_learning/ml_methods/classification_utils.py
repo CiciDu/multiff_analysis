@@ -1,143 +1,209 @@
 from machine_learning.ml_methods import ml_methods_utils
-import torch
-import torch.optim as optim
-import torch.nn as nn
-import numpy as np
-import matplotlib.pyplot as plt
+
 import copy
-import matplotlib.pyplot as plt
-import pandas as pd
-from sklearn.model_selection import cross_validate
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier, BaggingClassifier, GradientBoostingClassifier
-from sklearn.model_selection import cross_val_score
-import statsmodels.api as sm
-from sklearn.metrics import accuracy_score, confusion_matrix
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import RidgeClassifier
-from sklearn.linear_model import SGDClassifier
-from sklearn.ensemble import ExtraTreesClassifier
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import statsmodels.api as sm
+
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
+from sklearn.metrics import (
+    accuracy_score, balanced_accuracy_score, precision_score, recall_score,
+    f1_score, matthews_corrcoef, roc_auc_score, classification_report,
+    confusion_matrix
+)
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression, SGDClassifier, RidgeClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import (
+    BaggingClassifier, RandomForestClassifier, ExtraTreesClassifier,
+    AdaBoostClassifier, GradientBoostingClassifier
+)
+
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
-
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import BaggingClassifier, AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.metrics import (
-    accuracy_score, confusion_matrix, classification_report,
-    precision_score, recall_score, f1_score, roc_auc_score,
-    balanced_accuracy_score, matthews_corrcoef
-)
-from sklearn.model_selection import cross_val_score
-import pandas as pd
-import numpy as np
 
 
-def use_ml_model_for_classification(X_train, y_train, X_test, y_test, model=None, kfold_cv=None):
+# Optional external libs (guard if unavailable):
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    XGBClassifier = None
+
+try:
+    from lightgbm import LGBMClassifier
+except Exception:
+    LGBMClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    CatBoostClassifier = None
+
+
+def _proba_or_score(mdl, X):
+    """Return class probabilities if available, else decision scores (for ROC AUC)."""
+    if hasattr(mdl, "predict_proba"):
+        return mdl.predict_proba(X)
+    if hasattr(mdl, "decision_function"):
+        return mdl.decision_function(X)
+    return None  # ROC AUC will be skipped
+
+
+def ml_model_for_classification(X_train, y_train, X_test, y_test, model_names=None, kfold_cv=None, random_state=42, verbose=True):
     """
-    Train and evaluate classification models with multiple metrics.
-    If kfold_cv is None, uses original train/test split.
-    If kfold_cv is an integer, performs k-fold cross-validation on the training set.
+    Train and evaluate multiple classifiers.
+      - If kfold_cv is None: fit on train, evaluate on test.
+      - If kfold_cv is int or CV splitter: report cross-validated accuracy on train.
+    Returns: (best_model, y_pred_best, model_comparison_df)
     """
+
+    # ---- Define candidate models (list of (name, estimator)) ----
+    all_models = [
+        ("gnb", GaussianNB()),
+        ("logreg", LogisticRegression(max_iter=200, n_jobs=None)
+         if "n_jobs" in LogisticRegression().get_params() else LogisticRegression(max_iter=200)),
+        ("ridge", RidgeClassifier()),
+        ("sgd", SGDClassifier(max_iter=1000, tol=1e-3, random_state=random_state)),
+        ("dt", DecisionTreeClassifier(random_state=random_state)),
+        ("bagging", BaggingClassifier(
+            n_estimators=200, max_features=0.9, bootstrap_features=True, bootstrap=True, random_state=random_state
+        )),
+        ("rf", RandomForestClassifier(n_estimators=40,
+         max_depth=10, random_state=random_state)),
+        ("extra_trees", ExtraTreesClassifier(
+            n_estimators=200, random_state=random_state)),
+        ("boosting", AdaBoostClassifier(n_estimators=500,
+         learning_rate=0.05, random_state=random_state)),
+        ("grad_boosting", GradientBoostingClassifier(
+            learning_rate=0.05, max_depth=7, n_estimators=500, subsample=0.5,
+            max_features="sqrt", min_samples_split=7, min_samples_leaf=2, random_state=random_state
+        )),
+        ("knn", KNeighborsClassifier(n_neighbors=5)),
+        ("mlp", MLPClassifier(hidden_layer_sizes=(100,),
+         max_iter=500, random_state=random_state)),
+    ]
+
+    # Add optional libraries if available
+    if XGBClassifier is not None:
+        all_models.append(("xgb", XGBClassifier(
+            random_state=random_state, eval_metric="mlogloss", use_label_encoder=False
+        )))
+    if LGBMClassifier is not None:
+        all_models.append(("lgbm", LGBMClassifier(random_state=random_state)))
+    if CatBoostClassifier is not None:
+        all_models.append(("catboost", CatBoostClassifier(
+            verbose=0, random_state=random_state)))
+    # Add SVM only for smaller datasets (probability=True is slower)
+    if len(X_train) < 10_000:
+        all_models.append(
+            ("svm", SVC(probability=True, random_state=random_state)))
+
+    # Subselect by model_names if given
+    if model_names is not None:
+        name_set = set(model_names)
+        all_models = [(n, m) for n, m in all_models if n in name_set]
+
     metrics_list = []
-    
-    if model is not None:
-        model.fit(X_train, y_train)
-        model_comparison_df = None
-    else:
-        models = [
-                ('gnb', GaussianNB()),
-                ('logreg', LogisticRegression(max_iter=200)),
-                ('ridge', RidgeClassifier()),
-                ('sgd', SGDClassifier(max_iter=1000, tol=1e-3, random_state=42)),
-                ('dt', DecisionTreeClassifier()),
-                ('bagging', BaggingClassifier(n_estimators=200, max_features=0.9,
-                                            bootstrap_features=True, bootstrap=True, random_state=42)),
-                ('rf', RandomForestClassifier(n_estimators=40, max_depth=10, random_state=0)),
-                ('extra_trees', ExtraTreesClassifier(n_estimators=200, random_state=42)),
-                ('boosting', AdaBoostClassifier(n_estimators=500, learning_rate=0.05)),
-                ('grad_boosting', GradientBoostingClassifier(learning_rate=0.05, max_depth=7, n_estimators=500,
-                                                            subsample=0.5, max_features='sqrt',
-                                                            min_samples_split=7, min_samples_leaf=2)),
-                ('xgb', XGBClassifier(use_label_encoder=False, eval_metric='mlogloss', random_state=42)),
-                ('lgbm', LGBMClassifier(random_state=42)),
-                ('catboost', CatBoostClassifier(verbose=0, random_state=42)),
-                ('knn', KNeighborsClassifier(n_neighbors=5)),
-                ('mlp', MLPClassifier(hidden_layer_sizes=(100,), max_iter=500, random_state=42))
-]
-        if len(X_train) < 10000:
-            models.append(('svm', SVC(probability=True)))
 
-        for name, mdl in models:
-            print("Model:", name)
-            if kfold_cv:
-                scores = cross_val_score(mdl, X_train, y_train, cv=kfold_cv, scoring='accuracy')
-                metrics_list.append({
-                    'model': name,
-                    'accuracy': scores.mean(),
-                    'balanced_accuracy': None,
-                    'precision_macro': None,
-                    'recall_macro': None,
-                    'f1_macro': None,
-                    'mcc': None,
-                    'roc_auc': None,
-                    'cv_scores': scores
-                })
-                print(f"CV mean accuracy: {scores.mean():.4f}, scores: {scores}")
-            else:
-                mdl.fit(X_train, y_train)
-                y_pred = mdl.predict(X_test)
-                
-                try:
-                    roc_auc = roc_auc_score(y_test, mdl.predict_proba(X_test), multi_class='ovr') \
-                        if len(np.unique(y_test)) > 2 else roc_auc_score(y_test, mdl.predict_proba(X_test)[:, 1])
-                except:
-                    roc_auc = None  # not supported for some models
-                
-                metrics_list.append({
-                    'model': name,
-                    'accuracy': accuracy_score(y_test, y_pred),
-                    'balanced_accuracy': balanced_accuracy_score(y_test, y_pred),
-                    'precision_macro': precision_score(y_test, y_pred, average='macro', zero_division=0),
-                    'recall_macro': recall_score(y_test, y_pred, average='macro', zero_division=0),
-                    'f1_macro': f1_score(y_test, y_pred, average='macro', zero_division=0),
-                    'mcc': matthews_corrcoef(y_test, y_pred),
-                    'roc_auc': roc_auc,
-                    'cv_scores': None
-                })
+    # CV setup (use stratified for classification)
+    cv = None
+    if kfold_cv:
+        cv = StratifiedKFold(n_splits=kfold_cv, shuffle=True, random_state=random_state) if isinstance(
+            kfold_cv, int) else kfold_cv
 
-        model_comparison_df = pd.DataFrame(metrics_list).sort_values(by='accuracy', ascending=False)
-        print(model_comparison_df)
+    # ---- Evaluate models ----
+    for name, mdl in all_models:
+        if verbose:
+            print(f"Model: {name}")
 
-        # Pick best model
-        best_idx = model_comparison_df['accuracy'].idxmax()
-        best_model_name = model_comparison_df.loc[best_idx, 'model']
-        model = [m for m in models if m[0] == best_model_name][0][1]
-        print("\nThe model with the highest accuracy is:", best_model_name, '!!')
-        model.fit(X_train, y_train)
+        if cv is not None:
+            acc_scores = cross_val_score(
+                mdl, X_train, y_train, cv=cv, scoring="accuracy", n_jobs=None)
+            metrics_list.append({
+                "model": name,
+                "accuracy": acc_scores.mean(),
+                "balanced_accuracy": None,
+                "precision_macro": None,
+                "recall_macro": None,
+                "f1_macro": None,
+                "mcc": None,
+                "roc_auc": None,
+                "cv_scores": acc_scores,
+            })
+            if verbose:
+                print(
+                    f"CV mean accuracy: {acc_scores.mean():.4f}  | scores: {np.round(acc_scores, 4)}")
+        else:
+            mdl.fit(X_train, y_train)
+            y_pred = mdl.predict(X_test)
 
-    # Final evaluation of chosen model
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print("\nChosen model accuracy:", accuracy)
-    print("\nClassification Report:\n", classification_report(y_test, y_pred, zero_division=0))
-    
-    confusion_matrix_df = pd.DataFrame(confusion_matrix(y_test, y_pred))
-    confusion_matrix_df.columns = [f'Predicted {num}' for num in range(1, confusion_matrix_df.shape[1]+1)]
-    confusion_matrix_df.index = [f'Actual {num}' for num in range(1, confusion_matrix_df.shape[0]+1)]
-    print("\nConfusion Matrix:\n", confusion_matrix_df)
+            # ROC AUC (binary or multiclass). Try proba, else decision_function.
+            roc_auc = None
+            try:
+                scores = _proba_or_score(mdl, X_test)
+                if scores is not None:
+                    if scores.ndim == 1:
+                        # binary decision_function can be 1-D; need probability-like direction
+                        roc_auc = roc_auc_score(y_test, scores)
+                    else:
+                        # probabilities or OvR scores for multiclass
+                        roc_auc = roc_auc_score(
+                            y_test, scores, multi_class="ovr")
+            except Exception:
+                roc_auc = None
 
-    return model, y_pred, model_comparison_df
+            metrics_list.append({
+                "model": name,
+                "accuracy": accuracy_score(y_test, y_pred),
+                "balanced_accuracy": balanced_accuracy_score(y_test, y_pred),
+                "precision_macro": precision_score(y_test, y_pred, average="macro", zero_division=0),
+                "recall_macro": recall_score(y_test, y_pred, average="macro", zero_division=0),
+                "f1_macro": f1_score(y_test, y_pred, average="macro", zero_division=0),
+                "mcc": matthews_corrcoef(y_test, y_pred),
+                "roc_auc": roc_auc,
+                "cv_scores": None,
+            })
+
+    model_comparison_df = pd.DataFrame(metrics_list)
+    # If we only did CV, rank by accuracy; if test split, same thing.
+    model_comparison_df = model_comparison_df.sort_values(
+        by="accuracy", ascending=False).reset_index(drop=True)
+    if verbose:
+        print("\nModel comparison:\n", model_comparison_df)
+
+    # ---- Pick & fit best model on train, then evaluate on test ----
+    best_name = model_comparison_df.loc[0, "model"]
+    best_model = dict(all_models)[best_name]  # safe because names are unique
+    if verbose:
+        print(f"\nBest model by accuracy: {best_name}")
+
+    # If CV mode, we still need a final fit on the full train and a test evaluation:
+    best_model.fit(X_train, y_train)
+    y_pred_best = best_model.predict(X_test)
+
+    if verbose:
+        print("\nChosen model accuracy:", accuracy_score(y_test, y_pred_best))
+        print("\nClassification Report:\n", classification_report(
+            y_test, y_pred_best, zero_division=0))
+
+        cm = confusion_matrix(y_test, y_pred_best)
+        cm_df = pd.DataFrame(cm)
+        cm_df.columns = [
+            f"Predicted {c}" for c in range(1, cm_df.shape[1] + 1)]
+        cm_df.index = [f"Actual {r}" for r in range(1, cm_df.shape[0] + 1)]
+        print("\nConfusion Matrix:\n", cm_df)
+
+    return best_model, y_pred_best, model_comparison_df
 
 
 def use_logistic_regression(x_var_df, y_var_df):
@@ -149,8 +215,10 @@ def use_logistic_regression(x_var_df, y_var_df):
     conf_matrix = _use_logistic_regression(X_train, X_test, y_train, y_test)
 
     # Fit logistic regression on entire dataset for summary statistics
-    x_var_df2 = sm.add_constant(x_var_df)  # Add intercept, keep DataFrame structure
-    y_flat = y_var_df.values.reshape(-1) if hasattr(y_var_df, 'values') else y_var_df
+    # Add intercept, keep DataFrame structure
+    x_var_df2 = sm.add_constant(x_var_df)
+    y_flat = y_var_df.values.reshape(-1) if hasattr(y_var_df,
+                                                    'values') else y_var_df
 
     model = sm.Logit(y_flat, x_var_df2)
     results = model.fit(disp=False)  # disp=False suppresses output
@@ -197,13 +265,13 @@ def _use_logistic_regression(X_train, X_test, y_train, y_test):
 def use_logistic_regression_cv(x_var_df, y_var_df, cv=5, groups=None, verbose=False):
     """
     Perform cross-validation with logistic regression.
-    
+
     Parameters:
     - x_var_df: Features dataframe.
     - y_var_df: Target series or dataframe column.
     - cv: integer or cross-validation splitter object.
     - groups: array-like, group labels for samples (used if cv is GroupKFold).
-    
+
     Returns:
     - dict of train/test metrics (mean ± std).
     """
@@ -230,7 +298,8 @@ def use_logistic_regression_cv(x_var_df, y_var_df, cv=5, groups=None, verbose=Fa
 
     # Print header first
     if verbose:
-        print(f"{'Metric':<12} {'Train Mean':>12} {'Test Mean':>12} {'Train Std':>12}   {'Test Std':>12}")
+        print(
+            f"{'Metric':<12} {'Train Mean':>12} {'Test Mean':>12} {'Train Std':>12}   {'Test Std':>12}")
         print("-" * 70)
 
     # Then print metrics
@@ -244,7 +313,8 @@ def use_logistic_regression_cv(x_var_df, y_var_df, cv=5, groups=None, verbose=Fa
         results[f'test_{metric}'] = (test_mean, test_std)
 
         if verbose:
-            print(f"{metric.capitalize():<12} {train_mean:12.4f} {test_mean:12.4f} {train_std:12.4f}   {test_std:12.4f}")
+            print(
+                f"{metric.capitalize():<12} {train_mean:12.4f} {test_mean:12.4f} {train_std:12.4f}   {test_std:12.4f}")
 
     return results
 
@@ -268,10 +338,10 @@ def use_logistic_regression_cv(x_var_df, y_var_df, cv=5, groups=None, verbose=Fa
 #     )
 
 #     metrics = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
-    
+
 #     print(f"{'Metric':<12}{'Train Mean':>15} ± {'Std':<10}{'Test Mean':>15} ± {'Std':<10}")
 #     print("-" * 70)
-    
+
 #     results = {}
 
 #     for metric in metrics:
@@ -286,7 +356,7 @@ def use_logistic_regression_cv(x_var_df, y_var_df, cv=5, groups=None, verbose=Fa
 #         print(f"{metric.capitalize():<12}"
 #               f"{train_mean:>15.4f} ± {train_std:<10.4f}"
 #               f"{test_mean:>15.4f} ± {test_std:<10.4f}")
-    
+
 #     return results
 
 
@@ -341,11 +411,11 @@ class MultilabelModel(nn.Module):
         super().__init__()
         self.hidden = nn.Linear(n_features, 200)
         self.act = nn.ReLU()
-        self.output = nn.Linear(200, n_classes)
+        self.y_value = nn.Linear(200, n_classes)
 
     def forward(self, x):
         x = self.act(self.hidden(x))
-        x = torch.sigmoid(self.output(x))
+        x = torch.sigmoid(self.y_value(x))
         return x
 
 

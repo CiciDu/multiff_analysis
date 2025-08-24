@@ -86,7 +86,7 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
         self.free_selection_time = self.monkey_information.loc[self.point_index_array, 'time'].values
         self.num_stops = self.num_stops_df.set_index(
             'point_index').loc[self.point_index_array, 'num_stops'].values
-        self.output = (self.num_stops > 2).astype(int)
+        self.y_value = (self.num_stops > 2).astype(int)
 
     def add_additional_info_to_plot(self, time_range_of_trajectory,
                                     num_time_points_for_trajectory,
@@ -180,5 +180,5 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
         # incorporate whether_changed
         self.whether_changed = self.joined_cluster_df[[
             'point_index', 'whether_changed']].drop_duplicates()
-        self.output = self.whether_changed['whether_changed'].values.astype(
+        self.y_value = self.whether_changed['whether_changed'].values.astype(
             int).copy()

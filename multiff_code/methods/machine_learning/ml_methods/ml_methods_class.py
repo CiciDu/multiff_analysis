@@ -26,18 +26,44 @@ class MlMethods():
             self.x_var_df = x_var_df
         if y_var_df is not None:
             self.y_var_df = y_var_df
+        self.y_var_column = None
 
-    def use_train_test_split(self, x_var_df, y_var_df, y_var_column=None, remove_outliers=True):
+    def use_train_test_split(self, x_var_df=None, y_var_df=None, y_var_column=None, remove_outliers=True):
+        if x_var_df is None:
+            x_var_df = self.x_var_df
+        if y_var_df is None:
+            y_var_df = self.y_var_df
+        assert isinstance(x_var_df, pd.DataFrame) and isinstance(
+            y_var_df, pd.DataFrame)
+
         if y_var_column is None:
-            y_var_column = self.y_var_df.columns[0]
+            y_var_column = self.y_var_column
+        if y_var_column is None:
+            self.y_var_column = self.y_var_df.columns[0]
+
         self.x_var_prepared, self.y_var_prepared = prep_ml_data_utils.further_prepare_x_var_and_y_var(
-            x_var_df, y_var_df, y_var_column=y_var_column, remove_outliers=remove_outliers)
+            x_var_df, y_var_df, y_var_column=self.y_var_column, remove_outliers=remove_outliers)
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             self.x_var_prepared, self.y_var_prepared, test_size=0.2)
 
-    def use_ml_model_for_regression(self, model_names=['linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'], use_cv=False):
-        self.model_comparison_df, self.chosen_model_info = regression_utils.use_ml_model_for_regression(self.X_train, self.y_train, self.X_test, self.y_test,
-                                                                                                        model_names=model_names, use_cv=use_cv)
+    def use_ml_model_for_regression(self, x_var_df=None, y_var_df=None, y_var_column=None, remove_outliers=True,
+                                    model_names=['linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'], use_cv=False):
+
+        self.use_train_test_split(
+            x_var_df, y_var_df, y_var_column, remove_outliers=remove_outliers)
+
+        self.model_comparison_df, self.chosen_model_info = regression_utils.ml_model_for_regression(self.X_train, self.y_train, self.X_test, self.y_test,
+                                                                                                    model_names=model_names, use_cv=use_cv)
+
+    def use_ml_model_for_classification(self, x_var_df=None, y_var_df=None, y_var_column=None, remove_outliers=True,
+                                        model_names=None):
+
+        self.use_train_test_split(
+            x_var_df, y_var_df, y_var_column, remove_outliers=remove_outliers)
+
+        self.model, self.y_pred, self.model_comparison_df = classification_utils.ml_model_for_classification(
+            self.X_train, self.y_train, self.X_test, self.y_test, model_names=model_names,
+        )
 
     def use_ml_with_plots(self, models=None):
         # Define the models
@@ -76,7 +102,6 @@ class MlMethods():
                     by='importance', ascending=False, inplace=True)
                 self.feature_results_df = feature_results_df
 
-
     def use_linear_regression(self, show_plot=True, y_var_name=None):
         self.summary_df, self.y_pred, self.results, self.r2_test = regression_utils.use_linear_regression(
             self.X_train, self.X_test, self.y_train, self.y_test, show_plot=show_plot, y_var_name=y_var_name)
@@ -84,18 +109,18 @@ class MlMethods():
     def split_and_use_linear_regression(self, x_var_df, y_var_df, test_size=0.2):
         # if y_var_df is a series, convert it to a dataframe
         if isinstance(y_var_df, pd.Series):
-            y_var_df = pd.DataFrame(y_var_df) 
+            y_var_df = pd.DataFrame(y_var_df)
         elif isinstance(y_var_df, pd.DataFrame):
             if y_var_df.shape[1] > 1:
                 raise ValueError('y_var_df should contain only one column.')
         else:
             raise ValueError('y_var_df should be a series or a dataframe.')
-        
+
         y_var_name = y_var_df.columns[0]
-        
+
         self.temp_x_var_df, self.temp_y_var_df = prep_ml_data_utils.drop_na_in_x_and_y_var(
-            x_var_df, y_var_df)        
-        
+            x_var_df, y_var_df)
+
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             self.temp_x_var_df, self.temp_y_var_df, test_size=test_size)
         self.use_linear_regression(show_plot=True, y_var_name=y_var_name)
@@ -116,14 +141,6 @@ class MlMethods():
 
         self.summary_df, _ = classification_utils.use_logistic_regression(
             X_selected, y_var_df)
-
-    def use_ml_model_for_classification(self, x_var_df, y_var_df, model=None):
-        y_var_df = np.array(y_var_df)
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            x_var_df, y_var_df, test_size=0.2)  # random_state=42
-        self.model, self.y_pred, self.model_comparison_df = classification_utils.use_ml_model_for_classification(
-            self.X_train, self.y_train, self.X_test, self.y_test, model=model,
-        )
 
     def use_neural_network(self):
         self.model, self.predictions = regression_utils.use_neural_network_on_linear_regression_func(self.X_train.values, self.y_train.values,

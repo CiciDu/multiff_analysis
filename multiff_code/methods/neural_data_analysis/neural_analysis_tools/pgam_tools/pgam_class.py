@@ -146,8 +146,9 @@ class PGAMclass():
         np.savez(os.path.join(res_path, save_name+'.npz'), results=self.res)
 
     def load_results(self, neural_cluster_number):
+        self.cluster_name = self.x_var.columns[neural_cluster_number]
         res_path = os.path.join(self.processed_neural_data_folder_path, 'pgam_res')
-        save_name = f'neuron_{neural_cluster_number}'
+        save_name = f'neuron_{self.cluster_name}'
         filepath = os.path.join(res_path, save_name + '.npz')
 
         # Load npz file

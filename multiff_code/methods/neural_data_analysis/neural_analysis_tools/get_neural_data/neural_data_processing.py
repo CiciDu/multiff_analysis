@@ -181,6 +181,7 @@ def prepare_binned_spikes_df(spikes_df, spike_time_col='time', bin_width=0.02, m
     # Rename columns
     binned_spikes_df.columns = [f'cluster_{c}' for c in binned_spikes_df.columns]
     binned_spikes_df['bin'] = binned_spikes_df.index
+    binned_spikes_df.index.name = None
 
     return time_bins, binned_spikes_df
 
