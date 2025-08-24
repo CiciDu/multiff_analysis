@@ -1,3 +1,4 @@
+# edited from cluster
 from pathlib import Path
 from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
 import sys
@@ -144,7 +145,7 @@ class PGAMclass():
     def load_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
         
-        self.res_struct, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
+        self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
                                                             self.cluster_name)
 
 
