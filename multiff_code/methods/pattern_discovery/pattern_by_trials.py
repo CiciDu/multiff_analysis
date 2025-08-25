@@ -149,10 +149,13 @@ def visible_before_last_one_func(target_clust_df_short, ff_caught_T_new, max_tim
     print(f'{len(df_sub) - len(df_sub2)} out of {len(df_sub)} target were captured within {min_trial_duration} seconds from the previous capture. '
           'They are filtered out when finding the trials that are "visible before last one" because the monkey might have just captured two ff together.')
 
+    selected_base_trials = df_sub2.copy()
+    # it's in selected_base_trials that we select VBLO trials
+
     vblo_target_cluster_df = df_sub2[df_sub2['time_since_target_cluster_last_seen'] > df_sub2['time_since_prev_capture'] + min_time_visible_before_last_capture].copy()
     print(f'{len(vblo_target_cluster_df)} out of {len(df_sub2)} target clusters were seen at least {min_time_visible_before_last_capture} seconds before the previous capture, which is {len(vblo_target_cluster_df) / len(df_sub2) * 100:.2f}%')
     visible_before_last_one_trials = vblo_target_cluster_df['target_index'].unique()
-    return visible_before_last_one_trials, vblo_target_cluster_df
+    return visible_before_last_one_trials, vblo_target_cluster_df, selected_base_trials
 
 
 

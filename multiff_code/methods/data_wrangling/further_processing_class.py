@@ -124,7 +124,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def get_visible_before_last_one_trials_info(self):
         self.make_or_retrieve_target_clust_df_short()
-        self.visible_before_last_one_trials, self.vblo_target_cluster_df = pattern_by_trials.visible_before_last_one_func(
+        self.visible_before_last_one_trials, self.vblo_target_cluster_d, self.selected_base_trials = pattern_by_trials.visible_before_last_one_func(
             self.target_clust_df_short, self.ff_caught_T_new)
 
     def get_try_a_few_times_info(self):
