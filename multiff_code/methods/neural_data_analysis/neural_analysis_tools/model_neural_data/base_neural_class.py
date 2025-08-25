@@ -76,23 +76,6 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.target_df = prep_target_data.add_columns_to_target_df(
             self.target_df)
 
-    def _make_or_retrieve_target_cluster_df(self, exists_ok=True, fill_na=False):
-        target_cluster_df_filepath = os.path.join(
-            self.patterns_and_features_data_folder_path, 'target_cluster_df.csv')
-        if exists(target_cluster_df_filepath) & exists_ok:
-            self.target_cluster_df = pd.read_csv(target_cluster_df_filepath)
-            print("Retrieved target_cluster_df")
-        else:
-            self.target_cluster_df = prep_target_data.make_target_cluster_df(
-                self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe,
-                self.ff_life_sorted, max_visibility_window=self.max_visibility_window)
-            self.target_cluster_df.to_csv(
-                target_cluster_df_filepath, index=False)
-            print("Made new target_cluster_df")
-
-        if fill_na:
-            self.target_df = prep_target_data.fill_na_in_target_df(
-                self.target_df)
 
     def _add_ff_info(self, binned_features):
         ff_info = prep_monkey_data.get_ff_info_for_bins(

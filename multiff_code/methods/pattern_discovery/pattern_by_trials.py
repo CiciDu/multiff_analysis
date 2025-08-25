@@ -48,23 +48,23 @@ n_ff_in_a_row[k] will denote the number of ff that the monkey has captured in a 
 
 def on_before_last_one_func(ff_flash_end_sorted, ff_caught_T_new, caught_ff_num):
     """
-Find the trials where the current target has only flashed on before the capture of the previous target;
-In other words, the target hasn’t flashed on during the trial
+    Find the trials where the current target has only flashed on before the capture of the previous target;
+    In other words, the target hasn’t flashed on during the trial
 
-Parameters
-----------
-ff_flash_end_sorted: np.array
-  containing the last moment that each firefly flashes on
-ff_caught_T_new: np.array
-  containing the time when each captured firefly gets captured
-caught_ff_num: numeric
-  total number of caught firefies
+    Parameters
+    ----------
+    ff_flash_end_sorted: np.array
+    containing the last moment that each firefly flashes on
+    ff_caught_T_new: np.array
+    containing the time when each captured firefly gets captured
+    caught_ff_num: numeric
+    total number of caught firefies
 
 
-Returns
--------
-on_before_last_one_trials: array
-  trial numbers that can be categorized as "on before last one"
+    Returns
+    -------
+    on_before_last_one_trials: array
+    trial numbers that can be categorized as "on before last one"
 
 """
     on_before_last_one_trials = []
@@ -82,24 +82,24 @@ on_before_last_one_trials: array
 
 def visible_before_last_one_func(ff_dataframe):
     """
-Find the trials where the current target has only been visible on before the capture of the previous target;
-In other words, the target hasn’t been visible during the trial;
-Here, a firefly is considered visible if it satisfies: (1) flashes on, (2) Within 40 degrees to the left and right,
-(3) Within 400 cm to the monkey (the distance can be updated when the information of the actual experiment is available)
+    Find the trials where the current target has only been visible on before the capture of the previous target;
+    In other words, the target hasn’t been visible during the trial;
+    Here, a firefly is considered visible if it satisfies: (1) flashes on, (2) Within 40 degrees to the left and right,
+    (3) Within 400 cm to the monkey (the distance can be updated when the information of the actual experiment is available)
 
-Parameters
-----------
-ff_dataframe: pd.dataframe
-  containing various information about all visible or "in-memory" fireflies at each time point
+    Parameters
+    ----------
+    ff_dataframe: pd.dataframe
+    containing various information about all visible or "in-memory" fireflies at each time point
 
-Returns
--------
-visible_before_last_one_trials: array
-  trial numbers that can be categorized as "visible before last one"
+    Returns
+    -------
+    visible_before_last_one_trials: array
+    trial numbers that can be categorized as "visible before last one"
 
-"""
-  # We first take out the trials that cannot be categorized as "visible before last one";
-  # For these trials, the target has been visible for at least one time point during the trial
+    """
+    # We first take out the trials that cannot be categorized as "visible before last one";
+    # For these trials, the target has been visible for at least one time point during the trial
     temp_dataframe = ff_dataframe[(ff_dataframe['target_index'] == ff_dataframe['ff_index']) & (
         ff_dataframe['visible'] == 1)]
     trials_not_to_select = np.unique(np.array(temp_dataframe['target_index']))

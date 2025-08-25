@@ -597,9 +597,9 @@ def combine_per_sess_perc_info_across_monkeys(per_sess_perc_info_exists_ok=True)
 
 
 
-def assign_session_id(df):
+def assign_session_id(df, new_col_name='session_id'):
     # Map sorted data_names to session IDs
     unique_data_names = sorted(df['data_name'].unique())
     data_name_to_session_id = {name: idx for idx, name in enumerate(unique_data_names)}
-    df['session_id'] = df['data_name'].map(data_name_to_session_id)
+    df[new_col_name] = df['data_name'].map(data_name_to_session_id)
     return df
