@@ -92,7 +92,7 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
 
     def _add_all_target_and_target_cluster_info(self):
         self._make_or_retrieve_target_df()
-        self._make_or_retrieve_target_cluster_df()
+        self.make_or_retrieve_target_cluster_df()
         self._make_cmb_target_df()
 
         if self.one_point_index_per_bin:

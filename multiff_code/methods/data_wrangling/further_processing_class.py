@@ -55,7 +55,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.cluster_around_target_indices = None
         else:
             print("Warning: raw_data_folder_path is None")
-            
+
         self.max_visibility_window = 10
 
     def make_df_related_to_patterns_and_features(self, exists_ok=True):
@@ -112,16 +112,16 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                                'two_in_a_row_simul': self.two_in_a_row_simul,
                                'two_in_a_row_non_simul': self.two_in_a_row_non_simul,
                                'used_cluster': self.used_cluster, }
-        
-    def get_n_ff_in_a_row_info(self):    
+
+    def get_n_ff_in_a_row_info(self):
         self.n_ff_in_a_row = pattern_by_trials.n_ff_in_a_row_func(
             self.ff_believed_position_sorted, distance_between_ff=50)
         self.two_in_a_row = np.where(self.n_ff_in_a_row == 2)[0]
         self.two_in_a_row_simul, self.two_in_a_row_non_simul = pattern_by_trials.whether_current_and_last_targets_are_captured_simultaneously(
             self.two_in_a_row, self.ff_caught_T_new)
         self.three_in_a_row = np.where(self.n_ff_in_a_row == 3)[0]
-        self.four_in_a_row = np.where(self.n_ff_in_a_row == 4)[0]        
-        
+        self.four_in_a_row = np.where(self.n_ff_in_a_row == 4)[0]
+
     def get_visible_before_last_one_trials_info(self):
         self.make_or_retrieve_target_clust_df_short()
         self.visible_before_last_one_trials, self.vblo_target_cluster_df = pattern_by_trials.visible_before_last_one_func(
@@ -454,7 +454,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.auto_annot, self.auto_annot_long = decision_making_utils.make_auto_annot(
             self.best_arc_df, self.monkey_information, self.ff_caught_T_new)
 
-    def _make_or_retrieve_target_cluster_df(self, exists_ok=True, fill_na=False):
+    def make_or_retrieve_target_cluster_df(self, exists_ok=True, fill_na=False):
         target_cluster_df_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_cluster_df.csv')
         if exists(target_cluster_df_filepath) & exists_ok:
@@ -472,19 +472,20 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.target_df = prep_target_data.fill_na_in_target_df(
                 self.target_df)
 
-
     def make_or_retrieve_target_clust_df_short(self, exists_ok=True, fill_na=False):
         target_clust_df_short_filepath = os.path.join(
             self.patterns_and_features_data_folder_path, 'target_clust_df_short.csv')
         if exists(target_clust_df_short_filepath) & exists_ok:
-            self.target_clust_df_short = pd.read_csv(target_clust_df_short_filepath)
+            self.target_clust_df_short = pd.read_csv(
+                target_clust_df_short_filepath)
             print("Retrieved target_clust_df_short")
         else:
             self.target_clust_df_short = prep_target_data.make_target_clust_df_short(
                 self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, self.ff_dataframe, self.ff_life_sorted, max_visibility_window=self.max_visibility_window)
             self.target_clust_df_short.to_csv(
                 target_clust_df_short_filepath, index=False)
-            print("Made new target_clust_df_short and saved to ", target_clust_df_short_filepath)
+            print("Made new target_clust_df_short and saved to ",
+                  target_clust_df_short_filepath)
 
         if fill_na:
             self.target_clust_df_short = prep_target_data.fill_na_in_target_df(

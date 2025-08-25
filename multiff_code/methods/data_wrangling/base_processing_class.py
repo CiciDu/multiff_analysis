@@ -245,7 +245,7 @@ class BaseProcessing:
             print("Retrieved target_last_vis_df")
         else:
             self.target_last_vis_df = cluster_analysis.get_target_last_vis_df(self.ff_dataframe, self.monkey_information,
-                                                                              self.ff_caught_T_new, self.ff_real_position_sorted, duration_of_evaluation=3)
+                                                                              self.ff_caught_T_new, self.ff_real_position_sorted, duration_of_evaluation=10)
             self.target_last_vis_df.to_csv(path)
             print("Made target_last_vis_df and saved it at ", path)
         return

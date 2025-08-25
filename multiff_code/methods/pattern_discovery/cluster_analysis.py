@@ -223,7 +223,7 @@ def turn_list_of_ff_clusters_info_into_dataframe(ff_clusters, all_point_index):
 
 
 def find_ff_cluster_last_vis_df(ff_indices_of_each_cluster, time_of_evaluation_for_each_cluster, ff_dataframe,
-                                duration_of_evaluation=5,
+                                duration_of_evaluation=10,
                                 cluster_identifiers=None):
     # ff_indices_of_each_cluster: a list; each item in ff_indices_of_each_cluster should contain at least one ff index
 
@@ -305,7 +305,7 @@ def find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life
     return ff_indices_of_each_cluster
 
 
-def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=3):
+def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=10):
     """
     Calculate metrics for the last visible target.
     """
@@ -351,7 +351,7 @@ def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff
     return target_last_vis_df
 
 
-def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_life_sorted, duration_of_evaluation=3,
+def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_life_sorted, duration_of_evaluation=10,
                                  max_distance_to_target_in_cluster=50, keep_all_rows=False):
     ff_indices_of_each_cluster = find_alive_target_clusters(
         ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, max_distance=max_distance_to_target_in_cluster)
@@ -370,7 +370,7 @@ def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_n
     return target_clust_last_vis_df
 
 
-def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=3, max_distance_to_target_in_cluster=50):
+def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=10, max_distance_to_target_in_cluster=50):
     """
     Calculate metrics for the last visible target cluster.
     """

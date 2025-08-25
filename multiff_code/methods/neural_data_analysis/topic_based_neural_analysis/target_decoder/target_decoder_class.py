@@ -52,7 +52,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
         self._make_or_retrieve_target_df(
             exists_ok=True,
             fill_na=False)
-        self._make_or_retrieve_target_cluster_df(
+        self.make_or_retrieve_target_cluster_df(
             exists_ok=True,
             fill_na=False)
 
