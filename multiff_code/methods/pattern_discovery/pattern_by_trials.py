@@ -209,7 +209,7 @@ def cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_
         # Take out the indices
         past_visible_ff_indices = np.unique(np.array(ff_sub2.ff_index))
 
-        # # We also don't want to see whether the monkey has taken advantage of the cluster
+        # # We also also want to see whether the monkey has taken advantage of the cluster
         target_nums = np.arange(i-1, i+2)
         ff_sub3 = ff_sub2[~ff_sub2['ff_index'].isin(target_nums)]
         if ff_sub3['ff_index'].unique().shape[0] > 1:

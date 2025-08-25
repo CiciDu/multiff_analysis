@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+from matplotlib.ticker import PercentFormatter
+
 
 import numpy as np
 import pandas as pd
@@ -27,21 +29,25 @@ def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_
     results = [
         summarize_glm(glm_pois, "Poisson", transform="poisson")
     ]
-    
 
     results_df = pd.DataFrame(results)
     print(results_df)
 
+    # Get p-value from results
+    pval = results_df.iloc[0]['pval']
+
     plot_poisson_ratio_fit_generic(
         df_sess_counts, glm_pois,
         session_col="session", event_count_col=event_count_col, denom_count_col=denom_count_col,
-        title=f"Ratio of {event_count_col}", ylabel=f"Ratio of {event_count_col}"
+        title=f"Ratio of {event_count_col}", ylabel=f"Ratio of {event_count_col}",
+        pval=pval
     )
 
     plot_early_late_ratio(
         df_sess_counts,
         session_col="session", event_count_col=event_count_col, denom_count_col=denom_count_col,
-        ylabel=f"P({event_count_col} | {denom_count_col})", title="Early vs Late (custom)"
+        ylabel=f"P({event_count_col} | {denom_count_col})", title="Early vs Late (custom)",
+        pval=pval
     )
 
     plt.show()
@@ -49,6 +55,7 @@ def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_
 # ------------------
 # Utilities
 # ------------------
+
 
 def wilson_ci(k, n, alpha=0.05):
     """Wilson score 95% CI for a proportion."""
@@ -60,7 +67,6 @@ def wilson_ci(k, n, alpha=0.05):
     center = (p + z**2/(2*n)) / denom
     half = z * sqrt(p*(1-p)/n + z**2/(4*n**2)) / denom
     return max(0, center - half), min(1, center + half)
-
 
 
 def add_wilson_to_session_counts(df_sessions, event_count_col="success", denom_col="stops"):
@@ -105,7 +111,8 @@ def plot_poisson_ratio_fit_generic(
     event_count_col="success",
     denom_count_col="stops",
     title="Ratio across sessions",
-    ylabel="Ratio"
+    ylabel="Ratio",
+    pval=None
 ):
     """
     df_sessions_counts: session-level counts with columns [session_col, event_count_col, denom_count_col].
@@ -144,68 +151,40 @@ def plot_poisson_ratio_fit_generic(
              lw=2, label="Poisson offset fit")
     plt.fill_between(pred_df[session_col], pred_df["fit_lo"],
                      pred_df["fit_hi"], alpha=0.2, label="95% CI")
-    plt.ylim(0, 1)
+    # plt.ylim(0, 1)
+    y_min = min(plot_df["p_lo"].min(), pred_df["fit_lo"].min())
+    y_max = max(plot_df["p_hi"].max(), pred_df["fit_hi"].max())
+    plt.ylim(y_min * 0.9, y_max * 1.2)
+
     plt.xlabel("Session")
     plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
+
+    # Format y-axis as percentages
+    plt.gca().yaxis.set_major_formatter(
+        plt.FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
+
+    # Add p-value to plot if provided
+    if pval is not None:
+        pval_text = f"p = {pval:.4f}"
+        if pval < 0.001:
+            pval_text = "p < 0.001"
+        elif pval < 0.01:
+            pval_text = f"p = {pval:.3f}"
+        elif pval < 0.05:
+            pval_text = f"p = {pval:.3f}"
+        else:
+            pval_text = f"p = {pval:.3f}"
+
+        plt.text(0.02, 0.98, pval_text, transform=plt.gca().transAxes,
+                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
     plt.tight_layout()
 
-# ------------------
-# 3) Early vs Late bar plot (session-level Wilson CIs)
-# ------------------
-
-def plot_early_late_ratio(
-    df_sess_counts,
-    session_col="session",
-    event_count_col="success",
-    denom_count_col="stops",
-    ylabel="P(success | baseline)",
-    title="Early vs Late: stop→success probability"
-):
-    """
-    Works from stop-level data; aggregates to session-level and splits via tertiles.
-    """
-    ses = tertile_phase(df_sess_counts, session_col)
-
-    el = (
-        ses[ses["phase"].isin(["early", "late"])]
-        .groupby("phase", as_index=False)
-        .agg(**{event_count_col: (event_count_col, "sum"),
-                denom_count_col: (denom_count_col, "sum")})
-    )
-
-    el["p_hat"] = el[event_count_col] / el[denom_count_col].clip(lower=1)
-    ci = np.array([wilson_ci(int(k), int(n))
-                  for k, n in zip(el[event_count_col], el[denom_count_col])])
-    el["p_lo"], el["p_hi"] = ci[:, 0], ci[:, 1]
-
-    # Reorder for plotting
-    order = ["early", "late"]
-    dfp = el.set_index("phase").loc[order].reset_index()
-
-    # Plot
-    x = np.arange(2)
-    y = dfp["p_hat"].values
-    ylo = dfp["p_lo"].values
-    yhi = dfp["p_hi"].values
-    yerr = np.vstack([y - ylo, yhi - y])
-
-    plt.figure(figsize=(6, 4))
-    plt.bar(x, y)
-    plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-    plt.xticks(x, ["Early", "Late"])
-    plt.ylim(0, 1)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.tight_layout()
-
-    # Print table of results
-    display_cols = [event_count_col, denom_count_col, "p_hat", "p_lo", "p_hi"]
-    print("\n--- Early vs Late Results ---")
-    print(dfp[["phase"] + display_cols].to_string(index=False))
-
-    return dfp[["phase"] + display_cols]
+    y_min = min(plot_df["p_lo"].min(), pred_df["fit_lo"].min())
+    y_max = max(plot_df["p_hi"].max(), pred_df["fit_hi"].max())
+    plt.ylim(y_min * 0.9, y_max * 1.2)
 
 
 # --- 3) Summarize results ---
@@ -245,3 +224,96 @@ def summarize_glm(model, label, transform="logit"):
             "rate_ratio_per_10_sessions": effect,
             "95% CI": f"[{ci_low_eff:.3f}, {ci_high_eff:.3f}]"
         }
+
+
+def plot_early_late_ratio(
+    df_sess_counts,
+    session_col="session",
+    event_count_col="success",
+    denom_count_col="stops",
+    ylabel="P(captures | stops)",
+    title="Early vs Late",
+    pval=None
+):
+    """
+    Hybrid chart: translucent bars + point estimate + 95% CI.
+    Bars are narrower and closer together, figure is thinner.
+    """
+    # --- Aggregate ---
+    ses = tertile_phase(df_sess_counts, session_col)
+    el = (
+        ses[ses["phase"].isin(["early", "late"])]
+        .groupby("phase", as_index=False)
+        .agg(**{event_count_col: (event_count_col, "sum"),
+                denom_count_col: (denom_count_col, "sum")})
+    )
+
+    # Proportions + Wilson CI
+    el["p_hat"] = el[event_count_col] / el[denom_count_col].clip(lower=1)
+    ci = np.array([wilson_ci(int(k), int(n))
+                   for k, n in zip(el[event_count_col], el[denom_count_col])])
+    el["p_lo"], el["p_hi"] = ci[:, 0], ci[:, 1]
+
+    # Order for plotting
+    dfp = el.set_index("phase").loc[["early", "late"]].reset_index()
+
+    # Convert to percentages
+    dfp["pct"] = 100.0 * dfp["p_hat"]
+    dfp["pct_lo"] = 100.0 * dfp["p_lo"]
+    dfp["pct_hi"] = 100.0 * dfp["p_hi"]
+
+    # --- Plot ---
+    x = np.array([-0.3, 0.3])  # Closer positions for smaller gap
+    pct = dfp["pct"].to_numpy()
+    pctlo = dfp["pct_lo"].to_numpy()
+    pcthi = dfp["pct_hi"].to_numpy()
+    yerr = np.vstack([pct - pctlo, pcthi - pct])
+
+    # Thinner figure
+    fig, ax = plt.subplots(figsize=(4.8, 4.6))
+
+    # Bars (narrow + translucent)
+    ax.bar(x, pct, width=0.35, alpha=0.35, zorder=1, color="tab:blue")
+
+    # Point estimate + CI whiskers on top
+    ax.errorbar(x, pct, yerr=yerr, fmt="o", lw=2, capsize=5,
+                zorder=3, color="tab:blue", ecolor="tab:blue")
+    ax.scatter(x, pct, s=40, zorder=4, color="tab:blue")
+
+    # X labels
+    ax.set_xticks(x)
+    ax.set_xticklabels(["Early", "Late"], fontsize=12)
+
+    # k/n labels above bars
+    for xi, yi, k, n in zip(x, pct, dfp[event_count_col], dfp[denom_count_col]):
+        ax.text(xi, yi + 2.0, f"{int(k)}/{int(n)}",
+                ha="center", va="bottom", fontsize=9)
+
+    # Y-axis formatting
+    ymax = min(100.0, max(pcthi.max() * 1.10, pct.max() + 6.0))
+    ax.set_ylim(0, ymax)
+    ticks = ax.get_yticks()
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([f"{int(round(t))}%" for t in ticks])
+
+    ax.yaxis.grid(True, linestyle="--", alpha=0.45)
+    ax.set_axisbelow(True)
+
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(title, fontsize=13)
+
+    # Optional p-value box
+    if pval is not None:
+        ptxt = "p < 0.001" if pval < 1e-3 else f"p = {pval:.3f}"
+        ax.text(0.02, 0.98, ptxt, transform=ax.transAxes,
+                ha="left", va="top",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9))
+
+    plt.tight_layout()
+
+    # Results table
+    display_cols = [event_count_col, denom_count_col, "p_hat", "p_lo", "p_hi"]
+    print("\n--- Early vs Late Results ---")
+    print(dfp[["phase"] + display_cols].to_string(index=False))
+
+    return dfp[["phase"] + display_cols]

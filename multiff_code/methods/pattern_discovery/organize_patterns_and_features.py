@@ -1,89 +1,143 @@
+# --- tidy imports (remove duplicate) ---
 from data_wrangling import specific_utils, general_utils
-from pattern_discovery import pattern_by_trials
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from pattern_discovery import pattern_by_trials, cluster_analysis
+from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from planning_analysis.show_planning import nxt_ff_utils
 
 import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-np.set_printoptions(suppress=True)
-pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
+# Consider moving these to your script/entrypoint, not a module:
+# os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+# np.set_printoptions(suppress=True)
+# pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_information,
                              GUAT_w_ff_frequency, one_stop_w_ff_frequency,
                              data_folder_name=None):
-    pattern_frequencies = pd.DataFrame(
-        [], columns=['Item', 'Frequency', 'N_total', 'Rate', 'Group'])
-    n_ff_counted = len(ff_caught_T_new) - 1
+    # Ensure boolean/0-1 patterns behave as counts
+    # (only coerces bool -> int; leaves numeric alone)
+    atp_num = all_trial_patterns.copy()
+    for c in atp_num.columns:
+        if atp_num[c].dtype == bool:
+            atp_num[c] = atp_num[c].astype(int)
 
-    for item in all_trial_patterns.columns:
-        frequency = all_trial_patterns[item].sum()
-        new_row = pd.DataFrame({'Item': item,
-                                'Frequency': frequency}, index=[0])
-        pattern_frequencies = pd.concat([pattern_frequencies, new_row])
+    pattern_frequencies = (
+        atp_num.sum(axis=0)
+        .rename("Frequency")
+        .reset_index()
+        .rename(columns={"index": "Item"})
+    )
+    n_trials = len(atp_num)
+    pattern_frequencies["N_total"] = n_trials - 1
 
-    # Customize n_trials for each pattern
-    pattern_frequencies['N_total'] = len(all_trial_patterns) - 1
+    has = atp_num.columns
+    n_ff_counted = max(len(ff_caught_T_new) - 1, 0)
 
-    # Specific customizations
-    pattern_frequencies.loc[pattern_frequencies['Item'].isin(
-        ['cluster_around_target', 'disappear_latest']), 'N_total'] = len(all_trial_patterns)
-    pattern_frequencies.loc[pattern_frequencies['Item'] ==
-                            'three_in_a_row', 'N_total'] = len(all_trial_patterns) - 2
-    pattern_frequencies.loc[pattern_frequencies['Item'] ==
-                            'four_in_a_row', 'N_total'] = len(all_trial_patterns) - 3
-    pattern_frequencies.loc[pattern_frequencies['Item'].isin(
-        ['waste_cluster_around_target', 'use_cluster']), 'N_total'] = all_trial_patterns['cluster_around_target'].sum()
-    pattern_frequencies.loc[pattern_frequencies['Item'] == 'ignore_sudden_flash',
-                            'N_total'] = all_trial_patterns['sudden_flash'].sum()
+    if "cluster_around_target" in has:
+        pattern_frequencies.loc[
+            pattern_frequencies["Item"].isin(["cluster_around_target", "disappear_latest"]),
+            "N_total"
+        ] = n_trials
+        pattern_frequencies.loc[
+            pattern_frequencies["Item"].isin(["waste_cluster_around_target", "use_cluster"]),
+            "N_total"
+        ] = atp_num["cluster_around_target"].sum()
 
-    # Adjust GUAT and TAFT
-    n_total = GUAT_w_ff_frequency + one_stop_w_ff_frequency + \
-        all_trial_patterns['try_a_few_times'].sum()
-    pattern_frequencies.loc[pattern_frequencies['Item'] ==
-                            'give_up_after_trying', 'Frequency'] = GUAT_w_ff_frequency
-    pattern_frequencies.loc[pattern_frequencies['Item'].isin(
-        ['give_up_after_trying', 'try_a_few_times']), 'N_total'] = n_total
+    if "three_in_a_row" in has:
+        pattern_frequencies.loc[pattern_frequencies["Item"] == "three_in_a_row", "N_total"] = n_trials - 2
+    if "four_in_a_row" in has:
+        pattern_frequencies.loc[pattern_frequencies["Item"] == "four_in_a_row", "N_total"] = n_trials - 3
+    if "ignore_sudden_flash" in has and "sudden_flash" in has:
+        pattern_frequencies.loc[
+            pattern_frequencies["Item"] == "ignore_sudden_flash", "N_total"
+        ] = atp_num["sudden_flash"].sum()
 
-    # Calculate Rate
-    pattern_frequencies['Rate'] = pattern_frequencies['Frequency'] / \
-        pattern_frequencies['N_total']
-    pattern_frequencies['Percentage'] = pattern_frequencies['Rate']*100
-    pattern_frequencies['Group'] = 1
+    try_a_few = int(atp_num["try_a_few_times"].sum()) if "try_a_few_times" in has else 0
+    n_total_guat_block = GUAT_w_ff_frequency + one_stop_w_ff_frequency + try_a_few
 
-    # Calculate Firefly capture rate
-    # we don't consider the duration before the first ff was caught
-    total_duration = (ff_caught_T_new[-1]-ff_caught_T_new[0])
-    ff_capture_rate = n_ff_counted/total_duration
-    new_row = pd.DataFrame({'Item': 'ff_capture_rate', 'Frequency': n_ff_counted, 'N_total': total_duration,
-                            'Rate': ff_capture_rate, 'Group': 2}, index=[0])
-    pattern_frequencies = pd.concat([pattern_frequencies, new_row])
+    pattern_frequencies.loc[
+        pattern_frequencies["Item"] == "give_up_after_trying", "Frequency"
+    ] = GUAT_w_ff_frequency
+    pattern_frequencies.loc[
+        pattern_frequencies["Item"].isin(["give_up_after_trying", "try_a_few_times"]),
+        "N_total"
+    ] = n_total_guat_block
 
-    # Calculate Stop success rate
-    monkey_sub = monkey_information = monkey_information[
-        monkey_information['whether_new_distinct_stop'] == True]
-    monkey_sub = monkey_sub[monkey_sub['time'].between(
-        ff_caught_T_new[0], ff_caught_T_new[-1])]
-    total_number_of_stops = len(monkey_sub)
-    stop_success_rate = n_ff_counted/total_number_of_stops
-    new_row = pd.DataFrame({'Item': 'stop_success_rate', 'Frequency': n_ff_counted, 'N_total': total_number_of_stops,
-                            'Rate': stop_success_rate, 'Group': 2}, index=[0])
-    pattern_frequencies = pd.concat(
-        [pattern_frequencies, new_row]).reset_index(drop=True)
+    # Keep math in float domain
+    denom = pattern_frequencies["N_total"].replace(0, np.nan).astype(float)
+    pattern_frequencies["Rate"] = (pattern_frequencies["Frequency"].astype(float) / denom).fillna(0.0)
+    pattern_frequencies["Group"] = 1
 
-    # Calculate GUAT/TAFT rate
-    GUAT_over_TAFT = GUAT_w_ff_frequency / \
-        all_trial_patterns['try_a_few_times'].sum()
-    new_row = pd.DataFrame({'Item': 'GUAT_over_TAFT', 'Frequency': GUAT_w_ff_frequency, 'N_total': all_trial_patterns['try_a_few_times'].sum(),
-                            'Rate': GUAT_over_TAFT, 'Group': 2}, index=[0])
-    pattern_frequencies = pd.concat(
-        [pattern_frequencies, new_row]).reset_index(drop=True)
+    rows = []
 
-    # Define the mapping of Item to Label
+    # Firefly capture rate (per s)
+    if len(ff_caught_T_new) >= 2:
+        total_duration = float(ff_caught_T_new[-1] - ff_caught_T_new[0])
+        if total_duration > 0:
+            rows.append({
+                "Item": "ff_capture_rate",
+                "Frequency": n_ff_counted,
+                "N_total": total_duration,
+                "Rate": n_ff_counted / total_duration,
+                "Group": 2
+            })
+
+    # Stop success rate (guard columns)
+    if {"whether_new_distinct_stop", "time"}.issubset(monkey_information.columns):
+        mask_new_stop = monkey_information["whether_new_distinct_stop"].eq(True)
+        monkey_sub = monkey_information.loc[mask_new_stop].copy()
+        if len(ff_caught_T_new) >= 2:
+            t0, t1 = ff_caught_T_new[0], ff_caught_T_new[-1]
+            monkey_sub = monkey_sub[monkey_sub["time"].between(t0, t1)]
+        total_number_of_stops = len(monkey_sub)
+        if total_number_of_stops > 0:
+            rows.append({
+                "Item": "stop_success_rate",
+                "Frequency": n_ff_counted,
+                "N_total": total_number_of_stops,
+                "Rate": n_ff_counted / total_number_of_stops,
+                "Group": 2
+            })
+
+    if try_a_few > 0:
+        rows.extend([
+            {"Item": "GUAT_over_TAFT", "Frequency": GUAT_w_ff_frequency, "N_total": try_a_few,
+             "Rate": GUAT_w_ff_frequency / try_a_few, "Group": 2},
+            {"Item": "GUAT_over_both", "Frequency": GUAT_w_ff_frequency, "N_total": GUAT_w_ff_frequency + try_a_few,
+             "Rate": GUAT_w_ff_frequency / (GUAT_w_ff_frequency + try_a_few), "Group": 2},
+            {"Item": "TAFT_over_both", "Frequency": try_a_few, "N_total": GUAT_w_ff_frequency + try_a_few,
+             "Rate": try_a_few / (GUAT_w_ff_frequency + try_a_few), "Group": 2},
+        ])
+        both = GUAT_w_ff_frequency + try_a_few
+        denom_all = both + one_stop_w_ff_frequency
+        if denom_all > 0:
+            rows.extend([
+                {"Item": "GUAT_and_TAFT_over_all", "Frequency": both, "N_total": denom_all,
+                 "Rate": both / denom_all, "Group": 2},
+                {"Item": "GUAT_over_all", "Frequency": GUAT_w_ff_frequency, "N_total": denom_all,
+                 "Rate": GUAT_w_ff_frequency / denom_all, "Group": 2},
+                {"Item": "TAFT_over_all", "Frequency": try_a_few, "N_total": denom_all,
+                 "Rate": try_a_few / denom_all, "Group": 2},
+            ])
+
+    if "two_in_a_row" in has and "cluster_around_target" in has:
+        twos = atp_num["two_in_a_row"].sum()
+        clusters = atp_num["cluster_around_target"].sum()
+        if clusters > 0:
+            rows.append({
+                "Item": "two_in_a_row_over_cluster",
+                "Frequency": twos,
+                "N_total": clusters,
+                "Rate": twos / clusters,
+                "Group": 2
+            })
+
+    if rows:
+        pattern_frequencies = pd.concat([pattern_frequencies, pd.DataFrame(rows)], ignore_index=True)
+
     item_to_label = {
         'two_in_a_row': 'Two in a row',
         'visible_before_last_one': 'Visible before last capture',
@@ -100,20 +154,27 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'four_in_a_row': 'Four in a row',
         'one_in_a_row': 'One in a row',
         'multiple_in_a_row': 'Multiple in a row',
-        'multiple_in_a_row_all': 'Multiple in a row including 1st one',
+        'multiple_in_a_row_all': 'Multiple in a row incl. 1st',
         'cluster_around_target': 'Cluster exists around target',
-        'GUAT_over_TAFT': 'GUAT over TAFT'
+        'GUAT_over_TAFT': 'GUAT over TAFT',
+        'GUAT_over_both': 'GUAT over both',
+        'TAFT_over_both': 'TAFT over both',
+        'GUAT_over_all': 'GUAT over all',
+        'TAFT_over_all': 'TAFT over all',
+        'GUAT_and_TAFT_over_all': 'GUAT+TAFT over all',
+        'two_in_a_row_over_cluster': 'Two in a row over cluster'
     }
+    pattern_frequencies["Label"] = pattern_frequencies["Item"].map(item_to_label).fillna("Missing")
 
-    # Apply the mapping to the Label column
-    pattern_frequencies['Label'] = pattern_frequencies['Item'].map(
-        item_to_label).fillna('Missing')
-
-    pattern_frequencies['N_total'] = pattern_frequencies['N_total'].astype(int)
+    # Only compute Percentage for proportions (Group 1 or any Rate in [0,1])
+    pattern_frequencies["Percentage"] = np.where(
+        (pattern_frequencies["Rate"] >= 0.0) & (pattern_frequencies["Rate"] <= 1.0),
+        pattern_frequencies["Rate"] * 100.0,
+        np.nan
+    )
 
     if data_folder_name:
-        general_utils.save_df_to_csv(
-            pattern_frequencies, 'pattern_frequencies', data_folder_name)
+        general_utils.save_df_to_csv(pattern_frequencies, 'pattern_frequencies', data_folder_name)
 
     return pattern_frequencies
 
