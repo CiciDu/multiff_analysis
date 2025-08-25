@@ -300,7 +300,7 @@ def find_instances_of_sudden_flash_ff(ff_dataframe, max_ff_distance_from_monkey=
 def ignore_sudden_flash_func(ff_dataframe, max_point_index, max_ff_distance_from_monkey=50):
     """
     Find the trials where a firefly other than the target or the next target suddenly becomes visible, is within in 
-    50 cm (or max_ff_distance_from_monkey) of the monkey, and is closer than the target.
+    50 cm (or max_ff_distance_from_monkey) of the monkey, and is closer than the target. (But not the target itself)
 
 
     Parameters

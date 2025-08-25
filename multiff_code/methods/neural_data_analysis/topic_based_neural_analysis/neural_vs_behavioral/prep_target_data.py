@@ -180,6 +180,7 @@ def make_target_clust_df_short(monkey_information, ff_caught_T_new, ff_real_posi
     target_df['target_index'] = np.searchsorted(
         ff_caught_T_new, target_df['time'])
     target_df = target_df.sort_values(by='time').groupby('target_index').last().reset_index()
+    target_df = target_df[target_df['target_index'] < len(ff_caught_T_new)].copy() # the last number is not a real target index, so we remove it
     target_df['capture_time'] = ff_caught_T_new[target_df['target_index']]
 
     target_clust_df_short, nearby_alive_ff_indices = _add_target_cluster_last_seen_info(
