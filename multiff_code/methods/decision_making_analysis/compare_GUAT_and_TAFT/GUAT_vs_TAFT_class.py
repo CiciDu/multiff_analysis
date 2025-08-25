@@ -1,5 +1,6 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils, helper_GUAT_vs_TAFT_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from data_wrangling import general_utils
 
 import os
 import numpy as np
@@ -20,6 +21,15 @@ np.set_printoptions(suppress=True)
 
 class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
 
+    plotting_kwargs = {'show_stops': True,
+                        'show_believed_target_positions': True,
+                        'show_reward_boundary': True,
+                        'show_scale_bar': True,
+                        'truncate_part_before_crossing_arena_edge': True,
+                        'trial_too_short_ok': True,
+                        'show_connect_path_ff': False,
+                        'show_visible_fireflies': True}
+
     def __init__(self,
                  raw_data_folder_path='all_monkey_data/raw_monkey_data/monkey_Bruno/data_0330',
                  ref_point_mode='distance',
@@ -33,30 +43,59 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         self.ref_point_mode = ref_point_mode
         self.ref_point_value = ref_point_value
         self.stop_period_duration = stop_period_duration
-        
+
         self.GUAT_vs_TAFT_folder_path = os.path.join(
             self.decision_making_folder_path, 'GUAT_vs_TAFT')
         os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
 
+    def make_decision_making_basic_ff_info(self):
+        # This is another way to gather features to apply ML, just using much more simple features
+        self.streamline_getting_GUAT_or_TAFT_df(GUAT_or_TAFT='TAFT')
+        self.streamline_getting_GUAT_or_TAFT_df(GUAT_or_TAFT='GUAT')
+        
+        self.TAFT_df['whether_switched'] = 0
+        self.GUAT_df['whether_switched'] = 1
+
+        self.decision_making_basic_ff_info = pd.concat([self.TAFT_df, self.GUAT_df], axis=0).reset_index(
+            drop=True)
+        
+        self.decision_making_basic_ff_info.drop(columns=['cur_ff_capture_time'], inplace=True)
+        
+        # drop rows with NA in decision_making_basic_ff_info
+        self.decision_making_basic_ff_info_cleaned = general_utils.drop_rows_with_any_na(
+            self.decision_making_basic_ff_info)
 
     def streamline_getting_GUAT_or_TAFT_x_df(self, GUAT_or_TAFT='GUAT',
                                              save_data=True,
                                              exists_ok=True,
                                              ):
-        self.streamline_getting_GUAT_or_TAFT_df(GUAT_or_TAFT=GUAT_or_TAFT,
-                                                                   exists_ok=exists_ok)
-        self.get_GUAT_or_TAFT_x_df(save_data=save_data)
-        
-    def streamline_getting_GUAT_or_TAFT_df(self, GUAT_or_TAFT='GUAT',
-                                                    exists_ok=True,
-                                                    ):
         self.GUAT_or_TAFT = GUAT_or_TAFT
-        
+        # delete self.stops_near_ff_df
         if hasattr(self, 'stops_near_ff_df'):
-            del self.stops_near_ff_df  
+            del self.stops_near_ff_df
+
+        self.GUAT_vs_TAFT_folder_path = os.path.join(
+            self.decision_making_folder_path, 'GUAT_vs_TAFT')
+        os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
+
+        if exists_ok:
+            try:
+                self.try_retrieving_GUAT_or_TAFT_x_df()
+                return
+            except FileNotFoundError:
+                pass
+
         self.get_relevant_monkey_data()
         self.get_GUAT_or_TAFT_df()
+        self.get_GUAT_or_TAFT_x_df(save_data=save_data)
 
+    def streamline_getting_GUAT_or_TAFT_df(self, GUAT_or_TAFT='GUAT'):
+        self.GUAT_or_TAFT = GUAT_or_TAFT
+
+        if hasattr(self, 'stops_near_ff_df'):
+            del self.stops_near_ff_df
+        self.get_relevant_monkey_data()
+        self.get_GUAT_or_TAFT_df()
 
     def try_retrieving_GUAT_or_TAFT_x_df(self):
         if self.GUAT_or_TAFT == 'TAFT':
@@ -151,16 +190,6 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         sub2.rename(columns={'point_index': 'ref_point_index'}, inplace=True)
         sub = sub.merge(
             sub2[['stop_point_index', 'ref_point_index']], on='stop_point_index', how='left')
-
-        # also prepare some plotting args and kwargs
-        self.plotting_kwargs = {'show_stops': True,
-                                'show_believed_target_positions': True,
-                                'show_reward_boundary': True,
-                                'show_scale_bar': True,
-                                'truncate_part_before_crossing_arena_edge': True,
-                                'trial_too_short_ok': True,
-                                'show_connect_path_ff': False,
-                                'show_visible_fireflies': True}
 
         self.PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted,
                                 self.ff_real_position_sorted, self.ff_believed_position_sorted, None, self.ff_caught_T_new)

@@ -198,7 +198,7 @@ class ProcessCategoryData:
 
         variable_of_interest = "time_since_last_vis"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots()
+            fig, axes = plt.subplots(figsize=(8, 6))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False,
                          alpha=0.4, color="green", binwidth=0.1, stat="probability")
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
@@ -212,7 +212,7 @@ class ProcessCategoryData:
 
         variable_of_interest = "abs_last_vis_ang"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots()
+            fig, axes = plt.subplots(figsize=(8, 6))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False, binwidth=0.02,
                          alpha=0.3, color="green", stat="probability", edgecolor='grey')
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
@@ -229,7 +229,7 @@ class ProcessCategoryData:
 
         variable_of_interest = "abs_last_vis_ang_to_bndry"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots()
+            fig, axes = plt.subplots(figsize=(8, 6))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False, binwidth=0.02,
                          alpha=0.3, color="green", stat="probability", edgecolor='grey')
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
@@ -247,7 +247,7 @@ class ProcessCategoryData:
 
         variable_of_interest = "last_vis_dist"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots()
+            fig, axes = plt.subplots(figsize=(8, 6))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False, alpha=0.3,
                          color="green", binwidth=10, stat="probability",  edgecolor='grey')
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False, alpha=0.3,
@@ -275,7 +275,7 @@ class ProcessCategoryData:
         self.sort_2_to_prev_target_distances = np.linalg.norm(
             self.sort_2_ff_positions[valid_indices_2] - self.ff_real_position_sorted[self.sort_2_trials-1][valid_indices_2], axis=1)
 
-        fig, axes = plt.subplots()
+        fig, axes = plt.subplots(figsize=(8, 6))
         sns.histplot(data=self.sort_1_to_prev_target_distances, kde=False, alpha=0.3,
                      color="green", binwidth=10, stat="probability",  edgecolor='grey')
         sns.histplot(data=self.sort_2_to_prev_target_distances, kde=False, alpha=0.3,
@@ -301,7 +301,7 @@ class ProcessCategoryData:
         self.sort_2_sample_indices = np.random.choice(
             self.sort_2_df.shape[0], min_sample_size, replace=False)
 
-        fig = plt.figure(figsize=(8, 8))
+        fig = plt.figure(figsize=(8, 6))
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], polar=True)
         ax = plot_behaviors_utils.set_polar_background_for_plotting(
             ax, 400, color_visible_area_in_background=True)

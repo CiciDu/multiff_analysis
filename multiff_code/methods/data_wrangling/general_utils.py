@@ -299,24 +299,13 @@ def check_perfect_correlations(data, threshold=1.0, tol=1e-10):
     return perfect_pairs
 
 
-def drop_all_na_columns(df):
-    """
-    Drops columns from the DataFrame that contain only NaN values.
-    """
-    all_na_cols = df.columns[df.isna().all()].tolist()
-
-    print("Dropped columns with all NaN values:", all_na_cols)
-
-    return df.drop(columns=all_na_cols)
-
-
 def drop_rows_with_any_na(df):
     """
     Drops rows from the DataFrame that contain any NaN values.
     """
     all_na_rows = df[df.isna().any(axis=1)].index.tolist()
     if len(all_na_rows) > 0:
-        print(f"Dropped {len(all_na_rows)} rows with any NaN values")
+        print(f"Dropped {len(all_na_rows)} rows with any NaN values out of {len(df)} rows ")
     return df.drop(index=all_na_rows)
 
 
@@ -344,6 +333,17 @@ def drop_columns_with_many_nans(df, threshold=0.3):
     return df_cleaned, cols_to_drop
 
 
+def drop_columns_with_only_na(df):
+    """
+    Drops columns from the DataFrame that contain only NaN values.
+    """
+    all_na_cols = df.columns[df.isna().all()].tolist()
+
+    print("Dropped columns with all NaN values:", all_na_cols)
+
+    return df.drop(columns=all_na_cols)
+
+
 def drop_na_cols(df, df_name=None):
     # Identify columns with missing values
     na_counts = df.isna().sum()
@@ -364,9 +364,11 @@ def drop_na_cols(df, df_name=None):
 
 def clean_float(val):
     if isinstance(val, float):
-        val_str = f"{val:.10f}".rstrip('0').rstrip('.')  # Remove trailing zeros and dot
+        val_str = f"{val:.10f}".rstrip('0').rstrip(
+            '.')  # Remove trailing zeros and dot
         return val_str.replace('.', 'p')
     return str(val)
+
 
 def check_for_high_correlations(df, threshold=0.9):
     corr = df.corr()
@@ -380,8 +382,8 @@ def check_for_high_correlations(df, threshold=0.9):
 
     if len(high_corr_pairs) > 0:
         print(high_corr_pairs)
-       
-        
+
+
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -448,9 +450,6 @@ def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=True):
         return na_rows, na_cols
     else:
         return
-    
+
+
 setup_logging()
-
-
-
-

@@ -29,7 +29,7 @@ class ProcessGUATtrials:
                        'show_scale_bar': True,
                        'hitting_arena_edge_ok': True,
                        'trial_too_short_ok': True,
-                       'show_connect_path_ff': True,
+                       'show_connect_path_ff': False,
                        'vary_color_for_connecting_path_ff': True,
                        'show_connect_path_ff_memory': True,
                        'show_alive_fireflies': False,

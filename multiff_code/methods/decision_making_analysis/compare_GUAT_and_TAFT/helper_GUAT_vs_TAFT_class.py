@@ -293,12 +293,12 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
 
     def _get_TAFT_df(self):
         self.TAFT_df = GUAT_vs_TAFT_utils.process_trials_df(
-            self.TAFT_trials_df, self.monkey_information, self.ff_dataframe_visible, self.stop_period_duration)
+            self.TAFT_trials_df, self.monkey_information, self.ff_dataframe, self.ff_real_position_sorted, self.stop_period_duration)
         self.TAFT_df['cur_ff_capture_time'] = self.ff_caught_T_new[self.TAFT_df['ff_index'].values]
 
     def _get_GUAT_df(self):
         self.GUAT_df = GUAT_vs_TAFT_utils.process_trials_df(
-            self.GUAT_w_ff_df, self.monkey_information, self.ff_dataframe_visible, self.stop_period_duration)
+            self.GUAT_w_ff_df, self.monkey_information, self.ff_dataframe, self.ff_real_position_sorted, self.stop_period_duration)
 
     def _get_TAFT_df2_based_on_ref_point(self):
         self.TAFT_df2 = GUAT_vs_TAFT_utils.further_make_trials_df(
@@ -353,7 +353,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'num_old_ff_per_row': 2,  # originally it was 2
              'num_new_ff_per_row': 2,  # originally it was 2
 
-             'last_seen_and_next_seen_attributes_to_add': ['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y'],
+             'last_seen_and_next_seen_attributes_to_add': ['ff_distance', 'ff_angle', 'ff_angle_boundary', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y'],
 
              'curv_of_traj_mode': 'time',
              'window_for_curv_of_traj': [-1, 0],

@@ -407,10 +407,11 @@ def get_ff_first_and_last_seen_info(
         'ff_index': all_ff_index,
         'stop_point_index': all_stop_point_index
     })
-    ff_info[['point_index_ff_first_seen', 'monkey_angle_ff_first_seen']] = \
-        ff_first_seen_info[['point_index', 'monkey_angle']].values
-    ff_info[['point_index_ff_last_seen', 'monkey_angle_ff_last_seen']] = \
-        ff_last_seen_info[['point_index', 'monkey_angle']].values
+    
+    
+    for attr in ['point_index', 'monkey_angle', 'ff_distance', 'ff_angle', 'ff_angle_boundary', 'time']:
+        ff_info[f'{attr}_ff_first_seen'] = ff_first_seen_info[attr].values
+        ff_info[f'{attr}_ff_last_seen'] = ff_last_seen_info[attr].values
 
     # Handle missing data
     if drop_na and ff_info.isnull().values.any():

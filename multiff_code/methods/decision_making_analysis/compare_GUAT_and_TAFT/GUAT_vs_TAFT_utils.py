@@ -1,5 +1,6 @@
 from planning_analysis.show_planning import nxt_ff_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from decision_making_analysis.decision_making import decision_making_utils
 
 import os
 import numpy as np
@@ -38,6 +39,7 @@ def add_closest_point_on_trajectory_to_cur_ff(trials_df, monkey_information, ff_
 
 
 def add_stop_point_index(trials_df, monkey_information, ff_real_position_sorted):
+    # Note: stop_point_index here is not necessarily a real stop!!! But only the point on the trajectory that is closest to the current ff.
     add_closest_point_on_trajectory_to_cur_ff(
         trials_df, monkey_information, ff_real_position_sorted)
     trials_df['stop_point_index'] = trials_df['closest_point_index_to_cur_ff']
@@ -71,7 +73,9 @@ def deal_with_duplicated_stop_point_index(GUAT_w_ff_df):
     return GUAT_w_ff_df
 
 
-def process_trials_df(trials_df, monkey_information, ff_dataframe_visible, stop_period_duration):
+def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_position_sorted, stop_period_duration):
+    
+    ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1].copy()
 
     processed_df = trials_df[['stop_point_index', 'ff_index']].copy()
     processed_df[['stop_time', 'stop_cum_distance']
@@ -85,17 +89,37 @@ def process_trials_df(trials_df, monkey_information, ff_dataframe_visible, stop_
                                                                                processed_df['stop_time'],
                                                                                ff_dataframe_visible,
                                                                                monkey_information)
-
+    
     columns_to_add = ['point_index_ff_first_seen', 'point_index_ff_last_seen',
                       'monkey_angle_ff_first_seen', 'monkey_angle_ff_last_seen',
+                      'ff_distance_ff_first_seen', 'ff_distance_ff_last_seen',
+                      'ff_angle_ff_first_seen', 'ff_angle_ff_last_seen',
+                      'ff_angle_boundary_ff_first_seen', 'ff_angle_boundary_ff_last_seen',
                       'time_ff_first_seen', 'time_ff_last_seen']
+    
+    columns_to_add = [col for col in columns_to_add if col not in processed_df.columns]
     ff_first_and_last_seen_info = ff_first_and_last_seen_info[columns_to_add + [
-        'stop_point_index']]
+        'ff_index', 'stop_point_index']]
     # columns_to_be_renamed_dict = {column: 'NXT_' + column + '_bbas' for column in columns_to_add}
     # ff_first_and_last_seen_info.rename(columns=columns_to_be_renamed_dict, inplace=True)
     processed_df = processed_df.merge(
-        ff_first_and_last_seen_info, on='stop_point_index', how='left')
+        ff_first_and_last_seen_info, on=['stop_point_index', 'ff_index'], how='left')
+    
+    processed_df['time_since_ff_first_seen'] = processed_df['stop_time'] - processed_df['time_ff_first_seen']
+    processed_df['time_since_ff_last_seen'] = processed_df['stop_time'] - processed_df['time_ff_last_seen']
 
+
+    # also add ff info from the stop point
+    ff_info = decision_making_utils.find_many_ff_info_anew(
+            processed_df['ff_index'].values, processed_df['stop_point_index'].values, 
+            ff_real_position_sorted, ff_dataframe_visible, monkey_information)
+    
+    more_columns_to_add = ['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis']  
+    # Note: time_since_last_vis should equal to time_since_ff_last_seen. We shall check it.
+    more_columns_to_add = [col for col in more_columns_to_add if col not in processed_df.columns]
+    ff_info.rename(columns={'point_index': 'stop_point_index'}, inplace=True)
+    ff_info = ff_info[more_columns_to_add + ['stop_point_index', 'ff_index']]
+    processed_df = processed_df.merge(ff_info, on=['stop_point_index', 'ff_index'], how='left')
     return processed_df
 
 

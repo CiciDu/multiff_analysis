@@ -389,7 +389,7 @@ def add_time_till_next_visible(df, ff_dataframe_visible, monkey_information):
 
 
 def supply_info_of_ff_last_seen_and_next_seen_to_df(df, ff_dataframe, monkey_information, ff_real_position_sorted, ff_caught_T_new, curv_of_traj_df=None,
-                                                    attributes_to_add=['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
+                                                    attributes_to_add=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
     if curv_of_traj_df is None:
         raise ValueError('curv_of_traj_df cannot be None')
 

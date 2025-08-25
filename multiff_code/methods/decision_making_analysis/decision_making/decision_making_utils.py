@@ -129,9 +129,10 @@ def find_attributes_of_ff_when_last_vis_OR_next_visible(ff_indices, all_current_
     return ff_info
 
 
-def find_placeholder_values_for_attributes(attributes=['ff_distance', 'ff_angle', 'curv_diff'], additional_placeholder_mapping=None):
+def find_placeholder_values_for_attributes(attributes=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'curv_diff'], additional_placeholder_mapping=None):
     placeholder_mapping = {'ff_distance': [400, False],
                            'ff_angle': [-math.pi/4, True],
+                           'ff_angle_boundary': [-math.pi/4, True],
                            'curv_diff': [-0.6, True],
                            'abs_curv_diff': [0.6, False],
                            'monkey_x': [9999, False],
@@ -306,7 +307,7 @@ def find_many_ff_info_anew(ff_indices, point_index, ff_real_position_sorted, ff_
     return ff_info
 
 
-def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_dataframe, monkey_information):
+def find_one_ff_info_anew_at_one_point(ff_index, point_index, ff_real_position_sorted, ff_dataframe, monkey_information):
     # This function is only intended to use on a single ff
     ff_xy = ff_real_position_sorted[ff_index, :]
     monkey_info = monkey_information.loc[monkey_information['point_index'] == point_index]
@@ -327,7 +328,7 @@ def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_datafra
     else:
         ff_last_vis = 0
 
-    time_since_last_vis = time-ff_last_vis
+    time_since_last_vis = time - ff_last_vis
 
     # we want to make sure that we're just using float or int, and there's no array
     if (isinstance(ff_angle, float) is False) & (isinstance(ff_angle, int) is False):
@@ -338,7 +339,7 @@ def find_ff_info_anew(ff_index, point_index, ff_real_position_sorted, ff_datafra
     return ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis
 
 
-def find_ff_info_at_some_time(ff_index, point_index, ff_real_position_sorted, ff_dataframe, monkey_information):
+def find_one_ff_info_at_one_point(ff_index, point_index, ff_real_position_sorted, ff_dataframe, monkey_information):
     # This function is only intended to use on a single ff
 
     raw_ff_info = ff_dataframe[(ff_dataframe['ff_index'] == ff_index) & (
@@ -347,7 +348,7 @@ def find_ff_info_at_some_time(ff_index, point_index, ff_real_position_sorted, ff
 
     # if there's no corresponding info, then calculate it now.
     if len(raw_ff_info) == 0:
-        ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis = find_ff_info_anew(int(
+        ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis = find_one_ff_info_anew_at_one_point(int(
             ff_index), point_index, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
         # ff_info = pd.DataFrame([[ff_distance, ff_angle, ff_angle_boundary, time_since_last_vis]], columns=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis'])
     else:

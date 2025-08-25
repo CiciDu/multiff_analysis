@@ -60,3 +60,35 @@ class GUATandTAFTacrossSessionsClass():
         self.combd_TAFT_x_df.reset_index(drop=True, inplace=True)
 
         return self.combd_GUAT_x_df, self.combd_TAFT_x_df
+
+    def streamline_getting_combd_decision_making_basic_ff_info(self,
+                                                               exists_ok=True,
+                                                               monkey_name='monkey_Bruno',
+                                                               ):
+
+        self.monkey_name = monkey_name
+        df_path = f'all_monkey_data/decision_making/{monkey_name}/combd_decision_making_basic_ff_info.csv'
+
+        if exists_ok and os.path.exists(df_path):
+            self.combd_decision_making_basic_ff_info = pd.read_csv(df_path)
+        else:
+            self.combd_decision_making_basic_ff_info = pd.DataFrame()
+            sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
+                self.raw_data_dir_name, monkey_name)
+
+            for index, row in sessions_df_for_one_monkey.iterrows():
+                print(row['data_name'])
+                raw_data_folder_path = os.path.join(
+                    self.raw_data_dir_name, row['monkey_name'], row['data_name'])
+                self.cgt = GUAT_vs_TAFT_class.GUATvsTAFTclass(
+                    raw_data_folder_path=raw_data_folder_path)
+                self.cgt.make_decision_making_basic_ff_info()
+                self.cgt.decision_making_basic_ff_info['data_name'] = row['data_name']
+
+                self.combd_decision_making_basic_ff_info = pd.concat(
+                    [self.combd_decision_making_basic_ff_info, self.cgt.decision_making_basic_ff_info], axis=0)
+
+            self.combd_decision_making_basic_ff_info.reset_index(
+                drop=True, inplace=True)
+            self.combd_decision_making_basic_ff_info.to_csv(
+                df_path, index=False)

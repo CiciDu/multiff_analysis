@@ -24,7 +24,7 @@ np.set_printoptions(suppress=True)
 class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
     def get_current_ff_info_and_nxt_ff_info_for_info_collection(self, max_cluster_distance=50, max_time_since_last_vis=2.5, include_ff_in_near_future=True, duration_into_future=0.5, max_distance_to_stop=400,
-                                                                columns_to_sort_nxt_ff_by=['abs_curv_diff', 'time_since_last_vis'], last_seen_and_next_seen_attributes_to_add=['ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
+                                                                columns_to_sort_nxt_ff_by=['abs_curv_diff', 'time_since_last_vis'], last_seen_and_next_seen_attributes_to_add=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
 
         self.find_current_and_alternative_ff_info(columns_to_sort_nxt_ff_by=columns_to_sort_nxt_ff_by, max_cluster_distance=max_cluster_distance, max_time_since_last_vis=max_time_since_last_vis,
                                                   include_ff_in_near_future=include_ff_in_near_future, duration_into_future=duration_into_future, max_distance_to_stop=max_distance_to_stop)

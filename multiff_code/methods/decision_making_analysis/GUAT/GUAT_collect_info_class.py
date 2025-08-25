@@ -113,7 +113,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                                                           trajectory_features=[
                                                               'monkey_distance', 'monkey_angle_to_origin'],
                                                           last_seen_and_next_seen_attributes_to_add=[
-                                                              'ff_distance', 'ff_angle', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y'],
+                                                              'ff_distance', 'ff_angle', 'ff_angle_boundary', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y'],
                                                           curv_of_traj_df_exists_ok=True,
                                                           **kwargs
                                                           ):

@@ -50,13 +50,8 @@ class PatternsAndFeatures():
                 print('Failed to retrieve combd_pattern_frequencies, combd_feature_statistics, combd_all_trial_features, '
                       'agg_pattern_frequencies, agg_feature_statistics, and combd_scatter_around_target_df. Will make them anew.')
 
-        if not verbose:
-            # with general_utils.suppress_stdout():
-            self._combine_patterns_and_features(
-                exists_ok=exists_ok, save_data=save_data)
-        else:
-            self._combine_patterns_and_features(
-                exists_ok=exists_ok, save_data=save_data)
+        self._combine_patterns_and_features(
+            exists_ok=exists_ok, save_data=save_data)
 
         return
 
