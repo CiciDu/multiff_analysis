@@ -27,6 +27,7 @@ def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_
     results = [
         summarize_glm(glm_pois, "Poisson", transform="poisson")
     ]
+    
 
     results_df = pd.DataFrame(results)
     print(results_df)
@@ -154,7 +155,6 @@ def plot_poisson_ratio_fit_generic(
 # 3) Early vs Late bar plot (session-level Wilson CIs)
 # ------------------
 
-
 def plot_early_late_ratio(
     df_sess_counts,
     session_col="session",
@@ -169,20 +169,22 @@ def plot_early_late_ratio(
     ses = tertile_phase(df_sess_counts, session_col)
 
     el = (
-    ses[ses["phase"].isin(["early", "late"])]
-    .groupby("phase", as_index=False)
-    .agg(**{event_count_col: (event_count_col, "sum"),
-            denom_count_col: (denom_count_col, "sum")})
-)
-
+        ses[ses["phase"].isin(["early", "late"])]
+        .groupby("phase", as_index=False)
+        .agg(**{event_count_col: (event_count_col, "sum"),
+                denom_count_col: (denom_count_col, "sum")})
+    )
 
     el["p_hat"] = el[event_count_col] / el[denom_count_col].clip(lower=1)
     ci = np.array([wilson_ci(int(k), int(n))
                   for k, n in zip(el[event_count_col], el[denom_count_col])])
     el["p_lo"], el["p_hi"] = ci[:, 0], ci[:, 1]
 
+    # Reorder for plotting
     order = ["early", "late"]
     dfp = el.set_index("phase").loc[order].reset_index()
+
+    # Plot
     x = np.arange(2)
     y = dfp["p_hat"].values
     ylo = dfp["p_lo"].values
@@ -197,6 +199,13 @@ def plot_early_late_ratio(
     plt.ylabel(ylabel)
     plt.title(title)
     plt.tight_layout()
+
+    # Print table of results
+    display_cols = [event_count_col, denom_count_col, "p_hat", "p_lo", "p_hi"]
+    print("\n--- Early vs Late Results ---")
+    print(dfp[["phase"] + display_cols].to_string(index=False))
+
+    return dfp[["phase"] + display_cols]
 
 
 # --- 3) Summarize results ---
