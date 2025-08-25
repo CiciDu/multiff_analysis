@@ -20,7 +20,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.bin_width = bin_width
         self.one_point_index_per_bin = one_point_index_per_bin
         self.max_bin = None
-        self.max_visibility_window = 10
+
 
     def get_basic_data(self):
         self.retrieve_or_make_monkey_data(already_made_ok=True)

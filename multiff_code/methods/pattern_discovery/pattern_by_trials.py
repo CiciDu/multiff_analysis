@@ -80,7 +80,39 @@ def on_before_last_one_func(ff_flash_end_sorted, ff_caught_T_new, caught_ff_num)
     return on_before_last_one_trials
 
 
-def visible_before_last_one_func(ff_dataframe):
+# def visible_before_last_one_func(ff_dataframe):
+#     """
+#     Find the trials where the current target has only been visible on before the capture of the previous target;
+#     In other words, the target hasn’t been visible during the trial;
+#     Here, a firefly is considered visible if it satisfies: (1) flashes on, (2) Within 40 degrees to the left and right,
+#     (3) Within 400 cm to the monkey (the distance can be updated when the information of the actual experiment is available)
+
+#     Parameters
+#     ----------
+#     ff_dataframe: pd.dataframe
+#     containing various information about all visible or "in-memory" fireflies at each time point
+
+#     Returns
+#     -------
+#     visible_before_last_one_trials: array
+#     trial numbers that can be categorized as "visible before last one"
+
+#     """
+    
+#     # We first take out the trials that cannot be categorized as "visible before last one";
+#     # For these trials, the target has been visible for at least one time point during the trial
+#     temp_dataframe = ff_dataframe[(ff_dataframe['target_index'] == ff_dataframe['ff_index']) & (
+#         ff_dataframe['visible'] == 1)]
+#     trials_not_to_select = np.unique(np.array(temp_dataframe['target_index']))
+#     # Get the numbers for all trials
+#     all_trials = np.unique(np.array(ff_dataframe['target_index']))
+#     # Using the difference to get the trials of interest
+#     visible_before_last_one_trials = np.setdiff1d(
+#         all_trials, trials_not_to_select)
+#     return visible_before_last_one_trials
+
+
+def visible_before_last_one_func(target_clust_df_short, ff_caught_T_new):
     """
     Find the trials where the current target has only been visible on before the capture of the previous target;
     In other words, the target hasn’t been visible during the trial;
@@ -98,17 +130,20 @@ def visible_before_last_one_func(ff_dataframe):
     trial numbers that can be categorized as "visible before last one"
 
     """
-    # We first take out the trials that cannot be categorized as "visible before last one";
-    # For these trials, the target has been visible for at least one time point during the trial
-    temp_dataframe = ff_dataframe[(ff_dataframe['target_index'] == ff_dataframe['ff_index']) & (
-        ff_dataframe['visible'] == 1)]
-    trials_not_to_select = np.unique(np.array(temp_dataframe['target_index']))
-    # Get the numbers for all trials
-    all_trials = np.unique(np.array(ff_dataframe['target_index']))
-    # Using the difference to get the trials of interest
-    visible_before_last_one_trials = np.setdiff1d(
-        all_trials, trials_not_to_select)
-    return visible_before_last_one_trials
+
+    df = target_clust_df_short.copy()
+    df.rename(columns={'target_cluster_last_seen_time': 'time_since_target_cluster_last_seen'}, inplace=True)
+    df_sub = df[df['time_since_target_cluster_last_seen'] < 5].copy()
+    print(f'{len(df_sub)} out of {len(df)} target clusters were last seen within 10 seconds')
+
+    df_sub['prev_target_capture_time'] = ff_caught_T_new[df_sub['target_index'] - 1]
+    df_sub['time_since_prev_capture'] = df_sub['time'] - df_sub['prev_target_capture_time']
+
+    vblo_target_cluster_df = df_sub[df_sub['time_since_prev_capture'] < df_sub['time_since_target_cluster_last_seen']].copy()
+    print(f'{len(vblo_target_cluster_df)} out of {len(df_sub)} target clusters were seen only before the previous capture, which is {len(vblo_target_cluster_df) / len(df_sub) * 100:.2f}%')
+    visible_before_last_one_trials = vblo_target_cluster_df['target_index'].unique()
+    return visible_before_last_one_trials, vblo_target_cluster_df
+
 
 
 def find_target_cluster_visible_before_last_one(target_clust_last_vis_df, ff_caught_T_new):

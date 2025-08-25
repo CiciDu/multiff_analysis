@@ -171,6 +171,23 @@ def make_target_cluster_df(monkey_information, ff_caught_T_new, ff_real_position
 
     return target_clust_df
 
+def make_target_clust_df_short(monkey_information, ff_caught_T_new, ff_real_position_sorted, ff_dataframe, ff_life_sorted,
+                           max_visibility_window=10):
+    
+    # Whereas target_cluster_df contains all point indices, target_clust_df_short only contains the last point index (around capture time) for each target
+    target_df = monkey_information[[
+        'point_index', 'time', 'monkey_x', 'monkey_y', 'monkey_angle', 'cum_distance']].copy()
+    target_df['target_index'] = np.searchsorted(
+        ff_caught_T_new, target_df['time'])
+    target_df = target_df.sort_values(by='time').groupby('target_index').last().reset_index()
+    target_df['capture_time'] = ff_caught_T_new[target_df['target_index']]
+
+    target_clust_df_short, nearby_alive_ff_indices = _add_target_cluster_last_seen_info(
+        target_df, monkey_information, ff_real_position_sorted, ff_caught_T_new, ff_life_sorted, ff_dataframe,
+        max_visibility_window=max_visibility_window
+    )
+    
+    return target_clust_df_short
 
 def get_max_min_and_avg_info_from_target_df(target_df):
     target_average_info = _calculate_average_info(target_df)
