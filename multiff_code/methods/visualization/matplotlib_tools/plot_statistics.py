@@ -598,15 +598,15 @@ def plot_correlations_in_record(df, parameter_columns=['action_noise_std', 'ffxy
         plt.show()
 
 
-def plot_last_seen_info_vs_stops(last_vis_df):
+def plot_last_seen_info_vs_stops(last_vis_df, filter_by_p_value=True):
     for y_column in ['num_stops', 'num_stops_near_target', 'num_stops_since_last_vis']:
-        for x_column in ['time_since_last_vis', 'last_vis_dist', 'last_vis_cum_dist',
-                         'last_vis_ang', 'last_vis_ang_to_bndry',
+        for x_column in ['time_since_last_vis', 'last_vis_dist', 
+                         # 'last_vis_ang', 'last_vis_ang_to_bndry', 'last_vis_cum_dist',
                          'abs_last_vis_ang', 'abs_last_vis_ang_to_bndry']:
             if x_column in last_vis_df.columns:
                 # plot_statistics.fit_and_plot_linear_regression(target_clust_last_vis_df2[x_column].values, target_clust_last_vis_df2['num_stops'].values, show_regression = True)
                 r, p = pearsonr(last_vis_df[x_column], last_vis_df[y_column])
-                if p > 0.05:
+                if filter_by_p_value and p > 0.05:
                     print(
                         f'P-value for {x_column} and {y_column} is {p}. Plot skipped.')
                     continue

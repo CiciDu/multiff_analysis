@@ -69,8 +69,8 @@ class CompareTwoMonkeys():
             self, multiple_monkeys=True)
 
     def plot_the_changes_in_scatter_around_target_over_time(self):
-        for y_column_list in [['distance_mean', 'distance_median'],
-                              ['abs_angle_mean', 'abs_angle_median'],
+        for y_column_list in [['distance_mean', 'distance_50%'],
+                              ['abs_angle_mean', 'abs_angle_50%'],
                               # ['distance_mean', 'distance_Q1', 'distance_median', 'distance_Q3']
                               ]:
             plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_around_target_df, x="Session",
