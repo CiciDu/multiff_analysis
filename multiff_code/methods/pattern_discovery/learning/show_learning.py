@@ -1,193 +1,4 @@
 
-import numpy as np, pandas as pd
-
-def get_stop_df(monkey_information, ff_caught_T_new):
-    # 0) Build stop table (ensure sorted!)
-    stop_df = (monkey_information.loc[monkey_information['whether_new_distinct_stop'] == True, ['time']]
-        .rename(columns={'time': 'stop_time'})
-        .sort_values('stop_time', ignore_index=True)
-        )
-    stop_df['captures'] = 0
-
-    # 1) Build capture table (sorted)
-    cap_df = pd.DataFrame({'capture_time': np.asarray(ff_caught_T_new, dtype=float)})
-    cap_df = cap_df.sort_values('capture_time', ignore_index=True)
-        
-    # 2) Map each capture to the most recent stop at or before it
-    #    (captures occurring before the first stop yield NaN and are dropped)
-    mapped = pd.merge_asof(cap_df, stop_df[['stop_time']], 
-                    left_on='capture_time', right_on='stop_time',
-                    direction='backward')
-
-    # 3) Mark those stops as captures
-    hit_idx = mapped['stop_time'].dropna().map(
-    {t: i for i, t in enumerate(stop_df['stop_time'])}
-    ).dropna().astype(int)
-
-    stop_df.loc[hit_idx.unique(), 'captures'] = 1
-    
-    return stop_df
-
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from math import sqrt
-from scipy.stats import norm
-
-# ------------------
-# Utilities
-# ------------------
-def wilson_ci(k, n, alpha=0.05):
-    """Wilson score CI for a proportion."""
-    if n == 0:
-        return (0.0, 0.0)
-    z = norm.ppf(1 - alpha/2)
-    p = k / n
-    denom = 1 + z**2/n
-    center = (p + z**2/(2*n)) / denom
-    half = z * sqrt(p*(1-p)/n + z**2/(4*n**2)) / denom
-    return max(0, center - half), min(1, center + half)
-
-def session_prop_with_ci(df_sessions_counts):
-    """df with columns session, captures, stops -> add p_hat and Wilson CI."""
-    out = df_sessions_counts.copy()
-    p_hat = out["captures"] / out["stops"].clip(lower=1)
-    ci = np.array([wilson_ci(int(k), int(n)) for k, n in zip(out["captures"], out["stops"])])
-    out["p_hat"] = p_hat
-    out["p_lo"] = ci[:,0]
-    out["p_hi"] = ci[:,1]
-    return out
-
-# ------------------
-# 1) Logistic GLM (stop-level) fit plot
-# ------------------
-def plot_logistic_stop_success_fit(all_stop_df_sessions, glm_logit):
-    # Observed per-session success with Wilson CIs
-    df_sessions = (
-        all_stop_df_sessions.groupby("session", as_index=False)
-        .agg(captures=("captures","sum"), stops=("captures","size"))
-    )
-    plot_df = session_prop_with_ci(df_sessions)
-
-    # Model predictions across integer sessions
-    sess_grid = pd.DataFrame({"session": np.arange(plot_df["session"].min(),
-                                                   plot_df["session"].max()+1)})
-    pred = glm_logit.get_prediction(sess_grid).summary_frame()  # response scale for Binomial
-    sess_grid["fit_p"]  = pred["mean"].values
-    sess_grid["fit_lo"] = pred["mean_ci_lower"].values
-    sess_grid["fit_hi"] = pred["mean_ci_upper"].values
-
-    plt.figure(figsize=(7,4))
-    # observed points + CI
-    yerr = np.vstack([
-        plot_df["p_hat"] - plot_df["p_lo"],
-        plot_df["p_hi"] - plot_df["p_hat"]
-    ])
-    plt.errorbar(plot_df["session"], plot_df["p_hat"], yerr=yerr, fmt="o", capsize=3,
-                 alpha=0.8, label="Observed (per session, Wilson 95% CI)")
-    # fitted curve + band
-    plt.plot(sess_grid["session"], sess_grid["fit_p"], lw=2, label="Logistic GLM fit")
-    plt.fill_between(sess_grid["session"], sess_grid["fit_lo"], sess_grid["fit_hi"],
-                     alpha=0.2, label="95% CI")
-    plt.ylim(0, 1)
-    plt.xlabel("Session")
-    plt.ylabel("P(capture | stop)")
-    plt.title("Stop→Success probability with logistic GLM fit")
-    plt.legend()
-    plt.tight_layout()
-
-# ------------------
-# 2) Poisson (captures per stop) fit plot
-# ------------------
-def plot_poisson_captures_per_stop_fit(df_sessions, glm_pois):
-    # Observed per-session success (same as above)
-    plot_df = session_prop_with_ci(df_sessions)
-
-    # Predict captures per stop by setting offset=log(stops)
-    sess_grid = pd.DataFrame({"session": np.arange(df_sessions["session"].min(),
-                                                   df_sessions["session"].max()+1)})
-    # Need a representative offset; we'll predict on the logit scale via linear predictor trick:
-    # Easier: build a grid matched to actual sessions, then linearly interpolate for continuity.
-    grid = df_sessions[["session","stops"]].copy()
-    grid = grid.drop_duplicates("session").sort_values("session")
-    pred_list = []
-    for s, n in zip(grid["session"], grid["stops"]):
-        sf = glm_pois.get_prediction(
-            exog=pd.DataFrame({"session":[s]}),
-            offset=np.log([max(1.0, n)])
-        ).summary_frame()
-        # response scale => expected captures; divide by stops to get per-stop rate ~ success prob
-        rate = sf["mean"].iloc[0] / max(1.0, n)
-        lo   = sf["mean_ci_lower"].iloc[0] / max(1.0, n)
-        hi   = sf["mean_ci_upper"].iloc[0] / max(1.0, n)
-        pred_list.append((s, rate, lo, hi))
-    pred_df = pd.DataFrame(pred_list, columns=["session","fit_rate","fit_lo","fit_hi"])
-
-    plt.figure(figsize=(7,4))
-    # observed points + CI
-    yerr = np.vstack([
-        plot_df["p_hat"] - plot_df["p_lo"],
-        plot_df["p_hi"] - plot_df["p_hat"]
-    ])
-    plt.errorbar(plot_df["session"], plot_df["p_hat"], yerr=yerr, fmt="o", capsize=3,
-                 alpha=0.8, label="Observed (per session, Wilson 95% CI)")
-
-    # fitted curve + band (discrete sessions)
-    plt.plot(pred_df["session"], pred_df["fit_rate"], lw=2, label="Poisson offset fit (captures per stop)")
-    plt.fill_between(pred_df["session"], pred_df["fit_lo"], pred_df["fit_hi"], alpha=0.2, label="95% CI")
-
-    plt.ylim(0, 1)
-    plt.xlabel("Session")
-    plt.ylabel("Capture rate per stop")
-    plt.title("Captures per stop with Poisson-offset fit")
-    plt.legend()
-    plt.tight_layout()
-
-# ------------------
-# 3) Early vs Late bar charts with 95% CI
-# ------------------
-def plot_early_late_success_bars(all_stop_df_sessions):
-    # aggregate to session level first
-    df_sessions = (
-        all_stop_df_sessions.groupby("session", as_index=False)
-        .agg(captures=("captures","sum"),
-             stops=("captures","size"))
-    )
-    sessions = np.sort(df_sessions["session"].unique())
-    n = len(sessions)
-    early_cut = sessions[int(np.floor(n/3)) - 1]
-    late_cut  = sessions[int(np.ceil(2*n/3)) - 1]
-
-    df_sessions["phase"] = np.where(df_sessions["session"] <= early_cut, "early",
-                             np.where(df_sessions["session"] >= late_cut, "late", "mid"))
-
-    agg = (df_sessions[df_sessions["phase"].isin(["early","late"])]
-           .groupby("phase", as_index=False)
-           .agg(captures=("captures","sum"),
-                stops=("stops","sum")))
-
-    agg["p_hat"] = agg["captures"] / agg["stops"].clip(lower=1)
-    ci = np.array([wilson_ci(int(k), int(n)) for k, n in zip(agg["captures"], agg["stops"])])
-    agg["p_lo"], agg["p_hi"] = ci[:,0], ci[:,1]
-
-    # plot
-    plt.figure(figsize=(6,4))
-    x = np.arange(2)
-    y   = agg.set_index("phase").loc[["early","late"], "p_hat"].values
-    ylo = agg.set_index("phase").loc[["early","late"], "p_lo"].values
-    yhi = agg.set_index("phase").loc[["early","late"], "p_hi"].values
-    yerr = np.vstack([y - ylo, yhi - y])
-
-    plt.bar(x, y)
-    plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-    plt.xticks(x, ["Early", "Late"])
-    plt.ylim(0, 1)
-    plt.ylabel("P(capture | stop)")
-    plt.title("Early vs Late: stop→success probability")
-    plt.tight_layout()
-
-
 
 
 
@@ -195,6 +6,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
+import statsmodels.formula.api as smf
+import statsmodels.api as sm
 
 # ---------- Helpers ----------
 def geom_mean_per_session(df_trials):
@@ -250,6 +63,7 @@ def plot_poisson_rate_fit(df_sessions, po):
     plt.title("Reward throughput (captures/min) with Poisson GLM fit")
     plt.legend()
     plt.tight_layout()
+    plt.show()
 
 # ---------- Plot 2: Duration with OLS(logT) fit ----------
 def plot_duration_fit(df_trials, ols):
@@ -272,65 +86,250 @@ def plot_duration_fit(df_trials, ols):
     plt.title("Pursuit duration with log-linear fit")
     plt.legend()
     plt.tight_layout()
+    plt.show()
 
-# ---------- Plot 3: Early vs Late contrasts (bars with 95% CI) ----------
-def plot_early_late_contrasts(df_sessions, df_trials):
-    # define early/late tertiles from df_sessions (ensures same splits for both plots)
-    sessions = np.sort(df_sessions["session"].unique())
+
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.formula.api as smf
+import statsmodels.api as sm
+from scipy import stats
+
+# ---------- shared helpers ----------
+def _early_late_cuts_from_sessions(df_sessions, session_col="session"):
+    sessions = np.sort(df_sessions[session_col].unique())
     n = len(sessions)
-    early_cut = sessions[int(np.floor(n/3)) - 1]
-    late_cut  = sessions[int(np.ceil(2*n/3)) - 1]
+    if n < 3:
+        raise ValueError(f"Need ≥3 sessions to define tertiles, got n={n}.")
+    early_idx = max(0, int(np.floor(n/3)) - 1)
+    late_idx  = min(n-1, int(np.ceil(2*n/3)) - 1)
+    return sessions[early_idx], sessions[late_idx]
 
-    # Rates per minute
+def _phase_from_cuts(series_session, early_cut, late_cut):
+    return np.where(series_session <= early_cut, "early",
+             np.where(series_session >= late_cut, "late", "mid"))
+
+def _agg_with_ci(df, value_col, phase_col="phase", zero_floor=True):
+    sub = df[df[phase_col].isin(["early", "late"])].copy()
+    out = (sub.groupby(phase_col, as_index=False)
+             .agg(n=(value_col, "size"),
+                  mean=(value_col, "mean"),
+                  se=(value_col, lambda x: x.std(ddof=1)/np.sqrt(len(x)))))
+    lo = out["mean"] - 1.96*out["se"]
+    hi = out["mean"] + 1.96*out["se"]
+    out["lo"] = np.clip(lo, 0, None) if zero_floor else lo
+    out["hi"] = hi
+    out = out.set_index(phase_col).loc[["early", "late"]].reset_index()
+    return out
+
+def _welch_t_and_effect(a, b):
+    t, p = stats.ttest_ind(b, a, equal_var=False, nan_policy="omit")  # late vs early
+    mean_a, mean_b = np.nanmean(a), np.nanmean(b)
+    diff = mean_b - mean_a
+    ratio = np.nan if mean_a == 0 else (mean_b / mean_a)
+    pct = np.nan if not np.isfinite(ratio) else (ratio - 1) * 100.0
+    return {"diff": diff, "ratio": ratio, "percent_change": pct, "t": t, "pval": p}
+
+# ---------- RATE: descriptive + GLM Poisson with offset(time) ----------
+def summarize_early_late_rate_with_glm(df_sessions, session_col="session",
+                                       time_col="total_duration", capture_col="captures",
+                                       plot=True, title="Early vs Late: Reward rate"):
+    """
+    Outputs:
+      phase_tbl            : early/late means ± 95% CI for captures/min
+      ttest_contrast_tbl   : Welch t-test late vs early on session rates
+      glm_contrast_tbl     : Poisson GLM late vs early (rate ratio, CI, p)
+      effect_summary_tbl   : one-row summary combining descriptive ratio + GLM RR
+    """
+    early_cut, late_cut = _early_late_cuts_from_sessions(df_sessions, session_col=session_col)
+
+    # Session rates (assumes your helper returns ['session','rate_per_min', ...])
     rates = poisson_rate_per_min(df_sessions)
-    rates = rates.merge(df_sessions[["session","total_duration","captures"]], on="session", how="left")
-    rates["phase"] = np.where(rates["session"] <= early_cut, "early",
-                       np.where(rates["session"] >= late_cut, "late", "mid"))
-    agg_r = (rates[rates["phase"].isin(["early","late"])]
-             .groupby("phase", as_index=False)
-             .agg(rate=("rate_per_min","mean"),
-                  # rough CI via normal approx on session-means of rates
-                  se=("rate_per_min", lambda x: x.std(ddof=1)/np.sqrt(len(x)))))
-    agg_r["lo"] = np.clip(agg_r["rate"] - 1.96*agg_r["se"], 0, None)
-    agg_r["hi"] = agg_r["rate"] + 1.96*agg_r["se"]
+    rates["phase"] = _phase_from_cuts(rates[session_col], early_cut, late_cut)
 
-    # Durations: geometric mean per session then early/late means
+    # Descriptive phase table
+    phase_tbl = _agg_with_ci(rates, value_col="rate_per_min", phase_col="phase")
+    phase_tbl = phase_tbl.rename(columns={
+        "mean": "rate_per_min_mean",
+        "lo":   "rate_per_min_lo",
+        "hi":   "rate_per_min_hi"
+    })
+
+    # Welch t-test on session rates
+    early_vals = rates.loc[rates["phase"] == "early", "rate_per_min"].to_numpy()
+    late_vals  = rates.loc[rates["phase"] == "late",  "rate_per_min"].to_numpy()
+    tstats = _welch_t_and_effect(early_vals, late_vals)
+    ttest_contrast_tbl = pd.DataFrame([{
+        "contrast": "late_vs_early",
+        "diff_rate_per_min": tstats["diff"],
+        "rate_ratio_late_over_early": tstats["ratio"],
+        "percent_change_late_vs_early": tstats["percent_change"],
+        "t_stat": tstats["t"],
+        "pval": tstats["pval"]
+    }])
+
+    # GLM Poisson with offset(time) on early vs late
+    df_phase = df_sessions.copy()
+    df_phase["phase"] = _phase_from_cuts(df_phase[session_col], early_cut, late_cut)
+    sub = df_phase[df_phase["phase"].isin(["early", "late"])].copy()
+
+    glm_phase = smf.glm(
+        f"{capture_col} ~ C(phase)",
+        data=sub,
+        family=sm.families.Poisson(),
+        offset=np.log(sub[time_col])
+    ).fit(cov_type="HC0")
+
+    coef = glm_phase.params["C(phase)[T.late]"]
+    RR = float(np.exp(coef))
+    ci_low, ci_high = glm_phase.conf_int().loc["C(phase)[T.late]"].tolist()
+    RR_lo, RR_hi = float(np.exp(ci_low)), float(np.exp(ci_high))
+    pval = float(glm_phase.pvalues["C(phase)[T.late]"])
+
+    glm_contrast_tbl = pd.DataFrame([{
+        "contrast": "late_vs_early",
+        "rate_ratio_GLMPoisson": RR,
+        "RR_95CI_low": RR_lo,
+        "RR_95CI_high": RR_hi,
+        "pval": pval
+    }])
+
+    # Compact summary row combining both viewpoints
+    effect_summary_tbl = pd.DataFrame([{
+        "metric": "captures_per_min",
+        "descriptive_ratio_late_over_early": tstats["ratio"],
+        "descriptive_percent_change": tstats["percent_change"],
+        "GLM_rate_ratio": RR,
+        "GLM_95CI": f"[{RR_lo:.3f}, {RR_hi:.3f}]",
+        "GLM_pval": pval
+    }])
+
+    # Plot
+    if plot:
+        plt.figure(figsize=(6,4))
+        x = np.arange(2)
+        y   = phase_tbl.set_index("phase").loc[["early","late"], "rate_per_min_mean"].values
+        ylo = phase_tbl.set_index("phase").loc[["early","late"], "rate_per_min_lo"].values
+        yhi = phase_tbl.set_index("phase").loc[["early","late"], "rate_per_min_hi"].values
+        yerr = np.vstack([y - ylo, yhi - y])
+        plt.bar(x, y)
+        plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
+        plt.xticks(x, ["Early", "Late"])
+        plt.ylabel("Captures per minute")
+        plt.title(title)
+        plt.tight_layout()
+        plt.show()
+
+    return phase_tbl, ttest_contrast_tbl, glm_contrast_tbl, effect_summary_tbl
+
+# ---------- DURATION: descriptive + OLS on logT (clustered by session) ----------
+def summarize_early_late_duration_with_glm(df_trials, df_sessions,
+                                           session_col="session",
+                                           logT_col="logT",
+                                           plot=True, title="Early vs Late: Duration"):
+    """
+    Outputs:
+      phase_tbl            : early/late means ± 95% CI for geometric-mean duration (seconds)
+      ttest_contrast_tbl   : Welch t-test late vs early on per-session geometric means
+      glm_contrast_tbl     : OLS(logT ~ C(phase)) cluster-robust by session (percent change, CI, p)
+      effect_summary_tbl   : one-row summary combining descriptive ratio + OLS % change
+    NOTE: Requires df_trials to contain per-trial logT and session.
+    """
+    early_cut, late_cut = _early_late_cuts_from_sessions(df_sessions, session_col=session_col)
+
+    # Per-session geometric mean durations (assumes helper returns ['session','geom_mean_T', ...])
     per_sess = geom_mean_per_session(df_trials)
-    per_sess["phase"] = np.where(per_sess["session"] <= early_cut, "early",
-                          np.where(per_sess["session"] >= late_cut, "late", "mid"))
-    agg_d = (per_sess[per_sess["phase"].isin(["early","late"])]
-             .groupby("phase", as_index=False)
-             .agg(geomT=("geom_mean_T","mean"),
-                  se=("geom_mean_T", lambda x: x.std(ddof=1)/np.sqrt(len(x)))))
-    agg_d["lo"] = np.clip(agg_d["geomT"] - 1.96*agg_d["se"], 0, None)
-    agg_d["hi"] = agg_d["geomT"] + 1.96*agg_d["se"]
+    per_sess["phase"] = _phase_from_cuts(per_sess[session_col], early_cut, late_cut)
 
-    # Plot rates
-    plt.figure(figsize=(6,4))
-    x = np.arange(2)
-    y = agg_r.set_index("phase").loc[["early","late"], "rate"].values
-    ylo = agg_r.set_index("phase").loc[["early","late"], "lo"].values
-    yhi = agg_r.set_index("phase").loc[["early","late"], "hi"].values
-    yerr = np.vstack([y - ylo, yhi - y])
-    plt.bar(x, y)
-    plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-    plt.xticks(x, ["Early", "Late"])
-    plt.ylabel("Captures per minute")
-    plt.title("Early vs Late: Reward rate")
-    plt.tight_layout()
+    # Descriptive phase table (no zero-floor because durations are >0 and we work on seconds)
+    phase_tbl = _agg_with_ci(per_sess, value_col="geom_mean_T", phase_col="phase", zero_floor=False)
+    phase_tbl = phase_tbl.rename(columns={
+        "mean": "geomT_mean",
+        "lo":   "geomT_lo",
+        "hi":   "geomT_hi"
+    })
 
-    # Plot durations
-    plt.figure(figsize=(6,4))
-    y = agg_d.set_index("phase").loc[["early","late"], "geomT"].values
-    ylo = agg_d.set_index("phase").loc[["early","late"], "lo"].values
-    yhi = agg_d.set_index("phase").loc[["early","late"], "hi"].values
-    yerr = np.vstack([y - ylo, yhi - y])
-    plt.bar(x, y)
-    plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-    plt.xticks(x, ["Early", "Late"])
-    plt.ylabel("Typical pursuit duration (s)")
-    plt.title("Early vs Late: Duration")
-    plt.tight_layout()
+    # Welch t-test on per-session geometric means
+    early_vals = per_sess.loc[per_sess["phase"] == "early", "geom_mean_T"].to_numpy()
+    late_vals  = per_sess.loc[per_sess["phase"] == "late",  "geom_mean_T"].to_numpy()
+    tstats = _welch_t_and_effect(early_vals, late_vals)
+    ttest_contrast_tbl = pd.DataFrame([{
+        "contrast": "late_vs_early",
+        "diff_seconds": tstats["diff"],
+        "ratio_late_over_early": tstats["ratio"],
+        "percent_change_late_vs_early": tstats["percent_change"],
+        "t_stat": tstats["t"],
+        "pval": tstats["pval"]
+    }])
 
-# ---------- Run the plots ----------
+    # OLS on per-trial logT with cluster-robust SE by session
+    trials = df_trials.copy()
+    trials["phase"] = _phase_from_cuts(trials[session_col], early_cut, late_cut)
+    sub2 = trials[trials["phase"].isin(["early", "late"])].copy()
 
+    ols_phase = smf.ols(f"{logT_col} ~ C(phase)", data=sub2).fit(
+        cov_type="cluster", cov_kwds={"groups": sub2[session_col]}
+    )
+    coef = float(ols_phase.params["C(phase)[T.late]"])
+    ci_low, ci_high = ols_phase.conf_int().loc["C(phase)[T.late]"].tolist()
+    pct = (np.exp(coef) - 1) * 100.0
+    ci_pct = (np.exp(ci_low) - 1) * 100.0, (np.exp(ci_high) - 1) * 100.0
+    pval = float(ols_phase.pvalues["C(phase)[T.late]"])
+
+    glm_contrast_tbl = pd.DataFrame([{
+        "contrast": "late_vs_early",
+        "percent_change_duration_OLS": pct,
+        "pct_95CI_low": ci_pct[0],
+        "pct_95CI_high": ci_pct[1],
+        "pval": pval
+    }])
+
+    effect_summary_tbl = pd.DataFrame([{
+        "metric": "duration_seconds",
+        "descriptive_ratio_late_over_early": tstats["ratio"],
+        "descriptive_percent_change": tstats["percent_change"],
+        "OLS_percent_change": pct,
+        "OLS_95CI": f"[{ci_pct[0]:+.1f}%, {ci_pct[1]:+.1f}%]",
+        "OLS_pval": pval
+    }])
+
+    # Plot
+    if plot:
+        plt.figure(figsize=(6,4))
+        x = np.arange(2)
+        y   = phase_tbl.set_index("phase").loc[["early","late"], "geomT_mean"].values
+        ylo = phase_tbl.set_index("phase").loc[["early","late"], "geomT_lo"].values
+        yhi = phase_tbl.set_index("phase").loc[["early","late"], "geomT_hi"].values
+        yerr = np.vstack([y - ylo, yhi - y])
+        plt.bar(x, y)
+        plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
+        plt.xticks(x, ["Early", "Late"])
+        plt.ylabel("Typical pursuit duration (s)")
+        plt.title(title)
+        plt.tight_layout()
+        plt.show()
+
+    return phase_tbl, ttest_contrast_tbl, glm_contrast_tbl, effect_summary_tbl
+
+# ---------- Wrapper ----------
+def plot_early_late_contrasts(df_sessions, df_trials):
+    """
+    Runs both metrics with plots, and returns:
+      rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
+      dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl
+    """
+    (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl
+     ) = summarize_early_late_rate_with_glm(df_sessions)
+
+    (dur_phase_tbl, dur_ttest_tbl, dur_glm_tbl, dur_effect_summary_tbl
+     ) = summarize_early_late_duration_with_glm(df_trials, df_sessions)
+
+    return (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
+            dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl)
