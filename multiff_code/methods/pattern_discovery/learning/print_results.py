@@ -247,3 +247,81 @@ def show_all_pretty_tables(
 # (dur_phase,  dur_ttest,  dur_glm,  dur_effect ) = summarize_early_late_duration_with_glm(df_trials, df_sessions)
 # show_all_pretty_tables(rate_phase, rate_ttest, rate_glm, rate_effect,
 #                        dur_phase,  dur_ttest,  dur_glm,  dur_effect)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+
+def _fmt_df(df: pd.DataFrame, caption: str, percent_cols=(), round_map=None):
+    df = df.copy()
+    # Apply rounding
+    if round_map:
+        for col, nd in round_map.items():
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").round(nd)
+
+    # Percent columns -> show as percentages if they’re 0–1
+    for c in percent_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce") * 100
+
+    # Build a simple Styler
+    styler = (
+        df.style.hide(axis="index")
+          .set_caption(caption)  # keep short; avoids wrapping
+          .set_table_styles([
+              {"selector": "caption",
+               "props": [("font-size", "14px"),
+                         ("font-weight", "600"),
+                         ("margin", "0 0 8px 0"),
+                         ("white-space", "nowrap")]}  # discourage line breaks
+          ])
+    )
+
+    # Format numbers smartly
+    fmt = {}
+    for c in df.columns:
+        if c in percent_cols:
+            fmt[c] = "{:.1f}%"
+        elif any(k in c.lower() for k in ["p_value", "p-value", "pval", "stat"]):
+            fmt[c] = "{:.4f}"
+        elif any(k in c.lower() for k in ["estimate", "rate", "display", "ci_lo", "ci_hi",
+                                          "difference", "difference_pct_pts"]):
+            fmt[c] = "{:.3g}"  # compact sig figs for estimates/CI
+    styler = styler.format(fmt)
+    display(styler)
+
+
+def show_all_pretty_tables2(results, title="Results"):
+    """
+    Accepts the tuple returned by summarize_early_late:
+    (phase_tbl, ttest_contrast_tbl, model_contrast_tbl, effect_summary_tbl[, models_dict])
+    """
+    phase_tbl, ttest_tbl, model_tbl, eff_tbl = results[:4]
+
+    _fmt_df(phase_tbl, f"{title}: Phase summary",
+            percent_cols=[c for c in ["p_hat"] if c in phase_tbl.columns],
+            round_map={"rate": 3})
+
+    _fmt_df(ttest_tbl, f"{title}: Simple contrast",
+            percent_cols=[c for c in ["estimate"] if "pct-pts" in (ttest_tbl.get("contrast", pd.Series([""])).iloc[0] or "")])
+
+    _fmt_df(model_tbl, f"{title}: Model contrast",
+            round_map={"estimate": 3, "ci_lo": 3, "ci_hi": 3})
+
+    _fmt_df(eff_tbl, f"{title}: Effect summary",
+            percent_cols=[c for c in ["difference_pct_pts"] if c in eff_tbl.columns],
+            round_map={"early_display": 3, "late_display": 3, "rate_ratio": 3, "difference": 3})

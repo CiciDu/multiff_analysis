@@ -197,7 +197,7 @@ def plot_eye_positions_in_plotly(fig, current_plotly_key_comp, show_eye_position
         )
     else:
         for suffix, marker, trace_name_suffix, arrowcolor in [
-            ('_l', 'triangle-left', '_left', 'purple'),
+            ('_l', 'triangle-left', '_left', 'magenta'),
             ('_r', 'triangle-right', '_right', 'orange')
         ]:
             monkey_subset = eye_positions.find_eye_positions_rotated_in_world_coordinates(

@@ -453,6 +453,7 @@ def process_all_trial_durations_df(all_trial_durations_df):
     # 1) Filter and clean durations FIRST
     df_trials = all_trial_durations_df.query("duration_sec < 30").copy()
     df_trials["duration_sec"] = df_trials["duration_sec"].clip(lower=1e-6)
+    df_trials["logT"] = np.log(df_trials["duration_sec"])
 
 
     # 2) Build session-level aggregates from the cleaned trials

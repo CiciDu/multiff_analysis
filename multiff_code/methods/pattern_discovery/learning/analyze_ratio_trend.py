@@ -16,6 +16,49 @@ from math import sqrt
 import statsmodels.api as sm
 
 
+# --- NEW: helpers for Early vs Late p-value ---------------------------------
+from statsmodels.stats.proportion import proportions_ztest
+from scipy.stats import fisher_exact
+import numpy as np
+
+def _early_late_agg(df, session_col, event_count_col, denom_count_col):
+    """Aggregate early/late totals (using your tertile split)."""
+    ses = tertile_phase(df, session_col=session_col)
+    el = (
+        ses[ses["phase"].isin(["early", "late"])]
+        .groupby("phase", as_index=False)
+        .agg(**{
+            event_count_col: (event_count_col, "sum"),
+            denom_count_col: (denom_count_col, "sum")
+        })
+        .set_index("phase")
+        .reindex(["early", "late"])
+    )
+    # ensure integers
+    k1 = int(el.loc["early", event_count_col])
+    n1 = int(el.loc["early", denom_count_col])
+    k2 = int(el.loc["late", event_count_col])
+    n2 = int(el.loc["late", denom_count_col])
+    return k1, n1, k2, n2, el.reset_index()
+
+def _pval_early_vs_late(k1, n1, k2, n2):
+    """Two-proportion z-test by default; use Fisher if any cell < 5."""
+    # Edge cases
+    if n1 == 0 or n2 == 0:
+        return np.nan, "NA"  # not testable
+
+    table = np.array([[k1, n1 - k1],
+                      [k2, n2 - k2]], dtype=int)
+
+    if (table < 5).any():  # small counts → exact test
+        _, p = fisher_exact(table, alternative="two-sided")
+        return float(p), "Fisher"
+    else:
+        _, p = proportions_ztest(count=[k1, k2], nobs=[n1, n2], alternative="two-sided")
+        return float(p), "Z-test"
+
+
+
 def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_col="stops",
                          title=None, ylabel="P(Events | Baseline)"):
 
@@ -23,38 +66,42 @@ def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_
         f"{event_count_col} ~ session",
         data=df_sess_counts,
         family=sm.families.Poisson(),
-        offset=np.log(df_sess_counts[denom_count_col])
+        offset=np.log(df_sess_counts[denom_count_col].clip(lower=1))  # keep your offset guard
     ).fit(cov_type="HC0")
 
-    # Collect summaries
-    results = [
-        summarize_glm(glm_pois, "Poisson", transform="poisson")
-    ]
-
+    # Collect summaries (trend over sessions)
+    results = [summarize_glm(glm_pois, "Poisson", transform="poisson")]
     results_df = pd.DataFrame(results)
     print(results_df)
 
-    # Get p-value from results
-    pval = results_df.iloc[0]['pval']
-    
+    # p-value for TREND (keep on the session fit plot)
+    pval_trend = results_df.iloc[0]['pval']
+
+    # p-value for EARLY vs LATE (use on the bar+CI plot)
+    k1, n1, k2, n2, _ = _early_late_agg(df_sess_counts, "session", event_count_col, denom_count_col)
+    pval_el, test_name = _pval_early_vs_late(k1, n1, k2, n2)
+
     if title is None:
         title = f"Ratio of {event_count_col}"
 
+    # --- Plot session trend (annotate GLM p-val) ---
     plot_poisson_ratio_fit_generic(
         df_sess_counts, glm_pois,
         session_col="session", event_count_col=event_count_col, denom_count_col=denom_count_col,
         title=title, ylabel=ylabel,
-        pval=pval
+        pval=pval_trend
     )
 
+    # --- Plot Early vs Late (annotate group-diff p-val) ---
     plot_early_late_ratio(
         df_sess_counts,
         session_col="session", event_count_col=event_count_col, denom_count_col=denom_count_col,
-        ylabel=ylabel, title="Early vs Late",
-        pval=pval
+        ylabel=ylabel, title=f"Early vs Late ({test_name})",
+        pval=pval_el
     )
 
     plt.show()
+
 
 # ------------------
 # Utilities
@@ -146,7 +193,7 @@ def plot_poisson_ratio_fit_generic(
         preds, columns=[session_col, "fit_rate", "fit_lo", "fit_hi"])
 
     # plot
-    plt.figure(figsize=(7, 4))
+    plt.figure(figsize=(7, 5))
     yerr = np.vstack([plot_df["p_hat"]-plot_df["p_lo"],
                      plot_df["p_hi"]-plot_df["p_hat"]])
     plt.errorbar(plot_df[session_col], plot_df["p_hat"], yerr=yerr, fmt="o", capsize=3,
@@ -241,57 +288,43 @@ def plot_early_late_ratio(
 ):
     """
     Hybrid chart: translucent bars + point estimate + 95% CI.
-    Bars are narrower and closer together, figure is thinner.
+    Annotates the *group difference* p-value (two-proportion z-test or Fisher).
     """
-    # --- Aggregate ---
-    ses = tertile_phase(df_sess_counts, session_col)
-    el = (
-        ses[ses["phase"].isin(["early", "late"])]
-        .groupby("phase", as_index=False)
-        .agg(**{event_count_col: (event_count_col, "sum"),
-                denom_count_col: (denom_count_col, "sum")})
-    )
+    # --- Aggregate early/late ---
+    k1, n1, k2, n2, el = _early_late_agg(df_sess_counts, session_col, event_count_col, denom_count_col)
 
     # Proportions + Wilson CI
     el["p_hat"] = el[event_count_col] / el[denom_count_col].clip(lower=1)
-    ci = np.array([wilson_ci(int(k), int(n))
-                   for k, n in zip(el[event_count_col], el[denom_count_col])])
+    ci = np.array([wilson_ci(int(k), int(n)) for k, n in zip(el[event_count_col], el[denom_count_col])])
     el["p_lo"], el["p_hi"] = ci[:, 0], ci[:, 1]
 
     # Order for plotting
     dfp = el.set_index("phase").loc[["early", "late"]].reset_index()
 
     # Convert to percentages
-    dfp["pct"] = 100.0 * dfp["p_hat"]
+    dfp["pct"]    = 100.0 * dfp["p_hat"]
     dfp["pct_lo"] = 100.0 * dfp["p_lo"]
     dfp["pct_hi"] = 100.0 * dfp["p_hi"]
 
     # --- Plot ---
-    x = np.array([-0.3, 0.3])  # Closer positions for smaller gap
-    pct = dfp["pct"].to_numpy()
+    x = np.array([-0.3, 0.3])
+    pct   = dfp["pct"].to_numpy()
     pctlo = dfp["pct_lo"].to_numpy()
     pcthi = dfp["pct_hi"].to_numpy()
-    yerr = np.vstack([pct - pctlo, pcthi - pct])
+    yerr  = np.vstack([pct - pctlo, pcthi - pct])
 
-    # Thinner figure
     fig, ax = plt.subplots(figsize=(4.8, 4.6))
-
-    # Bars (narrow + translucent)
     ax.bar(x, pct, width=0.35, alpha=0.35, zorder=1, color="tab:blue")
-
-    # Point estimate + CI whiskers on top
-    ax.errorbar(x, pct, yerr=yerr, fmt="o", lw=2, capsize=5,
-                zorder=3, color="tab:blue", ecolor="tab:blue")
+    ax.errorbar(x, pct, yerr=yerr, fmt="o", lw=2, capsize=5, zorder=3, color="tab:blue", ecolor="tab:blue")
     ax.scatter(x, pct, s=40, zorder=4, color="tab:blue")
 
-    # X labels
+    # X labels (neutral to avoid fraction mismatch)
     ax.set_xticks(x)
-    ax.set_xticklabels(["Early 1/3 sessions", "Late 2/3 sessions"], fontsize=12)
+    ax.set_xticklabels(["Early", "Late"], fontsize=12)
 
     # k/n labels above bars
     for xi, yi, k, n in zip(x, pct, dfp[event_count_col], dfp[denom_count_col]):
-        ax.text(xi, yi + 2.0, f"{int(k)}/{int(n)}",
-                ha="center", va="bottom", fontsize=9)
+        ax.text(xi, yi + 2.0, f"{int(k)}/{int(n)}", ha="center", va="bottom", fontsize=9)
 
     # Y-axis formatting
     ymax = min(100.0, max(pcthi.max() * 1.10, pct.max() + 6.0))
@@ -302,15 +335,17 @@ def plot_early_late_ratio(
 
     ax.yaxis.grid(True, linestyle="--", alpha=0.45)
     ax.set_axisbelow(True)
-
     ax.set_ylabel(ylabel, fontsize=12)
     ax.set_title(title, fontsize=13)
 
-    # Optional p-value box
-    if pval is not None:
+    # Compute p-value here if not provided
+    if pval is None:
+        pval, _ = _pval_early_vs_late(k1, n1, k2, n2)
+
+    # Annotate p-value (if testable)
+    if pval is not None and not np.isnan(pval):
         ptxt = "p < 0.001" if pval < 1e-3 else f"p = {pval:.3f}"
-        ax.text(0.02, 0.98, ptxt, transform=ax.transAxes,
-                ha="left", va="top",
+        ax.text(0.02, 0.98, ptxt, transform=ax.transAxes, ha="left", va="top",
                 bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9))
 
     plt.tight_layout()
@@ -323,7 +358,7 @@ def plot_early_late_ratio(
     return dfp[["phase"] + display_cols]
 
 
-def show_event_ratio(df_monkey, event):
+def show_event_ratio(df_monkey, event, title=None, ylabel=None):
     df_event = df_monkey[df_monkey['Item'] == event].sort_values(by='Session').reset_index(drop=True)
 
     event_count_col = event
@@ -334,4 +369,4 @@ def show_event_ratio(df_monkey, event):
                             'N_total': denom_count_col,
                             }, inplace=True)
 
-    evaluate_ratio_trend(df_event, event_count_col=event_count_col, denom_count_col=denom_count_col)
+    evaluate_ratio_trend(df_event, event_count_col=event_count_col, denom_count_col=denom_count_col, title=title, ylabel=ylabel)

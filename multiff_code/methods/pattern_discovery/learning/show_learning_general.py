@@ -283,7 +283,25 @@ def summarize_early_late(df: pd.DataFrame,
         raise ValueError(f"Unknown spec.kind: {spec.kind}")
 
     if plot:
-        _plot_phase_bar(phase_tbl, ylabel=spec.ylabel, title=spec.title)
+        # Get p-value from the appropriate model for annotation
+        pval = None
+        if spec.kind == "rate" and "glm" in models_dict:
+            pval = float(models_dict["glm"].pvalues.get(
+                "C(phase)[T.late]", 1.0))
+        elif spec.kind == "continuous" and "ols" in models_dict:
+            pval = float(models_dict["ols"].pvalues.get(
+                "C(phase)[T.late]", 1.0))
+        elif spec.kind == "proportion" and "binom" in models_dict:
+            pval = float(models_dict["binom"].pvalues.get(
+                "C(phase)[T.late]", 1.0))
+
+        # Use percentage formatting for proportion data
+        if spec.kind == "proportion":
+            _plot_phase_bar_percentage(
+                phase_tbl, ylabel=spec.ylabel, title=spec.title, pval=pval)
+        else:
+            _plot_phase_bar(phase_tbl, ylabel=spec.ylabel,
+                            title=spec.title, pval=pval)
 
     if return_models:
         return phase_tbl, ttest_contrast_tbl, model_contrast_tbl, effect_summary_tbl, models_dict
@@ -292,18 +310,148 @@ def summarize_early_late(df: pd.DataFrame,
 
 # --------------------------- Plotting --------------------------------
 
-def _plot_phase_bar(phase_tbl: pd.DataFrame, *, ylabel: str, title: str):
-    x = np.arange(2)
-    y = phase_tbl.set_index("phase").loc[["early", "late"], "mean"].values
-    ylo = phase_tbl.set_index("phase").loc[["early", "late"], "lo"].values
-    yhi = phase_tbl.set_index("phase").loc[["early", "late"], "hi"].values
+def _plot_phase_bar(phase_tbl: pd.DataFrame, *, ylabel: str, title: str, pval: Optional[float] = None):
+    """
+    Create early vs late comparison plot similar to analyze_ratio_trend style.
+
+    Parameters:
+    -----------
+    phase_tbl : pd.DataFrame
+        DataFrame with columns ['phase', 'mean', 'lo', 'hi', 'n']
+    ylabel : str
+        Y-axis label
+    title : str
+        Plot title
+    pval : Optional[float]
+        P-value to display on plot
+    """
+    # Get data in correct order
+    dfp = phase_tbl.set_index("phase").loc[["early", "late"]].reset_index()
+
+    # Position bars closer together
+    x = np.array([-0.3, 0.3])
+    y = dfp["mean"].to_numpy()
+    ylo = dfp["lo"].to_numpy()
+    yhi = dfp["hi"].to_numpy()
     yerr = np.vstack([y - ylo, yhi - y])
-    plt.figure(figsize=(6, 4))
-    plt.bar(x, y, alpha=0.65)
-    plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-    plt.xticks(x, ["Early", "Late"])
-    plt.ylabel(ylabel)
-    plt.title(title)
+
+    # Create figure with similar dimensions to analyze_ratio_trend
+    fig, ax = plt.subplots(figsize=(4.8, 4.6))
+
+    # Bars (narrow + translucent)
+    ax.bar(x, y, width=0.35, alpha=0.35, zorder=1, color="tab:blue")
+
+    # Point estimate + CI whiskers on top
+    ax.errorbar(x, y, yerr=yerr, fmt="o", lw=2, capsize=5,
+                zorder=3, color="tab:blue", ecolor="tab:blue")
+    ax.scatter(x, y, s=40, zorder=4, color="tab:blue")
+
+    # X labels
+    ax.set_xticks(x)
+    ax.set_xticklabels(
+        ["Early 1/3 sessions", "Late 2/3 sessions"], fontsize=12)
+
+    # Add sample size labels above bars if available
+    if "n" in dfp.columns:
+        for xi, yi, n in zip(x, y, dfp["n"]):
+            ax.text(xi, yi + (yhi.max() - y.min()) * 0.05, f"n={int(n)}",
+                    ha="center", va="bottom", fontsize=9)
+
+    # Y-axis formatting
+    ymax = max(yhi.max() * 1.10, y.max() + (yhi.max() - y.min()) * 0.1)
+    ax.set_ylim(0, ymax)
+
+    # Add grid
+    ax.yaxis.grid(True, linestyle="--", alpha=0.45)
+    ax.set_axisbelow(True)
+
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(title, fontsize=13)
+
+    # Optional p-value box
+    if pval is not None:
+        ptxt = "p < 0.001" if pval < 1e-3 else f"p = {pval:.3f}"
+        ax.text(0.02, 0.98, ptxt, transform=ax.transAxes,
+                ha="left", va="top",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9))
+
+    plt.tight_layout()
+    plt.show()
+
+
+def _plot_phase_bar_percentage(phase_tbl: pd.DataFrame, *, ylabel: str, title: str, pval: Optional[float] = None):
+    """
+    Create early vs late comparison plot with percentage formatting, similar to analyze_ratio_trend style.
+
+    Parameters:
+    -----------
+    phase_tbl : pd.DataFrame
+        DataFrame with columns ['phase', 'mean', 'lo', 'hi', 'n']
+    ylabel : str
+        Y-axis label
+    title : str
+        Plot title
+    pval : Optional[float]
+        P-value to display on plot
+    """
+    # Get data in correct order
+    dfp = phase_tbl.set_index("phase").loc[["early", "late"]].reset_index()
+
+    # Convert to percentages
+    dfp["pct"] = 100.0 * dfp["mean"]
+    dfp["pct_lo"] = 100.0 * dfp["lo"]
+    dfp["pct_hi"] = 100.0 * dfp["hi"]
+
+    # Position bars closer together
+    x = np.array([-0.3, 0.3])
+    pct = dfp["pct"].to_numpy()
+    pctlo = dfp["pct_lo"].to_numpy()
+    pcthi = dfp["pct_hi"].to_numpy()
+    yerr = np.vstack([pct - pctlo, pcthi - pct])
+
+    # Create figure with similar dimensions to analyze_ratio_trend
+    fig, ax = plt.subplots(figsize=(4.8, 4.6))
+
+    # Bars (narrow + translucent)
+    ax.bar(x, pct, width=0.35, alpha=0.35, zorder=1, color="tab:blue")
+
+    # Point estimate + CI whiskers on top
+    ax.errorbar(x, pct, yerr=yerr, fmt="o", lw=2, capsize=5,
+                zorder=3, color="tab:blue", ecolor="tab:blue")
+    ax.scatter(x, pct, s=40, zorder=4, color="tab:blue")
+
+    # X labels
+    ax.set_xticks(x)
+    ax.set_xticklabels(
+        ["Early 1/3 sessions", "Late 2/3 sessions"], fontsize=12)
+
+    # Add sample size labels above bars if available
+    if "n" in dfp.columns:
+        for xi, yi, n in zip(x, pct, dfp["n"]):
+            ax.text(xi, yi + 2.0, f"n={int(n)}",
+                    ha="center", va="bottom", fontsize=9)
+
+    # Y-axis formatting as percentages
+    ymax = min(100.0, max(pcthi.max() * 1.10, pct.max() + 6.0))
+    ax.set_ylim(0, ymax)
+    ticks = ax.get_yticks()
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([f"{int(round(t))}%" for t in ticks])
+
+    # Add grid
+    ax.yaxis.grid(True, linestyle="--", alpha=0.45)
+    ax.set_axisbelow(True)
+
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(title, fontsize=13)
+
+    # Optional p-value box
+    if pval is not None:
+        ptxt = "p < 0.001" if pval < 1e-3 else f"p = {pval:.3f}"
+        ax.text(0.02, 0.98, ptxt, transform=ax.transAxes,
+                ha="left", va="top",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9))
+
     plt.tight_layout()
     plt.show()
 
@@ -510,9 +658,6 @@ def fit_both_models(df_trials: pd.DataFrame,
                                   value_col=value_col)
     return {"po": po, "ols": ols}
 
-
-import numpy as np
-import pandas as pd
 
 def extract_estimates_from_poisson_fit(po):
     """

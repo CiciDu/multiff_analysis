@@ -243,9 +243,9 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                     return fig
             fig = plotly_for_monkey.plot_or_update_eye_positions_using_either_marker_or_arrow(fig, x0, y0, monkey_subset2, trace_name=trace_name, update_if_already_exist=update_if_already_exist,
                                                                                               marker='circle', marker_size=marker_size, use_arrow_to_show_eye_positions=use_arrow_to_show_eye_positions,
-                                                                                              arrowcolor='orange')
+                                                                                              arrowcolor='magenta')
         else:
-            for left_or_right, marker, trace_name, arrowcolor in [('left', 'triangle-left', trace_name + '_left', 'orange'), ('right', 'triangle-right', trace_name + '_right', 'purple')]:
+            for left_or_right, marker, trace_name, arrowcolor in [('left', 'triangle-left', trace_name + '_left', '#DC143C'), ('right', 'triangle-right', trace_name + '_right', 'magenta')]:
                 monkey_subset = self.both_eyes_info[left_or_right]
                 if point_index_to_show_traj_curv is not None:
                     try:

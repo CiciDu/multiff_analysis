@@ -14,6 +14,7 @@ from datetime import datetime
 # np.set_printoptions(suppress=True)
 # pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
+
 def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_information,
                              GUAT_w_ff_frequency, one_stop_w_ff_frequency,
                              data_folder_name=None):
@@ -38,37 +39,44 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
 
     if "cluster_around_target" in has:
         pattern_frequencies.loc[
-            pattern_frequencies["Item"].isin(["cluster_around_target", "disappear_latest"]),
+            pattern_frequencies["Item"].isin(
+                ["cluster_around_target", "disappear_latest"]),
             "N_total"
         ] = n_trials
         pattern_frequencies.loc[
-            pattern_frequencies["Item"].isin(["waste_cluster_around_target", "use_cluster"]),
+            pattern_frequencies["Item"].isin(
+                ["waste_cluster_around_target", "use_cluster"]),
             "N_total"
         ] = atp_num["cluster_around_target"].sum()
 
     if "three_in_a_row" in has:
-        pattern_frequencies.loc[pattern_frequencies["Item"] == "three_in_a_row", "N_total"] = n_trials - 2
+        pattern_frequencies.loc[pattern_frequencies["Item"]
+                                == "three_in_a_row", "N_total"] = n_trials - 2
     if "four_in_a_row" in has:
-        pattern_frequencies.loc[pattern_frequencies["Item"] == "four_in_a_row", "N_total"] = n_trials - 3
+        pattern_frequencies.loc[pattern_frequencies["Item"]
+                                == "four_in_a_row", "N_total"] = n_trials - 3
     if "ignore_sudden_flash" in has and "sudden_flash" in has:
         pattern_frequencies.loc[
             pattern_frequencies["Item"] == "ignore_sudden_flash", "N_total"
         ] = atp_num["sudden_flash"].sum()
 
-    try_a_few = int(atp_num["try_a_few_times"].sum()) if "try_a_few_times" in has else 0
+    try_a_few = int(atp_num["try_a_few_times"].sum()
+                    ) if "try_a_few_times" in has else 0
     n_total_guat_block = GUAT_w_ff_frequency + one_stop_w_ff_frequency + try_a_few
 
     pattern_frequencies.loc[
         pattern_frequencies["Item"] == "give_up_after_trying", "Frequency"
     ] = GUAT_w_ff_frequency
     pattern_frequencies.loc[
-        pattern_frequencies["Item"].isin(["give_up_after_trying", "try_a_few_times"]),
+        pattern_frequencies["Item"].isin(
+            ["give_up_after_trying", "try_a_few_times"]),
         "N_total"
     ] = n_total_guat_block
 
     # Keep math in float domain
     denom = pattern_frequencies["N_total"].replace(0, np.nan).astype(float)
-    pattern_frequencies["Rate"] = (pattern_frequencies["Frequency"].astype(float) / denom).fillna(0.0)
+    pattern_frequencies["Rate"] = (
+        pattern_frequencies["Frequency"].astype(float) / denom).fillna(0.0)
     pattern_frequencies["Group"] = 1
 
     rows = []
@@ -87,7 +95,8 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
 
     # Stop success rate (guard columns)
     if {"whether_new_distinct_stop", "time"}.issubset(monkey_information.columns):
-        mask_new_stop = monkey_information["whether_new_distinct_stop"].eq(True)
+        mask_new_stop = monkey_information["whether_new_distinct_stop"].eq(
+            True)
         monkey_sub = monkey_information.loc[mask_new_stop].copy()
         if len(ff_caught_T_new) >= 2:
             t0, t1 = ff_caught_T_new[0], ff_caught_T_new[-1]
@@ -115,11 +124,11 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         denom_all = both + one_stop_w_ff_frequency
         if denom_all > 0:
             rows.extend([
-                {"Item": "GUAT_and_TAFT_over_all", "Frequency": both, "N_total": denom_all,
+                {"Item": "retry_any_over_all", "Frequency": both, "N_total": denom_all,
                  "Rate": both / denom_all, "Group": 2},
-                {"Item": "GUAT_over_all", "Frequency": GUAT_w_ff_frequency, "N_total": denom_all,
+                {"Item": "retry_fail_over_all", "Frequency": GUAT_w_ff_frequency, "N_total": denom_all,
                  "Rate": GUAT_w_ff_frequency / denom_all, "Group": 2},
-                {"Item": "TAFT_over_all", "Frequency": try_a_few, "N_total": denom_all,
+                {"Item": "retry_capture_over_all", "Frequency": try_a_few, "N_total": denom_all,
                  "Rate": try_a_few / denom_all, "Group": 2},
             ])
 
@@ -136,7 +145,8 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             })
 
     if rows:
-        pattern_frequencies = pd.concat([pattern_frequencies, pd.DataFrame(rows)], ignore_index=True)
+        pattern_frequencies = pd.concat(
+            [pattern_frequencies, pd.DataFrame(rows)], ignore_index=True)
 
     item_to_label = {
         'two_in_a_row': 'Two in a row',
@@ -159,22 +169,25 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'GUAT_over_TAFT': 'GUAT over TAFT',
         'GUAT_over_both': 'GUAT over both',
         'TAFT_over_both': 'TAFT over both',
-        'GUAT_over_all': 'GUAT over all',
-        'TAFT_over_all': 'TAFT over all',
-        'GUAT_and_TAFT_over_all': 'GUAT+TAFT over all',
+        'retry_fail_over_all': 'GUAT over all',
+        'retry_capture_over_all': 'TAFT over all',
+        'retry_any_over_all': 'GUAT+TAFT over all',
         'two_in_a_row_over_cluster': 'Two in a row over cluster'
     }
-    pattern_frequencies["Label"] = pattern_frequencies["Item"].map(item_to_label).fillna("Missing")
+    pattern_frequencies["Label"] = pattern_frequencies["Item"].map(
+        item_to_label).fillna("Missing")
 
     # Only compute Percentage for proportions (Group 1 or any Rate in [0,1])
     pattern_frequencies["Percentage"] = np.where(
-        (pattern_frequencies["Rate"] >= 0.0) & (pattern_frequencies["Rate"] <= 1.0),
+        (pattern_frequencies["Rate"] >= 0.0) & (
+            pattern_frequencies["Rate"] <= 1.0),
         pattern_frequencies["Rate"] * 100.0,
         np.nan
     )
 
     if data_folder_name:
-        general_utils.save_df_to_csv(pattern_frequencies, 'pattern_frequencies', data_folder_name)
+        general_utils.save_df_to_csv(
+            pattern_frequencies, 'pattern_frequencies', data_folder_name)
 
     return pattern_frequencies
 

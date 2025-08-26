@@ -79,7 +79,7 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
     y_max = fr_df[selected_cluster_cols].max().max()
     y_max = (y_max * 1.1) if y_max != 0 else 1
 
-    _add_reference_lines(fig, y_min, y_max, rel_hover_time)
+    # _add_reference_lines(fig, y_min, y_max, rel_hover_time)
     fig = _add_firefly_segments(
         fig, y_min, y_max, show_visible_segments, visible_segments_info)
     fig.update_layout(_common_layout('Firing Rate Over Time',
