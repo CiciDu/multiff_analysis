@@ -104,14 +104,14 @@ class PlanFactorsAcrossAgents():
         columns_to_find_unique_combinations_for_color = ['monkey_or_agent']
         columns_to_find_unique_combinations_for_line = []
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(median_new_df,
-                                                                                        fixed_variable_values_to_use,
-                                                                                        changeable_variables,
-                                                                                        x_var_column_list,
-                                                                                        y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                                                        var_to_determine_x_offset_direction='test_or_control',
-                                                                                        columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                        columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
+        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(median_new_df,
+                                                                                                   fixed_variable_values_to_use,
+                                                                                                   changeable_variables,
+                                                                                                   x_var_column_list,
+                                                                                                   y_var_column='diff_in_abs_angle_to_nxt_ff_median',
+                                                                                                   var_to_determine_x_offset_direction='test_or_control',
+                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                                   columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
 
     def plot_monkey_and_agent_perc_df(self):
         both_players_df = compare_monkey_and_agent_utils.make_both_players_df(
@@ -127,11 +127,11 @@ class PlanFactorsAcrossAgents():
         columns_to_find_unique_combinations_for_color = ['monkey_or_agent']
         columns_to_find_unique_combinations_for_line = []
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(perc_new_df,
-                                                                                        fixed_variable_values_to_use,
-                                                                                        changeable_variables,
-                                                                                        x_var_column_list,
-                                                                                        y_var_column='perc',
-                                                                                        var_to_determine_x_offset_direction='test_or_control',
-                                                                                        columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                        columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
+        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(perc_new_df,
+                                                                                                   fixed_variable_values_to_use,
+                                                                                                   changeable_variables,
+                                                                                                   x_var_column_list,
+                                                                                                   y_var_column='perc',
+                                                                                                   var_to_determine_x_offset_direction='test_or_control',
+                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                                   columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)

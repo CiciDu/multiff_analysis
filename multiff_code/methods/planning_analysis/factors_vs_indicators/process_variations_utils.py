@@ -369,17 +369,17 @@ def plot_heading_in_all_ref_median_info(all_ref_pooled_median_info, title_prefix
     columns_to_find_unique_combinations_for_color = []
     columns_to_find_unique_combinations_for_line = []
 
-    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_all_ref_pooled_median_info,
-                                                                                    fixed_variable_values_to_use,
-                                                                                    changeable_variables,
-                                                                                    x_var_column_list,
-                                                                                    y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                                                    se_column='diff_in_abs_angle_to_nxt_ff_boot_med_std',
-                                                                                    # var_to_determine_x_offset_direction=None,
-                                                                                    title_prefix=title_prefix,
-                                                                                    var_to_determine_x_offset_direction='test_or_control',
-                                                                                    columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                    columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
+    fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_all_ref_pooled_median_info,
+                                                                                               fixed_variable_values_to_use,
+                                                                                               changeable_variables,
+                                                                                               x_var_column_list,
+                                                                                               y_var_column='diff_in_abs_angle_to_nxt_ff_median',
+                                                                                               se_column='diff_in_abs_angle_to_nxt_ff_boot_med_std',
+                                                                                               # var_to_determine_x_offset_direction=None,
+                                                                                               title_prefix=title_prefix,
+                                                                                               var_to_determine_x_offset_direction='test_or_control',
+                                                                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                               columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
 
 
 def plot_curv_in_all_ref_pooled_median_info(all_ref_pooled_median_info, title_prefix=None):
@@ -404,17 +404,17 @@ def plot_curv_in_all_ref_pooled_median_info(all_ref_pooled_median_info, title_pr
     columns_to_find_unique_combinations_for_color = []
     columns_to_find_unique_combinations_for_line = []
 
-    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_all_ref_pooled_median_info,
-                                                                                    fixed_variable_values_to_use,
-                                                                                    changeable_variables,
-                                                                                    x_var_column_list,
-                                                                                    y_var_column='diff_in_abs_d_curv_median',
-                                                                                    se_column='diff_in_abs_d_curv_boot_med_std',
-                                                                                    title_prefix=title_prefix,
-                                                                                    # var_to_determine_x_offset_direction=None,
-                                                                                    var_to_determine_x_offset_direction='test_or_control',
-                                                                                    columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                    columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
+    fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_all_ref_pooled_median_info,
+                                                                                               fixed_variable_values_to_use,
+                                                                                               changeable_variables,
+                                                                                               x_var_column_list,
+                                                                                               y_var_column='diff_in_abs_d_curv_median',
+                                                                                               se_column='diff_in_abs_d_curv_boot_med_std',
+                                                                                               title_prefix=title_prefix,
+                                                                                               # var_to_determine_x_offset_direction=None,
+                                                                                               var_to_determine_x_offset_direction='test_or_control',
+                                                                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                               columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
 
 
 def plot_perc_in_overall_pooled_perc_info(pooled_perc_info, title_prefix=None):
@@ -432,12 +432,12 @@ def plot_perc_in_overall_pooled_perc_info(pooled_perc_info, title_prefix=None):
 
     columns_to_find_unique_combinations_for_color = []
 
-    plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_perc_df,
-                                                                                    fixed_variable_values_to_use,
-                                                                                    changeable_variables,
-                                                                                    x_var_column_list,
-                                                                                    y_var_column='perc',
-                                                                                    se_column='perc_se',
-                                                                                    title_prefix=title_prefix,
-                                                                                    var_to_determine_x_offset_direction='test_or_control',
-                                                                                    columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color)
+    fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_perc_df,
+                                                                                               fixed_variable_values_to_use,
+                                                                                               changeable_variables,
+                                                                                               x_var_column_list,
+                                                                                               y_var_column='perc',
+                                                                                               se_column='perc_se',
+                                                                                               title_prefix=title_prefix,
+                                                                                               var_to_determine_x_offset_direction='test_or_control',
+                                                                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color)

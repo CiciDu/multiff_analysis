@@ -104,7 +104,7 @@ class _CompareYValues:
 
     def make_or_retrieve_per_sess_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                             ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
-                                            filter_shared_stops_across_refs=True,
+                                            filter_heading_info_df_across_refs=False,
                                             ):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
@@ -115,7 +115,7 @@ class _CompareYValues:
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions2(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                     heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                    filter_shared_stops_across_refs=filter_shared_stops_across_refs)
+                                                                    filter_heading_info_df_across_refs=filter_heading_info_df_across_refs)
             self.per_sess_perc_info = make_variations_utils.make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(self.test_heading_info_df,
                                                                                                                        self.ctrl_heading_info_df, verbose=verbose)
 
@@ -133,7 +133,7 @@ class _CompareYValues:
 
     def make_or_retrieve_pooled_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                           ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
-                                          filter_shared_stops_across_refs=True,
+                                          filter_heading_info_df_across_refs=False,
                                           ):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
@@ -144,7 +144,7 @@ class _CompareYValues:
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions2(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                     heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                    filter_shared_stops_across_refs=filter_shared_stops_across_refs)
+                                                                    filter_heading_info_df_across_refs=filter_heading_info_df_across_refs)
             self.pooled_perc_info = make_variations_utils.make_pooled_perc_info_from_test_and_ctrl_heading_info_df(self.test_heading_info_df,
                                                                                                                    self.ctrl_heading_info_df, verbose=verbose)
 
@@ -182,7 +182,7 @@ class _CompareYValues:
                           heading_info_df_exists_ok: bool = True,
                           verbose: bool = False,
                           save_data: bool = True,
-                          filter_shared_stops_across_refs=True,
+                          filter_heading_info_df_across_refs=False,
                           **kwargs):
         """
         Unified builder for median-info DataFrames.
@@ -236,7 +236,7 @@ class _CompareYValues:
             stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
             save_data=save_data,
             combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
-            filter_shared_stops_across_refs=filter_shared_stops_across_refs,
+            filter_heading_info_df_across_refs=filter_heading_info_df_across_refs,
         )
 
         df = cfg["make_fn"](self.test_heading_info_df,
@@ -262,21 +262,24 @@ class _CompareYValues:
                                                            combd_heading_df_x_sessions_exists_ok=True,
                                                            stops_near_ff_df_exists_ok=True,
                                                            save_data=True,
-                                                           filter_shared_stops_across_refs=True,
+                                                           filter_heading_info_df_across_refs=False,
                                                            **kwargs
                                                            ):
-        if filter_shared_stops_across_refs:
+        if filter_heading_info_df_across_refs:
             self.get_test_and_ctrl_heading_info_df_across_sessions_filtered()
             self.test_heading_info_df = self.all_test_heading_info_df_filtered
             self.ctrl_heading_info_df = self.all_ctrl_heading_info_df_filtered
 
             def _filter_by_ref(df, mode, value):
                 return df[(df["ref_point_mode"] == mode) &
-                        (df["ref_point_value"] == value)].copy()
+                          (df["ref_point_value"] == value)].copy()
 
-            self.test_heading_info_df = _filter_by_ref(self.test_heading_info_df, ref_point_mode, ref_point_value)
-            print('self.test_heading_info_df.shape', self.test_heading_info_df.shape)
-            self.ctrl_heading_info_df = _filter_by_ref(self.ctrl_heading_info_df, ref_point_mode, ref_point_value)
+            self.test_heading_info_df = _filter_by_ref(
+                self.test_heading_info_df, ref_point_mode, ref_point_value)
+            print('self.test_heading_info_df.shape',
+                  self.test_heading_info_df.shape)
+            self.ctrl_heading_info_df = _filter_by_ref(
+                self.ctrl_heading_info_df, ref_point_mode, ref_point_value)
 
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions(

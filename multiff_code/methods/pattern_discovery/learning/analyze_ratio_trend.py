@@ -16,7 +16,8 @@ from math import sqrt
 import statsmodels.api as sm
 
 
-def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_col="stops"):
+def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_col="stops",
+                         title=None, ylabel="P(Events | Baseline)"):
 
     glm_pois = smf.glm(
         f"{event_count_col} ~ session",
@@ -35,18 +36,21 @@ def evaluate_ratio_trend(df_sess_counts, event_count_col="success", denom_count_
 
     # Get p-value from results
     pval = results_df.iloc[0]['pval']
+    
+    if title is None:
+        title = f"Ratio of {event_count_col}"
 
     plot_poisson_ratio_fit_generic(
         df_sess_counts, glm_pois,
         session_col="session", event_count_col=event_count_col, denom_count_col=denom_count_col,
-        title=f"Ratio of {event_count_col}", ylabel=f"Ratio of {event_count_col}",
+        title=title, ylabel=ylabel,
         pval=pval
     )
 
     plot_early_late_ratio(
         df_sess_counts,
         session_col="session", event_count_col=event_count_col, denom_count_col=denom_count_col,
-        ylabel=f"P({event_count_col} | {denom_count_col})", title="Early vs Late (custom)",
+        ylabel=ylabel, title="Early vs Late",
         pval=pval
     )
 
@@ -156,9 +160,9 @@ def plot_poisson_ratio_fit_generic(
     y_max = max(plot_df["p_hi"].max(), pred_df["fit_hi"].max())
     plt.ylim(y_min * 0.9, y_max * 1.2)
 
-    plt.xlabel("Session")
-    plt.ylabel(ylabel)
-    plt.title(title)
+    plt.xlabel("Session", fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.title(title, fontsize=13)
     plt.legend()
 
     # Format y-axis as percentages
@@ -282,7 +286,7 @@ def plot_early_late_ratio(
 
     # X labels
     ax.set_xticks(x)
-    ax.set_xticklabels(["Early", "Late"], fontsize=12)
+    ax.set_xticklabels(["Early 1/3 sessions", "Late 2/3 sessions"], fontsize=12)
 
     # k/n labels above bars
     for xi, yi, k, n in zip(x, pct, dfp[event_count_col], dfp[denom_count_col]):
@@ -317,3 +321,17 @@ def plot_early_late_ratio(
     print(dfp[["phase"] + display_cols].to_string(index=False))
 
     return dfp[["phase"] + display_cols]
+
+
+def show_event_ratio(df_monkey, event):
+    df_event = df_monkey[df_monkey['Item'] == event].sort_values(by='Session').reset_index(drop=True)
+
+    event_count_col = event
+    denom_count_col = "all_trial_count"
+
+    df_event.rename(columns={'Session': 'session',
+                            'Frequency':event_count_col,
+                            'N_total': denom_count_col,
+                            }, inplace=True)
+
+    evaluate_ratio_trend(df_event, event_count_col=event_count_col, denom_count_col=denom_count_col)

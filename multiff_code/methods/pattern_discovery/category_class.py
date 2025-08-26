@@ -8,6 +8,7 @@ from data_wrangling import specific_utils, general_utils
 
 import os
 from math import pi
+import math
 import os
 import os.path
 import pandas as pd
@@ -188,6 +189,12 @@ class ProcessCategoryData:
         # sample from it so the size is the same as target_cluster_info
         ax.scatter(self.sort_2_df_sample['last_vis_ang'], self.sort_2_df_sample['last_vis_dist'],
                    c="red", alpha=0.4, zorder=2, s=5, marker='o')  # originally it was s=15
+        
+        
+        ax.set_thetamin(-45)
+        ax.set_thetamax(45)
+
+        
         plt.title("Firefly Last Seen Positions", fontsize=17)
         plt.legend(labels=[self.sort_1_name, self.sort_2_name],
                    fontsize=13, loc="upper right")
@@ -198,45 +205,52 @@ class ProcessCategoryData:
 
         variable_of_interest = "time_since_last_vis"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots(figsize=(8, 6))
+            fig, axes = plt.subplots(figsize=(8, 5))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False,
                          alpha=0.4, color="green", binwidth=0.1, stat="probability")
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
                          alpha=0.4, color="blue", binwidth=0.1, stat="probability")
-            axes.set_title("Time Since Firefly Last Visible", fontsize=17)
-            axes.set_xlim([0, 6])
-            axes.set_xlabel("Time (s)", fontsize=15)
+            axes.set_title("Time Since Firefly Last Visible", fontsize=19)
+            max_time = max(self.sort_1_df[variable_of_interest].max(), self.sort_2_df[variable_of_interest].max())
+            axes.set_xlim([0, max_time])
+            axes.set_xlabel('')
             plt.legend(labels=[self.sort_1_name, self.sort_2_name],
                        fontsize=13, loc="upper right")
             plt.show()
 
         variable_of_interest = "abs_last_vis_ang"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots(figsize=(8, 6))
-            sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False, binwidth=0.02,
+            fig, axes = plt.subplots(figsize=(8, 5))
+            
+            sort_1_angles = self.sort_1_df[variable_of_interest] * 180 / np.pi
+            sort_2_angles = self.sort_2_df[variable_of_interest] * 180 / np.pi
+            
+            sns.histplot(data=sort_1_angles, kde=False, binwidth=5,
                          alpha=0.3, color="green", stat="probability", edgecolor='grey')
-            sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
-                         binwidth=0.02, alpha=0.3, color="blue", stat="probability", edgecolor='grey')
-            axes.set_title("Abs Angle of Firefly Last Visible", fontsize=17)
-            axes.set_xlabel("Angle (rad)", fontsize=15)
-            axes.set_xticks(np.arange(0.0, 0.9, 0.2))
-            axes.set_xticks(axes.get_xticks())
-            axes.set_xticklabels(np.arange(0.0, 0.9, 0.2).round(1))
-            axes.set_xlim(0, 0.7)
+            sns.histplot(data=sort_2_angles, kde=False,
+                         binwidth=5, alpha=0.3, color="blue", stat="probability", edgecolor='grey')
+            
+            max_angle = max(sort_1_angles.max(), sort_2_angles.max())
+            axes.set_title("Abs Angle of Firefly Last Visible", fontsize=19)
+            axes.set_xlabel('')
+            # axes.set_xticks(np.arange(0.0, 0.9, 0.2))
+            # axes.set_xticks(axes.get_xticks())
+            # axes.set_xticklabels(np.arange(0.0, 0.9, 0.2).round(1))
+            axes.set_xlim(0, max_angle)
             plt.legend(labels=[self.sort_1_name, self.sort_2_name],
                        fontsize=13, loc="upper right")
             plt.show()
 
         variable_of_interest = "abs_last_vis_ang_to_bndry"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots(figsize=(8, 6))
+            fig, axes = plt.subplots(figsize=(8, 5))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False, binwidth=0.02,
                          alpha=0.3, color="green", stat="probability", edgecolor='grey')
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
                          binwidth=0.02, alpha=0.3, color="blue", stat="probability", edgecolor='grey')
             axes.set_title(
-                "Abs Angle to Boundary of Firefly Last Visible", fontsize=17)
-            axes.set_xlabel("Angle (rad)", fontsize=15)
+                "Abs Angle to Boundary of Firefly Last Visible", fontsize=19)
+            axes.set_xlabel('')
             axes.set_xticks(np.arange(0.0, 0.9, 0.2))
             axes.set_xticks(axes.get_xticks())
             axes.set_xticklabels(np.arange(0.0, 0.9, 0.2).round(1))
@@ -247,14 +261,14 @@ class ProcessCategoryData:
 
         variable_of_interest = "last_vis_dist"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots(figsize=(8, 6))
+            fig, axes = plt.subplots(figsize=(8, 5))
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False, alpha=0.3,
                          color="green", binwidth=10, stat="probability",  edgecolor='grey')
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False, alpha=0.3,
                          color="blue", binwidth=10, stat="probability",  edgecolor='grey')
             axes.set_xlim(0, 400)
-            axes.set_title("Distance of Firefly Last Visible", fontsize=17)
-            axes.set_xlabel("Distance", fontsize=15)
+            axes.set_title("Distance of Firefly Last Visible", fontsize=19)
+            axes.set_xlabel('')
             xticklabels = axes.get_xticks().tolist()
             xticklabels = [str(int(label)) for label in xticklabels]
             xticklabels[-1] = '400+'

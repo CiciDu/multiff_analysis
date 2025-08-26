@@ -18,7 +18,7 @@ class _PlotVariations:
                                                 'whether_even_out_dist'],
                                             columns_to_find_unique_combinations_for_color=[],
                                             columns_to_find_unique_combinations_for_line=[],
-                                            add_error_bars=False,
+                                            add_error_bars= True,
                                             use_subplots_based_on_changeable_variables=False,
                                             ):
 
@@ -27,17 +27,23 @@ class _PlotVariations:
         if all_ref_median_info is None:
             all_ref_median_info = self.all_ref_pooled_median_info_heading
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
-                                                                                        fixed_variable_values_to_use,
-                                                                                        changeable_variables,
-                                                                                        x_var_column_list,
-                                                                                        y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                                                        se_column=se_column,
-                                                                                        # var_to_determine_x_offset_direction=None,
-                                                                                        var_to_determine_x_offset_direction='test_or_control',
-                                                                                        columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                        columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-                                                                                        use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
+        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
+                                                                                                   fixed_variable_values_to_use,
+                                                                                                   changeable_variables,
+                                                                                                   x_var_column_list,
+                                                                                                   y_var_column='diff_in_abs_angle_to_nxt_ff_median',
+                                                                                                   se_column=se_column,
+                                                                                                   # var_to_determine_x_offset_direction=None,
+                                                                                                   var_to_determine_x_offset_direction='test_or_control',
+                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                                   columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
+                                                                                                   use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
+
+        self.fig.update_layout(
+            title="Reference Point vs Absolute Angle Difference (Median ± 95% CI)",
+            xaxis_title="Reference Point Value (°)",
+            yaxis_title="Median Angle Difference to Next FF (°)"
+        )
 
     def plot_curv_in_all_ref_median_info(self,
                                          all_ref_median_info=None,
@@ -49,7 +55,7 @@ class _PlotVariations:
                                          columns_to_find_unique_combinations_for_color=[
                                              'curv_traj_window_before_stop'],
                                          columns_to_find_unique_combinations_for_line=[],
-                                         add_error_bars=False,
+                                         add_error_bars= True,
                                          use_subplots_based_on_changeable_variables=False):
 
         se_column = 'diff_in_abs_d_curv_boot_med_std' if add_error_bars else None
@@ -57,17 +63,24 @@ class _PlotVariations:
         if all_ref_median_info is None:
             all_ref_median_info = self.all_ref_pooled_median_info_curv
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
-                                                                                        fixed_variable_values_to_use,
-                                                                                        changeable_variables,
-                                                                                        x_var_column_list,
-                                                                                        y_var_column='diff_in_abs_d_curv_median',
-                                                                                        se_column=se_column,
-                                                                                        # var_to_determine_x_offset_direction=None,
-                                                                                        var_to_determine_x_offset_direction='test_or_control',
-                                                                                        columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                        columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-                                                                                        use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
+        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
+                                                                                                   fixed_variable_values_to_use,
+                                                                                                   changeable_variables,
+                                                                                                   x_var_column_list,
+                                                                                                   y_var_column='diff_in_abs_d_curv_median',
+                                                                                                   se_column=se_column,
+                                                                                                   # var_to_determine_x_offset_direction=None,
+                                                                                                   var_to_determine_x_offset_direction='test_or_control',
+                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                                   columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
+                                                                                                   use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
+
+        self.fig.update_layout(
+            title="Reference Point vs Difference in Curvature Across Two Arc Pairs (Median ± 95% CI)",
+            xaxis_title="Reference Point Value (°)",
+            yaxis_title="Difference in Curvature Across Two Arc Pairs (°/m)"
+        )
+
 
     def plot_heading_in_all_ref_median_info_across_monkeys_and_arc_types(self,
                                                                          all_ref_median_info=None,
@@ -135,7 +148,7 @@ class _PlotVariations:
                                     changeable_variables=[
                                         'whether_even_out_dist'],
                                     columns_to_find_unique_combinations_for_color=[],
-                                    add_error_bars=False,
+                                    add_error_bars= True,
                                     use_subplots_based_on_changeable_variables=False):
 
         se_column = 'perc_se' if add_error_bars else None
@@ -146,17 +159,25 @@ class _PlotVariations:
         perc_info = process_variations_utils.make_new_df_for_plotly_comparison(
             perc_info, match_rows_based_on_ref_columns_only=False)
 
-        plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(perc_info,
-                                                                                        fixed_variable_values_to_use,
-                                                                                        changeable_variables,
-                                                                                        x_var_column_list,
-                                                                                        y_var_column='perc',
-                                                                                        se_column=se_column,
-                                                                                        var_to_determine_x_offset_direction='test_or_control',
-                                                                                        columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                        use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
-                                                                                        )
+        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(perc_info,
+                                                                                                   fixed_variable_values_to_use,
+                                                                                                   changeable_variables,
+                                                                                                   x_var_column_list,
+                                                                                                   y_var_column='perc',
+                                                                                                   se_column=se_column,
+                                                                                                   var_to_determine_x_offset_direction='test_or_control',
+                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+                                                                                                   use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
+                                                                                                   )
 
+
+        self.fig.update_layout(
+            title="Same-Side Stop Rate (Median ± 2 Bootstrap SE)",
+            xaxis_title=None,
+            yaxis_title="Same-Side Stop Rate"
+        )
+
+    
     def plot_direction_in_perc_info_across_monkeys(self,
                                                    perc_info=None,
                                                    x_var_column_list=[

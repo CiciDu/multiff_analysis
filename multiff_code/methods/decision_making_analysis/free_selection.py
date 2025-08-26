@@ -23,7 +23,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, ff_caught_T_new, num_ff_per_row=3, guarantee_including_target_info=True, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
+def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_position_sorted, monkey_information, ff_caught_T_new, num_ff_per_row=3, guarantee_including_target_info=True, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='time_since_last_vis',
                                 placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=0, placeholder_ff_angle_boundary=0, placeholder_time_since_last_vis=3, curv_of_traj_df=None,
                                 add_arc_info=False, curvature_df=None, arc_info_to_add=['opt_arc_curv', 'curv_diff']):
     if only_select_n_ff_case is not None:
@@ -114,11 +114,11 @@ def find_free_selection_x_from_info_of_n_ff_per_point(
     free_selection_x_df_for_plotting = pd.DataFrame()
     pred_var = []
     sequence_of_obs_ff_indices = []
-    
+
     if ('mask' in info_of_n_ff_per_point.columns
         and (info_of_n_ff_per_point['mask'].sum() / len(info_of_n_ff_per_point)) > 0
         and (info_of_n_ff_per_point['mask'].sum() / len(info_of_n_ff_per_point)) < 1
-    ):
+        ):
         ff_attributes.append('mask')
 
     for i in range(num_ff_per_row):
@@ -325,7 +325,7 @@ def guarantee_ff_dataframe_include_target_info(target_info, ff_dataframe_sub, ff
     return ff_dataframe_sub
 
 
-def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=3, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='abs_ff_angle',
+def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=3, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='time_since_last_vis',
                                                    placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=math.pi/4, placeholder_ff_angle_boundary=math.pi/4, placeholder_time_since_last_vis=3,
                                                    placeholder_time_till_next_visible=10, placeholder_curv_diff=0.6, curv_of_traj_df=None):
 

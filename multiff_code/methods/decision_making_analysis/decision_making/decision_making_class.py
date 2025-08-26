@@ -241,7 +241,7 @@ class DecisionMaking(decision_making_helper_class.DecisionMakingHelper):
     def use_machine_learning_model_for_classification(self, model=None):
 
         self.model, self.y_pred, self.model_comparison_df = classification_utils.ml_model_for_classification(
-            self.X_train, self.y_train, self.X_test, self.y_test, model=model,
+            self.X_train, self.y_train, self.X_test, self.y_test,
         )
         self.y_pred = self.y_pred.ravel()
 
