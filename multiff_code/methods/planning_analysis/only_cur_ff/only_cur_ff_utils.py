@@ -88,9 +88,9 @@ def get_only_cur_ff_df(closest_stop_to_capture_df, ff_real_position_sorted, ff_c
     d_heading_var = 'cntr_arc_d_heading' if use_curv_to_ff_center else 'opt_arc_d_heading'
 
     df[['cur_opt_arc_d_heading', 'd_heading_of_traj']
-       ] = df[[d_heading_var, 'd_heading_of_traj']]*180/math.pi
+       ] = df[[d_heading_var, 'd_heading_of_traj']]
 
-    df['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_180(
+    df['d_heading_of_traj'] = find_cvn_utils.confine_angle_to_within_one_pie(
         df['d_heading_of_traj'].values)
     df['diff_in_d_heading_to_cur_ff'] = df['d_heading_of_traj'] - \
         df['cur_opt_arc_d_heading']

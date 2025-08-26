@@ -317,7 +317,8 @@ class GPFAHelperClass():
         return
 
     def plot_time_resolved_regression(self, time_resolved_cv_scores=None, features_to_plot=None,
-                                      features_not_to_plot=None, score_threshold_to_plot=None, rank_by_max_score=True):
+                                      features_not_to_plot=None, score_threshold_to_plot=None, rank_by_max_score=True,
+                                      n_behaviors_per_plot=4):
         if not hasattr(self, 'event_time'):
             self.event_time = None
         if time_resolved_cv_scores is None:
@@ -325,7 +326,8 @@ class GPFAHelperClass():
         plot_time_resolved_regression._plot_time_resolved_regression(time_resolved_cv_scores, event_time=self.event_time,
                                                                      rank_by_max_score=rank_by_max_score,
                                                                      features_to_plot=features_to_plot, features_not_to_plot=features_not_to_plot,
-                                                                     score_threshold_to_plot=score_threshold_to_plot)
+                                                                     score_threshold_to_plot=score_threshold_to_plot,
+                                                                     n_behaviors_per_plot=n_behaviors_per_plot)
 
     def plot_trial_counts_by_timepoint(self):
         plot_time_resolved_regression.plot_trial_counts_by_timepoint(

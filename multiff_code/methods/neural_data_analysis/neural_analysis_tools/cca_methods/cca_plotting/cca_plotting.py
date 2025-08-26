@@ -16,7 +16,8 @@ import math
 
 def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values=None, matrix_label='X',
                          max_components=20, features_per_fig=30, base_width=0.75, base_height=0.3,
-                         annotation_threshold=0.2, pval_threshold=0.05):
+                         annotation_threshold=0.2, pval_threshold=0.05,
+                         title_prefix=None):
     """
     Plots a heatmap of canonical loadings with features on y-axis and components on x-axis,
     split across multiple figures if needed. Adds asterisk for significant p-values and annotates
@@ -65,7 +66,11 @@ def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values
         im = ax.imshow(submatrix, aspect='auto',
                        cmap='RdBu_r', vmin=vmin, vmax=vmax)
 
-        ax.set_title(f'{matrix_label} Loadings (Features {start}-{end})')
+
+        if title_prefix is None:
+            ax.set_title(f'{matrix_label} Loadings (Features {start}-{end})', fontsize=14)
+        else:
+            ax.set_title(f'{title_prefix} Loadings (Features {start}-{end})', fontsize=14)
 
         # X-axis labels
         ax.set_xticks(range(max_components))
@@ -83,7 +88,7 @@ def plot_loading_heatmap(loadings, feature_names, canonical_corrs=None, p_values
 
         # Y-axis labels
         ax.set_yticks(range(num_rows))
-        ax.set_yticklabels(feature_names[start:end], fontsize=8)
+        ax.set_yticklabels(feature_names[start:end], fontsize=10)
 
         # Annotate values greater than threshold
         for row in range(num_rows):

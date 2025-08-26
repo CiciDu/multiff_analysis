@@ -38,7 +38,12 @@ def plot_cca_cv_results(
         filter_significant, significance_threshold, sort_by_significance
     )
 
-    title = f"Canonical Loading - {data_type} - Component {component}" if not use_cross_view_corr else f"Cross-View Correlation - {data_type}"
+    if data_type == 'X1':
+        title = f"Canonical Loading - Neural Data - Component {component}" if not use_cross_view_corr else f"Cross-View Correlation - Neural Data"
+    elif data_type == 'X2':
+        title = f"Canonical Loading - Behavioral Feature - Component {component}" if not use_cross_view_corr else f"Cross-View Correlation - Behavioral Feature"
+    else:
+        raise ValueError(f"Invalid data_type: {data_type}")
 
     if filter_significant:
         flip_y_axis = True
@@ -132,7 +137,8 @@ def _plot_bars(values_train, values_test, errors_train, errors_test, labels, tit
         # Single plot case
         _plot_single_bar_subplot(
             values_train, values_test, errors_train, errors_test, labels,
-            ylabel, title, use_cross_view_corr=use_cross_view_corr
+            ylabel, title, use_cross_view_corr=use_cross_view_corr,
+            flip_y_axis=flip_y_axis
         )
     else:
                 # Multiple subplots case
@@ -206,16 +212,22 @@ def _plot_bars(values_train, values_test, errors_train, errors_test, labels, tit
 
 
 
-def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_test, labels, ylabel, title, ax=None, use_cross_view_corr=True):
+def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_test, labels, ylabel, title, ax=None, use_cross_view_corr=True, flip_y_axis=False):
     """
     Create a single bar subplot with train/test mean ± std.
     """
     if len(labels) == 0:
         return
 
+
+    if flip_y_axis:
+        values_train, values_test, errors_train, errors_test, labels = values_train[::-1], values_test[::-1], errors_train[::-1], errors_test[::-1], labels[::-1]
+        
+        
     if ax is None:
         # Single plot case
-        fig, ax = plt.subplots(figsize=(7, max(5, len(labels) * 0.25)))
+        # fig, ax = plt.subplots(figsize=(7, max(5, len(labels) * 0.25)))
+        fig, ax = plt.subplots(figsize=(10, max(5, len(labels) * 0.5)))
         single_plot = True
     else:
         single_plot = False
@@ -239,6 +251,7 @@ def _plot_single_bar_subplot(values_train, values_test, errors_train, errors_tes
     ax.set_title(title, fontsize=14)
     ax.legend()
 
+        
     if single_plot:
         plt.tight_layout()
         plt.show()

@@ -102,7 +102,7 @@ class CCAclass():
         except ValueError as e:
             print("Warning: p_values not found. Error message:", e)
                 
-    def plot_X1_loadings(self, max_components=20, features_per_fig=30):
+    def plot_X1_loadings(self, max_components=20, features_per_fig=25):
         if not hasattr(self, 'p_values'):
             self.test_for_p_values()
             
@@ -113,10 +113,11 @@ class CCAclass():
             max_components=max_components,
             features_per_fig=features_per_fig,
             canonical_corrs=self.canon_corr,
-            p_values=self.p_values
+            p_values=self.p_values,
+            title_prefix='Neural Data'
         )
 
-    def plot_X2_loadings(self, max_components=20, features_per_fig=30):
+    def plot_X2_loadings(self, max_components=20, features_per_fig=20):
         if not hasattr(self, 'p_values'):
             self.test_for_p_values()
 
@@ -127,7 +128,8 @@ class CCAclass():
             max_components=max_components,
             features_per_fig=features_per_fig,
             canonical_corrs=self.canon_corr,
-            p_values=self.p_values
+            p_values=self.p_values,
+            title_prefix='Behavioral Feature'
         )
 
     def plot_ranked_loadings(self, keep_one_value_for_each_feature=False, max_plots_to_show=5, max_features_to_show_per_plot=10,

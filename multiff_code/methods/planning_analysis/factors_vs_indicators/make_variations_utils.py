@@ -529,17 +529,15 @@ def _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=True
     
     for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
         for opt_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
-            # suppress printed output
-            with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-                ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                         opt_arc_type=opt_arc_type)
-                func = ps.make_or_retrieve_all_ref_pooled_median_info if not per_sess else ps.make_or_retrieve_all_ref_per_sess_median_info                                                         
-                temp_info = func(exists_ok=exists_ok,
-                                pooled_median_info_exists_ok=pooled_median_info_exists_ok,
-                                process_info_for_plotting=False
-                                )
-                all_info = pd.concat(
-                    [all_info, temp_info], axis=0)
+            ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
+                                                                        opt_arc_type=opt_arc_type)
+            func = ps.make_or_retrieve_all_ref_pooled_median_info if not per_sess else ps.make_or_retrieve_all_ref_per_sess_median_info                                                         
+            temp_info = func(exists_ok=exists_ok,
+                            pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                            process_info_for_plotting=False
+                            )
+            all_info = pd.concat(
+                [all_info, temp_info], axis=0)
     all_info.reset_index(drop=True, inplace=True)
     return all_info
 
@@ -548,14 +546,13 @@ def combine_pooled_perc_info_across_monkeys(pooled_perc_info_exists_ok=True):
     pooled_perc_info = pd.DataFrame([])
     opt_arc_type = 'norm_opt_arc' # this doesn't matter for perc info
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
-        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-            ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                     opt_arc_type=opt_arc_type
-                                                                     )
-            temp_pooled_perc_info = ps.make_or_retrieve_pooled_perc_info(exists_ok=pooled_perc_info_exists_ok,
-                                                                         )
-            pooled_perc_info = pd.concat(
-                [pooled_perc_info, temp_pooled_perc_info], axis=0)
+        ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
+                                                                    opt_arc_type=opt_arc_type
+                                                                    )
+        temp_pooled_perc_info = ps.make_or_retrieve_pooled_perc_info(exists_ok=pooled_perc_info_exists_ok,
+                                                                        )
+        pooled_perc_info = pd.concat(
+            [pooled_perc_info, temp_pooled_perc_info], axis=0)
     pooled_perc_info.reset_index(drop=True, inplace=True)
     return pooled_perc_info
 
@@ -564,14 +561,13 @@ def combine_per_sess_perc_info_across_monkeys(per_sess_perc_info_exists_ok=True)
     per_sess_perc_info = pd.DataFrame([])
     opt_arc_type = 'norm_opt_arc' # this doesn't matter for perc info
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
-        with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
-            ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                     opt_arc_type=opt_arc_type
-                                                                     )
-            temp_per_sess_perc_info = ps.make_or_retrieve_per_sess_perc_info(exists_ok=per_sess_perc_info_exists_ok,
-                                                                         )
-            per_sess_perc_info = pd.concat(
-                [per_sess_perc_info, temp_per_sess_perc_info], axis=0)
+        ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
+                                                                    opt_arc_type=opt_arc_type
+                                                                    )
+        temp_per_sess_perc_info = ps.make_or_retrieve_per_sess_perc_info(exists_ok=per_sess_perc_info_exists_ok,
+                                                                        )
+        per_sess_perc_info = pd.concat(
+            [per_sess_perc_info, temp_per_sess_perc_info], axis=0)
     per_sess_perc_info.reset_index(drop=True, inplace=True)
     return per_sess_perc_info
 

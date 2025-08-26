@@ -130,7 +130,7 @@ def plot_monkey_info_for_ff_in_past_or_future(fig, monkey_info_for_ff_in_past_or
 def make_current_traj_df(current_traj_points, current_stops, trajectory_features):
     current_traj_df = pd.DataFrame(
         current_traj_points.T, columns=trajectory_features)
-    current_traj_df['monkey_angle_to_origin'] = current_traj_df['monkey_angle_to_origin'] * 180 / math.pi
+    current_traj_df['monkey_angle_to_origin'] = current_traj_df['monkey_angle_to_origin']
     current_traj_df['whether_stopped'] = current_stops
     current_traj_df.loc[current_traj_df['whether_stopped']
                         == 1, 'whether_stopped'] = 'has stop'
@@ -157,8 +157,8 @@ def find_monkey_info_when_ff_last_seen(current_ff_df, last_seen_ff_numbers):
                                                   'distance_from_monkey_now_to_ff_when_ff_last_seen': 'distance_from_monkey_now_to_ff_then',
                                                   'angle_from_monkey_now_to_ff_when_ff_last_seen': 'angle_from_monkey_now_to_ff_then'
                                                   }, inplace=True)
-    monkey_info_when_ff_last_seen['angle_from_monkey_now_to_ff_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_ff_then']*180/math.pi
-    monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then']*180/math.pi
+    monkey_info_when_ff_last_seen['angle_from_monkey_now_to_ff_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_ff_then']
+    monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then']i
     monkey_info_when_ff_last_seen['time_label'] = 'Past'
     return monkey_info_when_ff_last_seen
 
@@ -179,8 +179,8 @@ def find_monkey_info_when_ff_next_seen(current_ff_df, next_seen_ff_numbers):
                                                   'angle_from_monkey_now_to_monkey_when_ff_next_seen': 'angle_from_monkey_now_to_monkey_then',
                                                   'distance_from_monkey_now_to_ff_when_ff_next_seen': 'distance_from_monkey_now_to_ff_then',
                                                   'angle_from_monkey_now_to_ff_when_ff_next_seen': 'angle_from_monkey_now_to_ff_then'}, inplace=True)
-    monkey_info_when_ff_next_seen['angle_from_monkey_now_to_ff_then'] = monkey_info_when_ff_next_seen['angle_from_monkey_now_to_ff_then']*180/math.pi
-    monkey_info_when_ff_next_seen['angle_from_monkey_now_to_monkey_then'] = monkey_info_when_ff_next_seen['angle_from_monkey_now_to_monkey_then']*180/math.pi
+    monkey_info_when_ff_next_seen['angle_from_monkey_now_to_ff_then'] = monkey_info_when_ff_next_seen['angle_from_monkey_now_to_ff_then']
+    monkey_info_when_ff_next_seen['angle_from_monkey_now_to_monkey_then'] = monkey_info_when_ff_next_seen['angle_from_monkey_now_to_monkey_then']
     monkey_info_when_ff_next_seen['time_label'] = 'Future'
     return monkey_info_when_ff_next_seen
 

@@ -37,10 +37,13 @@ def plot_trial_counts_by_timepoint(time_resolved_cv_scores, trial_column='trial_
 def _agg_info_across_folds(time_resolved_cv_scores, group_cols=['feature', 'new_bin']):
     group_cols = ['feature', 'new_bin']
 
+    cols = [col for col in ['r2', 'bin_mid_time', 'trial_count', 'train_trial_count', 'test_trial_count'] if col in time_resolved_cv_scores.columns]
+
+
     # Dynamically construct the aggregation dictionary
     agg_dict = {
         col: ['mean', 'std'] if col == 'r2' else 'mean'
-        for col in ['r2', 'bin_mid_time', 'trial_count', 'train_trial_count', 'test_trial_count']
+        for col in cols
     }
 
     # Group and aggregate
@@ -66,7 +69,8 @@ def _agg_info_across_folds(time_resolved_cv_scores, group_cols=['feature', 'new_
 def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xticks=True,
                                    event_time=None, features_to_plot=None, features_not_to_plot=None,
                                    rank_by_max_score=True,
-                                   score_threshold_to_plot=None):
+                                   score_threshold_to_plot=None,
+                                   n_behaviors_per_plot = 4):
     """
     Plot time-resolved regression R² scores over time for each behavior.
 
@@ -93,7 +97,7 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
     else:
         behaviorals = list(behaviorals)
 
-    n_behaviors_per_plot = 4
+    
     xticks = None
     xtick_labels = None
 
@@ -107,22 +111,26 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
             for row in min_trial_counts.itertuples()
         ]
 
+
     def finalize_plot():
         plt.axhline(0, color='gray', lw=2)
-        plt.xlabel(
-            'Time (s)' + ('\nTrial count' if show_counts_on_xticks else ''))
+        plt.xlabel('Time (s)' + ('\nTrial count' if show_counts_on_xticks else ''))
         plt.ylabel('Cross-validated $R^2$')
         plt.title('Time-Resolved Regression Performance')
         plt.ylim(-2, 1.03)
         plt.legend(fontsize=10, loc='lower left')
         plt.grid(True)
         if xtick_labels is not None:
-            plt.xticks(xticks,
-                       xtick_labels, ha='right', rotation=0)
+            # choose spacing factor, e.g. every 4th tick
+            step = max(1, len(xticks) // 10)  # keep ~10 ticks at most
+            sparse_xticks = xticks[::step]
+            sparse_xtick_labels = xtick_labels[::step]
+            plt.xticks(sparse_xticks, sparse_xtick_labels, ha='right', rotation=0)
         if event_time is not None:
             plt.axvline(event_time, color='red', linestyle='--')
         plt.tight_layout()
         plt.show()
+
 
     if features_not_to_plot is None:
         features_not_to_plot = [
@@ -139,7 +147,7 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
         if b % n_behaviors_per_plot == 0:
             if any_plots:
                 finalize_plot()
-            plt.figure(figsize=(8, 4))
+            plt.figure(figsize=(8, 5))
             any_plots = True
 
         df_b = agg_df[agg_df['feature'] == behavior]

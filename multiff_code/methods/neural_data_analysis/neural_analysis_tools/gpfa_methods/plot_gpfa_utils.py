@@ -199,6 +199,34 @@ def plot_gpfa_traj_3d_uniform_color(trajectories,
     plt.show()
     return fig, ax
 
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from matplotlib.colors import Normalize
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+import random
+
+def _set_equal_aspect_3d(ax, X, Y, Z):
+    # Equal aspect box around data
+    x_range = np.nanmax(X) - np.nanmin(X)
+    y_range = np.nanmax(Y) - np.nanmin(Y)
+    z_range = np.nanmax(Z) - np.nanmin(Z)
+    max_range = max(x_range, y_range, z_range)
+    x_mid = (np.nanmax(X) + np.nanmin(X)) / 2
+    y_mid = (np.nanmax(Y) + np.nanmin(Y)) / 2
+    z_mid = (np.nanmax(Z) + np.nanmin(Z)) / 2
+    ax.set_xlim(x_mid - max_range/2, x_mid + max_range/2)
+    ax.set_ylim(y_mid - max_range/2, y_mid + max_range/2)
+    ax.set_zlim(z_mid - max_range/2, z_mid + max_range/2)
+    try:
+        ax.set_box_aspect([1,1,1])
+    except Exception:
+        pass
+
+
 
 def plot_gpfa_traj_3d_plotly(trajectories,
                              alpha_single_trial=0.1,
@@ -262,3 +290,110 @@ def plot_gpfa_traj_3d_plotly(trajectories,
 
     fig.show()
     return fig
+
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
+def plot_gpfa_traj_3d_timecolored_average(
+    trajectories,
+    linewidth_single_trial=0.5,
+    color_single_trial='C0',
+    alpha_single_trial=0.2,
+    linewidth_trial_average=3,
+    cmap_average='viridis',
+    show_colorbar=True,
+    start_end_markers=True,
+    start_marker='o',
+    end_marker='X',
+    marker_size=30,
+    view_azim=-5,
+    view_elev=60,
+    title='Latent dynamics extracted by GPFA'
+):
+    """
+    trajectories: iterable of arrays shaped (D, T), where D >= 3.
+    Only the first 3 dimensions are plotted.
+    """
+
+    # --- Convert to numpy and clip to first 3 dims
+    trajs = []
+    for tr in trajectories:
+        arr = np.asarray(tr, dtype=float)
+        if arr.ndim != 2:
+            raise ValueError(f"Each trajectory must be 2D (dims x time); got {arr.shape}.")
+        if arr.shape[0] < 3:
+            raise ValueError(f"Trajectory must have at least 3 dims; got {arr.shape[0]}.")
+        trajs.append(arr[:3])  # take first 3 dims
+
+    if len(trajs) == 0:
+        raise ValueError("No trajectories provided.")
+
+    # --- Figure setup
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title(title)
+    ax.set_xlabel('Dim 1')
+    ax.set_ylabel('Dim 2')
+    ax.set_zlabel('Dim 3')
+
+    # --- Single trials (uniform color)
+    for tr in trajs:
+        ax.plot(tr[0], tr[1], tr[2],
+                lw=linewidth_single_trial, c=color_single_trial, alpha=alpha_single_trial)
+
+    # --- NaN-padding for averaging
+    max_T = max(tr.shape[1] for tr in trajs)
+    padded = np.full((len(trajs), 3, max_T), np.nan)
+    for i, tr in enumerate(trajs):
+        T = tr.shape[1]
+        padded[i, :, :T] = tr
+
+    # Average across trials, ignoring NaNs
+    average_trajectory = np.nanmean(padded, axis=0)  # (3, max_T)
+    pts = average_trajectory.T                       # (max_T, 3)
+
+    # Build line segments
+    segs = np.stack([pts[:-1], pts[1:]], axis=1)   # (max_T-1, 2, 3)
+    t = np.linspace(0.0, 1.0, max_T)
+
+    lc = Line3DCollection(segs, cmap=cmap_average, norm=Normalize(vmin=0.0, vmax=1.0))
+    lc.set_array(t[:-1])
+    lc.set_linewidth(linewidth_trial_average)
+    ax.add_collection3d(lc)
+
+    # Start/end markers
+    if start_end_markers:
+        ax.scatter(*pts[0],  s=marker_size, marker=start_marker, label='start')
+        ax.scatter(*pts[-1], s=marker_size, marker=end_marker,  label='end')
+
+    if show_colorbar:
+        cb = fig.colorbar(lc, ax=ax, pad=0.1)
+        cb.set_label('time (normalized)')
+
+    # Axis limits
+    all_xyz = np.concatenate([tr.transpose(1,0) for tr in trajs] + [pts], axis=0)
+    ax.set_xlim(np.nanmin(all_xyz[:,0]), np.nanmax(all_xyz[:,0]))
+    ax.set_ylim(np.nanmin(all_xyz[:,1]), np.nanmax(all_xyz[:,1]))
+    ax.set_zlim(np.nanmin(all_xyz[:,2]), np.nanmax(all_xyz[:,2]))
+
+    if start_end_markers:
+        ax.legend(loc='best')
+    ax.view_init(azim=view_azim, elev=view_elev)
+
+    plt.tight_layout()
+    plt.show()
+    return fig, ax
+
+
+
+
+
+
+
+
+

@@ -44,7 +44,7 @@ def add_column_curv_of_traj_before_stop(df, curv_of_traj_df_w_one_sided_window):
     curv_of_traj_df_w_one_sided_window = curv_of_traj_df_w_one_sided_window[[
         'point_index', 'curv_of_traj']].copy()
     # change unit
-    curv_of_traj_df_w_one_sided_window['curv_of_traj'] = curv_of_traj_df_w_one_sided_window['curv_of_traj'] * 180/math.pi * 100
+    curv_of_traj_df_w_one_sided_window['curv_of_traj'] = curv_of_traj_df_w_one_sided_window['curv_of_traj']
     curv_of_traj_df_w_one_sided_window = curv_of_traj_df_w_one_sided_window.rename(columns={
         'point_index': 'point_index_before_stop',
         'curv_of_traj': 'curv_of_traj_before_stop'})
@@ -98,12 +98,6 @@ def _add_diff_in_abs_angle_to_nxt_ff(heading_info_df):
 def _add_diff_in_d_heading_to_cur_ff(heading_info_df):
     if 'd_heading_of_traj' not in heading_info_df.columns:
         heading_info_df = plan_factors_utils.add_d_heading_of_traj_to_df(heading_info_df)
-    # heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['d_heading_of_traj'] - \
-    #     heading_info_df['cur_opt_arc_d_heading']
-    # heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['diff_in_d_heading_to_cur_ff'] * 180/math.pi % 360
-    # heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > 180,
-    #                     'diff_in_d_heading_to_cur_ff'] = heading_info_df.loc[heading_info_df['diff_in_d_heading_to_cur_ff'] > 180,
-    #                                                                          'diff_in_d_heading_to_cur_ff'] - 360
 
     heading_info_df['diff_in_d_heading_to_cur_ff'] = heading_info_df['d_heading_of_traj'] - \
         heading_info_df['cur_opt_arc_d_heading']
@@ -178,19 +172,19 @@ def get_nxt_ff_last_seen_info_before_next_stop(nxt_ff_df_from_ref, ff_dataframe_
 def add_d_monkey_angle(plan_features1, cur_ff_df_from_ref, stops_near_ff_df):
     plan_features1 = plan_features1.merge(stops_near_ff_df[[
         'stop_point_index', 'stop_monkey_angle', 'monkey_angle_before_stop']], how='left')
-    cur_ff_df_from_ref['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df_from_ref['monkey_angle'] * 180 / math.pi
+    cur_ff_df_from_ref['monkey_angle_when_cur_ff_first_seen'] = cur_ff_df_from_ref['monkey_angle'] 
     if 'monkey_angle_when_cur_ff_first_seen' not in plan_features1.columns:
         plan_features1 = plan_features1.merge(cur_ff_df_from_ref[[
             'ff_index', 'monkey_angle_when_cur_ff_first_seen']], left_on='cur_ff_index', right_on='ff_index', how='left')
-    plan_features1['stop_monkey_angle'] = plan_features1['stop_monkey_angle'] * 180/math.pi
-    plan_features1['monkey_angle_before_stop'] = plan_features1['monkey_angle_before_stop'] * 180/math.pi
+    plan_features1['stop_monkey_angle'] = plan_features1['stop_monkey_angle'] 
+    plan_features1['monkey_angle_before_stop'] = plan_features1['monkey_angle_before_stop'] 
     plan_features1['d_monkey_angle_since_cur_ff_first_seen'] = plan_features1['stop_monkey_angle'] - \
         plan_features1['monkey_angle_when_cur_ff_first_seen']
     plan_features1['d_monkey_angle_since_cur_ff_first_seen2'] = plan_features1['monkey_angle_before_stop'] - \
         plan_features1['monkey_angle_when_cur_ff_first_seen']
-    plan_features1['d_monkey_angle_since_cur_ff_first_seen'] = find_cvn_utils.confine_angle_to_within_180(
+    plan_features1['d_monkey_angle_since_cur_ff_first_seen'] = find_cvn_utils.confine_angle_to_within_one_pie(
         plan_features1['d_monkey_angle_since_cur_ff_first_seen'].values)
-    plan_features1['d_monkey_angle_since_cur_ff_first_seen2'] = find_cvn_utils.confine_angle_to_within_180(
+    plan_features1['d_monkey_angle_since_cur_ff_first_seen2'] = find_cvn_utils.confine_angle_to_within_one_pie(
         plan_features1['d_monkey_angle_since_cur_ff_first_seen2'].values)
     return plan_features1
 
