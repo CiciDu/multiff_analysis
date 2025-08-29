@@ -1,6 +1,6 @@
 from decision_making_analysis.cluster_replacement import cluster_replacement_utils
 from decision_making_analysis.decision_making import decision_making_utils
-from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_helper_class, GUAT_utils
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT, GUAT_helper_class, GUAT_utils
 from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils, curv_of_traj_utils
 
@@ -29,9 +29,9 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.find_current_and_alternative_ff_info(columns_to_sort_nxt_ff_by=columns_to_sort_nxt_ff_by, max_cluster_distance=max_cluster_distance, max_time_since_last_vis=max_time_since_last_vis,
                                                   include_ff_in_near_future=include_ff_in_near_future, duration_into_future=duration_into_future, max_distance_to_stop=max_distance_to_stop)
 
-        self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info = GUAT_and_TAFT.add_curv_diff_and_ff_number_to_GUAT_cur_ff_info_and_GUAT_nxt_ff_info(self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info,
-                                                                                                                                          self.ff_caught_T_new, self.ff_real_position_sorted, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df
-                                                                                                                                          )
+        self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info = add_features_GUAT_and_TAFT.add_curv_diff_and_ff_number_to_GUAT_cur_ff_info_and_GUAT_nxt_ff_info(self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info,
+                                                                                                                                                       self.ff_caught_T_new, self.ff_real_position_sorted, self.monkey_information, curv_of_traj_df=self.curv_of_traj_df
+                                                                                                                                                       )
 
         # add time to self.GUAT_cur_ff_info and self.GUAT_nxt_ff_info
         self.GUAT_cur_ff_info['time'] = self.monkey_information.loc[
@@ -57,34 +57,34 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
         print('Note, the current value for max_cluster_distance is', max_cluster_distance,
               '. Please make sure that this is the same value used to make the GUAT_w_ff_df.')
-        GUAT_cur_ff_info = GUAT_and_TAFT.find_GUAT_cur_ff_info(self.GUAT_w_ff_df, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information,
-                                                               include_ff_in_near_future=include_ff_in_near_future, max_time_since_last_vis=max_time_since_last_vis,
-                                                               max_cluster_distance=max_cluster_distance, duration_into_future=duration_into_future,
-                                                               max_distance_to_stop=max_distance_to_stop)
-        GUAT_nxt_ff_info = GUAT_and_TAFT.find_GUAT_nxt_ff_info(GUAT_cur_ff_info, self.ff_dataframe, self.ff_real_position_sorted, self.monkey_information, include_ff_in_near_future=include_ff_in_near_future,
-                                                               max_time_since_last_vis=max_time_since_last_vis, duration_into_future=duration_into_future,
-                                                               max_distance_to_stop=max_distance_to_stop)
+        GUAT_cur_ff_info = add_features_GUAT_and_TAFT.find_GUAT_cur_ff_info(self.GUAT_w_ff_df, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information,
+                                                                            include_ff_in_near_future=include_ff_in_near_future, max_time_since_last_vis=max_time_since_last_vis,
+                                                                            max_cluster_distance=max_cluster_distance, duration_into_future=duration_into_future,
+                                                                            max_distance_to_stop=max_distance_to_stop)
+        GUAT_nxt_ff_info = add_features_GUAT_and_TAFT.find_GUAT_nxt_ff_info(GUAT_cur_ff_info, self.ff_dataframe, self.ff_real_position_sorted, self.monkey_information, include_ff_in_near_future=include_ff_in_near_future,
+                                                                            max_time_since_last_vis=max_time_since_last_vis, duration_into_future=duration_into_future,
+                                                                            max_distance_to_stop=max_distance_to_stop)
 
-        GUAT_cur_ff_info, GUAT_nxt_ff_info = GUAT_and_TAFT.retain_useful_cur_and_nxt_info(
+        GUAT_cur_ff_info, GUAT_nxt_ff_info = add_features_GUAT_and_TAFT.retain_useful_cur_and_nxt_info(
             GUAT_cur_ff_info, GUAT_nxt_ff_info)
 
         # The below can be replaced now because we're using the original GUAT_cur_ff_info + GUAT_nxt_ff_info as more_ff_df
         # if include_ff_in_near_future:
         #     unique_point_index_and_time_df = GUAT_cur_ff_info[['point_index', 'time', 'total_stop_time]].drop_duplicates()
-        #     ff_info, self.all_available_ff_in_near_future = GUAT_and_TAFT.find_additional_ff_info_for_near_future(unique_point_index_and_time_df, self.ff_dataframe_visible, self.ff_real_position_sorted, self.monkey_information,
+        #     ff_info, self.all_available_ff_in_near_future = add_features_GUAT_and_TAFT.find_additional_ff_info_for_near_future(unique_point_index_and_time_df, self.ff_dataframe_visible, self.ff_real_position_sorted, self.monkey_information,
         #                                                                                                           duration_into_future=duration_into_future)
-        #     ff_info, self.additional_curvature_df = GUAT_and_TAFT.find_curv_diff_for_ff_info(ff_info, self.monkey_information, self.ff_real_position_sorted, curv_of_traj_df=self.curv_of_traj_df)
+        #     ff_info, self.additional_curvature_df = add_features_GUAT_and_TAFT.find_curv_diff_for_ff_info(ff_info, self.monkey_information, self.ff_real_position_sorted, curv_of_traj_df=self.curv_of_traj_df)
         # else:
         #     self.additional_curvature_df, self.all_available_ff_in_near_future = None, None
         self.additional_curvature_df, self.all_available_ff_in_near_future = None, None
 
-        self.GUAT_cur_ff_info = GUAT_and_TAFT.polish_GUAT_cur_ff_info(
+        self.GUAT_cur_ff_info = add_features_GUAT_and_TAFT.polish_GUAT_cur_ff_info(
             GUAT_cur_ff_info)
-        self.GUAT_nxt_ff_info = GUAT_and_TAFT.polish_GUAT_nxt_ff_info(GUAT_nxt_ff_info, GUAT_cur_ff_info, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information, max_cluster_distance=max_cluster_distance,
-                                                                      columns_to_sort_nxt_ff_by=columns_to_sort_nxt_ff_by,
-                                                                      max_time_since_last_vis=max_time_since_last_vis, duration_into_future=duration_into_future)
+        self.GUAT_nxt_ff_info = add_features_GUAT_and_TAFT.polish_GUAT_nxt_ff_info(GUAT_nxt_ff_info, GUAT_cur_ff_info, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information, max_cluster_distance=max_cluster_distance,
+                                                                                   columns_to_sort_nxt_ff_by=columns_to_sort_nxt_ff_by,
+                                                                                   max_time_since_last_vis=max_time_since_last_vis, duration_into_future=duration_into_future)
 
-        self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info = GUAT_and_TAFT.make_sure_GUAT_nxt_ff_info_and_GUAT_cur_ff_info_have_the_same_point_indices(
+        self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info = add_features_GUAT_and_TAFT.make_sure_GUAT_nxt_ff_info_and_GUAT_cur_ff_info_have_the_same_point_indices(
             self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info)
 
         self.point_index_all = self.GUAT_cur_ff_info.point_index.unique()

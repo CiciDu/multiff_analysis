@@ -1,4 +1,4 @@
-from decision_making_analysis.GUAT import GUAT_and_TAFT
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT
 from data_wrangling import specific_utils
 
 import os
@@ -42,7 +42,7 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
             important_info[df] = pd.read_csv(os.path.join(folder, df+'.csv'))
 
         print('folder:', folder)
-        important_info, point_index_to_new_number_df = GUAT_and_TAFT.update_point_index_of_important_df_in_important_info_func(
+        important_info, point_index_to_new_number_df = add_features_GUAT_and_TAFT.update_point_index_of_important_df_in_important_info_func(
             important_info, new_point_index_start, point_index_column_name=point_index_column_name)
         new_point_index_start = point_index_to_new_number_df['new_number'].max(
         )+1

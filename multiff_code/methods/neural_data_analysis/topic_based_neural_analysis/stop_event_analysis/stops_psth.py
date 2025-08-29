@@ -1,13 +1,6 @@
 """
 Post-Stimulus Time Histogram (PSTH) analysis around stops (captures and misses)
-===============================================================================
-
-This module provides functions to analyze neural responses around different types of stops:
-- Captures: stops that resulted in successful firefly capture
-- Misses: stops that did not result in capture
-
-It extracts peri-event windows around stop events, bins spikes, computes firing rates,
-optionally baseline-normalizes them, and plots PSTHs with confidence bands.
+Optimized version: faster segment extraction (pure NumPy), cached arrays, optional batched bootstrap.
 """
 
 from __future__ import annotations
@@ -34,15 +27,9 @@ class PSTHConfig:
     min_trials: int = 5                     # minimum number of events required
 
     # Stop identification / cleaning
-    # classify stop as capture if within this of a capture time (s)
     capture_match_window: float = 0.3
-    # require speed==0 for at least this long to call a stop (s)
     min_stop_duration: float = 0.02
-    stop_debounce: float = 0.15             # merge stops closer than this (s)
-
-    # Boundary handling - removed boundary filtering
-    # exclude_boundary_stops: bool = True  # No longer used
-    # boundary_margin: float = 0.5         # No longer used
+    stop_debounce: float = 0.15
 
     # Normalization
     normalize: Optional[Literal["zscore", "sub", "div"]] = None
@@ -54,6 +41,7 @@ class PSTHConfig:
     ci_method: Literal["sem", "bootstrap"] = "sem"
     bootstrap_iters: int = 500
     alpha: float = 0.05                      # for bootstrap CIs
+    bootstrap_chunk: int = 64                # to bound memory during bootstrap
 
 
 # ----------------------------- Core Analyzer ---------------------------------
@@ -91,132 +79,106 @@ class PSTHAnalyzer:
         config : PSTHConfig, optional
             Configuration parameters for PSTH analysis
         captures_df : pd.DataFrame, optional
-            Pre-filtered captures dataframe. If provided, must have 'stop_time' (or 'time') 
-            and 'stop_point_index' (or 'point_index') columns. If provided along with 
-            no_capture_stops_df, will use these instead of built-in stop detection.
+            Pre-filtered captures dataframe with 'stop_time' (or 'time') and 'stop_point_index'/'point_index'.
         no_capture_stops_df : pd.DataFrame, optional
-            Pre-filtered no-capture stops dataframe. If provided, must have 'stop_time' (or 'time') 
-            and 'stop_point_index' (or 'point_index') columns. If provided along with 
-            captures_df, will use these instead of built-in stop detection.
+            Pre-filtered no-capture stops dataframe with 'stop_time' (or 'time') and 'stop_point_index'/'point_index'.
         """
-        self.spikes_df = spikes_df.copy()
-        self.spikes_df = self.spikes_df.sort_values(
-            "time").reset_index(drop=True)
+        self.spikes_df = spikes_df.copy().sort_values("time").reset_index(drop=True)
         if "cluster" not in self.spikes_df.columns:
             raise ValueError("spikes_df must have a 'cluster' column.")
 
-        self.monkey_information = monkey_information.copy()
+        self.monkey_information = monkey_information.copy().sort_values("time").reset_index(drop=True)
         if not {"time", "monkey_speeddummy"}.issubset(self.monkey_information.columns):
-            raise ValueError(
-                "monkey_information must have columns ['time', 'monkey_speeddummy'].")
+            raise ValueError("monkey_information must have columns ['time', 'monkey_speeddummy'].")
 
-        # Check if stop_event_id system is available, if not, warn user
+        # Warn if stop_event_id system isn't present (only relevant if you later use built-in detection)
         required_stop_cols = ["whether_new_distinct_stop", "stop_event_id"]
-        missing_stop_cols = [
-            col for col in required_stop_cols if col not in self.monkey_information.columns]
+        missing_stop_cols = [c for c in required_stop_cols if c not in self.monkey_information.columns]
         if missing_stop_cols:
-            print(
-                f"Warning: Missing stop_event_id system columns: {missing_stop_cols}")
-            print("Please run add_more_columns_to_monkey_information() on your monkey_information DataFrame first.")
-            print("The PSTH analysis will use the fallback stop detection method.")
+            print(f"Warning: Missing stop_event_id system columns: {missing_stop_cols}")
+            print("Please run add_more_columns_to_monkey_information() first if you rely on built-in stop detection.")
+            print("Using provided captures/no-captures dataframes (fallback) if given.")
 
-        self.monkey_information = self.monkey_information.sort_values(
-            "time").reset_index(drop=True)
-        self.ff_caught_T_new = np.asarray(ff_caught_T_new).astype(float)
+        self.ff_caught_T_new = np.asarray(ff_caught_T_new, dtype=float)
         if self.ff_caught_T_new.size == 0:
             raise ValueError("ff_caught_T_new is empty.")
 
         self.config = config or PSTHConfig()
-
-        # Store pre-filtered stop dataframes
         self.captures_df = captures_df
         self.no_capture_stops_df = no_capture_stops_df
 
-        # Map cluster ids to contiguous indices
-        self.clusters = np.array(
-            sorted(self.spikes_df["cluster"].unique().tolist()))
+        # Map cluster ids to contiguous indices (stable order)
+        self.clusters = np.array(sorted(self.spikes_df["cluster"].unique().tolist()))
         self.cluster_to_col = {c: i for i, c in enumerate(self.clusters)}
         self.n_clusters = len(self.clusters)
+
+        # Cache spike arrays to avoid repeated Series->NumPy conversion and hashing
+        self._spike_times: np.ndarray = self.spikes_df["time"].to_numpy()
+        self._spike_codes: np.ndarray = np.fromiter(
+            (self.cluster_to_col[c] for c in self.spikes_df["cluster"].to_numpy()),
+            count=len(self.spikes_df),
+            dtype=np.int32,
+        )
+
+        # Cache bin edges/centers and pre-mask (depends only on config)
+        self._edges, self._centers = self._make_time_edges_and_centers()
+        self._n_bins = len(self._centers)
+        self._pre_mask = self._centers < 0
 
         # Results
         self.stop_events: Optional[pd.DataFrame] = None
         self.psth_data: Dict = {}
 
+    # --------------------------- Stop events combiner -------------------------
 
     def identify_stop_events(self) -> pd.DataFrame:
         """
         Combine captures_df and no_capture_stops_df into a single stops dataframe.
-        Returns a DataFrame with columns ['stop_time', 'stop_point_index', 'stop_event_id'].
+        Returns DataFrame with columns ['stop_time', 'stop_point_index', 'stop_event_id', 'event_type'].
         """
         if self.captures_df is None or self.no_capture_stops_df is None:
-            raise ValueError(
-                "Both captures_df and no_capture_stops_df must be provided to use pre-filtered stops.")
+            raise ValueError("Both captures_df and no_capture_stops_df must be provided to use pre-filtered stops.")
 
-        # Prepare captures dataframe
-        captures_stops = self.captures_df.copy()
-        # Add stop_event_id for captures (sequential numbering)
-        captures_stops['stop_event_id'] = range(len(captures_stops))
-        captures_stops['event_type'] = 'capture'
+        def _prep(df: pd.DataFrame, label: str) -> pd.DataFrame:
+            out = df.copy()
+            if "stop_time" not in out.columns:
+                if "time" in out.columns:
+                    out = out.rename(columns={"time": "stop_time"})
+                else:
+                    raise ValueError(f"{label} dataframe missing 'stop_time' or 'time' column.")
+            if "stop_point_index" not in out.columns:
+                if "point_index" in out.columns:
+                    out = out.rename(columns={"point_index": "stop_point_index"})
+                else:
+                    # Make it optional; downstream doesn't strictly require the index
+                    out["stop_point_index"] = np.nan
+            out["event_type"] = label
+            return out[["stop_time", "stop_point_index", "event_type"]]
 
-        # Prepare no-capture stops dataframe
-        no_capture_stops = self.no_capture_stops_df.copy()
-        # Add stop_event_id for no-capture stops (continue numbering from captures)
-        no_capture_stops['stop_event_id'] = range(
-            len(captures_stops), len(captures_stops) + len(no_capture_stops))
-        no_capture_stops['event_type'] = 'miss'
+        cap = _prep(self.captures_df, "capture")
+        mis = _prep(self.no_capture_stops_df, "miss")
 
-        # Combine the dataframes
-        combined_stops = pd.concat([
-            captures_stops[['stop_time', 'stop_point_index', 'stop_event_id', 'event_type']],
-            no_capture_stops[['stop_time', 'stop_point_index', 'stop_event_id', 'event_type']]
-        ], ignore_index=True)
+        combined = pd.concat([cap, mis], ignore_index=True)
+        combined = combined.sort_values("stop_time", kind="mergesort").reset_index(drop=True)
+        combined["stop_event_id"] = np.arange(len(combined), dtype=int)
 
-        # Sort by stop_time
-        self.stop_events = combined_stops.sort_values(
-            'stop_time').reset_index(drop=True)
+        self.stop_events = combined
+        print("Combination of pre-filtered captures and no-capture stops complete.")
+        return self.stop_events
 
-        print('Combination of pre-filtered captures and no-capture stops complete.')
-
+    # ----------------------- Binning utilities (cached) -----------------------
 
     def _make_time_edges_and_centers(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create time bin edges and centers for PSTH analysis.
-        
-        This method calculates the number of bins for pre- and post-stop windows
-        and creates the corresponding time edges and bin centers.
-        
-        Returns
-        -------
-        edges : np.ndarray
-            Time bin edges from -pre_window to +post_window, shape (n_bins + 1,)
-        centers : np.ndarray
-            Time bin centers, shape (n_bins,)
-        """
+        """Create time bin edges and centers for PSTH analysis."""
         cfg = self.config
-        
-        # Calculate number of bins for pre-stop window
-        # n_pre_bins = pre_window_duration / bin_width (rounded to nearest integer)
-        # Default: pre_window=1.0s, bin_width=0.02s → n_pre_bins = 50 bins
         n_bins_pre = int(np.round(cfg.pre_window / cfg.bin_width))
-        
-        # Calculate number of bins for post-stop window
-        # n_post_bins = post_window_duration / bin_width (rounded to nearest integer)
-        # Default: post_window=1.0s, bin_width=0.02s → n_post_bins = 50 bins
         n_bins_post = int(np.round(cfg.post_window / cfg.bin_width))
-        
-        # Total number of bins across the entire time window
         n_bins = n_bins_pre + n_bins_post
-
-        # Create time bin edges spanning from -pre_window to +post_window
-        # edges shape: (n_bins + 1,) - one more edge than bins
-        edges = np.linspace(-cfg.pre_window, cfg.post_window,
-                            n_bins + 1, endpoint=True)
-        
-        # Calculate bin centers (midpoint of each bin)
-        # centers shape: (n_bins,) - one center per bin
+        edges = np.linspace(-cfg.pre_window, cfg.post_window, n_bins + 1, endpoint=True, dtype=np.float64)
         centers = edges[:-1] + cfg.bin_width / 2.0
-        
         return edges, centers
+
+    # ------------------------- Segment extraction (fast) ----------------------
 
     def extract_neural_segments(self, event_type: Optional[str] = None) -> Dict[str, np.ndarray]:
         """
@@ -235,57 +197,53 @@ class PSTHAnalyzer:
         if event_type:
             events = events[events["event_type"] == event_type]
 
-        edges, centers = self._make_time_edges_and_centers()
-        n_bins = len(centers)
+        n_bins = self._n_bins
+        pre_w = self.config.pre_window
+        post_w = self.config.post_window
+        bw = self.config.bin_width
 
-        segments = {"capture": [], "miss": []}
+        times = self._spike_times
+        codes = self._spike_codes  # contiguous 0..n_clusters-1
 
-        # Pre-allocate view for speed
-        times = self.spikes_df["time"].to_numpy()
-        clus = self.spikes_df["cluster"].to_numpy()
+        # Pre-allocate output arrays
+        ev_type = events["event_type"].to_numpy()
+        cap_idx = np.flatnonzero(ev_type == "capture")
+        mis_idx = np.flatnonzero(ev_type == "miss")
 
-        for _, ev in events.iterrows():
-            t0 = float(ev["stop_time"])
-            start, end = t0 - self.config.pre_window, t0 + self.config.post_window
+        cap_arr = np.zeros((len(cap_idx), n_bins, self.n_clusters), dtype=np.float32)
+        mis_arr = np.zeros((len(mis_idx), n_bins, self.n_clusters), dtype=np.float32)
 
-            # window spikes
+        # Local fast function to accumulate spikes for a single event
+        def fill_event(t0: float, out_mat: np.ndarray):
+            start, end = t0 - pre_w, t0 + post_w
             left = np.searchsorted(times, start, side="left")
-            right = np.searchsorted(times, end, side="right")
+            right = np.searchsorted(times, end,   side="right")
             if right <= left:
-                event_mat = np.zeros((n_bins, self.n_clusters), dtype=float)
-                segments[ev["event_type"]].append(event_mat)
-                continue
-
+                return
             rel_t = times[left:right] - t0
-            rel_c = clus[left:right]
-
-            # bin counts per cluster (vectorized via pandas crosstab)
-            # bin index: 0..n_bins-1 (clip out-of-range)
-            bin_idx = np.digitize(rel_t, edges, right=False) - 1
-            valid = (bin_idx >= 0) & (bin_idx < n_bins)
+            # Affine binning for uniform bins: shift so -pre_w -> 0
+            rows = np.floor((rel_t + pre_w) / bw).astype(np.int32)
+            valid = (rows >= 0) & (rows < n_bins)
             if not np.any(valid):
-                event_mat = np.zeros((n_bins, self.n_clusters), dtype=float)
-                segments[ev["event_type"]].append(event_mat)
-                continue
+                return
+            cols = codes[left:right][valid]
+            rows = rows[valid]
+            # Accumulate 1 spike per (row, col)
+            np.add.at(out_mat, (rows, cols), 1.0)
 
-            tab = pd.crosstab(bin_idx[valid], rel_c[valid], dropna=False)
-            # align to full bin/cluster axes
-            event_mat = np.zeros((n_bins, self.n_clusters), dtype=float)
-            # columns in tab may be unordered; map to our cluster columns
-            for c_in_tab in tab.columns:
-                if c_in_tab in self.cluster_to_col:
-                    col = self.cluster_to_col[c_in_tab]
-                    event_mat[tab.index.to_numpy(
-                    ), col] = tab[c_in_tab].to_numpy()
+        # Fill capture events
+        if cap_idx.size:
+            stop_times = events.iloc[cap_idx]["stop_time"].to_numpy(dtype=float)
+            for k, t0 in enumerate(stop_times):
+                fill_event(float(t0), cap_arr[k])
 
-            segments[ev["event_type"]].append(event_mat)
+        # Fill miss events
+        if mis_idx.size:
+            stop_times = events.iloc[mis_idx]["stop_time"].to_numpy(dtype=float)
+            for k, t0 in enumerate(stop_times):
+                fill_event(float(t0), mis_arr[k])
 
-        for k in segments:
-            arr = np.stack(segments[k], axis=0) if len(
-                segments[k]) else np.zeros((0, n_bins, self.n_clusters))
-            segments[k] = arr
-
-        return segments
+        return {"capture": cap_arr, "miss": mis_arr}
 
     # ----------------------------- PSTH compute ------------------------------
 
@@ -298,46 +256,15 @@ class PSTHAnalyzer:
 
     def _baseline_stats(self, counts_trials: np.ndarray, pre_mask: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Calculate baseline firing rate statistics from the pre-stop window.
-        
-        This method computes the mean and standard deviation of firing rates across all trials
-        and time bins in the pre-stop period. These baseline statistics are used for 
-        normalization (z-score, subtract, or divide) to control for baseline differences
-        between conditions or clusters.
-        
-        Parameters
-        ----------
-        counts_trials : np.ndarray
-            Raw spike counts with shape (n_trials, n_bins, n_clusters)
-        pre_mask : np.ndarray
-            Boolean mask indicating which time bins belong to the pre-stop window
-            
-        Returns
-        -------
-        baseline_mean : np.ndarray
-            Mean firing rate (Hz) for each cluster during pre-stop period, shape (n_clusters,)
-        baseline_std : np.ndarray
-            Standard deviation of firing rate (Hz) for each cluster during pre-stop period, shape (n_clusters,)
-            Note: Zero standard deviations are set to 1.0 to avoid division by zero in normalization
+        Mean and std of firing rates in the pre-stop window (per cluster).
         """
         if counts_trials.shape[0] == 0:
-            return np.zeros((self.n_clusters,)), np.ones((self.n_clusters,))
-        
-        # Extract spike counts from pre-stop window across all trials and clusters
-        # pre_counts shape: (n_trials, n_pre_bins, n_clusters)
-        pre_counts = counts_trials[:, pre_mask, :]
-        
-        # Calculate mean firing rate across trials and time bins, convert from counts to Hz
-        # baseline_mean shape: (n_clusters,)
-        baseline_mean = pre_counts.mean(axis=(0, 1)) / self.config.bin_width
-        
-        # Calculate standard deviation of firing rate across trials and time bins, convert to Hz
-        # baseline_std shape: (n_clusters,)
-        baseline_std = pre_counts.std(axis=(0, 1), ddof=1) / self.config.bin_width
-        
-        # Prevent division by zero in normalization by setting zero std to 1.0
+            return np.zeros((self.n_clusters,), dtype=np.float64), np.ones((self.n_clusters,), dtype=np.float64)
+        pre_counts = counts_trials[:, pre_mask, :]  # (n_trials, n_pre, n_clusters)
+        bw = self.config.bin_width
+        baseline_mean = pre_counts.mean(axis=(0, 1)) / bw
+        baseline_std = pre_counts.std(axis=(0, 1), ddof=1) / bw
         baseline_std[baseline_std == 0] = 1.0
-        
         return baseline_mean, baseline_std
 
     def _trial_rates(self, counts_trials: np.ndarray) -> np.ndarray:
@@ -345,7 +272,7 @@ class PSTHAnalyzer:
         return counts_trials / self.config.bin_width
 
     def _normalize(self, rates_trials: np.ndarray, baseline_mean: np.ndarray, baseline_std: np.ndarray) -> np.ndarray:
-        """Apply normalization in-place style and return new array."""
+        """Apply normalization and return a new array."""
         mode = self.config.normalize
         if mode is None:
             return rates_trials
@@ -359,7 +286,7 @@ class PSTHAnalyzer:
 
     def compute_psth(self, segments: Dict[str, np.ndarray], cluster_idx: Optional[int] = None) -> Dict[str, np.ndarray]:
         """
-        Compute PSTH mean and (optional) CI for each condition.
+        Compute PSTH mean and CI for each condition.
 
         Returns
         -------
@@ -368,53 +295,52 @@ class PSTHAnalyzer:
           - 'capture_sem', 'miss_sem': SEM (same shape) OR bootstrap CI half-width
           - 'time_axis': bin centers (s)
         """
-        edges, centers = self._make_time_edges_and_centers()
-        time_axis = centers
-        n_bins = len(time_axis)
-
-        # pre-window mask for baseline
-        pre_mask = time_axis < 0
+        time_axis = self._centers
+        n_bins = self._n_bins
+        pre_mask = self._pre_mask
 
         out: Dict[str, np.ndarray] = {"time_axis": time_axis}
 
         def _per_condition(name: str):
-            arr = segments.get(name, np.zeros((0, n_bins, self.n_clusters)))
+            arr = segments.get(name, np.zeros((0, n_bins, self.n_clusters), dtype=np.float32))
             if arr.shape[0] < self.config.min_trials:
-                # not enough trials: return zeros so downstream code keeps working
-                out[name] = np.zeros((n_bins, self.n_clusters))
-                out[name + "_sem"] = np.zeros((n_bins, self.n_clusters))
+                out[name] = np.zeros((n_bins, self.n_clusters), dtype=np.float32)
+                out[name + "_sem"] = np.zeros((n_bins, self.n_clusters), dtype=np.float32)
                 return
 
             # baseline + normalization
             base_mu, base_sd = self._baseline_stats(arr, pre_mask)
-            rates_trials = self._trial_rates(arr)
-            rates_trials = self._normalize(rates_trials, base_mu, base_sd)
+            rates_trials = self._trial_rates(arr.astype(np.float32))
+            rates_trials = self._normalize(rates_trials, base_mu, base_sd).astype(np.float32)
 
             # mean across trials
             mean_rate = rates_trials.mean(axis=0)  # (n_bins, n_clusters)
-            mean_rate = self._apply_smoothing(mean_rate)
+            mean_rate = self._apply_smoothing(mean_rate).astype(np.float32)
 
             # CI/SEM
             if self.config.ci_method == "sem":
-                sem = rates_trials.std(axis=0, ddof=1) / \
-                    np.sqrt(rates_trials.shape[0])
-                sem = self._apply_smoothing(sem)
+                sem = rates_trials.std(axis=0, ddof=1) / np.sqrt(rates_trials.shape[0])
+                sem = self._apply_smoothing(sem).astype(np.float32)
                 out[name + "_sem"] = sem
             else:
-                # bootstrap on trial axis
-                it = self.config.bootstrap_iters
-                boot = np.empty((it, n_bins, self.n_clusters))
+                # Batched bootstrap over the trial axis to bound memory
+                it = int(self.config.bootstrap_iters)
+                ntr = rates_trials.shape[0]
                 rng = np.random.default_rng(12345)
-                for i in range(it):
-                    idx = rng.integers(
-                        0, rates_trials.shape[0], size=rates_trials.shape[0])
-                    boot[i] = rates_trials[idx].mean(axis=0)
-                # central CI half-width
-                lo = np.percentile(boot, 100 * (self.config.alpha / 2), axis=0)
-                hi = np.percentile(
-                    boot, 100 * (1 - self.config.alpha / 2), axis=0)
-                half = (hi - lo) / 2.0
-                out[name + "_sem"] = self._apply_smoothing(half)
+                qs = [100 * (self.config.alpha / 2), 100 * (1 - self.config.alpha / 2)]
+                chunk = max(1, int(self.config.bootstrap_chunk))
+
+                # Accumulate bootstrap means in chunks
+                boot_means_list = []
+                for s in range(0, it, chunk):
+                    m = min(chunk, it - s)
+                    idx = rng.integers(0, ntr, size=(m, ntr))
+                    boot_means_list.append(rates_trials[idx].mean(axis=1))  # (m, n_bins, n_clusters)
+                boot_means = np.concatenate(boot_means_list, axis=0)  # (it, n_bins, n_clusters)
+
+                lo, hi = np.percentile(boot_means, qs, axis=0)
+                half = ((hi - lo) / 2.0).astype(np.float32)
+                out[name + "_sem"] = self._apply_smoothing(half).astype(np.float32)
 
             out[name] = mean_rate
 
@@ -441,8 +367,7 @@ class PSTHAnalyzer:
 
     def _plot_one(self, ax, time_axis, mean, ci, label):
         ax.plot(time_axis, mean, linewidth=2, label=label)
-        ax.fill_between(time_axis, mean - ci, mean +
-                        ci, alpha=0.25, linewidth=0)
+        ax.fill_between(time_axis, mean - ci, mean + ci, alpha=0.25, linewidth=0)
 
     def plot_psth(
         self,
@@ -463,8 +388,7 @@ class PSTHAnalyzer:
         else:
             cluster_indices = [cluster_idx]
 
-        fig, axes = plt.subplots(
-            len(list(cluster_indices)), 2, figsize=figsize, squeeze=False)
+        fig, axes = plt.subplots(len(list(cluster_indices)), 2, figsize=figsize, squeeze=False)
         time = psth["time_axis"]
 
         for row_i, ci in enumerate(cluster_indices):
@@ -475,28 +399,23 @@ class PSTHAnalyzer:
             if n_events["capture"] >= self.config.min_trials:
                 mean = psth["capture"][:, ci]
                 ciw = psth["capture_sem"][:, ci]
-                self._plot_one(ax_c, time, mean, ciw,
-                               f"Capture (n={n_events['capture']})")
+                self._plot_one(ax_c, time, mean, ciw, f"Capture (n={n_events['capture']})")
                 if show_individual:
                     for trial in segments["capture"]:
-                        ax_c.plot(
-                            time, (trial[:, ci] / self.config.bin_width), alpha=0.08)
+                        ax_c.plot(time, (trial[:, ci] / self.config.bin_width), alpha=0.08)
 
             if n_events["miss"] >= self.config.min_trials:
                 mean = psth["miss"][:, ci]
                 ciw = psth["miss_sem"][:, ci]
-                self._plot_one(ax_m, time, mean, ciw,
-                               f"Miss (n={n_events['miss']})")
+                self._plot_one(ax_m, time, mean, ciw, f"Miss (n={n_events['miss']})")
                 if show_individual:
                     for trial in segments["miss"]:
-                        ax_m.plot(
-                            time, (trial[:, ci] / self.config.bin_width), alpha=0.08)
+                        ax_m.plot(time, (trial[:, ci] / self.config.bin_width), alpha=0.08)
 
             for ax in (ax_c, ax_m):
                 ax.axvline(0, color="k", linestyle="--", alpha=0.5)
                 ax.set_xlabel("Time relative to stop (s)")
-                ax.set_ylabel(
-                    "Firing rate (Hz)" if self.config.normalize is None else "Normalized rate")
+                ax.set_ylabel("Firing rate (Hz)" if self.config.normalize is None else "Normalized rate")
                 ax.grid(True, alpha=0.3)
                 ax.legend()
 
@@ -524,27 +443,23 @@ class PSTHAnalyzer:
         else:
             cluster_indices = [cluster_idx]
 
-        fig, axes = plt.subplots(
-            len(list(cluster_indices)), 1, figsize=figsize, squeeze=False)
+        fig, axes = plt.subplots(len(list(cluster_indices)), 1, figsize=figsize, squeeze=False)
         axes = axes.ravel()
         for ax, ci in zip(axes, cluster_indices):
             cid = self.clusters[ci]
             if n_events["capture"] >= self.config.min_trials:
                 mc = psth["capture"][:, ci]
                 cc = psth["capture_sem"][:, ci]
-                self._plot_one(ax, time, mc, cc,
-                               f"Capture (n={n_events['capture']})")
+                self._plot_one(ax, time, mc, cc, f"Capture (n={n_events['capture']})")
 
             if n_events["miss"] >= self.config.min_trials:
                 mm = psth["miss"][:, ci]
                 cm = psth["miss_sem"][:, ci]
-                self._plot_one(ax, time, mm, cm,
-                               f"Miss (n={n_events['miss']})")
+                self._plot_one(ax, time, mm, cm, f"Miss (n={n_events['miss']})")
 
             ax.axvline(0, color="k", linestyle="--", alpha=0.5)
             ax.set_xlabel("Time relative to stop (s)")
-            ax.set_ylabel(
-                "Firing rate (Hz)" if self.config.normalize is None else "Normalized rate")
+            ax.set_ylabel("Firing rate (Hz)" if self.config.normalize is None else "Normalized rate")
             ax.set_title(f"Cluster {cid} — Capture vs Miss")
             ax.grid(True, alpha=0.3)
             ax.legend()
@@ -569,7 +484,7 @@ class PSTHAnalyzer:
         time_axis = self.psth_data["psth"]["time_axis"]
         cfg = self.config
 
-        # indices for time window (inclusive of start, inclusive of end nearest bin)
+        # indices for time window (inclusive)
         start_idx = int(np.argmin(np.abs(time_axis - time_window[0])))
         end_idx = int(np.argmin(np.abs(time_axis - time_window[1])))
         if end_idx < start_idx:
@@ -580,13 +495,11 @@ class PSTHAnalyzer:
             cid = self.clusters[ci]
 
             def _collect(name: str) -> List[float]:
-                arr = segments.get(name, np.zeros(
-                    (0, len(time_axis), self.n_clusters)))
+                arr = segments.get(name, np.zeros((0, len(time_axis), self.n_clusters), dtype=np.float32))
                 if arr.shape[0] == 0:
                     return []
                 # convert to Hz
-                rates = arr[:, start_idx:end_idx + 1,
-                            ci].mean(axis=1) / cfg.bin_width
+                rates = arr[:, start_idx:end_idx + 1, ci].mean(axis=1) / cfg.bin_width
                 return rates.tolist()
 
             cap = _collect("capture")
@@ -596,7 +509,7 @@ class PSTHAnalyzer:
                 stat, p = stats.mannwhitneyu(cap, mis, alternative="two-sided")
                 # Cohen's d (pooled std)
                 mean_diff = float(np.mean(cap) - np.mean(mis))
-                pooled_sd = np.sqrt(((len(cap) - 1)*np.var(cap, ddof=1) + (len(mis) - 1)*np.var(mis, ddof=1))
+                pooled_sd = np.sqrt(((len(cap) - 1) * np.var(cap, ddof=1) + (len(mis) - 1) * np.var(mis, ddof=1))
                                     / (len(cap) + len(mis) - 2))
                 d = mean_diff / pooled_sd if pooled_sd > 0 else 0.0
                 results[str(cid)] = {
@@ -611,8 +524,7 @@ class PSTHAnalyzer:
                     "n_misses": int(len(mis)),
                 }
             else:
-                results[str(cid)] = {
-                    "error": "Insufficient data for comparison"}
+                results[str(cid)] = {"error": "Insufficient data for comparison"}
 
         return results
 
@@ -632,8 +544,7 @@ def create_psth_around_stops(
     Convenience function to create and run PSTH analysis around stops.
     """
     analyzer = PSTHAnalyzer(
-        spikes_df, monkey_information, ff_caught_T_new, config, captures_df, no_capture_stops_df)
+        spikes_df, monkey_information, ff_caught_T_new, config, captures_df, no_capture_stops_df
+    )
     analyzer.run_full_analysis(cluster_idx)
     return analyzer
-
-

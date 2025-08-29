@@ -1,4 +1,4 @@
-from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_utils
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT, GUAT_utils
 from pattern_discovery import cluster_analysis
 from visualization.matplotlib_tools import plot_trials
 
@@ -64,7 +64,7 @@ class ProcessGUATtrials:
             relevant_info = np.where(
                 self.GUAT_indices_df['cluster_index'].values == cluster)[0]
             relevant_indices = self.GUAT_indices_df['point_index'].values[relevant_info]
-            ff_aimed_at = GUAT_and_TAFT.find_ff_aimed_at_through_manual_annotation(
+            ff_aimed_at = add_features_GUAT_and_TAFT.find_ff_aimed_at_through_manual_annotation(
                 relevant_indices, self.monkey_information, self.manual_anno)
             GUAT_ff_aimed_at_from_manual_anno.append(ff_aimed_at)
         self.GUAT_ff_aimed_at_from_manual_anno = np.array(

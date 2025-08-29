@@ -1,4 +1,4 @@
-from decision_making_analysis.GUAT import GUAT_and_TAFT, GUAT_collect_info_helper_class
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT, GUAT_collect_info_helper_class
 from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils
 from data_wrangling import base_processing_class
@@ -231,5 +231,5 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                 self.GUAT_folder_path, df + '.csv'))
 
     def _update_point_index_of_important_df_in_important_info(self):
-        self.important_info, self.point_index_to_new_number_df = GUAT_and_TAFT.update_point_index_of_important_df_in_important_info_func(
+        self.important_info, self.point_index_to_new_number_df = add_features_GUAT_and_TAFT.update_point_index_of_important_df_in_important_info_func(
             self.important_info, self.new_point_index_start)

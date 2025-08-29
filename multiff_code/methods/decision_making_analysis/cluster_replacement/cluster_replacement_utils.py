@@ -1,5 +1,5 @@
 from decision_making_analysis.decision_making import decision_making_utils
-from decision_making_analysis.GUAT import GUAT_and_TAFT
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT
 from decision_making_analysis import free_selection, replacement, trajectory_info
 from pattern_discovery import cluster_analysis
 
@@ -161,7 +161,7 @@ def further_process_df_related_to_cluster_replacement(joined_old_ff_cluster_df, 
     # make sure that there are num_old_ff_per_row or num_new_ff_per_row of ff for each point_index
     joined_old_ff_cluster_df = free_selection.guarantee_n_ff_per_point_index_in_ff_dataframe(joined_old_ff_cluster_df, np.unique(
         joined_old_ff_cluster_df.point_index.values), num_ff_per_row=num_old_ff_per_row, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff)
-    joined_new_ff_cluster_df = GUAT_and_TAFT.retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
+    joined_new_ff_cluster_df = add_features_GUAT_and_TAFT.retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
         joined_new_ff_cluster_df, joined_old_ff_cluster_df, columns=['point_index', 'ff_index'], whether_share=False)
     joined_new_ff_cluster_df = free_selection.guarantee_n_ff_per_point_index_in_ff_dataframe(joined_new_ff_cluster_df, np.unique(
         joined_old_ff_cluster_df.point_index.values), num_ff_per_row=num_new_ff_per_row, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff)

@@ -3,6 +3,89 @@
 from typing import Tuple, Callable, Optional
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats 
+from scipy.ndimage import gaussian_filter1d
+
+
+def prepare_no_capture_and_captures(
+    monkey_information: pd.DataFrame,
+    closest_stop_to_capture_df: pd.DataFrame,
+    ff_caught_T_new: np.ndarray | pd.Series,
+    *,
+    min_stop_duration: float = 0.02,
+    max_stop_duration: float = 1.0,
+    capture_match_window: float = 0.3,
+    stop_debounce: float = 0.1,
+    distance_thresh: float = 25.0,
+    distance_col: str = "distance_from_ff_to_stop",
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    End-to-end:
+      1) Build captures_df with stop_id
+      2) Build per-stop table + durations
+      3) Derive no-capture stops (apply duration filters)
+      4) Keep only captures within `distance_thresh`
+      5) Vectorized temporal filtering of no-capture stops via user-provided function
+
+    Returns:
+      valid_captures_df, filtered_no_capture_stops_df, unique_stops_df
+
+      Where:
+      - valid_captures_df: Captures that occurred within distance_thresh of stops
+      - filtered_no_capture_stops_df: Stops that didn't result in captures (filtered by duration and temporal proximity)
+      - unique_stops_df: Complete table of all stops with temporal statistics (start/end times, duration)
+
+    """
+    # 1) Captures with stop_id
+    if 'stop_id' not in closest_stop_to_capture_df.columns:
+        closest_stop_to_capture_df = add_stop_id_to_closest_stop_to_capture_df(
+            closest_stop_to_capture_df,
+            monkey_information,
+        )
+
+    captures_df = closest_stop_to_capture_df[["cur_ff_index", "stop_id", "time",
+                                              "point_index", "stop_time", 'distance_from_ff_to_stop']].copy()
+
+    # 2) Per-stop stats
+    # unique_stops_df: Comprehensive table of all stops with temporal statistics (start time, end time, duration)
+    # Each row represents one unique stop event from the monkey_information data
+    unique_stops_df = extract_unique_stops(monkey_information)
+
+    # 3) No-capture stops: exclude any stop_id present in captures
+    no_capture_stops_df = unique_stops_df.loc[
+        ~unique_stops_df["stop_id"].isin(captures_df["stop_id"])
+    ].reset_index(drop=True)
+
+    # Duration filters
+    no_capture_stops_df = no_capture_stops_df.loc[
+        no_capture_stops_df["stop_id_duration"] >= min_stop_duration
+    ].reset_index(drop=True)
+
+    no_capture_stops_df = no_capture_stops_df.loc[
+        no_capture_stops_df["stop_id_duration"] <= max_stop_duration
+    ].reset_index(drop=True)
+
+    # 4) Keep only “good” captures within spatial threshold
+    valid_captures_df = captures_df.loc[
+        pd.to_numeric(captures_df[distance_col],
+                      errors="coerce") <= distance_thresh
+    ].copy()
+    valid_captures_df['stop_point_index'] = valid_captures_df['point_index']
+    valid_captures_df['stop_time'] = valid_captures_df['time']
+
+    # 5) Temporal filtering against capture times (optional)
+    filtered_no_capture_stops_df = filter_no_capture_stops_vectorized(
+        no_capture_stops_df, ff_caught_T_new, capture_match_window
+    )
+    
+    filtered_no_capture_stops_df['stop_point_index'] = filtered_no_capture_stops_df['point_index']
+    filtered_no_capture_stops_df['stop_time'] = filtered_no_capture_stops_df['time']
+    filtered_no_capture_stops_df = filter_stops_df_by_debounce(
+        filtered_no_capture_stops_df, stop_debounce
+    )
+
+    return valid_captures_df.reset_index(drop=True), filtered_no_capture_stops_df.reset_index(drop=True), unique_stops_df.reset_index(drop=True)
 
 
 def filter_no_capture_stops_vectorized(no_capture_stops_df, ff_caught_T_new, capture_match_window):
@@ -73,7 +156,7 @@ def filter_stops_df_by_debounce(stops_df, stop_debounce) -> pd.DataFrame:
     return stops_df.reset_index(drop=True)
 
 
-def compute_stop_stats(monkey_information: pd.DataFrame) -> pd.DataFrame:
+def extract_unique_stops(monkey_information: pd.DataFrame) -> pd.DataFrame:
     """
     From per-sample `monkey_information`, compute one row per stop_id with duration and basic fields.
 
@@ -81,14 +164,14 @@ def compute_stop_stats(monkey_information: pd.DataFrame) -> pd.DataFrame:
     Returns a DataFrame with unique stop_ids and columns:
       ['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration', ...original first-row cols]
 
-    This function creates stops_with_stats: a comprehensive table of all stops with their temporal statistics.
+    This function creates unique_stops_df: a comprehensive table of all stops with their temporal statistics.
     Each row represents one unique stop event with calculated start time, end time, and duration.
     """
     required = {"point_index", "time", "stop_id"}
     missing = required - set(monkey_information.columns)
     if missing:
         raise KeyError(
-            f"compute_stop_stats: missing columns {sorted(missing)}")
+            f"extract_unique_stops: missing columns {sorted(missing)}")
 
     # Consider only rows that belong to a stop
     stops_df = monkey_information.loc[monkey_information["stop_id"].notna()].copy(
@@ -148,81 +231,86 @@ def add_stop_id_to_closest_stop_to_capture_df(
     return closest_stop_to_capture_df
 
 
-def prepare_no_capture_and_captures(
-    monkey_information: pd.DataFrame,
-    closest_stop_to_capture_df: pd.DataFrame,
-    ff_caught_T_new: np.ndarray | pd.Series,
-    *,
-    min_stop_duration: float = 0.02,
-    max_stop_duration: float = 1.0,
-    capture_match_window: float = 0.3,
-    stop_debounce: float = 0.1,
-    distance_thresh: float = 25.0,
-    distance_col: str = "distance_from_ff_to_stop",
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+from scipy import stats 
+from scipy.ndimage import gaussian_filter1d
+
+def plot_inter_stop_intervals(onsets,
+                              suggest_window: tuple = (0.1, 0.6),
+                              linear_max: float = 2.0,
+                              smooth_sigma_bins: int = 2) -> dict:
     """
-    End-to-end:
-      1) Build captures_df with stop_id
-      2) Build per-stop table + durations
-      3) Derive no-capture stops (apply duration filters)
-      4) Keep only captures within `distance_thresh`
-      5) Vectorized temporal filtering of no-capture stops via user-provided function
+    Build ISI histograms (linear + log) and auto-suggest a debounce by
+    finding the histogram valley within `suggest_window` seconds.
 
-    Returns:
-      valid_captures_df, filtered_no_capture_stops_df, stops_with_stats
-
-      Where:
-      - valid_captures_df: Captures that occurred within distance_thresh of stops
-      - filtered_no_capture_stops_df: Stops that didn't result in captures (filtered by duration and temporal proximity)
-      - stops_with_stats: Complete table of all stops with temporal statistics (start/end times, duration)
-
+    Returns dict with:
+      - 'onsets': array of stop onset times
+      - 'isi': array of inter-stop intervals (s)
+      - 'suggested_debounce': float or None
+      - 'fig': matplotlib Figure
     """
-    # 1) Captures with stop_id
-    if 'stop_id' not in closest_stop_to_capture_df.columns:
-        closest_stop_to_capture_df = add_stop_id_to_closest_stop_to_capture_df(
-            closest_stop_to_capture_df,
-            monkey_information,
-        )
 
-    captures_df = closest_stop_to_capture_df[["cur_ff_index", "stop_id", "time",
-                                              "point_index", "stop_time", 'distance_from_ff_to_stop']].copy()
+    isi = np.diff(onsets)
+    isi = isi[np.isfinite(isi) & (isi > 0)]
 
-    # 2) Per-stop stats
-    # stops_with_stats: Comprehensive table of all stops with temporal statistics (start time, end time, duration)
-    # Each row represents one unique stop event from the monkey_information data
-    stops_with_stats = compute_stop_stats(monkey_information)
+    # ---- Linear histogram (focus on short intervals up to linear_max) ----
+    lin_bins = np.linspace(0, linear_max, 81)  # 80 bins
+    lin_hist, lin_edges = np.histogram(isi, bins=lin_bins)
+    lin_centers = (lin_edges[:-1] + lin_edges[1:]) / 2
 
-    # 3) No-capture stops: exclude any stop_id present in captures
-    no_capture_stops_df = stops_with_stats.loc[
-        ~stops_with_stats["stop_id"].isin(captures_df["stop_id"])
-    ].reset_index(drop=True)
+    # Smooth to find a stable valley
+    if smooth_sigma_bins > 0:
+        lin_hist_sm = gaussian_filter1d(lin_hist.astype(float), sigma=smooth_sigma_bins, mode="nearest")
+    else:
+        lin_hist_sm = lin_hist.astype(float)
 
-    # Duration filters
-    no_capture_stops_df = no_capture_stops_df.loc[
-        no_capture_stops_df["stop_id_duration"] >= min_stop_duration
-    ].reset_index(drop=True)
+    # Find valley (minimum) inside suggest_window
+    w0, w1 = suggest_window
+    mask = (lin_centers >= w0) & (lin_centers <= w1)
+    suggested = None
+    if np.any(mask):
+        # Choose center with minimum smoothed count in the window
+        idx = np.argmin(lin_hist_sm[mask])
+        suggested = float(lin_centers[mask][idx])
 
-    no_capture_stops_df = no_capture_stops_df.loc[
-        no_capture_stops_df["stop_id_duration"] <= max_stop_duration
-    ].reset_index(drop=True)
+    # ---- Log histogram (broader view) ----
+    # Avoid zeros: clamp lower bound
+    lo = max(1e-3, np.min(isi[isi > 0]) * 0.8)
+    hi = max(0.5, np.max(isi))
+    log_bins = np.logspace(np.log10(lo), np.log10(hi), 60)
 
-    # 4) Keep only “good” captures within spatial threshold
-    valid_captures_df = captures_df.loc[
-        pd.to_numeric(captures_df[distance_col],
-                      errors="coerce") <= distance_thresh
-    ].copy()
-    valid_captures_df['stop_point_index'] = valid_captures_df['point_index']
-    valid_captures_df['stop_time'] = valid_captures_df['time']
+    # ---- Plot ----
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    ax1, ax2 = axes
 
-    # 5) Temporal filtering against capture times (optional)
-    filtered_no_capture_stops_df = filter_no_capture_stops_vectorized(
-        no_capture_stops_df, ff_caught_T_new, capture_match_window
-    )
-    
-    filtered_no_capture_stops_df['stop_point_index'] = filtered_no_capture_stops_df['point_index']
-    filtered_no_capture_stops_df['stop_time'] = filtered_no_capture_stops_df['time']
-    filtered_no_capture_stops_df = filter_stops_df_by_debounce(
-        filtered_no_capture_stops_df, stop_debounce
-    )
+    # Linear
+    ax1.bar(lin_centers, lin_hist, width=np.diff(lin_edges), align="center", alpha=0.6, edgecolor="none")
+    ax1.plot(lin_centers, lin_hist_sm, linewidth=2)
+    if suggested is not None:
+        ax1.axvline(suggested, linestyle="--", color="k", alpha=0.8, label=f"Suggested debounce ≈ {suggested:.3f}s")
+        ax1.legend()
+    ax1.set_title("Inter-stop intervals (linear scale)")
+    ax1.set_xlabel("ISI (s)")
+    ax1.set_ylabel("Count")
+    ax1.set_xlim(0, linear_max)
+    ax1.grid(alpha=0.3)
 
-    return valid_captures_df.reset_index(drop=True), filtered_no_capture_stops_df.reset_index(drop=True), stops_with_stats.reset_index(drop=True)
+    # Log
+    ax2.hist(isi, bins=log_bins, alpha=0.7)
+    if suggested is not None:
+        ax2.axvline(suggested, linestyle="--", color="k", alpha=0.8)
+    ax2.set_xscale("log")
+    ax2.set_title("Inter-stop intervals (log scale)")
+    ax2.set_xlabel("ISI (s, log)")
+    ax2.set_ylabel("Count")
+    ax2.grid(alpha=0.3, which="both")
+
+    fig.tight_layout()
+
+    return {
+        "onsets": onsets,
+        "isi": isi,
+        "suggested_debounce": suggested,
+        "fig": fig,
+        "ax1": ax1,
+        "ax2": ax2,
+    }

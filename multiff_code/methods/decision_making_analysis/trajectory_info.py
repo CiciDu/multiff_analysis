@@ -2,7 +2,7 @@
 from data_wrangling import specific_utils
 from null_behaviors import curv_of_traj_utils
 from decision_making_analysis.decision_making import decision_making_utils
-from decision_making_analysis.GUAT import GUAT_and_TAFT
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT
 from null_behaviors import opt_arc_utils
 
 import numpy as np
@@ -527,7 +527,7 @@ def add_distance_and_angle_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(
 def add_curv_diff_from_monkey_now_to_ff_when_ff_last_seen_or_next_seen(df, monkey_information, ff_real_position_sorted, ff_caught_T_new, use_last_seen=True, curv_of_traj_df=None):
     df = df.copy()
     suffix = '_last_seen' if use_last_seen else '_next_seen'
-    df, temp_curvature_df = GUAT_and_TAFT.find_curv_diff_for_ff_info(
+    df, temp_curvature_df = add_features_GUAT_and_TAFT.find_curv_diff_for_ff_info(
         df, monkey_information, ff_real_position_sorted, curv_of_traj_df=curv_of_traj_df)
     df.rename(columns={
               'curv_diff': 'curv_diff_from_monkey_now_to_ff_when_ff' + suffix}, inplace=True)
