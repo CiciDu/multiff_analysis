@@ -269,7 +269,7 @@ def _use_merge_to_get_num_stops_for_each_trial(monkey_sub, caught_ff_num):
     return num_stops_near_target
 
 
-def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, cluster_around_target_indices, ff_real_position_sorted, ff_believed_position_sorted, max_cluster_distance=75, data_folder_name=None):
+def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, cluster_around_target_indices, ff_real_position_sorted, ff_believed_position_sorted, max_cluster_distance=50, data_folder_name=None):
     # Note that we start from trial = 1
     caught_ff_num = len(ff_caught_T_new)
     visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]

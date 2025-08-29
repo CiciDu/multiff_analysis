@@ -49,12 +49,12 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
     def find_current_and_alternative_ff_info(self,
                                              columns_to_sort_nxt_ff_by=[
                                                  'abs_curv_diff', 'time_since_last_vis'],
-                                             max_cluster_distance=75,
+                                             max_cluster_distance=50,
                                              max_time_since_last_vis=2.5,
                                              max_distance_to_stop=400,
                                              include_ff_in_near_future=True,
                                              duration_into_future=0.5):
-        
+
         print('Note, the current value for max_cluster_distance is', max_cluster_distance,
               '. Please make sure that this is the same value used to make the GUAT_w_ff_df.')
         GUAT_cur_ff_info = GUAT_and_TAFT.find_GUAT_cur_ff_info(self.GUAT_w_ff_df, self.ff_real_position_sorted, self.ff_life_sorted, self.ff_dataframe, self.monkey_information,
@@ -93,8 +93,10 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
     def add_arc_info_to_each_df_of_ff_info(self, curvature_df):
         # add best_arc_info to GUAT_cur_ff_info and GUAT_nxt_ff_info
-        curvature_df_temp = pd.concat([curvature_df, self.additional_curvature_df], axis=0).reset_index(drop=True)
-        curvature_df_temp = curvature_df_temp[~curvature_df_temp[['point_index', 'ff_index']].duplicated()]
+        curvature_df_temp = pd.concat(
+            [curvature_df, self.additional_curvature_df], axis=0).reset_index(drop=True)
+        curvature_df_temp = curvature_df_temp[~curvature_df_temp[[
+            'point_index', 'ff_index']].duplicated()]
         arc_info = ['curv_of_traj', 'curvature_lower_bound',
                     'curvature_upper_bound', 'opt_arc_curv', 'curv_diff', 'abs_curv_diff']
 
@@ -123,8 +125,8 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             self.GUAT_nxt_ff_info, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
         self.more_ff_df = curvature_utils.fill_up_NAs_in_columns_related_to_curvature(
             self.more_ff_df, self.monkey_information, self.ff_caught_T_new, curv_of_traj_df=self.curv_of_traj_df)
-        return 
-        
+        return
+
     def set_time_of_eval(self, GUAT_w_ff_df, time_with_respect_to_first_stop=None, time_with_respect_to_second_stop=None, time_with_respect_to_last_stop=None):
         self.GUAT_w_ff_df = GUAT_w_ff_df.copy()
 
@@ -241,7 +243,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
             # self.ff_dataframe.loc[na_index, 'curv_diff'] = np.random.choice([-1,1], size= na_index.sum()) * 0.6
             # self.ff_dataframe['abs_curv_diff']  = self.ff_dataframe['curv_diff'].abs()
 
-
     def add_curv_of_traj_info_to_monkey_information(self, column_exists_ok=False):
         # add the column abs_curv_diff to ff_dataframe through merging with curvature_df
         if ('curv_of_traj' not in self.monkey_information.columns) or (column_exists_ok is False):
@@ -351,4 +352,3 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         else:
             self.more_traj_points_df = None
             self.more_traj_stops_df = None
-

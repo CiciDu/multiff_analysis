@@ -8,7 +8,7 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-def give_up_after_trying_func(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
+def give_up_after_trying_func(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=50):
     """
     Find the trials where the monkey has stopped more than once to catch a firefly but failed to succeed, and the monkey gave up.
     """
@@ -37,7 +37,7 @@ def give_up_after_trying_func(ff_dataframe, monkey_information, ff_caught_T_new,
     return give_up_after_trying_trials, GUAT_indices_df, GUAT_trials_df, GUAT_point_indices_for_anim, GUAT_w_ff_df
 
 
-def try_a_few_times_func(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=75):
+def try_a_few_times_func(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_point_index=None, max_cluster_distance=50):
     """
     Find the trials where the monkey has stopped more than one times to catch a target
     """
@@ -109,7 +109,7 @@ def only_get_point_indices_for_anim(trials_df, monkey_information, max_point_ind
     return point_indices_for_anim
 
 
-def make_GUAT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=75):
+def make_GUAT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
 
     # Extract a subset of monkey information that is relevant for GUAT analysis
     monkey_sub = _take_out_monkey_subset_for_GUAT(
@@ -122,7 +122,7 @@ def make_GUAT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_so
     return GUAT_trials_df
 
 
-def make_TAFT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=75):
+def make_TAFT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
 
     # Extract a subset of monkey information that is relevant for GUAT analysis
     monkey_sub = _take_out_monkey_subset_for_TAFT(
@@ -177,7 +177,7 @@ def _take_out_monkey_subset_for_GUAT(
     monkey_information: pd.DataFrame,
     ff_caught_T_new: np.ndarray,
     ff_real_position_sorted: np.ndarray,  # shape (n_trials, 2) → [[x, y], ...]
-    max_cluster_distance: float = 75.0,
+    max_cluster_distance: float = 50,
     far_distance_fill: float = 500.0,
 ) -> pd.DataFrame:
     """
@@ -186,14 +186,17 @@ def _take_out_monkey_subset_for_GUAT(
     """
     # Preconditions
     if ff_real_position_sorted.ndim != 2 or ff_real_position_sorted.shape[1] != 2:
-        raise ValueError("ff_real_position_sorted must be (n_trials, 2) [x, y].")
+        raise ValueError(
+            "ff_real_position_sorted must be (n_trials, 2) [x, y].")
     required_cols = {"trial", "monkey_x", "monkey_y"}
     missing = required_cols - set(monkey_information.columns)
     if missing:
-        raise KeyError(f"monkey_information missing columns: {sorted(missing)}")
+        raise KeyError(
+            f"monkey_information missing columns: {sorted(missing)}")
 
     # 1) Add stop cluster IDs
-    monkey_information = add_stop_cluster_id(monkey_information, max_cluster_distance)
+    monkey_information = add_stop_cluster_id(
+        monkey_information, max_cluster_distance)
 
     # 2) Base subset (copy to avoid chained assignment)
     monkey_sub = _take_out_monkey_subset_for_GUAT_or_TAFT(
@@ -204,7 +207,8 @@ def _take_out_monkey_subset_for_GUAT(
     trials = monkey_sub["trial"].to_numpy()
     if not np.issubdtype(trials.dtype, np.integer):
         if np.any(~np.isfinite(trials)):
-            raise ValueError("monkey_sub['trial'] contains NaN/inf; cannot index targets.")
+            raise ValueError(
+                "monkey_sub['trial'] contains NaN/inf; cannot index targets.")
         trials = trials.astype(int)
 
     n_trials = ff_real_position_sorted.shape[0]
@@ -217,33 +221,38 @@ def _take_out_monkey_subset_for_GUAT(
         return out
 
     # --- 0-based trial indexing ---
-    current_idx    = trials
-    last_idx       = trials - 1
-    last_last_idx  = trials - 2
-    next_idx       = trials + 1
-    next_next_idx  = trials + 2
+    current_idx = trials
+    last_idx = trials - 1
+    last_last_idx = trials - 2
+    next_idx = trials + 1
+    next_next_idx = trials + 2
 
-    last_xy       = safe_pick(last_idx)
-    last_last_xy  = safe_pick(last_last_idx)
-    current_xy    = safe_pick(current_idx)
-    next_xy       = safe_pick(next_idx)
-    next_next_xy  = safe_pick(next_next_idx)
+    last_xy = safe_pick(last_idx)
+    last_last_xy = safe_pick(last_last_idx)
+    current_xy = safe_pick(current_idx)
+    next_xy = safe_pick(next_idx)
+    next_next_xy = safe_pick(next_next_idx)
 
-    monkey_sub[["last_target_x", "last_target_y"]]             = last_xy
-    monkey_sub[["last_last_target_x", "last_last_target_y"]]   = last_last_xy
-    monkey_sub[["current_target_x", "current_target_y"]]       = current_xy
-    monkey_sub[["next_target_x", "next_target_y"]]             = next_xy
-    monkey_sub[["next_next_target_x", "next_next_target_y"]]   = next_next_xy
+    monkey_sub[["last_target_x", "last_target_y"]] = last_xy
+    monkey_sub[["last_last_target_x", "last_last_target_y"]] = last_last_xy
+    monkey_sub[["current_target_x", "current_target_y"]] = current_xy
+    monkey_sub[["next_target_x", "next_target_y"]] = next_xy
+    monkey_sub[["next_next_target_x", "next_next_target_y"]] = next_next_xy
 
     # 5) Distances
     mx = monkey_sub["monkey_x"].to_numpy()
     my = monkey_sub["monkey_y"].to_numpy()
 
-    monkey_sub["distance_to_last_target"]        = np.hypot(mx - last_xy[:, 0],       my - last_xy[:, 1])
-    monkey_sub["distance_to_last_last_target"]   = np.hypot(mx - last_last_xy[:, 0],  my - last_last_xy[:, 1])
-    monkey_sub["distance_to_target"]             = np.hypot(mx - current_xy[:, 0],    my - current_xy[:, 1])
-    monkey_sub["distance_to_next_target"]        = np.hypot(mx - next_xy[:, 0],       my - next_xy[:, 1])
-    monkey_sub["distance_to_next_next_target"]   = np.hypot(mx - next_next_xy[:, 0],  my - next_next_xy[:, 1])
+    monkey_sub["distance_to_last_target"] = np.hypot(
+        mx - last_xy[:, 0],       my - last_xy[:, 1])
+    monkey_sub["distance_to_last_last_target"] = np.hypot(
+        mx - last_last_xy[:, 0],  my - last_last_xy[:, 1])
+    monkey_sub["distance_to_target"] = np.hypot(
+        mx - current_xy[:, 0],    my - current_xy[:, 1])
+    monkey_sub["distance_to_next_target"] = np.hypot(
+        mx - next_xy[:, 0],       my - next_xy[:, 1])
+    monkey_sub["distance_to_next_next_target"] = np.hypot(
+        mx - next_next_xy[:, 0],  my - next_next_xy[:, 1])
 
     # Fill NaNs from out-of-bounds picks
     for col in [
@@ -264,7 +273,8 @@ def _take_out_monkey_subset_for_GUAT(
         "distance_to_next_next_target",
     ]
     close_mask = (monkey_sub[dcols] < max_cluster_distance).any(axis=1)
-    close_to_target_clusters = monkey_sub.loc[close_mask, "stop_cluster_id"].unique()
+    close_to_target_clusters = monkey_sub.loc[close_mask, "stop_cluster_id"].unique(
+    )
 
     print(
         f"When taking out monkey subset for GUAT, "
@@ -273,7 +283,8 @@ def _take_out_monkey_subset_for_GUAT(
         f"(threshold={max_cluster_distance}) and are filtered out."
     )
 
-    monkey_sub = monkey_sub[~monkey_sub["stop_cluster_id"].isin(close_to_target_clusters)].copy()
+    monkey_sub = monkey_sub[~monkey_sub["stop_cluster_id"].isin(
+        close_to_target_clusters)].copy()
 
     # 8) Filter out clusters that span multiple trials
     counts = (
@@ -283,7 +294,8 @@ def _take_out_monkey_subset_for_GUAT(
         .size()
     )
     single_trial_clusters = counts[counts == 1].index
-    monkey_sub = monkey_sub[monkey_sub["stop_cluster_id"].isin(single_trial_clusters)].copy()
+    monkey_sub = monkey_sub[monkey_sub["stop_cluster_id"].isin(
+        single_trial_clusters)].copy()
 
     # 9) Sort and reset index
     if "point_index" in monkey_sub.columns:
@@ -293,9 +305,7 @@ def _take_out_monkey_subset_for_GUAT(
     return monkey_sub
 
 
-
-
-def _take_out_monkey_subset_to_get_num_stops_near_target(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=75):
+def _take_out_monkey_subset_to_get_num_stops_near_target(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
     monkey_information = add_stop_cluster_id(
         monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=True)
 
@@ -314,7 +324,7 @@ def _take_out_monkey_subset_to_get_num_stops_near_target(monkey_information, ff_
     return monkey_sub
 
 
-def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=75):
+def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
 
     monkey_information = add_stop_cluster_id(
         monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=True)
@@ -343,7 +353,7 @@ def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_new, ff_rea
     return monkey_sub
 
 
-def _keep_clusters_close_to_target(monkey_sub, max_cluster_distance=75):
+def _keep_clusters_close_to_target(monkey_sub, max_cluster_distance=50):
     close_to_target_clusters = monkey_sub[(
         monkey_sub['distance_to_target'] < max_cluster_distance)]['stop_cluster_id'].unique()
     monkey_sub = monkey_sub[monkey_sub['stop_cluster_id'].isin(

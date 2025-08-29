@@ -338,7 +338,7 @@ def add_whether_new_distinct_stop_column(monkey_information, speed_threshold_for
     monkey_df = monkey_information.copy()
     # mark whether the speed is over the threshold
     monkey_df['speed_over_threshold'] = monkey_df['monkey_speed'] > speed_threshold_for_distinct_stop
-    # get the cumulative sum of the speed_over_threshold
+    # get the cumulative sum of the speed_over_threshold (which is a dummy variable); so the increase in cum_speed_over_threshold indicates a new stop
     monkey_df['cum_speed_over_threshold'] = monkey_df['speed_over_threshold'].cumsum()
     # take out the stop points
     monkey_df = monkey_df[monkey_df['monkey_speeddummy'] == 0].copy()

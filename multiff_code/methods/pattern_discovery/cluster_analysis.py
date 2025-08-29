@@ -12,7 +12,7 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey=500, max_cluster_distance=100, max_time_past=1,
+def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey=500, max_cluster_distance=50, max_time_past=1,
                           print_progress=True, data_folder_name=None, duration_per_step=None):
     """
     Find trials where the target has disappeared the latest among all visible fireflies during a trial
@@ -87,7 +87,7 @@ def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey=500, max_clu
             linked = linkage(ffxy_array, method='single')
 
             # In order to find the number of clusters that satisfy our requirements, we'll first find the number of rows from linked
-            # where the two components of the cluster are greater than max_cluster_distance (100 cm as default).
+            # where the two components of the cluster are greater than max_cluster_distance (50 cm as default).
             # If this number is n, then it means that at one point in the procedure, there are n+1 clusters that all satisfy our requirements,
             # and then these clusters are condensed into 1 big cluster through combining two clusters into one and repearting the procedure;
             # However, these final steps of combining are invalid for our use since all the n+1 clusters are further apart than max_cluster_distance;

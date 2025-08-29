@@ -343,7 +343,7 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'n_seconds_after_crossing_boundary': 2.5,
 
              # max distance from other ff to the current ff to be considered as in the same cluster
-             'max_cluster_distance': 100,
+             'max_cluster_distance': 50,
              'max_distance_to_stop': 400,
              'max_distance_to_stop_for_GUAT_target': 50,
              # originally using ['abs_curv_diff', 'time_since_last_vis'],

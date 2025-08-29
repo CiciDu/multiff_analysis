@@ -46,31 +46,88 @@ def add_stop_point_index(trials_df, monkey_information, ff_real_position_sorted)
     trials_df['stop_time'] = monkey_information.loc[trials_df['stop_point_index'], 'time'].values
 
 
-def deal_with_duplicated_stop_point_index(GUAT_w_ff_df):
-    df = GUAT_w_ff_df[GUAT_w_ff_df[['stop_point_index',
-                                    'latest_visible_ff']].duplicated(keep=False)].copy()
-    # drop those stop_point_index from GUAT_w_ff_df
-    GUAT_w_ff_df = GUAT_w_ff_df[~GUAT_w_ff_df['stop_point_index'].isin(
-        df['stop_point_index'])].copy()
+import numpy as np
+import pandas as pd
 
-    # For each duplicated stop_point_index, find the row with the smallest distance between the first or last stop_point_index and the duplicated stop_point_index
-    df['delta_point_index_from_first_stop_to_stop_point_index'] = np.abs(
-        df['first_stop_point_index'] - df['stop_point_index'])
-    df['delta_point_index_from_last_stop_to_stop_point_index'] = np.abs(
-        df['last_stop_point_index'] - df['stop_point_index'])
-    df['min_delta_point_index'] = df[['delta_point_index_from_first_stop_to_stop_point_index',
-                                      'delta_point_index_from_last_stop_to_stop_point_index']].min(axis=1)
-    df.sort_values(
-        by=['stop_point_index', 'min_delta_point_index'], ascending=True)
-    df = df.groupby('stop_point_index').first().reset_index(drop=False)
+def deal_with_duplicated_stop_point_index(
+    GUAT_w_ff_df: pd.DataFrame,
+    stop_col: str = "stop_point_index",
+    first_col: str = "first_stop_point_index",
+    last_col: str = "last_stop_point_index",
+    warn: bool = True,
+) -> pd.DataFrame:
+    """
+    De-duplicate rows that share the same `stop_col` by keeping, for each stop,
+    the row with the smallest distance (in index units) to either the first or last stop.
 
-    # add rows back to GUAT_w_ff_df (only keep the columns in GUAT_w_ff_df)
-    GUAT_w_ff_df = pd.concat([GUAT_w_ff_df, df[GUAT_w_ff_df.columns]], axis=0)
-    GUAT_w_ff_df.sort_values(by='stop_point_index', inplace=True)
+    Tie-breakers (in order): min_delta, then delta to first stop, then delta to last stop,
+    then first occurrence.
 
-    print('Warning: there can be multiple stop_point_index for the same ff_index. '
-          'This can happen when there are multiple failed attempts to catch another ff before catching the current target.')
-    return GUAT_w_ff_df
+    Parameters
+    ----------
+    GUAT_w_ff_df : pd.DataFrame
+        Must include columns: stop_col, first_col, last_col.
+    stop_col : str
+        Column with the (possibly duplicated) stop indices to resolve.
+    first_col, last_col : str
+        Columns with the first/last stop indices for computing deltas.
+    warn : bool
+        If True, prints a note about the behavior.
+
+    Returns
+    -------
+    pd.DataFrame
+        Same columns as input, with at most one row per `stop_col`.
+    """
+    required = {stop_col, first_col, last_col}
+    missing = required - set(GUAT_w_ff_df.columns)
+    if missing:
+        raise KeyError(f"Missing required column(s): {sorted(missing)}")
+
+    df = GUAT_w_ff_df.copy()
+
+    # Identify duplicates by STOP ONLY (matches your comment/intent).
+    dup_mask = df.duplicated(subset=[stop_col], keep=False)
+    if not dup_mask.any():
+        return df.sort_values(by=stop_col, kind="stable").reset_index(drop=True)
+
+    # Split into duplicated and unique parts
+    dups = df.loc[dup_mask].copy()
+    base = df.loc[~dup_mask].copy()
+
+    # Ensure numeric for distance computation; NaNs become inf so they never win
+    for c in (stop_col, first_col, last_col):
+        dups[c] = pd.to_numeric(dups[c], errors="coerce")
+
+    dups["delta_first"] = (dups[first_col] - dups[stop_col]).abs()
+    dups["delta_last"]  = (dups[last_col]  - dups[stop_col]).abs()
+    dups[["delta_first", "delta_last"]] = dups[["delta_first", "delta_last"]].fillna(np.inf)
+    dups["min_delta"] = dups[["delta_first", "delta_last"]].min(axis=1)
+
+    # Pick the best row per stop using deterministic tie-breakers
+    best = (
+        dups.sort_values(
+            by=[stop_col, "min_delta", "delta_first", "delta_last"],
+            kind="stable"
+        )
+        .groupby(stop_col, as_index=False, sort=False)
+        .head(1)
+    )
+
+    # Recombine; preserve original columns/order
+    out = pd.concat([base, best[df.columns]], ignore_index=True)
+    out = out.sort_values(by=stop_col, kind="stable").reset_index(drop=True)
+
+    if warn:
+        print(
+            "Note: multiple stop clusters may map to the same firefly around the same time.\n"
+            "We keep the cluster whose stop_point_index is closest (by index distance) to either "
+            f"{first_col} or {last_col}. Also, stop_point_index may be just the trajectory point "
+            "closest to the current FF, not necessarily a 'true' stop."
+        )
+
+    return out
+
 
 
 def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_position_sorted, stop_period_duration):
