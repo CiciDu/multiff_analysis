@@ -1,6 +1,6 @@
 
 from visualization.plotly_tools import plotly_for_time_series, plotly_for_null_arcs, plotly_for_correlation, plotly_for_monkey, plotly_plot_class
-from visualization.dash_tools import dash_utils, dash_utils
+from visualization.dash_tools import dash_utils
 from null_behaviors import curv_of_traj_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
 from visualization.matplotlib_tools import monkey_heading_utils
@@ -432,11 +432,10 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
             self.fig = plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.show_all_monkey_heading_in_plotly(
                 self)
 
-        self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
         if self.monkey_plot_params['show_null_arcs_to_ff']:
+            self._find_null_arcs_for_cur_and_nxt_ff_for_the_point_from_info_for_duration()
             self.fig = self._show_null_arcs_for_cur_and_nxt_ff_in_plotly()
-
-        if self.monkey_plot_params['show_null_arc_to_cur_ff']:
+        elif self.monkey_plot_params['show_null_arc_to_cur_ff']:
             self.fig = self._show_null_arc_to_cur_ff_in_plotly()
 
         if self.monkey_plot_params['show_extended_traj_arc']:

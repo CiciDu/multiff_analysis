@@ -11,9 +11,10 @@ from visualization.plotly_tools import plotly_plot_class
 
 def create_firing_rate_plot_for_one_duration_in_plotly(
         spikes_df, reference_time, start_time, end_time,
-        bin_width=0.05, bins_per_aggregate=1,
+        bin_width=0.02, bins_per_aggregate=1,
         max_clusters_to_plot=None, rel_hover_time=None,
-        show_visible_segments=False, visible_segments_info=None):
+        show_visible_segments=False, visible_segments_info=None,
+        smoothing_window=15, smoothing_method='gaussian'):
 
     filtered_spikes, selected_clusters = _select_clusters_and_spikes_in_time_window(
         spikes_df, start_time, end_time, max_clusters_to_plot)
@@ -33,7 +34,9 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
     )
     time_array = (time_bins[:-1] + time_bins[1:]) / 2
     fr_df = _prepare_fr_data(binned_df, bin_width,
-                             bins_per_aggregate, time_array=time_array)
+                             bins_per_aggregate, time_array=time_array,
+                             smoothing_window=smoothing_window,
+                             smoothing_method=smoothing_method)
 
     selected_cluster_cols = [f"cluster_{c}" for c in selected_clusters]
     if 'time' not in fr_df.columns or not set(selected_cluster_cols).intersection(fr_df.columns):
@@ -79,7 +82,7 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
     y_max = fr_df[selected_cluster_cols].max().max()
     y_max = (y_max * 1.1) if y_max != 0 else 1
 
-    # _add_reference_lines(fig, y_min, y_max, rel_hover_time)
+    _add_reference_lines(fig, y_min, y_max, rel_hover_time)
     fig = _add_firefly_segments(
         fig, y_min, y_max, show_visible_segments, visible_segments_info)
     fig.update_layout(_common_layout('Firing Rate Over Time',
@@ -126,7 +129,7 @@ def create_raster_plot_for_one_duration_in_plotly(
                 legendgroup=f'cluster-{cluster_id}',
                 showlegend=False,  # keep raster legend clean; toggle to True if you want a legend
                 customdata=[cluster_id] * len(group),
-                hovertemplate='<b>Cluster %{customdata}</b><br>Time: %{x:.3f}s<extra></extra>'
+                hovertemplate="%{customdata}<extra></extra>"
             ))
 
     y_min, y_max = filtered_spikes['cluster'].min(
@@ -153,9 +156,10 @@ def create_raster_plot_for_one_duration_in_plotly(
 
 
 def _add_reference_lines(fig, y_min, y_max, rel_hover_time=None):
-    _add_vertical_line(fig, 0, y_min, y_max,
-                       color=plotly_for_time_series.GUIDE_LINE_COLOR,
-                       name='Reference Time', showlegend=False, width=2, dash='solid')
+    # We decided to not add a line at 0 to avoid distraction.
+    # _add_vertical_line(fig, 0, y_min, y_max,
+    #                    color=plotly_for_time_series.GUIDE_LINE_COLOR,
+    #                    name='Reference Time', showlegend=False, width=2, dash='solid')
     if rel_hover_time is not None:
         _add_vertical_line(fig, rel_hover_time, y_min, y_max,
                            color=plotly_for_time_series.HOVER_LINE_COLOR,
@@ -253,7 +257,8 @@ def _add_vertical_line(fig, x_val, y_min, y_max, color, width=2, dash=None, name
     ))
 
 
-def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None):
+def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None,
+                     smoothing_window=None, smoothing_method='gaussian'):
     """
     Aggregate binned spike counts into firing rates averaged over bins_per_aggregate bins.
 
@@ -263,9 +268,11 @@ def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, 
         bins_per_aggregate: Number of bins to average (downsample factor).
         time_array: Optional array of times corresponding to bins.
         max_time: Optional max time to filter data.
+        smoothing_window: Optional window size for smoothing (number of bins). If None, no smoothing applied.
+        smoothing_method: Smoothing method ('gaussian', 'uniform', 'exponential'). Default is 'gaussian'.
 
     Returns:
-        DataFrame with averaged firing rates and 'time' column.
+        DataFrame with averaged firing rates in Hz and 'time' column.
     """
     df = binned_df.copy()
 
@@ -292,4 +299,77 @@ def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, 
     agg_dict = {col: 'mean' for col in df.columns if col not in ['agg_bin']}
     df_agg = df.groupby('agg_bin').agg(agg_dict).reset_index(drop=True)
 
+    # Convert spike counts to firing rates in Hz by dividing by bin width
+    # Note: When averaging over bins_per_aggregate bins, the effective bin width is bin_width * bins_per_aggregate
+    effective_bin_width = bin_width * bins_per_aggregate
+
+    # Convert all cluster columns to firing rates (Hz)
+    cluster_cols = [
+        col for col in df_agg.columns if col.startswith('cluster_')]
+    for col in cluster_cols:
+        df_agg[col] = df_agg[col] / effective_bin_width
+
+    # Apply smoothing if requested
+    if smoothing_window is not None and smoothing_window > 1:
+        df_agg = _apply_smoothing(
+            df_agg, cluster_cols, smoothing_window, smoothing_method)
+
     return df_agg
+
+
+def _apply_smoothing(df, cluster_cols, window_size, method='gaussian', pad_mode='reflect'):
+    """
+    Apply smoothing to firing rate data.
+
+    Args:
+        df: DataFrame with firing rate data (already binned)
+        cluster_cols: List[str] of columns to smooth
+        window_size: int, width in bins (Gaussian covers ~±3σ, so FWHM≈0.392*window_size)
+        method: 'gaussian' (acausal), 'uniform' (acausal), 'exponential' (causal EMA)
+        pad_mode: np.pad mode for acausal methods ('reflect', 'edge', ...)
+
+    Returns:
+        DataFrame with smoothed firing rates
+    """
+    import numpy as np
+    import pandas as pd
+
+    ws = int(max(1, round(window_size)))
+    df_smoothed = df.copy()
+
+    if method == 'gaussian':
+        # sigma chosen so 6σ ≈ window_size  (≈99% mass)
+        sigma = ws / 6.0
+        kernel_size = int(2 * np.ceil(3 * sigma) + 1)  # odd
+        x = np.arange(kernel_size) - kernel_size // 2
+        kernel = np.exp(-(x**2) / (2 * sigma**2))
+        kernel /= kernel.sum()
+
+    elif method == 'uniform':
+        kernel_size = ws if ws % 2 == 1 else ws + 1
+        kernel = np.ones(kernel_size) / kernel_size
+
+    elif method == 'exponential':
+        # causal EMA; span relates to alpha via alpha = 2/(span+1)
+        span = ws
+        for col in cluster_cols:
+            df_smoothed[col] = (
+                df[col]
+                .ewm(span=span, adjust=False, min_periods=1)  # causal
+                .mean()
+            )
+        return df_smoothed
+
+    else:
+        raise ValueError("method must be 'gaussian', 'uniform', or 'exponential'")
+
+    # Apply centered (acausal) convolution for gaussian/uniform
+    half = kernel.size // 2
+    for col in cluster_cols:
+        # choose how to treat NaNs: e.g., fillna(0) or interpolate if needed
+        vals = df[col].values
+        padded = np.pad(vals, (half, half), mode=pad_mode)
+        smoothed = np.convolve(padded, kernel, mode='valid')
+        df_smoothed[col] = smoothed
+
+    return df_smoothed

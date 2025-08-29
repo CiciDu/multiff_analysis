@@ -458,9 +458,9 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
 
     fig.update_layout(coloraxis_showscale=False)
 
-    # update hovertemplate
-    hovertemplate = ' <br>'.join(
-        [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(hoverdata_multi_columns)])
+    # update hovertemplate - hide hover display but preserve hover data
+    # This hides the hover box but preserves hover data for callbacks
+    hovertemplate = '<extra></extra>'
     fig.update_traces(hovertemplate=hovertemplate,
                       selector=dict(name='trajectory_data'))
 
@@ -480,9 +480,8 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
                        'cmax': 200,
                        'opacity': 0.8}
 
-        hovertemplate = ' <br>'.join(
-            [f'{col}: %{{customdata[{i}]:.2f}}' for i, col in enumerate(custom_data)])
-        # hovertemplate = hovertemplate + '<br>speed: %{customdata[len_customdata]:.2f}'
+        # Hide hover display but preserve hover data for callbacks
+        hovertemplate = '<extra></extra>'
         fig.update_traces(marker=marker_dict, hovertemplate=hovertemplate, selector=dict(
             name='trajectory_data'))
         # If show color as speed, let's add it to hover data, keep 2 decimals
@@ -594,7 +593,8 @@ def connect_points_to_points(fig, connect_path_ff_df, show_traj_points_when_maki
 
 
 def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monkey_information, rotation_matrix, x0, y0,
-                                                             how_to_show_ff='square', unique_ff_indices=None, varying_colors=None):
+                                                             how_to_show_ff='square', unique_ff_indices=None, varying_colors=None,
+                                                             hide_non_essential_visible_segment=True):
     """
     This function plots horizontal lines to show visible segments of fireflies (ff) using Plotly.
     It also shows the ff position as a square or a circle.
@@ -641,9 +641,8 @@ def plot_horizontal_lines_to_show_ff_visible_segments_plotly(fig, ff_info, monke
         ff_number = row.ff_number
         ff_index = row.ff_index
 
-        if ff_number <= 2:
-            visible = True
-        else:
+        visible = True
+        if hide_non_essential_visible_segment & (ff_number > 2):
             visible = 'legendonly'
 
         # Define color for current firefly

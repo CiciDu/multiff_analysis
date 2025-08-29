@@ -21,6 +21,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         # only meaningful when show_alive_fireflies is False
         "show_in_memory_fireflies": False,
         "show_visible_segments": True,
+        "hide_non_essential_visible_segments": True, # if True, then only the current and next ff's visible segments will be shown
         "show_all_eye_positions": False,
         "show_current_eye_positions": True,
         "show_eye_positions_for_both_eyes": False,
@@ -81,7 +82,9 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                                                       'rotation_matrix'], 0, 0,
                                                                                                   how_to_show_ff='square',
                                                                                                   unique_ff_indices=None,
-                                                                                                  varying_colors=varying_colors)
+                                                                                                  varying_colors=varying_colors,
+                                                                                                  hide_non_essential_visible_segment=self.monkey_plot_params['hide_non_essential_visible_segments'])
+                                                                                                  
 
         if self.monkey_plot_params['show_reward_boundary']:
             self.fig = plotly_for_monkey.plot_reward_boundary_in_plotly(

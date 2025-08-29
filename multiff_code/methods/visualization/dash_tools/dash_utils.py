@@ -10,6 +10,9 @@ from dash import html, dcc
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib
+import os
+import socket
+from contextlib import closing
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -340,3 +343,41 @@ def put_down_raster_plot(fig_raster, id='raster_plot', width='50%', height=300):
             figure=fig_raster,
         ),
     ], style={'width': width, 'padding': '0 0 10 0'})
+
+
+
+def _find_open_port(preferred: int | None, max_tries: int = 50) -> int:
+    """
+    Try preferred first (or $PORT if set and preferred is None), then scan upward.
+    Returns an open port number or raises RuntimeError if none found.
+    """
+    candidates = []
+    if preferred is not None:
+        candidates.append(int(preferred))
+    env_port = os.getenv("PORT")
+    if env_port is not None and (preferred is None or int(env_port) != int(preferred)):
+        candidates.append(int(env_port))
+
+    # If nothing specified, start from a sensible default (8050) then scan upward.
+    if not candidates:
+        candidates = [8050]
+
+    tried = set()
+    for base in candidates:
+        # try base, then base+1 ... base+max_tries
+        print(f"Trying port {base} and above up to {base + max_tries}")
+        for p in range(base, base + max_tries + 1):
+            if p in tried:
+                continue
+            tried.add(p)
+            with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    s.bind(("0.0.0.0", p))
+                    # success: immediately free it; we’ll reuse in run()
+                    return p
+                except OSError:
+                    continue
+    raise RuntimeError(
+        f"Could not find a free port near {candidates[0]} after {max_tries} attempts."
+    )

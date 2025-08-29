@@ -158,7 +158,7 @@ def find_monkey_info_when_ff_last_seen(current_ff_df, last_seen_ff_numbers):
                                                   'angle_from_monkey_now_to_ff_when_ff_last_seen': 'angle_from_monkey_now_to_ff_then'
                                                   }, inplace=True)
     monkey_info_when_ff_last_seen['angle_from_monkey_now_to_ff_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_ff_then']
-    monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then']i
+    monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then'] = monkey_info_when_ff_last_seen['angle_from_monkey_now_to_monkey_then']
     monkey_info_when_ff_last_seen['time_label'] = 'Past'
     return monkey_info_when_ff_last_seen
 

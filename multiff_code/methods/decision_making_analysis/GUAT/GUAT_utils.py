@@ -31,31 +31,81 @@ def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T
     return one_stop_df
 
 
-def make_one_stop_w_ff_df(one_stop_df):
+def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build one_stop_w_ff_df from a long one_stop_df (rows = point_index × ff candidates).
+    - nearby_alive_ff_indices: unique, stably ordered list per point_index
+    - latest_visible_ff: deterministic tie-break on time_since_last_vis, then ff_distance, then ff_index
+    """
 
-    # group one_stop_df by 'point_index' and make a list out of all ff_indices for each point_index
-    one_stop_df.sort_values(by=['point_index', 'time_since_last_vis'], ascending=[
-                            True, True], inplace=True)
-    ff_around_stop_df = one_stop_df[['point_index', 'ff_index']].groupby(
-        'point_index')['ff_index'].apply(list).reset_index(drop=False)
-    ff_around_stop_df['latest_visible_ff'] = one_stop_df.groupby('point_index')[
-        'ff_index'].first().values
-    one_stop_w_ff_df = ff_around_stop_df.merge(one_stop_df[['target_index', 'time', 'point_index', 'ff_distance',
-                                                            'closest_cum_distance_to_ff_capture', 'min_distance_from_adjacent_stops',
-                                                            ]].drop_duplicates(), on='point_index', how='left')
-    one_stop_w_ff_df[['num_stops', 'whether_w_ff_near_stops']] = 1
-    one_stop_w_ff_df['trial'] = one_stop_w_ff_df['target_index']
-    one_stop_w_ff_df['stop_indices'] = one_stop_w_ff_df['point_index'].apply(lambda x: [
-                                                                             x])
-    one_stop_w_ff_df.rename(columns={'ff_index': 'nearby_alive_ff_indices',
-                                     'point_index': 'first_stop_point_index',
-                                     'time': 'first_stop_time'}, inplace=True)
+    # ensure required columns exist
+    required = {"point_index", "ff_index", "time_since_last_vis"}
+    missing = required - set(one_stop_df.columns)
+    if missing:
+        raise KeyError(f"one_stop_df missing columns: {missing}")
 
-    for col in one_stop_w_ff_df.columns:
-        if '_index' in col:
-            one_stop_w_ff_df[col] = one_stop_w_ff_df[col].astype('int64')
+    # sort to define deterministic tie-breaks:
+    # 1) smallest time_since_last_vis (most recently seen)
+    # 2) nearest ff_distance
+    # 3) smallest ff_index
+    sort_cols = [c for c in ["point_index", "time_since_last_vis", "ff_distance", "ff_index"] if c in one_stop_df.columns]
+    asc = [True] * len(sort_cols)
+    df = one_stop_df.sort_values(sort_cols, ascending=asc, kind="mergesort").copy()
 
-    return one_stop_w_ff_df
+    # unique list of FFs per stop (keep stable order given by the sort above)
+    ff_lists = (
+        df[["point_index", "ff_index"]]
+        .drop_duplicates(["point_index", "ff_index"])
+        .groupby("point_index", sort=False)["ff_index"]
+        .agg(list)
+        .reset_index()
+        .rename(columns={"ff_index": "nearby_alive_ff_indices"})
+    )
+
+    # latest_visible_ff = first row per point_index after the deterministic sort
+    latest_ff = (
+        df.groupby("point_index", sort=False, as_index=False)
+          .first()[["point_index", "ff_index"]]
+          .rename(columns={"ff_index": "latest_visible_ff"})
+    )
+
+    # bring in stop-level metadata (dedup by point_index)
+    stop_meta_cols = [
+        "target_index", "time", "point_index", "ff_distance",
+        "distance_to_next_ff_capture", "min_distance_from_adjacent_stops"
+    ]
+    stop_meta_cols = [c for c in stop_meta_cols if c in df.columns]
+    stop_meta = df[stop_meta_cols].drop_duplicates("point_index")
+
+    # assemble
+    out = (
+        ff_lists
+        .merge(latest_ff, on="point_index", how="left")
+        .merge(stop_meta, on="point_index", how="left")
+    )
+
+    # add convenience columns
+    out["num_stops"] = 1
+    out["whether_w_ff_near_stops"] = 1
+    if "target_index" in out.columns:
+        out["trial"] = out["target_index"]
+
+    # normalize dtypes
+    for col in ["point_index", "target_index", "latest_visible_ff"]:
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64").astype("int64", errors="ignore")
+
+    # rename for consistency
+    out = out.rename(columns={
+        "point_index": "first_stop_point_index",
+        "time": "first_stop_time",
+    })
+
+    # per your previous pattern
+    out["stop_indices"] = out["first_stop_point_index"].apply(lambda x: [int(x)])
+
+    return out
+
 
 
 # def get_distinct_stops_df(monkey_information, min_distance_between_distinct_stops=15):
@@ -95,50 +145,115 @@ def get_filtered_stops_df(distinct_stops_df, min_distance_from_adjacent_stops):
 
     return filtered_stops_df
 
+import numpy as np
+import pandas as pd
 
-def filter_stops_based_on_distance_to_ff_capture(filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture):
-    # eliminate the stops that are too close to a ff capture (within min_cum_distance_to_ff_capture)
+def filter_stops_based_on_distance_to_ff_capture(
+    filtered_stops_df: pd.DataFrame,
+    monkey_information: pd.DataFrame,
+    ff_caught_T_new: np.ndarray,
+    min_cum_distance_to_ff_capture: float,
+) -> pd.DataFrame:
+    """
+    Keep only stops whose cumulative distance is at least `min_cum_distance_to_ff_capture`
+    *ahead of* (i.e., to the right of) the nearest firefly-capture cumulative distance.
 
-    # first find the corresponding point index of each time point in ff_caught_T_new
-    ff_caught_points_sorted = np.searchsorted(
-        monkey_information['time'].values, ff_caught_T_new)
-    ff_caught_points_df = monkey_information.iloc[ff_caught_points_sorted].copy(
+    One-sided rule: only the first capture with cum_distance >= stop_cum is considered.
+    """
+
+    # Preconditions: ensure monotonic inputs
+    time = monkey_information["time"].to_numpy()
+    if not np.all(np.diff(time) >= 0):
+        raise ValueError("monkey_information['time'] must be sorted ascending.")
+
+    if not np.all(np.diff(ff_caught_T_new) >= 0):
+        ff_caught_T_new = np.sort(ff_caught_T_new)
+
+    cumdist = monkey_information["cum_distance"].to_numpy()
+
+    # Map capture times -> cumulative distance via interpolation
+    # Assumes cumdist is (weakly) increasing with time.
+    capture_cumdist = np.interp(ff_caught_T_new, time, cumdist)
+
+    # For each stop: find index of first capture cum_distance >= stop_cum
+    stop_cum = filtered_stops_df["cum_distance"].to_numpy()
+    idx = np.searchsorted(capture_cumdist, stop_cum, side="left")
+
+    # Build distance to the *next* capture (right neighbor only).
+    # If there is no next capture (idx == len), use +inf so it won't be filtered out.
+    next_capture = np.full_like(stop_cum, np.inf, dtype=float)
+    valid = idx < len(capture_cumdist)
+    next_capture[valid] = capture_cumdist[idx[valid]]
+
+    # One-sided distance (non-negative or inf)
+    dist_to_next = next_capture - stop_cum
+
+    out = filtered_stops_df.copy()
+    out["distance_to_next_ff_capture"] = dist_to_next
+
+    # Keep stops that are far enough from the next capture
+    out = out[dist_to_next > min_cum_distance_to_ff_capture].copy()
+    return out
+
+
+def get_one_stop_df(
+    filtered_stops_df: pd.DataFrame,
+    ff_dataframe: pd.DataFrame,
+    min_distance_to_ff: float = 25,
+    max_distance_to_ff: float = 50,
+) -> pd.DataFrame:
+    """
+    Build a stop×FF table where:
+      1) Any stop whose nearest FF is closer than `min_distance_to_ff` is eliminated entirely.
+      2) Remaining rows are only those FF within `max_distance_to_ff` of the stop.
+
+    Returns a long table with one row per (stop point_index × nearby FF).
+    """
+
+    # --- Select only needed columns for a tight merge ---
+    stop_cols = [
+        "point_index", "target_index", "time",
+        "min_distance_from_adjacent_stops",
+        "distance_to_next_ff_capture",
+    ]
+    stop_cols = [c for c in stop_cols if c in filtered_stops_df.columns]
+    ff_cols = ["point_index", "ff_index", "ff_distance", "time_since_last_vis"]
+    ff_cols = [c for c in ff_cols if c in ff_dataframe.columns]
+
+    # Inner-join: we only care about stops that have at least one FF row
+    merged = filtered_stops_df[stop_cols].merge(
+        ff_dataframe[ff_cols], on="point_index", how="inner"
     )
 
-    # for each value in filtered_stops_df's cum_distance column, find the closest cum_distance in ff_caught_points
-    filtered_stops_df['closest_cum_distance_to_ff_capture'] = filtered_stops_df['cum_distance'].apply(
-        lambda x: np.abs(ff_caught_points_df['cum_distance'].values - x).min())
-    # then, eliminate the stops that are too close to a capture
-    filtered_stops_df = filtered_stops_df[filtered_stops_df['closest_cum_distance_to_ff_capture']
-                                          > min_cum_distance_to_ff_capture].copy()
+    # Ensure ff_distance is numeric and drop NaNs (rows without a valid distance)
+    merged = merged[pd.to_numeric(merged["ff_distance"], errors="coerce").notna()].copy()
 
-    return filtered_stops_df
+    # --- Eliminate stops that are "too close" to any FF (< min_distance_to_ff) ---
+    min_ff_per_stop = merged.groupby("point_index")["ff_distance"].transform("min")
+    keep_stops = min_ff_per_stop >= min_distance_to_ff
+
+    # --- Keep only FF within the allowed max distance ---
+    within_max = merged["ff_distance"] <= max_distance_to_ff
+
+    one_stop_df = merged[keep_stops & within_max].copy()
+
+    # ✅ ensure ff_distance is numeric and safe to compare
+    one_stop_df["time_since_last_vis"] = pd.to_numeric(one_stop_df["time_since_last_vis"], errors="coerce").fillna(np.inf)
+    one_stop_df["ff_distance"] = pd.to_numeric(one_stop_df["ff_distance"], errors="coerce").fillna(np.inf)
 
 
-def get_one_stop_df(filtered_stops_df, ff_dataframe, min_distance_to_ff=25, max_distance_to_ff=50):
-    # one_stop_df is used as a comparison to GUAT where there are at least 2 stops beside a missed ff.
-    # one_stop_df contains instances where there is one stop beside a missed ff.
+    # Optional: sort for stability
+    sort_cols = [c for c in ["point_index", "time_since_last_vis", "ff_distance"] if c in one_stop_df.columns]
+    if sort_cols:
+        one_stop_df.sort_values(sort_cols, inplace=True)
 
-    # from the filtered stops, take out the stops that are within n cm of a ff that's visible or in-memory (use ff_dataframe to check)
+    # Normalize dtypes where helpful
+    for col in ("point_index", "target_index", "ff_index"):
+        if col in one_stop_df.columns:
+            one_stop_df[col] = one_stop_df[col].astype("int64", errors="ignore")
 
-    # drop the columns in ff_dataframe that are also in one_stop_df except for 'point_index'
-    ff_dataframe_temp = ff_dataframe.drop(columns=ff_dataframe.columns.intersection(
-        filtered_stops_df.columns).difference(['point_index']))
-
-    one_stop_df = filtered_stops_df.merge(
-        ff_dataframe_temp, on='point_index', how='left')
-
-    # eliminate point_index in one_stop_df if there's at least one row in one_stop_df that has min ff_distance < min_distance_to_ff
-    grouped_df = one_stop_df.groupby('point_index').min()
-    point_index_to_eliminate = grouped_df[grouped_df['ff_distance']
-                                          < min_distance_to_ff].index.values
-    one_stop_df = one_stop_df[~one_stop_df['point_index'].isin(
-        point_index_to_eliminate)].copy()
-
-    # eliminate rows where ff is too far away from the stop (thus, some point indices will be completely eliminated, while others that have at least one row with ff_distance < max_distance_to_ff will remain)
-    one_stop_df = one_stop_df[one_stop_df['ff_distance']
-                              <= max_distance_to_ff].copy()
     return one_stop_df
+
 
 
 def get_GUAT_w_ff_df(GUAT_indices_df,

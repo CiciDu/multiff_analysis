@@ -269,5 +269,163 @@ def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df
 
     return scatter_around_target_df
 
+def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, cur_ff_index_array=None, stop_point_index_array=None):
+    stop_sub = monkey_information.loc[monkey_information['monkey_speeddummy'] == 0, [
+        'time', 'point_index']].copy()
+    closest_stop_to_capture_df = pd.DataFrame()
+    for i in range(len(ff_caught_T_sorted)):
+        caught_time = ff_caught_T_sorted[i]
+        time = stop_sub['time'].values
+        iloc_of_closest_time = np.argmin(np.abs(time - caught_time))
+        closest_point_row = stop_sub.iloc[[iloc_of_closest_time]].copy()
+        closest_point_row['caught_time'] = caught_time
+        closest_stop_to_capture_df = pd.concat(
+            [closest_stop_to_capture_df, closest_point_row], axis=0)
+    closest_stop_to_capture_df['diff_from_caught_time'] = closest_stop_to_capture_df['time'] - \
+        closest_stop_to_capture_df['caught_time']
+    if cur_ff_index_array is not None:
+        closest_stop_to_capture_df['cur_ff_index'] = cur_ff_index_array
+    else:
+        closest_stop_to_capture_df['cur_ff_index'] = np.arange(
+            len(ff_caught_T_sorted))
+    if stop_point_index_array is not None:
+        closest_stop_to_capture_df['stop_point_index'] = stop_point_index_array
+    else:
+        closest_stop_to_capture_df['stop_point_index'] = closest_stop_to_capture_df['point_index']
+    closest_stop_to_capture_df['stop_time'] = monkey_information.loc[closest_stop_to_capture_df['point_index'], 'time'].values
+
+    closest_stop_to_capture_df = monkey_landing_in_ff.add_distance_from_ff_to_stop(
+        closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
+    closest_stop_to_capture_df['whether_stop_inside_boundary'] = closest_stop_to_capture_df['distance_from_ff_to_stop'] <= 25
+    closest_stop_to_capture_df.sort_values(by='cur_ff_index', inplace=True)
+    return closest_stop_to_capture_df
+
+
+
+import numpy as np
+import pandas as pd
+import warnings
+from typing import Optional
+
+def get_closest_stop_to_all_capture_position(
+    ff_caught_T_sorted: np.ndarray,
+    monkey_information: pd.DataFrame,
+    ff_real_position_sorted: np.ndarray,
+    cur_ff_index_array: Optional[np.ndarray] = None,
+    stop_point_index_array: Optional[np.ndarray] = None,
+    capture_window_width: float = 0.2,
+    boundary_cm: float = 25.0,
+) -> pd.DataFrame:
+    """
+    Mirror-vectorized (broadcasted) nearest-stop-to-capture selector.
+
+    For each capture time (len F), choose among all stops (len S):
+      1) restrict to stops within ±capture_window_width of the capture time;
+      2) among those, pick the spatially closest to the firefly position;
+      3) if none exist in the window, fall back to the stop closest in time (globally).
+
+    Returns one row per capture, sorted by cur_ff_index.
+    """
+    # --- validation ---
+    needed_cols = {"time", "monkey_speeddummy", "monkey_x", "monkey_y", "point_index"}
+    missing = needed_cols - set(monkey_information.columns)
+    if missing:
+        raise ValueError(f"monkey_information missing columns: {missing}")
+
+    if ff_caught_T_sorted.ndim != 1:
+        raise ValueError("ff_caught_T_sorted must be 1-D (sorted times).")
+    F = len(ff_caught_T_sorted)
+
+    if ff_real_position_sorted.shape != (F, 2):
+        ff_real_position_sorted = ff_real_position_sorted[:len(ff_caught_T_sorted)]
+        assert ff_real_position_sorted.shape == (F, 2)
+
+    # --- gather all stops ---
+    stop_sub = monkey_information.loc[
+        monkey_information["monkey_speeddummy"] == 0,
+        ["time", "point_index", "monkey_x", "monkey_y"],
+    ].copy()
+
+    if stop_sub.empty:
+        warnings.warn("No stop samples (monkey_speeddummy==0) found at all.")
+        return pd.DataFrame(
+            columns=[
+                "point_index", "time", "monkey_x", "monkey_y",
+                "caught_time", "cur_ff_index", "stop_point_index",
+                "stop_time", "distance_from_ff_to_stop",
+                "whether_stop_inside_boundary", "diff_from_caught_time",
+            ]
+        )
+
+    stop_t = stop_sub["time"].to_numpy()               # (S,)
+    stop_xy = stop_sub[["monkey_x", "monkey_y"]].to_numpy()  # (S, 2)
+    S = stop_t.shape[0]
+
+    # --- broadcasted pairwise computations (S x F) ---
+    # time diffs
+    tdiff = np.abs(stop_t[:, None] - ff_caught_T_sorted[None, :])   # (S, F)
+    # window mask
+    in_window = tdiff <= capture_window_width                       # (S, F)
+
+    # spatial distances
+    dx = stop_xy[:, 0, None] - ff_real_position_sorted[None, :, 0]  # (S, F)
+    dy = stop_xy[:, 1, None] - ff_real_position_sorted[None, :, 1]  # (S, F)
+    dist = np.hypot(dx, dy)                                         # (S, F)
+
+    # pick spatial nearest among windowed stops by masking others to +inf
+    dist_masked = np.where(in_window, dist, np.inf)                 # (S, F)
+    idx_spatial = np.argmin(dist_masked, axis=0)                    # (F,)
+
+    # detect captures with no stops inside window (column all inf)
+    no_win = ~np.any(in_window, axis=0)                             # (F,)
+    if np.any(no_win):
+        # fallback: nearest in time (globally)
+        idx_time = np.argmin(tdiff, axis=0)                         # (F,)
+        # use time-closest index where window was empty
+        idx_final = idx_spatial.copy()
+        idx_final[no_win] = idx_time[no_win]
+        # one aggregated warning (keeps this function mostly vectorized)
+        bad_idxs = np.nonzero(no_win)[0]
+        warnings.warn(
+            f"No stops in ±{capture_window_width:.3f}s for captures at indices: {bad_idxs.tolist()} "
+            f"(times: {np.round(ff_caught_T_sorted[bad_idxs], 3).tolist()}); "
+            "used nearest-in-time stops for those."
+        )
+    else:
+        idx_final = idx_spatial
+
+    # --- gather selected rows in one shot ---
+    chosen = stop_sub.iloc[idx_final].copy()                        # (F, 4)
+    chosen.reset_index(drop=True, inplace=True)
+
+    # per-capture spatial distance values (index along axis 0 using idx_final)
+    # dist is (S, F); take along rows with idx_final to get shape (1, F)
+    sel_dist = np.take_along_axis(dist, idx_final[None, :], axis=0).ravel()
+
+    # build output columns (all vectorized)
+    chosen["caught_time"] = ff_caught_T_sorted
+    if cur_ff_index_array is not None:
+        if len(cur_ff_index_array) != F:
+            raise ValueError("cur_ff_index_array must have same length as ff_caught_T_sorted.")
+        chosen["cur_ff_index"] = cur_ff_index_array.astype(int)
+    else:
+        chosen["cur_ff_index"] = np.arange(F, dtype=int)
+
+    if stop_point_index_array is not None:
+        if len(stop_point_index_array) != F:
+            raise ValueError("stop_point_index_array must have same length as ff_caught_T_sorted.")
+        chosen["stop_point_index"] = stop_point_index_array.astype(int)
+    else:
+        chosen["stop_point_index"] = chosen["point_index"].astype(int)
+
+    chosen["stop_time"] = chosen["time"]
+    chosen["distance_from_ff_to_stop"] = sel_dist.astype(float)
+    chosen["whether_stop_inside_boundary"] = chosen["distance_from_ff_to_stop"] <= float(boundary_cm)
+    chosen["diff_from_caught_time"] = chosen["time"] - chosen["caught_time"]
+
+    # final order & clean index
+    chosen.sort_values("cur_ff_index", inplace=True)
+    chosen.reset_index(drop=True, inplace=True)
+    return chosen
 
 

@@ -164,6 +164,8 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                  'value': 'show_in_memory_fireflies'},
                              {'label': 'show visible segments of ff',
                                  'value': 'show_visible_segments'},
+                             {'label': 'hide non essential visible segments',
+                                 'value': 'hide_non_essential_visible_segments'},
                              {'label': 'show monkey heading',
                                  'value': 'show_monkey_heading'},
                              {'label': 'show portion used to calc traj curvature',
@@ -182,6 +184,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         checklist_params = ['show_visible_fireflies',
                             'show_in_memory_fireflies',
                             'show_visible_segments',
+                            'hide_non_essential_visible_segments',
                             'show_monkey_heading',
                             'show_traj_portion',
                             'show_null_arcs_to_ff',
@@ -263,6 +266,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         print('checklist_for_monkey_plot: ', checklist_for_monkey_plot)
 
         old_checklist_params = {'show_visible_segments': self.monkey_plot_params['show_visible_segments'],
+                                'hide_non_essential_visible_segments': self.monkey_plot_params['hide_non_essential_visible_segments'],
                                 'show_visible_fireflies': self.monkey_plot_params['show_visible_fireflies'],
                                 'show_in_memory_fireflies': self.monkey_plot_params['show_in_memory_fireflies'],
                                 'show_traj_portion': self.monkey_plot_params['show_traj_portion'],
@@ -270,7 +274,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
                                 'show_extended_traj_arc': self.monkey_plot_params['show_extended_traj_arc'],
                                 }
 
-        for param in ['show_monkey_heading', 'show_visible_segments', 'show_traj_portion', 'show_null_arcs_to_ff',
+        for param in ['show_monkey_heading', 'show_visible_segments', 'hide_non_essential_visible_segments', 'show_traj_portion', 'show_null_arcs_to_ff',
                       'show_extended_traj_arc', 'show_stops', 'show_all_eye_positions', 'show_current_eye_positions',
                       'show_eye_positions_for_both_eyes', 'show_visible_fireflies', 'show_in_memory_fireflies']:
             if param in checklist_for_monkey_plot:
@@ -296,7 +300,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
         if (self.monkey_plot_params['show_extended_traj_arc'] != old_checklist_params['show_extended_traj_arc']):
             self._find_ext_traj_arc_info_for_duration()
 
-        for param in ['show_visible_segments', 'show_visible_fireflies', 'show_in_memory_fireflies']:
+        for param in ['show_visible_segments', 'hide_non_essential_visible_segments', 'show_visible_fireflies', 'show_in_memory_fireflies']:
             if old_checklist_params[param] != self.monkey_plot_params[param]:
                 self.current_plotly_key_comp = plotly_preparation.prepare_to_plot_a_planning_instance_in_plotly(
                     self.stops_near_ff_row, self.PlotTrials_args, self.monkey_plot_params)

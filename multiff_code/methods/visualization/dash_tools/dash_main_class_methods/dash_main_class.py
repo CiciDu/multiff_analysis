@@ -36,6 +36,40 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
         self.freeze_time_series = False
 
+
+    def make_dash_for_main_plots(self, show_trajectory_time_series=True, show_neural_plots=True,
+                                 port=DEFAULT_PORT):
+
+        self.show_trajectory_time_series = show_trajectory_time_series
+        self.show_neural_plots = show_neural_plots
+
+        self.app = Dash(
+            __name__, external_stylesheets=DEFAULT_EXTERNAL_STYLESHEETS)
+        self.app.layout = self.prepare_dash_for_main_plots_layout()
+
+        # Pre-calculate bounds once
+        self.hoverdata_value_upper_bound_s = dash_utils.find_hoverdata_value_upper_bound(
+            self.stops_near_ff_row, 'rel_time'
+        )
+        self.hoverdata_value_upper_bound_cm = dash_utils.find_hoverdata_value_upper_bound(
+            self.stops_near_ff_row, 'rel_distance'
+        )
+
+        # Register all callbacks
+        self._register_all_callbacks()
+
+        # Resolve an open port (handles "port already in use")
+        chosen_port = dash_utils._find_open_port(port)
+
+        if chosen_port != port:
+            print(f"Port {port} is in use. Switching to {chosen_port}.")
+
+        print(f"Opening dash in browser at: http://127.0.0.1:{chosen_port}")
+        # If you're SSH-forwarding, forward *chosen_port* (both sides) instead of the original.
+        self.app.run(debug=False, use_reloader=False, mode='external',
+                    port=chosen_port, host='0.0.0.0')
+    
+    
     def _get_empty_figure(self):
         """Get a copy of the empty figure template to avoid race conditions"""
         empty_fig = go.Figure()
@@ -80,29 +114,6 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         layout.extend(more_to_add)
         return html.Div(layout)
 
-    def make_dash_for_main_plots(self, show_trajectory_time_series=True, show_neural_plots=True,
-                                 port=DEFAULT_PORT):
-
-        self.show_trajectory_time_series = show_trajectory_time_series
-        self.show_neural_plots = show_neural_plots
-
-        self.app = Dash(
-            __name__, external_stylesheets=DEFAULT_EXTERNAL_STYLESHEETS)
-        self.app.layout = self.prepare_dash_for_main_plots_layout()
-
-        # Pre-calculate bounds once
-        self.hoverdata_value_upper_bound_s = dash_utils.find_hoverdata_value_upper_bound(
-            self.stops_near_ff_row, 'rel_time'
-        )
-        self.hoverdata_value_upper_bound_cm = dash_utils.find_hoverdata_value_upper_bound(
-            self.stops_near_ff_row, 'rel_distance'
-        )
-
-        # Register all callbacks
-        self._register_all_callbacks()
-
-        print(f"Opening dash in browser at: http://127.0.0.1:{port}")
-        self.app.run(debug=True, mode='external', port=port, host='0.0.0.0')
 
     def _register_all_callbacks(self):
         """Register all callbacks in one place for better organization"""
