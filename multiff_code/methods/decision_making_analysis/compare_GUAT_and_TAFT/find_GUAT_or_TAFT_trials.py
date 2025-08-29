@@ -394,7 +394,7 @@ def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_new
     return monkey_sub
 
 
-def add_stop_cluster_id(monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=False):
+def add_stop_cluster_id(monkey_information, max_cluster_distance=50, use_ff_caught_time_new_to_separate_clusters=False):
     # note, in addition to stop_cluster_id, we also add stop_cluster_start_point and stop_cluster_end_point
     monkey_information = monkey_information.copy()
     stop_points_df = monkey_information[monkey_information['whether_new_distinct_stop']].copy(

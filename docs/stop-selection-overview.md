@@ -13,8 +13,9 @@
   - `one_stop_df`: Long format dataframe with one row per (stop × nearby firefly)  
   - `one_stop_w_ff_df`: Aggregates one_stop_df by grouping stops and selecting the most recently visible firefly. Contains nearby_alive_ff_indices (list of all nearby fireflies) and latest_visible_ff (primary firefly)
 - **Distance filter**
-  - Exclude stops **< 25 cm** from any firefly  
-  - Keep stops in the **25–50 cm** band  
+  - At least 25 cm in cum distance from the point when previous or next ff was caught
+  - Keep stops in the **25–50 cm** band of firefly (that has been visible within the last 2.5 s)
+  - At least 50 cm in absolute distance (which means it has also to be > 50 cm in cum_distance) from the stop before or after
 - **Spatial relationship**
   - Focus on stops **near but not at** fireflies  
   - Output in long format: **one row per (stop × nearby firefly)**  

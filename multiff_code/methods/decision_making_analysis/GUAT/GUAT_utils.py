@@ -18,13 +18,13 @@ np.set_printoptions(suppress=True)
 
 
 def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_new, min_distance_from_adjacent_stops=75,
-                                   min_cum_distance_to_ff_capture=100, min_distance_to_ff=25, max_distance_to_ff=75):
+                                  min_cum_distance_to_ff_capture=25, min_distance_to_ff=25, max_distance_to_ff=50):
     distinct_stops_df = monkey_information[monkey_information['whether_new_distinct_stop'] == 1].copy(
     )
     filtered_stops_df = get_filtered_stops_df(
         distinct_stops_df, min_distance_from_adjacent_stops)
     filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(
-        filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture)
+        filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture=min_cum_distance_to_ff_capture)
     one_stop_df = get_one_stop_df(
         filtered_stops_df, ff_dataframe, min_distance_to_ff, max_distance_to_ff)
 
@@ -156,17 +156,17 @@ def filter_stops_based_on_distance_to_ff_capture(
     min_cum_distance_to_ff_capture: float,
 ) -> pd.DataFrame:
     """
-    Keep only stops whose cumulative distance is at least `min_cum_distance_to_ff_capture`
-    *ahead of* (i.e., to the right of) the nearest firefly-capture cumulative distance.
+    Keep only stops whose cumulative distance is at least
+    `min_cum_distance_to_ff_capture` away from the nearest firefly capture
+    (both left and right in cumulative distance).
 
-    One-sided rule: only the first capture with cum_distance >= stop_cum is considered.
+    Two-sided rule: nearest capture (either <= or >= stop_cum) is considered.
     """
 
     # Preconditions: ensure monotonic inputs
     time = monkey_information["time"].to_numpy()
     if not np.all(np.diff(time) >= 0):
-        raise ValueError(
-            "monkey_information['time'] must be sorted ascending.")
+        raise ValueError("monkey_information['time'] must be sorted ascending.")
 
     if not np.all(np.diff(ff_caught_T_new) >= 0):
         ff_caught_T_new = np.sort(ff_caught_T_new)
@@ -174,27 +174,31 @@ def filter_stops_based_on_distance_to_ff_capture(
     cumdist = monkey_information["cum_distance"].to_numpy()
 
     # Map capture times -> cumulative distance via interpolation
-    # Assumes cumdist is (weakly) increasing with time.
     capture_cumdist = np.interp(ff_caught_T_new, time, cumdist)
 
-    # For each stop: find index of first capture cum_distance >= stop_cum
+    # Stops cumulative distance
     stop_cum = filtered_stops_df["cum_distance"].to_numpy()
-    idx = np.searchsorted(capture_cumdist, stop_cum, side="left")
 
-    # Build distance to the *next* capture (right neighbor only).
-    # If there is no next capture (idx == len), use +inf so it won't be filtered out.
-    next_capture = np.full_like(stop_cum, np.inf, dtype=float)
-    valid = idx < len(capture_cumdist)
-    next_capture[valid] = capture_cumdist[idx[valid]]
+    # --- Right-side (next capture) ---
+    idx_right = np.searchsorted(capture_cumdist, stop_cum, side="left")
+    right_dist = np.full_like(stop_cum, np.inf, dtype=float)
+    valid_r = idx_right < len(capture_cumdist)
+    right_dist[valid_r] = capture_cumdist[idx_right[valid_r]] - stop_cum[valid_r]
 
-    # One-sided distance (non-negative or inf)
-    dist_to_next = next_capture - stop_cum
+    # --- Left-side (previous capture) ---
+    idx_left = idx_right - 1
+    left_dist = np.full_like(stop_cum, np.inf, dtype=float)
+    valid_l = idx_left >= 0
+    left_dist[valid_l] = stop_cum[valid_l] - capture_cumdist[idx_left[valid_l]]
+
+    # --- Two-sided distance ---
+    nearest_dist = np.minimum(left_dist, right_dist)
 
     out = filtered_stops_df.copy()
-    out["distance_to_next_ff_capture"] = dist_to_next
+    out["distance_to_nearest_ff_capture"] = nearest_dist
 
-    # Keep stops that are far enough from the next capture
-    out = out[dist_to_next > min_cum_distance_to_ff_capture].copy()
+    # Keep stops far enough from *any* capture
+    out = out[nearest_dist > min_cum_distance_to_ff_capture].copy()
     return out
 
 
@@ -203,6 +207,7 @@ def get_one_stop_df(
     ff_dataframe: pd.DataFrame,
     min_distance_to_ff: float = 25,
     max_distance_to_ff: float = 50,
+    max_allowed_time_since_last_vis = 2.5,
 ) -> pd.DataFrame:
     """
     Build a stop×FF table where:
@@ -211,6 +216,9 @@ def get_one_stop_df(
 
     Returns a long table with one row per (stop point_index × nearby FF).
     """
+
+    ff_dataframe = ff_dataframe[ff_dataframe['time_since_last_vis']
+                                <= max_allowed_time_since_last_vis].copy()
 
     # --- Select only needed columns for a tight merge ---
     stop_cols = [
