@@ -394,67 +394,123 @@ def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_new
     return monkey_sub
 
 
-def add_stop_cluster_id(monkey_information, max_cluster_distance=50, use_ff_caught_time_new_to_separate_clusters=False):
-    # note, in addition to stop_cluster_id, we also add stop_cluster_start_point and stop_cluster_end_point
-    monkey_information = monkey_information.copy()
-    stop_points_df = monkey_information[monkey_information['whether_new_distinct_stop']].copy(
+import numpy as np
+import pandas as pd
+import numpy as np
+import pandas as pd
+
+def add_stop_cluster_id(
+    monkey_information: pd.DataFrame,
+    max_cluster_distance: float = 20,   # cm
+    use_ff_caught_time_new_to_separate_clusters: bool = False,
+    ff_caught_times: np.ndarray | None = None,   # seconds, sorted
+    capture_split_window_s: float = 0.3,         # seconds
+    stop_id_col: str = "stop_id",
+    stop_start_flag_col: str = "whether_new_distinct_stop",
+    cumdist_col: str = "cum_distance",           # cm
+    time_col: str = "time",
+    point_index_col: str = "point_index",
+    col_exists_ok: bool = True,
+) -> pd.DataFrame:
+    """
+    Assign stop clusters based on cumulative distance between consecutive stops (in cm).
+    Adds:
+      - stop_cluster_id (Int64; <NA> on non-stop rows)
+      - stop_cluster_start_point, stop_cluster_end_point
+      - stop_cluster_size (Int64): number of stops in the cluster
+    """
+    df = monkey_information.copy()
+
+    # If caller is OK with existing column, return early
+    if 'stop_cluster_id' in df.columns and col_exists_ok:
+        print("stop_cluster_id column already exists in the dataframe, skipping the addition of stop_cluster_id column")
+        return df
+
+    # Clean up prior cluster columns to avoid merge suffixes
+    df = df.drop(columns=[
+        "stop_cluster_id",
+        "stop_cluster_start_point",
+        "stop_cluster_end_point",
+        "stop_cluster_size",
+    ], errors="ignore")
+
+    # Required columns present?
+    needed = {stop_start_flag_col, stop_id_col, point_index_col, cumdist_col, time_col}
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
+    # One row per stop onset
+    stop_rows = df.loc[df[stop_start_flag_col]].copy()
+    if stop_rows.empty:
+        df["stop_cluster_id"] = pd.array([pd.NA]*len(df), dtype="Int64")
+        df["stop_cluster_start_point"] = pd.NA
+        df["stop_cluster_end_point"] = pd.NA
+        df["stop_cluster_size"] = pd.array([pd.NA]*len(df), dtype="Int64")
+        return df
+
+    stop_table = (
+        stop_rows.sort_values(stop_id_col)[[stop_id_col, point_index_col, cumdist_col, time_col]]
+        .rename(columns={
+            point_index_col: "stop_point_index",
+            cumdist_col: "stop_cumdist_cm",
+            time_col: "stop_time_s"
+        })
+        .reset_index(drop=True)
     )
 
-    # take out stops that are not too close to previous stop points
-    stop_points_df['cum_distance_from_last_stop_point'] = stop_points_df['cum_distance'].diff()
-    stop_points_df['cum_distance_from_last_stop_point'] = stop_points_df['cum_distance_from_last_stop_point'].fillna(
-        100)
+    if stop_table[stop_id_col].duplicated().any():
+        raise ValueError("Duplicate stop_id among stop starts; expected unique stop_ids.")
 
-    stop_points_df['cum_distance_from_next_stop_point'] = (
-        -1) * stop_points_df['cum_distance'].diff(-1)
-    stop_points_df['cum_distance_from_next_stop_point'] = stop_points_df['cum_distance_from_next_stop_point'].fillna(
-        100)
+    # Distance-based split
+    d_cum_cm = np.diff(stop_table["stop_cumdist_cm"].to_numpy())
+    new_cluster = np.r_[True, d_cum_cm > float(max_cluster_distance)]
 
-    stop_points_df['cluster_start'] = stop_points_df['cum_distance_from_last_stop_point'] > max_cluster_distance
-    stop_points_df['cluster_end'] = stop_points_df['cum_distance_from_next_stop_point'] > max_cluster_distance
+    # Optional capture-based split
+    if use_ff_caught_time_new_to_separate_clusters and ff_caught_times is not None and len(ff_caught_times) > 0:
+        caps = np.asarray(ff_caught_times, dtype=float)
+        if not np.all(np.diff(caps) >= 0):
+            caps = np.sort(caps)
+        if len(stop_table) >= 2:
+            t_prev = stop_table["stop_time_s"].to_numpy()[:-1]
+            t_next = stop_table["stop_time_s"].to_numpy()[1:]
+            idx = np.searchsorted(caps, t_prev, side="right")
+            has_cap = np.zeros_like(t_prev, dtype=bool)
+            valid = idx < caps.size
+            has_cap[valid] = (caps[idx[valid]] >= (t_prev[valid] - capture_split_window_s)) & \
+                             (caps[idx[valid]] <= (t_next[valid] + capture_split_window_s))
+            new_cluster = np.r_[True, (d_cum_cm > float(max_cluster_distance)) | has_cap]
 
-    if use_ff_caught_time_new_to_separate_clusters:
-        stop_points_df = further_identify_cluster_start_and_end_based_on_ff_capture_time(
-            stop_points_df)
+    # Assign cluster ids per stop
+    stop_table["stop_cluster_id"] = np.cumsum(new_cluster.astype(np.int64)) - 1
 
-    stop_points_df_sub = stop_points_df.copy()
+    # Per-cluster stats (ensure key remains a column)
+    bounds = (
+        stop_table.groupby("stop_cluster_id", sort=True, as_index=False)
+        .agg(
+            stop_cluster_start_point=("stop_point_index", "min"),
+            stop_cluster_end_point=("stop_point_index", "max"),
+            stop_cluster_size=("stop_point_index", "count"),
+        )
+    )
 
-    # now take out only the rows that are cluster_start or cluster_stop
-    stop_points_df_sub = stop_points_df_sub[(stop_points_df_sub['cluster_start']) | (
-        stop_points_df_sub['cluster_end'])].copy()
+    # Map cluster id to all samples via stop_id (left join keeps non-stop rows)
+    df = df.merge(
+        stop_table[[stop_id_col, "stop_cluster_id"]],
+        on=stop_id_col,
+        how="left"
+    )
 
-    all_start_stop_points = stop_points_df_sub.loc[stop_points_df_sub['cluster_start'],
-                                                   'point_index'].values
-    all_end_stop_points = stop_points_df_sub.loc[stop_points_df_sub['cluster_end'],
-                                                 'point_index'].values
-    if len(all_start_stop_points) != len(all_end_stop_points):
-        raise ValueError(
-            'The number of start and end stop points are not the same')
+    # Attach bounds (per cluster), including size
+    df = df.merge(bounds, on="stop_cluster_id", how="left")
 
-    # now, assign each point in monkey_information to a stop cluster
-    monkey_information['stop_cluster_id'] = np.searchsorted(
-        all_start_stop_points, monkey_information['point_index'].values, side='right') - 1
-    monkey_information.loc[monkey_information['stop_cluster_id']
-                           < 0, 'stop_cluster_id'] = 0
-    monkey_information.loc[monkey_information['stop_cluster_id'] >= len(
-        all_start_stop_points), 'stop_cluster_id'] = len(all_start_stop_points) - 1
-    monkey_information['stop_cluster_start_point'] = all_start_stop_points[monkey_information['stop_cluster_id']]
-    monkey_information['stop_cluster_end_point'] = all_end_stop_points[monkey_information['stop_cluster_id']]
+    # Final dtypes
+    df["stop_cluster_id"] = df["stop_cluster_id"].astype("Int64")
+    if "stop_cluster_size" in df.columns:
+        df["stop_cluster_size"] = df["stop_cluster_size"].astype("Int64")
 
-    # for the rows that are not stop points, set the stop_cluster_id to nan
-    monkey_information.loc[monkey_information['monkey_speeddummy']
-                           == 1, 'stop_cluster_id'] = np.nan
-    # for the rows that are not in between the start and end points, set the stop_cluster_id to nan
-    monkey_information.loc[~monkey_information['point_index'].between(monkey_information['stop_cluster_start_point'], monkey_information['stop_cluster_end_point']),
-                           'stop_cluster_id'] = np.nan
+    return df
 
-    # assign the same stop_cluster_id to all points with the same stop_id
-    sub_w_stop_cluster_id = monkey_information[[
-        'stop_id', 'stop_cluster_id']].drop_duplicates().dropna()
-    monkey_information.drop(columns='stop_cluster_id', inplace=True)
-    monkey_information = monkey_information.merge(
-        sub_w_stop_cluster_id, on='stop_id', how='left')
-    return monkey_information
 
 
 def further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df):
