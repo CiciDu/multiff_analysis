@@ -154,9 +154,11 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.pattern_frequencies = self.try_retrieving_df(
             df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
         self.make_one_stop_w_ff_df()
+        # Count one-stop misses (stops near but not at fireflies) for pattern frequency analysis
         self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
         if getattr(self, 'GUAT_w_ff_df', None) is None:
             self.get_give_up_after_trying_info()
+        # Count give-up-after-trying events (multiple stops with firefly proximity) for pattern frequency analysis
         self.GUAT_w_ff_frequency = len(self.GUAT_w_ff_df)
 
         if self.pattern_frequencies is None:
@@ -315,8 +317,15 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def make_one_stop_w_ff_df(self):
         self._prepare_to_find_patterns_and_features(find_patterns=False)
 
+        # one_stop_df: Long format dataframe with one row per (stop × nearby firefly)
+        # Contains stops that are 25-50cm from fireflies, representing potential decision points
+        # where the monkey stopped near but not at a firefly (one-stop misses)
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(
             self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
+        
+        # one_stop_w_ff_df: Wide format dataframe with one row per stop
+        # Aggregates one_stop_df by grouping stops and selecting the most recently visible firefly
+        # Contains nearby_alive_ff_indices (list of all nearby fireflies) and latest_visible_ff (primary firefly)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
             self.one_stop_df)
 
