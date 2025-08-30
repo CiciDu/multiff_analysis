@@ -365,7 +365,7 @@ class PSTHAnalyzer:
 
     # ------------------------------ Plotting ---------------------------------
 
-    def _plot_one(self, ax, time_axis, mean, ci, label):
+    def _plot_one(self, ax, time_axis, mean, ci, label=None):
         ax.plot(time_axis, mean, linewidth=2, label=label)
         ax.fill_between(time_axis, mean - ci, mean + ci, alpha=0.25, linewidth=0)
 
@@ -399,7 +399,8 @@ class PSTHAnalyzer:
             if n_events["capture"] >= self.config.min_trials:
                 mean = psth["capture"][:, ci]
                 ciw = psth["capture_sem"][:, ci]
-                self._plot_one(ax_c, time, mean, ciw, f"Capture (n={n_events['capture']})")
+                #self._plot_one(ax_c, time, mean, ciw, f"Capture (n={n_events['capture']})")
+                self._plot_one(ax_c, time, mean, ciw)
                 if show_individual:
                     for trial in segments["capture"]:
                         ax_c.plot(time, (trial[:, ci] / self.config.bin_width), alpha=0.08)
@@ -407,7 +408,8 @@ class PSTHAnalyzer:
             if n_events["miss"] >= self.config.min_trials:
                 mean = psth["miss"][:, ci]
                 ciw = psth["miss_sem"][:, ci]
-                self._plot_one(ax_m, time, mean, ciw, f"Miss (n={n_events['miss']})")
+                #self._plot_one(ax_m, time, mean, ciw, f"Miss (n={n_events['miss']})")
+                self._plot_one(ax_m, time, mean, ciw)
                 if show_individual:
                     for trial in segments["miss"]:
                         ax_m.plot(time, (trial[:, ci] / self.config.bin_width), alpha=0.08)

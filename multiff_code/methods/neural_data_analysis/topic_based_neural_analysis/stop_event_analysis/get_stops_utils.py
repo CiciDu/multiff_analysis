@@ -46,6 +46,12 @@ def prepare_no_capture_and_captures(
 
     captures_df = closest_stop_to_capture_df[["cur_ff_index", "stop_id", "time",
                                               "point_index", "stop_time", 'distance_from_ff_to_stop']].copy()
+    
+    captures_df = (
+        captures_df
+        .sort_values(by=['stop_time', 'distance_from_ff_to_stop'])
+        .drop_duplicates(subset=['stop_id'])
+    )
 
     # 2) Per-stop stats
     # unique_stops_df: Comprehensive table of all stops with temporal statistics (start time, end time, duration)
@@ -73,6 +79,9 @@ def prepare_no_capture_and_captures(
     ].copy()
     valid_captures_df['stop_point_index'] = valid_captures_df['point_index']
     valid_captures_df['stop_time'] = valid_captures_df['time']
+    
+    valid_captures_df = valid_captures_df.reset_index(drop=True)
+    valid_captures_df[['stop_id_duration', 'stop_id_start_time', 'stop_id_end_time']] = monkey_information.loc[valid_captures_df['point_index'], ['stop_id_duration', 'stop_id_start_time', 'stop_id_end_time']].values
 
     # 5) Temporal filtering against capture times (optional)
     filtered_no_capture_stops_df = filter_no_capture_stops_vectorized(
@@ -85,7 +94,7 @@ def prepare_no_capture_and_captures(
         filtered_no_capture_stops_df, stop_debounce
     )
 
-    return valid_captures_df.reset_index(drop=True), filtered_no_capture_stops_df.reset_index(drop=True), unique_stops_df.reset_index(drop=True)
+    return valid_captures_df, filtered_no_capture_stops_df.reset_index(drop=True), unique_stops_df.reset_index(drop=True)
 
 
 def filter_no_capture_stops_vectorized(no_capture_stops_df, ff_caught_T_new, capture_match_window):
@@ -157,47 +166,52 @@ def filter_stops_df_by_debounce(stops_df, stop_debounce) -> pd.DataFrame:
 
 
 def extract_unique_stops(monkey_information: pd.DataFrame) -> pd.DataFrame:
-    """
-    From per-sample `monkey_information`, compute one row per stop_id with duration and basic fields.
+    # """
+    # From per-sample `monkey_information`, compute one row per stop_id with duration and basic fields.
 
-    Requires columns: ['point_index', 'time', 'stop_id'].
-    Returns a DataFrame with unique stop_ids and columns:
-      ['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration', ...original first-row cols]
+    # Requires columns: ['point_index', 'time', 'stop_id'].
+    # Returns a DataFrame with unique stop_ids and columns:
+    #   ['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration', ...original first-row cols]
 
-    This function creates unique_stops_df: a comprehensive table of all stops with their temporal statistics.
-    Each row represents one unique stop event with calculated start time, end time, and duration.
-    """
-    required = {"point_index", "time", "stop_id"}
-    missing = required - set(monkey_information.columns)
-    if missing:
-        raise KeyError(
-            f"extract_unique_stops: missing columns {sorted(missing)}")
+    # This function creates unique_stops_df: a comprehensive table of all stops with their temporal statistics.
+    # Each row represents one unique stop event with calculated start time, end time, and duration.
+    # """
+    # required = {"point_index", "time", "stop_id"}
+    # missing = required - set(monkey_information.columns)
+    # if missing:
+    #     raise KeyError(
+    #         f"extract_unique_stops: missing columns {sorted(missing)}")
 
-    # Consider only rows that belong to a stop
-    stops_df = monkey_information.loc[monkey_information["stop_id"].notna()].copy(
-    )
+    # # Consider only rows that belong to a stop
+    # stops_df = monkey_information.loc[monkey_information["stop_id"].notna()].copy(
+    # )
 
-    # Aggregate per stop_id over time
-    stop_stats = stops_df.groupby("stop_id", as_index=True)["time"].agg(
-        stop_id_start_time="min",
-        stop_id_end_time="max"
-    )
-    stop_stats["stop_id_duration"] = (
-        stop_stats["stop_id_end_time"] - stop_stats["stop_id_start_time"]
-    )
+    # # Aggregate per stop_id over time
+    # stop_stats = stops_df.groupby("stop_id", as_index=True)["time"].agg(
+    #     stop_id_start_time="min",
+    #     stop_id_end_time="max"
+    # )
+    # stop_stats["stop_id_duration"] = (
+    #     stop_stats["stop_id_end_time"] - stop_stats["stop_id_start_time"]
+    # )
 
-    # Merge back; keep stable order by point_index (ascending)
-    stops_df = stops_df.merge(stop_stats, on="stop_id", how="left")
-    stops_df = stops_df.sort_values("point_index", kind="stable")
+    # # Merge back; keep stable order by point_index (ascending)
+    # stops_df = stops_df.merge(stop_stats, on="stop_id", how="left")
+    # stops_df = stops_df.sort_values("point_index", kind="stable")
 
-    # Reduce to one representative row per stop_id (the first encountered in time)
-    unique_stops_df = (
-        stops_df.groupby("stop_id", as_index=False, sort=False)
-        .first()
-        .reset_index(drop=True)
-    )
+    # # Reduce to one representative row per stop_id (the first encountered in time)
+    # unique_stops_df = (
+    #     stops_df.groupby("stop_id", as_index=False, sort=False)
+    #     .first()
+    #     .reset_index(drop=True)
+    # )
+    
+    unique_stops_df = monkey_information[['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration']].groupby(('stop_id')).first().reset_index(drop=False)
+    
+
     return unique_stops_df
 
+    
 
 def add_stop_id_to_closest_stop_to_capture_df(
     closest_stop_to_capture_df: pd.DataFrame,
@@ -314,3 +328,61 @@ def plot_inter_stop_intervals(onsets,
         "ax1": ax1,
         "ax2": ax2,
     }
+
+
+
+import pandas as pd
+import numpy as np
+
+def _expand_trials(trials_df: pd.DataFrame,
+                   monkey_information: pd.DataFrame,
+                   stop_indices_col: str = "stop_indices",
+                   out_index_col: str = "stop_point_index") -> pd.DataFrame:
+    """
+    Explode `trials_df[stop_indices_col]` so each stop index is its own row,
+    and add `stop_time` (and `stop_cluster_id` if not already present) by
+    mapping from `monkey_information` via positional indexing.
+
+    Assumes `stop_indices` are integer point indices into `monkey_information`.
+    """
+    df = (
+        trials_df
+        .explode(stop_indices_col, ignore_index=True)
+        .rename(columns={stop_indices_col: out_index_col})
+        .copy()
+    )
+
+    # Ensure integer positional indices
+    idx = df[out_index_col].astype("int64").to_numpy()
+
+    # Map stop_time from monkey_information (positional)
+    mi_time = monkey_information["time"].to_numpy()
+    df["stop_time"] = mi_time[idx]
+
+    # If stop_cluster_id is not already present, map it too (if exists in MI)
+    if "stop_cluster_id" not in df.columns and "stop_cluster_id" in monkey_information.columns:
+        mi_cluster = monkey_information["stop_cluster_id"].to_numpy()
+        df["stop_cluster_id"] = mi_cluster[idx]
+
+    return df
+
+
+def _add_cluster_ordering(df: pd.DataFrame,
+                          cluster_col: str = "stop_cluster_id",
+                          order_col: str = "stop_point_index") -> pd.DataFrame:
+    """
+    Sort within clusters and add:
+      - cluster_size
+      - order_in_cluster (0-based)
+      - is_first / is_last / is_middle
+    """
+    out = df.sort_values([cluster_col, order_col], ascending=[True, True]).reset_index(drop=True)
+
+    out["cluster_size"] = out.groupby(cluster_col)[order_col].transform("size")
+    out["order_in_cluster"] = out.groupby(cluster_col).cumcount()
+
+    out["is_first"] = out["order_in_cluster"].eq(0)
+    out["is_last"]  = out["order_in_cluster"].eq(out["cluster_size"] - 1)
+    out["is_middle"] = (~out["is_first"]) & (~out["is_last"])
+    return out
+

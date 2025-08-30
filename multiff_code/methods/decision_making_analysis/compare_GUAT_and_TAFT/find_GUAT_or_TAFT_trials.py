@@ -401,7 +401,7 @@ import pandas as pd
 
 def add_stop_cluster_id(
     monkey_information: pd.DataFrame,
-    max_cluster_distance: float = 20,   # cm
+    max_cluster_distance=50,   # cm
     use_ff_caught_time_new_to_separate_clusters: bool = False,
     ff_caught_times: np.ndarray | None = None,   # seconds, sorted
     capture_split_window_s: float = 0.3,         # seconds
