@@ -1,5 +1,5 @@
 """
-Standalone PSTH stats utilities for capture vs miss comparisons.
+Standalone PSTH stats utilities for event_a vs event_b comparisons.
 
 Drop this file next to your PSTH analyzer. It operates on a ready-to-use
 `PSTHAnalyzer` instance (from your existing script) without modifying it.
@@ -27,11 +27,10 @@ def quick_report(an, window="late_rebound(0.3–0.8)"):
     res = statistical_comparison_window(an, window_name=window)
     # pretty-print
     for k, v in res.items():
-        if "error" in v: 
+        if "error" in v:
             print(f"Cluster {k}: {v['error']}")
         else:
             print(f"Cluster {k}: p={v['p_value']:.3g}  AUC={v['AUC']:.3f}  δ={v['cliffs_delta']:.3f}  g={v['hedges_g']:.2f}")
-
 
 def _hedges_g(x: np.ndarray, y: np.ndarray) -> float:
     n1, n2 = len(x), len(y)
@@ -73,7 +72,6 @@ def _ensure_ready(analyzer) -> None:
     if not getattr(analyzer, "psth_data", None):
         analyzer.run_full_analysis(None)
 
-
 def _collect_window_absolute(analyzer, t0: float, t1: float) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray]]:
     """Return per-trial mean rates (Hz) within [t0,t1] for each cluster and condition."""
     _ensure_ready(analyzer)
@@ -88,7 +86,7 @@ def _collect_window_absolute(analyzer, t0: float, t1: float) -> Tuple[Dict[int, 
     if i1 < i0:
         i0, i1 = i1, i0
 
-    cap_by_c, mis_by_c = {}, {}
+    a_by_c, b_by_c = {}, {}
     for ci in range(analyzer.n_clusters):
         def take(name):
             arr = segments.get(name, np.zeros((0, len(time_axis), analyzer.n_clusters), np.float32))
@@ -96,18 +94,17 @@ def _collect_window_absolute(analyzer, t0: float, t1: float) -> Tuple[Dict[int, 
                 return np.array([], float)
             return (arr[:, i0:i1+1, ci].mean(axis=1) / bw).astype(float)
         cid = int(analyzer.clusters[ci]) if str(analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
-        cap_by_c[cid] = take("capture")
-        mis_by_c[cid] = take("miss")
-    return cap_by_c, mis_by_c
-
+        a_by_c[cid] = take("event_a")
+        b_by_c[cid] = take("event_b")
+    return a_by_c, b_by_c
 
 def _collect_window_percent(analyzer, window_name: str) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray]]:
     """Use analyzer.window_summary to resolve percent windows per event."""
     _ensure_ready(analyzer)
-    if not analyzer.config.windows_pct or window_name not in analyzer.config.windows_pct:
+    if not getattr(analyzer.config, "windows_pct", None) or window_name not in analyzer.config.windows_pct:
         raise ValueError(f"Percent window '{window_name}' not defined in config.windows_pct")
     tables = analyzer.window_summary(segments=analyzer.psth_data["segments"], use_abs=False, use_pct=True)
-    cap_by_c, mis_by_c = {}, {}
+    a_by_c, b_by_c = {}, {}
     for ci in range(analyzer.n_clusters):
         cid = int(analyzer.clusters[ci]) if str(analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
         def pick(df, cond):
@@ -115,9 +112,9 @@ def _collect_window_percent(analyzer, window_name: str) -> Tuple[Dict[int, np.nd
                 return np.array([], float)
             sub = df[(df["cluster"] == cid) & (df["window"] == window_name) & (df["event_type"] == cond)]
             return sub["rate_hz"].to_numpy(dtype=float)
-        cap_by_c[cid] = pick(tables["capture"], "capture")
-        mis_by_c[cid] = pick(tables["miss"], "miss")
-    return cap_by_c, mis_by_c
+        a_by_c[cid] = pick(tables["event_a"], "event_a")
+        b_by_c[cid] = pick(tables["event_b"], "event_b")
+    return a_by_c, b_by_c
 
 # ------------------------------ Main stats API -------------------------------
 
@@ -129,19 +126,19 @@ def statistical_comparison_window(
     fdr_across_clusters: bool = True,
 ) -> Dict:
     """
-    Capture vs Miss within a window (absolute or percent). Returns per-cluster dict with:
+    event_a vs event_b within a window (absolute or percent). Returns per-cluster dict with:
     U, p, p_fdr, AUC, rank-biserial r, Cliff's δ, Hedges' g, means, Ns, and window metadata.
     """
     _ensure_ready(analyzer)
     cfg_alpha = analyzer.config.alpha if alpha is None else alpha
 
     if window_name is not None:
-        if analyzer.config.windows_abs and window_name in analyzer.config.windows_abs:
+        if getattr(analyzer.config, "windows_abs", None) and window_name in analyzer.config.windows_abs:
             t0, t1 = analyzer.config.windows_abs[window_name]
-            cap_by_c, mis_by_c = _collect_window_absolute(analyzer, t0, t1)
+            a_by_c, b_by_c = _collect_window_absolute(analyzer, t0, t1)
             wlabel, wtype = window_name, "absolute"
-        elif analyzer.config.windows_pct and window_name in analyzer.config.windows_pct:
-            cap_by_c, mis_by_c = _collect_window_percent(analyzer, window_name)
+        elif getattr(analyzer.config, "windows_pct", None) and window_name in analyzer.config.windows_pct:
+            a_by_c, b_by_c = _collect_window_percent(analyzer, window_name)
             wlabel, wtype = window_name, "percent"
         else:
             raise ValueError(f"window_name '{window_name}' not found in absolute or percent windows.")
@@ -149,7 +146,7 @@ def statistical_comparison_window(
         if time_window is None:
             time_window = (0.0, 0.5)
         t0, t1 = time_window
-        cap_by_c, mis_by_c = _collect_window_absolute(analyzer, t0, t1)
+        a_by_c, b_by_c = _collect_window_absolute(analyzer, t0, t1)
         wlabel, wtype = f"[{t0:.3f},{t1:.3f}]", "absolute"
 
     results: Dict[str, Dict] = {}
@@ -157,27 +154,27 @@ def statistical_comparison_window(
 
     for ci in range(analyzer.n_clusters):
         cid = int(analyzer.clusters[ci]) if str(analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
-        cap = np.asarray(cap_by_c[cid])
-        mis = np.asarray(mis_by_c[cid])
-        if len(cap) >= analyzer.config.min_trials and len(mis) >= analyzer.config.min_trials:
-            U, p = stats.mannwhitneyu(cap, mis, alternative="two-sided")
-            auc = float(U / (len(cap) * len(mis)))
+        a = np.asarray(a_by_c[cid])
+        b = np.asarray(b_by_c[cid])
+        if len(a) >= analyzer.config.min_trials and len(b) >= analyzer.config.min_trials:
+            U, p = stats.mannwhitneyu(a, b, alternative="two-sided")
+            auc = float(U / (len(a) * len(b)))
             r_rb = float(2*auc - 1)
-            d_h = _hedges_g(cap, mis)
-            delta = _cliffs_delta_mwu(cap, mis)
+            d_h = _hedges_g(a, b)
+            delta = _cliffs_delta_mwu(a, b)
             res = {
-                "capture_mean": float(np.mean(cap)),
-                "capture_std": float(np.std(cap, ddof=1)) if len(cap) > 1 else 0.0,
-                "miss_mean": float(np.mean(mis)),
-                "miss_std": float(np.std(mis, ddof=1)) if len(mis) > 1 else 0.0,
+                "event_a_mean": float(np.mean(a)),
+                "event_a_std": float(np.std(a, ddof=1)) if len(a) > 1 else 0.0,
+                "event_b_mean": float(np.mean(b)),
+                "event_b_std": float(np.std(b, ddof=1)) if len(b) > 1 else 0.0,
                 "U": float(U),
                 "p_value": float(p),
                 "AUC": auc,
                 "rank_biserial_r": r_rb,
                 "cliffs_delta": delta,
                 "hedges_g": d_h,
-                "n_captures": int(len(cap)),
-                "n_misses": int(len(mis)),
+                "n_event_a": int(len(a)),
+                "n_event_b": int(len(b)),
                 "window": wlabel,
                 "window_type": wtype,
             }
@@ -196,7 +193,6 @@ def statistical_comparison_window(
 
     return results
 
-
 def statistical_comparison_by_windows(
     analyzer,
     windows: Optional[List[str]] = None,
@@ -208,10 +204,10 @@ def statistical_comparison_by_windows(
     _ensure_ready(analyzer)
 
     names: List[str] = []
-    if include_absolute and analyzer.config.windows_abs:
+    if include_absolute and getattr(analyzer.config, "windows_abs", None):
         abs_names = list(analyzer.config.windows_abs.keys())
         names.extend(abs_names if windows is None else [w for w in windows if w in abs_names])
-    if include_percent and (analyzer.config.windows_pct or {}):
+    if include_percent and getattr(analyzer.config, "windows_pct", None):
         pct_names = list(analyzer.config.windows_pct.keys())
         names.extend(pct_names if windows is None else [w for w in windows if w in pct_names])
 
@@ -233,7 +229,6 @@ def statistical_comparison_by_windows(
         out["reject_fdr_all"] = rej
     return out.sort_values(["window_type", "window_name", "cluster"]).reset_index(drop=True)
 
-
 def sliding_window_stats(
     analyzer,
     width_s: float = 0.1,
@@ -242,7 +237,7 @@ def sliding_window_stats(
     t_max: float = 1.0,
     fdr: bool = True,
 ) -> pd.DataFrame:
-    """Sweep capture vs miss over sliding windows. Returns tidy DataFrame."""
+    """Sweep event_a vs event_b over sliding windows. Returns tidy DataFrame."""
     _ensure_ready(analyzer)
     starts = np.arange(t_min, t_max - width_s + 1e-12, step_s)
     rows = []
@@ -262,7 +257,6 @@ def sliding_window_stats(
         out["p_value_adj_fdr"] = padj
         out["reject_fdr"] = rej
     return out.sort_values(["cluster", "t0"]).reset_index(drop=True)
-
 
 def permutation_time_cluster_test(
     analyzer,
@@ -285,8 +279,8 @@ def permutation_time_cluster_test(
         arr = segments.get(name, np.zeros((0, len(time_axis), analyzer.n_clusters), np.float32))
         return (arr[:, :, cluster_idx] / bw).astype(float)
 
-    X = take("capture")  # trials×time
-    Y = take("miss")
+    X = take("event_a")  # trials×time
+    Y = take("event_b")
     if X.shape[0] < analyzer.config.min_trials or Y.shape[0] < analyzer.config.min_trials:
         return {"error": "Insufficient trials"}
 

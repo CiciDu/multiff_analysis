@@ -46,13 +46,15 @@ def export_psth_to_df(
     all_idx = range(len(analyzer.clusters))
     idxs = list(all_idx) if clusters is None else list(clusters)
 
+    label_a = getattr(analyzer, "event_a_label", "event_a")
+    label_b = getattr(analyzer, "event_b_label", "event_b")
+
     # Helper to build one condition block
     def _block(cond_key: str, label: str) -> pd.DataFrame:
-        mean = psth[cond_key][:, idxs]              # (n_bins, n_sel_clusters)
-        sem = psth[cond_key + "_sem"][:, idxs]     # same shape
+        mean = psth[cond_key][:, idxs]           # (n_bins, n_sel_clusters)
+        sem = psth[cond_key + "_sem"][:, idxs]   # same shape
 
         # Repeat time for each selected cluster
-        # (n_bins, n_sel_clusters)
         t_rep = np.tile(time[:, None], (1, len(idxs)))
         cl_ids = analyzer.clusters[idxs]
         cl_rep = np.tile(cl_ids[None, :], (len(time), 1))
@@ -72,10 +74,10 @@ def export_psth_to_df(
 
     out_frames: List[pd.DataFrame] = []
     # Only append if there are any events for that condition
-    if analyzer.psth_data["n_events"]["capture"] > 0:
-        out_frames.append(_block("capture", "capture"))
-    if analyzer.psth_data["n_events"]["miss"] > 0:
-        out_frames.append(_block("miss", "miss"))
+    if analyzer.psth_data["n_events"]["event_a"] > 0:
+        out_frames.append(_block("event_a", label_a))
+    if analyzer.psth_data["n_events"]["event_b"] > 0:
+        out_frames.append(_block("event_b", label_b))
 
     return pd.concat(out_frames, ignore_index=True) if out_frames else pd.DataFrame(
         columns=(["time", "cluster", "condition", "mean"] +
@@ -107,25 +109,29 @@ def compare_windows(analyzer, windows, alpha=0.05):
     """
     Run analyzer.statistical_comparison() on multiple windows and
     return a tidy DataFrame with FDR-corrected significance flags.
+
+    Returns columns:
+      cluster, window, p, U, cohens_d,
+      event_a_mean, event_b_mean, n_event_a, n_event_b, sig_FDR
     """
     rows = []
     for win_name, (a, b) in windows.items():
-        stats = analyzer.statistical_comparison(time_window=(a, b))
-        for cl_id, d in stats.items():
+        stats_out = analyzer.statistical_comparison(time_window=(a, b))
+        for cl_id, d in stats_out.items():
             if "error" in d:
                 rows.append({
                     "cluster": cl_id, "window": win_name, "p": np.nan,
                     "U": np.nan, "cohens_d": np.nan,
-                    "cap_mean": np.nan, "miss_mean": np.nan,
-                    "n_cap": d.get("n_captures", 0), "n_miss": d.get("n_misses", 0),
+                    "event_a_mean": np.nan, "event_b_mean": np.nan,
+                    "n_event_a": d.get("n_event_a", 0), "n_event_b": d.get("n_event_b", 0),
                     "sig_FDR": False
                 })
             else:
                 rows.append({
                     "cluster": cl_id, "window": win_name, "p": d["p_value"],
                     "U": d["statistic_U"], "cohens_d": d["cohens_d"],
-                    "cap_mean": d["capture_mean"], "miss_mean": d["miss_mean"],
-                    "n_cap": d["n_captures"], "n_miss": d["n_misses"],
+                    "event_a_mean": d["event_a_mean"], "event_b_mean": d["event_b_mean"],
+                    "n_event_a": d["n_event_a"], "n_event_b": d["n_event_b"],
                     "sig_FDR": False  # temp, fill later
                 })
     df = pd.DataFrame(rows)
@@ -154,8 +160,8 @@ def summarize_epochs(analyzer, alpha=0.05):
     Returns
     -------
     pd.DataFrame with columns:
-      cluster, window, p, cohens_d, cap_mean, miss_mean,
-      n_cap, n_miss, sig_FDR
+      cluster, window, p, cohens_d, event_a_mean, event_b_mean,
+      n_event_a, n_event_b, sig_FDR
     """
     windows = {
         "pre_bump(-0.3–0.0)": (-0.3, 0.0),
@@ -166,7 +172,8 @@ def summarize_epochs(analyzer, alpha=0.05):
 
 
 def plot_effect_heatmap_all(summary: pd.DataFrame,
-                            title="Capture − Miss effects (Cohen's d)",
+                            analyzer,
+                            title=None,
                             grey_color="lightgrey",
                             order: str = "effect"):
     """
@@ -211,7 +218,6 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
 
     # Row ordering
     if order == "effect":
-        # strongest absolute effect across epochs (ignoring NaNs)
         strength = pivot.abs().max(axis=1).fillna(0.0)
         pivot = pivot.loc[strength.sort_values(ascending=False).index]
     elif order == "cluster":
@@ -227,6 +233,9 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
     vmax = np.nanmax(np.abs(pivot.values))
     if not np.isfinite(vmax) or vmax == 0:
         vmax = 1.0  # fallback if nothing significant at all
+        
+    if title is None:
+        title = f"{getattr(analyzer,'event_a_label','event_a')} − {getattr(analyzer,'event_b_label','event_b')} effects (Cohen's d)"
 
     fig, ax = plt.subplots(figsize=(8, max(3, 0.4 * len(pivot))))
     im = ax.imshow(pivot.values, aspect="auto",
@@ -239,11 +248,9 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
 
     ax.set_title(title)
     cbar = plt.colorbar(im, ax=ax)
-    cbar.set_label("Cohen's d (capture − miss)")
+    cbar.set_label("Cohen's d (event_a − event_b)")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Cluster")
     ax.grid(False)
     plt.tight_layout()
     return fig, ax
-
-
