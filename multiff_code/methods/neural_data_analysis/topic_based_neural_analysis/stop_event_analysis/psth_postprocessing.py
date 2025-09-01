@@ -254,3 +254,122 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
     ax.grid(False)
     plt.tight_layout()
     return fig, ax
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
+
+def _pick_sample_sizes(df: pd.DataFrame) -> tuple[int | None, int | None]:
+    nA = nB = None
+    if 'n_event_a' in df.columns and df['n_event_a'].notna().any():
+        nA = int(pd.to_numeric(df['n_event_a'], errors='coerce').dropna().iloc[0])
+    if 'n_event_b' in df.columns and df['n_event_b'].notna().any():
+        nB = int(pd.to_numeric(df['n_event_b'], errors='coerce').dropna().iloc[0])
+    return nA, nB
+
+def _shorten_labels(seq):
+    # turn 'pre_bump(…)' -> 'pre bump\n(…)' to save horizontal space
+    out = []
+    for s in map(str, seq):
+        if '(' in s and '_' in s:
+            left, right = s.split('(', 1)
+            out.append(left.replace('_', ' ') + '\n(' + right)
+        else:
+            out.append(s.replace('_', ' '))
+    return out
+
+def plot_sig_heatmap(summary: pd.DataFrame,
+                     title: str | None = None,
+                     window_order: list | None = None,
+                     cmap: str = 'coolwarm',
+                     drop_empty_windows: bool = False,
+                     xtick_rotation: int = 30):
+    """
+    Heatmap of FDR-significant Cohen's d by cluster × window.
+    - Title and sample size are combined into a single two-line suptitle.
+    - Explicit observed=… passed to pivot_table to silence FutureWarning.
+
+    summary needs: ['cluster','window','cohens_d','sig_FDR'] and (optionally) n_event_a/b.
+    """
+    if title is None:
+        title = "Significant effects (Cohen's d)"
+
+    nA, nB = _pick_sample_sizes(summary)
+    subtitle = f'sample sizes: n_a={nA}, n_b={nB}' if (nA is not None and nB is not None) else None
+
+    sig = summary[summary['sig_FDR']].copy()
+
+    # no significant results → compact info figure (with same header style)
+    if sig.empty:
+        fig, ax = plt.subplots(figsize=(7.5, 2.6))
+        ax.axis('off')
+        header = title if not subtitle else f'{title}\n{subtitle}'
+        fig.suptitle(header, fontsize=13)
+        ax.text(0.5, 0.58, 'No significant results to plot.', ha='center', va='center', fontsize=11)
+        ax.text(0.5, 0.30, 'Try more trials, different windows, or relaxed corrections.', ha='center', va='center', fontsize=9)
+        plt.subplots_adjust(top=0.78)
+        return fig, ax
+
+    if window_order is not None:
+        sig['window'] = pd.Categorical(sig['window'], categories=window_order, ordered=True)
+
+    # pivot clusters × windows; choose whether to keep unobserved categories
+    observed_flag = True if drop_empty_windows else False
+    pivot = sig.pivot_table(index='cluster',
+                            columns='window',
+                            values='cohens_d',
+                            aggfunc='mean',
+                            observed=observed_flag)
+
+    # optionally drop windows that are all NaN
+    if drop_empty_windows:
+        pivot = pivot.loc[:, pivot.notna().any(axis=0)]
+
+    # enforce column order
+    if window_order is not None:
+        cols = [w for w in window_order if w in pivot.columns] if drop_empty_windows else window_order
+        pivot = pivot.reindex(columns=cols)
+
+    # sort clusters by strongest absolute effect
+    with np.errstate(invalid='ignore'):
+        strength = pivot.abs().max(axis=1).to_numpy()
+    order_idx = np.argsort(-np.nan_to_num(strength, nan=-np.inf))
+    pivot = pivot.iloc[order_idx]
+
+    # symmetric color scale
+    vmax = np.nanmax(np.abs(pivot.to_numpy()))
+    if not np.isfinite(vmax) or vmax == 0:
+        vmax = 1.0
+    norm = TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
+
+    # figure
+    fig_h = max(3.2, 0.42 * max(1, len(pivot)))
+    fig, ax = plt.subplots(figsize=(9.0, fig_h), dpi=120)
+
+    im = ax.imshow(pivot.to_numpy(), aspect='auto', cmap=cmap, norm=norm)
+
+    ax.set_xticks(range(pivot.shape[1]))
+    ax.set_xticklabels(_shorten_labels(pivot.columns), rotation=xtick_rotation, ha='right')
+    ax.set_yticks(range(pivot.shape[0]))
+    ax.set_yticklabels(pivot.index)
+
+    # single two-line header avoids collisions
+    header = title if not subtitle else f'{title}\n{subtitle}'
+    fig.suptitle(header, fontsize=13)
+
+    cbar = plt.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
+    cbar.set_label("Cohen's d (event_a − event_b)")
+
+    # reserve space for the two-line suptitle
+    plt.subplots_adjust(top=0.80)
+    return fig, ax
+

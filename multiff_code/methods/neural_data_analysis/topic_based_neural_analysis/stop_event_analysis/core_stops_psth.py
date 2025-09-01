@@ -81,9 +81,9 @@ class PSTHAnalyzer:
         monkey_information : pd.DataFrame
             Must include 'time' (s), 'monkey_speeddummy' (0/1), optionally 'point_index'.
         event_a_df : pd.DataFrame
-            Pre-filtered events A with 'stop_time' (or 'time') and 'stop_point_index'/'point_index'.
+            Pre-filtered events A with 'stop_time' (or 'time').
         event_b_df : pd.DataFrame
-            Pre-filtered events B with 'stop_time' (or 'time') and 'stop_point_index'/'point_index'.
+            Pre-filtered events B with 'stop_time' (or 'time').
         """
         
         self.event_a_label = event_a_label
@@ -98,16 +98,6 @@ class PSTHAnalyzer:
         if not {"time", "monkey_speeddummy"}.issubset(self.monkey_information.columns):
             raise ValueError(
                 "monkey_information must have columns ['time', 'monkey_speeddummy'].")
-
-        # Optional warning if you rely on built-in stop detection elsewhere
-        required_stop_cols = ["whether_new_distinct_stop", "stop_event_id"]
-        missing_stop_cols = [
-            c for c in required_stop_cols if c not in self.monkey_information.columns]
-        if missing_stop_cols:
-            print(
-                f"Warning: Missing stop_event_id system columns: {missing_stop_cols}")
-            print("Please run add_more_columns_to_monkey_information() first if you rely on built-in stop detection.")
-            print("Using provided event_a/event_b dataframes (fallback) if given.")
 
         self.config = config or PSTHConfig()
 
@@ -145,27 +135,17 @@ class PSTHAnalyzer:
     def identify_stop_events(self) -> pd.DataFrame:
         """
         Combine event_a_df and event_b_df into a single stops dataframe.
-        Returns DataFrame with columns ['stop_time', 'stop_point_index', 'stop_event_id', 'event_type'].
+        Returns DataFrame with columns ['stop_time', 'event_type'].
         event_type is one of {'event_a', 'event_b'}.
         """
 
         def _prep(df: pd.DataFrame, label: str) -> pd.DataFrame:
             out = df.copy()
             if "stop_time" not in out.columns:
-                if "time" in out.columns:
-                    out = out.rename(columns={"time": "stop_time"})
-                else:
-                    raise ValueError(
-                        f"{label} dataframe missing 'stop_time' or 'time' column.")
-            if "stop_point_index" not in out.columns:
-                if "point_index" in out.columns:
-                    out = out.rename(
-                        columns={"point_index": "stop_point_index"})
-                else:
-                    # Optional; downstream doesn't strictly require index
-                    out["stop_point_index"] = np.nan
+                raise ValueError(
+                    f"{label} dataframe missing 'stop_time' column.")
             out["event_type"] = label
-            return out[["stop_time", "stop_point_index", "event_type"]]
+            return out[["stop_time", "event_type"]]
 
         a = _prep(self.event_a_df, "event_a")
         b = _prep(self.event_b_df, "event_b")
@@ -173,10 +153,8 @@ class PSTHAnalyzer:
         combined = pd.concat([a, b], ignore_index=True)
         combined = combined.sort_values(
             "stop_time", kind="mergesort").reset_index(drop=True)
-        combined["stop_event_id"] = np.arange(len(combined), dtype=int)
 
         self.stop_events = combined
-        print("Combination of pre-filtered event_a and event_b complete.")
         return self.stop_events
 
     # ----------------------- Binning utilities (cached) -----------------------

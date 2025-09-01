@@ -32,13 +32,30 @@ def quick_report(an, window="late_rebound(0.3–0.8)"):
         else:
             print(f"Cluster {k}: p={v['p_value']:.3g}  AUC={v['AUC']:.3f}  δ={v['cliffs_delta']:.3f}  g={v['hedges_g']:.2f}")
 
-def _hedges_g(x: np.ndarray, y: np.ndarray) -> float:
+# def _hedges_g(x: np.ndarray, y: np.ndarray) -> float:
+#     n1, n2 = len(x), len(y)
+#     if n1 < 2 or n2 < 2:
+#         return 0.0
+#     d = (np.mean(x) - np.mean(y)) / np.sqrt(((n1-1)*np.var(x, ddof=1) + (n2-1)*np.var(y, ddof=1)) / (n1+n2-2))
+#     J = 1 - (3 / (4*(n1+n2) - 9))  # small-sample correction
+#     return float(J * d)
+
+def _hedges_g(x, y, eps=1e-3, trim=0.0):
+    import numpy as np
+    x = np.asarray(x, float); y = np.asarray(y, float)
+    if trim > 0:
+        qx = np.quantile(x, [trim/2, 1-trim/2]); x = np.clip(x, *qx)
+        qy = np.quantile(y, [trim/2, 1-trim/2]); y = np.clip(y, *qy)
     n1, n2 = len(x), len(y)
     if n1 < 2 or n2 < 2:
         return 0.0
-    d = (np.mean(x) - np.mean(y)) / np.sqrt(((n1-1)*np.var(x, ddof=1) + (n2-1)*np.var(y, ddof=1)) / (n1+n2-2))
-    J = 1 - (3 / (4*(n1+n2) - 9))  # small-sample correction
+    s1, s2 = np.var(x, ddof=1), np.var(y, ddof=1)
+    sp = np.sqrt(((n1-1)*s1 + (n2-1)*s2) / max(n1+n2-2, 1))
+    sp = max(sp, eps)  # variance floor to stop blow-ups
+    d  = (np.mean(x) - np.mean(y)) / sp
+    J  = 1 - 3/(4*(n1+n2)-9) if (n1+n2) > 2 else 1.0  # small-sample correction
     return float(J * d)
+
 
 def _cliffs_delta_mwu(x: np.ndarray, y: np.ndarray) -> float:
     """Compute Cliff's delta via Mann–Whitney U -> AUC relation.
