@@ -339,8 +339,6 @@ def add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=
     list_of_delta_positions = [0]
     current_angle = pi/2  # This keeps track of the current angle during the iterations
     previous_angle = pi/2
-    delta_x = np.diff(monkey_information['monkey_x'])
-    delta_y = np.diff(monkey_information['monkey_y'])
 
     # Find the time in the data that is closest (right before) the time where we wan to know the monkey's angular position.
     total_points = len(monkey_information['time'])
@@ -553,3 +551,159 @@ def add_whether_new_distinct_stop_and_stop_id(
         df.iloc[i0:i1+1, df.columns.get_loc("stop_id_end_time")]   = et
 
     return df
+
+
+
+# ------------------------------------------------------------------------------
+# -------------------------- process speed --------------------------
+# ------------------------------------------------------------------------------
+
+import numpy as np
+
+import numpy as np
+try:
+    from numba import njit
+except Exception:
+    # If Numba isn't available, make a no-op decorator
+    print("Numba isn't available, making a no-op decorator")
+    def njit(*args, **kwargs):
+        def wrap(f): return f
+        return wrap
+
+@njit(cache=True, fastmath=True)
+def _tricube_weight(u):
+    # u in [0, 1]
+    one_minus = 1.0 - u*u*u
+    return one_minus*one_minus*one_minus
+
+@njit(cache=True, fastmath=True)
+def _local_linear_slopes_multi(time, Z, window_s=0.040, min_pts=3, ridge=1e-8, grow=1.5, max_grow=10.0):
+    """
+    Numba-accelerated local linear slope for multiple signals at once.
+    time: (n,), strictly increasing
+    Z:    (n, m), each column is a signal sampled at 'time'
+    Returns slopes: (n, m)
+    """
+    n = time.size
+    m = Z.shape[1]
+    slopes = np.zeros((n, m), np.float64)
+    half0 = 0.5 * window_s
+
+    for k in range(n):
+        # adapt radius until we have enough points
+        R = half0
+        t0 = time[k] - R
+        t1 = time[k] + R
+        i0 = np.searchsorted(time, t0, side='left')
+        i1 = np.searchsorted(time, t1, side='right')
+
+        g = 1.0
+        while (i1 - i0) < min_pts and g <= max_grow:
+            g *= grow
+            R = half0 * g
+            t0 = time[k] - R
+            t1 = time[k] + R
+            i0 = np.searchsorted(time, t0, side='left')
+            i1 = np.searchsorted(time, t1, side='right')
+        if i1 <= i0:
+            # fallback: derivative zero if we found nothing
+            continue
+
+        # Accumulate weighted moments for all signals
+        # Scalar moments
+        S_w = 0.0
+        S_wt = 0.0
+        S_wtt = 0.0
+        # Vector moments per column
+        S_wz  = np.zeros(m, np.float64)
+        S_wtz = np.zeros(m, np.float64)
+
+        tk = time[k]
+        invR = 1.0 / R
+
+        for i in range(i0, i1):
+            tc = time[i] - tk
+            u = tc * invR
+            if u < 0.0:
+                u = -u
+            if u > 1.0:
+                # outside tricube support
+                continue
+            w = _tricube_weight(u)
+            wt = w * tc
+            wtt = wt * tc
+
+            S_w  += w
+            S_wt += wt
+            S_wtt += wtt
+
+            zi = Z[i, :]
+            for j in range(m):
+                z = zi[j]
+                S_wz[j]  += w * z
+                S_wtz[j] += wt * z
+
+        denom = (S_w * S_wtt - S_wt * S_wt) + ridge
+        if denom == 0.0:
+            continue
+
+        for j in range(m):
+            num = (S_w * S_wtz[j] - S_wt * S_wz[j])
+            slopes[k, j] = num / denom
+
+    return slopes
+
+def _ensure_np1d(a):
+    return np.asarray(a, dtype=float).reshape(-1)
+
+def local_linear_velocity(time, x, y, window_s=0.040, min_pts=3, ridge=1e-8):
+    t = _ensure_np1d(time)
+    Z = np.column_stack(( _ensure_np1d(x), _ensure_np1d(y) ))
+    dZdt = _local_linear_slopes_multi(t, Z, window_s=window_s, min_pts=min_pts, ridge=ridge)
+    vx = dZdt[:, 0]
+    vy = dZdt[:, 1]
+    speed = np.hypot(vx, vy)
+    return vx, vy, speed
+
+def compute_kinematics_loclin(df, time_col='time', x_col='x', y_col='y', theta_col='theta',
+                              window_s=0.040, use_theta='auto', min_pts=3, ridge=1e-8):
+    out = df.copy()
+    t = out[time_col].to_numpy(dtype=float)
+    x = out[x_col].to_numpy(dtype=float)
+    y = out[y_col].to_numpy(dtype=float)
+
+    # 1) velocity
+    vx, vy, speed = local_linear_velocity(t, x, y, window_s=window_s, min_pts=min_pts, ridge=ridge)
+    out['vx'] = vx
+    out['vy'] = vy
+    out['speed'] = speed
+
+    # 2) tangential acceleration from (vx, vy)
+    dV = _local_linear_slopes_multi(t, np.column_stack((vx, vy)), window_s=window_s, min_pts=min_pts, ridge=ridge)
+    ax = dV[:, 0]; ay = dV[:, 1]
+    out['accel'] = (vx*ax + vy*ay) / np.maximum(speed, 1e-9)
+
+    # 3) heading
+    heading_from_v = np.arctan2(vy, vx)
+    heading_src = 'velocity'
+    if use_theta in ('auto', 'measured') and theta_col in out.columns:
+        theta = out[theta_col].to_numpy(dtype=float)
+        if np.isfinite(theta).any():
+            heading = np.unwrap(theta)
+            heading_src = 'measured'
+        else:
+            print(f"{theta_col} is not in the dataframe. Using heading from velocity.")
+            heading = np.unwrap(heading_from_v)
+    elif use_theta == 'velocity':
+        heading = np.unwrap(heading_from_v)
+    else:
+        heading = np.unwrap(heading_from_v)
+
+    # 4) angular kinematics
+    ang_speed = _local_linear_slopes_multi(t, heading.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
+    ang_accel = _local_linear_slopes_multi(t, ang_speed.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
+
+    out['ang_speed'] = ang_speed
+    out['ang_accel'] = ang_accel
+    out['heading_source'] = heading_src
+    return out
