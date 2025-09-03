@@ -373,129 +373,6 @@ def add_monkey_speeddummy_column(monkey_information):
     return monkey_information
 
 
-def add_whether_new_distinct_stop_and_stop_id(
-    monkey_information: pd.DataFrame,
-    speed_threshold_for_distinct_stop: float = 1.0,
-    close_gap_seconds: float = 0.2,
-    min_stop_duration: float = 0.05,
-    initial_long_stop_threshold: float | None = 3.0,
-    max_initial_long_stops: int = 5,
-) -> pd.DataFrame:
-    df = monkey_information.copy()
-
-    # required columns
-    for col in ["time", "speed", "monkey_speeddummy"]:
-        if col not in df.columns:
-            raise KeyError(f"Required column '{col}' not in dataframe")
-
-    t = df["time"].to_numpy()
-    speed = df["speed"].to_numpy()
-    is_stop = (df["monkey_speeddummy"].to_numpy() == 0)
-
-    n = len(df)
-    df["stop_id"] = pd.array([pd.NA]*n, dtype="Int64")
-    df["whether_new_distinct_stop"] = False
-    df["stop_id_duration"] = np.nan
-    df["stop_id_start_time"] = np.nan
-    df["stop_id_end_time"] = np.nan
-
-    if n == 0 or not is_stop.any():
-        return df
-
-    s = is_stop.astype(np.int8)
-    starts_mask = (s == 1) & (np.r_[0, s[:-1]] == 0)
-    ends_mask = (s == 1) & (np.r_[s[1:], 0] == 0)
-
-    start_idx = np.flatnonzero(starts_mask)
-    end_idx = np.flatnonzero(ends_mask)
-    n_runs = min(len(start_idx), len(end_idx))
-    if n_runs == 0:
-        return df
-    start_idx = start_idx[:n_runs]
-    end_idx = end_idx[:n_runs]
-
-    start_t = t[start_idx]
-    end_t = t[end_idx]
-    run_dur = end_t - start_t
-
-    keep = run_dur >= float(min_stop_duration)
-    if not np.any(keep):
-        # no kept runs — nothing to paint
-        return df
-    start_idx, end_idx = start_idx[keep], end_idx[keep]
-    start_t, end_t = start_t[keep], end_t[keep]
-    n_runs = len(start_idx)
-
-    # Merge rule
-    if n_runs > 1:
-        fast = speed > speed_threshold_for_distinct_stop
-        cfast = np.cumsum(fast, dtype=np.int64)
-        L = end_idx[:-1]
-        R = start_idx[1:]
-        Lm1 = np.maximum(L - 1, -1)
-        cL = np.where(Lm1 >= 0, cfast[Lm1], 0)
-        has_fast_sep = (cfast[R] - cL) > 0
-        gap_ok = (start_t[1:] - end_t[:-1]) > close_gap_seconds
-        new_run_flag = has_fast_sep & gap_ok
-    else:
-        new_run_flag = np.array([], dtype=bool)
-
-    run_starts_increment = np.r_[True, new_run_flag]
-    merged_ids = np.cumsum(run_starts_increment.astype(np.int64)) - 1  # 0..M-1
-
-    df_runs = pd.DataFrame({
-        "run_start_idx": start_idx,
-        "run_end_idx": end_idx,
-        "merged_id": merged_ids
-    })
-    merged_span = df_runs.groupby("merged_id", sort=True).agg(
-        merged_start_idx=("run_start_idx", "min"),
-        merged_end_idx=("run_end_idx", "max"),
-    ).reset_index()
-
-    # turn idx -> time
-    merged_span["merged_start_time"] = t[merged_span["merged_start_idx"].to_numpy()]
-    merged_span["merged_end_time"] = t[merged_span["merged_end_idx"].to_numpy()]
-    merged_span["merged_duration"] = merged_span["merged_end_time"] - \
-        merged_span["merged_start_time"]
-
-    # drop leading long merged-stops if requested
-    if initial_long_stop_threshold is not None and max_initial_long_stops > 0 and len(merged_span) > 0:
-        cutoff = float(initial_long_stop_threshold)
-        drop_ids = []
-        for k in range(min(max_initial_long_stops, len(merged_span))):
-            if merged_span.loc[k, "merged_duration"] >= cutoff:
-                drop_ids.append(merged_span.loc[k, "merged_id"])
-            else:
-                break
-        if drop_ids:
-            merged_span = merged_span[~merged_span["merged_id"].isin(
-                drop_ids)].reset_index(drop=True)
-
-    if merged_span.empty:
-        # everything filtered away
-        return df
-
-    # repaint
-    for new_sid, row in enumerate(merged_span.itertuples(index=False)):
-        i0 = int(row.merged_start_idx)
-        i1 = int(row.merged_end_idx)
-        # guard against bad ranges
-        if i1 < i0:
-            continue
-
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id")] = new_sid
-        df.iloc[i0,       df.columns.get_loc(
-            "whether_new_distinct_stop")] = True
-        dur = float(row.merged_duration)
-        st = float(row.merged_start_time)
-        et = float(row.merged_end_time)
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_duration")] = dur
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_start_time")] = st
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_end_time")] = et
-
-    return df
-
 
 # ------------------------------------------------------------------------------
 # -------------------------- process speed --------------------------
@@ -685,3 +562,130 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
                            < 0, 'turning_right'] = 1
 
     return monkey_information
+
+
+
+
+
+def add_whether_new_distinct_stop_and_stop_id(
+    monkey_information: pd.DataFrame,
+    speed_threshold_for_distinct_stop: float = 1.0,
+    close_gap_seconds: float = 0.2,
+    min_stop_duration: float = 0.01,
+    initial_long_stop_threshold: float | None = 3.0,
+    max_initial_long_stops: int = 5,
+) -> pd.DataFrame:
+    df = monkey_information.copy()
+
+    # required columns
+    for col in ["time", "speed", "monkey_speeddummy"]:
+        if col not in df.columns:
+            raise KeyError(f"Required column '{col}' not in dataframe")
+
+    t = df["time"].to_numpy()
+    speed = df["speed"].to_numpy()
+    is_stop = (df["monkey_speeddummy"].to_numpy() == 0)
+
+    n = len(df)
+    df["stop_id"] = pd.array([pd.NA]*n, dtype="Int64")
+    df["whether_new_distinct_stop"] = False
+    df["stop_id_duration"] = np.nan
+    df["stop_id_start_time"] = np.nan
+    df["stop_id_end_time"] = np.nan
+
+    if n == 0 or not is_stop.any():
+        return df
+
+    s = is_stop.astype(np.int8)
+    starts_mask = (s == 1) & (np.r_[0, s[:-1]] == 0)
+    ends_mask = (s == 1) & (np.r_[s[1:], 0] == 0)
+
+    start_idx = np.flatnonzero(starts_mask)
+    end_idx = np.flatnonzero(ends_mask)
+    n_runs = min(len(start_idx), len(end_idx))
+    if n_runs == 0:
+        return df
+    start_idx = start_idx[:n_runs]
+    end_idx = end_idx[:n_runs]
+
+    start_t = t[start_idx]
+    end_t = t[end_idx]
+    run_dur = end_t - start_t
+
+    keep = run_dur >= float(min_stop_duration)
+    if not np.any(keep):
+        # no kept runs — nothing to paint
+        return df
+    start_idx, end_idx = start_idx[keep], end_idx[keep]
+    start_t, end_t = start_t[keep], end_t[keep]
+    n_runs = len(start_idx)
+
+    # Merge rule
+    if n_runs > 1:
+        fast = speed > speed_threshold_for_distinct_stop
+        cfast = np.cumsum(fast, dtype=np.int64)
+        L = end_idx[:-1]
+        R = start_idx[1:]
+        Lm1 = np.maximum(L - 1, -1)
+        cL = np.where(Lm1 >= 0, cfast[Lm1], 0)
+        has_fast_sep = (cfast[R] - cL) > 0
+        gap_ok = (start_t[1:] - end_t[:-1]) > close_gap_seconds
+        new_run_flag = has_fast_sep & gap_ok
+    else:
+        new_run_flag = np.array([], dtype=bool)
+
+    run_starts_increment = np.r_[True, new_run_flag]
+    merged_ids = np.cumsum(run_starts_increment.astype(np.int64)) - 1  # 0..M-1
+
+    df_runs = pd.DataFrame({
+        "run_start_idx": start_idx,
+        "run_end_idx": end_idx,
+        "merged_id": merged_ids
+    })
+    merged_span = df_runs.groupby("merged_id", sort=True).agg(
+        merged_start_idx=("run_start_idx", "min"),
+        merged_end_idx=("run_end_idx", "max"),
+    ).reset_index()
+
+    # turn idx -> time
+    merged_span["merged_start_time"] = t[merged_span["merged_start_idx"].to_numpy()]
+    merged_span["merged_end_time"] = t[merged_span["merged_end_idx"].to_numpy()]
+    merged_span["merged_duration"] = merged_span["merged_end_time"] - \
+        merged_span["merged_start_time"]
+
+    # drop leading long merged-stops if requested
+    if initial_long_stop_threshold is not None and max_initial_long_stops > 0 and len(merged_span) > 0:
+        cutoff = float(initial_long_stop_threshold)
+        drop_ids = []
+        for k in range(min(max_initial_long_stops, len(merged_span))):
+            if merged_span.loc[k, "merged_duration"] >= cutoff:
+                drop_ids.append(merged_span.loc[k, "merged_id"])
+            else:
+                break
+        if drop_ids:
+            merged_span = merged_span[~merged_span["merged_id"].isin(
+                drop_ids)].reset_index(drop=True)
+
+    if merged_span.empty:
+        # everything filtered away
+        return df
+
+    # repaint
+    for new_sid, row in enumerate(merged_span.itertuples(index=False)):
+        i0 = int(row.merged_start_idx)
+        i1 = int(row.merged_end_idx)
+        # guard against bad ranges
+        if i1 < i0:
+            continue
+
+        df.iloc[i0:i1+1, df.columns.get_loc("stop_id")] = new_sid
+        df.iloc[i0,       df.columns.get_loc(
+            "whether_new_distinct_stop")] = True
+        dur = float(row.merged_duration)
+        st = float(row.merged_start_time)
+        et = float(row.merged_end_time)
+        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_duration")] = dur
+        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_start_time")] = st
+        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_end_time")] = et
+
+    return df

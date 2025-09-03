@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import core_stops_psth, get_stops_utils, psth_postprocessing, psth_stats
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, get_stops_utils, psth_postprocessing, psth_stats
 
 # ---------- schema & key utilities ----------
 def _ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:

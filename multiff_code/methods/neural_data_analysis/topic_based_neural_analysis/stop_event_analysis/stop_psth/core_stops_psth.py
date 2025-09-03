@@ -32,7 +32,7 @@ class PSTHConfig:
 
     # Stop identification / cleaning (kept for compatibility with your pipeline)
     capture_match_window: float = 0.3
-    min_stop_duration: float = 0.02
+    min_stop_duration: float = 0.01
     stop_debounce: float = 0.15
 
     # Normalization

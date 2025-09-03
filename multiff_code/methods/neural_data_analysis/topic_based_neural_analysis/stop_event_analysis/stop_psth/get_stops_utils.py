@@ -13,7 +13,7 @@ def prepare_no_capture_and_captures(
     closest_stop_to_capture_df: pd.DataFrame,
     ff_caught_T_new: np.ndarray | pd.Series,
     *,
-    min_stop_duration: float = 0.02,
+    min_stop_duration: float = 0.01,
     max_stop_duration: float = 1.0,
     capture_match_window: float = 0.3,
     stop_debounce: float = 0.1,
