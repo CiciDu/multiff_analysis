@@ -15,7 +15,7 @@ def make_empty_ff_dataframe():
                                          'ff_angle_boundary', 'left_right', 'abs_delta_ff_angle',
                                          'abs_delta_ff_angle_boundary', 'target_x', 'target_y',
                                          'ffdistance2target', 'abs_ffangle_decreasing',
-                                         'abs_ffangle_boundary_decreasing', 'IS_TARGET', 'monkey_dw',
+                                         'abs_ffangle_boundary_decreasing', 'IS_TARGET', 'ang_speed',
                                          'ff_index_string', 'dw_same_sign_as_ffangle',
                                          'dw_same_sign_as_ffangle_boundary'])
     return ff_dataframe

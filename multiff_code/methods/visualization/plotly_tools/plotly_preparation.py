@@ -130,7 +130,8 @@ def _find_duration_to_plot(row, monkey_information, eliminate_irrelevant_points_
 
     start = stop_time - 4.0
     # If nxt is NaN, use -inf so fmax picks stop_time+2.5
-    end = float(np.fmax(stop_time + 2.5, (nxt + 1.5) if np.isfinite(nxt) else -np.inf))
+    end = float(np.fmax(stop_time + 2.5, (nxt + 1.5)
+                if np.isfinite(nxt) else -np.inf))
 
     duration = [start, end]
 
@@ -169,7 +170,7 @@ def _make_trajectory_df(PlotTrials_args,
     cum_mxy_rotated = np.matmul(rotation_matrix, np.stack((cum_mx, cum_my)))
     trajectory_df = pd.DataFrame({'monkey_x': cum_mxy_rotated[0], 'monkey_y': cum_mxy_rotated[1],
                                   'point_index': cum_point_index, 'time': cum_t, 'monkey_angle': cum_angle,
-                                  'monkey_speed': cum_speed, 'monkey_speeddummy': cum_speeddummy, 'cum_distance': cum_distance})
+                                  'speed': cum_speed, 'monkey_speeddummy': cum_speeddummy, 'cum_distance': cum_distance})
 
     trajectory_df = _add_eye_positions_columns(
         trajectory_df, monkey_information)
@@ -310,4 +311,3 @@ def _modify_current_plotly_key_comp_based_on_whether_show_visible_segments(show_
         current_plotly_key_comp['monkey_information'] = monkey_information.copy(
         )
     return current_plotly_key_comp
-

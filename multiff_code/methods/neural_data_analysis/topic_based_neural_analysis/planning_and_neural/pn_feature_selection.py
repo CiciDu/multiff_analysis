@@ -4,9 +4,9 @@ all_features = ['cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis',
                 'cur_ff_distance', 'nxt_ff_distance', 'cur_ff_angle', 'nxt_ff_angle',
                 'abs_cur_ff_angle', 'abs_nxt_ff_angle',
                 'abs_cur_ff_rel_x', 'abs_nxt_ff_rel_x',
-                'stop', 'monkey_speed', 'angular_speed', 'curv_of_traj', 'capture_ff',
+                'stop', 'speed', 'angular_speed', 'curv_of_traj', 'capture_ff',
                 'whether_test', 'turning_right', 'time_since_last_capture',
-                'monkey_ddv', 'monkey_ddw', 'target_cluster_last_seen_distance',
+                'accel', 'ang_accel', 'target_cluster_last_seen_distance',
                 'target_cluster_last_seen_angle_to_boundary',
                 'num_ff_visible', 'num_ff_in_memory', 'any_ff_visible', 'any_ff_in_memory',
 
@@ -31,5 +31,5 @@ def select_features(data):
 
 # Note that we have renamed variables to make them easier to understand. E.g.
     # data = data.rename(columns={'monkey_speeddummy': 'stop',
-    #                             'monkey_dw': 'angular_speed',
+    #                             'ang_speed': 'angular_speed',
     #                             })

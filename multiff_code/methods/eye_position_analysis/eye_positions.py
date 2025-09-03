@@ -300,13 +300,13 @@ def plot_eye_world_speed_vs_monkey_speed(monkey_sub):
 
     i = 2  # monkey linear speed
     ax2 = ax.twinx()
-    p2, = ax2.plot(monkey_sub['cum_t'], monkey_sub['monkey_speed'],
+    p2, = ax2.plot(monkey_sub['cum_t'], monkey_sub['speed'],
                    color=colors[i], label=legend_labels[i])
     ax2.set_ylabel(ylabels[i], color=colors[i], fontsize=13)
 
     i = 3  # monkey angular speed
     ax3 = ax.twinx()
-    p3, = ax3.plot(monkey_sub['cum_t'], monkey_sub['monkey_dw'],
+    p3, = ax3.plot(monkey_sub['cum_t'], monkey_sub['ang_speed'],
                    color=colors[i], label=legend_labels[i])
     ax3.set_ylabel(ylabels[i], color=colors[i], fontsize=13)
 

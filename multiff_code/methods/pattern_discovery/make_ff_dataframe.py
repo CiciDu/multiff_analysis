@@ -144,8 +144,8 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
 
 
 def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_real_position_sorted, ff_radius=10, reward_boundary_radius=25):
-    ff_dataframe[['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance', 'time', 'monkey_speeddummy']]  \
-        = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance', 'time', 'monkey_speeddummy']].values
+    ff_dataframe[['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'ang_speed', 'dt', 'cum_distance', 'time', 'monkey_speeddummy']]  \
+        = monkey_information.loc[ff_dataframe['point_index'].values, ['monkey_x', 'monkey_y', 'monkey_angle', 'monkey_angle', 'ang_speed', 'dt', 'cum_distance', 'time', 'monkey_speeddummy']].values
     ff_dataframe[['ff_x', 'ff_y']
                  ] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
     ff_dataframe['ff_distance'] = np.linalg.norm(np.array(
@@ -204,11 +204,11 @@ def furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted, ff_caught_T_new,
         ff_dataframe["ff_index"] == ff_dataframe["target_index"])
     ff_dataframe['ff_index_string'] = ff_dataframe['ff_index'].astype('str')
     dw_same_sign_as_ffangle = np.sign(np.multiply(
-        np.array(ff_dataframe["monkey_dw"]), np.array(ff_dataframe["ff_angle"])))
+        np.array(ff_dataframe["ang_speed"]), np.array(ff_dataframe["ff_angle"])))
     ff_dataframe["dw_same_sign_as_ffangle"] = dw_same_sign_as_ffangle
 
     dw_same_sign_as_ffangle_boundary = np.sign(np.multiply(np.array(
-        ff_dataframe["monkey_dw"]), np.array(ff_dataframe["ff_angle_boundary"])))
+        ff_dataframe["ang_speed"]), np.array(ff_dataframe["ff_angle_boundary"])))
     ff_dataframe["dw_same_sign_as_ffangle_boundary"] = dw_same_sign_as_ffangle_boundary
 
     ff_dataframe_utils.add_caught_time_and_whether_caught_to_ff_dataframe(

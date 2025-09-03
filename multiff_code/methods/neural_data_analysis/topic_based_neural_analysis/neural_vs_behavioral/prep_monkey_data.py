@@ -18,7 +18,7 @@ np.set_printoptions(suppress=True)
 
 monkey_info_columns_of_interest = ['bin',
                                    'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
-                                   'monkey_speed', 'monkey_angle', 'monkey_dw', 'monkey_ddw', 'monkey_ddv',
+                                   'speed', 'monkey_angle', 'ang_speed', 'ang_accel', 'accel',
                                    'num_distinct_stops', 'stop_time_ratio_in_bin', 'num_caught_ff',
                                    ]
 

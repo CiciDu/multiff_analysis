@@ -38,45 +38,51 @@ def find_points_w_more_than_n_ff(ff_dataframe, monkey_information, ff_caught_T_n
     """
 
     # Count the number of unique fireflies at each point
-    point_vs_num_ff = ff_dataframe[['point_index', 'ff_index']].groupby('point_index').nunique()
-    point_vs_num_ff = point_vs_num_ff.rename(columns={'ff_index': 'num_alive_ff'})
+    point_vs_num_ff = ff_dataframe[['point_index', 'ff_index']].groupby(
+        'point_index').nunique()
+    point_vs_num_ff = point_vs_num_ff.rename(
+        columns={'ff_index': 'num_alive_ff'})
     point_vs_num_ff.loc[:, 'point_index'] = point_vs_num_ff.index
 
     # Select points where the number of alive fireflies is greater than n
-    points_w_more_than_n_ff = point_vs_num_ff[point_vs_num_ff['num_alive_ff'] > n].copy()
-    
+    points_w_more_than_n_ff = point_vs_num_ff[point_vs_num_ff['num_alive_ff'] > n].copy(
+    )
+
     # Optionally filter points exceeding n_max fireflies
     if n_max is not None:
         points_w_more_than_n_ff = points_w_more_than_n_ff[
             points_w_more_than_n_ff['num_alive_ff'] <= n_max].copy()
 
     # Exclude points before the first firefly was captured
-    valid_earliest_point = np.where(monkey_information['time'] > ff_caught_T_new[0])[0][0]
+    valid_earliest_point = np.where(
+        monkey_information['time'] > ff_caught_T_new[0])[0][0]
     points_w_more_than_n_ff = points_w_more_than_n_ff[
         points_w_more_than_n_ff['point_index'] >= valid_earliest_point].copy()
 
     # Compute differences between consecutive point indices
     diff = np.diff(points_w_more_than_n_ff['point_index'])
-    
+
     # 'diff' indicates gaps before a point (0 for first point)
     points_w_more_than_n_ff['diff'] = np.append(0, diff)
     # 'diff_2' indicates gaps after a point (0 for last point)
     points_w_more_than_n_ff['diff_2'] = np.append(diff, 0)
-    
-    points_w_more_than_n_ff['diff'] = points_w_more_than_n_ff['diff'].astype(int)
-    points_w_more_than_n_ff['diff_2'] = points_w_more_than_n_ff['diff_2'].astype(int)
+
+    points_w_more_than_n_ff['diff'] = points_w_more_than_n_ff['diff'].astype(
+        int)
+    points_w_more_than_n_ff['diff_2'] = points_w_more_than_n_ff['diff_2'].astype(
+        int)
 
     # Label consecutive points as chunks
-    points_w_more_than_n_ff['chunk'] = (points_w_more_than_n_ff['diff'] != 1).cumsum()
+    points_w_more_than_n_ff['chunk'] = (
+        points_w_more_than_n_ff['diff'] != 1).cumsum()
     # Start chunk numbering at 0
     points_w_more_than_n_ff['chunk'] = points_w_more_than_n_ff['chunk'] - 1
 
     return points_w_more_than_n_ff
 
 
-
-def find_changing_dw_info(chunk_df, monkey_information, ff_caught_T_new, 
-                                 chunk_interval=10, minimum_time_before_capturing=0.5):
+def find_changing_dw_info(chunk_df, monkey_information, ff_caught_T_new,
+                          chunk_interval=10, minimum_time_before_capturing=0.5):
     """
     Identify time points in a monkey tracking experiment where the monkey's 
     angular velocity (dw) changes significantly, excluding times immediately 
@@ -90,8 +96,8 @@ def find_changing_dw_info(chunk_df, monkey_information, ff_caught_T_new,
         DataFrame with time series data for the monkey, must include:
         - 'time': timestamps
         - 'point_index': index of each point
-        - 'monkey_dw': angular velocity
-        - 'monkey_ddw': angular acceleration
+        - 'ang_speed': angular velocity
+        - 'ang_accel': angular acceleration
     ff_caught_T_new : array-like
         Timestamps when the monkey caught a firefly.
     chunk_interval : float, optional
@@ -115,26 +121,28 @@ def find_changing_dw_info(chunk_df, monkey_information, ff_caught_T_new,
                 monkey_information['time'][first_point] + chunk_interval]
 
     # Find indices in monkey_information that fall within the interval
-    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) & 
+    cum_pos_index = np.where((monkey_information['time'] >= duration[0]) &
                              (monkey_information['time'] <= duration[1]))[0]
-    cum_point_index = np.array(monkey_information['point_index'].iloc[cum_pos_index])
+    cum_point_index = np.array(
+        monkey_information['point_index'].iloc[cum_pos_index])
 
     # Exclude periods right before firefly captures
-    relevant_ff_caught_T = ff_caught_T_new[(ff_caught_T_new >= duration[0]) & 
+    relevant_ff_caught_T = ff_caught_T_new[(ff_caught_T_new >= duration[0]) &
                                            (ff_caught_T_new <= duration[1] + minimum_time_before_capturing)]
     for time in relevant_ff_caught_T:
         duration_to_take_out = [time - minimum_time_before_capturing, time]
-        cum_pos_index = cum_pos_index[~((cum_pos_index >= duration_to_take_out[0]) & 
+        cum_pos_index = cum_pos_index[~((cum_pos_index >= duration_to_take_out[0]) &
                                         (cum_pos_index <= duration_to_take_out[1]))]
 
     # Extract the time, angular velocity, and acceleration for remaining indices
     cum_t = np.array(monkey_information['time'].iloc[cum_pos_index])
-    cum_dw = np.array(monkey_information['monkey_dw'].iloc[cum_pos_index])
-    cum_ddw = np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index])
+    cum_dw = np.array(monkey_information['ang_speed'].iloc[cum_pos_index])
+    cum_ddw = np.array(monkey_information['ang_accel'].iloc[cum_pos_index])
     cum_abs_ddw = np.abs(cum_ddw)
 
     # Identify indices where the angular acceleration exceeds a threshold
-    changing_dw_info = pd.DataFrame({'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
+    changing_dw_info = pd.DataFrame(
+        {'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
 
     # Group consecutive points to avoid double-counting rapid sequences
     changing_dw_info['group'] = np.append(
@@ -149,7 +157,6 @@ def find_changing_dw_info(chunk_df, monkey_information, ff_caught_T_new,
     changing_dw_info['ddw'] = cum_ddw[relative_pos_index]
 
     return changing_dw_info
-
 
 
 def increase_durations_between_points(df, min_duration=5):

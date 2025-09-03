@@ -383,7 +383,7 @@ def add_monkey_info_before_stop(monkey_information, stops_near_ff_df):
     stops_near_ff_df['stop_counter'] = np.arange(len(stops_near_ff_df))
 
     # we take out all the potential information from monkey_information first
-    monkey_info_sub = monkey_information[monkey_information['monkey_speed'] > 20].copy(
+    monkey_info_sub = monkey_information[monkey_information['speed'] > 20].copy(
     )
     monkey_info_sub['closest_future_stop'] = np.searchsorted(
         stops_near_ff_df['stop_point_index'].values, monkey_info_sub.index.values)
@@ -758,7 +758,8 @@ def _get_monkey_sub_for_polar_plot(monkey_information, row, nxt_ff_df_from_ref, 
                         'ref_point_index': nxt_ff_df_from_ref.loc[nxt_ff_df_from_ref['ff_index'] == row['nxt_ff_index'], 'point_index'].item()
                         }
 
-    monkey_sub = monkey_information.loc[point_index_dict[start]: point_index_dict[end] + 1].copy()
+    monkey_sub = monkey_information.loc[point_index_dict[start]
+        : point_index_dict[end] + 1].copy()
 
     # rotated monkey_x and monkey_y in reference to monkey angle at the reference point
     monkey_ref_xy = monkey_sub.loc[point_index_dict[start], [

@@ -6,11 +6,11 @@ trial_info_columns = [
 
 # Monkey movement and position features
 monkey_movement_columns = [
-    'monkey_speed',
+    'speed',
     'monkey_angle',
-    'monkey_dw',
-    'monkey_ddw',
-    'monkey_ddv',
+    'ang_speed',
+    'ang_accel',
+    'accel',
     'stop_time_ratio_in_bin',
     'whether_new_distinct_stop',
     'delta_distance',
@@ -104,10 +104,6 @@ behav_features_to_drop = [
     'gaze_world_y',
     'last_target_caught_time',
     'monkey_angle_target_last_seen',
-    'monkey_dw_smr',
-    'monkey_speed_smr',
-    'monkey_x_smr',
-    'monkey_y_smr',
     'target_has_disappeared_for_last_time_dummy',
     'target_visible_dummy',
     'capture_ff',

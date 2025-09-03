@@ -66,16 +66,16 @@ def design_bases_for_behav_data(
         data['nxt_ff_angle']) * (data['nxt_in_memory'] > 0)
     data['nxt_angle_cos'] = np.cos(
         data['nxt_ff_angle']) * (data['nxt_in_memory'] > 0)
-    data['speed'] = data['monkey_speed']
-    data['angular_speed'] = data['monkey_dw']
+    data['speed'] = data['speed']
+    data['angular_speed'] = data['ang_speed']
     data['curvature'] = data['curv_of_traj']
 
 
 # 'whether_test',
 # 'turning_right',
 # 'time_since_last_capture',
-# 'monkey_ddv',
-# 'monkey_ddw',
+# 'accel',
+# 'ang_accel',
 # 'target_cluster_last_seen_distance',
 # 'target_cluster_last_seen_angle_to_boundary',
 # 'abs_cur_ff_angle',
@@ -93,8 +93,8 @@ def design_bases_for_behav_data(
     data.rename(columns={'cur_in_memory': 'cur_on',
                          'nxt_in_memory': 'nxt_on',
                          'monkey_speeddummy': 'stop',
-                         'monkey_speed': 'speed',
-                         'monkey_dw': 'angular_speed',
+                         'speed': 'speed',
+                         'ang_speed': 'angular_speed',
                          'curv_of_traj': 'curvature',
                          'capture_ff': 'capture_ff',
                          }, inplace=True)

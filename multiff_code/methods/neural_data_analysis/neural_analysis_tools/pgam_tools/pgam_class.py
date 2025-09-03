@@ -1,7 +1,18 @@
+from PGAM.GAM_library import *
+import PGAM.gam_data_handlers as gdh
+import matplotlib.pylab as plt
+import pandas as pd
+from post_processing import postprocess_results
+from scipy.io import savemat
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
+import numpy as np
+import math
+from sklearn.preprocessing import StandardScaler
 from pathlib import Path
 from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
 import sys
 import os
+
 
 def find_project_root(marker="multiff_analysis"):
     """Search upward until we find a folder containing `marker`."""
@@ -9,7 +20,9 @@ def find_project_root(marker="multiff_analysis"):
     for parent in [cur] + list(cur.parents):
         if (parent / marker).exists():
             return parent
-    raise FileNotFoundError(f"Could not find project root with marker '{marker}'")
+    raise FileNotFoundError(
+        f"Could not find project root with marker '{marker}'")
+
 
 project_root = find_project_root()
 
@@ -20,20 +33,6 @@ pgam_src_pg = pgam_src / "PGAM"
 for path in [pgam_src, pgam_src_pg]:
     if str(path) not in sys.path:
         sys.path.append(str(path))
-
-    
-from sklearn.preprocessing import StandardScaler
-import math
-import os
-import numpy as np
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
-from scipy.io import savemat
-from post_processing import postprocess_results
-import pandas as pd
-import matplotlib.pylab as plt
-import PGAM.gam_data_handlers as gdh
-from PGAM.GAM_library import *
-import sys
 
 
 class PGAMclass():
@@ -49,7 +48,7 @@ class PGAMclass():
     #                  ]
 
     temporal_vars = ['capture_ff', 'any_ff_visible', 'any_ff_in_memory', 'turning_right', 'stop', 'whether_test',
-                    'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
+                     'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
     def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):
         self.x_var = x_var
@@ -125,7 +124,6 @@ class PGAMclass():
         self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, self.train_trials, self.sm_handler, self.poissFam, self.trial_ids,
                                        var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
 
-
     def plot_results(self, plot_vars_in_reduced_list_only=True):
         # find which variables in res['variable'] are in reduced.var_list
         # and then plot the corresponding x_rate_Hz
@@ -134,7 +132,8 @@ class PGAMclass():
                 indices_of_vars_to_plot = np.where(
                     np.isin(self.res['variable'], self.reduced.var_list))[0]
             except Exception as e:
-                print(f"Error occurred while plotting results: {e}. Skipping...")
+                print(
+                    f"Error occurred while plotting results: {e}. Skipping...")
                 return
         else:
             indices_of_vars_to_plot = np.arange(self.res.shape[0])
@@ -143,17 +142,14 @@ class PGAMclass():
         plot_modeling_result.plot_pgam_tuning_curvetions(
             self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
 
-
-
     def load_pgam_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
-        
-        self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
-                                                            self.cluster_name)
 
+        self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
+                                                                                  self.cluster_name)
 
     def save_results(self):
-                # after you compute self.res = postprocess_results(...):
+        # after you compute self.res = postprocess_results(...):
         extra_meta = {
             "bin_width": float(self.bin_width),
             "neuron_index": int(self.neural_cluster_number),
@@ -162,32 +158,11 @@ class PGAMclass():
             "full_AIC": float(getattr(self.full, "AIC", np.nan)) if hasattr(self.full, "AIC") else np.nan,
         }
         pgam_utils.save_full_results_npz(self.processed_neural_data_folder_path,
-                            self.cluster_name,
-                            self.res,                       # the structured array
-                            getattr(self.reduced, "var_list", []),
-                            extra_meta)
+                                         self.cluster_name,
+                                         self.res,                       # the structured array
+                                         getattr(self.reduced, "var_list", []),
+                                         extra_meta)
 
-
-
-
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
     def _scale_features(self):
         # since temporal variables are all dummy variables, we only need to scale the spatial variables
         scaler = StandardScaler()
@@ -281,10 +256,10 @@ class PGAMclass():
         variable[variable ==
                  'max_target_cluster_visible_dummy'] = 'whether target cluster is visible'
         variable[variable == 'gaze_world_y'] = 'gaze y-coordinate'
-        variable[variable == 'monkey_speed'] = 'monkey linear speed'
-        variable[variable == 'monkey_dw'] = 'monkey linear acceleration'
-        variable[variable == 'monkey_ddw'] = 'change in monkey linear acceleration'
-        variable[variable == 'monkey_ddv'] = 'change in monkey angular acceleration'
+        variable[variable == 'speed'] = 'monkey linear speed'
+        variable[variable == 'ang_speed'] = 'monkey linear acceleration'
+        variable[variable == 'ang_accel'] = 'change in monkey linear acceleration'
+        variable[variable == 'accel'] = 'change in monkey angular acceleration'
         variable[variable == 'avg_target_cluster_last_seen_distance'] = 'distance of target cluster last seen'
         variable[variable ==
                  'avg_target_cluster_last_seen_angle'] = 'angle of target cluster last seen'
@@ -296,14 +271,18 @@ class PGAMclass():
         variable = self.res['variable']
         # rename each variable to the corresponding label
         variable[variable == 'catching_ff'] = 'caught firefly (this bin)'
-        variable[variable == 'min_target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (first time)'
-        variable[variable == 'max_target_cluster_visible_dummy'] = 'target cluster visible'
+        variable[variable ==
+                 'min_target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (first time)'
+        variable[variable ==
+                 'max_target_cluster_visible_dummy'] = 'target cluster visible'
         variable[variable == 'gaze_world_y'] = 'gaze position (y)'
-        variable[variable == 'monkey_speed'] = 'monkey speed'
-        variable[variable == 'monkey_dw'] = 'monkey acceleration'
-        variable[variable == 'monkey_ddw'] = 'change in acceleration (jerk)'
-        variable[variable == 'monkey_ddv'] = 'change in angular accel'
+        variable[variable == 'speed'] = 'monkey speed'
+        variable[variable == 'ang_speed'] = 'monkey acceleration'
+        variable[variable == 'ang_accel'] = 'change in acceleration (jerk)'
+        variable[variable == 'accel'] = 'change in angular accel'
         variable[variable == 'avg_target_cluster_last_seen_distance'] = 'distance to last-seen target cluster'
-        variable[variable == 'avg_target_cluster_last_seen_angle'] = 'angle to last-seen target cluster'
-        variable[variable == 'target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (final time)'
+        variable[variable ==
+                 'avg_target_cluster_last_seen_angle'] = 'angle to last-seen target cluster'
+        variable[variable ==
+                 'target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (final time)'
         self.res['variable'] = variable

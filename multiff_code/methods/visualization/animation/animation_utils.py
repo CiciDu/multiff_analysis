@@ -145,7 +145,7 @@ def make_anim_monkey_info(monkey_information, cum_pos_index, k=3):
     cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_pos_index]), np.array(
         monkey_information['monkey_y'].iloc[cum_pos_index])
     cum_speed = np.array(
-        monkey_information['monkey_speed'].iloc[cum_pos_index])
+        monkey_information['speed'].iloc[cum_pos_index])
     anim_indices = cum_pos_index[0:-1:k]
     anim_t = cum_t[0:-1:k]
     anim_mx = cum_mx[0:-1:k]

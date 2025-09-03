@@ -20,7 +20,7 @@ connection_alpha = {"agent": 0.6, "monkey": 0.7, "combined": 0.8}
 
 
 def get_varying_colors_for_ff():
-    #custom_colors = [(1, 0.75, 0.8)]  # blue, pink
+    # custom_colors = [(1, 0.75, 0.8)]  # blue, pink
     # Define your existing palettes
     palette1 = sns.color_palette("tab10", 3)
     palette2 = sns.color_palette("tab10", 14)[4:]
@@ -141,7 +141,7 @@ def plot_behaviors_in_clusters(points_w_more_than_2_ff, chunk_numbers, monkey_in
         cum_point_index = np.array(
             monkey_information['point_index'].iloc[cum_pos_index])
         cum_ddw = np.array(
-            monkey_information['monkey_ddw'].iloc[cum_pos_index])
+            monkey_information['ang_accel'].iloc[cum_pos_index])
         cum_abs_ddw = np.abs(cum_ddw)
         changing_dw_info = pd.DataFrame(
             {'relative_pos_index': np.where(cum_abs_ddw > 0.15)[0]})
@@ -190,7 +190,7 @@ def show_trajectory_func(axes, player, cum_pos_index, cum_mxy_rotated, cum_t, cu
                      s=trail_size[player], alpha=trail_alpha[player], c=cum_speed, cmap='viridis', zorder=3)
     elif trail_color_var == 'abs_ddw':
         cum_abs_ddw = np.abs(
-            np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index]))
+            np.array(monkey_information['ang_accel'].iloc[cum_pos_index]))
         axes.scatter(cum_mxy_rotated[0]-x0, cum_mxy_rotated[1]-y0, marker='o', s=trail_size[player],
                      alpha=trail_alpha[player], c=cum_abs_ddw, cmap='viridis_r', zorder=3)
         # To mark the points where high abs_ddw occur:
@@ -276,7 +276,7 @@ def find_monkey_information_in_the_duration(duration, monkey_information):
         monkey_information['monkey_angle'].iloc[cum_pos_index])
     cum_mx, cum_my = np.array(monkey_information['monkey_x'].iloc[cum_pos_index]), np.array(
         monkey_information['monkey_y'].iloc[cum_pos_index])
-    cum_speed, cum_speeddummy = np.array(monkey_information['monkey_speed'].iloc[cum_pos_index]), np.array(
+    cum_speed, cum_speeddummy = np.array(monkey_information['speed'].iloc[cum_pos_index]), np.array(
         monkey_information['monkey_speeddummy'].iloc[cum_pos_index])
     return cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy
 
@@ -395,7 +395,6 @@ def plot_lines_to_connect_path_and_ff(axes, ff_info, rotation_matrix, x0, y0, li
         [custom_colors, palette1, palette2], axis=0
     )
     print(varying_colors.shape)  # should be (15, 3) since 2 + 3 + 10
-
 
     legend_flag = False
     temp_ff_positions = np.array([])
@@ -1184,6 +1183,3 @@ def plot_eye_positions(axes, monkey_information, duration, cum_mxy_rotated, x0, 
             monkey_sub, axes, x0, y0, player, sample_ratio=sample_ratio)
 
     return axes
-
-
-

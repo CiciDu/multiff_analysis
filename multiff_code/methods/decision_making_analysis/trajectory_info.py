@@ -86,8 +86,8 @@ def find_trajectory_data(time, monkey_information, time_range_of_trajectory=[-0.
 
     # monkey_x_2d = monkey_information['monkey_x'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
     # monkey_y_2d = monkey_information['monkey_y'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
-    # monkey_dv_2d = monkey_information['monkey_speed'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
-    # monkey_dw_2d = monkey_information['monkey_dw'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
+    # monkey_dv_2d = monkey_information['speed'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
+    # monkey_dw_2d = monkey_information['ang_speed'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
     # monkey_angle_2d = monkey_information['monkey_angle'].values[monkey_indices].reshape(-1,num_time_points_for_trajectory)
 
     return traj_time_2d, trajectory_data_dict
@@ -193,11 +193,11 @@ def generate_trajectory_velocity_data(time_all, monkey_information, time_range_o
         time_range_of_trajectory[0], time_range_of_trajectory[1], num_time_points_for_trajectory)
     traj_time_2d, trajectory_data_dict = find_trajectory_data(
         time_all, monkey_information, time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
-    traj_dv_2d = trajectory_data_dict['monkey_speed']
-    traj_dw_2d = trajectory_data_dict['monkey_dw']
+    traj_dv_2d = trajectory_data_dict['speed']
+    traj_dw_2d = trajectory_data_dict['ang_speed']
     monkey_dvdw = np.concatenate([traj_dv_2d, traj_dw_2d], axis=1)
     trajectory_feature_names = generate_feature_names_given_relative_time_points(
-        relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=['monkey_dv', 'monkey_dw'])
+        relative_time_points_of_trajectory, num_time_points_for_trajectory, original_feature_names=['monkey_dv', 'ang_speed'])
 
     return monkey_dvdw, trajectory_feature_names
 

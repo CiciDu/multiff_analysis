@@ -294,7 +294,7 @@ def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_informa
         closest_stop_to_capture_df['stop_point_index'] = closest_stop_to_capture_df['point_index']
     closest_stop_to_capture_df['stop_time'] = monkey_information.loc[closest_stop_to_capture_df['point_index'], 'time'].values
 
-    closest_stop_to_capture_df = monkey_landing_in_ff.add_distance_from_ff_to_stop(
+    closest_stop_to_capture_df = add_distance_from_ff_to_stop(
         closest_stop_to_capture_df, monkey_information, ff_real_position_sorted)
     closest_stop_to_capture_df['whether_stop_inside_boundary'] = closest_stop_to_capture_df['distance_from_ff_to_stop'] <= 25
     closest_stop_to_capture_df.sort_values(by='cur_ff_index', inplace=True)

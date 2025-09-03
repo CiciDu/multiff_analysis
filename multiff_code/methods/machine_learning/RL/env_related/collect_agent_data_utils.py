@@ -2,7 +2,8 @@ from data_wrangling import general_utils, process_monkey_information
 from pattern_discovery import pattern_by_trials, make_ff_dataframe
 from machine_learning.RL.env_related import env_for_lstm, env_for_sb3
 
-import os, shutil
+import os
+import shutil
 import numpy as np
 import matplotlib
 import pandas as pd
@@ -179,11 +180,11 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
         time, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
 
     monkey_information['point_index'] = range(len(monkey_information))
-    monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > env.linear_terminal_vel * 200) |
-                                               (np.abs(monkey_information['monkey_dw']) > env.angular_terminal_vel * pi/2)).astype(int)
+    monkey_information['monkey_speeddummy'] = ((monkey_information['speed'] > env.linear_terminal_vel * 200) |
+                                               (np.abs(monkey_information['ang_speed']) > env.angular_terminal_vel * pi/2)).astype(int)
     process_monkey_information.add_more_columns_to_monkey_information(
         monkey_information)
-    
+
     # get information about fireflies from env.ff_information and env.ff_lash
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(
         env.ff_information, env.ff_flash, env.time)
@@ -270,8 +271,8 @@ def pack_monkey_information(time, monkey_x, monkey_y, monkey_speed, monkey_dw, m
         'time': time,
         'monkey_x': monkey_x,
         'monkey_y': monkey_y,
-        'monkey_speed': monkey_speed,
-        'monkey_dw': monkey_dw,
+        'speed': monkey_speed,
+        'ang_speed': monkey_dw,
         'monkey_angle': monkey_angles,
     }
 
@@ -754,13 +755,13 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     # ======================================= Organize Collected Data ==========================================
     monkey_information = pack_monkey_information(
         time, monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, env.dt)
-    
+
     monkey_information['point_index'] = range(len(monkey_information))
-    monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > env.linear_terminal_vel * 200) |
-                                               (np.abs(monkey_information['monkey_dw']) > env.angular_terminal_vel * pi/2)).astype(int)
+    monkey_information['monkey_speeddummy'] = ((monkey_information['speed'] > env.linear_terminal_vel * 200) |
+                                               (np.abs(monkey_information['ang_speed']) > env.angular_terminal_vel * pi/2)).astype(int)
     process_monkey_information.add_more_columns_to_monkey_information(
         monkey_information)
-        
+
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(
         env.ff_information, env.ff_flash, env.time)
     caught_ff_num = len(ff_caught_T_new)
@@ -803,6 +804,7 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
     return info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent
 
+
 def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
     """
     Remove all contents inside folders in all_collected_data that are derived
@@ -811,7 +813,8 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
     if 'processed_data/' not in processed_data_folder_path:
         raise ValueError("'processed_data/' not found in the provided path.")
 
-    after_processed_data = processed_data_folder_path.split('processed_data/', 1)[1]
+    after_processed_data = processed_data_folder_path.split(
+        'processed_data/', 1)[1]
     search_root = 'RL_models/SB3_stored_models/all_collected_data'
 
     matching_dirs = []
@@ -831,7 +834,7 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
     for path in matching_dirs:
         if not any(path.startswith(parent + os.sep) for parent in filtered_matches):
             filtered_matches.append(path)
-            
+
     # Now clean out each directory but do not delete the directory itself
     for folder in filtered_matches:
         print(f"Cleaning contents of: {folder}")
@@ -844,6 +847,3 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
                     shutil.rmtree(item_path, ignore_errors=True)
             except Exception as e:
                 print(f"Failed to delete {item_path}: {e}")
-
-                    
-                    

@@ -229,7 +229,7 @@ def make_or_retrieve_txt_smr_t_diff_via_xy_df(raw_data_folder_path, exists_ok=Tr
             raw_data_folder_path)
         monkey_information = retrieve_raw_data._trim_monkey_information(
             raw_monkey_information, smr_markers_start_time, smr_markers_end_time)
-        process_monkey_information.add_monkey_speed_column(monkey_information)
+        monkey_information = process_monkey_information.compute_kinematics_loclin(monkey_information)
         raw_signal_df = process_monkey_information.get_raw_signal_df(
             raw_data_folder_path)
         txt_smr_t_diff_via_xy_df = find_txt_smr_t_diff_via_xy_df(
@@ -295,7 +295,7 @@ def find_txt_smr_t_diff_via_xy_df(raw_monkey_information, signal_df, n_points=10
     txt_sub = raw_monkey_information[raw_monkey_information['time'].between(
         signal_df['time'].iloc[0] + 50, signal_df['time'].iloc[-1] - 50)].copy()
     # take out points where monkey speed is above 10 cm/s (because otherwise when finding the closest position, there can be too much noise)
-    txt_sub = txt_sub[txt_sub['monkey_speed'] > 50].copy()
+    txt_sub = txt_sub[txt_sub['speed'] > 50].copy()
 
     # sample n_points at nearly equal interval based on positional index
     n_points_total = len(txt_sub['point_index'].unique())

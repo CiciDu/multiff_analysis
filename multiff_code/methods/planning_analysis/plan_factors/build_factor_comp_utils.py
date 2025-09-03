@@ -136,7 +136,7 @@ def _find_summary_stats_of_each_segment(data_of_segments,
 def _get_monkey_speed_stat_df(data_of_segments):
     monkey_speed_stat_df = build_factor_comp_utils._find_summary_stats_of_each_segment(data_of_segments,
                                                                                        groupby_column='stop_point_index',
-                                                                                       stat_columns=['monkey_speed', 'monkey_dw'])
+                                                                                       stat_columns=['speed', 'ang_speed'])
     columns_to_preserve = [column for column in monkey_speed_stat_df if ('iqr' in column) | (
         'range' in column) | ('std' in column) | (column == 'stop_point_index')]
     monkey_speed_stat_df = monkey_speed_stat_df[columns_to_preserve].copy()
@@ -154,9 +154,9 @@ def _get_monkey_speed_stat_df_bsans(stops_near_ff_df, monkey_information):
     data_of_segments = build_factor_comp_utils._prepare_data_of_segments_based_on_stop_point_index(
         stops_near_ff_df, monkey_information, start_time_column='stop_time', end_time_column='next_stop_time')
     monkey_speed_stat_df_bsans = _get_monkey_speed_stat_df(data_of_segments)
-    # for all column names that start with 'monkey_speed' or 'monkey_dw', add '_bsans' to the column name
+    # for all column names that start with 'speed' or 'ang_speed', add '_bsans' to the column name
     monkey_speed_stat_df_bsans.columns = [
-        col + '_bsans' if col.startswith('monkey_speed') or col.startswith('monkey_dw') else col for col in monkey_speed_stat_df_bsans.columns]
+        col + '_bsans' if col.startswith('speed') or col.startswith('ang_speed') else col for col in monkey_speed_stat_df_bsans.columns]
     return monkey_speed_stat_df_bsans
 
 

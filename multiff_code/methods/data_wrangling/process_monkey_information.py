@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from os.path import exists
 from eye_position_analysis import eye_positions
+from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -42,8 +43,9 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
             raw_monkey_information, smr_markers_start_time, smr_markers_end_time)
         add_monkey_angle_column(
             monkey_information, min_distance_to_calculate_angle=min_distance_to_calculate_angle)
-        add_monkey_speed_column(monkey_information)
-        add_monkey_dw_column(monkey_information)
+
+        # add speed, ang_speed, accel, ang_accel
+        monkey_information = compute_kinematics_loclin(monkey_information)
 
         monkey_information = add_smr_file_info_to_monkey_information(
             monkey_information, raw_data_folder_path)
@@ -243,40 +245,14 @@ def _calculate_delta_xy_and_current_delta_position_given_num_points(monkey_infor
     return delta_x, delta_y, current_delta_position, num_points_past, num_points_future
 
 
-def add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=1):
-    monkey_information = _get_derivative_of_a_column(
-        monkey_information, column_name='monkey_dw', derivative_name='monkey_ddw')
-    monkey_information = _get_derivative_of_a_column(
-        monkey_information, column_name='monkey_speed', derivative_name='monkey_ddv')
-    monkey_information = add_monkey_speeddummy_column(monkey_information)
-    add_crossing_boundary_column(monkey_information)
-    add_delta_distance_and_cum_distance_to_monkey_information(
-        monkey_information)
-    monkey_information = add_whether_new_distinct_stop_and_stop_id(
-        monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
-    # # assign "stop_id" to each stop, with each whether_new_distinct_stop==True marking a new stop id
-    # monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum(
-    # ) - 1
-    # monkey_information.loc[monkey_information['monkey_speeddummy']
-    #                        == 1, 'stop_id'] = np.nan
-    monkey_information['dt'] = (
-        monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
-    # add turning right column
-    monkey_information['turning_right'] = 0
-    monkey_information.loc[monkey_information['monkey_dw']
-                           < 0, 'turning_right'] = 1
-
-    return monkey_information
-
-
 def add_smr_file_info_to_monkey_information(monkey_information, raw_data_folder_path):
     signal_df = make_signal_df(raw_data_folder_path)
     monkey_information = _add_smr_file_info_to_monkey_information(
         monkey_information, signal_df)
-    monkey_information.rename(columns={
-                              'MonkeyX': 'monkey_x_smr', 'MonkeyY': 'monkey_y_smr', 'AngularV': 'monkey_dw_smr'}, inplace=True)
-    monkey_information = get_monkey_speed_and_dw_from_smr_info(
-        monkey_information)
+    # monkey_information.rename(columns={
+    #                           'MonkeyX': 'monkey_x_smr', 'MonkeyY': 'monkey_y_smr', 'AngularV': 'monkey_dw_smr'}, inplace=True)
+    # monkey_information = get_monkey_speed_and_dw_from_smr_info(
+    #     monkey_information)
     monkey_information.drop(columns=['LateralV', 'ForwardV'], inplace=True)
     return monkey_information
 
@@ -383,54 +359,19 @@ def add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=
     monkey_information['monkey_angle'] = np.array(monkey_angles)
 
 
-def add_monkey_speed_column(monkey_information):
-    delta_time = np.diff(monkey_information['time'])
-    delta_x = np.diff(monkey_information['monkey_x'])
-    delta_y = np.diff(monkey_information['monkey_y'])
-    delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
-    ceiling_of_delta_position = max(10, np.max(delta_time)*200*1.5)
-
-    # If the monkey's delta_position at one point exceeds 50, we replace it with the previous speed.
-    # (This can happen when the monkey reaches the boundary and comes out at another place)
-    while np.where(delta_position >= ceiling_of_delta_position)[0].size > 0:
-        above_ceiling_point_index = np.where(
-            delta_position >= ceiling_of_delta_position)[0]
-        # find the previous speed for all those points
-        delta_position_prev = np.append(np.array([0]), delta_position)
-        delta_position[above_ceiling_point_index] = delta_position_prev[above_ceiling_point_index]
-
-    monkey_speed = np.divide(delta_position, delta_time)
-    monkey_speed = np.append(monkey_speed[0], monkey_speed)
-    monkey_information['monkey_speed'] = monkey_speed
-    # and make sure that the monkey_speed does not exceed maximum speed
-    monkey_information.loc[monkey_information['monkey_speed']
-                           > 200, 'monkey_speed'] = 200
-
-
-def add_monkey_dw_column(monkey_information):
-    # positive dw means the monkey is turning counterclockwise
-    delta_time = np.diff(monkey_information['time'])
-    delta_angle = np.diff(monkey_information['monkey_angle'])
-    delta_angle = np.remainder(delta_angle, 2*pi)
-    delta_angle[delta_angle >= pi] = delta_angle[delta_angle >= pi]-2*pi
-    monkey_dw = np.divide(delta_angle, delta_time)
-    monkey_dw = np.append(monkey_dw[0], monkey_dw)
-    monkey_information['monkey_dw'] = monkey_dw
-    # monkey_information['monkey_dw'] = gaussian_filter1d(monkey_information['monkey_dw'], 1)
-
-
 def add_monkey_speeddummy_column(monkey_information):
     if 'monkey_speeddummy' not in monkey_information.columns:
-        monkey_information['monkey_speeddummy'] = ((monkey_information['monkey_speed'] > 0.1) |
-                                                   (np.abs(monkey_information['monkey_dw']) > 0.0035)).astype(int)
-    if 'monkey_speed_smr' in monkey_information.columns:
-        monkey_information['monkey_speeddummy_smr'] = ((monkey_information['monkey_speed_smr'] > 0.1) |
-                                                       (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int)
-        # now, make monkey_speeddummy 0 if it's 0 in either monkey_speeddummy or monkey_speeddummy_smr
-        monkey_information['monkey_speeddummy'] = monkey_information['monkey_speeddummy'] & monkey_information['monkey_speeddummy_smr']
-        monkey_information.drop(
-            columns=['monkey_speeddummy_smr'], inplace=True)
+        monkey_information['monkey_speeddummy'] = ((monkey_information['speed'] > 0.1) |
+                                                   (np.abs(monkey_information['ang_speed']) > 0.0035)).astype(int)
+    # if 'monkey_speed_smr' in monkey_information.columns:
+    #     monkey_information['monkey_speeddummy_smr'] = ((monkey_information['monkey_speed_smr'] > 0.1) |
+    #                                                    (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int)
+    #     # now, make monkey_speeddummy 0 if it's 0 in either monkey_speeddummy or monkey_speeddummy_smr
+    #     monkey_information['monkey_speeddummy'] = monkey_information['monkey_speeddummy'] & monkey_information['monkey_speeddummy_smr']
+    #     monkey_information.drop(
+    #         columns=['monkey_speeddummy_smr'], inplace=True)
     return monkey_information
+
 
 def add_whether_new_distinct_stop_and_stop_id(
     monkey_information: pd.DataFrame,
@@ -443,12 +384,12 @@ def add_whether_new_distinct_stop_and_stop_id(
     df = monkey_information.copy()
 
     # required columns
-    for col in ["time", "monkey_speed", "monkey_speeddummy"]:
+    for col in ["time", "speed", "monkey_speeddummy"]:
         if col not in df.columns:
             raise KeyError(f"Required column '{col}' not in dataframe")
 
     t = df["time"].to_numpy()
-    speed = df["monkey_speed"].to_numpy()
+    speed = df["speed"].to_numpy()
     is_stop = (df["monkey_speeddummy"].to_numpy() == 0)
 
     n = len(df)
@@ -463,18 +404,18 @@ def add_whether_new_distinct_stop_and_stop_id(
 
     s = is_stop.astype(np.int8)
     starts_mask = (s == 1) & (np.r_[0, s[:-1]] == 0)
-    ends_mask   = (s == 1) & (np.r_[s[1:], 0] == 0)
+    ends_mask = (s == 1) & (np.r_[s[1:], 0] == 0)
 
     start_idx = np.flatnonzero(starts_mask)
-    end_idx   = np.flatnonzero(ends_mask)
+    end_idx = np.flatnonzero(ends_mask)
     n_runs = min(len(start_idx), len(end_idx))
     if n_runs == 0:
         return df
     start_idx = start_idx[:n_runs]
-    end_idx   = end_idx[:n_runs]
+    end_idx = end_idx[:n_runs]
 
     start_t = t[start_idx]
-    end_t   = t[end_idx]
+    end_t = t[end_idx]
     run_dur = end_t - start_t
 
     keep = run_dur >= float(min_stop_duration)
@@ -482,17 +423,17 @@ def add_whether_new_distinct_stop_and_stop_id(
         # no kept runs — nothing to paint
         return df
     start_idx, end_idx = start_idx[keep], end_idx[keep]
-    start_t, end_t     = start_t[keep], end_t[keep]
+    start_t, end_t = start_t[keep], end_t[keep]
     n_runs = len(start_idx)
 
     # Merge rule
     if n_runs > 1:
         fast = speed > speed_threshold_for_distinct_stop
         cfast = np.cumsum(fast, dtype=np.int64)
-        L  = end_idx[:-1]
-        R  = start_idx[1:]
+        L = end_idx[:-1]
+        R = start_idx[1:]
         Lm1 = np.maximum(L - 1, -1)
-        cL  = np.where(Lm1 >= 0, cfast[Lm1], 0)
+        cL = np.where(Lm1 >= 0, cfast[Lm1], 0)
         has_fast_sep = (cfast[R] - cL) > 0
         gap_ok = (start_t[1:] - end_t[:-1]) > close_gap_seconds
         new_run_flag = has_fast_sep & gap_ok
@@ -514,8 +455,9 @@ def add_whether_new_distinct_stop_and_stop_id(
 
     # turn idx -> time
     merged_span["merged_start_time"] = t[merged_span["merged_start_idx"].to_numpy()]
-    merged_span["merged_end_time"]   = t[merged_span["merged_end_idx"].to_numpy()]
-    merged_span["merged_duration"]   = merged_span["merged_end_time"] - merged_span["merged_start_time"]
+    merged_span["merged_end_time"] = t[merged_span["merged_end_idx"].to_numpy()]
+    merged_span["merged_duration"] = merged_span["merged_end_time"] - \
+        merged_span["merged_start_time"]
 
     # drop leading long merged-stops if requested
     if initial_long_stop_threshold is not None and max_initial_long_stops > 0 and len(merged_span) > 0:
@@ -527,7 +469,8 @@ def add_whether_new_distinct_stop_and_stop_id(
             else:
                 break
         if drop_ids:
-            merged_span = merged_span[~merged_span["merged_id"].isin(drop_ids)].reset_index(drop=True)
+            merged_span = merged_span[~merged_span["merged_id"].isin(
+                drop_ids)].reset_index(drop=True)
 
     if merged_span.empty:
         # everything filtered away
@@ -542,39 +485,39 @@ def add_whether_new_distinct_stop_and_stop_id(
             continue
 
         df.iloc[i0:i1+1, df.columns.get_loc("stop_id")] = new_sid
-        df.iloc[i0,       df.columns.get_loc("whether_new_distinct_stop")] = True
+        df.iloc[i0,       df.columns.get_loc(
+            "whether_new_distinct_stop")] = True
         dur = float(row.merged_duration)
-        st  = float(row.merged_start_time)
-        et  = float(row.merged_end_time)
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_duration")]   = dur
+        st = float(row.merged_start_time)
+        et = float(row.merged_end_time)
+        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_duration")] = dur
         df.iloc[i0:i1+1, df.columns.get_loc("stop_id_start_time")] = st
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_end_time")]   = et
+        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_end_time")] = et
 
     return df
-
 
 
 # ------------------------------------------------------------------------------
 # -------------------------- process speed --------------------------
 # ------------------------------------------------------------------------------
 
-import numpy as np
-
-import numpy as np
 try:
     from numba import njit
 except Exception:
     # If Numba isn't available, make a no-op decorator
     print("Numba isn't available, making a no-op decorator")
+
     def njit(*args, **kwargs):
         def wrap(f): return f
         return wrap
+
 
 @njit(cache=True, fastmath=True)
 def _tricube_weight(u):
     # u in [0, 1]
     one_minus = 1.0 - u*u*u
     return one_minus*one_minus*one_minus
+
 
 @njit(cache=True, fastmath=True)
 def _local_linear_slopes_multi(time, Z, window_s=0.040, min_pts=3, ridge=1e-8, grow=1.5, max_grow=10.0):
@@ -615,7 +558,7 @@ def _local_linear_slopes_multi(time, Z, window_s=0.040, min_pts=3, ridge=1e-8, g
         S_wt = 0.0
         S_wtt = 0.0
         # Vector moments per column
-        S_wz  = np.zeros(m, np.float64)
+        S_wz = np.zeros(m, np.float64)
         S_wtz = np.zeros(m, np.float64)
 
         tk = time[k]
@@ -633,14 +576,14 @@ def _local_linear_slopes_multi(time, Z, window_s=0.040, min_pts=3, ridge=1e-8, g
             wt = w * tc
             wtt = wt * tc
 
-            S_w  += w
+            S_w += w
             S_wt += wt
             S_wtt += wtt
 
             zi = Z[i, :]
             for j in range(m):
                 z = zi[j]
-                S_wz[j]  += w * z
+                S_wz[j] += w * z
                 S_wtz[j] += wt * z
 
         denom = (S_w * S_wtt - S_wt * S_wt) + ridge
@@ -653,19 +596,23 @@ def _local_linear_slopes_multi(time, Z, window_s=0.040, min_pts=3, ridge=1e-8, g
 
     return slopes
 
+
 def _ensure_np1d(a):
     return np.asarray(a, dtype=float).reshape(-1)
 
+
 def local_linear_velocity(time, x, y, window_s=0.040, min_pts=3, ridge=1e-8):
     t = _ensure_np1d(time)
-    Z = np.column_stack(( _ensure_np1d(x), _ensure_np1d(y) ))
-    dZdt = _local_linear_slopes_multi(t, Z, window_s=window_s, min_pts=min_pts, ridge=ridge)
+    Z = np.column_stack((_ensure_np1d(x), _ensure_np1d(y)))
+    dZdt = _local_linear_slopes_multi(
+        t, Z, window_s=window_s, min_pts=min_pts, ridge=ridge)
     vx = dZdt[:, 0]
     vy = dZdt[:, 1]
     speed = np.hypot(vx, vy)
     return vx, vy, speed
 
-def compute_kinematics_loclin(df, time_col='time', x_col='x', y_col='y', theta_col='theta',
+
+def compute_kinematics_loclin(df, time_col='time', x_col='monkey_x', y_col='monkey_y', theta_col='monkey_angle',
                               window_s=0.040, use_theta='auto', min_pts=3, ridge=1e-8):
     out = df.copy()
     t = out[time_col].to_numpy(dtype=float)
@@ -673,14 +620,17 @@ def compute_kinematics_loclin(df, time_col='time', x_col='x', y_col='y', theta_c
     y = out[y_col].to_numpy(dtype=float)
 
     # 1) velocity
-    vx, vy, speed = local_linear_velocity(t, x, y, window_s=window_s, min_pts=min_pts, ridge=ridge)
+    vx, vy, speed = local_linear_velocity(
+        t, x, y, window_s=window_s, min_pts=min_pts, ridge=ridge)
     out['vx'] = vx
     out['vy'] = vy
     out['speed'] = speed
 
     # 2) tangential acceleration from (vx, vy)
-    dV = _local_linear_slopes_multi(t, np.column_stack((vx, vy)), window_s=window_s, min_pts=min_pts, ridge=ridge)
-    ax = dV[:, 0]; ay = dV[:, 1]
+    dV = _local_linear_slopes_multi(t, np.column_stack(
+        (vx, vy)), window_s=window_s, min_pts=min_pts, ridge=ridge)
+    ax = dV[:, 0]
+    ay = dV[:, 1]
     out['accel'] = (vx*ax + vy*ay) / np.maximum(speed, 1e-9)
 
     # 3) heading
@@ -692,7 +642,8 @@ def compute_kinematics_loclin(df, time_col='time', x_col='x', y_col='y', theta_c
             heading = np.unwrap(theta)
             heading_src = 'measured'
         else:
-            print(f"{theta_col} is not in the dataframe. Using heading from velocity.")
+            print(
+                f"{theta_col} is not in the dataframe. Using heading from velocity.")
             heading = np.unwrap(heading_from_v)
     elif use_theta == 'velocity':
         heading = np.unwrap(heading_from_v)
@@ -700,10 +651,37 @@ def compute_kinematics_loclin(df, time_col='time', x_col='x', y_col='y', theta_c
         heading = np.unwrap(heading_from_v)
 
     # 4) angular kinematics
-    ang_speed = _local_linear_slopes_multi(t, heading.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
-    ang_accel = _local_linear_slopes_multi(t, ang_speed.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
+    ang_speed = _local_linear_slopes_multi(
+        t, heading.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
+    ang_accel = _local_linear_slopes_multi(
+        t, ang_speed.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
 
     out['ang_speed'] = ang_speed
     out['ang_accel'] = ang_accel
-    out['heading_source'] = heading_src
+
+    out.drop(columns=['vx', 'vy'], inplace=True)
     return out
+
+
+def add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=1):
+    monkey_information = add_monkey_speeddummy_column(monkey_information)
+    add_crossing_boundary_column(monkey_information)
+    add_delta_distance_and_cum_distance_to_monkey_information(
+        monkey_information)
+    monkey_information = add_whether_new_distinct_stop_and_stop_id(
+        monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+    monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
+        monkey_information)
+    # # assign "stop_id" to each stop, with each whether_new_distinct_stop==True marking a new stop id
+    # monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum(
+    # ) - 1
+    # monkey_information.loc[monkey_information['monkey_speeddummy']
+    #                        == 1, 'stop_id'] = np.nan
+    monkey_information['dt'] = (
+        monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
+    # add turning right column
+    monkey_information['turning_right'] = 0
+    monkey_information.loc[monkey_information['ang_speed']
+                           < 0, 'turning_right'] = 1
+
+    return monkey_information

@@ -195,7 +195,7 @@ def get_cum_distance_traveled(currentTrial, ff_caught_T_new, monkey_information)
     if len(cum_pos_index) > 1:
         cum_t = np.array(monkey_information['time'].iloc[cum_pos_index])
         cum_speed = np.array(
-            monkey_information['monkey_speed'].iloc[cum_pos_index])
+            monkey_information['speed'].iloc[cum_pos_index])
         distance = np.sum((cum_t[1:] - cum_t[:-1])*cum_speed[1:])
     return distance
 
@@ -292,8 +292,8 @@ def reorganize_data_into_chunks(monkey_information):
     new_chunk_indices = [0]
 
     # for each time point
-    for i in range(len(monkey_information['monkey_speed'])):
-        speed = monkey_information['monkey_speed'].values[i]
+    for i in range(len(monkey_information['speed'])):
+        speed = monkey_information['speed'].values[i]
         # if the speed is above half of the full speed (100 cm/s) and if the previous speed is below half of the full speed
         if (speed > 100) & (prev_speed <= 100):
             # start a new chunk

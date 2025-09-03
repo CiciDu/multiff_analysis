@@ -439,7 +439,7 @@ def plot_arena_edge_in_plotly(fig, radius=1000):
 
 def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_traj_color_as_speed=True, hoverdata_multi_columns=['rel_time']):
 
-    custom_data = hoverdata_multi_columns + ['monkey_speed']
+    custom_data = hoverdata_multi_columns + ['speed']
     fig.add_traces(
         list(px.scatter(traj_df_to_use,
                         x='monkey_x',
@@ -474,7 +474,7 @@ def plot_trajectory_data(fig, traj_df_to_use, show_color_as_time=False, show_tra
                           selector=dict(name='trajectory_data'))
 
     elif show_traj_color_as_speed:  # note that show_color_as_time takes precedence over show_traj_color_as_speed
-        marker_dict = {'color': traj_df_to_use['monkey_speed'].values,
+        marker_dict = {'color': traj_df_to_use['speed'].values,
                        'colorscale': 'Viridis',
                        'cmin': 0,
                        'cmax': 200,

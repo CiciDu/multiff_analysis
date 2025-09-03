@@ -224,11 +224,12 @@ def PlotTrials(duration,
     # If currentTrial is not given, then it will be calculated based on the duration
     currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
         ff_caught_T_new, currentTrial, num_trials, duration)
-    
+
     print('currentTrial:', currentTrial, 'num_trials:', num_trials)
 
     if duration[1] <= duration[0]:
-        raise ValueError(f"duration[1] must be greater than duration[0]. Now duration[0] = {duration[0]} and duration[1] = {duration[1]}")
+        raise ValueError(
+            f"duration[1] must be greater than duration[0]. Now duration[0] = {duration[0]} and duration[1] = {duration[1]}")
 
     cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(
         duration, monkey_information)
@@ -686,7 +687,7 @@ def PlotTrials(duration,
             legend_names.append('Monkey trajectory')
         elif trail_color_var == 'abs_ddw':
             cum_abs_ddw = np.abs(
-                np.array(monkey_information['monkey_ddw'].iloc[cum_pos_index]))
+                np.array(monkey_information['ang_accel'].iloc[cum_pos_index]))
             colorbar_max_value = max(cum_abs_ddw)
 
     if show_null_agent_trajectory:
@@ -743,12 +744,11 @@ def PlotTrials(duration,
     # axes.spines['bottom'].set_color('#6c757d')
     # axes.spines['left'].set_linewidth(1.5)
     # axes.spines['bottom'].set_linewidth(1.5)
-    
+
     fig.patch.set_facecolor("white")   # figure background
     axes.set_facecolor("white")        # axes background
     # get rid of the axes
     axes.set_frame_on(False)
-
 
     if show_eye_world_speed_vs_monkey_speed:
         monkey_sub = monkey_information.iloc[cum_pos_index]

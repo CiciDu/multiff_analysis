@@ -11,7 +11,6 @@ import math
 from sklearn.preprocessing import StandardScaler
 
 
-
 class GLMclass():
 
     # for
@@ -40,7 +39,6 @@ class GLMclass():
         self.run_pgam(neural_cluster_number=neural_cluster_number)
         self.post_processing()
 
-
     def prepare_for_pgam(self, temporal_vars=None, num_total_trials=10):
         if temporal_vars is None:
             temporal_vars = self.temporal_vars
@@ -48,23 +46,24 @@ class GLMclass():
         self._scale_features()
         self._get_mock_trials_df(num_total_trials)
 
-
     def _categorize_features(self, temporal_vars):
         # Keep only valid temporal variables that exist in y_var
-        self.temporal_vars = [x for x in temporal_vars if x in self.y_var.columns]
+        self.temporal_vars = [
+            x for x in temporal_vars if x in self.y_var.columns]
 
         # Convert to set for subtraction
-        rest_of_vars = set(pn_feature_selection.all_features) - set(self.temporal_vars)
+        rest_of_vars = set(pn_feature_selection.all_features) - \
+            set(self.temporal_vars)
 
         # Spatial vars are those in y_var that are in the "rest"
-        self.spatial_vars = [x for x in self.y_var.columns if x in rest_of_vars]
+        self.spatial_vars = [
+            x for x in self.y_var.columns if x in rest_of_vars]
 
         print("Spatial variables:", np.array(self.spatial_vars))
 
         # Sub-dataframes
         self.temporal_sub = self.y_var.loc[:, self.temporal_vars]
         self.spatial_sub_unscaled = self.y_var.loc[:, self.spatial_vars]
-
 
     def _scale_features(self):
         # since temporal variables are all dummy variables, we only need to scale the spatial variables
@@ -159,10 +158,10 @@ class GLMclass():
         variable[variable ==
                  'max_target_cluster_visible_dummy'] = 'whether target cluster is visible'
         variable[variable == 'gaze_world_y'] = 'gaze y-coordinate'
-        variable[variable == 'monkey_speed'] = 'monkey linear speed'
-        variable[variable == 'monkey_dw'] = 'monkey linear acceleration'
-        variable[variable == 'monkey_ddw'] = 'change in monkey linear acceleration'
-        variable[variable == 'monkey_ddv'] = 'change in monkey angular acceleration'
+        variable[variable == 'speed'] = 'monkey linear speed'
+        variable[variable == 'ang_speed'] = 'monkey linear acceleration'
+        variable[variable == 'ang_accel'] = 'change in monkey linear acceleration'
+        variable[variable == 'accel'] = 'change in monkey angular acceleration'
         variable[variable == 'avg_target_cluster_last_seen_distance'] = 'distance of target cluster last seen'
         variable[variable ==
                  'avg_target_cluster_last_seen_angle'] = 'angle of target cluster last seen'

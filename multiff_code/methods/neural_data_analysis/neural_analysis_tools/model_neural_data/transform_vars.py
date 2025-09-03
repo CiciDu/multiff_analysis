@@ -6,10 +6,10 @@ from scipy.ndimage import gaussian_filter1d, uniform_filter1d
 
 
 def transform_behav_data(behav_data,
-                         power_vars=['monkey_ddv', 'target_rel_y'],
+                         power_vars=['accel', 'target_rel_y'],
                          log_vars=['time_since_last_capture'],
-                         smooth_vars=['monkey_dw', 'target_rel_x'],
-                         gaussian_smooth_vars=['monkey_ddv', 'delta_distance'],
+                         smooth_vars=['ang_speed', 'target_rel_x'],
+                         gaussian_smooth_vars=['accel', 'delta_distance'],
                          powers=[0.5, 1, 2, 3],
                          smooth_window_size=[5, 7],
                          gaussian_smooth_sigma=[4],

@@ -4,7 +4,7 @@ from null_behaviors import curv_of_traj_utils
 from planning_analysis.test_params_for_planning import params_utils
 from planning_analysis.show_planning import nxt_ff_utils
 from pattern_discovery import cluster_analysis
-
+from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 
 import os
 import os
@@ -174,7 +174,7 @@ class BaseProcessing:
                 path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         else:
             self.closest_stop_to_capture_df = monkey_landing_in_ff.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted,
-                                                                                                     cur_ff_index_array=np.arange(len(self.ff_caught_T_sorted)))
+                                                                                                             cur_ff_index_array=np.arange(len(self.ff_caught_T_sorted)))
             self.closest_stop_to_capture_df.to_csv(path)
         return
 
@@ -250,7 +250,6 @@ class BaseProcessing:
             print("Made target_last_vis_df and saved it at ", path)
         return
 
-              
     def retrieve_or_make_monkey_data(self, exists_ok=True, already_made_ok=True, save_data=True, speed_threshold_for_distinct_stop=1, min_distance_to_calculate_angle=5):
         if (not already_made_ok) | (getattr(self, 'ff_caught_T_sorted', None) is None):
             self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
@@ -290,8 +289,8 @@ class BaseProcessing:
 
     def crudely_furnish_ff_dataframe(self):
         # instead of furnishing ff_dataframe in the line above, we just add a few columns, so as not to make ff_dataframe_too_big
-        self.ff_dataframe[['monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']] = self.monkey_information.loc[self.ff_dataframe['point_index'].values, [
-            'monkey_angle', 'monkey_angle', 'monkey_dw', 'dt', 'cum_distance']].values
+        self.ff_dataframe[['monkey_angle', 'monkey_angle', 'ang_speed', 'dt', 'cum_distance']] = self.monkey_information.loc[self.ff_dataframe['point_index'].values, [
+            'monkey_angle', 'monkey_angle', 'ang_speed', 'dt', 'cum_distance']].values
         self.ff_dataframe = self.ff_dataframe.drop(
             columns=['left_right', 'abs_delta_ff_angle', 'abs_delta_ff_angle_boundary'], errors='ignore')
 
