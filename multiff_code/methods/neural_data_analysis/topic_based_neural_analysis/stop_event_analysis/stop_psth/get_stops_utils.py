@@ -207,7 +207,8 @@ def extract_unique_stops(monkey_information: pd.DataFrame) -> pd.DataFrame:
     #     .reset_index(drop=True)
     # )
     
-    unique_stops_df = monkey_information[['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration']].groupby(('stop_id')).first().reset_index(drop=False)
+    unique_stops_df = monkey_information[['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration', 
+        'stop_cluster_id', 'stop_cluster_size']].groupby(('stop_id')).first().reset_index(drop=False)
     
 
     return unique_stops_df

@@ -13,16 +13,16 @@ def make_history_lags(y_unit, n_lags=5):
     return H, [f'hist_lag{k}' for k in range(1, n_lags + 1)]
 
 
-# y = spike_counts[pos, :]   # you already have this (rows==design rows)
-unit_ix = 0
-H, H_names = make_history_lags(y[:, unit_ix], n_lags=6)
+# # y = spike_counts[pos, :]   # you already have this (rows==design rows)
+# unit_ix = 0
+# H, H_names = make_history_lags(y[:, unit_ix], n_lags=6)
 
-# optional: gate history differently pre vs post
-# (m_prepost was in the stop design helper; 0=pre, 1=post)
-# H_post = H * m_prepost.to_numpy()[:, None]
-# names_post = [n + '_post' for n in H_names]
+# # optional: gate history differently pre vs post
+# # (m_prepost was in the stop design helper; 0=pre, 1=post)
+# # H_post = H * m_prepost.to_numpy()[:, None]
+# # names_post = [n + '_post' for n in H_names]
 
-# X_unit = np.column_stack([X_common, H])   # then fit GLM for this unit
+# # X_unit = np.column_stack([X_common, H])   # then fit GLM for this unit
 
 
 
@@ -82,22 +82,22 @@ def make_history_rcos(y_unit, bin_dt, n_basis=5, t_max=0.4):
     return H, names
 
 
-H, H_names = make_history_rcos(y[:, unit_ix], bin_dt=0.04, n_basis=4, t_max=0.4)
-# X_unit = np.column_stack([X_common, H])
+# H, H_names = make_history_rcos(y[:, unit_ix], bin_dt=0.04, n_basis=4, t_max=0.4)
+# # X_unit = np.column_stack([X_common, H])
 
 
-# Common block for all units (kinematics, stop features you already built)
-X_common = X  # your existing design for rows 'pos' (kinematics + stop predictors)
-offset = offset_log
-T, n_units = y.shape
+# # Common block for all units (kinematics, stop features you already built)
+# X_common = X  # your existing design for rows 'pos' (kinematics + stop predictors)
+# offset = offset_log
+# T, n_units = y.shape
 
-for u in range(n_units):
-    # spike history for THIS unit
-    H_u, H_names = make_history_rcos(y[:, u], bin_dt=0.04, n_basis=4, t_max=0.4)
+# for u in range(n_units):
+#     # spike history for THIS unit
+#     H_u, H_names = make_history_rcos(y[:, u], bin_dt=0.04, n_basis=4, t_max=0.4)
 
-    # optional: gate history by pre/post
-    # H_u = H_u * prepost[:, None]
+#     # optional: gate history by pre/post
+#     # H_u = H_u * prepost[:, None]
 
-    X_u = np.column_stack([X_common, H_u])
-    names_u = X_names + H_names
+#     X_u = np.column_stack([X_common, H_u])
+#     names_u = X_names + H_names
 

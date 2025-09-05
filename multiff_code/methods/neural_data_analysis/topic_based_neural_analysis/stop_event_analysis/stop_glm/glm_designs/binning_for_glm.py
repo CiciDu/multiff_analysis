@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+from pandas.api import types as pdt
+import statsmodels.api as sm
+
+
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, get_stops_utils, psth_postprocessing, psth_stats
 
@@ -451,3 +455,88 @@ def bin_spikes_by_cluster(spikes_df,
     counts = np.zeros((M, C), dtype=int)
     np.add.at(counts, (idx, col), 1)
     return counts, cluster_ids
+
+
+import numpy as np
+import pandas as pd
+from pandas.api import types as pdt
+import statsmodels.api as sm
+
+def _is_dummy_col(s: pd.Series, tol_decimals: int = 12) -> bool:
+    """
+    Return True if the column is:
+      - boolean dtype, or
+      - numeric with unique values subset of {0, 1} (allowing 0.0/1.0).
+    """
+    if pdt.is_bool_dtype(s):
+        return True
+    x = pd.to_numeric(s, errors='coerce').dropna().unique()
+    if x.size == 0:
+        return False
+    x = np.round(x.astype(float), tol_decimals)
+    return np.isin(x, [0.0, 1.0]).all()
+
+def selective_zscore(
+    df: pd.DataFrame,
+    *,
+    centered_suffixes = ('_c', '_c2'),   # treat centered & its square as “do not scale”
+    zscored_suffixes = ('_z', '_z2'),    # already standardized → skip
+    mean_tol: float = 1e-8,              # if mean≈0 and std≈1, assume already z-scored
+    std_tol: float = 1e-6,
+    ddof: int = 0
+):
+    """
+    Z-score only the appropriate continuous columns.
+
+    We **skip** columns that are:
+      • dummies (0/1) or boolean,
+      • already centered or squared-centered (name ends with any of `centered_suffixes`),
+      • already z-scored or squared-z (name ends with any of `zscored_suffixes`),
+      • near-constant (std ~ 0),
+      • the intercept column named 'const' (if present).
+
+    Returns
+    -------
+    out : DataFrame
+        A copy of df where selected columns are z-scored (NaNs preserved).
+    scaled : list[str]
+        Names of the columns that were actually scaled.
+    """
+    out = df.copy()
+    scaled: list[str] = []
+
+    # Work only on numeric dtypes; strings/objects are ignored automatically.
+    for col in out.select_dtypes(include='number').columns:
+        # 1) never touch an intercept if it's already present
+        if col == 'const':
+            continue
+
+        # 2) respect naming conventions: *_c / *_c2 / *_z / *_z2 are left alone
+        if col.endswith(centered_suffixes) or col.endswith(zscored_suffixes):
+            continue
+
+        s = out[col]
+
+        # 3) skip dummies / boolean indicators
+        if _is_dummy_col(s):
+            continue
+
+        # 4) compute stats on numeric view (NaNs preserved)
+        x = pd.to_numeric(s, errors='coerce')
+        m = x.mean()
+        sd = x.std(ddof=ddof)
+
+        # 5) skip near-constant (or non-finite std)
+        if not np.isfinite(sd) or sd <= 1e-12:
+            continue
+
+        # 6) if it already looks z-scored (mean≈0, std≈1), skip
+        if abs(m) < mean_tol and abs(sd - 1.0) < std_tol:
+            continue
+
+        # 7) z-score; this preserves NaNs exactly where they were
+        out[col] = (x - m) / sd
+        scaled.append(col)
+
+    return out, scaled
+
