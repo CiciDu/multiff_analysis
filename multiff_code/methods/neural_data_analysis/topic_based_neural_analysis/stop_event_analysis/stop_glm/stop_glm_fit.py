@@ -71,15 +71,12 @@ def term_population_tests(coefs_df, terms=None):
 def fit_poisson_glm_per_cluster(
     df_X,
     df_Y,
-    offset_col='offset_log',
+    offset_log,
     cluster_ids=None,      # optional list of cluster IDs; defaults to df_Y columns
-    add_intercept=True,
     cov_type='HC1',
-    standardize=False
 ):
     """
     Fit Poisson GLMs per cluster, using predictors from df_X and responses from df_Y.
-    Optionally standardizes predictors (z-score per column).
 
     Parameters
     ----------
@@ -88,36 +85,20 @@ def fit_poisson_glm_per_cluster(
     df_Y : pd.DataFrame
         Response DataFrame. Each column = one cluster’s response (spike counts).
         Index must align with df_X.
-    offset_col : str
-        Column in df_X giving log(offset).
+    offset_log : np.ndarray
+        Log-offset for each row.
     cluster_ids : list or None
         Identifiers for clusters. If None, uses df_Y.columns.
-    add_intercept : bool
-        If True, include constant term.
     cov_type : str
         Covariance type for GLM.
-    standardize : bool
-        If True, z-score predictors (mean=0, std=1) before fitting.
+
 
     Returns
     -------
     results, coefs_df, metrics_df
     """
     # --- Design matrix ---
-    feature_names = [c for c in df_X.columns if c != offset_col]
-    X_df = df_X[feature_names].copy()
-
-    if standardize:
-        # z-score each predictor column
-        X_df = (X_df - X_df.mean()) / X_df.std(ddof=0)
-
-    if add_intercept:
-        X_df = sm.add_constant(X_df, has_constant='add')
-        design_cols = ['const'] + feature_names
-    else:
-        design_cols = feature_names
-
-    offset_log = df_X[offset_col].to_numpy()
+    feature_names = df_X.columns
 
     # --- Responses ---
     if cluster_ids is None:
@@ -140,14 +121,14 @@ def fit_poisson_glm_per_cluster(
             })
             continue
 
-        model = sm.GLM(yj, X_df, family=sm.families.Poisson(), offset=offset_log)
+        model = sm.GLM(yj, df_X, family=sm.families.Poisson(), offset=offset_log)
         res = model.fit(method='newton', maxiter=100, disp=False, cov_type=cov_type)
         results[cid] = res
 
-        params = res.params.reindex(design_cols)
-        ses    = res.bse.reindex(design_cols)
-        pvals  = res.pvalues.reindex(design_cols)
-        for name in design_cols:
+        params = res.params.reindex(feature_names)
+        ses    = res.bse.reindex(feature_names)
+        pvals  = res.pvalues.reindex(feature_names)
+        for name in feature_names:
             se = ses[name]
             coef_rows.append({
                 'cluster': cid,
@@ -162,8 +143,10 @@ def fit_poisson_glm_per_cluster(
         llnull = getattr(res, 'llnull', np.nan)
         dev    = getattr(res, 'deviance', np.nan)
         dev0   = getattr(res, 'null_deviance', np.nan)
-        r2_dev = (1 - dev / dev0) if np.isfinite(dev) and np.isfinite(dev0) and dev0 != 0 else np.nan
-        r2_mcf = (1 - llf / llnull) if np.isfinite(llf) and np.isfinite(llnull) and llnull != 0 else np.nan
+
+        r2_dev = safe_deviance_explained(dev, dev0)
+        r2_mcf = safe_mcfadden_r2(llf, llnull)
+
         metrics_rows.append({
             'cluster': cid, 'n_obs': n,
             'deviance': dev, 'null_deviance': dev0,
@@ -176,26 +159,104 @@ def fit_poisson_glm_per_cluster(
     return results, coefs_df, metrics_df
 
 
+import numpy as np
+
+def safe_deviance_explained(dev, null_dev, eps=1e-8):
+    # Returns NaN if null_dev is too small or non-finite
+    if not (np.isfinite(dev) and np.isfinite(null_dev)) or (abs(null_dev) < eps):
+        return np.nan
+    return 1.0 - (dev / null_dev)
+
+def safe_mcfadden_r2(ll_full, ll_null, eps=1e-12):
+    # ll_* should be log-likelihoods computed on the same data
+    if not (np.isfinite(ll_full) and np.isfinite(ll_null)) or (abs(ll_null) < eps):
+        return np.nan
+    return 1.0 - (ll_full / ll_null)
+
+
 # ---------- plots ----------
-def plot_coef_distributions(coefs_df, terms=None):
-    df = coefs_df
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_coef_distributions(
+    coefs_df,
+    terms=None,
+    rank='sig_FDR',                 # 'none' | 'sig_FDR' | 'abs_med'
+    rank_mode='fraction',        # when rank='sig_FDR': 'fraction' or 'count'
+    ascending=True              # False => most significant/effectful at top
+):
+    """
+    Plot per-cluster coefficient distributions, with optional term ranking.
+    Only plots terms with sig_FDR > 0; prints the others.
+    """
+    df = coefs_df.copy()
+
+    # Decide candidate terms
     if terms is None:
-        terms = df['term'].unique().tolist()
-    fig, ax = plt.subplots(figsize=(8, 4 + 1.2*len(terms)))
+        candidate_terms = df['term'].unique().tolist()
+    else:
+        candidate_terms = [t for t in terms if t in set(df['term'])]
+
+    # Build ranking key
+    if rank == 'sig_FDR' and 'sig_FDR' in df.columns:
+        by = df.groupby('term')['sig_FDR']
+        if rank_mode == 'count':
+            key = by.sum()
+        else:  # 'fraction'
+            key = by.mean()
+    elif rank == 'abs_med':
+        key = df.groupby('term')['coef'].apply(lambda s: float(np.median(np.abs(s))))
+    else:
+        key = None
+
+    # Order terms
+    if key is not None:
+        ordered_terms_all = list(key.sort_values(ascending=ascending).index)
+        terms_to_plot = [t for t in ordered_terms_all if t in candidate_terms]
+    else:
+        terms_to_plot = candidate_terms
+
+    # Filter by sig_FDR
+    if 'sig_FDR' in df.columns:
+        keep_terms = []
+        skip_terms = []
+        for t in terms_to_plot:
+            n_sig = int(df.loc[df['term'] == t, 'sig_FDR'].sum())
+            if n_sig > 0:
+                keep_terms.append(t)
+            else:
+                skip_terms.append(t)
+        if skip_terms:
+            print('Skipping terms with no significant clusters (sig_FDR=0):', skip_terms)
+        terms_to_plot = keep_terms
+
+    if not terms_to_plot:
+        print('No terms with sig_FDR > 0 to plot.')
+        return None
+
+    fig, ax = plt.subplots(figsize=(8, 3 + 0.6*len(terms_to_plot)))
     ytick = []; ylocs = []
-    for k, term in enumerate(terms):
+
+    for k, term in enumerate(terms_to_plot):
         g = df[df['term'] == term]
         y = np.full(g.shape[0], k, float)
         jitter = (np.random.rand(g.shape[0]) - 0.5) * 0.15
         ax.plot(g['coef'].to_numpy(), y + jitter, 'o', alpha=0.45, markersize=4)
-        med = np.median(g['coef'])
+
+        med = float(np.median(g['coef']))
         q1, q3 = np.percentile(g['coef'], [25, 75])
         ax.plot([q1, q3], [k, k], lw=4)
         ax.plot([med, med], [k - 0.18, k + 0.18], lw=2)
+
         if 'sig_FDR' in g.columns:
-            n_sig = int(g['sig_FDR'].sum())
-            ax.text(ax.get_xlim()[1], k, f'  sig_FDR={n_sig}/{g.shape[0]}', va='center')
+            n_sig = int(np.asarray(g['sig_FDR']).sum())
+            ax.text(
+                1.005, k, f'{n_sig}/{g.shape[0]} sig',
+                va='center', ha='left', transform=ax.get_yaxis_transform()
+            )
+
         ytick.append(term); ylocs.append(k)
+
     ax.axvline(0, ls='--', lw=1)
     ax.set_yticks(ylocs); ax.set_yticklabels(ytick)
     ax.set_xlabel('Coefficient (β)')
@@ -253,15 +314,13 @@ def plot_model_quality(metrics_df):
 def glm_mini_report(
     df_X,
     df_Y,
-    standardize=True,
-    offset_col='offset_log',
-    feature_names=None,         # if None, inferred from df_X \ {offset_col}
+    offset_log,
+    feature_names=None,         # if None, inferred from df_X
     cluster_ids=None,           # if None, uses df_Y.columns
     alpha=0.05,
     delta_for_rr=1.0,
     forest_term=None,
     forest_top_n=30,
-    add_intercept=True,
     cov_type='HC1',
     show_plots=True,
     save_dir=None
@@ -276,10 +335,10 @@ def glm_mini_report(
         Predictors (+ offset column). Index must align with df_Y.
     df_Y : pd.DataFrame
         Responses; each column is one cluster/unit. Index must align with df_X.
-    offset_col : str
-        Column in df_X containing log-offset.
+    offset_log : np.ndarray
+        Log-offset for each row.
     feature_names : list[str] or None
-        Predictor columns to use. If None, inferred as df_X.columns minus offset_col.
+        Predictor columns to use. If None, inferred as df_X.columns.
     cluster_ids : list or None
         Which response columns (IDs) to fit. If None, uses df_Y.columns.
     alpha : float
@@ -290,8 +349,6 @@ def glm_mini_report(
         Which term to use for forest / rr histogram. Defaults to first feature.
     forest_top_n : int
         Top |z| coefficients to display in forest plot.
-    add_intercept : bool
-        Whether to include a constant term in the design.
     cov_type : str
         Covariance estimator for GLM (e.g., 'nonrobust', 'HC0', 'HC1', 'HC2', 'HC3').
     show_plots : bool
@@ -312,17 +369,14 @@ def glm_mini_report(
     """
     # infer feature list if not provided
     if feature_names is None:
-        feature_names = [c for c in df_X.columns if c != offset_col]
-
+        feature_names = df_X.columns
     # run fits
     results, coefs_df, metrics_df = fit_poisson_glm_per_cluster(
         df_X=df_X,
         df_Y=df_Y,
-        offset_col=offset_col,
+        offset_log=offset_log,
         cluster_ids=cluster_ids,
-        add_intercept=add_intercept,
         cov_type=cov_type,
-        standardize=standardize,
     )
 
     # add FDR & rate ratios and population tests

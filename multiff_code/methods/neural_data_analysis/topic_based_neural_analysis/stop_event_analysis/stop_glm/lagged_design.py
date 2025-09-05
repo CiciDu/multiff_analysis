@@ -37,13 +37,9 @@ def build_lagged_design_by_group(
     df_Y,
     group_col,                      # e.g., 'stop_id' or 'segment_id'
     predictors,                     # list[str], columns in df_X
-    offset_col='offset_log',
     order_col=None,                 # optional: sort within group by this time column
     lags_bins=None,                 # list[int] like [-15..+20], OR
     basis_df=None,                  # DataFrame from make_raised_cosine_basis (index = lags)
-    add_intercept=True,
-    standardize=False,              # z-score columns after building design
-    standardize_within_group=False, # if True, z-score within each group instead of globally
     keep_cols=None                  # optional: extra columns to carry through (e.g., 'stop_id', 'trial_id')
 ):
     """
@@ -58,9 +54,6 @@ def build_lagged_design_by_group(
     if (lags_bins is None) == (basis_df is None):
         raise ValueError('Provide exactly one of lags_bins or basis_df.')
 
-    # basic checks
-    if offset_col not in df_X.columns:
-        raise KeyError(f'offset_col {offset_col!r} not found in df_X')
     for p in predictors:
         if p not in df_X.columns:
             raise KeyError(f'predictor {p!r} not found in df_X')
@@ -130,8 +123,7 @@ def build_lagged_design_by_group(
                 proj_blocks.append(XB)
             Xg = pd.concat(proj_blocks, axis=1)
 
-        # attach offset and group cols
-        Xg[offset_col] = gX[offset_col].to_numpy()
+
         Xg[group_col] = gid
         if keep_cols:
             for c in keep_cols:
@@ -143,19 +135,7 @@ def build_lagged_design_by_group(
         # align Y to Xg after drop
         Yg = gY.loc[Xg.index]
         if Yg.empty or Xg.empty:
-            continue
-
-        # standardize (optional)
-        if standardize:
-            if standardize_within_group:
-                # z-score within this group (excluding offset/group/carry)
-                zcols = [c for c in Xg.columns if c not in ([offset_col, group_col] + (keep_cols or []))]
-                for c in zcols:
-                    m = Xg[c].mean()
-                    s = Xg[c].std(ddof=0)
-                    if s and np.isfinite(s) and s > 0:
-                        Xg[c] = (Xg[c] - m) / s
-            # else: global standardization will be applied later (after concatenation)
+            continue   
 
         blocks.append((Xg, Yg))
 
@@ -166,18 +146,6 @@ def build_lagged_design_by_group(
     X_list, Y_list = zip(*blocks)
     df_X_design = pd.concat(X_list, axis=0)
     df_Y_aligned = pd.concat(Y_list, axis=0)
-
-    # global standardization (if requested and not already within-group)
-    if standardize and not standardize_within_group:
-        zcols = [c for c in df_X_design.columns if c not in ([offset_col, group_col] + (keep_cols or []))]
-        for c in zcols:
-            m = df_X_design[c].mean()
-            s = df_X_design[c].std(ddof=0)
-            if s and np.isfinite(s) and s > 0:
-                df_X_design[c] = (df_X_design[c] - m) / s
-
-    if add_intercept:
-        df_X_design.insert(0, 'const', 1.0)
 
     # final alignment sanity
     df_Y_aligned = df_Y_aligned.loc[df_X_design.index]

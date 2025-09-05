@@ -96,7 +96,8 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
             self._add_data_from_behav_data_by_point(exists_ok=True)
 
         if put_data_into_bins:
-            self.make_or_retrieve_monkey_information()
+            #self.make_or_retrieve_monkey_information()
+            self.retrieve_or_make_monkey_data()
             self.get_bin_info()
             self.get_planning_data_by_bin()
             # self._add_data_from_behav_data_by_bin(exists_ok=True)

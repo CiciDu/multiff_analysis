@@ -66,6 +66,45 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
         monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
     return monkey_information
 
+import numpy as np
+import pandas as pd
+
+def process_monkey_speed(monkey_information: pd.DataFrame,
+                         v_max: float = 200.0,
+                         overshoot_factor: float = 1.5) -> pd.DataFrame:
+    """
+    Clean up the 'speed' column by correcting teleport/boundary jumps.
+
+    Steps:
+      1. Compute step speed = distance / dt from x,y positions.
+      2. Flag arrivals where speed exceeds a ceiling (v_max * overshoot_factor).
+      3. Replace those arrivals with NaN and impute by forward/back fill.
+    """
+    df = monkey_information.copy()
+
+    # pull position and time
+    t = df['time'].to_numpy(float)
+    x = df['monkey_x'].to_numpy(float)
+    y = df['monkey_y'].to_numpy(float)
+
+    # differences
+    dt = np.diff(t)
+    dist = np.hypot(np.diff(x), np.diff(y))
+    step_speed = dist / dt  # speed per transition (length N-1)
+
+    # mark arrivals after "too-fast" steps
+    ceiling = v_max * overshoot_factor
+    bad_arrivals = np.where(step_speed > ceiling)[0] + 1  # shift to arrival index
+
+    # construct a speed array aligned to samples
+    speed = np.r_[np.nan, step_speed]  # pad to length N
+    speed[bad_arrivals] = np.nan
+
+    # fill gaps
+    df['speed'] = pd.Series(speed, index=df.index).ffill().bfill()
+
+    return df
+
 
 def _process_monkey_information_after_retrieval(monkey_information, speed_threshold_for_distinct_stop=1):
     monkey_information.index = monkey_information.point_index.values
@@ -361,8 +400,11 @@ def add_monkey_angle_column(monkey_information, min_distance_to_calculate_angle=
 
 def add_monkey_speeddummy_column(monkey_information):
     if 'monkey_speeddummy' not in monkey_information.columns:
-        monkey_information['monkey_speeddummy'] = ((monkey_information['speed'] > 0.1) |
-                                                   (np.abs(monkey_information['ang_speed']) > 0.0035)).astype(int)
+        # monkey_information['monkey_speeddummy'] = ((monkey_information['speed'] > 0.1) |
+        #                                            (np.abs(monkey_information['ang_speed']) > 0.0035)).astype(int)
+
+        monkey_information['monkey_speeddummy'] = (monkey_information['speed'] > 0.1).astype(int)
+
     # if 'monkey_speed_smr' in monkey_information.columns:
     #     monkey_information['monkey_speeddummy_smr'] = ((monkey_information['monkey_speed_smr'] > 0.1) |
     #                                                    (np.abs(monkey_information['monkey_dw_smr']) > 0.0035)).astype(int)
@@ -488,56 +530,115 @@ def local_linear_velocity(time, x, y, window_s=0.040, min_pts=3, ridge=1e-8):
     speed = np.hypot(vx, vy)
     return vx, vy, speed
 
+import numpy as np
+import pandas as pd
+
+def _bad_arrival_mask_from_positions(t, x, y, v_max=200.0, overshoot_factor=1.5):
+    """
+    Build a boolean mask (length N) where True marks the *arrival* sample
+    of a too-fast step (teleport/boundary wrap).
+    """
+    dt = np.diff(t)
+    dist = np.hypot(np.diff(x), np.diff(y))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        step_speed = dist / dt  # length N-1
+    ceiling = v_max * overshoot_factor
+    bad_arrivals = np.where(step_speed > ceiling)[0] + 1  # shift to arrival index
+    mask = np.zeros(len(t), dtype=bool)
+    mask[bad_arrivals[bad_arrivals < len(t)]] = True
+    return mask
+
+import numpy as np
+import pandas as pd
+
+
+
 
 def compute_kinematics_loclin(df, time_col='time', x_col='monkey_x', y_col='monkey_y', theta_col='monkey_angle',
-                              window_s=0.040, use_theta='auto', min_pts=3, ridge=1e-8):
+                              window_s=0.040, use_theta='auto', min_pts=3, ridge=1e-8,
+                              v_max=200.0, overshoot_factor=1.5):
     out = df.copy()
-    t = out[time_col].to_numpy(dtype=float)
-    x = out[x_col].to_numpy(dtype=float)
-    y = out[y_col].to_numpy(dtype=float)
+    t = out[time_col].to_numpy(float)
+    x = out[x_col].to_numpy(float)
+    y = out[y_col].to_numpy(float)
 
-    # 1) velocity
-    vx, vy, speed = local_linear_velocity(
-        t, x, y, window_s=window_s, min_pts=min_pts, ridge=ridge)
-    out['vx'] = vx
-    out['vy'] = vy
-    out['speed'] = speed
+    # 0) detect bad steps + contaminated samples for this window size
+    bad_step_mask, contam_mask = build_bad_transition_masks(
+        t, x, y, v_max=v_max, overshoot_factor=overshoot_factor, window_s=window_s
+    )
 
-    # 2) tangential acceleration from (vx, vy)
-    dV = _local_linear_slopes_multi(t, np.column_stack(
-        (vx, vy)), window_s=window_s, min_pts=min_pts, ridge=ridge)
-    ax = dV[:, 0]
-    ay = dV[:, 1]
-    out['accel'] = (vx*ax + vy*ay) / np.maximum(speed, 1e-9)
+    # 1) velocity as before
+    vx, vy, speed = local_linear_velocity(t, x, y, window_s=window_s, min_pts=min_pts, ridge=ridge)
 
-    # 3) heading
+    # 1a) mask contaminated samples and inpaint speed
+    s = pd.Series(speed.astype(float))
+    s[contam_mask] = np.nan
+    s = s.ffill().bfill()  # simple inpainting
+    out['speed'] = s.to_numpy()
+    out['speed'] = np.clip(s, 0, 200)
+
+    # 2) accel from slope of the (cleaned) speed
+    a = _local_linear_slopes_multi(t, out['speed'].to_numpy().reshape(-1, 1),
+                                   window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
+    # 2a) also mask accel where contaminated (then interpolate softly)
+    a = pd.Series(a.astype(float))
+    a[contam_mask] = np.nan
+    a = a.interpolate(limit_direction='both')
+    out['accel'] = a.to_numpy()
+
+    # 3) heading & angular kinematics unchanged
     heading_from_v = np.arctan2(vy, vx)
-    heading_src = 'velocity'
-    if use_theta in ('auto', 'measured') and theta_col in out.columns:
-        theta = out[theta_col].to_numpy(dtype=float)
-        if np.isfinite(theta).any():
-            heading = np.unwrap(theta)
-            heading_src = 'measured'
-        else:
-            print(
-                f"{theta_col} is not in the dataframe. Using heading from velocity.")
-            heading = np.unwrap(heading_from_v)
-    elif use_theta == 'velocity':
-        heading = np.unwrap(heading_from_v)
+    if use_theta in ('auto', 'measured') and theta_col in out.columns and np.isfinite(out[theta_col]).any():
+        heading = np.unwrap(out[theta_col].to_numpy(float))
     else:
         heading = np.unwrap(heading_from_v)
 
-    # 4) angular kinematics
-    ang_speed = _local_linear_slopes_multi(
-        t, heading.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
-    ang_accel = _local_linear_slopes_multi(
-        t, ang_speed.reshape(-1, 1), window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
-
+    ang_speed = _local_linear_slopes_multi(t, heading.reshape(-1, 1),
+                                           window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
+    ang_accel = _local_linear_slopes_multi(t, ang_speed.reshape(-1, 1),
+                                           window_s=window_s, min_pts=min_pts, ridge=ridge)[:, 0]
     out['ang_speed'] = ang_speed
     out['ang_accel'] = ang_accel
 
-    out.drop(columns=['vx', 'vy'], inplace=True)
+    # diagnostics
+    out['_contam'] = contam_mask  # which samples touched a bad step
     return out
+
+
+
+import numpy as np
+import pandas as pd
+
+def build_bad_transition_masks(t, x, y, v_max=200.0, overshoot_factor=1.5, window_s=0.040):
+    """
+    Returns:
+      bad_step_mask: bool[N-1], True for transitions (i -> i+1) that are too fast
+      contam_mask:   bool[N],    True for samples whose local-linear window touches any bad step
+    """
+    t = np.asarray(t, float)
+    dt = np.diff(t)
+    dist = np.hypot(np.diff(np.asarray(x, float)), np.diff(np.asarray(y, float)))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        step_speed = dist / dt
+
+    ceiling = v_max * overshoot_factor
+    bad_step_mask = (dt <= 0) | (step_speed > ceiling)
+    bad_step_mask = np.nan_to_num(bad_step_mask, nan=True)
+
+    # center time of each step (i -> i+1)
+    step_center_time = 0.5 * (t[:-1] + t[1:])
+
+    # contaminate any sample within half-window of a bad step center
+    half_w = 0.5 * window_s
+    contam_mask = np.zeros(t.shape[0], dtype=bool)
+    bad_centers = step_center_time[bad_step_mask]
+    if bad_centers.size:
+        # vectorized: for each sample time, is it near ANY bad center?
+        # (broadcast compare: |t_i - bad_centers_j| <= half_w)
+        dists = np.abs(t[:, None] - bad_centers[None, :])
+        contam_mask = (dists <= half_w).any(axis=1)
+
+    return bad_step_mask, contam_mask
 
 
 def add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=1):
@@ -545,6 +646,8 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
     add_crossing_boundary_column(monkey_information)
     add_delta_distance_and_cum_distance_to_monkey_information(
         monkey_information)
+    monkey_information['dt'] = (
+        monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
     monkey_information = add_whether_new_distinct_stop_and_stop_id(
         monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
     monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
@@ -554,8 +657,6 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
     # ) - 1
     # monkey_information.loc[monkey_information['monkey_speeddummy']
     #                        == 1, 'stop_id'] = np.nan
-    monkey_information['dt'] = (
-        monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
     # add turning right column
     monkey_information['turning_right'] = 0
     monkey_information.loc[monkey_information['ang_speed']
@@ -564,72 +665,82 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
     return monkey_information
 
 
-
-
+import numpy as np
+import pandas as pd
 
 def add_whether_new_distinct_stop_and_stop_id(
     monkey_information: pd.DataFrame,
     speed_threshold_for_distinct_stop: float = 1.0,
     close_gap_seconds: float = 0.2,
-    min_stop_duration: float = 0.01,
+    min_stop_duration: float = 0.0,  # seconds
     initial_long_stop_threshold: float | None = 3.0,
     max_initial_long_stops: int = 5,
 ) -> pd.DataFrame:
     df = monkey_information.copy()
 
     # required columns
-    for col in ["time", "speed", "monkey_speeddummy"]:
+    for col in ['time', 'speed', 'monkey_speeddummy', 'dt']:
         if col not in df.columns:
             raise KeyError(f"Required column '{col}' not in dataframe")
 
-    t = df["time"].to_numpy()
-    speed = df["speed"].to_numpy()
-    is_stop = (df["monkey_speeddummy"].to_numpy() == 0)
+    t = df['time'].to_numpy()
+    dt = df['dt'].to_numpy()
+    speed = df['speed'].to_numpy()
+    is_stop = (df['monkey_speeddummy'].to_numpy() == 0)
 
     n = len(df)
-    df["stop_id"] = pd.array([pd.NA]*n, dtype="Int64")
-    df["whether_new_distinct_stop"] = False
-    df["stop_id_duration"] = np.nan
-    df["stop_id_start_time"] = np.nan
-    df["stop_id_end_time"] = np.nan
+    df['stop_id'] = pd.array([pd.NA]*n, dtype='Int64')
+    df['whether_new_distinct_stop'] = False
+    df['stop_id_duration'] = np.nan
+    df['stop_id_start_time'] = np.nan   # coverage start: t[i0] - dt[i0]
+    df['stop_id_end_time'] = np.nan     # coverage end:   t[i1]
 
     if n == 0 or not is_stop.any():
         return df
 
     s = is_stop.astype(np.int8)
     starts_mask = (s == 1) & (np.r_[0, s[:-1]] == 0)
-    ends_mask = (s == 1) & (np.r_[s[1:], 0] == 0)
+    ends_mask   = (s == 1) & (np.r_[s[1:], 0] == 0)
 
     start_idx = np.flatnonzero(starts_mask)
-    end_idx = np.flatnonzero(ends_mask)
+    end_idx   = np.flatnonzero(ends_mask)
     n_runs = min(len(start_idx), len(end_idx))
     if n_runs == 0:
         return df
     start_idx = start_idx[:n_runs]
-    end_idx = end_idx[:n_runs]
+    end_idx   = end_idx[:n_runs]
 
-    start_t = t[start_idx]
-    end_t = t[end_idx]
-    run_dur = end_t - start_t
+    # duration of a run is sum of dt over its rows (dt is for current point)
+    run_dur = np.array([np.nansum(dt[i0:i1+1]) for i0, i1 in zip(start_idx, end_idx)], dtype=float)
 
+    # filter by minimum duration
     keep = run_dur >= float(min_stop_duration)
     if not np.any(keep):
-        # no kept runs — nothing to paint
         return df
-    start_idx, end_idx = start_idx[keep], end_idx[keep]
-    start_t, end_t = start_t[keep], end_t[keep]
-    n_runs = len(start_idx)
+    start_idx = start_idx[keep]
+    end_idx   = end_idx[keep]
+    run_dur   = run_dur[keep]
+    n_runs    = len(start_idx)
 
-    # Merge rule
+    # merge rule with corrected gap semantics for trailing dt:
+    # - left run right edge: t[L]
+    # - right run left edge: t[R] - dt[R]
     if n_runs > 1:
-        fast = speed > speed_threshold_for_distinct_stop
-        cfast = np.cumsum(fast, dtype=np.int64)
+        fast = (speed > speed_threshold_for_distinct_stop)
+        cfast = np.cumsum(fast.astype(np.int64))
+
         L = end_idx[:-1]
         R = start_idx[1:]
-        Lm1 = np.maximum(L - 1, -1)
-        cL = np.where(Lm1 >= 0, cfast[Lm1], 0)
-        has_fast_sep = (cfast[R] - cL) > 0
-        gap_ok = (start_t[1:] - end_t[:-1]) > close_gap_seconds
+
+        # any fast sample strictly between runs: indices (L+1 .. R-1)
+        Rm1 = np.maximum(R - 1, -1)
+        count_in_range = np.where(Rm1 >= 0, cfast[Rm1], 0) - cfast[L]
+        has_fast_sep = count_in_range > 0
+
+        left_edge  = t[L]
+        right_edge = t[R] - dt[R]
+        gap_ok = (right_edge - left_edge) > float(close_gap_seconds)
+
         new_run_flag = has_fast_sep & gap_ok
     else:
         new_run_flag = np.array([], dtype=bool)
@@ -638,54 +749,60 @@ def add_whether_new_distinct_stop_and_stop_id(
     merged_ids = np.cumsum(run_starts_increment.astype(np.int64)) - 1  # 0..M-1
 
     df_runs = pd.DataFrame({
-        "run_start_idx": start_idx,
-        "run_end_idx": end_idx,
-        "merged_id": merged_ids
+        'run_start_idx': start_idx,
+        'run_end_idx': end_idx,
+        'run_dur': run_dur,
+        'merged_id': merged_ids
     })
-    merged_span = df_runs.groupby("merged_id", sort=True).agg(
-        merged_start_idx=("run_start_idx", "min"),
-        merged_end_idx=("run_end_idx", "max"),
+
+    merged_span = df_runs.groupby('merged_id', sort=True).agg(
+        merged_start_idx=('run_start_idx', 'min'),
+        merged_end_idx=('run_end_idx', 'max'),
     ).reset_index()
 
-    # turn idx -> time
-    merged_span["merged_start_time"] = t[merged_span["merged_start_idx"].to_numpy()]
-    merged_span["merged_end_time"] = t[merged_span["merged_end_idx"].to_numpy()]
-    merged_span["merged_duration"] = merged_span["merged_end_time"] - \
-        merged_span["merged_start_time"]
+    ms = merged_span['merged_start_idx'].to_numpy()
+    me = merged_span['merged_end_idx'].to_numpy()
 
-    # drop leading long merged-stops if requested
+    # coverage times under trailing-dt convention
+    merged_start_time = t[ms] - dt[ms]   # left edge of first included sample
+    merged_end_time   = t[me]            # right edge of last included sample
+    merged_duration   = np.array([np.nansum(dt[i0:i1+1]) for i0, i1 in zip(ms, me)], dtype=float)
+
+    merged_span['merged_start_time'] = merged_start_time
+    merged_span['merged_end_time'] = merged_end_time
+    merged_span['merged_duration'] = merged_duration
+
+    # optional: drop leading long merged-stops
     if initial_long_stop_threshold is not None and max_initial_long_stops > 0 and len(merged_span) > 0:
         cutoff = float(initial_long_stop_threshold)
         drop_ids = []
         for k in range(min(max_initial_long_stops, len(merged_span))):
-            if merged_span.loc[k, "merged_duration"] >= cutoff:
-                drop_ids.append(merged_span.loc[k, "merged_id"])
+            if float(merged_span.loc[k, 'merged_duration']) >= cutoff:
+                drop_ids.append(int(merged_span.loc[k, 'merged_id']))
             else:
                 break
         if drop_ids:
-            merged_span = merged_span[~merged_span["merged_id"].isin(
-                drop_ids)].reset_index(drop=True)
+            merged_span = merged_span[~merged_span['merged_id'].isin(drop_ids)].reset_index(drop=True)
 
     if merged_span.empty:
-        # everything filtered away
         return df
 
     # repaint
     for new_sid, row in enumerate(merged_span.itertuples(index=False)):
         i0 = int(row.merged_start_idx)
         i1 = int(row.merged_end_idx)
-        # guard against bad ranges
         if i1 < i0:
             continue
 
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id")] = new_sid
-        df.iloc[i0,       df.columns.get_loc(
-            "whether_new_distinct_stop")] = True
-        dur = float(row.merged_duration)
-        st = float(row.merged_start_time)
-        et = float(row.merged_end_time)
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_duration")] = dur
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_start_time")] = st
-        df.iloc[i0:i1+1, df.columns.get_loc("stop_id_end_time")] = et
+        df.iloc[i0:i1+1, df.columns.get_loc('stop_id')] = new_sid
+        df.iloc[i0,       df.columns.get_loc('whether_new_distinct_stop')] = True
+
+        dur_sec = float(row.merged_duration)
+        st = float(row.merged_start_time)   # t[i0] - dt[i0]
+        et = float(row.merged_end_time)     # t[i1]
+
+        df.iloc[i0:i1+1, df.columns.get_loc('stop_id_duration')] = dur_sec
+        df.iloc[i0:i1+1, df.columns.get_loc('stop_id_start_time')] = st
+        df.iloc[i0:i1+1, df.columns.get_loc('stop_id_end_time')] = et
 
     return df

@@ -101,6 +101,3 @@ for u in range(n_units):
     X_u = np.column_stack([X_common, H_u])
     names_u = X_names + H_names
 
-    # fit your Poisson GLM with offset (per unit)
-    # beta_u = fit_poisson_glm(X_u, y[:, u], offset=offset, reg='ridge', alpha=...)
-    # store metrics, coefficients, etc.

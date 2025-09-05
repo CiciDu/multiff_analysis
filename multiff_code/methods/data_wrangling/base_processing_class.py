@@ -266,11 +266,10 @@ class BaseProcessing:
             self.make_or_retrieve_monkey_information(
                 exists_ok=exists_ok, save_data=save_data, min_distance_to_calculate_angle=min_distance_to_calculate_angle, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
 
-        if (not already_made_ok) | (getattr(self, 'closest_stop_to_capture_df', None) is None):
+        if (not already_made_ok) | (getattr(self, 'closest_stop_to_capture_df', None) is None) | (getattr(self, 'ff_caught_T_new', None) is None):
             self.make_or_retrieve_closest_stop_to_capture_df()
-
-        if (not already_made_ok) | (getattr(self, 'ff_caught_T_new', None) is None):
             self.make_ff_caught_T_new()
+
 
     def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):
         self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3

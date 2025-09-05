@@ -30,11 +30,11 @@ def _align_meta_to_pos(meta, pos):
             meta['t_center'] = np.asarray(meta['stop_time'] + meta['rel_center'], float)
         else:
             raise ValueError('meta needs t_center, or both stop_time and rel_center to reconstruct it.')
-    meta_by_bin = meta.set_index('bin_idx_array').sort_index()
+    meta_by_bin = meta.set_index('bin').sort_index()
     m = meta_by_bin.loc[np.asarray(pos, int)].copy()
     return m, meta_by_bin
 
-def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured', 'rewarded', 'reward_size')):
+def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured')):
     required = {'stop_id', 'stop_time'}
     if not required.issubset(new_seg_info.columns):
         raise ValueError('new_seg_info must contain columns: stop_id, stop_time')
@@ -52,7 +52,7 @@ def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured', 
 
 def _join_per_stop_avoid_collisions(m, stop_tbl):
     per_stop = stop_tbl.set_index('stop_id')
-    cols_to_add = [c for c in per_stop.columns if c not in m.columns]  # avoid overwriting e.g. stop_time
+    cols_to_add = [c for c in per_stop.columns if c not in m.columns]  # avoid overwriting
     return m.join(per_stop[cols_to_add], on='stop_id')
 
 def _expand_cond_dummies(m, drop_first_cond=True):
@@ -73,17 +73,12 @@ def _compute_core_stop_features(m, meta_by_bin):
               m['stop_id'].map(kmax_per_stop).replace(0, np.nan)).astype(float).fillna(0.0).to_numpy()
     return rel_t, prepost, straddle, k_norm
 
-def _compute_history_base_vars(m, standardize_numeric=True):
+def _compute_history_base_vars(m):
     ts_prev = (m['t_center'] - m['prev_stop_time']).to_numpy(float)     # NaN for first stop
     ts_next = (m['next_stop_time'] - m['t_center']).to_numpy(float)     # NaN for last stop
-    if standardize_numeric:
-        ts_prev_f = _zscore_nan(ts_prev)
-        ts_next_f = _zscore_nan(ts_next)
-        duration_f = _zscore_nan(m['duration'].to_numpy(float)) if 'duration' in m.columns else np.zeros(len(m))
-    else:
-        ts_prev_f = np.nan_to_num(ts_prev, nan=0.0)
-        ts_next_f = np.nan_to_num(ts_next, nan=0.0)
-        duration_f = np.nan_to_num(m['duration'].to_numpy(float), nan=0.0) if 'duration' in m.columns else np.zeros(len(m))
+    ts_prev_f = np.nan_to_num(ts_prev, nan=0.0)
+    ts_next_f = np.nan_to_num(ts_next, nan=0.0)
+    duration_f = np.nan_to_num(m['duration'].to_numpy(float), nan=0.0) if 'duration' in m.columns else np.zeros(len(m))
     return ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f
 
 def _make_history_block(prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
@@ -126,13 +121,9 @@ def _make_history_block(prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
         raise ValueError('history_mode must be one of: single, gated, sumdiff')
     return blocks, names
 
-def _make_capture_reward_blocks(m, prepost):
+def _make_capture_block(m):
     captured = m['captured'].fillna(0).to_numpy(dtype=float) if 'captured' in m.columns else None
-    rewarded = m['rewarded'].fillna(0).to_numpy(dtype=float) if 'rewarded' in m.columns else None
-    reward_size_z = _zscore_nan(m['reward_size'].to_numpy(float)) if 'reward_size' in m.columns else None
-    rewarded_post = prepost * rewarded if rewarded is not None else None
-    reward_size_z_post = prepost * reward_size_z if reward_size_z is not None else None
-    return captured, rewarded_post, reward_size_z_post
+    return captured
 
 # ------------------------- main builder -------------------------------------
 
@@ -146,40 +137,36 @@ def build_stop_design_from_meta(
     rc_width: float = 0.10,
     add_interactions: bool = True,
     drop_first_cond: bool = True,
-    standardize_numeric: bool = True,
     history_mode: str = 'single',            # 'single' | 'gated' | 'sumdiff'
     history_choice: str = 'prev',            # used for 'single': 'prev'|'next'
     include_columns=(
         'prepost', 'duration_z', 'time_since_prev_stop_z', 'cond_dummies',
         # optional extras: 'straddle','k_norm','basis','prepost*speed',
-        # capture/reward: 'captured','basis*captured','rewarded_post','reward_size_z_post',
+        # capture: 'captured','basis*captured',
     )
 ):
     '''
     Build stop-aware predictors aligned to your fitted rows (pos).
 
-    Capture/Reward support (if present in new_seg_info):
+    Capture support (if present in new_seg_info):
       - 'captured'              : 0/1 main effect (all bins of that stop)
       - 'basis*captured'        : peri-stop shape differs if captured
-      - 'rewarded_post'         : 0/1 post-only effect of reward delivery
-      - 'reward_size_z_post'    : post-only graded reward size (z-scored)
     '''
-    # 1) align meta → m (rows == pos) and keep full meta_by_bin for per-stop ops
+    # 1) align meta → m
     m, meta_by_bin = _align_meta_to_pos(meta, pos)
 
-    # 2) per-stop table and safe join (avoid column collisions)
+    # 2) per-stop table
     stop_tbl = _build_per_stop_table(new_seg_info)
     m = _join_per_stop_avoid_collisions(m, stop_tbl)
 
     # 3) core stop features
     rel_t, prepost, straddle, k_norm = _compute_core_stop_features(m, meta_by_bin)
 
-    # 4) history base variables + optional duration
-    ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f = _compute_history_base_vars(
-        m, standardize_numeric=standardize_numeric
+    # 4) history vars
+    ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f = _compute_history_base_vars(m
     )
 
-    # 5) condition dummies (generic; if you have no cond column it’s a no-op)
+    # 5) condition dummies
     cond_mat, cond_cols = _expand_cond_dummies(m, drop_first_cond=drop_first_cond)
 
     # 6) basis over rel_t
@@ -188,8 +175,8 @@ def build_stop_design_from_meta(
     B = _make_rcos_basis(rel_t, centers=rc_centers, width=rc_width)
     B_names = [f'rcos_{c:+.2f}s' for c in rc_centers]
 
-    # 7) capture / reward primitives (and post-gated variants)
-    captured, rewarded_post, reward_size_z_post = _make_capture_reward_blocks(m, prepost)
+    # 7) capture primitives
+    captured = _make_capture_block(m)
 
     # 8) interactions prepared
     BxCaptured = None; BxCaptured_names = []
@@ -200,7 +187,6 @@ def build_stop_design_from_meta(
     # 9) assemble blocks
     blocks, names = [], []
 
-    # basic stop features
     if 'prepost' in include_columns:
         blocks.append(prepost[:, None]); names.append('prepost')
     if 'straddle' in include_columns:
@@ -216,16 +202,14 @@ def build_stop_design_from_meta(
     if add_interactions and 'prepost*speed' in include_columns:
         x_prepost_speed = (prepost * np.asarray(speed_used, float))[:, None]
         blocks.append(x_prepost_speed); names.append('prepost*speed')
-
-    # capture / reward
+    if add_interactions and 'prepost*captured' in include_columns:
+        x_prepost_captured = (prepost * np.asarray(captured, float))[:, None]
+        blocks.append(x_prepost_captured); names.append('prepost*captured')
+        
     if 'captured' in include_columns and captured is not None:
         blocks.append(captured[:, None]); names.append('captured')
     if 'basis*captured' in include_columns and BxCaptured is not None:
         blocks.append(BxCaptured); names += BxCaptured_names
-    if 'rewarded_post' in include_columns and rewarded_post is not None:
-        blocks.append(rewarded_post[:, None]); names.append('rewarded_post')
-    if 'reward_size_z_post' in include_columns and reward_size_z_post is not None:
-        blocks.append(reward_size_z_post[:, None]); names.append('reward_size_z_post')
 
     # history block
     H_blocks, H_names = _make_history_block(
@@ -245,5 +229,3 @@ def build_stop_design_from_meta(
     X_stop_df = pd.DataFrame(X_stop, columns=names, index=np.arange(len(X_stop)))
     
     return X_stop_df
-
-

@@ -354,7 +354,7 @@ def stops_windows_to_bins2d(picked_windows,
     order = np.argsort(np.asarray(meta['t_left'], dtype=float))
     bins_2d = bins_2d[order]
     meta = meta.iloc[order].reset_index(drop=True)
-    meta['bin_idx_array'] = np.arange(len(meta), dtype=int)
+    meta['bin'] = np.arange(len(meta), dtype=int)
 
     return bins_2d, meta
 

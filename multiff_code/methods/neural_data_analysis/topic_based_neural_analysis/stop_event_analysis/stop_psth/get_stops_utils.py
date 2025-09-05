@@ -13,8 +13,8 @@ def prepare_no_capture_and_captures(
     closest_stop_to_capture_df: pd.DataFrame,
     ff_caught_T_new: np.ndarray | pd.Series,
     *,
-    min_stop_duration: float = 0.01,
-    max_stop_duration: float = 1.0,
+    min_stop_duration: float = 0.0,
+    max_stop_duration = None,
     capture_match_window: float = 0.3,
     stop_debounce: float = 0.1,
     distance_thresh: float = 25.0,
@@ -68,9 +68,10 @@ def prepare_no_capture_and_captures(
         no_capture_stops_df["stop_id_duration"] >= min_stop_duration
     ].reset_index(drop=True)
 
-    no_capture_stops_df = no_capture_stops_df.loc[
-        no_capture_stops_df["stop_id_duration"] <= max_stop_duration
-    ].reset_index(drop=True)
+    if max_stop_duration is not None:
+        no_capture_stops_df = no_capture_stops_df.loc[
+            no_capture_stops_df["stop_id_duration"] <= max_stop_duration
+        ].reset_index(drop=True)
 
     # 4) Keep only “good” captures within spatial threshold
     valid_captures_df = captures_df.loc[

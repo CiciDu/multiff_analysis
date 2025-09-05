@@ -5,37 +5,6 @@ from sklearn.model_selection import GroupKFold
 from scipy.stats import poisson
 
 # ---------- helpers ----------
-def _resolve_X_df(X, feature_names, df_X):
-    if df_X is not None:
-        X_df = df_X.copy()
-    else:
-        X = np.asarray(X)
-        if feature_names is None:
-            raise ValueError('feature_names must be provided when X is not a DataFrame.')
-        X_df = pd.DataFrame(X, columns=list(feature_names))
-    # add intercept later in fit/predict
-    return X_df
-
-def _resolve_y_df(y, df_Y):
-    if df_Y is not None:
-        # Expect shape (n_samples, n_clusters) or (n_samples,)
-        if isinstance(df_Y, pd.Series):
-            Y_df = df_Y.to_frame()
-        else:
-            Y_df = df_Y.copy()
-        cluster_labels = list(Y_df.columns)
-    else:
-        y = np.asarray(y)
-        if y.ndim == 1:
-            Y_df = pd.DataFrame({'y': y})
-            cluster_labels = ['y']
-        elif y.ndim == 2:
-            # name clusters 0..C-1
-            cluster_labels = [str(j) for j in range(y.shape[1])]
-            Y_df = pd.DataFrame(y, columns=cluster_labels)
-        else:
-            raise ValueError('y must be 1D or 2D.')
-    return Y_df, cluster_labels
 
 def _resolve_offset(offset_log, n_rows):
     if isinstance(offset_log, (pd.Series, pd.DataFrame)):
@@ -48,37 +17,13 @@ def _resolve_offset(offset_log, n_rows):
         raise ValueError('offset_log contains non-finite values.')
     return off
 
-# ---------- core ----------
-def fit_poisson_glm(X=None, y=None, offset_log=None, feature_names=None, df_X=None):
-    """
-    Fit a Poisson GLM with log link and an offset. Accepts either:
-      - arrays X (n x p), y (n,), feature_names; or
-      - df_X (DataFrame, n x p) and y (array-like or Series) of length n.
-    Returns a statsmodels results object.
-    """
-    X_df = _resolve_X_df(X, feature_names, df_X)
-    if isinstance(y, pd.Series):
-        y_vec = y.to_numpy()
-    else:
-        y_vec = np.asarray(y).reshape(-1)
-    if X_df.shape[0] != y_vec.shape[0]:
-        raise ValueError('X and y have different numbers of rows.')
-
-    offset = _resolve_offset(offset_log, X_df.shape[0])
-
-    # add intercept
-    X_df_const = sm.add_constant(X_df, has_constant='add')
-
-    model = sm.GLM(y_vec, X_df_const, family=sm.families.Poisson(), offset=offset)
-    return model.fit(method='newton', maxiter=100, disp=False)
 
 def ll_poisson(y, mu):
     # exact log-likelihood (includes log(y!))
     return poisson(mu).logpmf(y).sum()
 
 def cv_score_per_cluster(
-    X=None, y=None, offset_log=None, groups=None, feature_names=None, n_splits=5,
-    df_X=None, df_Y=None
+    df_X, df_Y, offset_log, groups=None, n_splits=5,
 ):
     """
     Cross-validated metrics per cluster. You can pass:
@@ -88,13 +33,12 @@ def cv_score_per_cluster(
     Returns a DataFrame with columns: cluster, ll_test, ll_test_null, mcfadden_R2_cv
     """
     # resolve X and Y as DataFrames
-    X_df = _resolve_X_df(X, feature_names, df_X)
-    Y_df, cluster_labels = _resolve_y_df(y, df_Y)
+    cluster_labels = df_Y.columns
 
-    if X_df.shape[0] != Y_df.shape[0]:
+    if df_X.shape[0] != df_Y.shape[0]:
         raise ValueError('X and Y have different numbers of rows.')
 
-    n = X_df.shape[0]
+    n = df_X.shape[0]
     if groups is None:
         raise ValueError('groups (length n) is required for GroupKFold.')
     groups = np.asarray(groups).reshape(-1)
@@ -110,24 +54,23 @@ def cv_score_per_cluster(
     for j, clabel in enumerate(cluster_labels):
         ll_test, ll_test_null = [], []
 
-        for train_idx, test_idx in gkf.split(X_df, groups=groups):
-            Xt, Xv = X_df.iloc[train_idx], X_df.iloc[test_idx]
-            yt, yv = Y_df.iloc[train_idx, j].to_numpy(), Y_df.iloc[test_idx, j].to_numpy()
+        for train_idx, test_idx in gkf.split(df_X, groups=groups):
+            Xt, Xv = df_X.iloc[train_idx], df_X.iloc[test_idx]
+            yt, yv = df_Y.iloc[train_idx, j].to_numpy(), df_Y.iloc[test_idx, j].to_numpy()
             ot, ov = offset.iloc[train_idx], offset.iloc[test_idx]
 
             # Full model
-            Xt_c = sm.add_constant(Xt, has_constant='add')
-            model = sm.GLM(yt, Xt_c, family=sm.families.Poisson(), offset=ot)
+            model = sm.GLM(yt, Xt, family=sm.families.Poisson(), offset=ot)
             res = model.fit(method='newton', maxiter=100, disp=False)
 
-            Xv_c = sm.add_constant(Xv, has_constant='add')
-            mu_v = res.predict(Xv_c, offset=ov)
+            mu_v = res.predict(Xv, offset=ov)
 
             # Null model: intercept + offset only
             ones_train = pd.DataFrame(index=Xt.index)  # empty -> const only after add_constant
             ones_test  = pd.DataFrame(index=Xv.index)
             ones_train_c = sm.add_constant(ones_train, has_constant='add')
             ones_test_c  = sm.add_constant(ones_test,  has_constant='add')
+
 
             model0 = sm.GLM(yt, ones_train_c, family=sm.families.Poisson(), offset=ot)
             res0 = model0.fit(method='newton', maxiter=100, disp=False)
@@ -149,35 +92,6 @@ def cv_score_per_cluster(
         })
 
     return pd.DataFrame(scores)
-
-
-def glm_mini_report_batch(
-    binned_feats: pd.DataFrame,
-    binned_spikes: pd.DataFrame,
-    groups,
-    n_splits: int = 5,
-    offset_col: str = 'offset_log',
-):
-    """
-    Batch mini report over MANY units with CV — wrapper to match the old API feel.
-    - binned_feats: DataFrame with predictors + 'offset_log'
-    - binned_spikes: DataFrame of counts (n_bins x n_units)
-    - groups: array-like group labels (e.g., window/session IDs) for GroupKFold
-    Returns: DataFrame with per-unit CV log-likelihoods and McFadden's R^2.
-    """
-    if offset_col not in binned_feats.columns:
-        raise ValueError(f'Offset column {offset_col!r} not found in binned_feats.')
-    df_X = binned_feats.drop(columns=[offset_col])
-    offset_log = binned_feats[offset_col]
-
-    scores = cv_score_per_cluster(
-        df_X=df_X,
-        df_Y=binned_spikes,
-        offset_log=offset_log,
-        groups=groups,
-        n_splits=n_splits
-    )
-    return scores
 
 
 # ---------- optional plotting helpers (headless-safe) ----------
@@ -202,27 +116,51 @@ def plot_cv_scores(scores: pd.DataFrame, outpath: str = 'glm_cv_scores.png', tit
     # plt.close()
     return outpath
 
-def plot_pred_vs_obs(res, df_X: pd.DataFrame, y: pd.Series, offset_log: pd.Series,
-                     outpath: str = 'glm_pred_vs_obs.png', title: str | None = None):
-    """
-    Diagnostic: predicted vs observed counts for the provided (X, y, offset).
-    """
-    Xc = sm.add_constant(df_X, has_constant='add')
-    mu = res.predict(Xc, offset=offset_log)
-    title = title or 'Predicted vs observed (counts)'
 
-    plt.figure(figsize=(5, 4))
-    plt.scatter(mu, y, s=10, alpha=0.6)
-    lim = [0, max(1.0, np.max([mu.max(), y.max()]))]
-    plt.plot(lim, lim)  # y=x
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
+def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
+    # 1) Make a copy and ensure we have a constant column
+    exog = df_X.copy()
+
+    # 2) Align columns to what the model saw during fit (order + presence)
+    train_cols = res.model.exog_names  # includes 'const' if used
+    # If any training columns are missing now, fill with 0.0
+    exog = exog.reindex(columns=train_cols, fill_value=0.0)
+
+    # 3) Align index with offset and y to avoid misalignment
+    if hasattr(offset_log, 'index') and hasattr(exog, 'index'):
+        common = exog.index.intersection(getattr(offset_log, 'index', exog.index))
+        if hasattr(y, 'index'):
+            common = common.intersection(y.index)
+        exog = exog.loc[common]
+        y_use = y.loc[common] if hasattr(y, 'loc') else np.asarray(y)[common]
+        off_use = offset_log.loc[common] if hasattr(offset_log, 'loc') else np.asarray(offset_log)[common]
+    else:
+        y_use = np.asarray(y)
+        off_use = np.asarray(offset_log)
+
+    # 4) Predict
+    mu = np.asarray(res.predict(exog, offset=off_use), float)
+
+    # 5) Robust plotting (drop non-finite)
+    y_arr = np.asarray(y_use, float)
+    m = np.isfinite(mu) & np.isfinite(y_arr)
+    if not m.any():
+        raise ValueError('No finite points to plot after prediction.')
+
+    mu_f = mu[m]; y_f = y_arr[m]
+    lim_max = max(1.0, float(np.nanmax([mu_f.max(), y_f.max()])))
+    lim = (0.0, lim_max)
+
+    plt.figure(figsize=(5,5))
+    plt.plot(mu_f, y_f, '.', alpha=0.5, markersize=4)
+    plt.plot(lim, lim, lw=1)
     plt.xlim(lim); plt.ylim(lim)
-    plt.xlabel('Predicted mean (μ)')
-    plt.ylabel('Observed count')
-    plt.title(title)
-    plt.tight_layout()
+    plt.xlabel('Predicted mean (μ)'); plt.ylabel('Observed count')
+    if title: plt.title(title)
+    if outpath: plt.savefig(outpath, bbox_inches='tight', dpi=150)
     plt.show()
-    # plt.savefig(outpath, dpi=200)
-    # plt.close()
-    return outpath
-
-
