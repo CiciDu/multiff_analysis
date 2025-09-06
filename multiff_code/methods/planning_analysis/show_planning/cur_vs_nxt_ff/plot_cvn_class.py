@@ -29,7 +29,6 @@ class _PlotCurVsNxtFF(plotly_plot_class.PlotlyPlotter, matplotlib_plot_class.Mat
         plot_monkey_heading_helper_class.PlotMonkeyHeadingHelper.find_all_mheading_for_counted_points(
             self)
 
-
     def compare_test_and_control_in_polar_plots(self, max_instances_each=10, test_color='green', ctrl_color='purple',
                                                 start='stop_point_index', end='next_stop_point_index', rmax=400):
 
@@ -103,4 +102,4 @@ class _PlotCurVsNxtFF(plotly_plot_class.PlotlyPlotter, matplotlib_plot_class.Mat
                 ),
             )
         )
-        fig.show()
+        plt.show()

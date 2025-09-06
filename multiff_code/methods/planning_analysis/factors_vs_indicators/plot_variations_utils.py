@@ -124,11 +124,11 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                 # hide x axis title
                 fig.update_xaxes(title_text='', row=row_number, col=col_number)
             else:
-                fig.show()
+                plt.show()
 
     if use_subplots_based_on_changeable_variables:
         fig.update_layout(height=600 * first_dim, width=675 * second_dim)
-        fig.show()
+        plt.show()
 
     return fig
 
@@ -441,7 +441,6 @@ def plot_markers_for_data_comparison(fig,
         # CI ribbon per series (if available)
         if {'se_lower', 'se_upper'}.issubset(d.columns):
             if use_ribbons_to_replace_error_bars:
-                
 
                 d = d.sort_values('x_value_numeric_with_offset')
                 if len(d) == 1:
@@ -487,7 +486,7 @@ def plot_markers_for_data_comparison(fig,
                             hoverinfo='skip',
                         ),
                         row=row_number, col=col_number
-                    )                
+                    )
 
         fig.add_trace(
             go.Scatter(
@@ -651,8 +650,6 @@ def _compare_y1_and_y2_in_overall_regrouped_info(sub_df, x, y1, y2, title=''):
     return
 
 
-
-
 def plot_coeff(df, column_to_split_grouped_bars='test_or_control', fixed_variable_values_to_use={},
                max_num_plots=1):
 
@@ -667,8 +664,6 @@ def plot_coeff(df, column_to_split_grouped_bars='test_or_control', fixed_variabl
                 df, column=column_to_split_grouped_bars)
             plot_counter += 1
     return
-
-
 
 
 def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
@@ -715,7 +710,6 @@ def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
     sub_df = _add_x_value_numeric_to_sub_df(
         sub_df, x_var_column, x_labels_to_values_map, x_offset)
 
-
     # ===== Single-category path: render grouped BARs with CI =====
     # ===== Single-category path: render grouped BARs with CI =====
     if sub_df['x_value_numeric'].nunique() == 1:
@@ -740,7 +734,8 @@ def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
         if {'se_lower', 'se_upper'}.issubset(d.columns):
             d['_ci'] = (d['se_upper'] - d[y_var_column]).abs().clip(lower=0)
         else:
-            se_col = next((c for c in [f"{y_var_column}_se", "se", "stderr", "std_error"] if c in d.columns), None)
+            se_col = next((c for c in [
+                          f"{y_var_column}_se", "se", "stderr", "std_error"] if c in d.columns), None)
             d['_ci'] = 1.96 * d[se_col] if se_col is not None else np.nan
 
         # sample sizes if available (used in hover)
@@ -798,19 +793,20 @@ def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
                 font=dict(size=15)
             )
         )
-        
+
         # Auto y-limits with a little margin
-        y_min = max(float(d[y_var_column].min() - d['_ci'].max()*10 if d['_ci'].notna().any() else d[y_var_column].min()), 0)
-        y_max = float(d[y_var_column].max() + d['_ci'].max()*1.2 if d['_ci'].notna().any() else d[y_var_column].max())
+        y_min = max(float(d[y_var_column].min() - d['_ci'].max() *
+                    10 if d['_ci'].notna().any() else d[y_var_column].min()), 0)
+        y_max = float(d[y_var_column].max() + d['_ci'].max() *
+                      1.2 if d['_ci'].notna().any() else d[y_var_column].max())
 
         fig.update_yaxes(range=[y_min, y_max])
-
 
         if title is None:
             single_x_label = next(iter(x_labels_to_values_map.keys()), "")
             title = f"{y_var_column} (bar ± 95% CI) — {x_var_column}: {single_x_label}"
         fig.update_layout(title=title)
-        
+
         fig.update_layout(showlegend=False)
 
         return fig

@@ -421,7 +421,7 @@ def _plot_relationship_in_plotly(x_array, y_array, slope=None, show_plot=True,
             fig, x_array, y_array, current_position_index_to_mark)
 
     if show_plot:
-        fig.show()
+        plt.show()
     return fig
 
 

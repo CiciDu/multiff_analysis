@@ -193,7 +193,7 @@ def plot_grid_search(clf):
                       #              font=dict(size=14), automargin=True, yref='paper'),
                       hovermode='closest',
                       template='none')
-    fig.show()
+    plt.show()
 
 
 def table_grid_search(clf, all_columns=False, all_ranks=False, save=True):

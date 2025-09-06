@@ -112,4 +112,4 @@ class CompareTwoMonkeys():
         fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
         # increase y lim a little bit to make sure no text is blocked
         fig.update_yaxes(range=[0, max(self.success_rate_df['value']) + 0.1])
-        fig.show()
+        plt.show()

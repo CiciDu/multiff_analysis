@@ -21,7 +21,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         # only meaningful when show_alive_fireflies is False
         "show_in_memory_fireflies": False,
         "show_visible_segments": True,
-        "hide_non_essential_visible_segments": True, # if True, then only the current and next ff's visible segments will be shown
+        # if True, then only the current and next ff's visible segments will be shown
+        "hide_non_essential_visible_segments": True,
         "show_all_eye_positions": False,
         "show_current_eye_positions": True,
         "show_eye_positions_for_both_eyes": False,
@@ -48,7 +49,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         "show_nxt_ff": False,
         "plot_arena_edge": True,
     }
-
 
     def make_one_monkey_plotly_plot(self,
                                     monkey_plot_params={}):
@@ -84,15 +84,16 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                                                                                                   unique_ff_indices=None,
                                                                                                   varying_colors=varying_colors,
                                                                                                   hide_non_essential_visible_segment=self.monkey_plot_params['hide_non_essential_visible_segments'])
-                                                                                                  
 
         if self.monkey_plot_params['show_reward_boundary']:
             self.fig = plotly_for_monkey.plot_reward_boundary_in_plotly(
                 self.fig, self.current_plotly_key_comp['ff_df'])
 
         self.fig = plotly_for_monkey.plot_trajectory_data(self.fig, self.current_plotly_key_comp['trajectory_df'],
-                                                          hoverdata_multi_columns=self.monkey_plot_params['hoverdata_multi_columns'],
-                                                          show_color_as_time=self.monkey_plot_params['show_all_eye_positions'],
+                                                          hoverdata_multi_columns=self.monkey_plot_params[
+                                                              'hoverdata_multi_columns'],
+                                                          show_color_as_time=self.monkey_plot_params[
+                                                              'show_all_eye_positions'],
                                                           show_traj_color_as_speed=self.monkey_plot_params['show_traj_color_as_speed'])
 
         if self.monkey_plot_params['show_traj_portion']:
@@ -103,7 +104,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
             self.fig = plotly_for_monkey.plot_eye_positions_in_plotly(self.fig, self.current_plotly_key_comp,
                                                                       show_eye_positions_for_both_eyes=self.monkey_plot_params[
                                                                           'show_eye_positions_for_both_eyes'],
-                                                                      trace_name=self.monkey_plot_params['eye_positions_trace_name'],
+                                                                      trace_name=self.monkey_plot_params[
+                                                                          'eye_positions_trace_name'],
                                                                       use_arrow_to_show_eye_positions=self.monkey_plot_params['use_arrow_to_show_eye_positions'])
 
         if self.monkey_plot_params['show_cur_ff']:
@@ -112,7 +114,8 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         if self.monkey_plot_params['show_nxt_ff']:
             self._show_nxt_ff()
 
-        self._update_show_stop_point_indices(self.current_plotly_key_comp['trajectory_df'])
+        self._update_show_stop_point_indices(
+            self.current_plotly_key_comp['trajectory_df'])
 
         if self.monkey_plot_params['show_stops'] & (self.monkey_plot_params['show_stop_point_indices'] is not None):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), self.monkey_plot_params['show_stop_point_indices'],
@@ -121,7 +124,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         if self.monkey_plot_params['show_cur_and_nxt_stops'] & (self.monkey_plot_params['show_cur_and_nxt_stops_indices'] is not None):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), self.monkey_plot_params['show_cur_and_nxt_stops_indices'],
                                                               hoverdata_multi_columns=self.monkey_plot_params['hoverdata_multi_columns'], name='cur_and_nxt_stops', color='red')
-
 
         if self.monkey_plot_params['show_capture_stops'] & (self.monkey_plot_params['show_capture_stops_indices'] is not None):
             self.fig = plotly_for_monkey.plot_stops_in_plotly(self.fig, self.current_plotly_key_comp['trajectory_df'].copy(), self.monkey_plot_params['show_capture_stops_indices'],
@@ -162,8 +164,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                 plot_counter_i=i)
 
             if show_fig is True:
-                self.fig.show()
-
+                self.plt.show()
 
     def plot_cvn_in_plotly_func(self,
                                 monkey_plot_params={},
@@ -204,7 +205,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
 
         return self.current_plotly_key_comp, self.fig
 
-
     def _update_show_stop_point_indices(self, trajectory_df):
         """
         Update stop indices to visualize:
@@ -217,8 +217,10 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         - self.stops_near_ff_row has attributes stop_point_index, next_stop_point_index (when used)
         """
         show_stops = bool(self.monkey_plot_params.get('show_stops', False))
-        show_capture = bool(self.monkey_plot_params.get('show_cur_and_nxt_stops', False))
-        show_capture_stops = bool(self.monkey_plot_params.get('show_capture_stops', False))
+        show_capture = bool(self.monkey_plot_params.get(
+            'show_cur_and_nxt_stops', False))
+        show_capture_stops = bool(
+            self.monkey_plot_params.get('show_capture_stops', False))
 
         # Defaults
         stop_indices = None
@@ -247,7 +249,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                 .astype(int)
                 .to_numpy()
             )
-            
+
         if show_capture_stops:
             capture_df = self.closest_stop_to_capture_df
             capture_stop_indices = capture_df[capture_df['time'].between(
@@ -262,12 +264,11 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         self.monkey_plot_params['show_cur_and_nxt_stops_indices'] = cur_and_nxt_stop_indices
         self.monkey_plot_params['show_capture_stops_indices'] = capture_stop_indices
 
-
     def _show_null_arcs_for_cur_and_nxt_ff_in_plotly(self):
         rotation_matrix = self.current_plotly_key_comp['rotation_matrix']
         self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.nxt_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
                                                                  color=self.nxt_ff_color, trace_name='nxt null arc', linewidth=3.3, opacity=0.8)
-        self._show_null_arc_to_cur_ff_in_plotly()                                                         
+        self._show_null_arc_to_cur_ff_in_plotly()
         return self.fig
 
     def _show_null_arc_to_cur_ff_in_plotly(self):
@@ -275,7 +276,6 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
         self.fig = plotly_for_null_arcs.plot_null_arcs_in_plotly(self.fig, self.cur_null_arc_info_for_the_point, rotation_matrix=rotation_matrix,
                                                                  color=self.cur_ff_color, trace_name='cur null arc', linewidth=2.8, opacity=0.8)
         return self.fig
-
 
     def _show_cur_ff(self):
         self.cur_ff_index = self.stops_near_ff_row.cur_ff_index

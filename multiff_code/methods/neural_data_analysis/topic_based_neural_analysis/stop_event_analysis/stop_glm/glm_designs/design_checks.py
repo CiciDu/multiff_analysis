@@ -103,3 +103,41 @@ def suggest_columns_to_drop(df, corr_thresh=0.98, vif_thresh=30.0):
         df_work = df_work.drop(columns=[worst])
 
     return drops
+
+
+def check_design(binned_feats_sc):
+    # 0) quick sanity: NaN/inf
+    bad_any = ~np.isfinite(binned_feats_sc.to_numpy(dtype=float)).all()
+    print('NaN/inf present?', bad_any)
+
+    # 1) near-constant columns
+    near_const_cols, variances = check_near_constant(binned_feats_sc, tol=1e-12)
+    print('Near-constant:', near_const_cols)
+
+    # 2) duplicates
+    dups = find_duplicate_columns(binned_feats_sc)
+    print('Duplicate column groups:', dups)
+
+    # 3) correlation spikes
+    hits, corr = pairwise_high_corr(binned_feats_sc, thresh=0.98)
+    print('High-corr pairs (|r| >= 0.98):', hits)
+
+    # 4) condition number
+    kappa, svals = condition_number(binned_feats_sc)
+    print('Condition number:', kappa)
+
+    # 5) rank deficiency
+    rank, p, is_deficient = rank_deficiency(binned_feats_sc)
+    print(f'rank={rank} of {p} columns; deficient? {is_deficient}')
+
+    # 6) VIF
+    vif_report = compute_vif(binned_feats_sc)
+    print(vif_report.head(10))
+
+    # 7) Suggested columns to drop
+    to_drop = suggest_columns_to_drop(binned_feats_sc, corr_thresh=0.98, vif_thresh=30.0)
+    print('Suggested drops (order matters):', to_drop)
+
+    # Optional: apply the drop list
+    X_pruned = binned_feats_sc.drop(columns=to_drop, errors='ignore')
+    return X_pruned

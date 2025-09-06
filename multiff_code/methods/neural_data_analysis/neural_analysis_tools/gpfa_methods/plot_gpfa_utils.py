@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -199,15 +200,6 @@ def plot_gpfa_traj_3d_uniform_color(trajectories,
     plt.show()
     return fig, ax
 
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
-from matplotlib.colors import Normalize
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
-import random
 
 def _set_equal_aspect_3d(ax, X, Y, Z):
     # Equal aspect box around data
@@ -222,10 +214,9 @@ def _set_equal_aspect_3d(ax, X, Y, Z):
     ax.set_ylim(y_mid - max_range/2, y_mid + max_range/2)
     ax.set_zlim(z_mid - max_range/2, z_mid + max_range/2)
     try:
-        ax.set_box_aspect([1,1,1])
+        ax.set_box_aspect([1, 1, 1])
     except Exception:
         pass
-
 
 
 def plot_gpfa_traj_3d_plotly(trajectories,
@@ -288,16 +279,9 @@ def plot_gpfa_traj_3d_plotly(trajectories,
         margin=dict(l=0, r=0, b=0, t=40)
     )
 
-    fig.show()
+    plt.show()
     return fig
 
-
-
-
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 def plot_gpfa_traj_3d_timecolored_average(
     trajectories,
@@ -325,9 +309,11 @@ def plot_gpfa_traj_3d_timecolored_average(
     for tr in trajectories:
         arr = np.asarray(tr, dtype=float)
         if arr.ndim != 2:
-            raise ValueError(f"Each trajectory must be 2D (dims x time); got {arr.shape}.")
+            raise ValueError(
+                f"Each trajectory must be 2D (dims x time); got {arr.shape}.")
         if arr.shape[0] < 3:
-            raise ValueError(f"Trajectory must have at least 3 dims; got {arr.shape[0]}.")
+            raise ValueError(
+                f"Trajectory must have at least 3 dims; got {arr.shape[0]}.")
         trajs.append(arr[:3])  # take first 3 dims
 
     if len(trajs) == 0:
@@ -361,7 +347,8 @@ def plot_gpfa_traj_3d_timecolored_average(
     segs = np.stack([pts[:-1], pts[1:]], axis=1)   # (max_T-1, 2, 3)
     t = np.linspace(0.0, 1.0, max_T)
 
-    lc = Line3DCollection(segs, cmap=cmap_average, norm=Normalize(vmin=0.0, vmax=1.0))
+    lc = Line3DCollection(segs, cmap=cmap_average,
+                          norm=Normalize(vmin=0.0, vmax=1.0))
     lc.set_array(t[:-1])
     lc.set_linewidth(linewidth_trial_average)
     ax.add_collection3d(lc)
@@ -376,10 +363,11 @@ def plot_gpfa_traj_3d_timecolored_average(
         cb.set_label('time (normalized)')
 
     # Axis limits
-    all_xyz = np.concatenate([tr.transpose(1,0) for tr in trajs] + [pts], axis=0)
-    ax.set_xlim(np.nanmin(all_xyz[:,0]), np.nanmax(all_xyz[:,0]))
-    ax.set_ylim(np.nanmin(all_xyz[:,1]), np.nanmax(all_xyz[:,1]))
-    ax.set_zlim(np.nanmin(all_xyz[:,2]), np.nanmax(all_xyz[:,2]))
+    all_xyz = np.concatenate([tr.transpose(1, 0)
+                             for tr in trajs] + [pts], axis=0)
+    ax.set_xlim(np.nanmin(all_xyz[:, 0]), np.nanmax(all_xyz[:, 0]))
+    ax.set_ylim(np.nanmin(all_xyz[:, 1]), np.nanmax(all_xyz[:, 1]))
+    ax.set_zlim(np.nanmin(all_xyz[:, 2]), np.nanmax(all_xyz[:, 2]))
 
     if start_end_markers:
         ax.legend(loc='best')
@@ -388,12 +376,3 @@ def plot_gpfa_traj_3d_timecolored_average(
     plt.tight_layout()
     plt.show()
     return fig, ax
-
-
-
-
-
-
-
-
-

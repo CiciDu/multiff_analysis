@@ -135,3 +135,159 @@ def plot_spaghetti_per_stop(
     ax.grid(True, alpha=0.25)
     plt.tight_layout()
     return fig, ax, lines_plotted
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+def plot_observed_vs_predicted_stop(
+    binned_feats_sc: pd.DataFrame,
+    binned_spikes: pd.DataFrame,
+    meta_used: pd.DataFrame,
+    offset_log,                        # 1D np.ndarray or pd.Series aligned to rows
+    model_res,                         # statsmodels GLMResults(_wrapper) for THIS cluster
+    cluster_idx: int | str,            # column label or positional index in binned_spikes
+    stop_id: int,
+    *,
+    time_col: str = 'rel_center',
+    exposure_s: pd.Series | np.ndarray | None = None,  # if None, derived from offset_log
+    sort_by_time: bool = True,
+    title_prefix: str = 'Observed vs Predicted',
+    ax: plt.Axes | None = None,
+):
+    """
+    Plot observed vs predicted firing rate (Hz) for one cluster and one stop,
+    correctly handling variable per-bin exposure.
+
+    Assumptions
+    ----------
+    - Poisson GLM with log link.
+    - If exposure_s is None, offset_log = log(exposure_s).
+
+    Parameters
+    ----------
+    binned_feats_sc : DataFrame
+        The exact feature matrix used to FIT the model (same scaling & columns).
+    binned_spikes : DataFrame
+        Shape (n_bins, n_clusters), integer spike counts per bin.
+    meta_used : DataFrame
+        Must include 'stop_id' and the time_col (e.g., 'rel_time').
+    offset_log : 1D array-like
+        Log-exposure aligned 1:1 with rows of binned_feats_sc/meta_used.
+    model_res : GLMResults
+        Fitted GLM for this cluster.
+    cluster_idx : int | str
+        Column index or column name in binned_spikes for the neuron.
+    stop_id : int
+        Stop/segment to visualize.
+    time_col : str
+        Column in meta_used for the x-axis time (relative to stop).
+    exposure_s : array-like | None
+        Per-bin exposure in seconds. If None, uses exp(offset_log).
+    sort_by_time : bool
+        If True, sort by time before plotting (cleaner lines).
+    title_prefix : str
+        Title prefix for the plot.
+    ax : matplotlib.axes.Axes | None
+        If provided, draw into this axes; otherwise create a new figure.
+
+    Returns
+    -------
+    tidy : DataFrame
+        Columns: ['time_s', 'obs_hz', 'pred_hz', 'exposure_s', 'cluster', 'stop_id'].
+    """
+    n = len(meta_used)
+    if binned_feats_sc.shape[0] != n or binned_spikes.shape[0] != n:
+        raise ValueError('Row counts must match across features, spikes, and meta.')
+
+    if 'stop_id' not in meta_used.columns:
+        raise ValueError('meta_used must contain a "stop_id" column.')
+    if time_col not in meta_used.columns:
+        raise ValueError(f'meta_used must contain "{time_col}".')
+
+    offset_log = np.asarray(offset_log).reshape(-1)
+    if offset_log.shape[0] != n:
+        raise ValueError('offset_log length must match rows of meta_used.')
+
+    if exposure_s is not None:
+        exposure_s = np.asarray(exposure_s).reshape(-1)
+        if exposure_s.shape[0] != n:
+            raise ValueError('exposure_s length must match rows of meta_used.')
+
+    # --- mask rows for this stop
+    mask = (meta_used['stop_id'].to_numpy() == stop_id)
+    if not np.any(mask):
+        raise ValueError(f'No rows found for stop_id={stop_id}.')
+
+    # --- slice aligned views
+    X_stop_full = binned_feats_sc.loc[mask]
+    if isinstance(cluster_idx, (int, np.integer)):
+        y_counts = binned_spikes.loc[mask].iloc[:, int(cluster_idx)]
+        cluster_label = binned_spikes.columns[int(cluster_idx)]
+    else:
+        y_counts = binned_spikes.loc[mask, cluster_idx]
+        cluster_label = cluster_idx
+    off_stop = offset_log[mask]
+
+    # --- resolve exposure (seconds) per bin
+    if exposure_s is None:
+        exp_s = np.exp(off_stop)
+    else:
+        exp_s = exposure_s[mask]
+
+    # --- guard against invalid exposure and keep all arrays aligned
+    good = np.isfinite(exp_s) & (exp_s > 0)
+    if not good.all():
+        X_stop_full = X_stop_full.loc[good]
+        y_counts = y_counts.loc[good]
+        off_stop = off_stop[good]
+        exp_s = exp_s[good]
+
+
+    # --- predictions: expected COUNTS per bin
+    pred_counts = model_res.predict(X_stop_full, offset=off_stop)
+
+    # --- convert to Hz using per-bin exposure
+    obs_rate_hz = y_counts.to_numpy() / exp_s
+    pred_rate_hz = pred_counts.to_numpy() / exp_s
+
+    # --- time axis (apply same "good" filter, then optional sort)
+    t = meta_used.loc[mask, time_col].to_numpy()
+    t = t[good]
+
+    if sort_by_time:
+        order = np.argsort(t)
+        t = t[order]
+        obs_rate_hz = obs_rate_hz[order]
+        pred_rate_hz = pred_rate_hz[order]
+        exp_s_plot = exp_s[order]
+    else:
+        exp_s_plot = exp_s
+
+    # --- plot
+    if ax is None:
+        _, ax = plt.subplots(figsize=(7.5, 4.2))
+    ax.plot(t, obs_rate_hz, 'o-', label='Observed (Hz)', alpha=0.7)
+    ax.plot(t, pred_rate_hz, '-', label='Predicted (Hz)', lw=2)
+    ax.axvline(0, color='k', ls='--', lw=1, alpha=0.5)
+    ax.set_xlabel('Time relative to stop (s)')
+    ax.set_ylabel('Firing rate (Hz)')
+    ax.set_title(f'{title_prefix} • cluster {cluster_label} • stop {stop_id}')
+    ax.legend()
+    plt.tight_layout()
+
+    return pd.DataFrame({
+        'time_s': t,
+        'obs_hz': obs_rate_hz,
+        'pred_hz': pred_rate_hz,
+        'exposure_s': exp_s_plot,
+        'cluster': cluster_label,
+        'stop_id': stop_id,
+    })

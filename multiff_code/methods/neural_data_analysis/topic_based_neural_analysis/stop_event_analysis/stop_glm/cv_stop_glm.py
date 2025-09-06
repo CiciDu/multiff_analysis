@@ -22,6 +22,79 @@ def ll_poisson(y, mu):
     # exact log-likelihood (includes log(y!))
     return poisson(mu).logpmf(y).sum()
 
+# ---------- optional plotting helpers (headless-safe) ----------
+import matplotlib.pyplot as plt
+
+def plot_cv_scores(scores: pd.DataFrame, outpath: str = 'glm_cv_scores.png', title: str | None = None):
+    """
+    Bar plot of McFadden's R^2 (CV) per unit. Saves to disk (no GUI).
+    """
+    title = title or 'Cross-validated Poisson GLM fits per neuron'
+    scores_sorted = scores.sort_values('mcfadden_R2_cv', ascending=False)
+
+    plt.figure(figsize=(9, 4))
+    plt.bar(range(len(scores_sorted)), scores_sorted['mcfadden_R2_cv'])
+    plt.xticks(range(len(scores_sorted)), scores_sorted['cluster'], rotation=90)
+    plt.ylabel("McFadden's R² (CV)")
+    plt.xlabel('Cluster / neuron')
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+    # plt.savefig(outpath, dpi=200)
+    # plt.close()
+    return outpath
+
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
+def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
+    # 1) Make a copy and ensure we have a constant column
+    exog = df_X.copy()
+
+    # 2) Align columns to what the model saw during fit (order + presence)
+    train_cols = res.model.exog_names  # includes 'const' if used
+    # If any training columns are missing now, fill with 0.0
+    exog = exog.reindex(columns=train_cols, fill_value=0.0)
+
+    # 3) Align index with offset and y to avoid misalignment
+    if hasattr(offset_log, 'index') and hasattr(exog, 'index'):
+        common = exog.index.intersection(getattr(offset_log, 'index', exog.index))
+        if hasattr(y, 'index'):
+            common = common.intersection(y.index)
+        exog = exog.loc[common]
+        y_use = y.loc[common] if hasattr(y, 'loc') else np.asarray(y)[common]
+        off_use = offset_log.loc[common] if hasattr(offset_log, 'loc') else np.asarray(offset_log)[common]
+    else:
+        y_use = np.asarray(y)
+        off_use = np.asarray(offset_log)
+
+    # 4) Predict
+    mu = np.asarray(res.predict(exog, offset=off_use), float)
+
+    # 5) Robust plotting (drop non-finite)
+    y_arr = np.asarray(y_use, float)
+    m = np.isfinite(mu) & np.isfinite(y_arr)
+    if not m.any():
+        raise ValueError('No finite points to plot after prediction.')
+
+    mu_f = mu[m]; y_f = y_arr[m]
+    lim_max = max(1.0, float(np.nanmax([mu_f.max(), y_f.max()])))
+    lim = (0.0, lim_max)
+
+    plt.figure(figsize=(5,5))
+    plt.plot(mu_f, y_f, '.', alpha=0.5, markersize=4)
+    plt.plot(lim, lim, lw=1)
+    plt.xlim(lim); plt.ylim(lim)
+    plt.xlabel('Predicted mean (μ)'); plt.ylabel('Observed count')
+    if title: plt.title(title)
+    if outpath: plt.savefig(outpath, bbox_inches='tight', dpi=150)
+    plt.show()
+
+
+
 def cv_score_per_cluster(
     df_X, df_Y, offset_log, groups=None, n_splits=5,
 ):
@@ -93,74 +166,3 @@ def cv_score_per_cluster(
 
     return pd.DataFrame(scores)
 
-
-# ---------- optional plotting helpers (headless-safe) ----------
-import matplotlib.pyplot as plt
-
-def plot_cv_scores(scores: pd.DataFrame, outpath: str = 'glm_cv_scores.png', title: str | None = None):
-    """
-    Bar plot of McFadden's R^2 (CV) per unit. Saves to disk (no GUI).
-    """
-    title = title or 'Cross-validated Poisson GLM fits per neuron'
-    scores_sorted = scores.sort_values('mcfadden_R2_cv', ascending=False)
-
-    plt.figure(figsize=(9, 4))
-    plt.bar(range(len(scores_sorted)), scores_sorted['mcfadden_R2_cv'])
-    plt.xticks(range(len(scores_sorted)), scores_sorted['cluster'], rotation=90)
-    plt.ylabel("McFadden's R² (CV)")
-    plt.xlabel('Cluster / neuron')
-    plt.title(title)
-    plt.tight_layout()
-    plt.show()
-    # plt.savefig(outpath, dpi=200)
-    # plt.close()
-    return outpath
-
-
-import numpy as np
-import pandas as pd
-import statsmodels.api as sm
-import matplotlib.pyplot as plt
-
-def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
-    # 1) Make a copy and ensure we have a constant column
-    exog = df_X.copy()
-
-    # 2) Align columns to what the model saw during fit (order + presence)
-    train_cols = res.model.exog_names  # includes 'const' if used
-    # If any training columns are missing now, fill with 0.0
-    exog = exog.reindex(columns=train_cols, fill_value=0.0)
-
-    # 3) Align index with offset and y to avoid misalignment
-    if hasattr(offset_log, 'index') and hasattr(exog, 'index'):
-        common = exog.index.intersection(getattr(offset_log, 'index', exog.index))
-        if hasattr(y, 'index'):
-            common = common.intersection(y.index)
-        exog = exog.loc[common]
-        y_use = y.loc[common] if hasattr(y, 'loc') else np.asarray(y)[common]
-        off_use = offset_log.loc[common] if hasattr(offset_log, 'loc') else np.asarray(offset_log)[common]
-    else:
-        y_use = np.asarray(y)
-        off_use = np.asarray(offset_log)
-
-    # 4) Predict
-    mu = np.asarray(res.predict(exog, offset=off_use), float)
-
-    # 5) Robust plotting (drop non-finite)
-    y_arr = np.asarray(y_use, float)
-    m = np.isfinite(mu) & np.isfinite(y_arr)
-    if not m.any():
-        raise ValueError('No finite points to plot after prediction.')
-
-    mu_f = mu[m]; y_f = y_arr[m]
-    lim_max = max(1.0, float(np.nanmax([mu_f.max(), y_f.max()])))
-    lim = (0.0, lim_max)
-
-    plt.figure(figsize=(5,5))
-    plt.plot(mu_f, y_f, '.', alpha=0.5, markersize=4)
-    plt.plot(lim, lim, lw=1)
-    plt.xlim(lim); plt.ylim(lim)
-    plt.xlabel('Predicted mean (μ)'); plt.ylabel('Observed count')
-    if title: plt.title(title)
-    if outpath: plt.savefig(outpath, bbox_inches='tight', dpi=150)
-    plt.show()

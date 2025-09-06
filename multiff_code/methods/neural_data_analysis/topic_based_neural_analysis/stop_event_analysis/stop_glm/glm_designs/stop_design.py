@@ -3,6 +3,7 @@ import pandas as pd
 
 # ------------------------- small utilities ----------------------------------
 
+
 def _zscore_nan(a):
     """
     (Still available if you need it elsewhere.)
@@ -18,6 +19,7 @@ def _zscore_nan(a):
     out = (x - m) / s
     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
 
+
 def _make_rcos_basis(t, centers, width):
     """
     Raised cosine basis functions over relative time t (seconds).
@@ -30,6 +32,7 @@ def _make_rcos_basis(t, centers, width):
     B[(t < c - width) | (t > c + width)] = 0.0
     return B
 
+
 def _align_meta_to_pos(meta, pos):
     """
     Align metadata to the set of modeled rows `pos`.
@@ -38,12 +41,15 @@ def _align_meta_to_pos(meta, pos):
     if 't_center' not in meta.columns:
         if {'stop_time', 'rel_center'}.issubset(meta.columns):
             meta = meta.copy()
-            meta['t_center'] = np.asarray(meta['stop_time'] + meta['rel_center'], float)
+            meta['t_center'] = np.asarray(
+                meta['stop_time'] + meta['rel_center'], float)
         else:
-            raise ValueError('meta needs t_center, or both stop_time and rel_center to reconstruct it.')
+            raise ValueError(
+                'meta needs t_center, or both stop_time and rel_center to reconstruct it.')
     meta_by_bin = meta.set_index('bin').sort_index()
     m = meta_by_bin.loc[np.asarray(pos, int)].copy()
     return m, meta_by_bin
+
 
 def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured')):
     """
@@ -54,7 +60,8 @@ def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured'))
     """
     required = {'stop_id', 'stop_time'}
     if not required.issubset(new_seg_info.columns):
-        raise ValueError('new_seg_info must contain columns: stop_id, stop_time')
+        raise ValueError(
+            'new_seg_info must contain columns: stop_id, stop_time')
     stop_tbl = (new_seg_info[['stop_id', 'stop_time']]
                 .drop_duplicates('stop_id')
                 .sort_values('stop_time')
@@ -67,6 +74,7 @@ def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured'))
     stop_tbl['next_stop_time'] = stop_tbl['stop_time'].shift(-1)
     return stop_tbl
 
+
 def _join_per_stop_avoid_collisions(m, stop_tbl):
     """
     Left-join per-stop features into per-bin metadata without overwriting existing columns.
@@ -75,6 +83,7 @@ def _join_per_stop_avoid_collisions(m, stop_tbl):
     cols_to_add = [c for c in per_stop.columns if c not in m.columns]
     return m.join(per_stop[cols_to_add], on='stop_id')
 
+
 def _expand_cond_dummies(m, drop_first_cond=True):
     """
     Convert condition labels into one-hot dummies: cond_x, cond_y, ...
@@ -82,10 +91,12 @@ def _expand_cond_dummies(m, drop_first_cond=True):
     """
     if 'cond' not in m.columns:
         return np.empty((len(m), 0), float), []
-    cond_dum = pd.get_dummies(m['cond'].fillna('_none_'), prefix='cond', dtype=int)
+    cond_dum = pd.get_dummies(m['cond'].fillna(
+        '_none_'), prefix='cond', dtype=int)
     if drop_first_cond and cond_dum.shape[1] > 0:
         cond_dum = cond_dum.iloc[:, 1:]
     return cond_dum.to_numpy(dtype=float), list(cond_dum.columns)
+
 
 def _compute_core_stop_features(m, meta_by_bin):
     """
@@ -96,8 +107,10 @@ def _compute_core_stop_features(m, meta_by_bin):
       k_norm   : normalized within-stop position in [0,1]
     """
     rel_t = m['rel_center'].to_numpy(dtype=float)
-    prepost = (~m['is_pre'].to_numpy(dtype=bool)).astype(np.float64)  # 0=pre, 1=post
-    straddle = ((m['rel_left'] < 0) & (m['rel_right'] > 0)).astype(np.float64).to_numpy()
+    prepost = (~m['is_pre'].to_numpy(dtype=bool)).astype(
+        np.float64)  # 0=pre, 1=post
+    straddle = ((m['rel_left'] < 0) & (m['rel_right'] > 0)
+                ).astype(np.float64).to_numpy()
 
     # normalized within-stop position
     kmax_per_stop = meta_by_bin.groupby('stop_id')['k_within_stop'].max()
@@ -105,93 +118,140 @@ def _compute_core_stop_features(m, meta_by_bin):
               m['stop_id'].map(kmax_per_stop).replace(0, np.nan)).astype(float).fillna(0.0).to_numpy()
     return rel_t, prepost, straddle, k_norm
 
+
+def _to_seconds(arr):
+    """
+    Convert a pandas Series/array that might be datetime/Timedelta/float
+    into float seconds. Works for:
+      - Timedelta/Datetime differences → uses .dt.total_seconds()
+      - plain floats/ints → returned as float array
+    """
+    if isinstance(arr, pd.Series):
+        if pd.api.types.is_timedelta64_dtype(arr):
+            return arr.dt.total_seconds().to_numpy()
+        # If datetime-like, caller should pass differences, not raw datetimes.
+        return arr.astype(float).to_numpy()
+    a = np.asarray(arr)
+    # If it's a timedelta64 numpy array
+    if np.issubdtype(a.dtype, np.timedelta64):
+        return a.astype('timedelta64[ns]').astype(np.int64) / 1e9
+    return a.astype(float)
+
+
 def _compute_history_base_vars(m):
     """
-    Primitive timing vars for history:
-      ts_prev   : seconds since previous stop (NaN if none)
-      ts_next   : seconds until next stop (NaN if none)
-      ts_prev_f : ts_prev with NaN→0
-      ts_next_f : ts_next with NaN→0
-      duration_f: stop duration (seconds, NaN→0)
+    Primitive timing vars for history (all in seconds):
+      ts_prev    : seconds since previous stop (NaN if none)
+      ts_next    : seconds until next stop (NaN if none)
+      ts_prev_f  : ts_prev with NaN→0
+      ts_next_f  : ts_next with NaN→0
+      duration_f : stop duration (seconds, NaN→0 if missing)
+    Expects columns:
+      - 't_center' (time of current stop alignment center)
+      - 'prev_stop_time' (time of previous stop or NaT/NaN)
+      - 'next_stop_time' (time of next stop or NaT/NaN)
+      - optional 'duration' (seconds or Timedelta)
     """
-    ts_prev = (m['t_center'] - m['prev_stop_time']).to_numpy(float)     # NaN for first stop
-    ts_next = (m['next_stop_time'] - m['t_center']).to_numpy(float)     # NaN for last stop
-    ts_prev_f = np.nan_to_num(ts_prev, nan=0.0)
-    ts_next_f = np.nan_to_num(ts_next, nan=0.0)
-    duration_f = np.nan_to_num(m['duration'].to_numpy(float), nan=0.0) if 'duration' in m.columns else np.zeros(len(m))
-    return ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f
+    # Differences → may be Timedelta; convert to seconds robustly
+    ts_prev_sec = _to_seconds(
+        m['t_center'] - m['prev_stop_time'])   # NaN for first stop
+    ts_next_sec = _to_seconds(
+        m['next_stop_time'] - m['t_center'])   # NaN for last stop
 
-def _make_history_block(prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
-                        history_mode, include_columns, history_choice='prev'):
-    """
+    ts_prev_f = np.nan_to_num(ts_prev_sec, nan=0.0)
+    ts_next_f = np.nan_to_num(ts_next_sec, nan=0.0)
+
+    if 'duration' in m.columns:
+        duration_sec = _to_seconds(m['duration'])
+        duration_f = np.nan_to_num(duration_sec, nan=0.0)
+    else:
+        duration_f = np.zeros(len(m), dtype=float)
+
+    return ts_prev_sec, ts_next_sec, ts_prev_f, ts_next_f, duration_f
+
+
+def _make_history_block(
+    include_columns,
+    prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
+):
+    '''
     Build history-related predictors WITHOUT z-scoring (raw seconds/scalars).
 
-    Modes:
-      'single' :
-         - time_since_prev_stop (raw seconds)
-         - time_to_next_stop   (raw seconds)
-         (choose one depending on include_columns / history_choice)
+    Parameters
+    ----------
+    include_columns : iterable of str
+        Any of:
+          'time_since_prev_stop', 'time_to_next_stop',
+          'time_since_prev_stop_pre', 'time_to_next_stop_post',
+          'isi_len', 'mid_offset',
+    prepost : array-like (n_bins,)
+        0 for pre-stop, 1 for post-stop (relative to current stop_id).
+    ts_prev, ts_next : arrays (n_bins,)
+        Raw seconds since previous / until next stop (can contain NaN).
+    ts_prev_f, ts_next_f : arrays (n_bins,)
+        Same as above but with NaN→0 already applied.
 
-      'gated'  :
-         - time_since_prev_stop_post = prepost * ts_prev_f  (post-only)
-         - time_to_next_stop_pre     = (1-prepost) * ts_next_f (pre-only)
+    Returns
+    -------
+    blocks : list of arrays shaped (n_bins, 1)
+    names  : list of str
+    '''
 
-      'sumdiff':
-         - isi_len    = ts_prev + ts_next  (total inter-stop interval length, seconds)
-         - mid_offset = 0.5 * (ts_next - ts_prev)  (signed offset from interval midpoint, seconds)
-    """
+    # ensure 1D float arrays
+    prepost   = np.asarray(prepost,  float).reshape(-1)
+    ts_prev   = np.asarray(ts_prev,  float).reshape(-1)
+    ts_next   = np.asarray(ts_next,  float).reshape(-1)
+    ts_prev_f = np.asarray(ts_prev_f, float).reshape(-1)
+    ts_next_f = np.asarray(ts_next_f, float).reshape(-1)
+
+    # derived features
+    ts_prev_pre  = (1.0 - prepost) * ts_prev_f   # active in PRE window
+    ts_next_post = prepost * ts_next_f           # active in POST window
+
+    isi_len       = ts_prev + ts_next
+    mid_offset    = 0.5 * (ts_next - ts_prev)    # negative -> closer to prev stop
+    isi_len_f     = np.nan_to_num(isi_len, nan=0.0)
+    mid_offset_f  = np.nan_to_num(mid_offset, nan=0.0)
+
+    # include set + bundles
+    inc = set(include_columns or [])
+
+    # build outputs (dedupe-safe)
     blocks, names = [], []
-    wants_any = any(k in include_columns for k in (
-        'time_since_prev_stop', 'time_to_next_stop',
-        'time_since_prev_stop_post', 'time_to_next_stop_pre',
-        'isi_len', 'mid_offset', 'history_gated', 'history_sumdiff'
-    ))
 
-    if history_mode == 'single':
-        chosen = None
-        for key in include_columns:
-            if key in ('time_since_prev_stop', 'time_to_next_stop'):
-                chosen = key
-                break
-        if chosen is None and wants_any:
-            chosen = 'time_since_prev_stop' if history_choice == 'prev' else 'time_to_next_stop'
+    def _add(name, col):
+        if name not in names:
+            blocks.append(col[:, None])
+            names.append(name)
 
-        if chosen == 'time_since_prev_stop':
-            blocks.append(ts_prev_f[:, None]); names.append('time_since_prev_stop')
-        elif chosen == 'time_to_next_stop':
-            blocks.append(ts_next_f[:, None]); names.append('time_to_next_stop')
+    if 'time_since_prev_stop' in inc:
+        _add('time_since_prev_stop', ts_prev_f)
+    if 'time_to_next_stop' in inc:
+        _add('time_to_next_stop', ts_next_f)
 
-    elif history_mode == 'gated':
-        if wants_any or 'history_gated' in include_columns \
-           or 'time_since_prev_stop_post' in include_columns \
-           or 'time_to_next_stop_pre' in include_columns:
-            ts_prev_post = prepost * ts_prev_f           # only active post-stop
-            ts_next_pre  = (1.0 - prepost) * ts_next_f    # only active pre-stop
-            blocks += [ts_prev_post[:, None], ts_next_pre[:, None]]
-            names  += ['time_since_prev_stop_post', 'time_to_next_stop_pre']
+    if 'time_since_prev_stop_pre' in inc:
+        _add('time_since_prev_stop_pre', ts_prev_pre)
+    if 'time_to_next_stop_post' in inc:
+        _add('time_to_next_stop_post', ts_next_post)
 
-    elif history_mode == 'sumdiff':
-        if wants_any or 'history_sumdiff' in include_columns \
-           or 'isi_len' in include_columns or 'mid_offset' in include_columns:
-            isi_len    = ts_prev + ts_next          # seconds
-            mid_offset = 0.5 * (ts_next - ts_prev)  # seconds; negative→closer to prev
-            isi_len_f    = np.nan_to_num(isi_len, nan=0.0)
-            mid_offset_f = np.nan_to_num(mid_offset, nan=0.0)
-            blocks += [isi_len_f[:, None], mid_offset_f[:, None]]
-            names  += ['isi_len', 'mid_offset']
-    else:
-        raise ValueError('history_mode must be one of: single, gated, sumdiff')
+    if 'isi_len' in inc:
+        _add('isi_len', isi_len_f)
+    if 'mid_offset' in inc:
+        _add('mid_offset', mid_offset_f)
 
     return blocks, names
+
 
 def _make_capture_block(m):
     """
     Capture covariate: 0/1 indicator across all bins of a stop (if available).
     """
-    captured = m['captured'].fillna(0).to_numpy(dtype=float) if 'captured' in m.columns else None
+    captured = m['captured'].fillna(0).to_numpy(
+        dtype=float) if 'captured' in m.columns else None
     return captured
 
 # ------------------------- main builder -------------------------------------
+
 
 def build_stop_design_from_meta(
     meta: pd.DataFrame,
@@ -203,8 +263,6 @@ def build_stop_design_from_meta(
     rc_width: float = 0.10,
     add_interactions: bool = True,
     drop_first_cond: bool = True,
-    history_mode: str = 'gated',            # 'single' | 'gated' | 'sumdiff'
-    history_choice: str = 'prev',            # used for 'single': 'prev'|'next'
     include_columns=(
         'prepost', 'duration', 'time_since_prev_stop', 'cond_dummies',
         # optional extras: 'straddle','k_norm','basis','prepost*speed',
@@ -227,8 +285,8 @@ def build_stop_design_from_meta(
       - prepost*captured         : interaction of prepost and captured
       - time_since_prev_stop     : seconds since previous stop (NaN→0)
       - time_to_next_stop        : seconds until next stop (NaN→0)
-      - time_since_prev_stop_post: post-only gated since-prev (pre bins=0)
-      - time_to_next_stop_pre    : pre-only gated to-next (post bins=0)
+      - time_since_prev_stop_pre: post-only gated since-prev (pre bins=0)
+      - time_to_next_stop_post    : pre-only gated to-next (post bins=0)
       - isi_len                  : total inter-stop interval length (seconds)
       - mid_offset               : signed offset from midpoint (seconds)
     '''
@@ -240,17 +298,21 @@ def build_stop_design_from_meta(
     m = _join_per_stop_avoid_collisions(m, stop_tbl)
 
     # 3) core stop features
-    rel_t, prepost, straddle, k_norm = _compute_core_stop_features(m, meta_by_bin)
+    rel_t, prepost, straddle, k_norm = _compute_core_stop_features(
+        m, meta_by_bin)
 
     # 4) history vars
-    ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f = _compute_history_base_vars(m)
+    ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f = _compute_history_base_vars(
+        m)
 
     # 5) condition dummies
-    cond_mat, cond_cols = _expand_cond_dummies(m, drop_first_cond=drop_first_cond)
+    cond_mat, cond_cols = _expand_cond_dummies(
+        m, drop_first_cond=drop_first_cond)
 
     # 6) basis over rel_t
     if rc_centers is None:
-        rc_centers = np.array([-0.24, -0.16, -0.08, 0.00, 0.08, 0.16, 0.24], float)
+        rc_centers = np.array(
+            [-0.24, -0.16, -0.08, 0.00, 0.08, 0.16, 0.24], float)
     B = _make_rcos_basis(rel_t, centers=rc_centers, width=rc_width)
     B_names = [f'rcos_{c:+.2f}s' for c in rc_centers]
 
@@ -258,7 +320,8 @@ def build_stop_design_from_meta(
     captured = _make_capture_block(m)
 
     # 8) interactions prepared
-    BxCaptured = None; BxCaptured_names = []
+    BxCaptured = None
+    BxCaptured_names = []
     if add_interactions and 'basis*captured' in include_columns and captured is not None:
         BxCaptured = B * captured[:, None]
         BxCaptured_names = [f'{bn}*captured' for bn in B_names]
@@ -267,48 +330,62 @@ def build_stop_design_from_meta(
     blocks, names = [], []
 
     if 'prepost' in include_columns:
-        blocks.append(prepost[:, None]); names.append('prepost')
+        blocks.append(prepost[:, None])
+        names.append('prepost')
     if 'straddle' in include_columns:
-        blocks.append(straddle[:, None]); names.append('straddle')
+        blocks.append(straddle[:, None])
+        names.append('straddle')
     if 'k_norm' in include_columns:
-        blocks.append(k_norm[:, None]); names.append('k_norm')
+        blocks.append(k_norm[:, None])
+        names.append('k_norm')
     if 'duration' in include_columns:
-        blocks.append(duration_f[:, None]); names.append('duration')
+        blocks.append(duration_f[:, None])
+        names.append('duration')
     if 'cond_dummies' in include_columns and cond_mat.size:
-        blocks.append(cond_mat); names += cond_cols
+        blocks.append(cond_mat)
+        names += cond_cols
     if 'basis' in include_columns:
-        blocks.append(B); names += B_names
+        blocks.append(B)
+        names += B_names
     if add_interactions and 'prepost*speed' in include_columns:
         x_prepost_speed = (prepost * np.asarray(speed_used, float))[:, None]
-        blocks.append(x_prepost_speed); names.append('prepost*speed')
+        blocks.append(x_prepost_speed)
+        names.append('prepost*speed')
     if add_interactions and 'prepost*captured' in include_columns and captured is not None:
         x_prepost_captured = (prepost * np.asarray(captured, float))[:, None]
-        blocks.append(x_prepost_captured); names.append('prepost*captured')
+        blocks.append(x_prepost_captured)
+        names.append('prepost*captured')
 
     if 'captured' in include_columns and captured is not None:
-        blocks.append(captured[:, None]); names.append('captured')
+        blocks.append(captured[:, None])
+        names.append('captured')
     if 'basis*captured' in include_columns and BxCaptured is not None:
-        blocks.append(BxCaptured); names += BxCaptured_names
-
-    # history block (no z-scoring)
+        blocks.append(BxCaptured)
+        names += BxCaptured_names
+    
     H_blocks, H_names = _make_history_block(
+        include_columns,
         prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
-        history_mode, include_columns, history_choice=history_choice
     )
+    
     if H_blocks:
-        blocks += H_blocks; names += H_names
+        blocks += H_blocks
+        names += H_names
 
     # pack & sanitize
     if not blocks:
-        X_stop = np.zeros((len(m), 1), float); names = ['_zeros_']
+        X_stop = np.zeros((len(m), 1), float)
+        names = ['_zeros_']
     else:
         X_stop = np.column_stack(blocks).astype(float)
     X_stop = np.nan_to_num(X_stop, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    X_stop_df = pd.DataFrame(X_stop, columns=names, index=np.arange(len(X_stop)))
+
+    X_stop_df = pd.DataFrame(X_stop, columns=names,
+                             index=np.arange(len(X_stop)))
     return X_stop_df
 
 # ------------------------- programmatic feature glossary ---------------------
+
 
 FEATURE_DESCRIPTIONS = {
     # core stop context
@@ -338,8 +415,8 @@ FEATURE_DESCRIPTIONS = {
     'time_to_next_stop': 'Seconds until the next stop (NaN→0 for last stop).',
 
     # history: gated
-    'time_since_prev_stop_post': 'Post-only version of time_since_prev_stop; pre bins are 0.',
-    'time_to_next_stop_pre': 'Pre-only version of time_to_next_stop; post bins are 0.',
+    'time_since_prev_stop_pre': 'Post-only version of time_since_prev_stop; pre bins are 0.',
+    'time_to_next_stop_post': 'Pre-only version of time_to_next_stop; post bins are 0.',
 
     # history: sumdiff
     'isi_len': 'Total inter-stop interval length in seconds: (next_stop_time - prev_stop_time).',
