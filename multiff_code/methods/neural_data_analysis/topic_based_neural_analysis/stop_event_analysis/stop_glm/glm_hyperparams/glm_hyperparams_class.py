@@ -12,7 +12,7 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm import stop_glm_fit, cv_stop_glm
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import stop_glm_fit, cv_stop_glm
 
 
 # ----------------------------- types -----------------------------------------

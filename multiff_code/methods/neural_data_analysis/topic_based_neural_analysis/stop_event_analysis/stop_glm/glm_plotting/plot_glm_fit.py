@@ -1,4 +1,4 @@
-from . import stop_glm_fit
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import stop_glm_fit
 
 import numpy as np
 import pandas as pd
@@ -9,24 +9,43 @@ from pathlib import Path
 from sklearn.model_selection import GroupKFold, KFold
 
 
+import numpy as np
+import matplotlib.pyplot as plt
 
+import numpy as np
+import matplotlib.pyplot as plt
 
-# ---------- plots ----------
+def _cluster_sort_key(label):
+    # numeric-first fallback-to-string sort key
+    try:
+        return (0, float(label))
+    except Exception:
+        return (1, str(label))
+
 def plot_coef_distributions(
     coefs_df,
     terms=None,
     rank='sig_FDR',           # 'none' | 'sig_FDR' | 'abs_med'
     rank_mode='fraction',     # when rank='sig_FDR': 'fraction' or 'count'
-    ascending=True            # False -> most significant/effectful at top
+    ascending=True,           # False -> most significant/effectful at top
+    *,
+    cluster_col='cluster',    # or 'cluster_id' (auto-detected)
+    show_legend=True,
+    max_clusters_in_legend=20
 ):
-    """
-    Jittered dot + median/IQR per term across clusters.
-    If FDR info is present, hides terms with zero significant units (and prints them).
-    """
     df = coefs_df.copy()
 
+    # Resolve cluster column
+    if cluster_col not in df.columns:
+        if 'cluster_id' in df.columns:
+            cluster_col = 'cluster_id'
+        else:
+            raise KeyError(f'Could not find cluster column {cluster_col!r} (or "cluster_id") in coefs_df.')
+
     # Candidate terms
-    candidate_terms = df['term'].unique().tolist() if terms is None else [t for t in terms if t in set(df['term'])]
+    candidate_terms = (df['term'].unique().tolist()
+                       if terms is None
+                       else [t for t in terms if t in set(df['term'])])
 
     # Ranking
     if rank == 'sig_FDR' and 'sig_FDR' in df.columns:
@@ -58,32 +77,151 @@ def plot_coef_distributions(
         print('No terms with sig_FDR > 0 to plot.')
         return None
 
+    # Consistent colors per cluster across all terms (sorted numerically if possible)
+    clusters = df[cluster_col].astype(str).unique().tolist()
+    clusters = sorted(clusters, key=_cluster_sort_key)
+    base_cmap = plt.get_cmap('tab20')
+    palette = [base_cmap(i % 20) for i in range(len(clusters))]
+    cluster_to_color = {c: palette[i] for i, c in enumerate(clusters)}
+
     fig, ax = plt.subplots(figsize=(8, 2.5 + 0.35 * len(terms_to_plot)))
     ytick, ylocs = [], []
+    legend_handles = {}
 
     for k, term in enumerate(terms_to_plot):
-        g = df[df['term'] == term]
-        y = np.full(g.shape[0], k, float)
-        jitter = (np.random.rand(g.shape[0]) - 0.5) * 0.15
-        ax.plot(g['coef'].to_numpy(), y + jitter, 'o', alpha=0.45, markersize=4)
+        g = df[df['term'] == term].copy()
+        y_base = np.full(g.shape[0], k, float)
 
-        med = float(np.median(g['coef']))
-        q1, q3 = np.percentile(g['coef'], [25, 75])
-        ax.plot([q1, q3], [k, k], lw=4)
-        ax.plot([med, med], [k - 0.18, k + 0.18], lw=2)
+        # Group by cluster; one scatter per cluster for stable handles
+        for c_id, sub in g.groupby(g[cluster_col].astype(str)):
+            idx = sub.index
+            jitter = (np.random.rand(len(idx)) - 0.5) * 0.15
+            xvals = sub['coef'].to_numpy()
+            # map back to the y_base positions for these rows
+            yvals = y_base[g.index.get_indexer(idx)] + jitter
 
+            handle = ax.plot(
+                xvals, yvals,
+                'o', alpha=0.65, markersize=4,
+                color=cluster_to_color.get(c_id, (0.3, 0.3, 0.3))
+            )[0]
+
+            if c_id not in legend_handles:
+                legend_handles[c_id] = handle
+
+        # # Median & IQR bars (per term)
+        # med = float(np.median(g['coef']))
+        # q1, q3 = np.percentile(g['coef'], [25, 75])
+        # ax.plot([q1, q3], [k, k], lw=4, color='k')
+        # ax.plot([med, med], [k - 0.18, k + 0.18], lw=2, color='k')
+
+        # Right-side annotation: n_sig / total
         if 'sig_FDR' in g.columns:
             n_sig = int(np.asarray(g['sig_FDR']).sum())
-            ax.text(1.005, k, f'{n_sig}/{g.shape[0]} sig', va='center', ha='left', transform=ax.get_yaxis_transform())
+            ax.text(1.005, k, f'{n_sig}/{g.shape[0]} sig', va='center', ha='left',
+                    transform=ax.get_yaxis_transform())
 
         ytick.append(term); ylocs.append(k)
 
-    ax.axvline(0, ls='--', lw=1)
+    ax.axvline(0, ls='--', lw=1, color='k')
     ax.set_yticks(ylocs); ax.set_yticklabels(ytick)
     ax.set_xlabel('Coefficient (β)')
-    ax.set_title('Per-cluster coefficients by term')
+    ax.set_title('Per-cluster coefficients by term (colored by cluster)')
     plt.tight_layout()
+
+    # Legend (numeric-first, fallback to string; optionally truncated)
+    if show_legend and legend_handles:
+        items = sorted(legend_handles.items(), key=lambda kv: _cluster_sort_key(kv[0]))
+        if len(items) > max_clusters_in_legend:
+            shown = items[:max_clusters_in_legend]
+            labels = [k for k, _ in shown]
+            handles = [h for _, h in shown]
+            rem = len(items) - max_clusters_in_legend
+            ax.legend(handles, labels,
+                      title=f'Clusters (first {max_clusters_in_legend}; +{rem} more)',
+                      loc='best', fontsize=8)
+        else:
+            labels = [k for k, _ in items]
+            handles = [h for _, h in items]
+            ax.legend(handles, labels, title='Clusters', loc='best', fontsize=8)
+
     return fig
+
+
+
+# ---------- plots ----------
+# def plot_coef_distributions(
+#     coefs_df,
+#     terms=None,
+#     rank='sig_FDR',           # 'none' | 'sig_FDR' | 'abs_med'
+#     rank_mode='fraction',     # when rank='sig_FDR': 'fraction' or 'count'
+#     ascending=True            # False -> most significant/effectful at top
+# ):
+#     """
+#     Jittered dot + median/IQR per term across clusters.
+#     If FDR info is present, hides terms with zero significant units (and prints them).
+#     """
+#     df = coefs_df.copy()
+
+#     # Candidate terms
+#     candidate_terms = df['term'].unique().tolist() if terms is None else [t for t in terms if t in set(df['term'])]
+
+#     # Ranking
+#     if rank == 'sig_FDR' and 'sig_FDR' in df.columns:
+#         by = df.groupby('term')['sig_FDR']
+#         key = by.sum() if rank_mode == 'count' else by.mean()
+#     elif rank == 'abs_med':
+#         key = df.groupby('term')['coef'].apply(lambda s: float(np.median(np.abs(s))))
+#     else:
+#         key = None
+
+#     # Ordering
+#     if key is not None:
+#         ordered_terms_all = list(key.sort_values(ascending=ascending).index)
+#         terms_to_plot = [t for t in ordered_terms_all if t in candidate_terms]
+#     else:
+#         terms_to_plot = candidate_terms
+
+#     # Filter by significance (optional)
+#     if 'sig_FDR' in df.columns:
+#         keep_terms, skip_terms = [], []
+#         for t in terms_to_plot:
+#             n_sig = int(df.loc[df['term'] == t, 'sig_FDR'].sum())
+#             (keep_terms if n_sig > 0 else skip_terms).append(t)
+#         if skip_terms:
+#             print('Skipping terms with no significant clusters (sig_FDR=0):', skip_terms)
+#         terms_to_plot = keep_terms
+
+#     if not terms_to_plot:
+#         print('No terms with sig_FDR > 0 to plot.')
+#         return None
+
+#     fig, ax = plt.subplots(figsize=(8, 2.5 + 0.35 * len(terms_to_plot)))
+#     ytick, ylocs = [], []
+
+#     for k, term in enumerate(terms_to_plot):
+#         g = df[df['term'] == term]
+#         y = np.full(g.shape[0], k, float)
+#         jitter = (np.random.rand(g.shape[0]) - 0.5) * 0.15
+#         ax.plot(g['coef'].to_numpy(), y + jitter, 'o', alpha=0.45, markersize=4)
+
+#         med = float(np.median(g['coef']))
+#         q1, q3 = np.percentile(g['coef'], [25, 75])
+#         ax.plot([q1, q3], [k, k], lw=4)
+#         ax.plot([med, med], [k - 0.18, k + 0.18], lw=2)
+
+#         if 'sig_FDR' in g.columns:
+#             n_sig = int(np.asarray(g['sig_FDR']).sum())
+#             ax.text(1.005, k, f'{n_sig}/{g.shape[0]} sig', va='center', ha='left', transform=ax.get_yaxis_transform())
+
+#         ytick.append(term); ylocs.append(k)
+
+#     ax.axvline(0, ls='--', lw=1)
+#     ax.set_yticks(ylocs); ax.set_yticklabels(ytick)
+#     ax.set_xlabel('Coefficient (β)')
+#     ax.set_title('Per-cluster coefficients by term')
+#     plt.tight_layout()
+#     return fig
 
 
 def plot_forest_for_term(coefs_df, term, top_n=30):

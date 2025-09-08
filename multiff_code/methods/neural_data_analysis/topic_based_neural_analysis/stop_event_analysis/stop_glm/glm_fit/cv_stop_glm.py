@@ -51,40 +51,26 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
 def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
-    # 1) Make a copy and ensure we have a constant column
-    exog = df_X.copy()
+    # predict with guards
+    mu = safe_predict_mu(res, df_X, offset_log, clip_eta=30.0)
 
-    # 2) Align columns to what the model saw during fit (order + presence)
-    train_cols = res.model.exog_names  # includes 'const' if used
-    # If any training columns are missing now, fill with 0.0
-    exog = exog.reindex(columns=train_cols, fill_value=0.0)
-
-    # 3) Align index with offset and y to avoid misalignment
-    if hasattr(offset_log, 'index') and hasattr(exog, 'index'):
-        common = exog.index.intersection(getattr(offset_log, 'index', exog.index))
-        if hasattr(y, 'index'):
-            common = common.intersection(y.index)
-        exog = exog.loc[common]
-        y_use = y.loc[common] if hasattr(y, 'loc') else np.asarray(y)[common]
-        off_use = offset_log.loc[common] if hasattr(offset_log, 'loc') else np.asarray(offset_log)[common]
+    # align y to the same index if it’s a Series/DataFrame
+    if hasattr(y, 'reindex'):
+        # align to the exog alignment used inside safe_predict_mu
+        exog = df_X.reindex(columns=list(res.model.exog_names), fill_value=0.0)
+        y_use = y.reindex(exog.index).to_numpy(dtype=float)
     else:
-        y_use = np.asarray(y)
-        off_use = np.asarray(offset_log)
+        y_use = np.asarray(y, dtype=float)
 
-    # 4) Predict
-    mu = np.asarray(res.predict(exog, offset=off_use), float)
-
-    # 5) Robust plotting (drop non-finite)
-    y_arr = np.asarray(y_use, float)
-    m = np.isfinite(mu) & np.isfinite(y_arr)
+    m = np.isfinite(mu) & np.isfinite(y_use)
     if not m.any():
         raise ValueError('No finite points to plot after prediction.')
 
-    mu_f = mu[m]; y_f = y_arr[m]
+    mu_f, y_f = mu[m], y_use[m]
     lim_max = max(1.0, float(np.nanmax([mu_f.max(), y_f.max()])))
     lim = (0.0, lim_max)
 
-    plt.figure(figsize=(5,5))
+    plt.figure(figsize=(5, 5))
     plt.plot(mu_f, y_f, '.', alpha=0.5, markersize=4)
     plt.plot(lim, lim, lw=1)
     plt.xlim(lim); plt.ylim(lim)
@@ -93,6 +79,36 @@ def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
     if outpath: plt.savefig(outpath, bbox_inches='tight', dpi=150)
     plt.show()
 
+def safe_predict_mu(res, df_X, offset_log, clip_eta=30.0):
+    """
+    Robust Poisson mean prediction μ = exp(η):
+      - Align exog columns to what the model saw
+      - Replace NaN/inf params with 0.0 (common after L1 refit-on-support)
+      - Clip η to avoid exp overflow
+    Returns a 1D float array (same row order as the aligned exog).
+    """
+    # 1) align design matrix to what the model used
+    exog = df_X.copy()
+    train_cols = list(res.model.exog_names)  # includes 'const' if used
+    exog = exog.reindex(columns=train_cols, fill_value=0.0)
+
+    # 2) align offset by index if possible
+    if hasattr(offset_log, 'reindex'):
+        off = offset_log.reindex(exog.index).to_numpy(dtype=float)
+    else:
+        off = np.asarray(offset_log, dtype=float).reshape(-1)
+        if off.shape[0] != exog.shape[0]:
+            raise ValueError("offset_log length doesn't match X rows.")
+
+    # 3) robust linear predictor
+    beta = np.asarray(res.params, dtype=float)
+    beta = np.nan_to_num(beta, nan=0.0, posinf=0.0, neginf=0.0)
+
+    eta = exog.to_numpy(dtype=float) @ beta + off
+    eta = np.clip(eta, -clip_eta, clip_eta)
+
+    # 4) μ
+    return np.exp(eta)
 
 
 def cv_score_per_cluster(

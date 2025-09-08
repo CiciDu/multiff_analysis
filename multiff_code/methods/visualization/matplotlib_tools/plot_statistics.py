@@ -480,7 +480,7 @@ def plot_number_of_visible_ff_per_point_in_histogram(ff_dataframe):
         height=400  # height of the figure
         # bargroupgap=0.1 # gap between bars of the same location coordinates
     )
-    fig.show()
+    plt.show()
 
 
 def plot_number_of_ff_in_memory_per_point_in_histogram(ff_dataframe):
@@ -495,7 +495,7 @@ def plot_number_of_ff_in_memory_per_point_in_histogram(ff_dataframe):
         bargap=0.2,  # gap between bars of adjacent location coordinates
         # bargroupgap=0.1 # gap between bars of the same location coordinates
     )
-    fig.show()
+    plt.show()
 
  # First find the points where the target and at least 1 non-target is present in ff_dataframe
 
