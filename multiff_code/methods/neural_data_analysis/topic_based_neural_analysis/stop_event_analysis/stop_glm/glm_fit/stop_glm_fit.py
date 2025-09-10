@@ -409,7 +409,9 @@ def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_
         figs['forest'] = plot_glm_fit.plot_forest_for_term(
             coefs_df, term=ft, top_n=forest_top_n)
         figs['rr_hist'] = plot_glm_fit.plot_rate_ratio_hist(
-            coefs_df, term=ft, delta=delta_for_rr)
+            coefs_df, term=ft, delta=delta_for_rr, bins=40, log=True, clip_q=0.995
+        )
+
     else:
         figs['forest'] = None
         figs['rr_hist'] = None
@@ -510,11 +512,21 @@ def glm_mini_report(
         coefs_df, do_inference=do_inference, make_plots=make_plots,
         alpha=alpha, delta_for_rr=delta_for_rr
     )
-    figs = _build_figs(
-        coefs_df, metrics_df, feature_names=feature_names,
-        forest_term=forest_term, forest_top_n=forest_top_n,
-        delta_for_rr=delta_for_rr, make_plots=make_plots
-    )
+    
+    try:
+        figs = _build_figs(
+            coefs_df, metrics_df,
+            feature_names=feature_names,
+            forest_term=forest_term,
+            forest_top_n=forest_top_n,
+            delta_for_rr=delta_for_rr,
+            make_plots=make_plots,
+        )
+    except Exception as e:
+        print(f'[glm_mini_report] WARNING: could not build figures: {type(e).__name__}: {e}')
+        figs = {}
+
+        
     _save_outputs(save_dir, coefs_df, metrics_df,
                   pop_tests, figs, make_plots=make_plots)
     _show_or_close(figs, make_plots=make_plots, show_plots=show_plots)

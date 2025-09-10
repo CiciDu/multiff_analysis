@@ -250,20 +250,74 @@ def plot_forest_for_term(coefs_df, term, top_n=30):
     return fig
 
 
-def plot_rate_ratio_hist(coefs_df, term, delta=1.0, bins=30):
+def plot_rate_ratio_hist(coefs_df, term, delta, bins=30, log=False, clip_q=None):
     """
-    Histogram of rate ratios exp(beta * delta) across clusters for a term.
+    Histogram of per-unit rate ratios for a given term.
+    - Drops non-finite or non-positive values before plotting.
+    - Optional log scale on x and optional upper-tail clipping for readability.
+
+    Parameters
+    ----------
+    coefs_df : DataFrame
+        Must contain columns: ['term', 'rr'] at least.
+    term : str
+        Term name to filter rows.
+    delta : float
+        The delta used to compute the rate ratio (for labeling).
+    bins : int or sequence
+        Passed to matplotlib hist. Default 30.
+    log : bool
+        If True, use log scale on x-axis.
+    clip_q : float or None
+        If set (e.g., 0.995), clip RR values above this quantile to reduce the impact of outliers.
     """
-    g = stop_glm_fit.add_rate_ratios(coefs_df[coefs_df['term'] == term], delta=delta)
-    rr = g['rr'].to_numpy()
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    g = coefs_df.loc[coefs_df['term'] == term]
+    rr = g['rr'].to_numpy(dtype=float)
+
+    # Keep only finite and strictly positive (log-x requires >0)
+    m = np.isfinite(rr) & (rr > 0)
+    rr = rr[m]
+
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.hist(rr, bins=bins)
+
+    if rr.size == 0:
+        ax.text(0.5, 0.5, 'No finite rate ratios to plot', ha='center', va='center')
+        ax.axis('off')
+        return fig
+
+    # Optional gentle clipping of extreme tail for readability
+    if clip_q is not None:
+        hi = np.nanquantile(rr, clip_q)
+        rr = np.minimum(rr, hi)
+
+    # Optional log scaling: use log-spaced bins for a clean look
+    if log:
+        rr_min = rr.min()
+        rr_max = rr.max()
+        # Guard in case all values identical after clipping
+        if rr_min == rr_max:
+            rr_max = rr_min * 1.001
+        # Build log-spaced edges if user passed an int for bins
+        if isinstance(bins, int):
+            import math
+            lo = max(rr_min, np.finfo(float).tiny)
+            edges = np.logspace(math.log10(lo), math.log10(rr_max), bins + 1)
+        else:
+            edges = bins
+        ax.hist(rr, bins=edges)
+        ax.set_xscale('log')
+    else:
+        ax.hist(rr, bins=bins)
+
     ax.axvline(1.0, ls='--', lw=1)
     ax.set_xlabel(f'Rate ratio for Δ{term}={delta}')
     ax.set_ylabel('Units')
-    ax.set_title(f'Population rate ratios — {term}')
-    plt.tight_layout()
+    ax.set_title(f'{term}: distribution of rate ratios (n={rr.size})')
     return fig
+
 
 
 def plot_model_quality(metrics_df):

@@ -1,7 +1,9 @@
+import statsmodels.api as sm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Optional, Sequence
+
 
 def _safe_div(a, b, fill=0.0):
     out = np.zeros_like(a, dtype=float)
@@ -9,6 +11,7 @@ def _safe_div(a, b, fill=0.0):
     out[m] = a[m] / b[m]
     out[~m] = fill
     return out
+
 
 def _gaussian_smooth_1d(y: np.ndarray, sigma_bins: float) -> np.ndarray:
     if sigma_bins is None or sigma_bins <= 0:
@@ -28,7 +31,7 @@ def make_rate_df_from_binned(
     binned_spikes2: pd.DataFrame,
     unit_col: str | int,
     *,
-    stop_col: str = 'stop_id',
+    seg_col: str = 'stop_id',
     time_col: str = 'rel_center',
     left_col: str = 't_left',
     right_col: str = 't_right',
@@ -42,14 +45,15 @@ def make_rate_df_from_binned(
             raise KeyError(f'Unit column {unit_col!r} not found.')
 
     # exposure per bin (seconds)
-    exp = (df[right_col].to_numpy(dtype=float) - df[left_col].to_numpy(dtype=float))
+    exp = (df[right_col].to_numpy(dtype=float) -
+           df[left_col].to_numpy(dtype=float))
     exp[~np.isfinite(exp)] = 0.0
 
     # rate in Hz
     counts = df[unit_col].to_numpy(dtype=float)
     rate = _safe_div(counts, exp, fill=0.0)
 
-    out_cols = [stop_col, time_col]
+    out_cols = [seg_col, time_col]
     if keep_cols:
         for k in keep_cols:
             if k in df.columns and k not in out_cols:
@@ -61,10 +65,11 @@ def make_rate_df_from_binned(
     out['rate_hz'] = rate
     return out
 
+
 def plot_spaghetti_per_stop(
     df_rate: pd.DataFrame,
     *,
-    stop_col: str = 'stop_id',
+    seg_col: str = 'stop_id',
     time_col: str = 'rel_center',
     rate_col: str = 'rate_hz',
     smooth_sigma_bins: Optional[float] = None,
@@ -87,27 +92,28 @@ def plot_spaghetti_per_stop(
             bw = bin_width_s_hint
         else:
             # robust guess from within-stop diffs
-            tmp = df_rate.sort_values([stop_col, time_col])
-            diffs = tmp.groupby(stop_col)[time_col].diff().dropna().to_numpy()
+            tmp = df_rate.sort_values([seg_col, time_col])
+            diffs = tmp.groupby(seg_col)[time_col].diff().dropna().to_numpy()
             diffs = diffs[np.isfinite(diffs) & (diffs > 0)]
             bw = np.median(diffs) if diffs.size else 0.04
         smooth_sigma_bins = smooth_sigma_s / max(bw, 1e-9)
 
     # optionally downselect stops
-    stops = df_rate[stop_col].unique().tolist()
+    stops = df_rate[seg_col].unique().tolist()
     if max_stops is not None and len(stops) > max_stops:
         stops = stops[:max_stops]
-    g = df_rate[df_rate[stop_col].isin(stops)].copy()
+    g = df_rate[df_rate[seg_col].isin(stops)].copy()
 
     # plot each stop
     fig, ax = plt.subplots(figsize=(8, 5))
     lines_plotted = 0
-    for sid, df_s in g.groupby(stop_col, sort=True):
+    for sid, df_s in g.groupby(seg_col, sort=True):
         y = df_s.sort_values(time_col)
         yv = y[rate_col].to_numpy()
         if baseline_window is not None:
             t0, t1 = baseline_window
-            mask = (y[time_col].to_numpy() >= t0) & (y[time_col].to_numpy() < t1)
+            mask = (y[time_col].to_numpy() >= t0) & (
+                y[time_col].to_numpy() < t1)
             base = yv[mask].mean() if mask.any() else 0.0
             yv = yv - base
         if smooth_sigma_bins is not None and smooth_sigma_bins > 0:
@@ -117,11 +123,13 @@ def plot_spaghetti_per_stop(
 
     # median across stops at each time (works if time grid is common; otherwise still a useful pooled summary)
     if show_median:
-        med = g.groupby(time_col)[rate_col].median().reset_index().sort_values(time_col)
+        med = g.groupby(time_col)[rate_col].median(
+        ).reset_index().sort_values(time_col)
         yv = med[rate_col].to_numpy()
         if baseline_window is not None:
             t0, t1 = baseline_window
-            mask = (med[time_col].to_numpy() >= t0) & (med[time_col].to_numpy() < t1)
+            mask = (med[time_col].to_numpy() >= t0) & (
+                med[time_col].to_numpy() < t1)
             base = yv[mask].mean() if mask.any() else 0.0
             yv = yv - base
         if smooth_sigma_bins is not None and smooth_sigma_bins > 0:
@@ -137,27 +145,20 @@ def plot_spaghetti_per_stop(
     return fig, ax, lines_plotted
 
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import statsmodels.api as sm
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import statsmodels.api as sm
-
 def plot_observed_vs_predicted_stop(
     binned_feats_sc: pd.DataFrame,
     binned_spikes: pd.DataFrame,
     meta_used: pd.DataFrame,
     offset_log,                        # 1D np.ndarray or pd.Series aligned to rows
-    model_res,                         # statsmodels GLMResults(_wrapper) for THIS cluster
+    # statsmodels GLMResults(_wrapper) for THIS cluster
+    model_res,
     cluster_idx: int | str,            # column label or positional index in binned_spikes
-    stop_id: int,
+    seg_id: int,
     *,
     time_col: str = 'rel_center',
-    exposure_s: pd.Series | np.ndarray | None = None,  # if None, derived from offset_log
+    seg_col: str = 'stop_id',
+    # if None, derived from offset_log
+    exposure_s: pd.Series | np.ndarray | None = None,
     sort_by_time: bool = True,
     title_prefix: str = 'Observed vs Predicted',
     ax: plt.Axes | None = None,
@@ -178,14 +179,14 @@ def plot_observed_vs_predicted_stop(
     binned_spikes : DataFrame
         Shape (n_bins, n_clusters), integer spike counts per bin.
     meta_used : DataFrame
-        Must include 'stop_id' and the time_col (e.g., 'rel_time').
+        Must include seg_col and the time_col (e.g., 'rel_time').
     offset_log : 1D array-like
         Log-exposure aligned 1:1 with rows of binned_feats_sc/meta_used.
     model_res : GLMResults
         Fitted GLM for this cluster.
     cluster_idx : int | str
         Column index or column name in binned_spikes for the neuron.
-    stop_id : int
+    seg_id : int
         Stop/segment to visualize.
     time_col : str
         Column in meta_used for the x-axis time (relative to stop).
@@ -201,14 +202,15 @@ def plot_observed_vs_predicted_stop(
     Returns
     -------
     tidy : DataFrame
-        Columns: ['time_s', 'obs_hz', 'pred_hz', 'exposure_s', 'cluster', 'stop_id'].
+        Columns: ['time_s', 'obs_hz', 'pred_hz', 'exposure_s', 'cluster', seg_col].
     """
     n = len(meta_used)
     if binned_feats_sc.shape[0] != n or binned_spikes.shape[0] != n:
-        raise ValueError('Row counts must match across features, spikes, and meta.')
+        raise ValueError(
+            'Row counts must match across features, spikes, and meta.')
 
-    if 'stop_id' not in meta_used.columns:
-        raise ValueError('meta_used must contain a "stop_id" column.')
+    if seg_col not in meta_used.columns:
+        raise ValueError(f'meta_used must contain a {seg_col} column.')
     if time_col not in meta_used.columns:
         raise ValueError(f'meta_used must contain "{time_col}".')
 
@@ -222,9 +224,9 @@ def plot_observed_vs_predicted_stop(
             raise ValueError('exposure_s length must match rows of meta_used.')
 
     # --- mask rows for this stop
-    mask = (meta_used['stop_id'].to_numpy() == stop_id)
+    mask = (meta_used[seg_col].to_numpy() == seg_id)
     if not np.any(mask):
-        raise ValueError(f'No rows found for stop_id={stop_id}.')
+        raise ValueError(f'No rows found for {seg_col}={seg_id}.')
 
     # --- slice aligned views
     X_stop_full = binned_feats_sc.loc[mask]
@@ -249,7 +251,6 @@ def plot_observed_vs_predicted_stop(
         y_counts = y_counts.loc[good]
         off_stop = off_stop[good]
         exp_s = exp_s[good]
-
 
     # --- predictions: expected COUNTS per bin
     pred_counts = model_res.predict(X_stop_full, offset=off_stop)
@@ -279,7 +280,7 @@ def plot_observed_vs_predicted_stop(
     ax.axvline(0, color='k', ls='--', lw=1, alpha=0.5)
     ax.set_xlabel('Time relative to stop (s)')
     ax.set_ylabel('Firing rate (Hz)')
-    ax.set_title(f'{title_prefix} • cluster {cluster_label} • stop {stop_id}')
+    ax.set_title(f'{title_prefix} • cluster {cluster_label} • Segment {seg_id}')
     ax.legend()
     plt.tight_layout()
 
@@ -289,5 +290,5 @@ def plot_observed_vs_predicted_stop(
         'pred_hz': pred_rate_hz,
         'exposure_s': exp_s_plot,
         'cluster': cluster_label,
-        'stop_id': stop_id,
+        seg_col: seg_id,
     })

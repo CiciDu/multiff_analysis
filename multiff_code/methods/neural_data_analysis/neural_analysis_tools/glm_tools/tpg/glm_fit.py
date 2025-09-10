@@ -68,57 +68,6 @@ def fit_poisson_glm_trials(
             return model.fit()
 
 
-# def fit_poisson_glm_trials(
-#     design_df: pd.DataFrame,
-#     y: np.ndarray,
-#     dt: float,
-#     trial_ids: np.ndarray,
-#     *,
-#     add_const: bool = True,
-#     l2: float = 0.0,
-#     cluster_se: bool = False,
-# ):
-#     """Fit a Poisson GLM with optional L2 and cluster-robust SEs by trial.
-
-#     Parameters
-#     ----------
-#     design_df : DataFrame
-#         Model matrix with **column names** so coefficients map back to kernels.
-#     y : ndarray
-#         Spike counts per bin.
-#     dt : float
-#         Bin width (seconds). Supplied to ``exposure`` so rates are per second.
-#     trial_ids : ndarray
-#         For ``cov_type='cluster'`` grouping when ``cluster_se`` is True.
-#     add_const : bool, default=True
-#         If True, add an intercept column named ``'const'``.
-#     l2 : float, default=0.0
-#         If > 0, uses ``fit_regularized`` with L2 penalty (no SEs available).
-#     cluster_se : bool, default=True
-#         If True (and ``l2==0``), use cluster-robust covariance by trial.
-
-#     Returns
-#     -------
-#     result : statsmodels result object
-#         ``GLMResults`` when unpenalized; regularized results object otherwise.
-#     """
-#     X_df = design_df.copy()
-#     if add_const:
-#         X_df = sm.add_constant(X_df, has_constant='add')  # preserves names
-#     exposure = np.full_like(y, fill_value=dt, dtype=float)
-
-#     model = sm.GLM(y, X_df, family=sm.families.Poisson(), exposure=exposure)
-#     if l2 > 0:
-#         # Regularized fit (no covariance / SEs by default)
-#         res = model.fit_regularized(alpha=l2, L1_wt=0.0, maxiter=1000)
-#         return res
-#     else:
-#         if cluster_se:
-#             return model.fit(cov_type="cluster", cov_kwds={"groups": trial_ids})
-#         else:
-#             return model.fit()
-
-
 def predict_mu(result, design_df: pd.DataFrame, dt: float, add_const: bool = True) -> np.ndarray:
     """Predict mean bin counts (mu) aligned with a fitted statsmodels GLM result.
 
