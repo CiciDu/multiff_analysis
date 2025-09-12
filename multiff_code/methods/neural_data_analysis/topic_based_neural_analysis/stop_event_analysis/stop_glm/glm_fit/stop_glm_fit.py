@@ -12,7 +12,9 @@
 # - Public functions preserved: add_fdr, add_rate_ratios, term_population_tests,
 #   fit_poisson_glm_per_cluster, glm_mini_report
 # - New knobs are optional and default to your original (no penalty).
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit.glm_fit_utils import *
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import glm_fit_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import plot_spikes, plot_glm_fit
+
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 import warnings
 
@@ -23,7 +25,7 @@ from scipy import stats
 import statsmodels.api as sm
 from pathlib import Path
 from sklearn.model_selection import GroupKFold, KFold
-
+from scipy import stats as _stats
 
 # ---------- small helpers (place near the top of the file) ----------
 
@@ -73,15 +75,15 @@ def record_cluster_outcomes(
     results, coef_rows, metrics_rows, used_refit=False
 ):
     """Common post-fit bookkeeping for both MLE and CV paths."""
-    llf, llnull, dev, dev0 = metrics_from_result(res, y, X, off)
+    llf, llnull, dev, dev0 = glm_fit_utils.metrics_from_result(res, y, X, off)
     # coefficients table (SE/p may be NaN for penalized fits)
     coef_rows.extend(
-        collect_coef_rows(feature_names, cid, res, alpha=0.0,
+        glm_fit_utils.collect_coef_rows(feature_names, cid, res, alpha=0.0,
                           l1_wt=0.0, used_refit=False)
     )
 
     # metrics table
-    mr = collect_metric_row(cid, n, llf, llnull, dev,
+    mr = glm_fit_utils.collect_metric_row(cid, n, llf, llnull, dev,
                             dev0, alpha_val, l1_wt_val)
     _flag_and_update_metrics_row(mr, res, y, condX)
     metrics_rows.append(mr)
@@ -109,7 +111,7 @@ def fit_poisson_glm_per_cluster(
     use_overdispersion_scale=False
 ):
     """Fit Poisson GLMs per cluster with optional Elastic-Net and CV."""
-    feature_names, X, off, n, cluster_ids = _validate_shapes(
+    feature_names, X, off, n, cluster_ids = glm_fit_utils._validate_shapes(
         df_X, df_Y, offset_log, cluster_ids)
     condX_once = float(np.linalg.cond(np.asarray(df_X, float)))
 
@@ -129,7 +131,7 @@ def fit_poisson_glm_per_cluster(
                 continue
 
             # unpenalized single fit (with your fallback inside _fit_once)
-            res = _fit_once(
+            res = glm_fit_utils._fit_once(
                 y=y, X=X, off=off, cov_type=cov_type,
                 regularization='none', alpha=0.0, l1_wt=0.0,
                 use_overdispersion_scale=use_overdispersion_scale,
@@ -146,7 +148,7 @@ def fit_poisson_glm_per_cluster(
         return pd.Series(results).to_dict(), pd.DataFrame(coef_rows), pd.DataFrame(metrics_rows), pd.DataFrame()
 
     # ----------------------- regular path with tuning ------------------------
-    folds = _build_folds(n, n_splits=n_splits,
+    folds = glm_fit_utils._build_folds(n, n_splits=n_splits,
                          groups=groups, cv_splitter=cv_splitter)
     results, coef_rows, metrics_rows, cv_tables = {}, [], [], []
 
@@ -160,7 +162,7 @@ def fit_poisson_glm_per_cluster(
             continue
 
         # Hyperparam search → best full fit
-        best, cv_table = _hyperparam_search(
+        best, cv_table = glm_fit_utils._hyperparam_search(
             y=y, X=X, off=off, folds=folds, cov_type=cov_type,
             regularization=regularization,
             alpha_grid=alpha_grid, l1_wt_grid=l1_wt_grid,
@@ -171,7 +173,7 @@ def fit_poisson_glm_per_cluster(
         res = best['res']
 
         # Optional L1 refit on support to recover SE/p
-        res, used_refit = _refit_l1_support_if_needed(
+        res, used_refit = glm_fit_utils._refit_l1_support_if_needed(
             res, y, X, off, cov_type,
             regularization, best['alpha'], best['l1_wt'],
             refit_on_support, use_overdispersion_scale=use_overdispersion_scale
@@ -240,8 +242,8 @@ def fit_poisson_glm_per_cluster_fast_mle(
 
         # Unpenalized Newton/IRLS with robust fallback (tiny ridge), then (try) unpen refit
         model = sm.GLM(y, X, family=fam, offset=off)
-        attach_feature_names(model, feature_names)
-        res = fit_with_fallback(
+        glm_fit_utils.attach_feature_names(model, feature_names)
+        res = glm_fit_utils.fit_with_fallback(
             model, cov_type=cov_type, use_overdispersion_scale=False,
             maxiter=maxiter, try_unpenalized_refit=True
         )
@@ -345,7 +347,6 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr):
         # try z → p
         z = df.get('z', None)
         if z is not None and np.isfinite(z).any():
-            from scipy import stats as _stats
             df['p'] = 2.0 * _stats.norm.sf(np.abs(z))
         else:
             # try coef/se → p
@@ -355,7 +356,6 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr):
                 with np.errstate(divide='ignore', invalid='ignore'):
                     z = df['coef'] / se
                 df['z'] = z
-                from scipy import stats as _stats
                 df['p'] = 2.0 * _stats.norm.sf(np.abs(z))
             else:
                 # last resort: create NaN p's so add_fdr can still run
@@ -366,25 +366,25 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr):
 
     if do_inference:
         try:
-            df = add_fdr(df, alpha=alpha, by_term=has_term)
+            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=has_term)
         except KeyError:
             # safety net if helper still enforces 'term'
-            df = add_fdr(df, alpha=alpha, by_term=False)
+            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=False)
 
         # add rate ratios if possible
         if 'coef' in df.columns:
             if 'se' not in df.columns:
                 df['se'] = np.nan
-            df = add_rate_ratios(df, delta=delta_for_rr)
-        pop = term_population_tests(df) if has_term else pd.DataFrame()
+            df = glm_fit_utils.add_rate_ratios(df, delta=delta_for_rr)
+        pop = glm_fit_utils.term_population_tests(df) if has_term else pd.DataFrame()
         return df, pop
 
     # not doing inference, but ensure FDR exists for plotting legends
     if make_plots and ('sig_FDR' not in df.columns):
         try:
-            df = add_fdr(df, alpha=alpha, by_term=has_term)
+            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=has_term)
         except KeyError:
-            df = add_fdr(df, alpha=alpha, by_term=False)
+            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=False)
 
     return df, pd.DataFrame()
 

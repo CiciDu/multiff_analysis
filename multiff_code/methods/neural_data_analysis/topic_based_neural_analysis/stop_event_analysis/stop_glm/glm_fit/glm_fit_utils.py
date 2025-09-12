@@ -1,8 +1,9 @@
 from statsmodels.stats.multitest import multipletests
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import plot_spikes, plot_glm_fit
 
-import numpy as np
+
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 import statsmodels.api as sm
@@ -262,6 +263,46 @@ def _score_from_beta(beta, X_val, off_val, y_val, metric='loglik'):
     if metric == 'deviance':
         return -_poisson_deviance(y_val, mu_val)
     return float(np.sum(_poisson_loglik(y_val, mu_val)))
+
+import numpy as np
+from scipy import stats
+
+def _poisson_mu_from_eta(eta, clip=(-50.0, 50.0)):
+    """
+    Canonical link for Poisson: mu = exp(eta).
+    """
+    if clip is not None:
+        lo, hi = clip
+        eta = np.clip(np.asarray(eta, dtype=float), lo, hi)
+    else:
+        eta = np.asarray(eta, dtype=float)
+    return np.exp(eta)
+
+
+def _poisson_loglik(y, mu, eps=1e-12):
+    """
+    Pointwise log-likelihood for Poisson(y | mu).
+
+    We return the full log pmf (including log(y!)) so CV scores are comparable.
+    This function returns one value per observation, not a sum.
+    """
+    y = np.asarray(y, dtype=float)
+    mu = np.clip(np.asarray(mu, dtype=float), eps, None)
+    return stats.poisson(mu).logpmf(y)
+
+
+def _poisson_deviance(y, mu, eps=1e-12):
+    """
+    Poisson deviance:
+        D = 2 * sum( y * log(y / mu) - (y - mu) )
+    with the convention y*log(y/.) := 0 when y == 0.
+    """
+    y = np.asarray(y, dtype=float)
+    mu = np.clip(np.asarray(mu, dtype=float), eps, None)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        term = np.where(y > 0.0, y * np.log(y / mu), 0.0)
+    return float(2.0 * np.sum(term - (y - mu)))
 
 
 def _validate_shapes(df_X, df_Y, offset_log, cluster_ids):
@@ -633,9 +674,6 @@ def summarize_large_coeffs(coefs_df, df_X, top_n=20, beta_abs_thresh=8.0, rr_thr
     """
     Flag large coefficients and report more interpretable 'rate ratio per 1 SD' (RR_1sd).
     """
-    import numpy as np
-    import pandas as pd
-
     # 1SD per column (binary: SD≈sqrt(p(1-p)); still fine for RR scaling)
     sd = df_X.std(axis=0, ddof=0).replace(0, np.nan)   # avoid zero division
     sd_map = sd.to_dict()
@@ -661,7 +699,7 @@ def summarize_large_coeffs(coefs_df, df_X, top_n=20, beta_abs_thresh=8.0, rr_thr
 
 
 def has_all_finite_params(res):
-    import numpy as np
+    
     try:
         b = np.asarray(getattr(res, 'params', np.nan), float)
         return np.isfinite(b).all()
@@ -687,7 +725,7 @@ def mark_result(res, *, used_ridge, msg, is_penalized, tried=None):
 
 
 def ensure_fields_present(res, p):
-    import numpy as np
+    
     if not hasattr(res, 'bse'):
         res.bse = np.full(p, np.nan, float)
     if not hasattr(res, 'pvalues'):
@@ -696,8 +734,6 @@ def ensure_fields_present(res, p):
 
 
 def try_unpenalized(model, *, cov_type, use_overdispersion_scale, maxiter, start_params=None):
-    import warnings
-    from statsmodels.tools.sm_exceptions import ConvergenceWarning
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always', ConvergenceWarning)
         try:
@@ -712,7 +748,7 @@ def try_unpenalized(model, *, cov_type, use_overdispersion_scale, maxiter, start
 
 
 def ridge_once(model, a, const_ix):
-    import numpy as np
+    
     p = int(model.exog.shape[1])
     alpha_vec = np.full(p, float(a), dtype=float)
     if const_ix is not None:
@@ -725,7 +761,7 @@ def inject_baseline_intercept_if_needed(res):
     If params are all zeros (or intercept is non-finite) and an intercept exists,
     set it to log(mean rate) adjusted for offset so predictions are sane.
     """
-    import numpy as np
+    
     model = getattr(res, 'model', None)
     if model is None:
         return res
@@ -768,7 +804,7 @@ def inject_baseline_intercept_if_needed(res):
 
 def coerce_params_finite_inplace(res):
     """NaN/±inf → 0.0 (keeps vector finite)."""
-    import numpy as np
+    
     try:
         b = np.asarray(res.params, float)
     except Exception:
@@ -791,7 +827,7 @@ def coerce_params_finite_inplace(res):
 
 
 def make_ridge_partial_result(last_ridge, last_alpha, tried):
-    import numpy as np
+    
 
     class _RidgeCoercedRes:
         pass
@@ -814,7 +850,7 @@ def make_ridge_partial_result(last_ridge, last_alpha, tried):
 
 
 def make_baseline_result(model, const_ix, last_alpha, tried):
-    import numpy as np
+    
 
     class _BaselineRes:
         pass
@@ -856,7 +892,7 @@ def fit_with_fallback(
     Additionally, if the returned vector is all zeros and an intercept exists,
     we inject a baseline intercept so predictions are meaningful.
     """
-    import numpy as np
+    
 
     # 1) Unpenalized
     res = try_unpenalized(model, cov_type=cov_type,

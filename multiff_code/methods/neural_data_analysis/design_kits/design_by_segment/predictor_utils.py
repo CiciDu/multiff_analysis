@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Sequence, Optional, Tuple, List, Mapping
 
 import warnings
-from neural_data_analysis.neural_analysis_tools.glm_tools.prep_predictors import other_feats
+from neural_data_analysis.design_kits.design_by_segment import other_feats
 import numpy as np
 import pandas as pd
 from scipy import signal
@@ -15,7 +15,7 @@ from scipy.linalg import qr
 
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.glm_tools.prep_predictors import temporal_feats
+from neural_data_analysis.design_kits.design_by_segment import temporal_feats
 
 
 def check_design_vs_bases(

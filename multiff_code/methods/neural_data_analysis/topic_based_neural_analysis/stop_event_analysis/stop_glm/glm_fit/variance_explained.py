@@ -1,35 +1,3 @@
-
-"""
-stop_glm_metrics.py
-===================
-
-Variance-explained metrics for stop-aligned GLMs and related models.
-
-Implements two complementary families of evaluation metrics:
-
-1. Single-neuron temporal variance explained (VE)
-   - For each neuron, compute how much of its firing rate variance over time
-     is captured by the model’s predictions.
-   - Formula: VE_j = 1 - Var_t(y_j - yhat_j) / Var_t(y_j)
-   - Report distribution across neurons, plus mean/median/weighted summary.
-
-2. Population structure variance explained (VE in PC-space)
-   - Assemble the population matrix (time x neurons).
-   - Define a low-dimensional subspace via PCA on observed activity.
-   - Project both observed and predicted activity into this subspace.
-   - Compare structures via Frobenius norm similarity:
-       VE_pop = 1 - ||X_proj - Y_proj||_F^2 / ||X_proj||_F^2
-   - Mirrors Lakshminarasimhan et al. (Nature 2023).
-
-Also includes:
-- Per-stop breakdown (grouped by stop_id) for condition-wise VE analysis.
-- Utilities for safe variance computation and shape checking.
-
-References
-----------
-Lakshminarasimhan, K.J., et al. (2023).
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -205,7 +173,7 @@ def _safe_var(a, axis=0, ddof=0):
     Why:
       - VE = 1 - Var(resid)/Var(obs) → zero (or near-zero) Var(obs) explodes.
       - Some neurons can be almost constant within a short window (low firing),
-        especially with small T per stop; we clamp denominators conservatively.
+        especially with small T per event; we clamp denominators conservatively.
 
     Returns
     -------
@@ -407,24 +375,24 @@ def population_VE_in_PCspace(X, X_hat, *, k=10, var_thresh=None, center=True, ep
     ve = max(0.0, min(1.0, ve))
     return ve, k_eff
 
-def per_stop_breakdown(X, X_hat, *, stop_ids, k=10, var_thresh=None, center=True, eps=1e-12):
+def per_event_breakdown(X, X_hat, *, event_ids, k=10, var_thresh=None, center=True, eps=1e-12):
     """
-    Compute per-stop population VE (in PC space) and single-neuron temporal VE.
+    Compute per-event population VE (in PC space) and single-neuron temporal VE.
     Skips/zeros out degenerate windows safely.
     """
-    # Expect X, X_hat as (T × N) arrays; stop_ids length T
+    # Expect X, X_hat as (T × N) arrays; event_ids length T
     X = np.asarray(X, float)
     Y = np.asarray(X_hat, float)
     if X.shape != Y.shape:
         raise ValueError(f"X and X_hat must have same shape, got {X.shape} vs {Y.shape}")
 
-    stop_ids = np.asarray(stop_ids)
-    if stop_ids.shape[0] != X.shape[0]:
-        raise ValueError("stop_ids length must match number of time bins in X/X_hat")
+    event_ids = np.asarray(event_ids)
+    if event_ids.shape[0] != X.shape[0]:
+        raise ValueError("event_ids length must match number of time bins in X/X_hat")
 
     rows = []
-    for sid in pd.unique(stop_ids):
-        m = (stop_ids == sid)
+    for sid in pd.unique(event_ids):
+        m = (event_ids == sid)
         T_win = int(m.sum())
         if T_win == 0:
             continue
@@ -448,14 +416,14 @@ def per_stop_breakdown(X, X_hat, *, stop_ids, k=10, var_thresh=None, center=True
         ve_unit_mean = float(np.nanmean(ve_unit)) if np.isfinite(ve_unit).any() else 0.0
 
         rows.append({
-            'stop_id': sid,
+            'event_id': sid,
             'n_bins': T_win,
             've_pop': float(ve_pop),
             'k_eff': int(k_eff),
             've_unit_mean': ve_unit_mean
         })
 
-    return pd.DataFrame(rows, columns=['stop_id', 'n_bins', 've_pop', 'k_eff', 've_unit_mean'])
+    return pd.DataFrame(rows, columns=['event_id', 'n_bins', 've_pop', 'k_eff', 've_unit_mean'])
 
 
 

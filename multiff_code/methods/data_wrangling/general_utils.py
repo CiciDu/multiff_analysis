@@ -318,7 +318,7 @@ def convert_bool_to_int(df):
     return df
 
 
-def drop_columns_with_many_nans(df, threshold=0.3):
+def drop_columns_with_many_nans(df, threshold=0.5):
     """
     Drops columns from the DataFrame that have more than `threshold` proportion of missing values.
     """

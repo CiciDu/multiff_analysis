@@ -31,7 +31,7 @@ def make_rate_df_from_binned(
     binned_spikes2: pd.DataFrame,
     unit_col: str | int,
     *,
-    seg_col: str = 'stop_id',
+    seg_col: str = 'event_id',
     time_col: str = 'rel_center',
     left_col: str = 't_left',
     right_col: str = 't_right',
@@ -69,7 +69,7 @@ def make_rate_df_from_binned(
 def plot_spaghetti_per_stop(
     df_rate: pd.DataFrame,
     *,
-    seg_col: str = 'stop_id',
+    seg_col: str = 'event_id',
     time_col: str = 'rel_center',
     rate_col: str = 'rate_hz',
     smooth_sigma_bins: Optional[float] = None,
@@ -145,7 +145,7 @@ def plot_spaghetti_per_stop(
     return fig, ax, lines_plotted
 
 
-def plot_observed_vs_predicted_stop(
+def plot_observed_vs_predicted_event(
     binned_feats_sc: pd.DataFrame,
     binned_spikes: pd.DataFrame,
     meta_used: pd.DataFrame,
@@ -156,7 +156,7 @@ def plot_observed_vs_predicted_stop(
     seg_id: int,
     *,
     time_col: str = 'rel_center',
-    seg_col: str = 'stop_id',
+    seg_col: str = 'event_id',
     # if None, derived from offset_log
     exposure_s: pd.Series | np.ndarray | None = None,
     sort_by_time: bool = True,

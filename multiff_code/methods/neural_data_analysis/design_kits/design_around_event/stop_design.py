@@ -39,49 +39,48 @@ def _align_meta_to_pos(meta, pos):
     Ensures we have absolute bin center time `t_center` for each modeled bin.
     """
     if 't_center' not in meta.columns:
-        if {'stop_time', 'rel_center'}.issubset(meta.columns):
+        if {'event_time', 'rel_center'}.issubset(meta.columns):
             meta = meta.copy()
             meta['t_center'] = np.asarray(
-                meta['stop_time'] + meta['rel_center'], float)
+                meta['event_time'] + meta['rel_center'], float)
         else:
             raise ValueError(
-                'meta needs t_center, or both stop_time and rel_center to reconstruct it.')
+                'meta needs t_center, or both event_time and rel_center to reconstruct it.')
     meta_by_bin = meta.set_index('bin').sort_index()
     m = meta_by_bin.loc[np.asarray(pos, int)].copy()
     return m, meta_by_bin
 
 
-def _build_per_stop_table(new_seg_info, extras=('cond', 'duration', 'captured')):
+def _build_per_event_table(new_seg_info, extras=('cond', 'duration', 'captured')):
     """
-    Build a per-stop table:
-      - stop_id, stop_time
+    Build a per-event table:
+      - event_id, event_time
       - (optional) cond, duration, captured
-      - prev_stop_time, next_stop_time for history context
+      - prev_event_time, next_event_time for history context
     """
-    required = {'stop_id', 'stop_time'}
+    required = {'event_id', 'event_time'}
     if not required.issubset(new_seg_info.columns):
         raise ValueError(
-            'new_seg_info must contain columns: stop_id, stop_time')
-    stop_tbl = (new_seg_info[['stop_id', 'stop_time']]
-                .drop_duplicates('stop_id')
-                .sort_values('stop_time')
-                .reset_index(drop=True))
+            'new_seg_info must contain columns: event_id, event_time')
+    event_tbl = (new_seg_info[['event_id', 'event_time']]
+                 .drop_duplicates('event_id')
+                 .sort_values('event_time')
+                 .reset_index(drop=True))
     extra_cols = [c for c in extras if c in new_seg_info.columns]
     if extra_cols:
-        stop_tbl = stop_tbl.merge(new_seg_info[['stop_id'] + extra_cols]
-                                  .drop_duplicates('stop_id'), on='stop_id', how='left')
-    stop_tbl['prev_stop_time'] = stop_tbl['stop_time'].shift(1)
-    stop_tbl['next_stop_time'] = stop_tbl['stop_time'].shift(-1)
-    return stop_tbl
+        event_tbl = event_tbl.merge(new_seg_info[['event_id'] + extra_cols]
+                                    .drop_duplicates('event_id'), on='event_id', how='left')
+    event_tbl['prev_event_time'] = event_tbl['event_time'].shift(1)
+    event_tbl['next_event_time'] = event_tbl['event_time'].shift(-1)
+    return event_tbl
 
-
-def _join_per_stop_avoid_collisions(m, stop_tbl):
+def _join_event_tbl_avoid_collisions(m, event_tbl):
     """
-    Left-join per-stop features into per-bin metadata without overwriting existing columns.
+    Left-join per-event features into per-bin metadata without overwriting existing columns.
     """
-    per_stop = stop_tbl.set_index('stop_id')
-    cols_to_add = [c for c in per_stop.columns if c not in m.columns]
-    return m.join(per_stop[cols_to_add], on='stop_id')
+    event_tbl = event_tbl.set_index('event_id')
+    cols_to_add = [c for c in event_tbl.columns if c not in m.columns]
+    return m.join(event_tbl[cols_to_add], on='event_id')
 
 
 def _expand_cond_dummies(m, drop_first_cond=True):
@@ -98,13 +97,13 @@ def _expand_cond_dummies(m, drop_first_cond=True):
     return cond_dum.to_numpy(dtype=float), list(cond_dum.columns)
 
 
-def _compute_core_stop_features(m, meta_by_bin):
+def _compute_core_event_features(m, meta_by_bin):
     """
-    Core per-bin stop features:
-      rel_t    : time relative to stop center (seconds)
-      prepost  : 0=pre-stop, 1=post-stop
-      straddle : 1 if bin spans across stop time (rel_left<0<rel_right)
-      k_norm   : normalized within-stop position in [0,1]
+    Core per-bin event features:
+      rel_t    : time relative to event center (seconds)
+      prepost  : 0=pre-event, 1=post-event
+      straddle : 1 if bin spans across event time (rel_left<0<rel_right)
+      k_norm   : normalized within-event position in [0,1]
     """
     rel_t = m['rel_center'].to_numpy(dtype=float)
     prepost = (~m['is_pre'].to_numpy(dtype=bool)).astype(
@@ -112,10 +111,10 @@ def _compute_core_stop_features(m, meta_by_bin):
     straddle = ((m['rel_left'] < 0) & (m['rel_right'] > 0)
                 ).astype(np.float64).to_numpy()
 
-    # normalized within-stop position
-    kmax_per_stop = meta_by_bin.groupby('stop_id')['k_within_stop'].max()
-    k_norm = (m['k_within_stop'] /
-              m['stop_id'].map(kmax_per_stop).replace(0, np.nan)).astype(float).fillna(0.0).to_numpy()
+    # normalized within-event position
+    kmax_event_tbl = meta_by_bin.groupby('event_id')['k_within_seg'].max()
+    k_norm = (m['k_within_seg'] /
+              m['event_id'].map(kmax_event_tbl).replace(0, np.nan)).astype(float).fillna(0.0).to_numpy()
     return rel_t, prepost, straddle, k_norm
 
 
@@ -141,22 +140,22 @@ def _to_seconds(arr):
 def _compute_history_base_vars(m):
     """
     Primitive timing vars for history (all in seconds):
-      ts_prev    : seconds since previous stop (NaN if none)
-      ts_next    : seconds until next stop (NaN if none)
+      ts_prev    : seconds since previous event (NaN if none)
+      ts_next    : seconds until next event (NaN if none)
       ts_prev_f  : ts_prev with NaN→0
       ts_next_f  : ts_next with NaN→0
-      duration_f : stop duration (seconds, NaN→0 if missing)
+      duration_f : event duration (seconds, NaN→0 if missing)
     Expects columns:
-      - 't_center' (time of current stop alignment center)
-      - 'prev_stop_time' (time of previous stop or NaT/NaN)
-      - 'next_stop_time' (time of next stop or NaT/NaN)
+      - 't_center' (time of current event alignment center)
+      - 'prev_event_time' (time of previous event or NaT/NaN)
+      - 'next_event_time' (time of next event or NaT/NaN)
       - optional 'duration' (seconds or Timedelta)
     """
     # Differences → may be Timedelta; convert to seconds robustly
     ts_prev_sec = _to_seconds(
-        m['t_center'] - m['prev_stop_time'])   # NaN for first stop
+        m['t_center'] - m['prev_event_time'])   # NaN for first event
     ts_next_sec = _to_seconds(
-        m['next_stop_time'] - m['t_center'])   # NaN for last stop
+        m['next_event_time'] - m['t_center'])   # NaN for last event
 
     ts_prev_f = np.nan_to_num(ts_prev_sec, nan=0.0)
     ts_next_f = np.nan_to_num(ts_next_sec, nan=0.0)
@@ -181,13 +180,13 @@ def _make_history_block(
     ----------
     include_columns : iterable of str
         Any of:
-          'time_since_prev_stop', 'time_to_next_stop',
-          'time_since_prev_stop_pre', 'time_to_next_stop_post',
+          'time_since_prev_event', 'time_to_next_event',
+          'time_since_prev_event_pre', 'time_to_next_event_post',
           'isi_len', 'mid_offset',
     prepost : array-like (n_bins,)
-        0 for pre-stop, 1 for post-stop (relative to current stop_id).
+        0 for pre-event, 1 for post-event (relative to current event_id).
     ts_prev, ts_next : arrays (n_bins,)
-        Raw seconds since previous / until next stop (can contain NaN).
+        Raw seconds since previous / until next event (can contain NaN).
     ts_prev_f, ts_next_f : arrays (n_bins,)
         Same as above but with NaN→0 already applied.
 
@@ -198,20 +197,20 @@ def _make_history_block(
     '''
 
     # ensure 1D float arrays
-    prepost   = np.asarray(prepost,  float).reshape(-1)
-    ts_prev   = np.asarray(ts_prev,  float).reshape(-1)
-    ts_next   = np.asarray(ts_next,  float).reshape(-1)
+    prepost = np.asarray(prepost,  float).reshape(-1)
+    ts_prev = np.asarray(ts_prev,  float).reshape(-1)
+    ts_next = np.asarray(ts_next,  float).reshape(-1)
     ts_prev_f = np.asarray(ts_prev_f, float).reshape(-1)
     ts_next_f = np.asarray(ts_next_f, float).reshape(-1)
 
     # derived features
-    ts_prev_pre  = (1.0 - prepost) * ts_prev_f   # active in PRE window
+    ts_prev_pre = (1.0 - prepost) * ts_prev_f   # active in PRE window
     ts_next_post = prepost * ts_next_f           # active in POST window
 
-    isi_len       = ts_prev + ts_next
-    mid_offset    = 0.5 * (ts_next - ts_prev)    # negative -> closer to prev stop
-    isi_len_f     = np.nan_to_num(isi_len, nan=0.0)
-    mid_offset_f  = np.nan_to_num(mid_offset, nan=0.0)
+    isi_len = ts_prev + ts_next
+    mid_offset = 0.5 * (ts_next - ts_prev)    # negative -> closer to prev event
+    isi_len_f = np.nan_to_num(isi_len, nan=0.0)
+    mid_offset_f = np.nan_to_num(mid_offset, nan=0.0)
 
     # include set + bundles
     inc = set(include_columns or [])
@@ -224,15 +223,15 @@ def _make_history_block(
             blocks.append(col[:, None])
             names.append(name)
 
-    if 'time_since_prev_stop' in inc:
-        _add('time_since_prev_stop', ts_prev_f)
-    if 'time_to_next_stop' in inc:
-        _add('time_to_next_stop', ts_next_f)
+    if 'time_since_prev_event' in inc:
+        _add('time_since_prev_event', ts_prev_f)
+    if 'time_to_next_event' in inc:
+        _add('time_to_next_event', ts_next_f)
 
-    if 'time_since_prev_stop_pre' in inc:
-        _add('time_since_prev_stop_pre', ts_prev_pre)
-    if 'time_to_next_stop_post' in inc:
-        _add('time_to_next_stop_post', ts_next_post)
+    if 'time_since_prev_event_pre' in inc:
+        _add('time_since_prev_event_pre', ts_prev_pre)
+    if 'time_to_next_event_post' in inc:
+        _add('time_to_next_event_post', ts_next_post)
 
     if 'isi_len' in inc:
         _add('isi_len', isi_len_f)
@@ -244,7 +243,7 @@ def _make_history_block(
 
 def _make_capture_block(m):
     """
-    Capture covariate: 0/1 indicator across all bins of a stop (if available).
+    Capture covariate: 0/1 indicator across all bins of a event (if available).
     """
     captured = m['captured'].fillna(0).to_numpy(
         dtype=float) if 'captured' in m.columns else None
@@ -253,7 +252,7 @@ def _make_capture_block(m):
 # ------------------------- main builder -------------------------------------
 
 
-def build_stop_design_from_meta(
+def build_event_design_from_meta(
     meta: pd.DataFrame,
     pos: np.ndarray,
     new_seg_info: pd.DataFrame,
@@ -264,41 +263,41 @@ def build_stop_design_from_meta(
     add_interactions: bool = True,
     drop_first_cond: bool = True,
     include_columns=(
-        'prepost', 'duration', 'time_since_prev_stop', 'cond_dummies',
+        'prepost', 'duration', 'time_since_prev_event', 'cond_dummies',
         # optional extras: 'straddle','k_norm','basis','prepost*speed',
         # capture: 'captured','basis*captured','prepost*captured',
     )
 ):
     '''
-    Build stop-aware predictors aligned to fitted rows (pos).
+    Build event-aware predictors aligned to fitted rows (pos).
 
     Available columns (no z-scoring here):
       - prepost                  : 0=pre, 1=post
-      - straddle                 : bin spans across the stop time
-      - k_norm                   : normalized within-stop position [0,1]
-      - duration                 : stop duration in seconds
+      - straddle                 : bin spans across the event time
+      - k_norm                   : normalized within-event position [0,1]
+      - duration                 : event duration in seconds
       - cond_dummies             : one-hot condition indicators
-      - basis                    : raised-cosine over rel time (peri-stop shape)
+      - basis                    : raised-cosine over rel time (peri-event shape)
       - prepost*speed            : interaction (pre vs post) × (speed_used)
-      - captured                 : 0/1 capture indicator (per stop)
-      - basis*captured           : capture-modulated peri-stop basis
+      - captured                 : 0/1 capture indicator (per event)
+      - basis*captured           : capture-modulated peri-event basis
       - prepost*captured         : interaction of prepost and captured
-      - time_since_prev_stop     : seconds since previous stop (NaN→0)
-      - time_to_next_stop        : seconds until next stop (NaN→0)
-      - time_since_prev_stop_pre: post-only gated since-prev (pre bins=0)
-      - time_to_next_stop_post    : pre-only gated to-next (post bins=0)
-      - isi_len                  : total inter-stop interval length (seconds)
+      - time_since_prev_event     : seconds since previous event (NaN→0)
+      - time_to_next_event        : seconds until next event (NaN→0)
+      - time_since_prev_event_pre: post-only gated since-prev (pre bins=0)
+      - time_to_next_event_post    : pre-only gated to-next (post bins=0)
+      - isi_len                  : total inter-event interval length (seconds)
       - mid_offset               : signed offset from midpoint (seconds)
     '''
     # 1) align meta → m
     m, meta_by_bin = _align_meta_to_pos(meta, pos)
 
-    # 2) per-stop table
-    stop_tbl = _build_per_stop_table(new_seg_info)
-    m = _join_per_stop_avoid_collisions(m, stop_tbl)
+    # 2) per-event table
+    event_tbl = _build_per_event_table(new_seg_info)
+    m = _join_event_tbl_avoid_collisions(m, event_tbl)
 
-    # 3) core stop features
-    rel_t, prepost, straddle, k_norm = _compute_core_stop_features(
+    # 3) core event features
+    rel_t, prepost, straddle, k_norm = _compute_core_event_features(
         m, meta_by_bin)
 
     # 4) history vars
@@ -362,63 +361,26 @@ def build_stop_design_from_meta(
     if 'basis*captured' in include_columns and BxCaptured is not None:
         blocks.append(BxCaptured)
         names += BxCaptured_names
-    
+
     H_blocks, H_names = _make_history_block(
         include_columns,
         prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
     )
-    
+
     if H_blocks:
         blocks += H_blocks
         names += H_names
 
     # pack & sanitize
     if not blocks:
-        X_stop = np.zeros((len(m), 1), float)
+        X_event = np.zeros((len(m), 1), float)
         names = ['_zeros_']
     else:
-        X_stop = np.column_stack(blocks).astype(float)
-    X_stop = np.nan_to_num(X_stop, nan=0.0, posinf=0.0, neginf=0.0)
+        X_event = np.column_stack(blocks).astype(float)
+    X_event = np.nan_to_num(X_event, nan=0.0, posinf=0.0, neginf=0.0)
 
-    X_stop_df = pd.DataFrame(X_stop, columns=names,
-                             index=np.arange(len(X_stop)))
-    return X_stop_df
+    X_event_df = pd.DataFrame(X_event, columns=names,
+                             index=np.arange(len(X_event)))
+    return X_event_df
 
 # ------------------------- programmatic feature glossary ---------------------
-
-
-FEATURE_DESCRIPTIONS = {
-    # core stop context
-    'prepost': '0 for bins before the stop center; 1 for bins after the stop center.',
-    'straddle': '1 if a bin’s left/right edges cross the stop center (rel_left<0<rel_right); else 0.',
-    'k_norm': 'Normalized within-stop position in [0,1], based on k_within_stop / max k within that stop.',
-    'duration': 'Stop duration in seconds for the current stop (NaN→0).',
-
-    # condition dummies
-    # (actual names are generated like 'cond_X', 'cond_Y', ... depending on your data)
-    'cond_*': 'One-hot dummy columns for condition labels (first level may be dropped to avoid collinearity).',
-
-    # peri-stop temporal basis
-    # (actual names are generated like 'rcos_-0.08s', 'rcos_+0.08s', ...)
-    'rcos_*': 'Raised cosine basis functions over time relative to stop center (rel_t).',
-
-    # interactions
-    'prepost*speed': 'Interaction between prepost (0/1) and the instantaneous speed used for this model row.',
-    'prepost*captured': 'Interaction between prepost (0/1) and the captured indicator (0/1).',
-    'basis*captured': 'Elementwise product of peri-stop basis columns and the captured indicator.',
-
-    # capture
-    'captured': 'Per-stop 0/1 flag: 1 if this stop culminated in capture; else 0.',
-
-    # history: single
-    'time_since_prev_stop': 'Seconds since the previous stop (NaN→0 for first stop).',
-    'time_to_next_stop': 'Seconds until the next stop (NaN→0 for last stop).',
-
-    # history: gated
-    'time_since_prev_stop_pre': 'Post-only version of time_since_prev_stop; pre bins are 0.',
-    'time_to_next_stop_post': 'Pre-only version of time_to_next_stop; post bins are 0.',
-
-    # history: sumdiff
-    'isi_len': 'Total inter-stop interval length in seconds: (next_stop_time - prev_stop_time).',
-    'mid_offset': 'Signed offset from the midpoint of the inter-stop interval in seconds; negative=closer to prev stop, positive=closer to next stop.',
-}

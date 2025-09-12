@@ -11,8 +11,7 @@ from scipy.interpolate import BSpline
 
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.glm_tools.prep_predictors import temporal_feats, spatial_feats, predictor_utils
-
+from neural_data_analysis.design_kits.design_by_segment import temporal_feats, spatial_feats, predictor_utils
 
 import numpy as np
 import pandas as pd
@@ -99,7 +98,8 @@ def _transform_single(
         x = _robust_z(v)
         center, scale = True, True
     else:
-        raise ValueError("transform must be one of {'linear','log','log1p','sqrt','zscore','standardize'}")
+        raise ValueError(
+            "transform must be one of {'linear','log','log1p','sqrt','zscore','standardize'}")
 
     # Impute with mean of transformed values
     mask = np.isfinite(x)
@@ -133,7 +133,8 @@ def _odd_component(v: np.ndarray, kind: str, mag_eps: float) -> np.ndarray:
     elif k == 'signed_log1p':
         odd = np.sign(v) * np.log1p(np.abs(v))
     else:
-        raise ValueError("odd_kind must be in {'zscore','linear','signed_sqrt','signed_log1p'}")
+        raise ValueError(
+            "odd_kind must be in {'zscore','linear','signed_sqrt','signed_log1p'}")
     if not np.isfinite(odd).any():
         raise ValueError('Odd component has no finite values.')
     return np.where(np.isfinite(odd), odd, 0.0).astype(float)
@@ -172,7 +173,8 @@ def _register_passthrough_col(meta: dict, col: str, *, source: Union[str, ArrayL
     m['groups'] = groups
 
     raw_specs = dict(m.get('raw_specs', {}))
-    raw_specs[col] = {**spec, 'source': source if isinstance(source, str) else 'array'}
+    raw_specs[col] = {
+        **spec, 'source': source if isinstance(source, str) else 'array'}
     m['raw_specs'] = raw_specs
 
     raw_cols = list(m.get('raw_cols', [])) + [col]
@@ -223,7 +225,8 @@ def add_raw_feature(
     encoding='single'  -> one column: <name>
     encoding='odd_even'-> two columns: <name>_odd, <name>_mag
     """
-    v, base = _coerce_feature_vec(feature, data=data, rows_mask=rows_mask, name=name)
+    v, base = _coerce_feature_vec(
+        feature, data=data, rows_mask=rows_mask, name=name)
     out = design_df.copy()
 
     if encoding.lower() == 'odd_even':
@@ -234,12 +237,15 @@ def add_raw_feature(
         out[mag_name] = mag
         if meta is None:
             return out, None
-        m = _register_passthrough_col(meta, odd_name, source=feature, spec={'encoding': 'odd', 'odd_kind': odd_kind})
-        m = _register_passthrough_col(m, mag_name, source=feature, spec={'encoding': 'even', 'even_kind': even_kind})
+        m = _register_passthrough_col(meta, odd_name, source=feature, spec={
+                                      'encoding': 'odd', 'odd_kind': odd_kind})
+        m = _register_passthrough_col(m, mag_name, source=feature, spec={
+                                      'encoding': 'even', 'even_kind': even_kind})
         return out, m
 
     # single
-    x, did_center, did_scale, mu, sd = _transform_single(v, transform=transform, eps=eps, center=center, scale=scale)
+    x, did_center, did_scale, mu, sd = _transform_single(
+        v, transform=transform, eps=eps, center=center, scale=scale)
     out_col = base
     out[out_col] = x
     if meta is None:
@@ -385,28 +391,51 @@ def add_ff_distance_features(
     K: int = 6,
     degree: int = 3,
     pct: tuple[int, int] = (2, 98),
+    gate_with: str | None = None,  # e.g., 'cur_ff_in_memory'
 ):
     """
-    Distance to target: (a) global log-distance ramp; (b) optional row-normalized tuning spline on log-distance.
+    Distance to target:
+      (a) global log-distance ramp (centered),
+      (b) optional row-normalized tuning spline on log-distance,
+      (c) optional gating by a binary column (multiplies the design columns).
     """
     out, m = add_raw_feature(
         design_df, feature=dist_col, data=data,
-        name='log_ff_distance', transform='log', eps=log_eps,
+        name=f'log_{dist_col}', transform='log', eps=log_eps,
         center=True, scale=False, meta=meta
     )
-    
+
     out, m = add_raw_feature(
         out, feature=dist_col, data=data,
         name=dist_col, transform='linear', meta=m
     )
-    
+
+    spline_name = 'ff_distance_spline'
     if make_spline:
-        log_dist = np.log(data[dist_col].to_numpy() + log_eps)
+        d = data[dist_col].to_numpy()
+        log_dist = np.log(np.maximum(d, 0.0) + log_eps)
         out, m = spatial_feats.add_spatial_spline_feature(
-            design_df=out, feature=log_dist, name='ff_distance_spline',
+            design_df=out, feature=log_dist, name=spline_name,
             knots_mode='percentile', K=K, degree=degree, percentiles=pct,
             row_normalize=True, drop_one=True, center=True, meta=m
         )
+
+    # ----- optional gating -----
+    if gate_with is not None and gate_with in data.columns:
+        gate = (data[gate_with].to_numpy() > 0).astype(float)
+
+        # ramp columns we just created
+        ramp_cols = [f'log_{dist_col}', dist_col]
+        for c in ramp_cols:
+            if c in out.columns:
+                out[c] = out[c].to_numpy() * gate
+
+        # spline columns if present (they're registered under their prefix)
+        for c in m.get('groups', {}).get(spline_name, []):
+            if c in out.columns:
+                out[c] = out[c].to_numpy() * gate
+    # ---------------------------
+
     return out, m
 
 
@@ -415,7 +444,8 @@ def add_time_since_features(
     data: pd.DataFrame,
     meta: dict,
     *,
-    cols: tuple[str, ...] = ('time_since_target_last_seen', 'time_since_last_capture'),
+    cols: tuple[str, ...] = (
+        'time_since_target_last_seen', 'time_since_last_capture'),
     make_spline: bool = False,
     t_floor: float = 0.05,
     t_cap: float = 12.0,
@@ -430,7 +460,8 @@ def add_time_since_features(
     """
     out, m = design_df.copy(), dict(meta)
     for ts in cols:
-        out, m = add_raw_feature(out, feature=ts, data=data, name=ts, transform='log1p', meta=m)
+        out, m = add_raw_feature(
+            out, feature=ts, data=data, name=ts, transform='log1p', meta=m)
         if make_spline:
             out, m = add_time_since_spline_feature(
                 design_df=out, time_since=ts, data=data, name=ts,
@@ -458,7 +489,8 @@ def add_cum_dist_since_seen_features(
     """
     Cumulative distance since last seen: log1p ramp, optionally an unnormalized spline on log1p scale.
     """
-    out, m = add_raw_feature(design_df, feature=col, data=data, name='cum_dist_seen_log1p', transform='log1p', meta=meta)
+    out, m = add_raw_feature(design_df, feature=col, data=data,
+                             name='cum_dist_seen_log1p', transform='log1p', meta=meta)
     if make_spline:
         cum_log = np.log1p(data[col].to_numpy())
         out, m = spatial_feats.add_spatial_spline_feature(
@@ -483,7 +515,8 @@ def add_eye_speed_features(
     """
     Eye speed: log1p ramp; optional row-normalized tuning spline on log1p(speed).
     """
-    out, m = add_raw_feature(design_df, feature=col, data=data, name='eye_speed_log1p', transform='log1p', meta=meta)
+    out, m = add_raw_feature(design_df, feature=col, data=data,
+                             name='eye_speed_log1p', transform='log1p', meta=meta)
     if make_spline:
         spd_log = np.log1p(data[col].to_numpy())
         out, m = spatial_feats.add_spatial_spline_feature(
@@ -532,7 +565,8 @@ def add_gaze_features(
                 return cols[:rank_xy]
             zname = f'{axis}_z'
             if zname not in out.columns:
-                out, m = add_raw_feature(out, feature=axis, data=data, name=zname, transform='zscore', meta=m)
+                out, m = add_raw_feature(
+                    out, feature=axis, data=data, name=zname, transform='zscore', meta=m)
             return [zname]
 
         gx = _get_cols(x_col)
@@ -548,7 +582,8 @@ def add_gaze_features(
 
         groups = dict(m.get('groups', {}))
         for nm in xy_cols:
-            groups.setdefault(nm, []).append(nm)   # checker-friendly passthrough group
+            # checker-friendly passthrough group
+            groups.setdefault(nm, []).append(nm)
         m['groups'] = groups
 
     return out, m
@@ -579,8 +614,10 @@ def add_speed_features(
     col: str = 'speed',
 ):
     """Keep both log1p ramp and robust z-score of speed."""
-    out, m = add_raw_feature(design_df, feature=col, data=data, name='speed_log1p', transform='log1p', meta=meta)
-    out, m = add_raw_feature(out,        feature=col, data=data, name='speed_z',     transform='zscore', meta=m)
+    out, m = add_raw_feature(design_df, feature=col, data=data,
+                             name='speed_log1p', transform='log1p', meta=meta)
+    out, m = add_raw_feature(out,        feature=col, data=data,
+                             name='speed_z',     transform='zscore', meta=m)
     return out, m
 
 

@@ -4,7 +4,6 @@ from pandas.api import types as pdt
 import statsmodels.api as sm
 
 
-
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, get_stops_utils, psth_postprocessing, psth_stats
 
 
@@ -34,7 +33,7 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
     bin_ids : (M,) int
         Sorted unique bin IDs corresponding to rows in `out`/`exposure`.
     """
-    V  = np.asarray(values, float)
+    V = np.asarray(values, float)
     dt = np.asarray(dt_array, float)
     bi = np.asarray(bin_idx_array, int)
 
@@ -42,7 +41,8 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
         V = V[:, None]
 
     if not (len(V) == len(dt) == len(bi)):
-        raise ValueError('values, dt_array, and bin_idx_array must have the same length')
+        raise ValueError(
+            'values, dt_array, and bin_idx_array must have the same length')
     if np.any(bi < 0):
         raise ValueError('bin_idx_array must be non-negative')
 
@@ -77,11 +77,10 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
         out[~np.isfinite(out)] = np.nan
     else:
         raise ValueError("how must be 'mean' or 'sum'")
-    
+
     weighted_values = out.squeeze()
 
     return weighted_values, exposure, used_bins
-
 
 
 def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False):
@@ -163,27 +162,26 @@ def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False
 
     if sample_idx:
         sample_idx = np.asarray(sample_idx, dtype=int)
-        bin_idx_array    = np.asarray(bin_idx_array,    dtype=int)
-        dt_array   = np.asarray(dt_array,   dtype=float)
+        bin_idx_array = np.asarray(bin_idx_array,    dtype=int)
+        dt_array = np.asarray(dt_array,   dtype=float)
     else:
         sample_idx = np.zeros(0, dtype=int)
-        bin_idx_array    = np.zeros(0, dtype=int)
-        dt_array   = np.zeros(0, dtype=float)
+        bin_idx_array = np.zeros(0, dtype=int)
+        dt_array = np.zeros(0, dtype=float)
 
     return sample_idx, bin_idx_array, dt_array, m
 
 
-
-def pick_stop_window(df, stop_time_col='stop_time',
-                     next_event_col='next_time',
-                     prev_event_col='prev_time',
-                     pre_s=0.6, post_s=1.0, min_pre_bins=10, min_post_bins=20, bin_dt=0.04):
+def pick_event_window(df, event_time_col='stop_time',
+                      prev_event_col='prev_time',
+                      next_event_col='next_time',
+                      pre_s=0.6, post_s=1.0, min_pre_bins=10, min_post_bins=20, bin_dt=0.04):
     out = df.copy()
-    stop_t = out[stop_time_col].astype(float)
+    event_t = out[event_time_col].astype(float)
 
     # nominal window
-    t0_nom = stop_t - float(pre_s)
-    t1_nom = stop_t + float(post_s)
+    t0_nom = event_t - float(pre_s)
+    t1_nom = event_t + float(post_s)
     t0 = t0_nom.copy()
     t1 = t1_nom.copy()
 
@@ -191,11 +189,11 @@ def pick_stop_window(df, stop_time_col='stop_time',
     if prev_event_col in out.columns:
         prev_t = out[prev_event_col].astype(float)
         mask = prev_t.notna()
-        t0[mask] = np.maximum(t0[mask], 0.5 * (prev_t[mask] + stop_t[mask]))
+        t0[mask] = np.maximum(t0[mask], 0.5 * (prev_t[mask] + event_t[mask]))
     if next_event_col in out.columns:
         next_t = out[next_event_col].astype(float)
         mask = next_t.notna()
-        t1[mask] = np.minimum(t1[mask], 0.5 * (next_t[mask] + stop_t[mask]))
+        t1[mask] = np.minimum(t1[mask], 0.5 * (next_t[mask] + event_t[mask]))
 
     out['new_seg_start_time'] = t0
     out['new_seg_end_time'] = t1
@@ -208,25 +206,25 @@ def pick_stop_window(df, stop_time_col='stop_time',
     # bin counts
     dt = float(bin_dt)
     out['n_pre_bins'] = np.floor(
-        (stop_t - out['new_seg_start_time']) / dt).astype(int)
+        (event_t - out['new_seg_start_time']) / dt).astype(int)
     out['n_post_bins'] = np.floor(
-        (out['new_seg_end_time'] - stop_t) / dt).astype(int)
+        (out['new_seg_end_time'] - event_t) / dt).astype(int)
 
-    out['new_seg_start_time'] = stop_t - out['n_pre_bins'] * dt
-    out['new_seg_end_time'] = stop_t + out['n_post_bins'] * dt
+    out['new_seg_start_time'] = event_t - out['n_pre_bins'] * dt
+    out['new_seg_end_time'] = event_t + out['n_post_bins'] * dt
     out['new_seg_duration'] = out['new_seg_end_time'] - out['new_seg_start_time']
 
     # quality flag
     out['ok_window'] = (out['n_pre_bins'] >= int(min_pre_bins)) & (
         out['n_post_bins'] >= int(min_post_bins))
-    
+
     new_seg_info = out
     return new_seg_info
 
 
-def stops_windows_to_bins2d(picked_windows,
-                            stop_id_col='stop_id',
-                            stop_time_col='stop_time',
+def event_windows_to_bins2d(picked_windows,
+                            event_id_col='event_id',
+                            event_time_col='event_time',
                             win_t0_col='new_seg_start_time',
                             win_t1_col='new_seg_end_time',
                             n_pre_col='n_pre_bins',
@@ -236,32 +234,26 @@ def stops_windows_to_bins2d(picked_windows,
                             bin_dt=None,
                             tol=1e-9):
     """
-    Turn stop-centered windows into per-stop fixed-width bins.
+    Turn event-centered windows into per-event fixed-width bins.
 
     Produces:
-      - bins_2d: (N_bins, 2) array of [left, right] for each bin across all stops
-      - meta: tidy DataFrame with per-bin metadata (stop_id, indices, centers, etc.)
-
-    Assumptions
-    -----------
-    - Each row in `stops_df` describes one stop with snapped edges (new_seg_start_time/new_seg_end_time)
-      consistent with integer bin counts n_pre_bins/n_post_bins.
-    - If `bin_dt` is None, we infer it from the first row with positive pre or post bins.
+      - bins_2d: (N_bins, 2) array of [left, right] for each bin across all events
+      - meta: tidy DataFrame with per-bin metadata (event_id, indices, centers, etc.)
 
     Parameters
     ----------
     only_ok : bool
         If True and `ok_col` exists, keep only rows where ok_window is True.
     bin_dt : float or None
-        Bin width. If None, infer from (stop - new_seg_start_time)/n_pre or (new_seg_end_time - stop)/n_post.
+        Bin width. If None, infer from (event - new_seg_start_time)/n_pre or (new_seg_end_time - event)/n_post.
 
     Returns
     -------
     bins_2d : ndarray, shape (N, 2)
         All bins concatenated: [t_left, t_right].
     meta : DataFrame, shape (N, ?)
-        Per-bin info: stop_id, k_within_stop, is_pre, t_left, t_right, t_center,
-        rel_left, rel_right, rel_center, exposure_s (=bin_dt), stop_time.
+        Per-bin info: event_id, k_within_seg, is_pre, t_left, t_right, t_center,
+        rel_left, rel_right, rel_center, exposure_s (=bin_dt), event_time.
     """
     df = picked_windows.copy()
 
@@ -269,7 +261,7 @@ def stops_windows_to_bins2d(picked_windows,
     if only_ok and ok_col in df.columns:
         df = df[df[ok_col].astype(bool)].copy()
 
-    required = [stop_id_col, stop_time_col,
+    required = [event_id_col, event_time_col,
                 win_t0_col, win_t1_col, n_pre_col, n_post_col]
     missing = [c for c in required if c not in df.columns]
     if missing:
@@ -283,11 +275,11 @@ def stops_windows_to_bins2d(picked_windows,
             npre = int(r[n_pre_col])
             npost = int(r[n_post_col])
             if npre > 0:
-                dts.append((float(r[stop_time_col]) -
+                dts.append((float(r[event_time_col]) -
                            float(r[win_t0_col])) / npre)
             if npost > 0:
                 dts.append((float(r[win_t1_col]) -
-                           float(r[stop_time_col])) / npost)
+                           float(r[event_time_col])) / npost)
         if not dts:
             raise ValueError(
                 'cannot infer bin_dt: no rows with positive pre/post bin counts')
@@ -298,15 +290,15 @@ def stops_windows_to_bins2d(picked_windows,
     meta_rows = []
 
     for _, r in df.iterrows():
-        stop_id = r[stop_id_col]
-        s = float(r[stop_time_col])
+        event_id = r[event_id_col]
+        s = float(r[event_time_col])
         npre = int(r[n_pre_col])
         npost = int(r[n_post_col])
         n_bins = npre + npost
         if n_bins <= 0:
             continue
 
-        # Build bin edges centered around stop (pre first, then post)
+        # Build bin edges centered around event (pre first, then post)
         # Left edge of the first bin is s - npre*dt
         left0 = s - npre * bin_dt
         lefts = left0 + bin_dt * np.arange(n_bins)
@@ -331,8 +323,8 @@ def stops_windows_to_bins2d(picked_windows,
             is_pre[:npre] = True
 
         meta_rows.append(pd.DataFrame({
-            'stop_id': stop_id,
-            'k_within_stop': np.arange(n_bins, dtype=int),
+            'event_id': event_id,
+            'k_within_seg': np.arange(n_bins, dtype=int),
             'is_pre': is_pre,
             't_left': lefts,
             't_right': rights,
@@ -341,14 +333,14 @@ def stops_windows_to_bins2d(picked_windows,
             'rel_right': rights - s,
             'rel_center': centers - s,
             'exposure_s': np.full(n_bins, bin_dt),
-            'stop_time': np.full(n_bins, s),
+            'event_time': np.full(n_bins, s),
         }))
 
     if not bins_list:
         # No bins created
         return np.zeros((0, 2), float), pd.DataFrame(columns=[
-            'stop_id', 'k_within_stop', 'is_pre', 't_left', 't_right', 't_center',
-            'rel_left', 'rel_right', 'rel_center', 'exposure_s', 'stop_time'
+            'event_id', 'k_within_seg', 'is_pre', 't_left', 't_right', 't_center',
+            'rel_left', 'rel_right', 'rel_center', 'exposure_s', 'event_time'
         ])
 
     bins_2d = np.vstack(bins_list)
@@ -361,7 +353,6 @@ def stops_windows_to_bins2d(picked_windows,
     meta['bin'] = np.arange(len(meta), dtype=int)
 
     return bins_2d, meta
-
 
 
 def bin_spikes_by_cluster(spikes_df,
@@ -405,9 +396,10 @@ def bin_spikes_by_cluster(spikes_df,
         order = np.argsort(bins[:, 0], kind='mergesort')
         bins = bins[order]
     if check_nonoverlap and np.any(bins[1:, 0] < bins[:-1, 1]):
-        raise ValueError('bins overlap; expected non-overlapping bins for single assignment')
+        raise ValueError(
+            'bins overlap; expected non-overlapping bins for single assignment')
 
-    lefts  = bins[:, 0]
+    lefts = bins[:, 0]
     rights = bins[:, 1]
     M = bins.shape[0]
 
@@ -424,7 +416,7 @@ def bin_spikes_by_cluster(spikes_df,
             return np.zeros((M, len(clusters)), dtype=int), np.asarray(clusters)
 
     idx = idx[valid]
-    cl  = cl[valid]
+    cl = cl[valid]
 
     # Choose cluster columns
     if clusters is None:
@@ -446,7 +438,8 @@ def bin_spikes_by_cluster(spikes_df,
     except Exception:
         # Fallback: general mapping (works for strings too)
         id2col = {cid: k for k, cid in enumerate(cluster_ids)}
-        col = np.fromiter((id2col.get(x, -1) for x in cl), count=cl.size, dtype=int)
+        col = np.fromiter((id2col.get(x, -1)
+                          for x in cl), count=cl.size, dtype=int)
         keep = col >= 0
         idx = idx[keep]
         col = col[keep]
@@ -456,11 +449,6 @@ def bin_spikes_by_cluster(spikes_df,
     np.add.at(counts, (idx, col), 1)
     return counts, cluster_ids
 
-
-import numpy as np
-import pandas as pd
-from pandas.api import types as pdt
-import statsmodels.api as sm
 
 def _is_dummy_col(s: pd.Series, tol_decimals: int = 12) -> bool:
     """
@@ -476,11 +464,13 @@ def _is_dummy_col(s: pd.Series, tol_decimals: int = 12) -> bool:
     x = np.round(x.astype(float), tol_decimals)
     return np.isin(x, [0.0, 1.0]).all()
 
+
 def selective_zscore(
     df: pd.DataFrame,
     *,
-    centered_suffixes = ('_c', '_c2'),   # treat centered & its square as “do not scale”
-    zscored_suffixes = ('_z', '_z2'),    # already standardized → skip
+    # treat centered & its square as “do not scale”
+    centered_suffixes=('_c', '_c2'),
+    zscored_suffixes=('_z', '_z2'),    # already standardized → skip
     mean_tol: float = 1e-8,              # if mean≈0 and std≈1, assume already z-scored
     std_tol: float = 1e-6,
     ddof: int = 0
@@ -539,4 +529,3 @@ def selective_zscore(
         scaled.append(col)
 
     return out, scaled
-

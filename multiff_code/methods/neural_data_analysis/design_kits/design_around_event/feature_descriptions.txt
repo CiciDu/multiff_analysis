@@ -1,0 +1,36 @@
+
+FEATURE_DESCRIPTIONS = {
+    # core stop context
+    'prepost': '0 for bins before the stop center; 1 for bins after the stop center.',
+    'straddle': '1 if a bin’s left/right edges cross the stop center (rel_left<0<rel_right); else 0.',
+    'k_norm': 'Normalized within-stop position in [0,1], based on k_within_seg / max k within that stop.',
+    'duration': 'Stop duration in seconds for the current stop (NaN→0).',
+
+    # condition dummies
+    # (actual names are generated like 'cond_X', 'cond_Y', ... depending on your data)
+    'cond_*': 'One-hot dummy columns for condition labels (first level may be dropped to avoid collinearity).',
+
+    # peri-stop temporal basis
+    # (actual names are generated like 'rcos_-0.08s', 'rcos_+0.08s', ...)
+    'rcos_*': 'Raised cosine basis functions over time relative to stop center (rel_t).',
+
+    # interactions
+    'prepost*speed': 'Interaction between prepost (0/1) and the instantaneous speed used for this model row.',
+    'prepost*captured': 'Interaction between prepost (0/1) and the captured indicator (0/1).',
+    'basis*captured': 'Elementwise product of peri-stop basis columns and the captured indicator.',
+
+    # capture
+    'captured': 'Per-stop 0/1 flag: 1 if this stop culminated in capture; else 0.',
+
+    # history: single
+    'time_since_prev_stop': 'Seconds since the previous stop (NaN→0 for first stop).',
+    'time_to_next_stop': 'Seconds until the next stop (NaN→0 for last stop).',
+
+    # history: gated
+    'time_since_prev_stop_pre': 'Post-only version of time_since_prev_stop; pre bins are 0.',
+    'time_to_next_stop_post': 'Pre-only version of time_to_next_stop; post bins are 0.',
+
+    # history: sumdiff
+    'isi_len': 'Total inter-stop interval length in seconds: (next_event_time - prev_event_time).',
+    'mid_offset': 'Signed offset from the midpoint of the inter-stop interval in seconds; negative=closer to prev stop, positive=closer to next stop.',
+}

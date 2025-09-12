@@ -51,6 +51,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         self.plot_trial_counts_by_timepoint()
 
+
     def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True):
         bin_width_str = f"{self.bin_width:.4f}".rstrip(
             '0').rstrip('.').replace('.', 'p')

@@ -11,7 +11,7 @@ from scipy.interpolate import BSpline
 
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.glm_tools.prep_predictors import temporal_feats, spatial_feats, predictor_utils, other_feats
+from neural_data_analysis.design_kits.design_by_segment import temporal_feats, spatial_feats, predictor_utils, other_feats
 
 
 import numpy as np
@@ -37,10 +37,12 @@ def get_initial_design_df(
         data['stop'] = (data['whether_new_distinct_stop'] == 1).astype(int)
     elif 'monkey_speeddummy' in data.columns:
         stopped = (data['monkey_speeddummy'] == 0)
-        prev = stopped.groupby(trial_ids, sort=False).shift(1, fill_value=False)
+        prev = stopped.groupby(trial_ids, sort=False).shift(
+            1, fill_value=False)
         data['stop'] = (stopped & ~prev).astype(int)
     else:
-        raise KeyError("need 'whether_new_distinct_stop' or 'monkey_speeddummy' to define stop onsets")
+        raise KeyError(
+            "need 'whether_new_distinct_stop' or 'monkey_speeddummy' to define stop onsets")
 
     # ---------- builder: events + raw states (passthrough) ----------
     colmap = {}
@@ -113,17 +115,24 @@ def get_initial_design_df(
         )
 
     # ---------- recommended additional features ----------
-    design_df, meta = other_feats.add_memory_state_feature(design_df, data, meta)
-    design_df, meta = other_feats.add_ff_distance_features(design_df, data, meta, dist_col='cur_ff_distance')
+    design_df, meta = other_feats.add_memory_state_feature(
+        design_df, data, meta)
+    design_df, meta = other_feats.add_ff_distance_features(
+        design_df, data, meta, dist_col='cur_ff_distance', gate_with='cur_in_memory')
+    design_df, meta = other_feats.add_ff_distance_features(
+        design_df, data, meta, dist_col='nxt_ff_distance', gate_with='nxt_in_memory')
     design_df, meta = other_feats.add_time_since_features(
         design_df, data, meta,
         cols=('time_since_target_last_seen', 'time_since_last_capture'),
         gate_with='cur_vis'
     )
-    design_df, meta = other_feats.add_cum_dist_since_seen_features(design_df, data, meta)
+    design_df, meta = other_feats.add_cum_dist_since_seen_features(
+        design_df, data, meta)
     design_df, meta = other_feats.add_eye_speed_features(design_df, data, meta)
-    design_df, meta = other_feats.add_gaze_features(design_df, data, meta, add_lowrank_2d=True, rank_xy=3)
-    design_df, meta = other_feats.add_eye_component_features(design_df, data, meta)
+    design_df, meta = other_feats.add_gaze_features(
+        design_df, data, meta, add_lowrank_2d=True, rank_xy=3)
+    design_df, meta = other_feats.add_eye_component_features(
+        design_df, data, meta)
     design_df, meta = other_feats.add_speed_features(design_df, data, meta)
 
     for accel_col in ['accel', 'ang_accel']:

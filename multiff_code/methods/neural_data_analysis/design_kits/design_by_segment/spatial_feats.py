@@ -9,8 +9,7 @@ from scipy.interpolate import BSpline
 
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.glm_tools.prep_predictors import temporal_feats
-
+from neural_data_analysis.design_kits.design_by_segment import temporal_feats
 
 
 def _knots_from_breaks(breaks: np.ndarray, degree: int) -> np.ndarray:
@@ -20,6 +19,7 @@ def _knots_from_breaks(breaks: np.ndarray, degree: int) -> np.ndarray:
         raise ValueError('`breaks` must have at least 2 values.')
     br = np.unique(br)
     return np.concatenate([np.full(degree + 1, br[0]), br[1:-1], np.full(degree + 1, br[-1])])
+
 
 def _build_spatial_knots(
     x: np.ndarray,
@@ -46,9 +46,11 @@ def _build_spatial_knots(
         M = max(0, K - deg - 1)  # # internal knots
         if M > 0:
             internal = np.linspace(lo, hi, M + 2)[1:-1]
-            full_knots = np.concatenate([np.full(deg + 1, lo), internal, np.full(deg + 1, hi)])
+            full_knots = np.concatenate(
+                [np.full(deg + 1, lo), internal, np.full(deg + 1, hi)])
         else:
-            full_knots = np.concatenate([np.full(deg + 1, lo), np.full(deg + 1, hi)])
+            full_knots = np.concatenate(
+                [np.full(deg + 1, lo), np.full(deg + 1, hi)])
 
     elif mode == 'breaks':
         if breaks is None:
@@ -68,13 +70,15 @@ def _build_spatial_knots(
 
     return full_knots, int(K)
 
+
 def _bspline_design_from_knots(x: np.ndarray, full_knots: np.ndarray, degree: int) -> np.ndarray:
     x = np.asarray(x, float).ravel()
     deg = int(degree)
     K = full_knots.size - deg - 1
     X = np.empty((x.size, K), float)
     for k in range(K):
-        c = np.zeros(K); c[k] = 1.0
+        c = np.zeros(K)
+        c[k] = 1.0
         spl = BSpline(full_knots, c, deg, extrapolate=False)
         X[:, k] = np.nan_to_num(spl(x), nan=0.0, posinf=0.0, neginf=0.0)
     return X
@@ -94,12 +98,15 @@ def add_spatial_spline_feature(
     degree: int = 3,
     percentiles: tuple[float, float] = (2, 98),  # for percentile mode
     breaks: np.ndarray | None = None,            # for breaks mode
-    knots:  np.ndarray | None = None,            # for knots mode (full clamped vector)
+    # for knots mode (full clamped vector)
+    knots:  np.ndarray | None = None,
 
     # identifiability & scaling
-    row_normalize: str | bool = 'auto',          # True/False or 'auto' (True only in percentile mode)
+    # True/False or 'auto' (True only in percentile mode)
+    row_normalize: str | bool = 'auto',
     drop_one: bool = True,                       # drop one column (baseline)
-    center: bool = True,                         # center columns (orthogonal to intercept)
+    # center columns (orthogonal to intercept)
+    center: bool = True,
 
     meta: dict | None = None,
 ) -> tuple[pd.DataFrame, dict | None]:
@@ -136,7 +143,8 @@ def add_spatial_spline_feature(
     # identifiability tweaks
     colnames = [f'{feat_name}:s{k}' for k in range(X.shape[1])]
     if drop_one and X.shape[1] >= 2:
-        X = X[:, :-1]; colnames = colnames[:-1]
+        X = X[:, :-1]
+        colnames = colnames[:-1]
     if center and X.size:
         X = X - X.mean(axis=0, keepdims=True)
 
@@ -149,8 +157,12 @@ def add_spatial_spline_feature(
         return out, None
 
     meta = dict(meta)
-    g = dict(meta.get('groups', {})); g.setdefault(feat_name, []); g[feat_name].extend(colnames); meta['groups'] = g
-    ss = dict(meta.get('spatial_specs', {})); ss[feat_name] = {
+    g = dict(meta.get('groups', {}))
+    g.setdefault(feat_name, [])
+    g[feat_name].extend(colnames)
+    meta['groups'] = g
+    ss = dict(meta.get('spatial_specs', {}))
+    ss[feat_name] = {
         'mode': knots_mode,
         'degree': int(degree),
         'K': int(K_eff),
@@ -160,7 +172,8 @@ def add_spatial_spline_feature(
         'percentiles': tuple(percentiles) if knots_mode == 'percentile' else None,
         'breaks': breaks.tolist() if isinstance(breaks, np.ndarray) else None,
         'knots': full_knots.tolist(),
-    }; meta['spatial_specs'] = ss
+    }
+    meta['spatial_specs'] = ss
     meta['spatial_cols'] = list(meta.get('spatial_cols', [])) + colnames
     return out, meta
 
@@ -173,14 +186,18 @@ def add_circular_fourier_feature(
     design_df: pd.DataFrame,
     theta: str | np.ndarray | pd.Series,   # column name or vector of angles
     *,
-    name: str | None = None,               # logical feature name (e.g., 'cur_angle')
+    # logical feature name (e.g., 'cur_angle')
+    name: str | None = None,
     data: pd.DataFrame | None = None,      # required if theta is a column name
-    rows_mask: np.ndarray | None = None,   # mask used when you built design_df (edge='drop')
-    gate: str | np.ndarray | pd.Series | None = None,  # 0/1 mask to “turn on” the angle rows
+    # mask used when you built design_df (edge='drop')
+    rows_mask: np.ndarray | None = None,
+    # 0/1 mask to “turn on” the angle rows
+    gate: str | np.ndarray | pd.Series | None = None,
     M: int = 3,                            # number of harmonics
     degrees: bool = False,                 # set True if theta is in degrees
     center: bool = True,                   # column-center -> orthogonal to intercept
-    standardize: bool = False,             # per-column unit variance (after centering)
+    # per-column unit variance (after centering)
+    standardize: bool = False,
     meta: dict | None = None,
 ) -> tuple[pd.DataFrame, dict | None]:
     """
@@ -193,14 +210,16 @@ def add_circular_fourier_feature(
     def _get_vec(v, label):
         if isinstance(v, str):
             if data is None:
-                raise ValueError(f'When {label} is a column name, pass `data=`.')
+                raise ValueError(
+                    f'When {label} is a column name, pass `data=`.')
             arr = data[v].to_numpy()
         else:
             arr = np.asarray(v).ravel()
         if rows_mask is not None and arr.shape[0] == (rows_mask.shape[0]):
             arr = arr[rows_mask]
         if arr.shape[0] != len(design_df):
-            raise ValueError(f'Length of {label} ({arr.shape[0]}) must equal len(design_df) ({len(design_df)}).')
+            raise ValueError(
+                f'Length of {label} ({arr.shape[0]}) must equal len(design_df) ({len(design_df)}).')
         return arr
 
     th = _get_vec(theta, 'theta')
@@ -221,8 +240,10 @@ def add_circular_fourier_feature(
     for m in range(1, int(M) + 1):
         s = np.sin(m * th) * g
         c = np.cos(m * th) * g
-        cols.append(s); names.append(f'{name or "angle"}:sin{m}')
-        cols.append(c); names.append(f'{name or "angle"}:cos{m}')
+        cols.append(s)
+        names.append(f'{name or "angle"}:sin{m}')
+        cols.append(c)
+        names.append(f'{name or "angle"}:cos{m}')
 
     X = np.column_stack(cols) if cols else np.empty((len(design_df), 0))
 
@@ -260,6 +281,7 @@ def add_circular_fourier_feature(
     meta['circular_specs'] = circ
     meta['circular_cols'] = list(meta.get('circular_cols', [])) + names
     return out, meta
+
 
 def add_visibility_transition_kernels(
     specs: Dict[str, temporal_feats.PredictorSpec],
@@ -343,8 +365,8 @@ def add_visibility_transition_kernels(
         else:
             f = pd.Series(np.asarray(flag_bool, dtype=bool))
         prev = f.groupby(tid_vec, sort=False).shift(1, fill_value=False)
-        on  = ( f & ~prev).to_numpy(dtype=float, copy=False)
-        off = (~f &  prev).to_numpy(dtype=float, copy=False)
+        on = (f & ~prev).to_numpy(dtype=float, copy=False)
+        off = (~f & prev).to_numpy(dtype=float, copy=False)
         return on, off
 
     # make sure stems is a list or tuple
@@ -356,8 +378,9 @@ def add_visibility_transition_kernels(
             raise KeyError(f'missing column {stem!r} in data')
 
         on, off = _on_off(data[stem], tid)
-        specs[f'{stem}_on']  = temporal_feats.PredictorSpec(signal=on,  bases=[B])
-        specs[f'{stem}_off'] = temporal_feats.PredictorSpec(signal=off, bases=[B])
+        specs[f'{stem}_on'] = temporal_feats.PredictorSpec(
+            signal=on,  bases=[B])
+        specs[f'{stem}_off'] = temporal_feats.PredictorSpec(
+            signal=off, bases=[B])
 
     return specs
-

@@ -635,121 +635,212 @@ def overlay_tuning_curves(emp_df,
     plt.show()
 
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def plot_tuning_with_ci(df: pd.DataFrame,
-                        xcol: str,
+                        xcol: str | None = None,
                         ycol: str = 'rate_hz',
                         ci_lo: str = 'ci_lo',
                         ci_hi: str = 'ci_hi',
                         title: str | None = None,
+                        kind: str = 'auto',          # 'auto' | 'line' | 'bar'
+                        ci_style: str = 'auto',      # 'auto' | 'band' | 'errorbar' | 'none'
+                        show_counts: bool = False,   # annotate n_bins/time per point
+                        counts_col: str = 'n_bins',  # which count to show
                         ax=None):
     """
-    Plot one tuning curve with an optional shaded CI band.
+    Plot one tuning curve with optional CIs.
 
-    Accepts DataFrames produced by `glm_tuning_curve` (numeric or categorical)
-    or by your empirical function (if it contains matching columns).
+    Accepts DataFrames from `empirical_tuning_curve(...)` or GLM partials.
+
+    - Continuous expects: ['bin_center'] or ['bin_left','bin_right'] + y & optional CI.
+    - Categorical expects: ['level'] + y & optional CI.
 
     Parameters
     ----------
-    df : DataFrame
-        Must contain either:
-          - continuous: 'bin_center' (preferred) or a numeric `xcol`
-          - categorical: 'level' or a discrete `xcol`
-        And a y column (default 'rate_hz').
-        CI columns are optional; provide names via `ci_lo`, `ci_hi`.
-    xcol : str
-        Name of x column to use when neither 'bin_center' nor 'level' is present.
-    ycol : str
-        Name of y column (default 'rate_hz').
-    ci_lo, ci_hi : str
-        Column names for CI bounds, if present.
-    title : str | None
-        Figure title.
-    ax : matplotlib Axes | None
-        Existing axes to draw on; creates a new one if None.
-
-    Returns
-    -------
-    ax : matplotlib Axes
+    xcol : str | None
+        Used if neither 'bin_center' nor 'level' are present.
+    kind : 'auto' | 'line' | 'bar'
+        For categoricals, 'bar' often reads better; for continuous, 'line'.
+    ci_style : 'auto' | 'band' | 'errorbar' | 'none'
+        'band' (continuous) uses fill_between; 'errorbar' uses yerr.
+    show_counts : bool
+        If True, annotate each point/bar with df[counts_col].
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(4, 3))
+        _, ax = plt.subplots(figsize=(4.5, 3.3))
 
-    # Decide x source and categorical status
-    if 'bin_center' in df.columns:
-        x = df['bin_center'].to_numpy()
-        y = df[ycol].to_numpy()
-        order = np.argsort(x)
-        x, y = x[order], y[order]
-        has_ci = (ci_lo in df.columns) and (ci_hi in df.columns)
-        if has_ci:
-            lo = df[ci_lo].to_numpy()[order]
-            hi = df[ci_hi].to_numpy()[order]
-        # plot
-        ax.plot(x, y, marker='o')
-        if has_ci and np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
-            ax.fill_between(x, lo, hi, alpha=0.2)
-        ax.set_xlabel('bin_center')
-    elif 'level' in df.columns:
-        # treat as categorical; map to integer ticks
-        levels = df['level'].to_numpy()
-        y = df[ycol].to_numpy()
-        # keep numeric levels sorted; otherwise preserve row order
-        if np.issubdtype(df['level'].dtype, np.number):
-            order = np.argsort(levels)
-            levels, y = levels[order], y[order]
-            df_ord = df.iloc[order]
+    cols = set(df.columns)
+    has_ci = (ci_lo in cols) and (ci_hi in cols)
+    is_continuous = {'bin_center'}.issubset(cols) or {'bin_left','bin_right'}.issubset(cols)
+    is_categorical = {'level'}.issubset(cols)
+
+    # ---- Choose x and ordering
+    if is_continuous:
+        if 'bin_center' in df:
+            x = df['bin_center'].to_numpy()
         else:
-            df_ord = df
-        idx = np.arange(len(df_ord))
-        ax.plot(idx, df_ord[ycol].to_numpy(), marker='o')
-        has_ci = (ci_lo in df_ord.columns) and (ci_hi in df_ord.columns)
-        if has_ci:
-            lo = df_ord[ci_lo].to_numpy()
-            hi = df_ord[ci_hi].to_numpy()
-            if np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
-                ax.fill_between(idx, lo, hi, alpha=0.2)
-        ax.set_xticks(idx)
-        ax.set_xticklabels([str(v) for v in df_ord['level'].to_numpy()])
+            # fall back to midpoints if only edges are present
+            x = 0.5*(df['bin_left'].to_numpy() + df['bin_right'].to_numpy())
+
+        order = np.argsort(x)
+        x = x[order]
+        y = df[ycol].to_numpy()[order]
+        lo = df[ci_lo].to_numpy()[order] if has_ci else None
+        hi = df[ci_hi].to_numpy()[order] if has_ci else None
+
+        # Decide visuals
+        if kind == 'auto':
+            kind_use = 'line'
+        else:
+            kind_use = kind
+        if ci_style == 'auto':
+            ci_use = 'band'
+        else:
+            ci_use = ci_style
+
+        # Plot
+        if kind_use == 'line':
+            ax.plot(x, y, 'o-', ms=4)
+        else:
+            ax.scatter(x, y, s=18)
+
+        if has_ci and ci_use != 'none' and np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
+            if ci_use == 'band':
+                ax.fill_between(x, lo, hi, alpha=0.2)
+            elif ci_use == 'errorbar':
+                yerr = np.vstack([y - lo, hi - y])
+                ax.errorbar(x, y, yerr=yerr, fmt='none', capsize=3)
+
+        ax.set_xlabel('predictor (binned)')
+        ax.set_ylabel('rate (Hz)')
+
+        if show_counts and (counts_col in df.columns):
+            counts = df[counts_col].to_numpy()[order]
+            for xi, yi, c in zip(x, y, counts):
+                ax.annotate(str(int(c)), (xi, yi), textcoords='offset points', xytext=(0, 6),
+                            ha='center', fontsize=8)
+
+    elif is_categorical:
+        # Preserve categorical order if provided
+        if pd.api.types.is_categorical_dtype(df['level']):
+            df_ord = df.sort_values('level')
+        else:
+            # numeric -> sort; otherwise keep input order
+            if np.issubdtype(df['level'].dtype, np.number):
+                df_ord = df.sort_values('level')
+            else:
+                df_ord = df.copy()
+
+        levels = df_ord['level'].to_numpy()
+        y = df_ord[ycol].to_numpy()
+        lo = df_ord[ci_lo].to_numpy() if has_ci else None
+        hi = df_ord[ci_hi].to_numpy() if has_ci else None
+        xpos = np.arange(len(levels))
+
+        if kind == 'auto':
+            kind_use = 'bar'
+        else:
+            kind_use = kind
+        if ci_style == 'auto':
+            ci_use = 'errorbar'
+        else:
+            ci_use = ci_style
+
+        if kind_use == 'bar':
+            ax.bar(xpos, y, width=0.7)
+        else:
+            ax.plot(xpos, y, 'o-')
+
+        if has_ci and ci_use != 'none' and np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
+            yerr = np.vstack([y - lo, hi - y])
+            ax.errorbar(xpos, y, yerr=yerr, fmt='none', capsize=4)
+
+        ax.set_xticks(xpos)
+        ax.set_xticklabels([str(v) for v in levels])
         ax.set_xlabel('level')
+        ax.set_ylabel('rate (Hz)')
+
+        if show_counts and (counts_col in df_ord.columns):
+            counts = df_ord[counts_col].to_numpy()
+            for xi, yi, c in zip(xpos, y, counts):
+                ax.annotate(str(int(c)), (xi, yi), textcoords='offset points', xytext=(0, 6),
+                            ha='center', fontsize=8)
     else:
-        # fallback to provided xcol—decide if categorical by few uniques
+        # Fallback to xcol
+        if xcol is None:
+            raise ValueError('Provide xcol when df lacks bin_center/level.')
         x = df[xcol].to_numpy()
         y = df[ycol].to_numpy()
         uniques = pd.unique(x)
-        is_categorical = (df[xcol].dtype.kind in 'Ob') or (uniques.size <= 6)
-        if is_categorical:
-            levels = np.asarray(uniques)
-            # build index order matching first occurrence of each level
-            level_to_idx = {lvl: i for i, lvl in enumerate(levels)}
+        treat_cat = (df[xcol].dtype.kind in 'Ob') or (uniques.size <= 6)
+
+        if treat_cat:
+            # Map first occurrence order
+            level_to_idx = {lvl: i for i, lvl in enumerate(uniques)}
             idx = np.array([level_to_idx[v] for v in x])
             order = np.argsort(idx)
             idx, y = idx[order], y[order]
-            lo = df.get(ci_lo, pd.Series(index=df.index, dtype=float)).to_numpy()
-            hi = df.get(ci_hi, pd.Series(index=df.index, dtype=float)).to_numpy()
-            lo = lo[order] if lo.size else None
-            hi = hi[order] if hi.size else None
+            lo = df[ci_lo].to_numpy()[order] if has_ci else None
+            hi = df[ci_hi].to_numpy()[order] if has_ci else None
 
-            ax.plot(idx, y, marker='o')
-            if lo is not None and hi is not None and np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
-                ax.fill_between(idx, lo, hi, alpha=0.2)
-            ax.set_xticks(np.arange(len(levels)))
-            ax.set_xticklabels([str(v) for v in levels])
+            if kind == 'auto':
+                kind_use = 'bar'
+            else:
+                kind_use = kind
+            if ci_style == 'auto':
+                ci_use = 'errorbar'
+            else:
+                ci_use = ci_style
+
+            if kind_use == 'bar':
+                # aggregate duplicates if any
+                ax.bar(np.arange(len(uniques)), y[:len(uniques)], width=0.7)
+            else:
+                ax.plot(idx, y, 'o-')
+
+            if has_ci and ci_use != 'none' and lo is not None and hi is not None:
+                if np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
+                    yerr = np.vstack([y - lo, hi - y])
+                    ax.errorbar(idx, y, yerr=yerr, fmt='none', capsize=4)
+
+            ax.set_xticks(np.arange(len(uniques)))
+            ax.set_xticklabels([str(v) for v in uniques])
+            ax.set_xlabel(xcol)
+            ax.set_ylabel('rate (Hz)')
+
         else:
             order = np.argsort(x)
             x, y = x[order], y[order]
-            ax.plot(x, y, marker='o')
-            if (ci_lo in df.columns) and (ci_hi in df.columns):
-                lo = df[ci_lo].to_numpy()[order]
-                hi = df[ci_hi].to_numpy()[order]
-                if np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
-                    ax.fill_between(x, lo, hi, alpha=0.2)
-        ax.set_xlabel(xcol)
+            lo = df[ci_lo].to_numpy()[order] if has_ci else None
+            hi = df[ci_hi].to_numpy()[order] if has_ci else None
 
-    ax.set_ylabel('rate (Hz)')
+            if kind == 'auto':
+                kind_use = 'line'
+            else:
+                kind_use = kind
+            if ci_style == 'auto':
+                ci_use = 'band'
+            else:
+                ci_use = ci_style
+
+            if kind_use == 'line':
+                ax.plot(x, y, 'o-', ms=4)
+            else:
+                ax.scatter(x, y, s=18)
+
+            if has_ci and ci_use != 'none' and np.all(np.isfinite(lo)) and np.all(np.isfinite(hi)):
+                if ci_use == 'band':
+                    ax.fill_between(x, lo, hi, alpha=0.2)
+                elif ci_use == 'errorbar':
+                    yerr = np.vstack([y - lo, hi - y])
+                    ax.errorbar(x, y, yerr=yerr, fmt='none', capsize=3)
+
+            ax.set_xlabel(xcol)
+            ax.set_ylabel('rate (Hz)')
+
     if title:
         ax.set_title(title)
     plt.tight_layout()
