@@ -18,15 +18,19 @@ np.set_printoptions(suppress=True)
 
 
 def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_new, min_distance_from_adjacent_stops=75,
-                                  min_cum_distance_to_ff_capture=25, min_distance_to_ff=25, max_distance_to_ff=50):
-    distinct_stops_df = monkey_information[monkey_information['whether_new_distinct_stop'] == 1].copy(
-    )
-    filtered_stops_df = get_filtered_stops_df(
-        distinct_stops_df, min_distance_from_adjacent_stops)
-    filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(
-        filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture=min_cum_distance_to_ff_capture)
+                                   min_cum_distance_to_ff_capture=25, min_distance_from_ff=25, max_distance_to_ff=50):
+    # distinct_stops_df = monkey_information[(monkey_information['whether_new_distinct_stop'] == 1)].copy()
+    # filtered_stops_df = filter_stops_by_distance_to_adjacent_stops(
+    #     distinct_stops_df, min_distance_from_adjacent_stops)
+    # filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(
+    #     filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture=min_cum_distance_to_ff_capture)
+    
+    distinct_stops_df = monkey_information[(monkey_information['whether_new_distinct_stop'] == 1)
+                                           & (monkey_information['stop_cluster_size'] == 1)].copy()
+    filtered_stops_df = distinct_stops_df.copy()
+
     one_stop_df = get_one_stop_df(
-        filtered_stops_df, ff_dataframe, min_distance_to_ff, max_distance_to_ff)
+        filtered_stops_df, ff_dataframe, min_distance_from_ff, max_distance_to_ff)
 
     return one_stop_df
 
@@ -125,7 +129,7 @@ def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
 #     return distinct_stops_df
 
 
-def get_filtered_stops_df(distinct_stops_df, min_distance_from_adjacent_stops):
+def filter_stops_by_distance_to_adjacent_stops(distinct_stops_df, min_distance_from_adjacent_stops):
     # take out stops that are not within min_distance_from_adjacent_stops of any other stop
     delta_x_from_last_stop = distinct_stops_df['monkey_x'].diff().fillna(
         min_distance_from_adjacent_stops * 2)
@@ -166,7 +170,8 @@ def filter_stops_based_on_distance_to_ff_capture(
     # Preconditions: ensure monotonic inputs
     time = monkey_information["time"].to_numpy()
     if not np.all(np.diff(time) >= 0):
-        raise ValueError("monkey_information['time'] must be sorted ascending.")
+        raise ValueError(
+            "monkey_information['time'] must be sorted ascending.")
 
     if not np.all(np.diff(ff_caught_T_new) >= 0):
         ff_caught_T_new = np.sort(ff_caught_T_new)
@@ -183,7 +188,8 @@ def filter_stops_based_on_distance_to_ff_capture(
     idx_right = np.searchsorted(capture_cumdist, stop_cum, side="left")
     right_dist = np.full_like(stop_cum, np.inf, dtype=float)
     valid_r = idx_right < len(capture_cumdist)
-    right_dist[valid_r] = capture_cumdist[idx_right[valid_r]] - stop_cum[valid_r]
+    right_dist[valid_r] = capture_cumdist[idx_right[valid_r]] - \
+        stop_cum[valid_r]
 
     # --- Left-side (previous capture) ---
     idx_left = idx_right - 1
@@ -205,13 +211,13 @@ def filter_stops_based_on_distance_to_ff_capture(
 def get_one_stop_df(
     filtered_stops_df: pd.DataFrame,
     ff_dataframe: pd.DataFrame,
-    min_distance_to_ff: float = 25,
+    min_distance_from_ff: float = 25,
     max_distance_to_ff: float = 50,
-    max_allowed_time_since_last_vis = 2.5,
+    max_allowed_time_since_last_vis=2.5,
 ) -> pd.DataFrame:
     """
     Build a stop×FF table where:
-      1) Any stop whose nearest FF is closer than `min_distance_to_ff` is eliminated entirely.
+      1) Any stop whose nearest FF is closer than `min_distance_from_ff` is eliminated entirely (because a distance smaller than 25 to a ff signifies a capture, not a miss).
       2) Remaining rows are only those FF within `max_distance_to_ff` of the stop.
 
     Returns a long table with one row per (stop point_index × nearby FF).
@@ -225,6 +231,7 @@ def get_one_stop_df(
         "point_index", "target_index", "time",
         "min_distance_from_adjacent_stops",
         "distance_to_next_ff_capture",
+        "stop_id", "stop_cluster_id", "stop_cluster_size",
     ]
     stop_cols = [c for c in stop_cols if c in filtered_stops_df.columns]
     ff_cols = ["point_index", "ff_index", "ff_distance", "time_since_last_vis"]
@@ -239,10 +246,10 @@ def get_one_stop_df(
     merged = merged[pd.to_numeric(
         merged["ff_distance"], errors="coerce").notna()].copy()
 
-    # --- Eliminate stops that are "too close" to any FF (< min_distance_to_ff) ---
+    # --- Eliminate stops that are "too close" to any FF (< min_distance_from_ff) ---
     min_ff_per_stop = merged.groupby("point_index")[
         "ff_distance"].transform("min")
-    keep_stops = min_ff_per_stop >= min_distance_to_ff
+    keep_stops = min_ff_per_stop >= min_distance_from_ff
 
     # --- Keep only FF within the allowed max distance ---
     within_max = merged["ff_distance"] <= max_distance_to_ff
@@ -351,9 +358,11 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     # Add stop point indices and handle duplicates
     GUAT_vs_TAFT_utils.add_stop_point_index(
         GUAT_w_ff_df, monkey_information, ff_real_position_sorted)
-    print('before calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(GUAT_w_ff_df))
+    print('before calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
+        GUAT_w_ff_df))
     GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(
         GUAT_w_ff_df)
 
-    print('after calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(GUAT_w_ff_df))
+    print('after calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
+        GUAT_w_ff_df))
     return GUAT_w_ff_df, GUAT_expanded_trials_df

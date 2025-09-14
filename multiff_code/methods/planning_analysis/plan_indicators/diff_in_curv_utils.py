@@ -221,10 +221,10 @@ def furnish_diff_in_curv_df(diff_in_curv_df):
     # we need the df to have the following columns:
     # curv_from_cur_end_to_nxt_ff, curv_from_stop_to_nxt_ff, traj_curv_to_stop, opt_curv_to_cur_ff
 
-    diff_in_curv_df['d_curv_null_arc'] = (180/math.pi * 100) * (
-        diff_in_curv_df['curv_from_cur_end_to_nxt_ff'] - diff_in_curv_df['opt_curv_to_cur_ff'])
-    diff_in_curv_df['d_curv_monkey'] = (180/math.pi * 100) * (
-        diff_in_curv_df['curv_from_stop_to_nxt_ff'] - diff_in_curv_df['traj_curv_to_stop'])
+    diff_in_curv_df['d_curv_null_arc'] = (
+        diff_in_curv_df['curv_from_cur_end_to_nxt_ff'] - diff_in_curv_df['opt_curv_to_cur_ff']) * 180/math.pi * 100
+    diff_in_curv_df['d_curv_monkey'] = (
+        diff_in_curv_df['curv_from_stop_to_nxt_ff'] - diff_in_curv_df['traj_curv_to_stop']) * 180/math.pi * 100
 
     diff_in_curv_df['abs_d_curv_null_arc'] = np.abs(
         diff_in_curv_df['d_curv_null_arc'])

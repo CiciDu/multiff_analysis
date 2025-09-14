@@ -1,4 +1,4 @@
-from planning_analysis.factors_vs_indicators import plot_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
 from data_wrangling import general_utils
 import numpy as np
 import pandas as pd
@@ -135,10 +135,10 @@ def get_combinations_from_changeable_variables(df, changeable_variables):
 
 
 def break_up_df_to_smaller_ones(df, fixed_variable_values_to_use, changeable_variables, var_to_determine_x_offset_direction=None,
-                                y_var_column='avg_r_squared', se_column=None):
+                                y_var_column='avg_r_squared', add_ci_bounds=True):
 
     processed_df = process_lr_or_ml_df_for_visualization(df, var_to_split=var_to_determine_x_offset_direction,
-                                                         y_var_column=y_var_column, se_column=se_column)
+                                                         y_var_column=y_var_column, add_ci_bounds=add_ci_bounds)
 
     # Filter the DataFrame by fixed_variable_values_to_use
     for key, value in fixed_variable_values_to_use.items():
@@ -163,8 +163,8 @@ def break_up_df_to_smaller_ones(df, fixed_variable_values_to_use, changeable_var
 def process_lr_or_ml_df_for_visualization(lr_or_ml_df,
                                           all_x_vars_of_interest=all_x_vars_of_interest,
                                           y_var_column='avg_r_squared',
-                                          se_column=None,
                                           var_to_split='ref_columns_only',
+                                          add_ci_bounds=True,
                                           ):
 
     lr_or_ml_df = lr_or_ml_df.copy()
@@ -179,12 +179,8 @@ def process_lr_or_ml_df_for_visualization(lr_or_ml_df,
         vars_to_keep = list(set(all_x_vars_of_interest +
                             ['sample_size', var_to_split, y_var_column]))
 
-    if se_column is not None:
-        lr_or_ml_df['se_upper'] = lr_or_ml_df[y_var_column] + \
-            lr_or_ml_df[se_column] * 2
-        lr_or_ml_df['se_lower'] = lr_or_ml_df[y_var_column] - \
-            lr_or_ml_df[se_column] * 2
-        vars_to_keep.extend(['se_upper', 'se_lower'])
+    if add_ci_bounds & ('ci_upper' in lr_or_ml_df.columns) & ('ci_lower' in lr_or_ml_df.columns):
+        vars_to_keep.extend(['ci_upper', 'ci_lower'])
 
     try:
         # lr_or_ml_df['ref_point_value'] = lr_or_ml_df['ref_point_value'].astype('str')
@@ -348,96 +344,3 @@ def melt_df_by_test_and_control(df, test_column='test_perc', control_column='ctr
     return df2
 
 
-def plot_heading_in_all_ref_median_info(all_ref_pooled_median_info, title_prefix=None):
-    new_all_ref_pooled_median_info = make_new_df_for_plotly_comparison(
-        all_ref_pooled_median_info)
-
-    x_var_column_list = ['ref_point_value']
-
-    fixed_variable_values_to_use = {
-        # 'whether_even_out_dist': True
-        # 'max_curv_range': 200,
-        # 'whether_filter_info': True,
-        'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-        'key_for_split': 'ff_seen',
-        'whether_even_out_dist': False,
-    }
-
-    # changeable_variables = ['whether_even_out_dist']
-    changeable_variables = []
-
-    columns_to_find_unique_combinations_for_color = []
-    columns_to_find_unique_combinations_for_line = []
-
-    fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_all_ref_pooled_median_info,
-                                                                                               fixed_variable_values_to_use,
-                                                                                               changeable_variables,
-                                                                                               x_var_column_list,
-                                                                                               y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                                                               se_column='diff_in_abs_angle_to_nxt_ff_boot_med_std',
-                                                                                               # var_to_determine_x_offset_direction=None,
-                                                                                               title_prefix=title_prefix,
-                                                                                               var_to_determine_x_offset_direction='test_or_control',
-                                                                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                               columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
-
-
-def plot_curv_in_all_ref_pooled_median_info(all_ref_pooled_median_info, title_prefix=None):
-
-    new_all_ref_pooled_median_info = make_new_df_for_plotly_comparison(
-        all_ref_pooled_median_info)
-    new_all_ref_pooled_median_info['sample_size'] = new_all_ref_pooled_median_info['sample_size_for_curv']
-
-    x_var_column_list = ['ref_point_value']
-
-    fixed_variable_values_to_use = {
-        # 'whether_even_out_dist': True
-        # 'max_curv_range': 200,
-        # 'whether_filter_info': True,
-        'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-        'key_for_split': 'ff_seen',
-        'whether_even_out_dist': False,
-    }
-
-    changeable_variables = []
-
-    columns_to_find_unique_combinations_for_color = []
-    columns_to_find_unique_combinations_for_line = []
-
-    fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_all_ref_pooled_median_info,
-                                                                                               fixed_variable_values_to_use,
-                                                                                               changeable_variables,
-                                                                                               x_var_column_list,
-                                                                                               y_var_column='diff_in_abs_d_curv_median',
-                                                                                               se_column='diff_in_abs_d_curv_boot_med_std',
-                                                                                               title_prefix=title_prefix,
-                                                                                               # var_to_determine_x_offset_direction=None,
-                                                                                               var_to_determine_x_offset_direction='test_or_control',
-                                                                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                               columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line)
-
-
-def plot_perc_in_overall_pooled_perc_info(pooled_perc_info, title_prefix=None):
-
-    new_perc_df = make_new_df_for_plotly_comparison(pooled_perc_info,
-                                                    match_rows_based_on_ref_columns_only=False)
-
-    x_var_column_list = ['key_for_split']
-
-    fixed_variable_values_to_use = {'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-                                    'whether_even_out_dist': False,
-                                    }
-
-    changeable_variables = []
-
-    columns_to_find_unique_combinations_for_color = []
-
-    fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(new_perc_df,
-                                                                                               fixed_variable_values_to_use,
-                                                                                               changeable_variables,
-                                                                                               x_var_column_list,
-                                                                                               y_var_column='perc',
-                                                                                               se_column='perc_se',
-                                                                                               title_prefix=title_prefix,
-                                                                                               var_to_determine_x_offset_direction='test_or_control',
-                                                                                               columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color)

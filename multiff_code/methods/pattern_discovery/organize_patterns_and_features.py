@@ -8,6 +8,7 @@ import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 # Consider moving these to your script/entrypoint, not a module:
 # os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -27,37 +28,37 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
 
     pattern_frequencies = (
         atp_num.sum(axis=0)
-        .rename("Frequency")
+        .rename('frequency')
         .reset_index()
-        .rename(columns={"index": "Item"})
+        .rename(columns={"index": 'item'})
     )
     n_trials = len(atp_num)
-    pattern_frequencies["N_total"] = n_trials - 1
+    pattern_frequencies['denom_count'] = n_trials - 1
 
     has = atp_num.columns
-    n_ff_counted = max(len(ff_caught_T_new) - 1, 0)
+    capture_counted = max(len(ff_caught_T_new) - 1, 0)
 
     if "cluster_around_target" in has:
         pattern_frequencies.loc[
-            pattern_frequencies["Item"].isin(
+            pattern_frequencies['item'].isin(
                 ["cluster_around_target", "disappear_latest"]),
-            "N_total"
+            'denom_count'
         ] = n_trials
         pattern_frequencies.loc[
-            pattern_frequencies["Item"].isin(
+            pattern_frequencies['item'].isin(
                 ["waste_cluster_around_target", "use_cluster"]),
-            "N_total"
+            'denom_count'
         ] = atp_num["cluster_around_target"].sum()
 
     if "three_in_a_row" in has:
-        pattern_frequencies.loc[pattern_frequencies["Item"]
-                                == "three_in_a_row", "N_total"] = n_trials - 2
+        pattern_frequencies.loc[pattern_frequencies['item']
+                                == "three_in_a_row", 'denom_count'] = n_trials - 2
     if "four_in_a_row" in has:
-        pattern_frequencies.loc[pattern_frequencies["Item"]
-                                == "four_in_a_row", "N_total"] = n_trials - 3
+        pattern_frequencies.loc[pattern_frequencies['item']
+                                == "four_in_a_row", 'denom_count'] = n_trials - 3
     if "ignore_sudden_flash" in has and "sudden_flash" in has:
         pattern_frequencies.loc[
-            pattern_frequencies["Item"] == "ignore_sudden_flash", "N_total"
+            pattern_frequencies['item'] == "ignore_sudden_flash", 'denom_count'
         ] = atp_num["sudden_flash"].sum()
 
     try_a_few = int(atp_num["try_a_few_times"].sum()
@@ -65,33 +66,75 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
     n_total_guat_block = GUAT_w_ff_frequency + one_stop_w_ff_frequency + try_a_few
 
     pattern_frequencies.loc[
-        pattern_frequencies["Item"] == "give_up_after_trying", "Frequency"
+        pattern_frequencies['item'] == "give_up_after_trying", 'frequency'
     ] = GUAT_w_ff_frequency
     pattern_frequencies.loc[
-        pattern_frequencies["Item"].isin(
+        pattern_frequencies['item'].isin(
             ["give_up_after_trying", "try_a_few_times"]),
-        "N_total"
+        'denom_count'
     ] = n_total_guat_block
 
-    # Keep math in float domain
-    denom = pattern_frequencies["N_total"].replace(0, np.nan).astype(float)
-    pattern_frequencies["Rate"] = (
-        pattern_frequencies["Frequency"].astype(float) / denom).fillna(0.0)
-    pattern_frequencies["Group"] = 1
+    # assign group = 1 for the patterns above
+    pattern_frequencies['group'] = 1
 
+    # get more patterns
     rows = []
 
+    rows.extend([
+        {'item': "GUAT_over_TAFT", 'frequency': GUAT_w_ff_frequency,
+            'denom_count': try_a_few, 'group': 2},
+        {'item': "GUAT_over_both", 'frequency': GUAT_w_ff_frequency,
+            'denom_count': GUAT_w_ff_frequency + try_a_few, 'group': 2},
+        {'item': "TAFT_over_both", 'frequency': try_a_few,
+            'denom_count': GUAT_w_ff_frequency + try_a_few, 'group': 2},
+    ])
+
+    retry = GUAT_w_ff_frequency + try_a_few
+    first_miss = retry + one_stop_w_ff_frequency
+    attempt = capture_counted + first_miss
+
+    # Choice after miss
+    rows.extend([
+        {'item': "retry_over_miss", 'frequency': retry,
+            'denom_count': first_miss, 'group': 2},
+        {'item': "no_retry_over_miss", 'frequency': (
+            first_miss - retry), 'denom_count': first_miss, 'group': 2},
+        {'item': "retry_fail_over_miss", 'frequency': GUAT_w_ff_frequency,
+            'denom_count': first_miss, 'group': 2},
+        {'item': "retry_capture_over_miss", 'frequency': try_a_few,
+            'denom_count': first_miss, 'group': 2},
+    ])
+    
+    # try using attempt instead of first_miss as denom_count
+    rows.extend([
+        {'item': "retry_over_attempt", 'frequency': retry,
+            'denom_count': attempt, 'group': 2},
+        {'item': "no_retry_over_attempt", 'frequency': (
+            first_miss - retry), 'denom_count': attempt, 'group': 2},
+        {'item': "retry_fail_over_attempt", 'frequency': GUAT_w_ff_frequency,
+            'denom_count': attempt, 'group': 2},
+        {'item': "retry_capture_over_attempt", 'frequency': try_a_few,
+            'denom_count': attempt, 'group': 2},
+    ])
+
     # Firefly capture rate (per s)
-    if len(ff_caught_T_new) >= 2:
-        total_duration = float(ff_caught_T_new[-1] - ff_caught_T_new[0])
-        if total_duration > 0:
-            rows.append({
-                "Item": "ff_capture_rate",
-                "Frequency": n_ff_counted,
-                "N_total": total_duration,
-                "Rate": n_ff_counted / total_duration,
-                "Group": 2
-            })
+    total_duration = float(ff_caught_T_new[-1] - ff_caught_T_new[0])
+    if total_duration > 0:
+        rows.append({
+            'item': "ff_capture_rate",
+            'frequency': capture_counted,
+            'denom_count': total_duration,
+            'group': 2
+        })
+
+    
+    # get miss_over_attempt and capture_over_attempt
+    rows.extend([
+        {'item': "miss_over_attempt", 'frequency': first_miss,
+            'denom_count': attempt, 'group': 2},
+        {'item': "capture_over_attempt", 'frequency': capture_counted,
+            'denom_count': attempt, 'group': 2},
+    ])
 
     # Stop success rate (guard columns)
     if {"whether_new_distinct_stop", "time"}.issubset(monkey_information.columns):
@@ -104,49 +147,30 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         total_number_of_stops = len(monkey_sub)
         if total_number_of_stops > 0:
             rows.append({
-                "Item": "stop_success_rate",
-                "Frequency": n_ff_counted,
-                "N_total": total_number_of_stops,
-                "Rate": n_ff_counted / total_number_of_stops,
-                "Group": 2
+                'item': "stop_success_rate",
+                'frequency': capture_counted,
+                'denom_count': total_number_of_stops,
+                'group': 2
             })
-
-    if try_a_few > 0:
-        rows.extend([
-            {"Item": "GUAT_over_TAFT", "Frequency": GUAT_w_ff_frequency, "N_total": try_a_few,
-             "Rate": GUAT_w_ff_frequency / try_a_few, "Group": 2},
-            {"Item": "GUAT_over_both", "Frequency": GUAT_w_ff_frequency, "N_total": GUAT_w_ff_frequency + try_a_few,
-             "Rate": GUAT_w_ff_frequency / (GUAT_w_ff_frequency + try_a_few), "Group": 2},
-            {"Item": "TAFT_over_both", "Frequency": try_a_few, "N_total": GUAT_w_ff_frequency + try_a_few,
-             "Rate": try_a_few / (GUAT_w_ff_frequency + try_a_few), "Group": 2},
-        ])
-        both = GUAT_w_ff_frequency + try_a_few
-        denom_all = both + one_stop_w_ff_frequency
-        if denom_all > 0:
-            rows.extend([
-                {"Item": "retry_any_over_all", "Frequency": both, "N_total": denom_all,
-                 "Rate": both / denom_all, "Group": 2},
-                {"Item": "retry_fail_over_all", "Frequency": GUAT_w_ff_frequency, "N_total": denom_all,
-                 "Rate": GUAT_w_ff_frequency / denom_all, "Group": 2},
-                {"Item": "retry_capture_over_all", "Frequency": try_a_few, "N_total": denom_all,
-                 "Rate": try_a_few / denom_all, "Group": 2},
-            ])
 
     if "two_in_a_row" in has and "cluster_around_target" in has:
         twos = atp_num["two_in_a_row"].sum()
         clusters = atp_num["cluster_around_target"].sum()
         if clusters > 0:
             rows.append({
-                "Item": "two_in_a_row_over_cluster",
-                "Frequency": twos,
-                "N_total": clusters,
-                "Rate": twos / clusters,
-                "Group": 2
+                'item': "two_in_a_row_over_cluster",
+                'frequency': twos,
+                'denom_count': clusters,
+                'group': 2
             })
 
     if rows:
         pattern_frequencies = pd.concat(
             [pattern_frequencies, pd.DataFrame(rows)], ignore_index=True)
+
+    denom = pattern_frequencies['denom_count'].replace(0, np.nan).astype(float)
+    pattern_frequencies['rate'] = (
+        pattern_frequencies['frequency'].astype(float) / denom).fillna(0.0)
 
     item_to_label = {
         'two_in_a_row': 'Two in a row',
@@ -169,19 +193,26 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'GUAT_over_TAFT': 'GUAT over TAFT',
         'GUAT_over_both': 'GUAT over both',
         'TAFT_over_both': 'TAFT over both',
-        'retry_fail_over_all': 'GUAT over all',
-        'retry_capture_over_all': 'TAFT over all',
-        'retry_any_over_all': 'GUAT+TAFT over all',
+        'retry_fail_over_miss': 'GUAT over all miss',
+        'retry_capture_over_miss': 'TAFT over all miss',
+        'retry_over_miss': 'GUAT+TAFT over all miss',
+        'no_retry_over_miss': 'No retry over all miss',
+        'retry_fail_over_attempt': 'GUAT over all attempt',
+        'retry_capture_over_attempt': 'TAFT over all attempt',
+        'retry_over_attempt': 'GUAT+TAFT over all attempt',
+        'no_retry_over_attempt': 'No retry over all attempt',
+        'miss_over_attempt': 'Miss over attempt',
+        'capture_over_attempt': 'Capture over attempt',
         'two_in_a_row_over_cluster': 'Two in a row over cluster'
     }
-    pattern_frequencies["Label"] = pattern_frequencies["Item"].map(
+    pattern_frequencies['label'] = pattern_frequencies['item'].map(
         item_to_label).fillna("Missing")
 
     # Only compute Percentage for proportions (Group 1 or any Rate in [0,1])
-    pattern_frequencies["Percentage"] = np.where(
-        (pattern_frequencies["Rate"] >= 0.0) & (
-            pattern_frequencies["Rate"] <= 1.0),
-        pattern_frequencies["Rate"] * 100.0,
+    pattern_frequencies['percentage'] = np.where(
+        (pattern_frequencies['rate'] >= 0.0) & (
+            pattern_frequencies['rate'] <= 1.0),
+        pattern_frequencies['rate'] * 100.0,
         np.nan
     )
 
@@ -327,7 +358,7 @@ def make_feature_statistics(all_trial_features, data_folder_name=None):
         median = median_values[item]
         mean = mean_values[item]
         new_row = pd.DataFrame(
-            {'Item': item, 'Median': median, 'Mean': mean, 'N_trial': n_trial}, index=[0])
+            {'item': item, 'median': median, 'mean': mean, 'n_trial': n_trial}, index=[0])
         if i == 0:
             feature_statistics = new_row
         else:
@@ -335,32 +366,32 @@ def make_feature_statistics(all_trial_features, data_folder_name=None):
 
     feature_statistics = feature_statistics.reset_index(drop=True)
 
-    feature_statistics['Label'] = 'Missing'
-    feature_statistics.loc[feature_statistics['Item'] == 't', 'Label'] = 'time'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           't_last_vis', 'Label'] = 'time target last seen'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'd_last_vis', 'Label'] = 'distance target last seen'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'abs_angle_last_vis', 'Label'] = 'abs angle target last seen'
-    feature_statistics.loc[feature_statistics['Item']
-                           == 'num_stops', 'Label'] = 'num stops'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'num_stops_near_target', 'Label'] = 'num stops near target'
+    feature_statistics['label'] = 'Missing'
+    feature_statistics.loc[feature_statistics['item'] == 't', 'label'] = 'time'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           't_last_vis', 'label'] = 'time target last seen'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'd_last_vis', 'label'] = 'distance target last seen'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'abs_angle_last_vis', 'label'] = 'abs angle target last seen'
+    feature_statistics.loc[feature_statistics['item']
+                           == 'num_stops', 'label'] = 'num stops'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'num_stops_near_target', 'label'] = 'num stops near target'
 
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'hitting_arena_edge', 'Label'] = 'hitting arena edge'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'num_stops_since_last_vis', 'Label'] = 'num stops since target last seen'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'n_ff_in_a_row', 'Label'] = 'num ff caught in a row'
-    feature_statistics.loc[feature_statistics['Item'] ==
-                           'num_ff_around_target', 'Label'] = 'num ff around target'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'hitting_arena_edge', 'label'] = 'hitting arena edge'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'num_stops_since_last_vis', 'label'] = 'num stops since target last seen'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'n_ff_in_a_row', 'label'] = 'num ff caught in a row'
+    feature_statistics.loc[feature_statistics['item'] ==
+                           'num_ff_around_target', 'label'] = 'num ff around target'
 
-    feature_statistics['Label for median'] = 'Median ' + \
-        feature_statistics['Label']
-    feature_statistics['Label for mean'] = 'Mean ' + \
-        feature_statistics['Label']
+    feature_statistics['label for median'] = 'Median ' + \
+        feature_statistics['label']
+    feature_statistics['label for mean'] = 'Mean ' + \
+        feature_statistics['label']
 
     if data_folder_name:
         general_utils.save_df_to_csv(
@@ -394,7 +425,7 @@ def combine_df_of_agent_and_monkey(df_m, df_a, agent_names=["Agent", "Agent2", "
     """
 
     df_a['Player'] = agent_names[0]
-    df_m['Player'] = 'Monkey'
+    df_m['Player'] = 'monkey'
 
     if df_a3:
         # Then a 2nd agent and a 3rd agent are used
@@ -418,8 +449,8 @@ def _add_dates_based_on_data_names(df):
     all_dates = [int(date[-4:]) for date in df['data'].tolist()]
     all_dates = [datetime.strptime(
         str(date/100), '%m.%d').date() for date in all_dates]
-    df['Date'] = all_dates
-    df.sort_values(by='Date', inplace=True)
+    df['date'] = all_dates
+    df.sort_values(by='date', inplace=True)
 
 
 def add_dates_and_sessions(df):
@@ -427,13 +458,13 @@ def add_dates_and_sessions(df):
     _add_dates_based_on_data_names(df)
 
     # Create a mapping of unique data_name to unique sessions
-    unique_sessions = {name: i for i, name in enumerate(df['Date'].unique())}
+    unique_sessions = {name: i for i, name in enumerate(df['date'].unique())}
 
     # Map the unique sessions to the Data column
-    df['Session'] = df['Date'].map(unique_sessions)
+    df['session'] = df['date'].map(unique_sessions)
 
     # Sort the DataFrame by data_name
-    df.sort_values(by='Session', inplace=True)
+    df.sort_values(by='session', inplace=True)
 
 
 def make_distance_df(ff_caught_T_new, monkey_information, ff_believed_position_sorted):
@@ -473,3 +504,4 @@ def make_num_stops_df(distance_df, closest_stop_to_capture_df, ff_caught_T_new, 
     # print(f'Filtered out {original_length - len(num_stops_df)} outliers out of {original_length} trials, since they have distance ' +
     #       f'or displacement greater than 2000, which is {round(100*(original_length - len(num_stops_df))/original_length, 2)}% of the data')
     return num_stops_df
+

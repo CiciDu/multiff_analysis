@@ -1,7 +1,10 @@
 
 from scipy import stats
-from planning_analysis.factors_vs_indicators import make_variations_utils, plot_variations_utils, process_variations_utils
+from planning_analysis.factors_vs_indicators import make_variations_utils, process_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
 from data_wrangling import specific_utils, process_monkey_information, base_processing_class, combine_info_utils, further_processing_class
+
+from pattern_discovery.learning.proportion_trend import analyze_proportion_trend
 
 
 import numpy as np
@@ -40,90 +43,8 @@ def poisson_rate_per_min(df_sessions):
 
 # ---------- Plot 1: Captures per minute with Poisson fit ----------
 
-
-def plot_poisson_rate_fit(df_sessions, po, title_prefix=""):
-    sess_grid = pd.DataFrame({"session": np.arange(df_sessions["session"].min(),
-                                                   df_sessions["session"].max()+1)})
-    # Predict a RATE by setting offset = log(60 sec) ⇒ rate per minute
-    pred = po.get_prediction(
-        exog=sess_grid.assign(**{}),
-        offset=np.log(np.full(len(sess_grid), 60.0))
-    ).summary_frame()  # columns: mean, mean_ci_lower, mean_ci_upper on link=log scale already exp'ed
-    # NOTE: statsmodels GLM returns predictions on response scale by default for Poisson
-
-    sess_grid["fit_rate_per_min"] = pred["mean"].values
-    sess_grid["fit_lo"] = pred["mean_ci_lower"].values
-    sess_grid["fit_hi"] = pred["mean_ci_upper"].values
-
-    obs = poisson_rate_per_min(df_sessions)
-
-    # Extract p-value for session coefficient
-    # Default to 1.0 if 'session' not found
-    p_value = po.pvalues.get('session', 1.0)
-    p_text = f"p = {p_value:.3f}" if p_value >= 0.001 else f"p < 0.001"
-
-    plt.figure(figsize=(7, 5))
-    # observed points + error bars
-    plt.errorbar(obs["session"], obs["rate_per_min"],
-                 yerr=[obs["rate_per_min"]-obs["rate_lo"],
-                       obs["rate_hi"]-obs["rate_per_min"]],
-                 fmt="o", alpha=0.7, label="Observed (rate ±95% CI)")
-    # fitted curve + band
-    plt.plot(sess_grid["session"], sess_grid["fit_rate_per_min"],
-             lw=2, label="Poisson fit (per min)")
-    plt.fill_between(sess_grid["session"], sess_grid["fit_lo"],
-                     sess_grid["fit_hi"], alpha=0.2, label="95% CI")
-    plt.xlabel("Session")
-    plt.ylabel("Captures per minute")
-
-    # Add title with prefix and p-value annotation
-    title = f"{title_prefix}Reward throughput (captures/min) with Poisson GLM fit" if title_prefix else "Reward throughput (captures/min) with Poisson GLM fit"
-    plt.title(f"{title}\n{p_text}")
-
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-# ---------- Plot 2: Duration with OLS(logT) fit ----------
-
-
-def plot_duration_fit(df_trials, ols, title_prefix=""):
-    per_sess = geom_mean_per_session(df_trials)
-    sess_grid = pd.DataFrame({"session": np.arange(df_trials["session"].min(),
-                                                   df_trials["session"].max()+1)})
-
-    # Predict on log scale then exponentiate to plot on seconds
-    # mean, mean_ci_lower, ...
-    pred = ols.get_prediction(sess_grid).summary_frame()
-    sess_grid["fit_T"] = np.exp(pred["mean"].values)
-    sess_grid["fit_lo"] = np.exp(pred["mean_ci_lower"].values)
-    sess_grid["fit_hi"] = np.exp(pred["mean_ci_upper"].values)
-
-    # Extract p-value for session coefficient
-    # Default to 1.0 if 'session' not found
-    p_value = ols.pvalues.get('session', 1.0)
-    p_text = f"p = {p_value:.3f}" if p_value >= 0.001 else f"p < 0.001"
-
-    plt.figure(figsize=(7, 5))
-    plt.scatter(per_sess["session"], per_sess["geom_mean_T"],
-                alpha=0.8, label="Geometric mean (per session)")
-    plt.plot(sess_grid["session"], sess_grid["fit_T"],
-             lw=2, label="OLS fit on log-duration")
-    plt.fill_between(sess_grid["session"], sess_grid["fit_lo"],
-                     sess_grid["fit_hi"], alpha=0.2, label="95% CI")
-    plt.xlabel("Session")
-    plt.ylabel("Typical pursuit duration (s)")
-
-    # Add title with prefix and p-value annotation
-    title = f"{title_prefix}Pursuit duration with log-linear fit" if title_prefix else "Pursuit duration with log-linear fit"
-    plt.title(f"{title}\n{p_text}")
-
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-
 # ---------- shared helpers ----------
+
 
 def _early_late_cuts_from_sessions(df_sessions, session_col="session"):
     sessions = np.sort(df_sessions[session_col].unique())
@@ -166,9 +87,9 @@ def _welch_t_and_effect(a, b):
 # ---------- RATE: descriptive + GLM Poisson with offset(time) ----------
 
 
-def summarize_early_late_rate_with_glm(df_sessions, session_col="session",
-                                       time_col="total_duration", capture_col="captures",
-                                       plot=True, title="Early vs Late: Reward rate"):
+def summarize_early_late_event_rate_with_glm(df_sessions, session_col="session",
+                                             time_col="total_duration", capture_col="captures",
+                                             plot=True, title="Early vs Late: Reward rate"):
     """
     Outputs:
       phase_tbl            : early/late means ± 95% CI for captures/min
@@ -245,22 +166,14 @@ def summarize_early_late_rate_with_glm(df_sessions, session_col="session",
 
     # Plot
     if plot:
-        plt.figure(figsize=(6, 4))
-        x = np.arange(2)
-        y = phase_tbl.set_index(
-            "phase").loc[["early", "late"], "rate_per_min_mean"].values
-        ylo = phase_tbl.set_index(
-            "phase").loc[["early", "late"], "rate_per_min_lo"].values
-        yhi = phase_tbl.set_index(
-            "phase").loc[["early", "late"], "rate_per_min_hi"].values
-        yerr = np.vstack([y - ylo, yhi - y])
-        plt.bar(x, y)
-        plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-        plt.xticks(x, ["Early", "Late"])
-        plt.ylabel("Captures per minute")
-        plt.title(title)
-        plt.tight_layout()
-        plt.show()
+        plot_early_late_with_ci(
+            phase_tbl,
+            mean_col='rate_per_min_mean',
+            lo_col='rate_per_min_lo',
+            hi_col='rate_per_min_hi',
+            ylabel='Captures per minute',
+            title=title
+        )
 
     return phase_tbl, ttest_contrast_tbl, glm_contrast_tbl, effect_summary_tbl
 
@@ -345,127 +258,99 @@ def summarize_early_late_duration_with_glm(df_trials, df_sessions,
 
     # Plot
     if plot:
-        plt.figure(figsize=(6, 4))
-        x = np.arange(2)
-        y = phase_tbl.set_index(
-            "phase").loc[["early", "late"], "geomT_mean"].values
-        ylo = phase_tbl.set_index(
-            "phase").loc[["early", "late"], "geomT_lo"].values
-        yhi = phase_tbl.set_index(
-            "phase").loc[["early", "late"], "geomT_hi"].values
-        yerr = np.vstack([y - ylo, yhi - y])
-        plt.bar(x, y)
-        plt.errorbar(x, y, yerr=yerr, fmt="none", capsize=5)
-        plt.xticks(x, ["Early", "Late"])
-        plt.ylabel("Typical pursuit duration (s)")
-        plt.title(title)
-        plt.tight_layout()
-        plt.show()
+        plot_early_late_with_ci(
+            phase_tbl,
+            mean_col='geomT_mean',
+            lo_col='geomT_lo',
+            hi_col='geomT_hi',
+            ylabel='Typical pursuit duration (s)',
+            title=title
+        )
 
     return phase_tbl, ttest_contrast_tbl, glm_contrast_tbl, effect_summary_tbl
 
 # ---------- Wrapper ----------
 
 
-def plot_early_late_contrasts(df_sessions, df_trials):
+def plot_early_late_with_ci(
+    phase_tbl: pd.DataFrame,
+    mean_col: str,
+    lo_col: str,
+    hi_col: str,
+    ylabel: str,
+    title: str,
+    order=('early', 'late'),
+    fmt='{:.2f}'
+):
+    """
+    Bar plot with asymmetric CI error bars for Early vs Late phases.
+
+    Parameters
+    ----------
+    phase_tbl : pd.DataFrame
+        Must contain columns [phase, mean_col, lo_col, hi_col].
+    mean_col, lo_col, hi_col : str
+        Column names for the mean and confidence interval bounds.
+    ylabel : str
+        Y-axis label.
+    title : str
+        Plot title.
+    order : tuple of str
+        Order of phases on the x-axis (default: ('early', 'late')).
+    fmt : str
+        Format string for value labels on top of bars.
+    """
+    sub = phase_tbl.set_index('phase').reindex(order)
+
+    x = np.arange(len(order))
+    y = sub[mean_col].to_numpy()
+    lo = sub[lo_col].to_numpy()
+    hi = sub[hi_col].to_numpy()
+
+    yerr = np.vstack([np.clip(y - lo, 0, None), np.clip(hi - y, 0, None)])
+
+    fig, ax = plt.subplots(figsize=(5.6, 3.6))
+
+    bars = ax.bar(
+        x, y, width=0.6,
+        yerr=yerr,
+        error_kw={'capsize': 5, 'elinewidth': 1.2, 'alpha': 0.9},
+        edgecolor='black', linewidth=0.8, alpha=0.9
+    )
+
+    ax.set_xticks(x, [ph.capitalize() for ph in order])
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
+    ax.yaxis.grid(True, linestyle='--', linewidth=0.8, alpha=0.35)
+    ax.set_axisbelow(True)
+    for spine in ['top', 'right']:
+        ax.spines[spine].set_visible(False)
+
+    for bar in bars:
+        h = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2, h,
+            fmt.format(h),
+            ha='center', va='bottom',
+            fontsize=9, clip_on=False
+        )
+
+    fig.tight_layout()
+    plt.show()
+
+
+def analyze_early_late_capture_and_duration(df_sessions, df_trials):
     """
     Runs both metrics with plots, and returns:
       rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
       dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl
     """
     (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl
-     ) = summarize_early_late_rate_with_glm(df_sessions)
+     ) = summarize_early_late_event_rate_with_glm(df_sessions)
 
     (dur_phase_tbl, dur_ttest_tbl, dur_glm_tbl, dur_effect_summary_tbl
      ) = summarize_early_late_duration_with_glm(df_trials, df_sessions)
 
     return (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
             dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl)
-
-
-def get_key_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno'):
-
-    sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
-        raw_data_dir_name, monkey_name)
-
-    all_trial_durations_df = pd.DataFrame()
-    all_stop_df = pd.DataFrame()
-    all_VBLO_df = pd.DataFrame()
-
-    for index, row in sessions_df_for_one_monkey.iterrows():
-        if row['finished'] is True:
-            continue
-
-        data_name = row['data_name']
-        raw_data_folder_path = os.path.join(
-            raw_data_dir_name, row['monkey_name'], data_name)
-        print(raw_data_folder_path)
-        data_item = further_processing_class.FurtherProcessing(
-            raw_data_folder_path=raw_data_folder_path)
-
-        # disable printing
-        data_item.retrieve_or_make_monkey_data()
-        data_item.make_or_retrieve_ff_dataframe()
-
-        trial_durations = np.diff(data_item.ff_caught_T_new)
-        trial_durations_df = pd.DataFrame(
-            {'duration_sec': trial_durations, 'trial_index': np.arange(len(trial_durations))})
-        trial_durations_df['data_name'] = data_name
-        all_trial_durations_df = pd.concat(
-            [all_trial_durations_df, trial_durations_df])
-
-        num_stops = data_item.monkey_information.loc[data_item.monkey_information['whether_new_distinct_stop'] == True, [
-            'time']].shape[0]
-        num_captures = len(data_item.ff_caught_T_new)
-        stop_df = pd.DataFrame(
-            {
-                'stops': [num_stops],
-                'captures': [num_captures],
-                'data_name': [data_name],
-            }
-        )
-        all_stop_df = pd.concat([all_stop_df, stop_df])
-
-        data_item.get_visible_before_last_one_trials_info()
-        num_VBLO_trials = len(data_item.vblo_target_cluster_df)
-        all_selected_base_trials = len(data_item.selected_base_trials)
-        VBLO_df = pd.DataFrame(
-            {
-                'VBLO_trials': [num_VBLO_trials],
-                'base_trials': [all_selected_base_trials],
-                'data_name': [data_name],
-            }
-        )
-        all_VBLO_df = pd.concat([all_VBLO_df, VBLO_df])
-
-    all_trial_durations_df = make_variations_utils.assign_session_id(
-        all_trial_durations_df, 'session')
-    all_stop_df = make_variations_utils.assign_session_id(
-        all_stop_df, 'session')
-    all_VBLO_df = make_variations_utils.assign_session_id(
-        all_VBLO_df, 'session')
-
-    return all_trial_durations_df, all_stop_df, all_VBLO_df
-
-
-
-def process_all_trial_durations_df(all_trial_durations_df):
-    # 1) Filter and clean durations FIRST
-    df_trials = all_trial_durations_df.query("duration_sec < 30").copy()
-    df_trials["duration_sec"] = df_trials["duration_sec"].clip(lower=1e-6)
-    df_trials["logT"] = np.log(df_trials["duration_sec"])
-
-
-    # 2) Build session-level aggregates from the cleaned trials
-    df_sessions = (
-        df_trials.groupby("session", as_index=False)
-        .agg(captures=("duration_sec", "size"),
-            total_duration=("duration_sec", "sum"))
-    )
-
-    # total_duration should be >0. Still, be safe:
-    df_sessions["total_duration"] = df_sessions["total_duration"].clip(lower=1e-12)
-
-    return df_trials, df_sessions
-
-

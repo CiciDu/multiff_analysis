@@ -267,7 +267,7 @@ def _take_out_ff_and_monkey_line_numbers(log_content):
     ffLinenumberList = []
     for LineNumber, line in enumerate(log_content):
         key_ff = re.search('Firefly', line)
-        key_monkey = re.search('Monkey', line)
+        key_monkey = re.search('monkey', line)
         if key_ff is not None:
             ffLinenumberList.append(LineNumber)
         if key_monkey is not None:

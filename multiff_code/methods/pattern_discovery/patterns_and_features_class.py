@@ -76,7 +76,7 @@ class PatternsAndFeatures():
                 raw_data_folder_path=raw_data_folder_path)
             self.data_item.make_df_related_to_patterns_and_features(
                 exists_ok=exists_ok)
-            print('Successfully made df related to patterns and features for ', data_name)
+            print(f'Successfully made df related to patterns and features for {data_name}')
 
             self.data_item.pattern_frequencies['data_name'] = data_name
             self.data_item.feature_statistics['data_name'] = data_name
@@ -103,7 +103,7 @@ class PatternsAndFeatures():
 
         self.agg_pattern_frequencies = self._make_agg_pattern_frequency()
         self.agg_feature_statistics = organize_patterns_and_features.make_feature_statistics(self.combd_all_trial_features.drop(
-            columns=['data_name', 'data', 'Date']), data_folder_name=None)
+            columns=['data_name', 'data', 'date']), data_folder_name=None)
 
         if save_data:
             os.makedirs(
@@ -173,16 +173,16 @@ class PatternsAndFeatures():
         self.combd_scatter_around_target_df = pd.read_csv(os.path.join(
             self.combd_patterns_and_features_folder_path, 'combd_scatter_around_target_df.csv')).drop(columns='Unnamed: 0')
 
-        # the line below is used because when the df was saved, 'Percentage' column was not in it.
-        self.combd_pattern_frequencies['Percentage'] = self.combd_pattern_frequencies['Rate']*100
+        # the line below is used because when the df was saved, 'percentage' column was not in it.
+        self.combd_pattern_frequencies['percentage'] = self.combd_pattern_frequencies['rate']*100
         return
 
     def _make_agg_pattern_frequency(self):
-        self.agg_pattern_frequencies = self.combd_pattern_frequencies[['Item', 'Group', 'Label', 'Frequency', 'N_total']].groupby(
-            ['Item', 'Group', 'Label']).sum(numeric_only=False).reset_index()
-        self.agg_pattern_frequencies['Rate'] = self.agg_pattern_frequencies['Frequency'] / \
-            self.agg_pattern_frequencies['N_total']
-        self.agg_pattern_frequencies['Percentage'] = self.agg_pattern_frequencies['Rate']*100
+        self.agg_pattern_frequencies = self.combd_pattern_frequencies[['item', 'group', 'label', 'frequency', 'denom_count']].groupby(
+            ['item', 'group', 'label']).sum(numeric_only=False).reset_index()
+        self.agg_pattern_frequencies['rate'] = self.agg_pattern_frequencies['frequency'] / \
+            self.agg_pattern_frequencies['denom_count']
+        self.agg_pattern_frequencies['percentage'] = self.agg_pattern_frequencies['rate']*100
         return self.agg_pattern_frequencies
 
     def plot_feature_statistics(self, hue=None):
@@ -200,14 +200,14 @@ class PatternsAndFeatures():
         plt.show()
 
     def plot_the_changes_in_pattern_frequencies_over_time(self, multiple_monkeys=False):
-        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_pattern_frequencies, x="Session", y="Rate",
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_pattern_frequencies, x='session', y='rate',
                                                                     multiple_monkeys=multiple_monkeys, monkey_name='monkey_Bruno',
                                                                     category_order=self.pattern_order)
 
     def plot_the_changes_in_feature_statistics_over_time(self, multiple_monkeys=False):
-        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_feature_statistics, x="Session", y="Median", title_column="Label for median",
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_feature_statistics, x='session', y='median', title_column='label for median',
                                                                     multiple_monkeys=multiple_monkeys, monkey_name=self.monkey_name, category_order=self.feature_order)
-        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_feature_statistics, x="Session", y="Mean", title_column="Label for mean",
+        plot_change_over_time.plot_the_changes_over_time_in_long_df(self.combd_feature_statistics, x='session', y='mean', title_column='label for mean',
                                                                     multiple_monkeys=multiple_monkeys, monkey_name=self.monkey_name, category_order=self.feature_order)
 
     def plot_the_changes_in_scatter_around_target_over_time(self, y_columns=None):
@@ -217,7 +217,7 @@ class PatternsAndFeatures():
                          'angle_median', 'angle_Q3', 'angle_iqr', 'abs_angle_mean',
                          'abs_angle_std', 'abs_angle_Q1', 'abs_angle_median', 'abs_angle_Q3',
                          'abs_angle_iqr', 'Q1_perc', 'Q2_perc', 'Q3_perc', 'Q4_perc']
-        plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_around_target_df, x="Session",
+        plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_around_target_df, x='session',
                                                                     y_columns=y_columns,
                                                                     monkey_name=self.monkey_name,
                                                                     title_prefix='Landing Position From FF Center \n'

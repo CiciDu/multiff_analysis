@@ -48,6 +48,11 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
             self.decision_making_folder_path, 'GUAT_vs_TAFT')
         os.makedirs(self.GUAT_vs_TAFT_folder_path, exist_ok=True)
 
+    def find_patterns(self):
+        super().find_patterns()
+        self.furnish_TAFT_trials_df()
+
+
     def make_decision_making_basic_ff_info(self):
         # This is another way to gather features to apply ML, just using much more simple features
         self.streamline_getting_GUAT_or_TAFT_df(GUAT_or_TAFT='TAFT')
@@ -115,6 +120,17 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         else:
             raise ValueError('GUAT_or_TAFT must be either TAFT or GUAT')
 
+
+    def furnish_TAFT_trials_df(self):
+        self.TAFT_trials_df['first_stop_time'] = self.monkey_information.loc[
+            self.TAFT_trials_df['first_stop_point_index'], 'time'].values
+        self.TAFT_trials_df['ff_index'] = self.TAFT_trials_df['trial']
+        # because we need to have nxt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
+        
+        if 'stop_point_index' not in self.TAFT_trials_df.columns:
+            GUAT_vs_TAFT_utils.add_stop_point_index(
+                self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
+            
     def get_relevant_monkey_data(self,
                                  already_retrieved_ok=True,
                                  ):
@@ -125,14 +141,9 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
                              include_GUAT_data=include_GUAT_data, include_TAFT_data=include_TAFT_data)
 
         if self.GUAT_or_TAFT == 'TAFT':
-            self.TAFT_trials_df['first_stop_time'] = self.monkey_information.loc[
-                self.TAFT_trials_df['first_stop_point_index'], 'time'].values
-            self.TAFT_trials_df['ff_index'] = self.TAFT_trials_df['trial']
-            # because we need to have nxt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
-            self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(
-                self.ff_caught_T_new) - 2]
-            GUAT_vs_TAFT_utils.add_stop_point_index(
-                self.TAFT_trials_df, self.monkey_information, self.ff_real_position_sorted)
+            self.furnish_TAFT_trials_df()
+            # # because we need to have nxt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
+            # self.TAFT_trials_df = self.TAFT_trials_df[self.TAFT_trials_df['ff_index'] < len(self.ff_caught_T_new) - 2]
         self.ff_dataframe_visible = self.ff_dataframe[self.ff_dataframe['visible'] == 1]
 
     def get_GUAT_or_TAFT_df(self):

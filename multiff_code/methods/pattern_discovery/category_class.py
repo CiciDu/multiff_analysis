@@ -173,29 +173,28 @@ class ProcessCategoryData:
               "remained after cleaning out trials where target cluster was not seen for a long time before capture.")
 
     def make_polar_plot_of_target_last_seen_positions(self):
-
+        sns.set_style(style="white")
         min_sample_size = min(self.sort_1_df.shape[0], self.sort_2_df.shape[0])
         self.sort_1_df_sample = self.sort_1_df.sample(
             n=min_sample_size, replace=False)
         self.sort_2_df_sample = self.sort_2_df.sample(
             n=min_sample_size, replace=False)
 
-        fig = plt.figure(figsize=(8, 8))
+        fig = plt.figure(figsize=(6.5, 6.5), dpi=300)
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], polar=True)
         ax = plot_behaviors_utils.set_polar_background_for_plotting(
             ax, 400, color_visible_area_in_background=True)
         ax.scatter(self.sort_1_df_sample['last_vis_ang'], self.sort_1_df_sample['last_vis_dist'],
-                   c="green", alpha=0.7, zorder=2, s=5, marker='o')  # originally it was s=15
+                   c="green", alpha=0.7, zorder=2, s=15, marker='o')  # originally it was s=15
         # sample from it so the size is the same as target_cluster_info
         ax.scatter(self.sort_2_df_sample['last_vis_ang'], self.sort_2_df_sample['last_vis_dist'],
-                   c="red", alpha=0.4, zorder=2, s=5, marker='o')  # originally it was s=15
+                   c="red", alpha=0.4, zorder=2, s=15, marker='o')  # originally it was s=15
         
         
         ax.set_thetamin(-45)
         ax.set_thetamax(45)
-
         
-        plt.title("Firefly Last Seen Positions", fontsize=17)
+        plt.title("Firefly Last Seen Positions", fontsize=20)
         plt.legend(labels=[self.sort_1_name, self.sort_2_name],
                    fontsize=13, loc="upper right")
         plt.show()
@@ -205,15 +204,18 @@ class ProcessCategoryData:
 
         variable_of_interest = "time_since_last_vis"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
-            fig, axes = plt.subplots(figsize=(8, 5))
+            fig, axes = plt.subplots(figsize=(7, 4.8), dpi=300)
             sns.histplot(data=self.sort_1_df[variable_of_interest], kde=False,
                          alpha=0.4, color="green", binwidth=0.1, stat="probability")
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
                          alpha=0.4, color="blue", binwidth=0.1, stat="probability")
-            axes.set_title("Time Since Firefly Last Visible", fontsize=19)
+            axes.set_title("Time from Last Firefly Visibility to Closest Stop", fontsize=19, pad=12)
+            # axes.set_title("Time Since Firefly Last Visible at Time of Closest Stop", fontsize=19)
             max_time = max(self.sort_1_df[variable_of_interest].max(), self.sort_2_df[variable_of_interest].max())
             axes.set_xlim([0, max_time])
-            axes.set_xlabel('')
+            axes.set_xlabel('Time (s)', fontsize=13)
+            # change ylabel font size
+            axes.yaxis.label.set_fontsize(13)
             plt.legend(labels=[self.sort_1_name, self.sort_2_name],
                        fontsize=13, loc="upper right")
             plt.show()

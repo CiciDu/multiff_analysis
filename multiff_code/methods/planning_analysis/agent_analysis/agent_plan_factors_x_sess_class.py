@@ -3,7 +3,7 @@ from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
 from planning_analysis.agent_analysis import agent_plan_factors_class
-from planning_analysis.factors_vs_indicators import _variations_base_class
+from planning_analysis.factors_vs_indicators import variations_base_class
 from machine_learning.RL.SB3 import rl_for_multiff_class
 
 import pandas as pd
@@ -15,7 +15,7 @@ import os
 # This class collects data from many agents and compares them
 
 
-class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
+class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
     def __init__(self,
                  model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
@@ -79,25 +79,25 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
         print(' ')
         print('Making overall all median info ......')
         self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode={'time after cur ff visible': [0.1, 0],
-                                                                                  'distance': [-150, -100, -50]},
-                                                  list_of_curv_traj_window_before_stop=[
-                                                      [-25, 0]],
-                                                  save_data=save_data,
-                                                  exists_ok=final_products_exist_ok,
-                                                  pooled_median_info_exists_ok=intermediate_products_exist_ok,
-                                                  combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
-                                                  stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                                                  heading_info_df_exists_ok=intermediate_products_exist_ok)
+                                                                                         'distance': [-150, -100, -50]},
+                                                         list_of_curv_traj_window_before_stop=[
+            [-25, 0]],
+            save_data=save_data,
+            exists_ok=final_products_exist_ok,
+            pooled_median_info_exists_ok=intermediate_products_exist_ok,
+            combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
+            stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+            heading_info_df_exists_ok=intermediate_products_exist_ok)
 
         self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
         print(' ')
         print('Making all perc info ......')
         self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                            verbose=True,
-                                            exists_ok=final_products_exist_ok,
-                                            stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                                            heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                            save_data=save_data)
+                                               verbose=True,
+                                               exists_ok=final_products_exist_ok,
+                                               stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                                               heading_info_df_exists_ok=intermediate_products_exist_ok,
+                                               save_data=save_data)
         self.agent_all_perc_df = self.pooled_perc_info.copy()
 
     def get_plan_features_df_across_sessions(self,
@@ -250,11 +250,11 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
                                                           save_data=True,
                                                           **env_kwargs
                                                           ):
-        
+
         try:
             if combd_heading_df_x_sessions_exists_ok:
                 self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                        curv_traj_window_before_stop=curv_traj_window_before_stop)
+                                                          curv_traj_window_before_stop=curv_traj_window_before_stop)
                 if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
                     raise Exception('Empty combd_heading_df_x_sessions.')
             else:
@@ -264,14 +264,14 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
             print(
                 f'Will make new combd_heading_df_x_sessions for the agent because {e}.')
             self.make_combd_heading_df_x_sessions(num_steps_per_dataset=self.num_steps_per_dataset, num_datasets_to_collect=num_datasets_to_collect,
-                                                ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,
-                                                use_curv_to_ff_center=use_curv_to_ff_center,
-                                                save_data=save_data,
-                                                **env_kwargs)
+                                                  ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                  curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                  heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                  stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                  curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,
+                                                  use_curv_to_ff_center=use_curv_to_ff_center,
+                                                  save_data=save_data,
+                                                  **env_kwargs)
 
     def _add_plan_features_to_combd_plan_features(self, data_name):
         plan_features_tc = self.pfa.plan_features_tc.copy()
@@ -292,7 +292,8 @@ class PlanFactorsAcrossAgentSessions(_variations_base_class._VariationsBase):
             [self.ctrl_heading_info_df, self.ctrl_heading_info_df], axis=0)
 
     def make_or_retrieve_all_ref_pooled_median_info(self, **kwargs):
-        self.all_ref_pooled_median_info = super().make_or_retrieve_all_ref_pooled_median_info(**kwargs)
+        self.all_ref_pooled_median_info = super(
+        ).make_or_retrieve_all_ref_pooled_median_info(**kwargs)
         self.all_ref_pooled_median_info['monkey_name'] = 'agent'
         return self.all_ref_pooled_median_info
 

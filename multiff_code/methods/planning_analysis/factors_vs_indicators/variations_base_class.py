@@ -1,6 +1,7 @@
 
 from planning_analysis.plan_factors import test_vs_control_utils, test_vs_control_utils
-from planning_analysis.factors_vs_indicators import make_variations_utils, _predict_y_values_class, _compare_y_values_class, _plot_variations_class
+from planning_analysis.factors_vs_indicators import make_variations_utils, predict_y_values_class, compare_y_values_class
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import plan_factors_utils, build_factor_comp
 import os
@@ -20,9 +21,9 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class _VariationsBase(_predict_y_values_class._PredictYValues,
-                      _compare_y_values_class._CompareYValues,
-                      _plot_variations_class._PlotVariations):
+class _VariationsBase(predict_y_values_class._PredictYValues,
+                      compare_y_values_class._CompareYValues,
+                      plot_variations_class._PlotVariations):
 
     # class _VariationsBase:
 
@@ -41,12 +42,12 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
                  'RDy_median',
                  'RDy_Q3',
                  'RDz_Q1',
-                 'monkey_speed_Q1',
-                 'monkey_speed_median',
-                 'monkey_speed_Q3',
-                 'monkey_dw_Q1',
-                 'monkey_dw_median',
-                 'monkey_dw_Q3',
+                 'speed_Q1',
+                 'speed_median',
+                 'speed_Q3',
+                 'ang_speed_Q1',
+                 'ang_speed_median',
+                 'ang_speed_Q3',
                  # 'cur_ff_angle_when_cur_ff_last_seen',
                  # 'cur_ff_distance_when_cur_ff_last_seen',
                  # 'traj_curv_when_cur_ff_last_seen',
@@ -92,17 +93,17 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         self.opt_arc_type = opt_arc_type
 
         # # Bind methods from _PredictYValues
-        # for name, method in _predict_y_values_class._PredictYValues.__dict__.items():
+        # for name, method in predict_y_values_class._PredictYValues.__dict__.items():
         #     if callable(method):
         #         setattr(self, name, MethodType(method, self))
 
         # # Bind methods from _CompareYValues
-        # for name, method in _compare_y_values_class._CompareYValues.__dict__.items():
+        # for name, method in compare_y_values_class._CompareYValues.__dict__.items():
         #     if callable(method):
         #         setattr(self, name, MethodType(method, self))
 
         # # Bind methods from _PlotVariations
-        # for name, method in _plot_variations_class._PlotVariations.__dict__.items():
+        # for name, method in plot_variations_class._PlotVariations.__dict__.items():
         #     if callable(method):
         #         setattr(self, name, MethodType(method, self))
 
@@ -154,7 +155,7 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         """
         if hasattr(self, 'all_test_heading_info_df_filtered') and hasattr(self, 'all_ctrl_heading_info_df_filtered'):
             return
-        
+
         df_name = 'all_heading_info_filtered.csv'
         test_df_path = os.path.join(
             self.dict_of_combd_heading_info_folder_path['test'], df_name)
@@ -163,9 +164,11 @@ class _VariationsBase(_predict_y_values_class._PredictYValues,
         if exists(test_df_path) and exists(ctrl_df_path):
             self.all_test_heading_info_df_filtered = pd.read_csv(test_df_path)
             self.all_ctrl_heading_info_df_filtered = pd.read_csv(ctrl_df_path)
-            print(f'Successfully retrieved filtered heading info df across sessions at {test_df_path} and {ctrl_df_path}')
+            print(
+                f'Successfully retrieved filtered heading info df across sessions at {test_df_path} and {ctrl_df_path}')
         else:
-            print('Filtered heading info df across sessions does not exist. Will recreate it.')
+            print(
+                'Filtered heading info df across sessions does not exist. Will recreate it.')
             self.combine_test_and_ctrl_heading_info_df_across_sessions_and_ref_point_params()
             self.filter_heading_info_df()
             self.all_test_heading_info_df_filtered.to_csv(

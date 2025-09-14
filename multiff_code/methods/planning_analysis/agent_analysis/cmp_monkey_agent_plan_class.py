@@ -1,13 +1,13 @@
 from planning_analysis.factors_vs_indicators import make_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
-from planning_analysis.factors_vs_indicators import make_variations_utils, _variations_base_class
+from planning_analysis.factors_vs_indicators import make_variations_utils, variations_base_class
 from planning_analysis.factors_vs_indicators import process_variations_utils
 
 
 # This class collects data from many agents and compares them
 
 
-class CompareMonkeyAgentPlan(_variations_base_class._VariationsBase):
+class CompareMonkeyAgentPlan(variations_base_class._VariationsBase):
 
     def __init__(self,
                  opt_arc_type='opt_arc_stop_closest',
@@ -28,8 +28,7 @@ class CompareMonkeyAgentPlan(_variations_base_class._VariationsBase):
     def get_monkey_and_agent_pooled_perc_info(self):
         self.monkey_pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys()
         self.agent_pooled_perc_info = self.pfas.make_or_retrieve_pooled_perc_info(
-            )
+        )
 
         self.pooled_perc_info = compare_monkey_and_agent_utils.make_both_players_df(
             self.monkey_pooled_perc_info, self.agent_pooled_perc_info)
-

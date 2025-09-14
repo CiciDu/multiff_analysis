@@ -2,7 +2,7 @@ from planning_analysis.factors_vs_indicators import make_variations_utils
 from planning_analysis.show_planning import show_planning_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from planning_analysis.plan_factors import plan_factors_class
-from planning_analysis.factors_vs_indicators import _variations_base_class
+from planning_analysis.factors_vs_indicators import variations_base_class
 from data_wrangling import specific_utils, combine_info_utils, base_processing_class
 from planning_analysis.factors_vs_indicators import process_variations_utils
 
@@ -25,12 +25,12 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class PlanAcrossSessions(_variations_base_class._VariationsBase):
+class PlanAcrossSessions(variations_base_class._VariationsBase):
 
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
     default_ref_point_params_based_on_mode = {
-        'distance': np.arange(-150, -30, 10)}
+        'distance': np.arange(-150, -40, 10)}
 
     # default_ref_point_params_based_on_mode = {'time after cur ff visible': [-0.2]}
 
@@ -184,10 +184,10 @@ class PlanAcrossSessions(_variations_base_class._VariationsBase):
         self.process_all_ref_per_sess_median_info_to_plot_heading_and_curv()
         return self.all_ref_per_sess_median_info
 
-    def combine_pooled_perc_info_across_monkeys(self):
-        self.pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys()
+    def combine_pooled_perc_info_across_monkeys(self, pooled_perc_info_exists_ok=True):
+        self.pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys(pooled_perc_info_exists_ok=pooled_perc_info_exists_ok)
         return self.pooled_perc_info
 
-    def combine_per_sess_perc_info_across_monkeys(self):
-        self.per_sess_perc_info = make_variations_utils.combine_per_sess_perc_info_across_monkeys()
+    def combine_per_sess_perc_info_across_monkeys(self, per_sess_perc_info_exists_ok=True):
+        self.per_sess_perc_info = make_variations_utils.combine_per_sess_perc_info_across_monkeys(per_sess_perc_info_exists_ok=per_sess_perc_info_exists_ok)
         return self.per_sess_perc_info

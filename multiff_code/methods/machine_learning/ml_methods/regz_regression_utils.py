@@ -238,7 +238,7 @@ def create_regression_diagnostic_plots(y_true, y_pred, residuals, model_name):
     # 3. Residuals histogram
     axes[0, 2].hist(residuals, bins=30, alpha=0.7, edgecolor='black')
     axes[0, 2].set_xlabel('Residuals')
-    axes[0, 2].set_ylabel('Frequency')
+    axes[0, 2].set_ylabel('frequency')
     axes[0, 2].set_title('Residuals Distribution')
     axes[0, 2].grid(True, alpha=0.3)
     # 4. Q-Q plot for residuals
@@ -256,7 +256,7 @@ def create_regression_diagnostic_plots(y_true, y_pred, residuals, model_name):
     prediction_errors = np.abs(y_true - y_pred)
     axes[1, 2].hist(prediction_errors, bins=30, alpha=0.7, edgecolor='black')
     axes[1, 2].set_xlabel('Absolute Prediction Error')
-    axes[1, 2].set_ylabel('Frequency')
+    axes[1, 2].set_ylabel('frequency')
     axes[1, 2].set_title('Prediction Error Distribution')
     axes[1, 2].grid(True, alpha=0.3)
     plt.tight_layout()

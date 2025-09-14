@@ -392,55 +392,6 @@ def cv_decode_with_glm_report(
         n_splits=n_splits
     )
 
-# =========================
-# Baseline: LR pipeline on rates (with optional PCA search)
-# =========================
-
-def decode_visible_with_lr(
-    K_counts,           # (T, N) spikes (counts)
-    y_visible,          # (T,) 0/1
-    groups,             # (T,) episode ids
-    dt=None,            # scalar or (T,)
-    try_pca: bool = False
-):
-    """Simple LR decoder on sqrt-rate features with GroupKFold + GridSearch."""
-    K = _as_np(K_counts, 'K', two_d=True)
-    y = _as_np(y_visible, 'y').ravel()
-    g = _as_np(groups, 'groups').ravel()
-
-    T, _ = K.shape
-    if dt is None:
-        dt_arr = np.ones(T, float)
-    elif isinstance(dt, float) or np.ndim(dt) == 0:
-        dt_arr = np.full(T, float(dt))
-    else:
-        dt_arr = _as_np(dt, 'dt').ravel()
-        if dt_arr.shape[0] != T:
-            raise ValueError('dt must be scalar or length T')
-
-    K_feat = K / dt_arr[:, None]  # convert to rates
-
-    pipe = Pipeline([
-        ('sqrt', FunctionTransformer(lambda X: np.sqrt(X + 1e-8))),
-        ('scaler', StandardScaler(with_mean=True, with_std=True)),
-        ('pca', PCA(svd_solver='auto', whiten=False)),
-        ('clf', LogisticRegression(penalty='l2', solver='lbfgs', max_iter=5000, class_weight='balanced'))
-    ])
-
-    Cs = np.logspace(-2, 2, 7)
-    param_grid = [{'pca__n_components': [None], 'clf__C': Cs}]
-    if try_pca:
-        param_grid.append({'pca__n_components': [0.8, 0.9, 0.95, 0.98], 'clf__C': Cs})
-
-    cv = GroupKFold(n_splits=min(5, len(np.unique(g))))
-    gs = GridSearchCV(pipe, param_grid, scoring='roc_auc', cv=cv, n_jobs=-1, refit=True, verbose=0)
-    gs.fit(K_feat, y, groups=g)
-
-    best_model = gs.best_estimator_
-    best_auc = float(gs.best_score_)
-    proba = best_model.predict_proba(K_feat)[:, 1]
-    auc_all = float(roc_auc_score(y, proba))
-    return best_model, best_auc, auc_all, gs.best_params_
 
 # =========================
 # Significance & uncertainty utilities (AUC)

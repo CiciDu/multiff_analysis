@@ -9,21 +9,20 @@
 ---
 
 ## `one_stop_df` (One-Stop Misses; no evidence of retrying)
+#### Note, the criteria had been updated alongside the function streamline_getting_one_stop_df (criteria were made to be less stringent in order to include all misses)
+
 - **Base DataFrames**
   - `one_stop_df`: Long format dataframe with one row per (stop × nearby firefly)  
   - `one_stop_w_ff_df`: Aggregates one_stop_df by grouping stops and selecting the most recently visible firefly. Contains nearby_alive_ff_indices (list of all nearby fireflies) and latest_visible_ff (primary firefly)
 - **Distance filter**
-  - At least 25 cm in cum distance from the point when previous or next ff was caught
+  - (currently not used) At least 25 cm in cum distance from the point when previous or next ff was caught
+  - (currently not used) At least 50 cm in absolute distance (which means it has also to be > 50 cm in cum_distance) from the stop before or after
+  - (has added) Not in a cluster of stops
   - Keep stops in the **25–50 cm** band of firefly (that has been visible within the last 2.5 s)
-  - At least 50 cm in absolute distance (which means it has also to be > 50 cm in cum_distance) from the stop before or after
 - **Spatial relationship**
   - Focus on stops **near but not at** fireflies  
   - Output in long format: **one row per (stop × nearby firefly)**  
 - **Purpose**: identify potential decision points  
-
-*Potential additional filters (to confirm)*  
-- Minimum stop duration: **0.02 s**  
-- Stop debouncing: **0.15 s**
 
 ---
 

@@ -305,6 +305,42 @@ def find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life
     return ff_indices_of_each_cluster
 
 
+def lookup_rows_by_time(
+    df: pd.DataFrame,
+    target_times: np.ndarray | list[float],
+    time_col: str = 'time',
+    max_diff = 0.1,
+) -> pd.DataFrame:
+    """
+    Look up rows in `df` whose `time_col` values are closest to `target_times`.
+
+    Raises ValueError if the nearest time is farther than `max_diff`.
+    """
+    times = df[time_col].to_numpy()
+    target_times = np.atleast_1d(target_times)
+
+    # Find insertion indices
+    indices = np.searchsorted(times, target_times, side='left')
+    indices = np.clip(indices, 1, len(times)-1)
+
+    # Compare left vs right neighbor
+    left = indices - 1
+    right = indices
+    choose_left = np.abs(target_times - times[left]) < np.abs(target_times - times[right])
+    nearest = np.where(choose_left, left, right)
+
+    # Check max_diff condition
+    if max_diff is not None:
+        diffs = np.abs(target_times - times[nearest])
+        if np.any(diffs > max_diff):
+            raise ValueError(
+                f'Time mismatch too large: max diff={diffs.max():.3f}, threshold={max_diff}'
+            )
+
+    return df.iloc[nearest].copy()
+
+
+
 def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff_real_position_sorted, duration_of_evaluation=10):
     """
     Calculate metrics for the last visible target.
@@ -315,8 +351,7 @@ def get_target_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_new, ff
         'last_vis_dist': [], 'last_vis_cum_dist': [], 'last_vis_ang': [], 'last_vis_ang_to_bndry': []
     }
 
-    ff_capture_rows = monkey_information.iloc[np.searchsorted(
-        monkey_information['time'].values, ff_caught_T_new)]
+    ff_capture_rows = lookup_rows_by_time(monkey_information, ff_caught_T_new)
     visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
 
     for i, caught_time in enumerate(ff_caught_T_new):
@@ -380,8 +415,7 @@ def _get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_
         'time_since_last_vis': [], 'last_vis_dist': [], 'last_vis_cum_dist': [], 'last_vis_ang': [], 'last_vis_ang_to_bndry': [],
     }
 
-    ff_capture_rows = monkey_information.iloc[np.searchsorted(
-        monkey_information['time'].values, ff_caught_T_new)]
+    ff_capture_rows = lookup_rows_by_time(monkey_information, ff_caught_T_new)
     visible_ff = ff_dataframe[ff_dataframe['visible'] == 1]
 
     for i, caught_time in enumerate(ff_caught_T_new):

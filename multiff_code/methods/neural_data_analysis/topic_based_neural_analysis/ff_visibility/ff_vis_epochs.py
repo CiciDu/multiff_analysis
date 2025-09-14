@@ -366,31 +366,3 @@ def add_global_vis_cluster_id(
         nullable_int=nullable_int,
         tiebreak_cols=tiebreak_cols
     )
-
-
-import pandas as pd
-
-def select_ff_subset(
-    heading_df: pd.DataFrame,
-    rebinned_x_var: pd.DataFrame,
-    rebinned_y_var: pd.DataFrame,
-    top: bool = True,
-    n: int = 200,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Select a subset of trials (top or bottom by heading_df order) 
-    and apply the same filter to both X and Y re-binned variables.
-    """
-    if top:
-        selected_ff = heading_df.loc[:n-1, 'cur_ff_index'].to_numpy()
-    else:
-        selected_ff = heading_df.loc[len(heading_df)-n:, 'cur_ff_index'].to_numpy()
-
-    print('rebinned_y_var.shape (before):', rebinned_y_var.shape)
-    mask = rebinned_y_var['cur_ff_index'].isin(selected_ff)
-    rebinned_y_var_filt = rebinned_y_var[mask]
-    rebinned_x_var_filt = rebinned_x_var[mask]
-    print('rebinned_y_var.shape (after):', rebinned_y_var_filt.shape)
-
-    return rebinned_x_var_filt, rebinned_y_var_filt
-

@@ -17,6 +17,7 @@ import statsmodels.api as sm
 from scipy.stats import pearsonr
 from sklearn.model_selection import cross_validate
 
+
 def use_linear_regression(X_train, X_test, y_train, y_test,
                           show_plot=True, y_var_name=None):
     # Ensure y is 1-dimensional
@@ -89,9 +90,9 @@ def use_linear_regression(X_train, X_test, y_train, y_test,
 
 
 def ml_model_for_regression(X_train, y_train, X_test, y_test,
-                                model_names=[
-                                    'linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'],
-                                use_cv=False):
+                            model_names=[
+                                'linreg', 'svr', 'dt', 'bagging', 'boosting', 'grad_boosting', 'rf'],
+                            use_cv=False):
 
     models = {'linreg': LinearRegression(),
               'svr': SVR(),
@@ -111,7 +112,7 @@ def ml_model_for_regression(X_train, y_train, X_test, y_test,
                                           n_jobs=-1,
                                           ),
               }
-    
+
     if model_names is None:
         model_names = list(models.keys())
 
@@ -223,16 +224,17 @@ def pearson_r_score(y_true, y_pred):
     # Pearson r as a scorer, ignoring p-value
     return pearsonr(y_true, y_pred)[0]
 
+
 def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
     """
     Perform cross-validation with linear regression.
-    
+
     Parameters:
     - x_var: feature matrix
     - y_var: target vector
     - cv: int or cross-validation splitter
     - groups: optional group labels (for GroupKFold)
-    
+
     Returns:
     - dict of train/test metrics (mean ± std) including R² and Pearson r.
     """
@@ -240,7 +242,7 @@ def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
         'r2': make_scorer(r2_score),
         'pearson_r': make_scorer(pearson_r_score)
     }
-    
+
     cv_results = cross_validate(
         LinearRegression(),
         x_var,
@@ -255,7 +257,8 @@ def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
     results = {}
 
     if verbose:
-        print(f"{'Metric':<12} {'Train Mean':>12} {'Test Mean':>12} {'Train Std':>12}   {'Test Std':>12}")
+        print(
+            f"{'Metric':<12} {'Train Mean':>12} {'Test Mean':>12} {'Train Std':>12}   {'Test Std':>12}")
         print("-" * 70)
 
     # Then print metrics
@@ -269,7 +272,8 @@ def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
         results[f'test_{metric}'] = (test_mean, test_std)
 
         if verbose:
-            print(f"{metric.capitalize():<12} {train_mean:12.4f} {test_mean:12.4f} {train_std:12.4f}   {test_std:12.4f}")
+            print(
+                f"{metric.capitalize():<12} {train_mean:12.4f} {test_mean:12.4f} {train_std:12.4f}   {test_std:12.4f}")
 
     return results
 
@@ -310,7 +314,7 @@ def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
 #     pearson_p_mean = np.mean(pearson_p_values)
 #     pearson_p_std = np.std(pearson_p_values)
 
-#     print(f"{'Metric':<35}{'Mean':>10} ± {'Std':<10}")
+#     print(f"{'Metric':<35}{'mean':>10} ± {'Std':<10}")
 #     print("-" * 60)
 #     print(f"{'Train R²':<35}{train_r2_mean:>10.4f} ± {train_r2_std:<10.4f}")
 #     print(f"{'Test R²':<35}{test_r2_mean:>10.4f} ± {test_r2_std:<10.4f}")
@@ -327,8 +331,6 @@ def use_linear_regression_cv(x_var, y_var, cv=10, groups=None, verbose=False):
 #         "pearson_p_mean": pearson_p_mean,
 #         "pearson_p_std": pearson_p_std
 #     }
-
-
 
 
 # def use_linear_regression_cv(x_var, y_var, num_folds=10):
@@ -479,9 +481,3 @@ def get_significant_features_in_one_row(summary_df, max_features_to_save=None, a
 #         raise ValueError('temp_info should only have one row')
 #     temp_info.columns.name = ''
 #     return temp_info
-
-
-
-
-
-

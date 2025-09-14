@@ -105,7 +105,7 @@ def prepare_for_subplots(num_items):
     return fig, axes
 
 
-def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_column="Label", monkey_name='',
+def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y='rate', title_column='label', monkey_name='',
                                           multiple_monkeys=False, category_order=None):
     """
     Compare datasets using scatterplots with fitted linear regression lines.
@@ -129,10 +129,10 @@ def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y="Rate", title_c
     fig, axes = prepare_for_subplots(len(category_order))
 
     for i, item in enumerate(category_order):
-        one_pattern_df = merged_df[merged_df['Item'] == item]
+        one_pattern_df = merged_df[merged_df['item'] == item]
         ax = axes[i]
 
-        hue = 'Monkey' if multiple_monkeys else None
+        hue = 'monkey' if multiple_monkeys else None
         plot_regression(ax, x, y, one_pattern_df, hue=hue)
 
         title = get_title(
@@ -179,7 +179,7 @@ def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], mon
             y = y.replace('_median', '_median')
             merged_df[y] = merged_df[y_old]
 
-        hue = 'Monkey' if multiple_monkeys else None
+        hue = 'monkey' if multiple_monkeys else None
         plot_regression(ax, x, y, merged_df, hue=hue)
 
         title = get_title(merged_df, x, y, y, multiple_monkeys,
@@ -196,8 +196,8 @@ def plot_the_changes_over_time_in_wide_df(merged_df, x="Data", y_columns=[], mon
 def get_title(data_df, x, y, feature_name, multiple_monkeys, monkey_name='', title_prefix=''):
     if multiple_monkeys:
         title = f"{feature_name}\n"
-        for monkey in data_df['Monkey'].unique():
-            monkey_df = data_df[data_df['Monkey'] == monkey]
+        for monkey in data_df['monkey'].unique():
+            monkey_df = data_df[data_df['monkey'] == monkey]
             title_str = get_title_str(monkey_df, x, y)
             title += f"{monkey}: {title_str}\n"
     else:

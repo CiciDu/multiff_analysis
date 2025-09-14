@@ -46,9 +46,6 @@ def add_stop_point_index(trials_df, monkey_information, ff_real_position_sorted)
     trials_df['stop_time'] = monkey_information.loc[trials_df['stop_point_index'], 'time'].values
 
 
-import numpy as np
-import pandas as pd
-
 def deal_with_duplicated_stop_point_index(
     GUAT_w_ff_df: pd.DataFrame,
     stop_col: str = "stop_point_index",
@@ -100,8 +97,9 @@ def deal_with_duplicated_stop_point_index(
         dups[c] = pd.to_numeric(dups[c], errors="coerce")
 
     dups["delta_first"] = (dups[first_col] - dups[stop_col]).abs()
-    dups["delta_last"]  = (dups[last_col]  - dups[stop_col]).abs()
-    dups[["delta_first", "delta_last"]] = dups[["delta_first", "delta_last"]].fillna(np.inf)
+    dups["delta_last"] = (dups[last_col] - dups[stop_col]).abs()
+    dups[["delta_first", "delta_last"]] = dups[[
+        "delta_first", "delta_last"]].fillna(np.inf)
     dups["min_delta"] = dups[["delta_first", "delta_last"]].min(axis=1)
 
     # Pick the best row per stop using deterministic tie-breakers
@@ -129,9 +127,8 @@ def deal_with_duplicated_stop_point_index(
     return out
 
 
-
 def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_position_sorted, stop_period_duration):
-    
+
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1].copy()
 
     processed_df = trials_df[['stop_point_index', 'ff_index']].copy()
@@ -146,37 +143,42 @@ def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_posit
                                                                                processed_df['stop_time'],
                                                                                ff_dataframe_visible,
                                                                                monkey_information)
-    
+
     columns_to_add = ['point_index_ff_first_seen', 'point_index_ff_last_seen',
                       'monkey_angle_ff_first_seen', 'monkey_angle_ff_last_seen',
                       'ff_distance_ff_first_seen', 'ff_distance_ff_last_seen',
                       'ff_angle_ff_first_seen', 'ff_angle_ff_last_seen',
                       'ff_angle_boundary_ff_first_seen', 'ff_angle_boundary_ff_last_seen',
                       'time_ff_first_seen', 'time_ff_last_seen']
-    
-    columns_to_add = [col for col in columns_to_add if col not in processed_df.columns]
+
+    columns_to_add = [
+        col for col in columns_to_add if col not in processed_df.columns]
     ff_first_and_last_seen_info = ff_first_and_last_seen_info[columns_to_add + [
         'ff_index', 'stop_point_index']]
     # columns_to_be_renamed_dict = {column: 'NXT_' + column + '_bbas' for column in columns_to_add}
     # ff_first_and_last_seen_info.rename(columns=columns_to_be_renamed_dict, inplace=True)
     processed_df = processed_df.merge(
         ff_first_and_last_seen_info, on=['stop_point_index', 'ff_index'], how='left')
-    
-    processed_df['time_since_ff_first_seen'] = processed_df['stop_time'] - processed_df['time_ff_first_seen']
-    processed_df['time_since_ff_last_seen'] = processed_df['stop_time'] - processed_df['time_ff_last_seen']
 
+    processed_df['time_since_ff_first_seen'] = processed_df['stop_time'] - \
+        processed_df['time_ff_first_seen']
+    processed_df['time_since_ff_last_seen'] = processed_df['stop_time'] - \
+        processed_df['time_ff_last_seen']
 
     # also add ff info from the stop point
     ff_info = decision_making_utils.find_many_ff_info_anew(
-            processed_df['ff_index'].values, processed_df['stop_point_index'].values, 
-            ff_real_position_sorted, ff_dataframe_visible, monkey_information)
-    
-    more_columns_to_add = ['ff_distance', 'ff_angle', 'ff_angle_boundary', 'time_since_last_vis']  
+        processed_df['ff_index'].values, processed_df['stop_point_index'].values,
+        ff_real_position_sorted, ff_dataframe_visible, monkey_information)
+
+    more_columns_to_add = ['ff_distance', 'ff_angle',
+                           'ff_angle_boundary', 'time_since_last_vis']
     # Note: time_since_last_vis should equal to time_since_ff_last_seen. We shall check it.
-    more_columns_to_add = [col for col in more_columns_to_add if col not in processed_df.columns]
+    more_columns_to_add = [
+        col for col in more_columns_to_add if col not in processed_df.columns]
     ff_info.rename(columns={'point_index': 'stop_point_index'}, inplace=True)
     ff_info = ff_info[more_columns_to_add + ['stop_point_index', 'ff_index']]
-    processed_df = processed_df.merge(ff_info, on=['stop_point_index', 'ff_index'], how='left')
+    processed_df = processed_df.merge(
+        ff_info, on=['stop_point_index', 'ff_index'], how='left')
     return processed_df
 
 
@@ -200,7 +202,7 @@ def combine_relevant_features(x_features_df, only_cur_ff_df, plan_features_df, d
     only_cur_ff_df = only_cur_ff_df[columns_to_keep_from_only_cur_ff_df + [
         'stop_point_index']].copy()
     plan_features_df = plan_features_df[non_cluster_columns_to_keep_from_plan_features_df + ['stop_point_index'] +
-                          [col for col in plan_features_df.columns if 'cluster' in col]].copy()
+                                        [col for col in plan_features_df.columns if 'cluster' in col]].copy()
     x_df = pd.merge(x_features_df, only_cur_ff_df,
                     on='stop_point_index', how='inner')
     x_df = pd.merge(x_df, plan_features_df, on='stop_point_index', how='inner')
@@ -221,7 +223,7 @@ def combine_relevant_features(x_features_df, only_cur_ff_df, plan_features_df, d
 
     x_df['dir_from_cur_ff_same_side'] = x_df['dir_from_cur_ff_same_side'].astype(
         int)
-    
+
     # drop duplicated columns
     x_df = x_df.loc[:, ~x_df.columns.duplicated()]
 
@@ -251,66 +253,66 @@ non_cluster_columns_to_keep_from_x_features_df = [
     'cur_ff_latest_flash_rel_time_at_ref']
 
 non_cluster_columns_to_keep_from_plan_features_df = ['d_from_cur_ff_to_nxt_ff',
-                                              'distance_between_stop_and_arena_edge',
-                                              'cum_distance_between_two_stops',
-                                              'time_between_two_stops',
-                                              'nxt_ff_distance_at_ref',
-                                              'nxt_ff_angle_at_ref',
-                                              'cur_ff_distance_at_ref',
-                                              'cur_ff_angle_at_ref',
-                                              'cur_ff_angle_boundary_at_ref',
-                                              'monkey_speed_std',
-                                              'monkey_dw_std',
-                                              'monkey_speed_range',
-                                              'monkey_speed_iqr',
-                                              'monkey_dw_range',
-                                              'monkey_dw_iqr',
-                                              'left_eye_cur_ff_time_perc_5',
-                                              'left_eye_cur_ff_time_perc_10',
-                                              'left_eye_nxt_ff_time_perc_5',
-                                              'left_eye_nxt_ff_time_perc_10',
-                                              'right_eye_cur_ff_time_perc_5',
-                                              'right_eye_cur_ff_time_perc_10',
-                                              'right_eye_nxt_ff_time_perc_5',
-                                              'right_eye_nxt_ff_time_perc_10',
-                                              'LDy_std',
-                                              'LDz_std',
-                                              'RDy_std',
-                                              'RDz_std',
-                                              'LDy_range',
-                                              'LDy_iqr',
-                                              'LDz_range',
-                                              'LDz_iqr',
-                                              'RDy_range',
-                                              'RDy_iqr',
-                                              'RDz_range',
-                                              'RDz_iqr',
-                                            'cur_ff_cluster_50_size',
-                                            'monkey_angle_before_stop',
-                                            #  'NXT_time_ff_last_seen_bbas_rel_to_stop',
-                                            #  'NXT_time_ff_last_seen_bsans_rel_to_stop',
-                                            #  'nxt_ff_last_flash_time_bbas_rel_to_stop',
-                                            #  'nxt_ff_last_flash_time_bsans_rel_to_stop',
-                                            #  'nxt_ff_cluster_last_seen_time_bbas_rel_to_stop',
-                                            #  'nxt_ff_cluster_last_seen_time_bsans_rel_to_stop',
-                                            #  'nxt_ff_cluster_last_flash_time_bbas_rel_to_stop',
-                                            #  'nxt_ff_cluster_last_flash_time_bsans_rel_to_stop',
-                                            'd_heading_of_traj',
-                                            'ref_curv_of_traj',
-                                            # 'angle_from_m_before_stop_to_cur_ff',
-                                            'angle_from_stop_to_nxt_ff',
-                                            # 'angle_from_cur_ff_to_stop',
-                                            'angle_from_cur_ff_to_nxt_ff',
-                                            'curv_mean',
-                                            'curv_std',
-                                            'curv_min',
-                                            'curv_Q1',
-                                            'curv_median',
-                                            'curv_Q3',
-                                            'curv_max',
-                                            #  'curv_iqr', # this will cause perfect correlation
-                                            #  'curv_range', # this will cause perfect correlation
-                                            'curv_of_traj_before_stop',
-                                            # 'dir_from_cur_ff_to_stop', # this has high correlation with dir_from_cur_ff_to_nxt_ff
-                                            'dir_from_cur_ff_to_nxt_ff',
-                                            'dir_from_cur_ff_same_side']
+                                                     'distance_between_stop_and_arena_edge',
+                                                     'cum_distance_between_two_stops',
+                                                     'time_between_two_stops',
+                                                     'nxt_ff_distance_at_ref',
+                                                     'nxt_ff_angle_at_ref',
+                                                     'cur_ff_distance_at_ref',
+                                                     'cur_ff_angle_at_ref',
+                                                     'cur_ff_angle_boundary_at_ref',
+                                                     'speed_std',
+                                                     'ang_speed_std',
+                                                     'speed_range',
+                                                     'speed_iqr',
+                                                     'ang_speed_range',
+                                                     'ang_speed_iqr',
+                                                     'left_eye_cur_ff_time_perc_5',
+                                                     'left_eye_cur_ff_time_perc_10',
+                                                     'left_eye_nxt_ff_time_perc_5',
+                                                     'left_eye_nxt_ff_time_perc_10',
+                                                     'right_eye_cur_ff_time_perc_5',
+                                                     'right_eye_cur_ff_time_perc_10',
+                                                     'right_eye_nxt_ff_time_perc_5',
+                                                     'right_eye_nxt_ff_time_perc_10',
+                                                     'LDy_std',
+                                                     'LDz_std',
+                                                     'RDy_std',
+                                                     'RDz_std',
+                                                     'LDy_range',
+                                                     'LDy_iqr',
+                                                     'LDz_range',
+                                                     'LDz_iqr',
+                                                     'RDy_range',
+                                                     'RDy_iqr',
+                                                     'RDz_range',
+                                                     'RDz_iqr',
+                                                     'cur_ff_cluster_50_size',
+                                                     'monkey_angle_before_stop',
+                                                     #  'NXT_time_ff_last_seen_bbas_rel_to_stop',
+                                                     #  'NXT_time_ff_last_seen_bsans_rel_to_stop',
+                                                     #  'nxt_ff_last_flash_time_bbas_rel_to_stop',
+                                                     #  'nxt_ff_last_flash_time_bsans_rel_to_stop',
+                                                     #  'nxt_ff_cluster_last_seen_time_bbas_rel_to_stop',
+                                                     #  'nxt_ff_cluster_last_seen_time_bsans_rel_to_stop',
+                                                     #  'nxt_ff_cluster_last_flash_time_bbas_rel_to_stop',
+                                                     #  'nxt_ff_cluster_last_flash_time_bsans_rel_to_stop',
+                                                     'd_heading_of_traj',
+                                                     'ref_curv_of_traj',
+                                                     # 'angle_from_m_before_stop_to_cur_ff',
+                                                     'angle_from_stop_to_nxt_ff',
+                                                     # 'angle_from_cur_ff_to_stop',
+                                                     'angle_from_cur_ff_to_nxt_ff',
+                                                     'curv_mean',
+                                                     'curv_std',
+                                                     'curv_min',
+                                                     'curv_Q1',
+                                                     'curv_median',
+                                                     'curv_Q3',
+                                                     'curv_max',
+                                                     #  'curv_iqr', # this will cause perfect correlation
+                                                     #  'curv_range', # this will cause perfect correlation
+                                                     'curv_of_traj_before_stop',
+                                                     # 'dir_from_cur_ff_to_stop', # this has high correlation with dir_from_cur_ff_to_nxt_ff
+                                                     'dir_from_cur_ff_to_nxt_ff',
+                                                     'dir_from_cur_ff_same_side']

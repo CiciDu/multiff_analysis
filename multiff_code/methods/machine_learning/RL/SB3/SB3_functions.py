@@ -212,8 +212,8 @@ class SaveOnBestTrainingRewardAndStopTrainingOnNoTestingRewardImprovement(SaveOn
 
 
 def add_row_to_record(df, csv_name, value_name, current_info, overall_folder):
-    new_row = df[['Item', value_name]].set_index(
-        'Item').T.reset_index(drop=True)
+    new_row = df[['item', value_name]].set_index(
+        'item').T.reset_index(drop=True)
     new_row = pd.DataFrame(current_info, index=[0]).join(new_row)
     df = pd.read_csv(f'{overall_folder}{csv_name}.csv').drop(
         ["Unnamed: 0"], axis=1)
@@ -223,14 +223,14 @@ def add_row_to_record(df, csv_name, value_name, current_info, overall_folder):
 
 def add_row_to_pattern_frequencies_record(pattern_frequencies, current_info, overall_folder):
     add_row_to_record(df=pattern_frequencies, csv_name='pattern_frequencies_record',
-                      value_name='Rate', current_info=current_info, overall_folder=overall_folder)
+                      value_name='rate', current_info=current_info, overall_folder=overall_folder)
 
 
 def add_row_to_feature_medians_record(feature_statistics, current_info, overall_folder):
     add_row_to_record(df=feature_statistics, csv_name='feature_medians_record',
-                      value_name='Median', current_info=current_info, overall_folder=overall_folder)
+                      value_name='median', current_info=current_info, overall_folder=overall_folder)
 
 
 def add_row_to_feature_means_record(feature_statistics, current_info, overall_folder):
     add_row_to_record(df=feature_statistics, csv_name='feature_means_record',
-                      value_name='Mean', current_info=current_info, overall_folder=overall_folder)
+                      value_name='mean', current_info=current_info, overall_folder=overall_folder)

@@ -104,7 +104,8 @@ def regress_by_variable_type_cv(
             raise ValueError(
                 f"segment_column '{segment_column}' not found in y_var_df")
         groups = y_var_df[segment_column]
-        cv = GroupKFold(n_splits=num_folds, shuffle=True, random_state=random_state)
+        cv = GroupKFold(n_splits=num_folds, shuffle=True,
+                        random_state=random_state)
     else:
         groups = None
         cv = KFold(n_splits=num_folds, shuffle=True,
@@ -153,7 +154,7 @@ def regress_by_variable_type_cv(
                 'Feature': y_var_column,
                 'Model': model_type,
                 'Metric': metric_name,
-                'Mean': mean,
+                'mean': mean,
                 'Std': std
             })
 
@@ -169,13 +170,14 @@ def convert_results_to_wide_df(results_df, index_columns=['Feature', 'Model']):
         .pivot_table(
             index=index_columns,
             columns='Metric',
-            values=['Mean', 'Std']
+            values=['mean', 'Std']
         )
     )
     wide_df.columns = [f'{metric}_{stat}' for stat, metric in wide_df.columns]
     wide_df = wide_df.reset_index()
 
     return wide_df
+
 
 def _prepare_grouped_bar_data(results_df, metric, features=None):
     """Extract matrix of mean metric values per feature per group."""
@@ -185,7 +187,7 @@ def _prepare_grouped_bar_data(results_df, metric, features=None):
         metric_df = metric_df[metric_df['Feature'].isin(features)]
 
     features = (
-        metric_df.groupby('Feature')['Mean']
+        metric_df.groupby('Feature')['mean']
         .max()
         .sort_values(ascending=False)
         .index.values
@@ -199,7 +201,7 @@ def _prepare_grouped_bar_data(results_df, metric, features=None):
             val = metric_df.loc[
                 (metric_df['Feature'] == feat) &
                 (metric_df['test_or_control'] == group),
-                'Mean'
+                'mean'
             ]
             vals.append(val.values[0] if len(val) > 0 else np.nan)
         data_dict[feat] = vals
@@ -218,11 +220,14 @@ def _draw_grouped_barplot(chunk_targets, chunk_data, groups, metric, plot_title)
 
     for i, group in enumerate(groups):
         offsets = group_centers + (i - (num_groups - 1) / 2) * bar_width
-        ax.bar(offsets, chunk_data[:, i], width=bar_width, label=group, zorder=3)
+        ax.bar(offsets, chunk_data[:, i],
+               width=bar_width, label=group, zorder=3)
 
     for center in group_centers:
-        ax.axvline(center - group_spacing / 2, color='lightgray', linestyle='-', linewidth=1, zorder=1)
-    ax.axvline(group_centers[-1] + group_spacing / 2, color='lightgray', linestyle='-', linewidth=1, zorder=1)
+        ax.axvline(center - group_spacing / 2, color='lightgray',
+                   linestyle='-', linewidth=1, zorder=1)
+    ax.axvline(group_centers[-1] + group_spacing / 2,
+               color='lightgray', linestyle='-', linewidth=1, zorder=1)
 
     if 'r2' in metric.lower():
         ax.set_ylim(max(-2, np.nanmin(chunk_data)), 1)
@@ -245,7 +250,8 @@ def make_barplot_to_compare_results(results_df, metric, features=None, max_targe
     """
     Main wrapper function: Prepares data and calls plot renderer in chunks.
     """
-    features, groups, data_dict = _prepare_grouped_bar_data(results_df, metric, features)
+    features, groups, data_dict = _prepare_grouped_bar_data(
+        results_df, metric, features)
 
     num_targets = len(features)
     num_plots = math.ceil(num_targets / max_targets_per_plot)

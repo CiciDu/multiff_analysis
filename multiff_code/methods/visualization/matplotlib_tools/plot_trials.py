@@ -21,6 +21,7 @@ def PlotTrials(duration,
                cluster_around_target_indices,
                ff_caught_T_new,
                currentTrial=None,  # Can be None; then it means all trials in the duration will be plotted
+               target_index=None,
                num_trials=None,
                fig=None,
                axes=None,
@@ -30,7 +31,7 @@ def PlotTrials(duration,
                player="monkey",
                # None or 'speed' or 'abs_ddw' or 'time'; if not None, then the color of the path will vary by this variable
                trail_color_var=None,
-               visible_distance=400,
+               visible_distance=500,
                minimal_margin=100,
                show_start=True,
                show_stops=False,
@@ -259,12 +260,15 @@ def PlotTrials(duration,
                 print("duration[0] updated to {} to truncate the part of crossing arena edge".format(
                     duration[0]))
                 # need to find the new currentTrial and num_trials and related information
+                old_currentTrial = currentTrial
                 currentTrial = None
                 num_trials = None
                 currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
                     ff_caught_T_new, currentTrial, num_trials, duration)
                 cum_pos_index, cum_point_index, cum_t, cum_angle, cum_mx, cum_my, cum_speed, cum_speeddummy = plot_behaviors_utils.find_monkey_information_in_the_duration(
                     duration, monkey_information)
+                if old_currentTrial != currentTrial:
+                    print("After truncating due to crossing arena edge, currentTrial is changed from {} to {}".format(old_currentTrial, currentTrial))
             else:
                 print("The monkey crossed the arena edge at {} but the duration is long enough (more than 2/3 of the original duration) to include the crossing".format(cross_boundary_time))
     # # Make sure the duration is sufficient for assumed_memory_duration_of_agent
@@ -277,7 +281,11 @@ def PlotTrials(duration,
     #         # recalculate currentTrial and num_trials accordingly
     #         currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial, num_trials, duration)
 
-    target_indices = np.arange(currentTrial-num_trials+1, currentTrial+1)
+    if target_index is None:
+        target_index = currentTrial
+        print("Since target_index is not provided, it is set to currentTrial: ", target_index)
+    #target_indices = np.arange(currentTrial-num_trials+1, currentTrial+1)
+    target_indices = np.array([target_index])
 
     ff_dataframe_in_duration = ff_dataframe[(
         ff_dataframe['time'] >= duration[0]) & (ff_dataframe['time'] <= duration[1])]
@@ -474,7 +482,7 @@ def PlotTrials(duration,
     if show_path_when_target_visible:
         path_size = {"agent": 50, "monkey": 30, "combined": 2}
         ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(
-            currentTrial, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
+            target_index, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
         marker = axes.scatter(
             ff_visible_path_rotated[0]-x0, ff_visible_path_rotated[1]-y0, s=path_size[player], c="green", alpha=0.6, zorder=5)
         legend_markers.append(marker)
@@ -483,7 +491,7 @@ def PlotTrials(duration,
     if show_path_when_prev_target_visible:  # for previous target
         path_size = {"agent": 65, "monkey": 40, "combined": 2}
         ff_visible_path_rotated = plot_behaviors_utils.find_path_when_ff_visible(
-            currentTrial-1, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
+            target_index-1, ff_dataframe_in_duration, cum_point_index, visible_distance, rotation_matrix=R)
         marker = axes.scatter(
             ff_visible_path_rotated[0]-x0, ff_visible_path_rotated[1]-y0, s=path_size[player], c="aqua", alpha=0.8, zorder=3)
         legend_markers.append(marker)

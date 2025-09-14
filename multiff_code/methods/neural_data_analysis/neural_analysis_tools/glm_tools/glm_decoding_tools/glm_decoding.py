@@ -115,7 +115,7 @@ def glm_decoding_cv(cols_to_decode, df_X, df_Y, groups, offset_log):
 
 
 
-def glm_decoding_permutation_test(cols_to_decode, df_X, df_Y, groups, offset_log, report):
+def glm_decoding_permutation_test(cols_to_decode, df_X, df_Y, groups, offset_log, report, print_progress=True):
     for decoding_col in cols_to_decode:
         y_vars = df_X[decoding_col].to_numpy()
 
@@ -142,7 +142,7 @@ def glm_decoding_permutation_test(cols_to_decode, df_X, df_Y, groups, offset_log
 
         auc_obs, pval, null = glm_decoding_llr.auc_permutation_test(
             y_vars, p_vis, groups=groups, n_perm=2000,
-            progress=False, desc="Permutations"
+            progress=print_progress, desc="Permutations"
         )
 
         # mean_auc, lo, hi, aucs = glm_decoding_llr.auc_block_bootstrap_ci(

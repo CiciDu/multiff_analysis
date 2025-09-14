@@ -13,57 +13,55 @@ from sklearn.linear_model import LinearRegression
 from matplotlib.ticker import MaxNLocator
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-def plot_distribution(var, 
-                      xlim=None, 
-                      x_of_vline=None, 
-                      scale_factor=1, 
-                      plot_cdf=True, 
-                      bins=100, 
-                      xlabel=None, 
-                      ylabel='Density', 
+def plot_distribution(var,
+                      xlim=None,
+                      x_of_vline=None,
+                      scale_factor=1,
+                      plot_cdf=True,
+                      bins=100,
+                      xlabel=None,
+                      ylabel='Density',
                       title=None):
     """
     Plot histogram (PDF) and optionally CDF of a variable.
     """
-    
+
     data = var * scale_factor
-    
+
     # --- Histogram ---
     fig, ax = plt.subplots(figsize=(8, 5))
     sns.histplot(data, bins=bins, stat='density', binrange=xlim, ax=ax)
-    
+
     if xlim is not None:
         ax.set_xlim(xlim)
     if x_of_vline is not None:
         ax.axvline(x=x_of_vline, color='k', linestyle='--', linewidth=1)
-    
+
     if xlabel is not None:
         ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if title is not None:
         ax.set_title(title + ' (Histogram)')
-    
+
     plt.show()
-    
+
     # --- CDF ---
     if plot_cdf:
         fig, ax = plt.subplots(figsize=(8, 5))
         sns.ecdfplot(data, ax=ax)
-        
+
         if xlim is not None:
             ax.set_xlim(xlim)
         if x_of_vline is not None:
             ax.axvline(x=x_of_vline, color='k', linestyle='--', linewidth=1)
-        
+
         if xlabel is not None:
             ax.set_xlabel(xlabel)
         ax.set_ylabel('CDF')
         if title is not None:
             ax.set_title(title + ' (CDF)')
-        
+
         plt.show()
 
 
@@ -97,7 +95,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     axes.set_title("Time Since Target Last Visible", fontsize=11)
     axes.set_xlim([0, 6])
     axes.set_xlabel("Time (s)", fontsize=11)
-    plt.legend(labels=["Agent(LSTM)", "Monkey"],
+    plt.legend(labels=["Agent(LSTM)", 'monkey'],
                fontsize=11, loc="upper right")
 
     variable_of_interest = "num_stops_near_target"
@@ -184,7 +182,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     plt.show()
 
 
-def plot_merged_df(merged_df, x="Label", y="Rate", hue=None, label_order=None, ax=None):
+def plot_merged_df(merged_df, x='label', y='rate', hue=None, label_order=None, ax=None):
     sns.set_style(style="darkgrid")
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 7))
@@ -204,7 +202,7 @@ def plot_merged_df(merged_df, x="Label", y="Rate", hue=None, label_order=None, a
     return ax
 
 
-def plot_merged_df_by_category(merged_df, category_column_name, category_order=None, x="Player", y="Rate", hue=None, percentage=False, subplots=True, num_columns=3):
+def plot_merged_df_by_category(merged_df, category_column_name, category_order=None, x="Player", y='rate', hue=None, percentage=False, subplots=True, num_columns=3):
     """
     Make one barplot for each category in the merged_df (can be merged_stats_df or merged_medians_df, and can compare the monkey and the agent(s)
 
@@ -252,13 +250,13 @@ def plot_merged_df_by_category(merged_df, category_column_name, category_order=N
 
 def plot_pattern_frequencies(pattern_frequencies, compare_monkey_and_agent=False, data_folder_name=None, file_name=None, monkey_name='',
                              ax=None, return_ax=False, hue=None):
-    subset = pattern_frequencies[pattern_frequencies['Item'].isin(['two_in_a_row', 'visible_before_last_one', 'disappear_latest', 'waste_cluster_around_target',
+    subset = pattern_frequencies[pattern_frequencies['item'].isin(['two_in_a_row', 'visible_before_last_one', 'disappear_latest', 'waste_cluster_around_target',
                                                                    'ignore_sudden_flash', 'give_up_after_trying', 'try_a_few_times', 'ff_capture_rate', 'stop_success_rate'])]
     label_order = ['Visible before last capture', 'Target disappears latest', 'Two in a row', 'Waste cluster around target',
                    'Try a few times', 'Give up after trying', 'Ignore sudden flash', 'Firefly capture rate (per s)', 'Stop success rate']
     if compare_monkey_and_agent:
         hue = "Player"
-    ax = plot_merged_df(subset, x="Label", y="Rate",
+    ax = plot_merged_df(subset, x='label', y='rate',
                         hue=hue, label_order=label_order, ax=ax)
 
     if data_folder_name is not None:
@@ -296,26 +294,26 @@ def plot_feature_statistics(feature_statistics, compare_monkey_and_agent=False, 
         monkey_name = monkey_name + ': '
 
     if compare_monkey_and_agent:
-        plot_merged_df_by_category(feature_statistics, category_column_name="Label for median", category_order=label_order_for_medians,
-                                   x="Player", y="Median", percentage=False, subplots=True)
-        plot_merged_df_by_category(feature_statistics, category_column_name="Label for mean", category_order=label_order_for_means,
-                                   x="Player", y="Mean", percentage=False, subplots=True)
+        plot_merged_df_by_category(feature_statistics, category_column_name='label for median', category_order=label_order_for_medians,
+                                   x="Player", y='median', percentage=False, subplots=True)
+        plot_merged_df_by_category(feature_statistics, category_column_name='label for mean', category_order=label_order_for_means,
+                                   x="Player", y='mean', percentage=False, subplots=True)
 
     else:
-        subset = feature_statistics[feature_statistics['Item'].isin(
+        subset = feature_statistics[feature_statistics['item'].isin(
             ['t', 't_last_vis', 'abs_angle_last_vis', 'num_stops', 'num_stops_near_target'])]
 
         # Create a 1x2 subplot
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
 
         # Plot the first subplot
-        plot_merged_df(subset, x="Label for median", y="Median",
+        plot_merged_df(subset, x='label for median', y='median',
                        label_order=label_order_for_medians, ax=ax1, hue=hue)
         ax1.set_title(monkey_name + 'Medians', fontsize=15)
         ax1.set_xlabel('')
 
         # Plot the second subplot
-        plot_merged_df(subset, x="Label for mean", y="Mean",
+        plot_merged_df(subset, x='label for mean', y='mean',
                        label_order=label_order_for_means, ax=ax2, hue=hue)
         ax2.set_title(monkey_name + 'Means', fontsize=15)
         ax2.set_xlabel('')
@@ -344,15 +342,15 @@ def plot_feature_statistics(feature_statistics, compare_monkey_and_agent=False, 
 def plot_num_ff_caught_in_a_row_in_barplot(pattern_frequencies, show_one_in_a_row=True):
     plt.rcParams['figure.figsize'] = (6, 4)
     sns.set_style(style="darkgrid")
-    if 'Item' in pattern_frequencies.columns:
-        pattern_frequencies = pattern_frequencies.set_index('Item')
+    if 'item' in pattern_frequencies.columns:
+        pattern_frequencies = pattern_frequencies.set_index('item')
     if show_one_in_a_row:
         temp_df = pattern_frequencies.loc[[
             'one_in_a_row', 'two_in_a_row', 'three_in_a_row', 'four_in_a_row']]
     else:
         temp_df = pattern_frequencies.loc[[
             'two_in_a_row', 'three_in_a_row', 'four_in_a_row']]
-    axes = sns.barplot(data=temp_df, x="Label", y='Percentage')
+    axes = sns.barplot(data=temp_df, x='label', y='percentage')
     axes.set(title='Number of Fireflies Captured In a Row',
              xlabel='Number of Fireflies', ylabel='Percentage(%)')
     plt.rcParams.update({'font.size': 15})
@@ -373,14 +371,14 @@ def plot_num_ff_caught_in_a_row_in_barplot(pattern_frequencies, show_one_in_a_ro
 
 
 def plot_num_ff_caught_in_a_row_in_pie_chart(pattern_frequencies):
-    if 'Item' in pattern_frequencies.columns:
-        pattern_frequencies = pattern_frequencies.set_index('Item')
+    if 'item' in pattern_frequencies.columns:
+        pattern_frequencies = pattern_frequencies.set_index('item')
     temp_df = pattern_frequencies.loc[[
         'one_in_a_row', 'two_in_a_row', 'three_in_a_row', 'four_in_a_row']]
-    temp_df = temp_df[temp_df['Percentage'] > 0]
-    data = list(temp_df['Frequency'])
+    temp_df = temp_df[temp_df['percentage'] > 0]
+    data = list(temp_df['frequency'])
     colors = sns.color_palette('pastel')[0:5]
-    labels = temp_df['Label']
+    labels = temp_df['label']
     # create pie chart
     plt.rcParams.update({'font.size': 11})
     plt.pie(data, labels=labels, colors=colors,
@@ -600,7 +598,7 @@ def plot_correlations_in_record(df, parameter_columns=['action_noise_std', 'ffxy
 
 def plot_last_seen_info_vs_stops(last_vis_df, filter_by_p_value=True):
     for y_column in ['num_stops', 'num_stops_near_target', 'num_stops_since_last_vis']:
-        for x_column in ['time_since_last_vis', 'last_vis_dist', 
+        for x_column in ['time_since_last_vis', 'last_vis_dist',
                          # 'last_vis_ang', 'last_vis_ang_to_bndry', 'last_vis_cum_dist',
                          'abs_last_vis_ang', 'abs_last_vis_ang_to_bndry']:
             if x_column in last_vis_df.columns:

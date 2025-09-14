@@ -52,9 +52,11 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                                                               columns_to_find_unique_combinations_for_line=[],
                                                               var_to_determine_x_offset_direction='ref_columns_only',
                                                               y_var_column='avg_r_squared',
-                                                              se_column=None,
                                                               title_prefix=None,
-                                                              use_subplots_based_on_changeable_variables=False):
+                                                              use_subplots_based_on_changeable_variables=False,
+                                                              add_ci_bounds=True,
+                                                              is_difference=False,
+                                                              ):
 
     if use_subplots_based_on_changeable_variables & (len(changeable_variables) == 2):
         changeable_variables = _check_order_in_changeable_variables(
@@ -62,7 +64,8 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
 
     list_of_smaller_dfs, combinations = process_variations_utils.break_up_df_to_smaller_ones(original_df, fixed_variable_values_to_use, changeable_variables,
                                                                                              var_to_determine_x_offset_direction=var_to_determine_x_offset_direction, y_var_column=y_var_column,
-                                                                                             se_column=se_column)
+                                                                                             add_ci_bounds=add_ci_bounds,
+                                                                                             )
 
     if use_subplots_based_on_changeable_variables:
         first_dim, second_dim = _find_first_and_second_dim(
@@ -73,7 +76,7 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
 
         fig = make_subplots(rows=first_dim, cols=second_dim,
                             subplot_titles=all_subplot_titles,
-                            vertical_spacing=0.05, horizontal_spacing=0.05)
+                            vertical_spacing=0.11, horizontal_spacing=0.06)
         # change the font size of the subplot titles
         for annotation in fig['layout']['annotations']:
             annotation['font'] = dict(size=14, family='Arial')
@@ -113,6 +116,7 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                                                                fig=fig,
                                                                row_number=row_number,
                                                                col_number=col_number,
+                                                               is_difference=is_difference,
                                                                )
             if use_subplots_based_on_changeable_variables:
                 # for trace in fig.data:
@@ -123,12 +127,9 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                     row_number += 1
                 # hide x axis title
                 fig.update_xaxes(title_text='', row=row_number, col=col_number)
-            else:
-                plt.show()
 
     if use_subplots_based_on_changeable_variables:
-        fig.update_layout(height=600 * first_dim, width=675 * second_dim)
-        plt.show()
+        fig.update_layout(height=500 * first_dim, width=700 * second_dim)
 
     return fig
 
@@ -139,7 +140,7 @@ def _find_rest_of_x_for_hoverdata(sub_df, x_var_column, y_var_column, var_to_det
         if len(sub_df[column].unique()) > 1:
             if ('sample_size' not in column) & ('diff_in_angle_to_nxt_ff' not in column) & ('unique_combination' not in column) & \
                 (column not in ['pair_id', 'y1_or_y2', 'line_color', 'x_value_numeric', 'x_value_numeric_with_offset',
-                                'var_to_split_value', 'se_upper', 'se_lower', x_var_column, y_var_column, var_to_determine_x_offset_direction]):
+                                'var_to_split_value', 'ci_upper', 'ci_lower', x_var_column, y_var_column, var_to_determine_x_offset_direction]):
                 rest_of_x_for_hoverdata.append(column)
     return rest_of_x_for_hoverdata
 
@@ -234,9 +235,9 @@ def _update_fig_based_on_x_labels_to_values_map(fig, x_labels_to_values_map,
 
 def _set_minimal_y_scale(fig, sub_df, y_var_column,
                          row_number=None, col_number=None):
-    if {'se_lower', 'se_upper'}.issubset(sub_df.columns):
-        y_lo = sub_df['se_lower'].astype(float)
-        y_hi = sub_df['se_upper'].astype(float)
+    if {'ci_lower', 'ci_upper'}.issubset(sub_df.columns):
+        y_lo = sub_df['ci_lower'].astype(float)
+        y_hi = sub_df['ci_upper'].astype(float)
         min_y = np.nanmin(y_lo.to_numpy())
         max_y = np.nanmax(y_hi.to_numpy())
     else:
@@ -256,71 +257,6 @@ def _set_minimal_y_scale(fig, sub_df, y_var_column,
         min_y, max_y = min_y - pad, max_y + pad
 
     fig.update_yaxes(range=[min_y, max_y], row=row_number, col=col_number)
-    return fig
-
-
-def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
-                                                 x_var_column,
-                                                 y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                 var_to_determine_x_offset_direction='ref_columns_only',
-                                                 title=None,
-                                                 x_offset=0.0,
-                                                 columns_to_find_unique_combinations_for_color=[],
-                                                 columns_to_find_unique_combinations_for_line=[],
-                                                 show_combo_legends=True,
-                                                 fig=None,
-                                                 row_number=None,
-                                                 col_number=None,
-                                                 ):
-    if fig is None:
-        fig = go.Figure()
-
-    # --- Add CI bounds if only SE column is present ---
-    se_col = None
-    for cand in [f"{y_var_column}_se", "se", "stderr", "std_error"]:
-        if cand in sub_df.columns:
-            se_col = cand
-            break
-    if se_col is not None and not ({'se_lower', 'se_upper'} <= set(sub_df.columns)):
-        sub_df = sub_df.copy()
-        sub_df['se_lower'] = sub_df[y_var_column] - 1.96 * sub_df[se_col]
-        sub_df['se_upper'] = sub_df[y_var_column] + 1.96 * sub_df[se_col]
-
-    rest_of_x_for_hoverdata = _find_rest_of_x_for_hoverdata(
-        sub_df, x_var_column, y_var_column, var_to_determine_x_offset_direction)
-    sub_df = _process_x_var_columns(sub_df, x_var_column)
-
-    columns_to_find_unique_combinations_for_color = _process_columns_to_find_unique_combinations_for_color(
-        columns_to_find_unique_combinations_for_color, x_var_column, rest_of_x_for_hoverdata)
-    sub_df = process_variations_utils.assign_color_to_sub_df_based_on_unique_combinations(
-        sub_df, columns_to_find_unique_combinations_for_color)
-    sub_df = process_variations_utils.assign_line_type_to_sub_df_based_on_unique_combinations(
-        sub_df, columns_to_find_unique_combinations_for_line)
-
-    # Define color mapping
-    x_labels_to_values_map = _find_x_labels_to_values_map(sub_df, x_var_column)
-    sub_df = _add_x_value_numeric_to_sub_df(
-        sub_df, x_var_column, x_labels_to_values_map, x_offset)
-
-    fig = plot_markers_for_data_comparison(
-        fig, sub_df, rest_of_x_for_hoverdata, y_var_column, row_number=row_number, col_number=col_number)
-    fig = connect_every_pair(fig, sub_df, y_var_column, rest_of_x_for_hoverdata,
-                             show_combo_legends=show_combo_legends, row_number=row_number, col_number=col_number)
-    fig = _update_fig_based_on_x_labels_to_values_map(
-        fig, x_labels_to_values_map, row_number=row_number, col_number=col_number)
-
-    fig = _set_minimal_y_scale(
-        fig, sub_df, y_var_column, row_number=row_number, col_number=col_number)
-
-    fig = label_smallest_y_sample_size(
-        fig, sub_df, y_var_column, row_number=row_number, col_number=col_number)
-
-    # update title to be x_var_column, y axis title to be y_var_column, and x axis title to be x_var_column
-    if title is None:
-        title = f'{y_var_column} vs {x_var_column}'
-    fig.update_layout(title=title, xaxis_title=x_var_column,
-                      yaxis_title=y_var_column)
-
     return fig
 
 
@@ -410,146 +346,6 @@ marker_partial_kwargs = dict(mode='markers',
                              ))
 
 
-def plot_markers_for_data_comparison(fig,
-                                     sub_df,
-                                     customdata_columns,
-                                     y_var_column,
-                                     use_ribbons_to_replace_error_bars=True,
-                                     row_number=None,
-                                     col_number=None):
-
-    # clean rows
-    sub_df = sub_df.dropna(subset=[y_var_column]).copy()
-
-    # marker sizes scaled & clipped
-    max_n = max(int(sub_df.get('sample_size', pd.Series([1])).max()), 1)
-    scale = 45.0 / max_n
-    min_size, max_size = 6, 18
-
-    hovertemplate, custom_cols = _make_hovertemplate(
-        sub_df, y_var_column, customdata_columns)
-
-    # only first subplot shows legend
-    showlegend = not ((row_number and col_number) and not (
-        row_number == 1 and col_number == 1))
-
-    for line_color in sub_df['line_color'].unique():
-        d = sub_df[sub_df['line_color'] == line_color].copy()
-        name = d['var_to_split_value'].iloc[0] if 'var_to_split_value' in d.columns else str(
-            line_color)
-
-        # CI ribbon per series (if available)
-        if {'se_lower', 'se_upper'}.issubset(d.columns):
-            if use_ribbons_to_replace_error_bars:
-
-                d = d.sort_values('x_value_numeric_with_offset')
-                if len(d) == 1:
-                    # Duplicate the row to force a ribbon
-                    d = pd.concat([d, d], ignore_index=True)
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=d['x_value_numeric_with_offset'],
-                        y=d['se_upper'],
-                        mode='lines',
-                        line=dict(width=0),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    ),
-                    row=row_number, col=col_number
-                )
-                fig.add_trace(
-                    go.Scatter(
-                        x=d['x_value_numeric_with_offset'],
-                        y=d['se_lower'],
-                        mode='lines',
-                        fill='tonexty',
-                        fillcolor='rgba(0,0,0,0.10)',
-                        line=dict(width=0),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    ),
-                    row=row_number, col=col_number
-                )
-
-            else:
-                for x_value, y_upper, y_lower in zip(
-                    d['x_value_numeric_with_offset'], d['se_upper'], d['se_lower']
-                ):
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[x_value, x_value],
-                            y=[y_lower, y_upper],
-                            mode='lines',
-                            line=dict(width=1.5, color=line_color),
-                            showlegend=False,
-                            hoverinfo='skip',
-                        ),
-                        row=row_number, col=col_number
-                    )
-
-        fig.add_trace(
-            go.Scatter(
-                x=d['x_value_numeric_with_offset'],
-                y=d[y_var_column],
-                name=name,
-                mode='markers+lines',
-                line=dict(color=line_color, width=1.5),
-                marker=dict(
-                    color=line_color,
-                    size=np.clip(d['sample_size'].fillna(max_n).astype(
-                        float) * scale, min_size, max_size),
-                    opacity=0.8
-                ),
-                customdata=d[custom_cols].values,
-                hovertemplate=hovertemplate,
-                showlegend=showlegend,
-            ),
-            row=row_number, col=col_number
-        )
-    return fig
-
-
-def connect_every_pair(fig, sub_df, y_var_column, customdata_columns, show_combo_legends=True,
-                       row_number=None, col_number=None):
-
-    hovertemplate, custom_cols = _make_hovertemplate(
-        sub_df, y_var_column, customdata_columns)
-
-    for pair_id in sub_df['pair_id'].unique():
-        d = sub_df[sub_df['pair_id'] == pair_id].copy()
-        if d.empty:
-            continue
-        d = d.sort_values('x_value_numeric_with_offset')
-        if len(d) < 2:
-            continue  # need at least 2 points to connect
-
-        row0 = d.iloc[0]
-        fig.add_trace(
-            go.Scatter(
-                x=d['x_value_numeric_with_offset'],
-                y=d[y_var_column],
-                mode='lines',
-                line=dict(color=row0['color'], width=1,
-                          dash=row0['line_type']),
-                marker=dict(size=0),
-                customdata=d[custom_cols].values,
-                hovertemplate=hovertemplate,
-                showlegend=False,
-                legendgroup=row0.get('color', 'group'),
-                name=row0.get('unique_combination', None)
-            ),
-            row=row_number, col=col_number
-        )
-
-    if show_combo_legends:
-        _add_color_legends(fig, sub_df, row_number=row_number,
-                           col_number=col_number)
-        _add_line_type_legends(
-            fig, sub_df, row_number=row_number, col_number=col_number)
-    return fig
-
-
 def _add_color_legends(fig, sub_df,
                        row_number=None,
                        col_number=None,
@@ -603,53 +399,6 @@ def _add_line_type_legends(fig, sub_df,
                           )
 
 
-def compare_diff_in_abs_in_all_ref_pooled_median_info(sub_df, x, plotly=True):
-    if plotly:
-        make_plotly_plots_for_test_and_control_data_comparison(
-            sub_df, x, 'test_diff_in_abs_angle_to_nxt_ff', 'ctrl_diff_in_abs_angle_to_nxt_ff', title='test vs ctrl diff_in_abs_angle_to_nxt_ff')
-        make_plotly_plots_for_test_and_control_data_comparison(
-            sub_df, x, 'delta_diff_in_abs_angle_to_nxt_ff', 'delta_diff_in_angle_to_nxt_ff',  title='delta diff_in_abs vs delta diff_in_angle_to_nxt_ff')
-    else:
-        _compare_y1_and_y2_in_overall_regrouped_info(
-            sub_df, x, 'test_diff_in_abs_angle_to_nxt_ff', 'ctrl_diff_in_abs_angle_to_nxt_ff', title='test vs ctrl diff_in_abs_angle_to_nxt_ff')
-        _compare_y1_and_y2_in_overall_regrouped_info(
-            sub_df, x, 'delta_diff_in_abs_angle_to_nxt_ff', 'delta_diff_in_angle_to_nxt_ff',  title='delta diff_in_abs vs delta diff_in_angle_to_nxt_ff')
-    return
-
-
-def compare_test_and_ctrl_in_pooled_perc_info(sub_df, x, plotly=True):
-    if plotly:
-        make_plotly_plots_for_test_and_control_data_comparison(
-            sub_df, x, 'test_perc', 'ctrl_perc', title='test perc vs ctrl perc')
-    else:
-        _compare_y1_and_y2_in_overall_regrouped_info(
-            sub_df, x, 'test_perc', 'ctrl_perc', title='test perc vs ctrl perc')
-    return
-
-
-def _compare_y1_and_y2_in_overall_regrouped_info(sub_df, x, y1, y2, title=''):
-    print('sample_size:',
-          sub_df[['test_sample_size', 'ctrl_sample_size']].describe())
-    # maybe grouped bar plots?
-    fig, ax = plt.subplots(figsize=(10, 5))
-    plt.figure(figsize=(10, 5))
-    sns.barplot(data=sub_df, x=x, y=y1, color='blue', alpha=0.5, ax=ax)
-    sns.barplot(data=sub_df, x=x, y=y2, color='orange', alpha=0.5, ax=ax)
-
-    # Label all bars
-    for p in ax.patches:
-        ax.text(p.get_x() + p.get_width() / 2. * 1.5, p.get_height(), f'{p.get_height():.2f}',
-                ha='center', va='bottom')
-    ax.set_title(title)
-
-    if x == 'if_test_nxt_ff_group_appear_after_stop':
-        # make x label rotated on ax
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45,
-                           horizontalalignment='right')
-    plt.show()
-    return
-
-
 def plot_coeff(df, column_to_split_grouped_bars='test_or_control', fixed_variable_values_to_use={},
                max_num_plots=1):
 
@@ -666,168 +415,338 @@ def plot_coeff(df, column_to_split_grouped_bars='test_or_control', fixed_variabl
     return
 
 
-def make_plotly_plot_to_compare_two_sets_of_data(sub_df,
-                                                 x_var_column,
-                                                 y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                 var_to_determine_x_offset_direction='ref_columns_only',
-                                                 title=None,
-                                                 x_offset=0.0,
-                                                 columns_to_find_unique_combinations_for_color=[],
-                                                 columns_to_find_unique_combinations_for_line=[],
-                                                 show_combo_legends=True,
-                                                 fig=None,
-                                                 row_number=None,
-                                                 col_number=None,
-                                                 ):
-    if fig is None:
-        fig = go.Figure()
+def plot_markers_for_data_comparison(fig,
+                                     sub_df,
+                                     customdata_columns,
+                                     y_var_column,
+                                     use_ribbons_to_replace_error_bars=True,
+                                     row_number=None,
+                                     col_number=None,
+                                     is_difference=False):
 
-    # --- (1) If only a single SE column exists, synthesize CI bounds ---
-    se_col = None
-    for cand in [f"{y_var_column}_se", "se", "stderr", "std_error"]:
-        if cand in sub_df.columns:
-            se_col = cand
-            break
-    if se_col is not None and not ({'se_lower', 'se_upper'} <= set(sub_df.columns)):
-        sub_df = sub_df.copy()
-        sub_df['se_lower'] = sub_df[y_var_column] - 1.96 * sub_df[se_col]
-        sub_df['se_upper'] = sub_df[y_var_column] + 1.96 * sub_df[se_col]
+    # clean rows
+    sub_df = sub_df.dropna(subset=[y_var_column]).copy()
 
-    # --- (2) Usual preprocessing for colors/lines/hover ---
-    rest_of_x_for_hoverdata = _find_rest_of_x_for_hoverdata(
-        sub_df, x_var_column, y_var_column, var_to_determine_x_offset_direction)
+    # marker sizes scaled & clipped
+    max_n = max(int(sub_df.get('sample_size', pd.Series([1])).max()), 1)
+    scale = 45.0 / max_n
+    min_size, max_size = 6, 18
+
+    hovertemplate, custom_cols = _make_hovertemplate(
+        sub_df, y_var_column, customdata_columns)
+
+    # only first subplot shows legend
+    showlegend = not ((row_number and col_number) and not (
+        row_number == 1 and col_number == 1))
+
+    for line_color in sub_df['line_color'].unique():
+        d = sub_df[sub_df['line_color'] == line_color].copy()
+        name = d['var_to_split_value'].iloc[0] if 'var_to_split_value' in d.columns else str(
+            line_color)
+
+        # CI ribbon per series (if available)
+        if {'ci_lower', 'ci_upper'}.issubset(d.columns):
+            if use_ribbons_to_replace_error_bars:
+
+                d = d.sort_values('x_value_numeric_with_offset')
+                if len(d) == 1:
+                    # Duplicate the row to force a ribbon
+                    d = pd.concat([d, d], ignore_index=True)
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=d['x_value_numeric_with_offset'],
+                        y=d['ci_upper'],
+                        mode='lines',
+                        line=dict(width=0),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    ),
+                    row=row_number, col=col_number
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=d['x_value_numeric_with_offset'],
+                        y=d['ci_lower'],
+                        mode='lines',
+                        fill='tonexty',
+                        fillcolor='rgba(0,0,0,0.10)',
+                        line=dict(width=0),
+                        showlegend=False,
+                        hoverinfo='skip'
+                    ),
+                    row=row_number, col=col_number
+                )
+
+            else:
+                for x_value, y_upper, y_lower in zip(
+                    d['x_value_numeric_with_offset'], d['ci_upper'], d['ci_lower']
+                ):
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x_value, x_value],
+                            y=[y_lower, y_upper],
+                            mode='lines',
+                            line=dict(width=1.5, color=line_color),
+                            showlegend=False,
+                            hoverinfo='skip',
+                        ),
+                        row=row_number, col=col_number
+                    )
+        marker_color = 'green' if is_difference else line_color
+        fig.add_trace(
+            go.Scatter(
+                x=d['x_value_numeric_with_offset'],
+                y=d[y_var_column],
+                name=name,
+                mode='markers+lines',
+                line=dict(color=marker_color, width=1.5),
+                marker=dict(
+                    color=marker_color,
+                    size=np.clip(d['sample_size'].fillna(max_n).astype(
+                        float) * scale, min_size, max_size),
+                    opacity=0.8
+                ),
+                customdata=d[custom_cols].values,
+                hovertemplate=hovertemplate,
+                showlegend=showlegend,
+            ),
+            row=row_number, col=col_number
+        )
+    return fig
+
+
+def connect_every_pair(fig, sub_df, y_var_column, customdata_columns, show_combo_legends=True,
+                       row_number=None, col_number=None):
+
+    hovertemplate, custom_cols = _make_hovertemplate(
+        sub_df, y_var_column, customdata_columns)
+
+    if sub_df['x_value_numeric_with_offset'].value_counts().max() <= 2:
+        return fig
+
+    for pair_id in sub_df['pair_id'].unique():
+        d = sub_df[sub_df['pair_id'] == pair_id].copy()
+        if d.empty:
+            continue
+        d = d.sort_values('x_value_numeric_with_offset')
+        if len(d) < 2:
+            continue  # need at least 2 points to connect
+
+        row0 = d.iloc[0]
+        fig.add_trace(
+            go.Scatter(
+                x=d['x_value_numeric_with_offset'],
+                y=d[y_var_column],
+                mode='lines',
+                line=dict(color=row0['color'], width=1,
+                          dash=row0['line_type']),
+                marker=dict(size=0),
+                customdata=d[custom_cols].values,
+                hovertemplate=hovertemplate,
+                showlegend=False,
+                legendgroup=row0.get('color', 'group'),
+                name=row0.get('unique_combination', None)
+            ),
+            row=row_number, col=col_number
+        )
+
+    if show_combo_legends:
+        _add_color_legends(fig, sub_df, row_number=row_number,
+                           col_number=col_number)
+        _add_line_type_legends(
+            fig, sub_df, row_number=row_number, col_number=col_number)
+    return fig
+
+
+# ---- helpers for path 1 (single x-bin) ----
+
+
+def _choose_group_column(df):
+    return next((c for c in ('var_to_split_value', 'test_or_control', 'line_color') if c in df.columns),
+                'line_color')
+
+
+def _first_per_group(df, grp_col, y_col):
+    d = (df.dropna(subset=[y_col])
+           .sort_values(grp_col)
+           .groupby(grp_col, as_index=False)
+           .first())
+    # stable order: control, test, then others
+    pref = ['control', 'test']
+    seen = list(pd.unique(d[grp_col]))
+    order = [g for g in pref if g in seen] + [g for g in seen if g not in pref]
+    return d.set_index(grp_col).loc[order].reset_index(drop=False)
+
+
+def _has_bounds(df):
+    return {'ci_lower', 'ci_upper'}.issubset(df.columns)
+
+
+def _attach_error_arrays(d, y_col):
+    """
+    Add asymmetric error arrays (err_plus/err_minus) from ci_lower/ci_upper.
+    Only called if both columns exist.
+    """
+    d = d.copy()
+    d['err_plus'] = (d['ci_upper'] - d[y_col]).clip(lower=0).astype(float)
+    d['err_minus'] = (d[y_col] - d['ci_lower']).clip(lower=0).astype(float)
+    return d
+
+
+def _infer_group_n(row, grp_col, full_df):
+    if 'sample_size' in row and pd.notna(row['sample_size']):
+        return int(row['sample_size'])
+    gname = f"{str(row[grp_col]).lower()}_sample_size"
+    if gname in full_df.columns and pd.notna(full_df[gname].iloc[0]):
+        return int(full_df[gname].iloc[0])
+    return None
+
+
+def _add_grouped_bars(fig, d, grp_col, y_col, colors=None, row_number=None, col_number=None):
+    colors = colors or {'control': '#F58518', 'test': '#4C78A8'}
+    for _, r in d.iterrows():
+        has_ci = 'err_plus' in r and 'err_minus' in r and np.isfinite(
+            r['err_plus']) and np.isfinite(r['err_minus'])
+        fig.add_trace(go.Bar(
+            x=[str(r[grp_col])],
+            y=[r[y_col]],
+            name=str(r[grp_col]),
+            marker_color=colors.get(r[grp_col], 'gray'),
+            error_y=(dict(
+                type='data',
+                symmetric=False,
+                array=[float(r['err_plus'])],
+                arrayminus=[float(r['err_minus'])],
+                visible=True,
+                thickness=1.2,
+                width=3
+            ) if has_ci and (r['err_plus'] > 0 or r['err_minus'] > 0) else None),
+            hovertemplate=(
+                f'{grp_col}: %{{x}}<br>'
+                f'{y_col}: %{{y:.4f}}'
+                + (f'<br>n: {r["_n"]}' if r.get('_n') is not None else '')
+                + '<extra></extra>'
+            )
+        ), row=row_number, col=col_number)
+    return fig
+
+
+def _apply_single_bin_layout(fig, title_text, grp_col, y_col, y_min, y_max, row_number=None, col_number=None):
+    pad = 0.05 * (y_max - y_min if y_max > y_min else 1.0)
+    fig.update_traces(width=0.4)
+    fig.update_layout(
+        barmode='group',
+        xaxis_title=grp_col, yaxis_title=y_col,
+        template='plotly_white',
+        margin=dict(l=60, r=20, t=60, b=50),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, x=0),
+        width=500, height=400,
+        title=dict(text=title_text, x=0.5, y=0.98, xanchor='center',
+                   yanchor='top', font=dict(size=15)),
+        showlegend=False
+    )
+    fig.update_yaxes(range=[max(0.0, y_min - pad), y_max + pad])
+    return fig
+
+# ---- in your main function, replace the single-bin branch with this ----
+
+
+def _single_bin_path(fig, sub_df, x_var_column, y_var_column, x_labels_to_values_map, title, row_number=None, col_number=None, is_difference=False):
+    grp_col = _choose_group_column(sub_df)
+    d = _first_per_group(sub_df, grp_col, y_var_column)
+
+    # attach sample sizes for hover (optional)
+    d['_n'] = d.apply(lambda r: _infer_group_n(r, grp_col, sub_df), axis=1)
+
+    # only plot CI if ci_lower & ci_upper exist; use them directly (asymmetric)
+    if _has_bounds(d):
+        d = _attach_error_arrays(d, y_var_column)
+        y_lo = np.minimum(d[y_var_column], d['ci_lower']).min()
+        y_hi = np.maximum(d[y_var_column], d['ci_upper']).max()
+    else:
+        y_lo = d[y_var_column].min()
+        y_hi = d[y_var_column].max()
+
+    fig = _add_grouped_bars(fig, d, grp_col, y_var_column,
+                            row_number=row_number, col_number=col_number)
+
+    base_title = title or f'{y_var_column} (bar' + \
+        (' ± 95% CI' if _has_bounds(d) else '') + ')'
+    if title is None:
+        single_x_label = next(iter(x_labels_to_values_map.keys()), '')
+        base_title = f'{base_title} — {x_var_column}: {single_x_label}'
+
+    return _apply_single_bin_layout(fig, base_title, grp_col, y_var_column, float(y_lo), float(y_hi), row_number=row_number, col_number=col_number)
+
+
+def make_plotly_plot_to_compare_two_sets_of_data(
+    sub_df,
+    x_var_column,
+    y_var_column='diff_in_abs_angle_to_nxt_ff_median',
+    var_to_determine_x_offset_direction='ref_columns_only',
+    title=None,
+    x_offset=0.0,
+    columns_to_find_unique_combinations_for_color=None,
+    columns_to_find_unique_combinations_for_line=None,
+    show_combo_legends=True,
+    fig=None,
+    row_number=None,
+    col_number=None,
+    is_difference=False
+):
+    columns_to_find_unique_combinations_for_color = columns_to_find_unique_combinations_for_color or []
+    columns_to_find_unique_combinations_for_line = columns_to_find_unique_combinations_for_line or []
+    fig = fig or go.Figure()
+
+    # --- preprocessing (colors/lines/hover) ---
+    rest_hover = _find_rest_of_x_for_hoverdata(
+        sub_df, x_var_column, y_var_column, var_to_determine_x_offset_direction
+    )
     sub_df = _process_x_var_columns(sub_df, x_var_column)
 
-    columns_to_find_unique_combinations_for_color = _process_columns_to_find_unique_combinations_for_color(
-        columns_to_find_unique_combinations_for_color, x_var_column, rest_of_x_for_hoverdata)
+    cols_for_color = _process_columns_to_find_unique_combinations_for_color(
+        columns_to_find_unique_combinations_for_color, x_var_column, rest_hover
+    )
     sub_df = process_variations_utils.assign_color_to_sub_df_based_on_unique_combinations(
-        sub_df, columns_to_find_unique_combinations_for_color)
+        sub_df, cols_for_color)
     sub_df = process_variations_utils.assign_line_type_to_sub_df_based_on_unique_combinations(
-        sub_df, columns_to_find_unique_combinations_for_line)
+        sub_df, columns_to_find_unique_combinations_for_line
+    )
 
-    # --- (3) Build numeric x and (important) detect "single-bin" case ---
+    # --- numeric x + offset ---
     x_labels_to_values_map = _find_x_labels_to_values_map(sub_df, x_var_column)
     sub_df = _add_x_value_numeric_to_sub_df(
         sub_df, x_var_column, x_labels_to_values_map, x_offset)
 
-    # ===== Single-category path: render grouped BARs with CI =====
-    # ===== Single-category path: render grouped BARs with CI =====
+    # ===== path 1: single x-bin → grouped bars with CI (if available) =====
     if sub_df['x_value_numeric'].nunique() == 1:
-        # choose group column (labels on x-axis)
-        if 'var_to_split_value' in sub_df.columns:
-            grp_col = 'var_to_split_value'
-        elif 'test_or_control' in sub_df.columns:
-            grp_col = 'test_or_control'
-        else:
-            grp_col = 'line_color'  # fallback
+        return _single_bin_path(fig, sub_df, x_var_column, y_var_column, x_labels_to_values_map, title,
+                                row_number=row_number, col_number=col_number, is_difference=is_difference)
 
-        # one row per group; stable order: control -> test if present
-        d = (sub_df
-             .dropna(subset=[y_var_column])
-             .sort_values(grp_col)
-             .groupby(grp_col, as_index=False).first())
-        order = [g for g in ['control', 'test'] if g in set(d[grp_col])]
-        order += [g for g in d[grp_col] if g not in order]
-        d = d[d[grp_col].isin(order)].copy()
-
-        # CI half-widths (from se_lower/upper if present; else from *_se etc.)
-        if {'se_lower', 'se_upper'}.issubset(d.columns):
-            d['_ci'] = (d['se_upper'] - d[y_var_column]).abs().clip(lower=0)
-        else:
-            se_col = next((c for c in [
-                          f"{y_var_column}_se", "se", "stderr", "std_error"] if c in d.columns), None)
-            d['_ci'] = 1.96 * d[se_col] if se_col is not None else np.nan
-
-        # sample sizes if available (used in hover)
-        def _get_n(row):
-            if 'sample_size' in row and pd.notna(row['sample_size']):
-                return int(row['sample_size'])
-            gname = str(row[grp_col]).lower() + '_sample_size'
-            return int(sub_df[gname].iloc[0]) if gname in sub_df.columns and pd.notna(sub_df[gname].iloc[0]) else None
-        d['_n'] = d.apply(_get_n, axis=1)
-
-        colors = {"control": "#F58518", "test": "#4C78A8"}
-
-        fig = fig or go.Figure()
-        for _, r in d.iterrows():
-            show_ci = pd.notna(r['_ci']) and r['_ci'] > 0
-            fig.add_trace(go.Bar(
-                x=[str(r[grp_col])],
-                y=[r[y_var_column]],
-                name=str(r[grp_col]),
-                marker_color=colors.get(r[grp_col], "gray"),
-                error_y=dict(
-                    type="data",
-                    array=[float(r['_ci'])] if show_ci else [0.0],
-                    visible=show_ci,
-                    thickness=1.2,
-                    width=3
-                ),
-                hovertemplate=(
-                    f"{grp_col}: %{{x}}<br>"
-                    f"{y_var_column}: %{{y:.4f}}"
-                    + (f"<br>n: {r['_n']}" if r['_n'] is not None else "")
-                    + "<extra></extra>"
-                )
-            ))
-
-        fig.update_traces(
-            width=0.4  # thinner bars (default is ~0.8)
-        )
-
-        fig.update_layout(
-            barmode='group',
-            xaxis_title=grp_col,
-            yaxis_title=y_var_column,
-            template="plotly_white",
-            margin=dict(l=60, r=20, t=60, b=50),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-            width=500,   # make figure narrower
-            height=400,  # adjust height so it doesn’t look squashed
-            title=dict(
-                text=title or f"{y_var_column} (bar ± 95% CI)",
-                x=0.5,         # center title
-                y=0.98,        # a little below the top edge
-                xanchor="center",
-                yanchor="top",
-                font=dict(size=15)
-            )
-        )
-
-        # Auto y-limits with a little margin
-        y_min = max(float(d[y_var_column].min() - d['_ci'].max() *
-                    10 if d['_ci'].notna().any() else d[y_var_column].min()), 0)
-        y_max = float(d[y_var_column].max() + d['_ci'].max() *
-                      1.2 if d['_ci'].notna().any() else d[y_var_column].max())
-
-        fig.update_yaxes(range=[y_min, y_max])
-
-        if title is None:
-            single_x_label = next(iter(x_labels_to_values_map.keys()), "")
-            title = f"{y_var_column} (bar ± 95% CI) — {x_var_column}: {single_x_label}"
-        fig.update_layout(title=title)
-
-        fig.update_layout(showlegend=False)
-
-        return fig
-
-    # ===== Multi-category path: original vertical plot =====
+    # ===== path 2: multi-bin (your original line/marker workflow) =====
     fig = plot_markers_for_data_comparison(
-        fig, sub_df, rest_of_x_for_hoverdata, y_var_column, row_number=row_number, col_number=col_number)
-    fig = connect_every_pair(
-        fig, sub_df, y_var_column, rest_of_x_for_hoverdata,
-        show_combo_legends=show_combo_legends, row_number=row_number, col_number=col_number)
+        fig, sub_df, rest_hover, y_var_column, row_number=row_number, col_number=col_number,
+        is_difference=is_difference
+    )
 
-    fig = _update_fig_based_on_x_labels_to_values_map(
-        fig, x_labels_to_values_map, row_number=row_number, col_number=col_number)
-    fig = _set_minimal_y_scale(
-        fig, sub_df, y_var_column, row_number=row_number, col_number=col_number)
-    fig = label_smallest_y_sample_size(
-        fig, sub_df, y_var_column, row_number=row_number, col_number=col_number)
+    if not is_difference:
+        fig = connect_every_pair(
+            fig, sub_df, y_var_column, rest_hover,
+            show_combo_legends=show_combo_legends, row_number=row_number, col_number=col_number
+        )
+    fig = _update_fig_based_on_x_labels_to_values_map(fig, x_labels_to_values_map,
+                                                      row_number=row_number, col_number=col_number)
+    fig = _set_minimal_y_scale(fig, sub_df, y_var_column,
+                               row_number=row_number, col_number=col_number)
 
-    if title is None:
-        title = f'{y_var_column} vs {x_var_column}'
-    fig.update_layout(title=title, xaxis_title=x_var_column,
-                      yaxis_title=y_var_column)
+    # annotate sample size
+    # fig = label_smallest_y_sample_size(fig, sub_df, y_var_column,
+    #                                    row_number=row_number, col_number=col_number)
 
+    fig.update_layout(
+        title=title or f'{y_var_column} vs {x_var_column}',
+        xaxis_title=x_var_column, yaxis_title=y_var_column,
+        # template='plotly_white'
+    )
     return fig

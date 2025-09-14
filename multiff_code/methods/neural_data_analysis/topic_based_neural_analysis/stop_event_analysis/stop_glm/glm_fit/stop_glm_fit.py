@@ -398,23 +398,26 @@ def _pick_forest_term(feature_names, forest_term):
 
 
 def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_n, delta_for_rr, make_plots):
+    # Currently, a lot of the plots are not useful for our purposes
+    
     if not make_plots:
         return {}
     figs = {
         'coef_dists': plot_glm_fit.plot_coef_distributions(coefs_df),
-        'model_quality': plot_glm_fit.plot_model_quality(metrics_df),
+        # 'model_quality': plot_glm_fit.plot_model_quality(metrics_df),
     }
-    ft = _pick_forest_term(feature_names, forest_term)
-    if ft is not None:
-        figs['forest'] = plot_glm_fit.plot_forest_for_term(
-            coefs_df, term=ft, top_n=forest_top_n)
-        figs['rr_hist'] = plot_glm_fit.plot_rate_ratio_hist(
-            coefs_df, term=ft, delta=delta_for_rr, bins=40, log=True, clip_q=0.995
-        )
+    
+    # ft = _pick_forest_term(feature_names, forest_term)
+    # if ft is not None:
+    #     figs['forest'] = plot_glm_fit.plot_forest_for_term(
+    #         coefs_df, term=ft, top_n=forest_top_n)
+    #     figs['rr_hist'] = plot_glm_fit.plot_rate_ratio_hist(
+    #         coefs_df, term=ft, delta=delta_for_rr, bins=40, log=True, clip_q=0.995
+    #     )
 
-    else:
-        figs['forest'] = None
-        figs['rr_hist'] = None
+    # else:
+    #     figs['forest'] = None
+    #     figs['rr_hist'] = None
     return figs
 
 

@@ -1,4 +1,5 @@
 
+from scipy import stats
 from planning_analysis.show_planning import show_planning_utils
 from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class, test_vs_control_utils
@@ -161,6 +162,7 @@ def make_pooled_median_info_from_test_and_ctrl_heading_info_df(test_heading_info
 
     return pooled_median_info
 
+
 def make_per_sess_median_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
                                                                  ctrl_heading_info_df,
                                                                  verbose=True,
@@ -204,13 +206,14 @@ def make_per_sess_median_info_from_test_and_ctrl_heading_info_df(test_heading_in
         session_median_info['data_name'] = data_name
         per_sess_median_info = pd.concat(
             [per_sess_median_info, session_median_info], axis=0)
-        
+
     per_sess_median_info = per_sess_median_info.reset_index(drop=True)
-    
+
     # Map sorted data_names to session IDs
     per_sess_median_info = assign_session_id(per_sess_median_info)
 
     return per_sess_median_info
+
 
 def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
                                                              ctrl_heading_info_df,
@@ -255,7 +258,6 @@ def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_d
     return pooled_perc_info
 
 
-
 def make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_df,
                                                                ctrl_heading_info_df,
                                                                verbose=True,
@@ -284,21 +286,21 @@ def make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info
             ctrl_heading_info_df['data_name'] == data_name]
 
         session_perc_info = make_pooled_perc_info_from_test_and_ctrl_heading_info_df(session_test_heading_info_df,
-                                                                                         session_ctrl_heading_info_df,
-                                                                                         verbose=verbose,
-                                                                                         key_for_split_choices=key_for_split_choices,
-                                                                                         whether_filter_info_choices=whether_filter_info_choices,
-                                                                                         whether_even_out_distribution_choices=whether_even_out_distribution_choices,
-                                                                                         whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
-                                                                                         whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
-                                                                                         ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
-                                                                                         max_curv_range_choices=max_curv_range_choices,
-                                                                                         )
+                                                                                     session_ctrl_heading_info_df,
+                                                                                     verbose=verbose,
+                                                                                     key_for_split_choices=key_for_split_choices,
+                                                                                     whether_filter_info_choices=whether_filter_info_choices,
+                                                                                     whether_even_out_distribution_choices=whether_even_out_distribution_choices,
+                                                                                     whether_test_nxt_ff_flash_after_stop_choices=whether_test_nxt_ff_flash_after_stop_choices,
+                                                                                     whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
+                                                                                     ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
+                                                                                     max_curv_range_choices=max_curv_range_choices,
+                                                                                     )
 
         session_perc_info['data_name'] = data_name
         per_sess_perc_info = pd.concat(
             [per_sess_perc_info, session_perc_info], axis=0)
-        
+
     per_sess_perc_info = per_sess_perc_info.reset_index(drop=True)
 
     return per_sess_perc_info
@@ -321,50 +323,34 @@ def extract_key_info_from_stat_df(stat_df, metrics=['Q1', 'median', 'Q3']):
     return current_row
 
 
-def get_rows_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df,
-                                columns_to_get_metrics=[
-                                    'diff_in_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'],
-                                metrics=['Q1', 'median', 'Q3']):
+def get_medians_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df,
+                                   columns_to_get_metrics=[
+                                       'diff_in_angle_to_nxt_ff', 'diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'],
+                                   # metrics=['Q1', 'median', 'Q3']
+                                   metrics=['median'],
+                                   ):
 
     test_stat = test_heading_info_df[columns_to_get_metrics].describe().rename(
         index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
     ctrl_stat = ctrl_heading_info_df[columns_to_get_metrics].describe().rename(
         index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
 
-    row_from_test = extract_key_info_from_stat_df(test_stat, metrics=metrics)
-    row_from_ctrl = extract_key_info_from_stat_df(ctrl_stat, metrics=metrics)
+    test_row = extract_key_info_from_stat_df(test_stat, metrics=metrics)
+    ctrl_row = extract_key_info_from_stat_df(ctrl_stat, metrics=metrics)
 
-    row_from_test['test_or_control'] = 'test'
-    row_from_ctrl['test_or_control'] = 'control'
+    test_row['test_or_control'] = 'test'
+    ctrl_row['test_or_control'] = 'control'
 
-    row_from_test['sample_size'] = len(test_heading_info_df)
-    row_from_ctrl['sample_size'] = len(ctrl_heading_info_df)
+    test_row['sample_size'] = len(test_heading_info_df)
+    ctrl_row['sample_size'] = len(ctrl_heading_info_df)
 
     if 'diff_in_abs_d_curv' in columns_to_get_metrics:
-        row_from_test['sample_size_for_curv'] = len(
+        test_row['sample_size_for_curv'] = len(
             test_heading_info_df[~test_heading_info_df['diff_in_abs_d_curv'].isna()])
-        row_from_ctrl['sample_size_for_curv'] = len(
+        ctrl_row['sample_size_for_curv'] = len(
             ctrl_heading_info_df[~ctrl_heading_info_df['diff_in_abs_d_curv'].isna()])
 
-    return row_from_test, row_from_ctrl
-
-
-def get_delta_values_between_test_and_control(test_heading_info_df, ctrl_heading_info_df):
-    diff_and_ratio_stat_df = show_planning_utils.make_diff_and_ratio_stat_df(
-        test_heading_info_df, ctrl_heading_info_df)
-
-    diff_and_ratio_stat_df['delta_diff_in_abs_angle_to_nxt_ff'] = diff_and_ratio_stat_df['test_diff_in_abs_angle_to_nxt_ff'] - \
-        diff_and_ratio_stat_df['ctrl_diff_in_abs_angle_to_nxt_ff']
-    diff_and_ratio_stat_df['delta_diff_in_angle_to_nxt_ff'] = diff_and_ratio_stat_df['test_diff_in_angle_to_nxt_ff'] - \
-        diff_and_ratio_stat_df['ctrl_diff_in_angle_to_nxt_ff']
-    diff_and_ratio_stat_df['delta_diff_in_abs_d_curv'] = diff_and_ratio_stat_df['test_diff_in_abs_d_curv'] - \
-        diff_and_ratio_stat_df['ctrl_diff_in_abs_d_curv']
-    new_diff_and_ratio_stat_df = diff_and_ratio_stat_df[[
-        'delta_diff_in_abs_angle_to_nxt_ff', 'delta_diff_in_angle_to_nxt_ff', 'delta_diff_in_abs_d_curv']].copy()
-
-    delta_row = extract_key_info_from_stat_df(
-        new_diff_and_ratio_stat_df, metrics=['median'])
-    return delta_row
+    return test_row, ctrl_row
 
 
 def get_bootstrap_median_std(array, bootstrap_sample_size=5000):
@@ -383,46 +369,437 @@ def get_bootstrap_median_std(array, bootstrap_sample_size=5000):
     return bootstrap_median_std
 
 
-def add_boostrap_median_std_to_df(test_heading_info_df, ctrl_heading_info_df,
-                                  row_from_test, row_from_ctrl, columns):
-    row_from_test = row_from_test.copy()
-    row_from_ctrl = row_from_ctrl.copy()
+def get_bca_confidence_interval(array, bootstrap_sample_size=5000, confidence_level=0.95, random_state=None):
+    """
+    Calculate Bias-Corrected and Accelerated (BCa) confidence interval for the median.
+
+    Parameters:
+    -----------
+    array : array-like
+        Input data array
+    bootstrap_sample_size : int, default=5000
+        Number of bootstrap samples to generate
+    confidence_level : float, default=0.95
+        Confidence level (e.g., 0.95 for 95% CI)
+    random_state : int or None, default=None
+        Random seed for reproducibility
+
+    Returns:
+    --------
+    tuple
+        (lower_bound, upper_bound) of the BCa confidence interval
+    """
+    from scipy import stats
+
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    array = np.asarray(array)
+    array = array[~np.isnan(array)]  # Remove NaN values
+
+    if len(array) == 0:
+        return np.nan, np.nan
+
+    n = len(array)
+    original_median = np.median(array)
+
+    # Generate bootstrap samples
+    bootstrap_samples = np.random.choice(
+        array, (bootstrap_sample_size, n), replace=True)
+
+    # Calculate bootstrap medians
+    bootstrap_medians = np.median(bootstrap_samples, axis=1)
+
+    # Calculate bias correction (z0)
+    # Proportion of bootstrap medians less than original median
+    bias_correction = stats.norm.ppf(
+        np.mean(bootstrap_medians < original_median))
+
+    # Calculate acceleration (a) using jackknife
+    jackknife_medians = []
+    for i in range(n):
+        jackknife_sample = np.concatenate([array[:i], array[i+1:]])
+        jackknife_medians.append(np.median(jackknife_sample))
+
+    jackknife_medians = np.array(jackknife_medians)
+    jackknife_mean = np.mean(jackknife_medians)
+
+    # Calculate acceleration
+    numerator = np.sum((jackknife_mean - jackknife_medians) ** 3)
+    denominator = 6 * \
+        (np.sum((jackknife_mean - jackknife_medians) ** 2)) ** (3/2)
+
+    if denominator == 0:
+        acceleration = 0
+    else:
+        acceleration = numerator / denominator
+
+    # Calculate BCa confidence interval
+    alpha = 1 - confidence_level
+    z_alpha_2 = stats.norm.ppf(alpha / 2)
+    z_1_alpha_2 = stats.norm.ppf(1 - alpha / 2)
+
+    # BCa adjustment
+    z_lower = bias_correction + \
+        (bias_correction + z_alpha_2) / \
+        (1 - acceleration * (bias_correction + z_alpha_2))
+    z_upper = bias_correction + (bias_correction + z_1_alpha_2) / \
+        (1 - acceleration * (bias_correction + z_1_alpha_2))
+
+    # Convert to percentiles
+    p_lower = stats.norm.cdf(z_lower)
+    p_upper = stats.norm.cdf(z_upper)
+
+    # Ensure percentiles are within [0, 1]
+    p_lower = max(0, min(1, p_lower))
+    p_upper = max(0, min(1, p_upper))
+
+    # Get confidence interval bounds
+    lower_bound = np.percentile(bootstrap_medians, 100 * p_lower)
+    upper_bound = np.percentile(bootstrap_medians, 100 * p_upper)
+
+    return lower_bound, upper_bound
+
+
+def add_bootstrap_bca_ci_to_df(
+    test_heading_info_df,
+    ctrl_heading_info_df,
+    test_row,
+    ctrl_row,
+    columns,
+    stat_fn=np.median,
+    confidence_level=0.95,
+    random_state=None
+):
+    """
+    Add BCa confidence interval bounds to dataframe rows.
+
+    Parameters
+    ----------
+    test_heading_info_df : pandas.DataFrame
+        Test condition data
+    ctrl_heading_info_df : pandas.DataFrame
+        Control condition data
+    test_row : pandas.Series
+        Row containing test condition statistics
+    ctrl_row : pandas.Series
+        Row containing control condition statistics
+    columns : list
+        Column names to calculate BCa intervals for
+    confidence_level : float, default=0.95
+        Confidence level for the intervals
+    random_state : int or None, default=None
+        Random seed for reproducibility
+
+    Returns
+    -------
+    tuple
+        (test_row, ctrl_row) with BCa CI bounds added
+    """
+    test_row = test_row.copy()
+    ctrl_row = ctrl_row.copy()
+    ci_tag = int(confidence_level * 100)
 
     for column in columns:
-        series = test_heading_info_df[column]
-        boot_med_std = get_bootstrap_median_std(series[~series.isna()].values)
-        row_from_test[f'{column}_boot_med_std'] = boot_med_std
+        series = test_heading_info_df[column].dropna().values
+        ci_low, ci_high = bootstrap_bca_ci(
+            series,
+            stat_fn=stat_fn,
+            confidence_level=confidence_level,
+            random_state=random_state
+        )
+        test_row[f'{column}_ci_low_{ci_tag}'] = ci_low
+        test_row[f'{column}_ci_high_{ci_tag}'] = ci_high
 
     for column in columns:
-        series = ctrl_heading_info_df[column]
-        boot_med_std = get_bootstrap_median_std(series[~series.isna()].values)
-        row_from_ctrl[f'{column}_boot_med_std'] = boot_med_std
+        series = ctrl_heading_info_df[column].dropna().values
+        ci_low, ci_high = bootstrap_bca_ci(
+            series,
+            stat_fn=stat_fn,
+            confidence_level=confidence_level,
+            random_state=random_state
+        )
+        ctrl_row[f'{column}_ci_low_{ci_tag}'] = ci_low
+        ctrl_row[f'{column}_ci_high_{ci_tag}'] = ci_high
 
-    return row_from_test, row_from_ctrl
+    return test_row, ctrl_row
 
 
-def make_temp_median_info_func(test_heading_info_df, ctrl_heading_info_df):
-    row_from_test, row_from_ctrl = get_rows_from_test_and_ctrl(
+# --- Core BCa engine (no duplication lives above this line) ---
+
+
+def bca_interval_from_boot_jack(stat_obs, boot_stats, jackknife_stats, confidence_level=0.95):
+    """Core BCa interval computation (reused everywhere)."""
+    boot_stats = np.asarray(boot_stats, float)
+    jackknife_stats = np.asarray(jackknife_stats, float)
+    if boot_stats.size == 0:
+        return np.nan, np.nan
+
+    alpha = 1.0 - confidence_level
+
+    # Bias-correction z0
+    prop_less = np.mean(boot_stats < stat_obs)
+    eps = 1.0 / (len(boot_stats) * 2.0)
+    prop_less = np.clip(prop_less, eps, 1 - eps)
+    z0 = stats.norm.ppf(prop_less)
+
+    # Acceleration a
+    j_mean = jackknife_stats.mean()
+    num = np.sum((j_mean - jackknife_stats) ** 3)
+    den = 6.0 * (np.sum((j_mean - jackknife_stats) ** 2) ** 1.5)
+    a = 0.0 if den == 0.0 else num / den
+
+    # Adjusted quantiles
+    z_lo, z_hi = stats.norm.ppf([alpha/2, 1 - alpha/2])
+    adj_lo = z0 + (z0 + z_lo) / (1 - a * (z0 + z_lo))
+    adj_hi = z0 + (z0 + z_hi) / (1 - a * (z0 + z_hi))
+    q_lo, q_hi = stats.norm.cdf([adj_lo, adj_hi])
+    q_lo, q_hi = np.clip([q_lo, q_hi], 0, 1)
+    if q_lo > q_hi:
+        q_lo, q_hi = q_hi, q_lo
+
+    return (np.quantile(boot_stats, q_lo, method='linear'),
+            np.quantile(boot_stats, q_hi, method='linear'))
+
+
+def bootstrap_bca_ci(x, stat_fn=np.median, bootstrap_sample_size=5000,
+                     confidence_level=0.95, random_state=None):
+    """
+    Generic BCa bootstrap CI for any 1-sample statistic.
+
+    Parameters
+    ----------
+    x : array-like
+        Input data (will drop NaNs)
+    stat_fn : callable, default=np.median
+        Statistic function (e.g., np.median, np.mean, np.var)
+    bootstrap_sample_size : int, default=5000
+        Number of bootstrap replicates
+    confidence_level : float, default=0.95
+        CI coverage
+    random_state : int or None
+        RNG seed
+
+    Returns
+    -------
+    (ci_low, ci_high)
+    """
+    x = np.asarray(x, float)
+    x = x[~np.isnan(x)]
+    n = len(x)
+    if n == 0:
+        return np.nan, np.nan
+
+    rng = np.random.default_rng(random_state)
+    stat_obs = stat_fn(x)
+
+    # Bootstrap replicates
+    idx = rng.integers(0, n, size=(bootstrap_sample_size, n))
+    boot_stats = [stat_fn(x[i]) for i in idx]
+
+    # Jackknife replicates
+    if n >= 2:
+        jack_stats = [stat_fn(np.delete(x, i)) for i in range(n)]
+    else:
+        jack_stats = [stat_obs]
+
+    return bca_interval_from_boot_jack(stat_obs, boot_stats, jack_stats, confidence_level)
+
+
+def get_bootstrap_diff_bca_ci(
+    x,
+    y,
+    bootstrap_sample_size=5000,
+    confidence_level=0.95,
+    random_state=None,
+    stat_fn=np.median
+):
+    """
+    BCa CI for difference of statistics: stat_fn(x) - stat_fn(y).
+    By default stat_fn=np.median. Returns (ci_low, ci_high).
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    x = x[~np.isnan(x)]
+    y = y[~np.isnan(y)]
+    n_x, n_y = len(x), len(y)
+    if n_x == 0 or n_y == 0:
+        return np.nan, np.nan
+
+    rng = np.random.default_rng(random_state)
+
+    stat_x, stat_y = stat_fn(x), stat_fn(y)
+    stat_obs = float(stat_x - stat_y)
+
+    # Bootstrap difference (independent resampling)
+    idx_x = rng.integers(0, n_x, size=(bootstrap_sample_size, n_x))
+    idx_y = rng.integers(0, n_y, size=(bootstrap_sample_size, n_y))
+    boot_stats = stat_fn(x[idx_x], axis=1) - stat_fn(y[idx_y], axis=1)
+
+    # Jackknife over both samples
+    jk = []
+    if n_x >= 2:
+        for i in range(n_x):
+            jk_x = stat_fn(np.delete(x, i))
+            jk.append(jk_x - stat_y)
+    else:
+        jk.append(stat_obs)
+    if n_y >= 2:
+        for j in range(n_y):
+            jk_y = stat_fn(np.delete(y, j))
+            jk.append(stat_x - jk_y)
+    else:
+        jk.append(stat_obs)
+
+    jackknife_stats = np.asarray(jk, float)
+
+    return bca_interval_from_boot_jack(stat_obs, boot_stats, jackknife_stats, confidence_level)
+
+# --- Your higher-level function stays tiny and calls the wrapper ---
+
+
+def calculate_difference_with_bca_ci(
+    test_heading_info_df,
+    ctrl_heading_info_df,
+    columns,
+    confidence_level=0.95,
+    random_state=None,
+    n_boot=5000,
+    stat_fn=np.median
+):
+    """
+    Difference of medians (test - control) with BCa CIs for each column.
+    Returns a Series with median_diff, ci_low_XX, ci_high_XX.
+    """
+    out = {}
+    tag = int(confidence_level * 100)
+
+    for col in columns:
+        x = test_heading_info_df[col].dropna().to_numpy()
+        y = ctrl_heading_info_df[col].dropna().to_numpy()
+
+        if len(x) == 0 or len(y) == 0:
+            out[f'{col}_median'] = np.nan
+            out[f'{col}_ci_low_{tag}'] = np.nan
+            out[f'{col}_ci_high_{tag}'] = np.nan
+            continue
+
+        diff_in_stat = float(stat_fn(x) - stat_fn(y))
+        lo, hi = get_bootstrap_diff_bca_ci(
+            x, y,
+            bootstrap_sample_size=n_boot,
+            confidence_level=confidence_level,
+            random_state=random_state,
+            stat_fn=stat_fn
+        )
+
+        if stat_fn == np.median:
+            out[f'{col}_median'] = diff_in_stat
+        elif stat_fn == np.mean:
+            out[f'{col}_mean'] = diff_in_stat
+        out[f'{col}_ci_low_{tag}'] = lo
+        out[f'{col}_ci_high_{tag}'] = hi
+
+    return pd.Series(out, dtype=float)
+
+
+def make_temp_median_info_func(test_heading_info_df, ctrl_heading_info_df, confidence_level=0.95, random_state=None):
+    """
+    Create temporary median info with either standard bootstrap SE or BCa confidence intervals.
+
+    Parameters:
+    -----------
+    test_heading_info_df : pandas.DataFrame
+        Test condition data
+    ctrl_heading_info_df : pandas.DataFrame
+        Control condition data
+    confidence_level : float, default=0.95
+        Confidence level for BCa intervals
+    random_state : int or None, default=None
+        Random seed for reproducibility
+
+    Returns:
+    --------
+    pandas.DataFrame
+        Combined dataframe with median statistics and error estimates
+    """
+    test_row, ctrl_row = get_medians_from_test_and_ctrl(
         test_heading_info_df, ctrl_heading_info_df)
-    row_from_test, row_from_ctrl = add_boostrap_median_std_to_df(test_heading_info_df, ctrl_heading_info_df,
-                                                                 row_from_test, row_from_ctrl,
-                                                                 columns=['diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'])
 
-    delta_row = get_delta_values_between_test_and_control(
-        test_heading_info_df, ctrl_heading_info_df)
+    test_row, ctrl_row = add_bootstrap_bca_ci_to_df(
+        test_heading_info_df, ctrl_heading_info_df,
+        test_row, ctrl_row,
+        columns=['diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'],
+        confidence_level=confidence_level,
+        stat_fn=np.median,
+        random_state=random_state
+    )
 
-    delta_rows = pd.concat([delta_row, delta_row], axis=0)
-    temp_regrouped_info = pd.concat([row_from_test, row_from_ctrl], axis=0)
-    temp_regrouped_info = pd.concat([temp_regrouped_info, delta_rows], axis=1)
+    difference_row = calculate_difference_with_bca_ci(
+        test_heading_info_df, ctrl_heading_info_df,
+        columns=['diff_in_abs_angle_to_nxt_ff', 'diff_in_abs_d_curv'],
+        confidence_level=confidence_level,
+        random_state=random_state,
+        stat_fn=np.median
+    )
+    # Add test_or_control identifier for difference
+    difference_row['test_or_control'] = 'difference'
+    difference_row['sample_size'] = min(test_row['sample_size'].item(), ctrl_row['sample_size'].item())
+    difference_row['sample_size_for_curv'] = min(test_row['sample_size_for_curv'].item(), ctrl_row['sample_size_for_curv'].item())
+
+    # Convert to DataFrame and create two identical difference rows
+    difference_row = pd.DataFrame([difference_row])
+
+    temp_regrouped_info = pd.concat(
+        [test_row, ctrl_row, difference_row], axis=0)
+
     return temp_regrouped_info
 
 
-def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df):
-    test_perc = (test_heading_info_df['dir_from_cur_ff_to_stop'] ==
-                 test_heading_info_df['dir_from_cur_ff_to_nxt_ff']).sum()/len(test_heading_info_df)
-    ctrl_perc = (ctrl_heading_info_df['dir_from_cur_ff_to_stop'] ==
-                 ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff']).sum()/len(ctrl_heading_info_df)
-    diff_in_perc = test_perc - ctrl_perc
+
+def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df, confidence_level=0.95, random_state=None):
+    test_row, ctrl_row = get_perc_from_test_and_ctrl(
+        test_heading_info_df, ctrl_heading_info_df)
+
+    test_row, ctrl_row = add_bootstrap_bca_ci_to_df(
+        test_heading_info_df, ctrl_heading_info_df,
+        test_row, ctrl_row,
+        columns=['perc'],
+        stat_fn=np.mean,
+        confidence_level=confidence_level,
+        random_state=random_state
+    )
+
+    difference_row = calculate_difference_with_bca_ci(
+        test_heading_info_df, ctrl_heading_info_df,
+        columns=['perc'],
+        confidence_level=confidence_level,
+        random_state=random_state,
+        stat_fn=np.mean
+    )
+    
+    difference_row['test_or_control'] = 'difference'
+    difference_row['sample_size'] = min(test_row['sample_size'].item(), ctrl_row['sample_size'].item())
+    
+    difference_row = pd.DataFrame([difference_row])
+    difference_row.rename(columns={'perc_mean': 'perc'}, inplace=True)
+
+    temp_regrouped_info = pd.concat(
+        [test_row, ctrl_row, difference_row], axis=0)
+
+    return temp_regrouped_info
+
+
+
+def get_perc_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df):
+    test_heading_info_df['perc'] = test_heading_info_df[
+        'dir_from_cur_ff_to_stop'] == test_heading_info_df['dir_from_cur_ff_to_nxt_ff']
+    ctrl_heading_info_df['perc'] = ctrl_heading_info_df[
+        'dir_from_cur_ff_to_stop'] == ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff']
+    test_perc = (test_heading_info_df['perc']).sum(
+    )/len(test_heading_info_df)
+    ctrl_perc = (ctrl_heading_info_df['perc']).sum(
+    )/len(ctrl_heading_info_df)
 
     test_sample_size = len(test_heading_info_df)
     ctrl_sample_size = len(ctrl_heading_info_df)
@@ -432,28 +809,7 @@ def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df):
     ctrl_row = pd.DataFrame(
         {'perc': ctrl_perc, 'sample_size': ctrl_sample_size, 'test_or_control': 'control'}, index=[0])
 
-    temp_regrouped_info = pd.concat(
-        [test_row, ctrl_row], axis=0).reset_index(drop=True)
-    temp_regrouped_info['perc_se'] = np.sqrt(temp_regrouped_info['perc']*(
-        1-temp_regrouped_info['perc'])/temp_regrouped_info['sample_size'])
-    temp_regrouped_info['diff_in_perc'] = diff_in_perc
-
-    return temp_regrouped_info
-
-
-# def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df):
-#     test_perc = (test_heading_info_df['dir_from_cur_ff_to_stop']==test_heading_info_df['dir_from_cur_ff_to_nxt_ff']).sum()/len(test_heading_info_df)
-#     ctrl_perc = (ctrl_heading_info_df['dir_from_cur_ff_to_stop']==ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff']).sum()/len(ctrl_heading_info_df)
-#     test_sample_size = len(test_heading_info_df)
-#     ctrl_sample_size = len(ctrl_heading_info_df)
-
-#     temp_regrouped_info = pd.DataFrame({'test_perc': test_perc,
-#                                         'ctrl_perc': ctrl_perc,
-#                                         'test_sample_size': test_sample_size,
-#                                         'ctrl_sample_size': ctrl_sample_size
-#                                         }, index=[0])
-#     return temp_regrouped_info
-
+    return test_row, ctrl_row
 
 def make_variations_df_across_ref_point_values(variation_func,
                                                variation_func_kwargs={},
@@ -506,36 +862,38 @@ def make_combd_only_cur_ff_path(monkey_name):
 
 
 def combine_all_ref_per_sess_median_info_across_monkeys_and_opt_arc_types(all_ref_per_sess_median_info_exists_ok=True,
-                                                                        pooled_median_info_exists_ok=True):
+                                                                          pooled_median_info_exists_ok=True):
     all_ref_per_sess_median_info = _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=all_ref_per_sess_median_info_exists_ok,
-                                                                                                pooled_median_info_exists_ok=pooled_median_info_exists_ok,
-                                                                                                per_sess=True,
-                                                                                                )
+                                                                                                 pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                                                                                                 per_sess=True,
+                                                                                                 )
     return all_ref_per_sess_median_info
+
 
 def combine_all_ref_pooled_median_info_across_monkeys_and_opt_arc_types(all_ref_pooled_median_info_exists_ok=True,
                                                                         pooled_median_info_exists_ok=True):
     all_ref_pooled_median_info = _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=all_ref_pooled_median_info_exists_ok,
-                                                                                                pooled_median_info_exists_ok=pooled_median_info_exists_ok,
-                                                                                                per_sess=False,
-                                                                                                )
+                                                                                               pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                                                                                               per_sess=False,
+                                                                                               )
     return all_ref_pooled_median_info
 
+
 def _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=True,
-                                                                        pooled_median_info_exists_ok=True,
-                                                                        per_sess=False,
-                                                                        ):
+                                                                  pooled_median_info_exists_ok=True,
+                                                                  per_sess=False,
+                                                                  ):
     all_info = pd.DataFrame([])
-    
+
     for monkey_name in ['monkey_Schro', 'monkey_Bruno']:
         for opt_arc_type in ['norm_opt_arc', 'opt_arc_stop_closest', 'opt_arc_stop_first_vis_bdry']:
             ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                        opt_arc_type=opt_arc_type)
-            func = ps.make_or_retrieve_all_ref_pooled_median_info if not per_sess else ps.make_or_retrieve_all_ref_per_sess_median_info                                                         
+                                                                     opt_arc_type=opt_arc_type)
+            func = ps.make_or_retrieve_all_ref_pooled_median_info if not per_sess else ps.make_or_retrieve_all_ref_per_sess_median_info
             temp_info = func(exists_ok=exists_ok,
-                            pooled_median_info_exists_ok=pooled_median_info_exists_ok,
-                            process_info_for_plotting=False
-                            )
+                             pooled_median_info_exists_ok=pooled_median_info_exists_ok,
+                             process_info_for_plotting=False
+                             )
             all_info = pd.concat(
                 [all_info, temp_info], axis=0)
     all_info.reset_index(drop=True, inplace=True)
@@ -544,13 +902,13 @@ def _combine_all_ref_median_info_across_monkeys_and_opt_arc_types(exists_ok=True
 
 def combine_pooled_perc_info_across_monkeys(pooled_perc_info_exists_ok=True):
     pooled_perc_info = pd.DataFrame([])
-    opt_arc_type = 'norm_opt_arc' # this doesn't matter for perc info
+    opt_arc_type = 'norm_opt_arc'  # this doesn't matter for perc info
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
         ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                    opt_arc_type=opt_arc_type
-                                                                    )
+                                                                 opt_arc_type=opt_arc_type
+                                                                 )
         temp_pooled_perc_info = ps.make_or_retrieve_pooled_perc_info(exists_ok=pooled_perc_info_exists_ok,
-                                                                        )
+                                                                     )
         pooled_perc_info = pd.concat(
             [pooled_perc_info, temp_pooled_perc_info], axis=0)
     pooled_perc_info.reset_index(drop=True, inplace=True)
@@ -559,13 +917,13 @@ def combine_pooled_perc_info_across_monkeys(pooled_perc_info_exists_ok=True):
 
 def combine_per_sess_perc_info_across_monkeys(per_sess_perc_info_exists_ok=True):
     per_sess_perc_info = pd.DataFrame([])
-    opt_arc_type = 'norm_opt_arc' # this doesn't matter for perc info
+    opt_arc_type = 'norm_opt_arc'  # this doesn't matter for perc info
     for monkey_name in ['monkey_Bruno', 'monkey_Schro']:
         ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(monkey_name=monkey_name,
-                                                                    opt_arc_type=opt_arc_type
-                                                                    )
+                                                                 opt_arc_type=opt_arc_type
+                                                                 )
         temp_per_sess_perc_info = ps.make_or_retrieve_per_sess_perc_info(exists_ok=per_sess_perc_info_exists_ok,
-                                                                        )
+                                                                         )
         per_sess_perc_info = pd.concat(
             [per_sess_perc_info, temp_per_sess_perc_info], axis=0)
     per_sess_perc_info.reset_index(drop=True, inplace=True)
@@ -590,12 +948,10 @@ def combine_per_sess_perc_info_across_monkeys(per_sess_perc_info_exists_ok=True)
 #     return per_sess_median_info
 
 
-
-
-
 def assign_session_id(df, new_col_name='session_id'):
     # Map sorted data_names to session IDs
     unique_data_names = sorted(df['data_name'].unique())
-    data_name_to_session_id = {name: idx for idx, name in enumerate(unique_data_names)}
+    data_name_to_session_id = {name: idx for idx,
+                               name in enumerate(unique_data_names)}
     df[new_col_name] = df['data_name'].map(data_name_to_session_id)
     return df

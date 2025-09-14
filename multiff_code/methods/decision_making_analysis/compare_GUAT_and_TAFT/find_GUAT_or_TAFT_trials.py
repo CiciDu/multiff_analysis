@@ -194,11 +194,7 @@ def _take_out_monkey_subset_for_GUAT(
         raise KeyError(
             f"monkey_information missing columns: {sorted(missing)}")
 
-    # 1) Add stop cluster IDs
-    monkey_information = add_stop_cluster_id(
-        monkey_information, max_cluster_distance)
-
-    # 2) Base subset (copy to avoid chained assignment)
+    # 2) Base subset (sorry i know the numbering here needs to be updated)
     monkey_sub = _take_out_monkey_subset_for_GUAT_or_TAFT(
         monkey_information, ff_caught_T_new, ff_real_position_sorted
     ).copy()
@@ -263,25 +259,29 @@ def _take_out_monkey_subset_for_GUAT(
         "distance_to_next_next_target",
     ]:
         monkey_sub[col] = monkey_sub[col].fillna(far_distance_fill)
+        
 
     # 7) Filter: clusters too close to any target
+    # Right now, we have changed to filter only based on distance to current target, but we can use the distances to previous and next targets for filteringif needed
     dcols = [
         "distance_to_target",
-        "distance_to_last_target",
-        "distance_to_last_last_target",
-        "distance_to_next_target",
-        "distance_to_next_next_target",
+        # "distance_to_last_target",
+        # "distance_to_last_last_target",
+        # "distance_to_next_target",
+        # "distance_to_next_next_target",
     ]
+    
+    # Note: this is the opposite of what we do for TAFT
     close_mask = (monkey_sub[dcols] < max_cluster_distance).any(axis=1)
     close_to_target_clusters = monkey_sub.loc[close_mask, "stop_cluster_id"].unique(
     )
 
-    print(
-        f"When taking out monkey subset for GUAT, "
-        f"{len(close_to_target_clusters)} clusters out of "
-        f"{monkey_sub['stop_cluster_id'].nunique()} are too close to a target "
-        f"(threshold={max_cluster_distance}) and are filtered out."
-    )
+    # print(
+    #     f"When taking out monkey subset for GUAT, "
+    #     f"{len(close_to_target_clusters)} clusters out of "
+    #     f"{monkey_sub['stop_cluster_id'].nunique()} are too close to a target "
+    #     f"(threshold={max_cluster_distance}) and are filtered out."
+    # )
 
     monkey_sub = monkey_sub[~monkey_sub["stop_cluster_id"].isin(
         close_to_target_clusters)].copy()
@@ -306,9 +306,6 @@ def _take_out_monkey_subset_for_GUAT(
 
 
 def _take_out_monkey_subset_to_get_num_stops_near_target(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
-    monkey_information = add_stop_cluster_id(
-        monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=True)
-
     monkey_sub = _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_new, ff_real_position_sorted,
                                                           min_stop_per_cluster=1)
     # Keep clusters that are close to the targets
@@ -326,8 +323,6 @@ def _take_out_monkey_subset_to_get_num_stops_near_target(monkey_information, ff_
 
 def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
 
-    monkey_information = add_stop_cluster_id(
-        monkey_information, max_cluster_distance, use_ff_caught_time_new_to_separate_clusters=True)
 
     monkey_sub = _take_out_monkey_subset_for_GUAT_or_TAFT(
         monkey_information, ff_caught_T_new, ff_real_position_sorted)
@@ -336,10 +331,11 @@ def _take_out_monkey_subset_for_TAFT(monkey_information, ff_caught_T_new, ff_rea
     monkey_sub = _keep_clusters_close_to_target(
         monkey_sub, max_cluster_distance)
 
-    # For each trial, keep the latest stop cluster
+    # For each trial, keep the latest stop cluster if there are multiple stop clusters during the same trial close to the target; but this is unlikely
     monkey_sub = _keep_latest_cluster_for_each_trial(monkey_sub)
 
     # if two trials share the same stop cluster, then keep the trial with the smaller trial number
+    # (Actually I don't know when this would happen. Need to verify later)
     monkey_sub.sort_values(by=['stop_cluster_id', 'trial'], inplace=True)
     unique_combo_to_keep = monkey_sub.groupby(
         'stop_cluster_id')['trial'].first().reset_index(drop=False)
@@ -372,6 +368,22 @@ def _keep_latest_cluster_for_each_trial(monkey_sub):
 
 def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_new, ff_real_position_sorted,
                                              min_stop_per_cluster=2):
+    
+    """
+    Extract a subset of monkey stop events for GUAT/TAFT analysis.
+
+    This function filters the monkey's behavioral data to focus on valid stop 
+    clusters within the time window of a firefly capture episode. It assigns 
+    trial target positions, computes distance-to-target at each stop, and 
+    removes clusters that do not meet a minimum number of stops.
+
+    Steps performed:
+    1. Keep only rows marked as new distinct stops within the capture timeframe.
+    2. Attach target (firefly) positions based on trial indices.
+    3. Compute Euclidean distance between monkey position and target position.
+    4. Retain only stop clusters that have at least `min_stop_per_cluster` stops.
+
+    """
 
     # Filter for new distinct stops within the time range
     monkey_sub = monkey_information[monkey_information['whether_new_distinct_stop'] == True].copy(
@@ -402,15 +414,14 @@ import pandas as pd
 def add_stop_cluster_id(
     monkey_information: pd.DataFrame,
     max_cluster_distance=50,   # cm
-    use_ff_caught_time_new_to_separate_clusters: bool = False,
+    use_ff_caught_time_new_to_separate_clusters: bool = True,
     ff_caught_times: np.ndarray | None = None,   # seconds, sorted
-    capture_split_window_s: float = 0.3,         # seconds
     stop_id_col: str = "stop_id",
     stop_start_flag_col: str = "whether_new_distinct_stop",
     cumdist_col: str = "cum_distance",           # cm
     time_col: str = "time",
     point_index_col: str = "point_index",
-    col_exists_ok: bool = True,
+    col_exists_ok: bool = False,
 ) -> pd.DataFrame:
     """
     Assign stop clusters based on cumulative distance between consecutive stops (in cm).
@@ -466,20 +477,43 @@ def add_stop_cluster_id(
     d_cum_cm = np.diff(stop_table["stop_cumdist_cm"].to_numpy())
     new_cluster = np.r_[True, d_cum_cm > float(max_cluster_distance)]
 
-    # Optional capture-based split
+
+    # >>> OPTIONAL CAPTURE-BASED SPLIT (eps-shift assigns border to the NEXT gap) <<<
     if use_ff_caught_time_new_to_separate_clusters and ff_caught_times is not None and len(ff_caught_times) > 0:
         caps = np.asarray(ff_caught_times, dtype=float)
         if not np.all(np.diff(caps) >= 0):
             caps = np.sort(caps)
+
         if len(stop_table) >= 2:
-            t_prev = stop_table["stop_time_s"].to_numpy()[:-1]
-            t_next = stop_table["stop_time_s"].to_numpy()[1:]
-            idx = np.searchsorted(caps, t_prev, side="right")
-            has_cap = np.zeros_like(t_prev, dtype=bool)
-            valid = idx < caps.size
-            has_cap[valid] = (caps[idx[valid]] >= (t_prev[valid] - capture_split_window_s)) & \
-                             (caps[idx[valid]] <= (t_next[valid] + capture_split_window_s))
-            new_cluster = np.r_[True, (d_cum_cm > float(max_cluster_distance)) | has_cap]
+            eps = 0.01  # seconds; tiny shift to resolve boundary cases deterministically
+
+            # Consecutive stop times
+            t_prev = stop_table['stop_time_s'].to_numpy()[:-1]
+            t_next = stop_table['stop_time_s'].to_numpy()[1:]
+
+            # Define disjoint, half-open intervals per gap j:
+            #     [ t_prev[j] - eps,  t_next[j] - eps )
+            #
+            # Effect of the -eps shift:
+            #   • A capture just BEFORE a stop (e.g., 6.99 near stop 7 with eps=0.01)
+            #     is EXCLUDED from the (6,7) gap (right-open at 6.99) and INCLUDED
+            #     in the NEXT gap (7,8) because that next gap starts at 7 - eps = 6.99.
+            #   • A capture at or just AFTER a stop (e.g., 7.00 or 7.01) is also
+            #     INCLUDED in the NEXT gap (7,8).
+            #
+            # Therefore, captures near a stop are consistently attributed to the
+            # gap that starts AFTER that stop. In the example with stops at 5,6,7,8,9s:
+            #   - capture at 6.99 → belongs to (7,8) → split between 7 and 8
+            #   - capture at 7.01 → belongs to (7,8) → split between 7 and 8
+            #
+            # One capture can trigger at most one split because intervals are disjoint.
+            lo = np.searchsorted(caps, t_prev - eps, side='left')
+            hi = np.searchsorted(caps, t_next - eps, side='left')
+            has_cap_between = (hi > lo)
+
+            # Start a new cluster at stop j if either distance jumps or a capture lies in its preceding gap
+            new_cluster = np.r_[True, (d_cum_cm > float(max_cluster_distance)) | has_cap_between]
+
 
     # Assign cluster ids per stop
     stop_table["stop_cluster_id"] = np.cumsum(new_cluster.astype(np.int64)) - 1
