@@ -238,6 +238,7 @@ def build_comparisons(specs: list[dict]) -> list[dict]:
     out = []
     for s in specs:
         a, b = s['a'], s['b']
+        title = s.get('title', f'{_titleize_side(a)} vs {_titleize_side(b)}')
         base_key = s.get('key', f'{a}_vs_{b}')
         item = {
             'key': base_key,                # machine-friendly
@@ -248,7 +249,7 @@ def build_comparisons(specs: list[dict]) -> list[dict]:
             # human-/file-friendly alternates:
             'slug_capfirst': f'{_cap_first_segment(a)}_vs_{_cap_first_segment(b)}',
             'slug_pascal': f'{_pascalize(a)}_vs_{_pascalize(b)}',
-            'title': f'{_titleize_side(a)} vs {_titleize_side(b)}',
+            'title': title,
         }
         out.append(item)
     return out
@@ -433,7 +434,7 @@ def show_results(an, title=None):
     summary = psth_postprocessing.compare_windows(an, windows, alpha=0.05)
     psth_postprocessing.plot_sig_heatmap(summary, title=title, window_order=window_order)
     
-    
+    plt.show()
     # summary_sub = summary.loc[summary['sig_FDR'], ['cluster', 'window', 'p', 'cohens_d', 'sig_FDR']].copy()
     # summary_sub = summary_sub.sort_values(["sig_FDR", "window", "p"], ascending=[False, True, True])
     # print(summary_sub)

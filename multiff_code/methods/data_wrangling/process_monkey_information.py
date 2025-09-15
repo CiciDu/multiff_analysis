@@ -593,8 +593,8 @@ def compute_kinematics_loclin(df, time_col='time', x_col='monkey_x', y_col='monk
     out['ang_speed'] = ang_speed
     out['ang_accel'] = ang_accel
 
-    # diagnostics
-    out['_contam'] = contam_mask  # which samples touched a bad step
+    # # diagnostics
+    # out['_contam'] = contam_mask  # which samples touched a bad step
     return out
 
 

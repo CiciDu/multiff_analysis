@@ -228,6 +228,8 @@ class GPFAHelperClass():
             'new_segment')['new_bin'].agg(['min', 'max'])
 
         self.bin_width_w_unit = self.bin_width * pq.s
+        
+        print('Number of features to regress on:', self.concat_behav_trials.shape[1])
 
         with warnings.catch_warnings():
 

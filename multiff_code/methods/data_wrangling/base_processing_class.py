@@ -250,7 +250,7 @@ class BaseProcessing:
             print("Made target_last_vis_df and saved it at ", path)
         return
 
-    def retrieve_or_make_monkey_data(self, exists_ok=True, already_made_ok=True, save_data=True, speed_threshold_for_distinct_stop=1, min_distance_to_calculate_angle=5):
+    def retrieve_or_make_monkey_data(self, exists_ok=True, already_made_ok=True, save_data=True, speed_threshold_for_distinct_stop=1, min_distance_to_calculate_angle=5, include_monkey_information=True):
         if (not already_made_ok) | (getattr(self, 'ff_caught_T_sorted', None) is None):
             self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
                 self.ff_flash_end_sorted = retrieve_raw_data.make_or_retrieve_ff_info_from_txt_data(
@@ -262,7 +262,7 @@ class BaseProcessing:
             self.ff_flash_sorted = retrieve_raw_data.make_or_retrieve_ff_flash_sorted_from_txt_data(
                 self.raw_data_folder_path, exists_ok=exists_ok, save_data=save_data)
 
-        if (not already_made_ok) | (getattr(self, 'monkey_information', None) is None):
+        if include_monkey_information & ((not already_made_ok) | (getattr(self, 'monkey_information', None) is None)):
             self.make_or_retrieve_monkey_information(
                 exists_ok=exists_ok, save_data=save_data, min_distance_to_calculate_angle=min_distance_to_calculate_angle, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
 

@@ -3,9 +3,14 @@ import numpy as np
 import pandas as pd
 
 
-def get_rebinned_var_lags(rebinned_var, trial_vector, rebinned_max_lag_number=2):
-    lag_numbers = np.arange(-rebinned_max_lag_number,
-                            rebinned_max_lag_number+1)
+def get_rebinned_var_lags(rebinned_var, trial_vector, lag_numbers=None, rebinned_max_lag_number=2):
+    if lag_numbers is None:
+        lag_numbers = np.arange(-rebinned_max_lag_number,
+                                rebinned_max_lag_number+1)
+    else:
+        print(f"Using provided lag numbers for rebinned_var_lags: {lag_numbers}")
+        
+        
     rebinned_var_lags = neural_data_processing.add_lags_to_each_feature(
         rebinned_var, lag_numbers, trial_vector=trial_vector)
 

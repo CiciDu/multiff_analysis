@@ -23,14 +23,14 @@ np.set_printoptions(suppress=True)
 
 def retain_rows_in_df1_that_share_or_not_share_columns_with_df2(df1, df2, columns, whether_share=True):
     temp_df = df2[columns].copy()
-    temp_df['share'] = True
+    temp_df['_share'] = True
     temp_df.drop_duplicates(inplace=True)
     df1 = pd.merge(df1, temp_df, on=columns, how='left')
-    df1['share'] = df1['share'].fillna(False)
+    df1['_share'] = df1['_share'].fillna(False)
     if whether_share:
-        df1 = df1[df1['share'] == True].drop(['share'], axis=1).copy()
+        df1 = df1[df1['_share'] == True].drop(['_share'], axis=1).copy()
     else:
-        df1 = df1[df1['share'] != True].drop(['share'], axis=1).copy()
+        df1 = df1[df1['_share'] != True].drop(['_share'], axis=1).copy()
     return df1
 
 
@@ -54,21 +54,38 @@ def supply_info_of_cluster_to_df(df, ff_real_position_sorted, ff_life_sorted, mo
     return ff_cluster_df
 
 
-def find_GUAT_cur_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information, include_ff_in_near_future=False,
-                          max_time_since_last_vis=2.5,
-                          duration_into_future=0.5,
-                          max_cluster_distance=50,
-                          max_distance_to_stop=400,):
+def find_miss_abort_cur_ff_info(miss_abort_df, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information, include_ff_in_near_future=False,
+                                max_time_since_last_vis=2.5,
+                                duration_into_future=0.5,
+                                max_cluster_distance=50,
+                                max_distance_to_stop=400,):
+    """
+    Build a per-(point_index, ff_index) table of current-firefly candidates for
+    miss/abort events, filtered by recent visibility and distance, and optionally
+    augmented with “near-future” visibility.
+
+    This function expands each miss/abort evaluation point by its nearby alive
+    fireflies, queries geometry/visibility features for those pairs, and returns
+    one row per unique (point_index, ff_index) that passes the filters.
+    -----
+    - Duplicates by (point_index, ff_index) are removed, keeping the first occurrence.
+    - Visibility filtering always applies 'time_since_last_vis' <= max_time_since_last_vis.
+      When `include_ff_in_near_future=True`, a pair may also pass if it will become visible
+      within 'total_stop_time + duration_into_future'.
+    - Distances are computed between firefly position ('ff_real_position_sorted[ff_index]')
+      and monkey position at 'first_stop_point_index'.
+    - This function does not modify inputs in-place.
+    """
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == True].copy()
     list_of_target_index = []
     list_of_ff_index = []
     list_of_point_index = []
 
-    GUAT_w_ff_df = GUAT_w_ff_df.rename(columns={'point_index_of_eval': 'point_index',
-                                                'time_of_eval': 'time', })
+    miss_abort_df = miss_abort_df.rename(columns={'point_index_of_eval': 'point_index',
+                                                  'time_of_eval': 'time', })
 
-    for index, row in GUAT_w_ff_df.iterrows():
+    for index, row in miss_abort_df.iterrows():
         if len(row.nearby_alive_ff_indices) > 0:
             for ff_index in row.nearby_alive_ff_indices:
                 list_of_ff_index.append(ff_index)
@@ -82,94 +99,109 @@ def find_GUAT_cur_ff_info(GUAT_w_ff_df, ff_real_position_sorted, ff_life_sorted,
 
     GUAT_cur_ff = GUAT_cur_ff.astype(int)
 
-    GUAT_cur_ff = GUAT_cur_ff.merge(GUAT_w_ff_df[['target_index', 'point_index', 'time', 'num_stops', 'first_stop_point_index', 'total_stop_time']],
+    GUAT_cur_ff = GUAT_cur_ff.merge(miss_abort_df[['target_index', 'point_index', 'time', 'num_stops', 'first_stop_point_index', 'total_stop_time']],
                                     on=['target_index', 'point_index'], how='left')
 
-    GUAT_cur_ff_info = decision_making_utils.find_many_ff_info_anew(
+    miss_abort_cur_ff_info = decision_making_utils.find_many_ff_info_anew(
         GUAT_cur_ff['ff_index'].values, GUAT_cur_ff['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information)
-    GUAT_cur_ff_info = GUAT_cur_ff_info.drop_duplicates(
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info.drop_duplicates(
         subset=['point_index', 'ff_index'], keep='first').reset_index(drop=True)
-    GUAT_cur_ff_info = GUAT_cur_ff_info[GUAT_cur_ff_info['time_since_last_vis']
-                                        <= max_time_since_last_vis]
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info[miss_abort_cur_ff_info['time_since_last_vis']
+                                                    <= max_time_since_last_vis]
 
     if include_ff_in_near_future:
-        GUAT_cur_ff_info = supply_info_of_cluster_to_df(
-            GUAT_cur_ff_info, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=max_cluster_distance)
-        GUAT_cur_ff_info = decision_making_utils.find_many_ff_info_anew(
-            GUAT_cur_ff_info['ff_index'].values, GUAT_cur_ff_info['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
+        miss_abort_cur_ff_info = supply_info_of_cluster_to_df(
+            miss_abort_cur_ff_info, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=max_cluster_distance)
+        miss_abort_cur_ff_info = decision_making_utils.find_many_ff_info_anew(
+            miss_abort_cur_ff_info['ff_index'].values, miss_abort_cur_ff_info['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
 
         # now we need to add back some columns
         columns_to_add_back = GUAT_cur_ff[[
             'point_index', 'num_stops', 'total_stop_time']].drop_duplicates()
-        GUAT_cur_ff_info = pd.merge(GUAT_cur_ff_info, columns_to_add_back, on=[
+        miss_abort_cur_ff_info = pd.merge(miss_abort_cur_ff_info, columns_to_add_back, on=[
             'point_index'], how='left')
 
         # either the ff has appeared lately, or will appear shortly
-        GUAT_cur_ff_info = GUAT_cur_ff_info[(GUAT_cur_ff_info['time_since_last_vis'] <= max_time_since_last_vis) |
-                                            (GUAT_cur_ff_info['time_till_next_visible'] <= GUAT_cur_ff_info['total_stop_time'] + duration_into_future)]
+        miss_abort_cur_ff_info = miss_abort_cur_ff_info[(miss_abort_cur_ff_info['time_since_last_vis'] <= max_time_since_last_vis) |
+                                                        (miss_abort_cur_ff_info['time_till_next_visible'] <= miss_abort_cur_ff_info['total_stop_time'] + duration_into_future)]
 
     # get distance_to_monkey
-    GUAT_cur_ff_info = GUAT_cur_ff_info.merge(
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info.merge(
         GUAT_cur_ff[['point_index', 'first_stop_point_index']], on='point_index', how='left')
-    ff_x, ff_y = ff_real_position_sorted[GUAT_cur_ff_info['ff_index'].values].T
-    monkey_x, monkey_y = monkey_information.loc[GUAT_cur_ff_info['first_stop_point_index'].values, [
+    ff_x, ff_y = ff_real_position_sorted[miss_abort_cur_ff_info['ff_index'].values].T
+    monkey_x, monkey_y = monkey_information.loc[miss_abort_cur_ff_info['first_stop_point_index'].values, [
         'monkey_x', 'monkey_y']].values.T
-    GUAT_cur_ff_info['distance_to_monkey'] = np.sqrt(
+    miss_abort_cur_ff_info['distance_to_monkey'] = np.sqrt(
         (ff_x - monkey_x)**2 + (ff_y - monkey_y)**2)
     # since distance_to_monkey's reference point is the stop
-    GUAT_cur_ff_info['distance_to_stop'] = GUAT_cur_ff_info['distance_to_monkey']
-    GUAT_cur_ff_info = GUAT_cur_ff_info[GUAT_cur_ff_info['distance_to_stop'] < max_distance_to_stop].copy(
+    miss_abort_cur_ff_info['distance_to_stop'] = miss_abort_cur_ff_info['distance_to_monkey']
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info[miss_abort_cur_ff_info['distance_to_stop'] < max_distance_to_stop].copy(
     )
 
-    GUAT_cur_ff_info = GUAT_cur_ff_info.drop_duplicates(
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info.drop_duplicates(
         subset=['point_index', 'ff_index'], keep='first').reset_index(drop=True)
 
-    return GUAT_cur_ff_info
+    return miss_abort_cur_ff_info
 
 
-def find_GUAT_nxt_ff_info(GUAT_cur_ff_info, ff_dataframe, ff_real_position_sorted, monkey_information,
-                          max_time_since_last_vis=2.5,
-                          max_distance_to_stop=400,
-                          duration_into_future=0.5,
-                          include_ff_in_near_future=True):
+def find_miss_abort_nxt_ff_info(miss_abort_cur_ff_info, ff_dataframe, ff_real_position_sorted, monkey_information,
+                                max_time_since_last_vis=2.5,
+                                max_distance_to_stop=400,
+                                duration_into_future=0.5,
+                                include_ff_in_near_future=True):
+    """
+    Construct a table of “next-firefly” (alternative target) candidates for each
+    miss/abort evaluation point, filtered by recent visibility and distance, and
+    optionally augmented with fireflies that will become visible in the near future.
 
-    # find the info of the alternative ff that's not within the same cluster as the current ff
-    GUAT_nxt_ff_info = ff_dataframe[ff_dataframe['point_index'].isin(
-        GUAT_cur_ff_info['point_index'].values)].copy()
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[GUAT_nxt_ff_info['time_since_last_vis']
-                                        <= max_time_since_last_vis]
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary',
-                                         'abs_ff_angle_boundary', 'time_since_last_vis', 'point_index', 'ff_index', 'abs_curv_diff']]
-    GUAT_nxt_ff_info['distance_to_monkey'] = GUAT_nxt_ff_info['ff_distance']
-    GUAT_nxt_ff_info['distance_to_stop'] = GUAT_nxt_ff_info['ff_distance']
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[GUAT_nxt_ff_info['distance_to_stop']
-                                        < max_distance_to_stop].copy()
+    The function starts from `miss_abort_cur_ff_info` (current-firefly candidates per
+    evaluation point), then:
+      1) Gathers all fireflies available at the same `point_index` from `ff_dataframe`,
+         filters by `time_since_last_vis <= max_time_since_last_vis`, and keeps a
+         compact set of geometry/angle features.
+      2) Optionally augments with fireflies that are not currently available but will
+         become visible within the evaluation window
+         (`total_stop_time + duration_into_future`), recomputing distances to the stop.
+      3) Enforces a maximum distance to the stop and removes duplicate (point_index, ff_index),
+         keeping the closest instance.
+    """
+    
+    miss_abort_nxt_ff_info = ff_dataframe[ff_dataframe['point_index'].isin(
+        miss_abort_cur_ff_info['point_index'].values)].copy()
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['time_since_last_vis']
+                                                    <= max_time_since_last_vis]
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary',
+                                                     'abs_ff_angle_boundary', 'time_since_last_vis', 'point_index', 'ff_index', 'abs_curv_diff']]
+    miss_abort_nxt_ff_info['distance_to_monkey'] = miss_abort_nxt_ff_info['ff_distance']
+    miss_abort_nxt_ff_info['distance_to_stop'] = miss_abort_nxt_ff_info['ff_distance']
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['distance_to_stop']
+                                                    < max_distance_to_stop].copy()
 
     # Also add more ff for ff that become available in the near future of each point_index
     if include_ff_in_near_future:
-        unique_point_index_and_time_df = GUAT_cur_ff_info[[
+        unique_point_index_and_time_df = miss_abort_cur_ff_info[[
             'point_index', 'time', 'total_stop_time']].drop_duplicates()
         ff_info, all_available_ff_in_near_future = find_additional_ff_info_for_near_future(unique_point_index_and_time_df, ff_dataframe, ff_real_position_sorted, monkey_information,
                                                                                            duration_into_future=duration_into_future)
-        GUAT_nxt_ff_info = pd.concat(
-            [GUAT_nxt_ff_info, ff_info], axis=0).reset_index(drop=True)
+        miss_abort_nxt_ff_info = pd.concat(
+            [miss_abort_nxt_ff_info, ff_info], axis=0).reset_index(drop=True)
 
         # calculate the distance to the stop
         add_distance_to_stop(
-            GUAT_nxt_ff_info, monkey_information, ff_real_position_sorted)
-        GUAT_nxt_ff_info = GUAT_nxt_ff_info[GUAT_nxt_ff_info['distance_to_stop']
-                                            < max_distance_to_stop].copy()
+            miss_abort_nxt_ff_info, monkey_information, ff_real_position_sorted)
+        miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['distance_to_stop']
+                                                        < max_distance_to_stop].copy()
 
-        # use merge to add 'total_stop_time' to GUAT_nxt_ff_info
-        GUAT_nxt_ff_info = GUAT_nxt_ff_info.merge(
-            GUAT_cur_ff_info[['point_index', 'total_stop_time']], on='point_index', how='left')
+        # use merge to add 'total_stop_time' to miss_abort_nxt_ff_info
+        miss_abort_nxt_ff_info = miss_abort_nxt_ff_info.merge(
+            miss_abort_cur_ff_info[['point_index', 'total_stop_time']], on='point_index', how='left')
 
-        GUAT_nxt_ff_info.sort_values(
+        miss_abort_nxt_ff_info.sort_values(
             by=['point_index', 'ff_index', 'distance_to_monkey'], inplace=True)
-        GUAT_nxt_ff_info = GUAT_nxt_ff_info.drop_duplicates(
+        miss_abort_nxt_ff_info = miss_abort_nxt_ff_info.drop_duplicates(
             subset=['point_index', 'ff_index'], keep='first').reset_index(drop=True)
 
-    return GUAT_nxt_ff_info
+    return miss_abort_nxt_ff_info
 
 
 def add_distance_to_stop(df, monkey_information, ff_real_position_sorted):
@@ -180,90 +212,92 @@ def add_distance_to_stop(df, monkey_information, ff_real_position_sorted):
         (stop_monkey_x - ff_x)**2 + (stop_monkey_y - ff_y)**2)
 
 
-def retain_useful_cur_and_nxt_info(GUAT_cur_ff_info, GUAT_nxt_ff_info, eliminate_cases_with_close_nxt_ff=True,
+def retain_useful_cur_and_nxt_info(miss_abort_cur_ff_info, miss_abort_nxt_ff_info, eliminate_cases_with_close_nxt_ff=True,
                                    min_nxt_ff_distance_to_stop=0):
-    # we need to eliminate the info of the ff in GUAT_nxt_ff_info that's also in GUAT_cur_ff_info at the same point indices
-    # GUAT_nxt_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(GUAT_nxt_ff_info, GUAT_cur_ff_info, columns=['point_index', 'ff_index'], whether_share=False)
+    # we need to eliminate the info of the ff in miss_abort_nxt_ff_info that's also in miss_abort_cur_ff_info at the same point indices
+    miss_abort_nxt_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
+        miss_abort_nxt_ff_info, miss_abort_cur_ff_info, columns=['point_index', 'ff_index'], whether_share=False)
 
-    # then, we eliminate the cases where GUAT_nxt_ff_info has at least one ff that's within 150 to the current point, because that creates confounding factors
+    # then, we eliminate the cases where miss_abort_nxt_ff_info has at least one ff that's within min_nxt_ff_distance_to_stop to the current point, so that the separation between the current and alternative ff is not too small
+    # Note: right now we set min_nxt_ff_distance_to_stop to 0, so that we don't eliminate any cases
     if eliminate_cases_with_close_nxt_ff:
-        GUAT_nxt_ff_info = GUAT_nxt_ff_info[GUAT_nxt_ff_info['ff_distance']
-                                            > min_nxt_ff_distance_to_stop].copy()
+        miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['ff_distance']
+                                                        > min_nxt_ff_distance_to_stop].copy()
 
     # also eliminate nxt_ff if it's at the back of the monkey
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[GUAT_nxt_ff_info['ff_angle_boundary'].between(
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['ff_angle_boundary'].between(
         -90*math.pi/180, 90*math.pi/180)].copy()
 
-    # then, we eliminate the info in GUAT_cur_ff_info that does not have corresponding info in GUAT_nxt_ff_info (with the same point_index)
-    GUAT_cur_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
-        GUAT_cur_ff_info, GUAT_nxt_ff_info, columns=['point_index'], whether_share=True)
-    return GUAT_cur_ff_info, GUAT_nxt_ff_info
+    # then, we eliminate the info in miss_abort_cur_ff_info that does not have corresponding info in miss_abort_nxt_ff_info (with the same point_index)
+    miss_abort_cur_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
+        miss_abort_cur_ff_info, miss_abort_nxt_ff_info, columns=['point_index'], whether_share=True)
+    return miss_abort_cur_ff_info, miss_abort_nxt_ff_info
 
 
-def make_sure_GUAT_nxt_ff_info_and_GUAT_cur_ff_info_have_the_same_point_indices(GUAT_cur_ff_info, GUAT_nxt_ff_info):
-    GUAT_cur_ff_info = GUAT_cur_ff_info[GUAT_cur_ff_info['point_index'].isin(
-        GUAT_nxt_ff_info['point_index'].values)].copy()
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[GUAT_nxt_ff_info['point_index'].isin(
-        GUAT_cur_ff_info['point_index'].values)].copy()
-    return GUAT_cur_ff_info, GUAT_nxt_ff_info
+def make_sure_miss_abort_nxt_ff_info_and_miss_abort_cur_ff_info_have_the_same_point_indices(miss_abort_cur_ff_info, miss_abort_nxt_ff_info):
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info[miss_abort_cur_ff_info['point_index'].isin(
+        miss_abort_nxt_ff_info['point_index'].values)].copy()
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['point_index'].isin(
+        miss_abort_cur_ff_info['point_index'].values)].copy()
+    return miss_abort_cur_ff_info, miss_abort_nxt_ff_info
 
 
-def polish_GUAT_cur_ff_info(GUAT_cur_ff_info):
-    GUAT_cur_ff_info = GUAT_cur_ff_info.sort_values(
+def polish_miss_abort_cur_ff_info(miss_abort_cur_ff_info):
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info.sort_values(
         by=['point_index']).reset_index(drop=True)
-    GUAT_cur_ff_info = GUAT_cur_ff_info[['num_stops', 'ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis',
-                                         'time_till_next_visible', 'duration_of_last_vis_period', 'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']].copy()
-    GUAT_cur_ff_info.sort_values(by=['point_index'], inplace=True)
+    miss_abort_cur_ff_info = miss_abort_cur_ff_info[['num_stops', 'ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary', 'time_since_last_vis',
+                                                     'time_till_next_visible', 'duration_of_last_vis_period', 'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']].copy()
+    miss_abort_cur_ff_info.sort_values(by=['point_index'], inplace=True)
 
-    GUAT_cur_ff_info = _clip_time_since_last_vis_and_time_till_next_visible(
-        GUAT_cur_ff_info)
+    miss_abort_cur_ff_info = _clip_time_since_last_vis_and_time_till_next_visible(
+        miss_abort_cur_ff_info)
 
-    GUAT_cur_ff_info = _add_num_ff_in_cluster(GUAT_cur_ff_info)
+    miss_abort_cur_ff_info = _add_num_ff_in_cluster(miss_abort_cur_ff_info)
 
-    return GUAT_cur_ff_info
+    return miss_abort_cur_ff_info
 
 
-def polish_GUAT_nxt_ff_info(GUAT_nxt_ff_info, GUAT_cur_ff_info, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information,
-                            columns_to_sort_nxt_ff_by=['abs_curv_diff', 'time_since_last_vis'], max_cluster_distance=50,
-                            max_time_since_last_vis=2.5, duration_into_future=0.5,
-                            take_one_row_for_each_point_and_find_cluster=False):
+def polish_miss_abort_nxt_ff_info(miss_abort_nxt_ff_info, miss_abort_cur_ff_info, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information,
+                                  columns_to_sort_nxt_ff_by=['abs_curv_diff', 'time_since_last_vis'], max_cluster_distance=50,
+                                  max_time_since_last_vis=2.5, duration_into_future=0.5,
+                                  take_one_row_for_each_point_and_find_cluster=False):
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == True].copy()
     if take_one_row_for_each_point_and_find_cluster:
-        # take the optimal ff from GUAT_nxt_ff_info based on columns_to_sort_nxt_ff_by
-        GUAT_nxt_ff_info = take_optimal_row_per_group_based_on_columns(
-            GUAT_nxt_ff_info, columns_to_sort_nxt_ff_by, groupby_column='point_index')
+        # take the optimal ff from miss_abort_nxt_ff_info based on columns_to_sort_nxt_ff_by
+        miss_abort_nxt_ff_info = take_optimal_row_per_group_based_on_columns(
+            miss_abort_nxt_ff_info, columns_to_sort_nxt_ff_by, groupby_column='point_index')
 
-        # now, let's re-find GUAT_nxt_ff_info by considering clusters
-        GUAT_nxt_ff_info_old = GUAT_nxt_ff_info.copy()
-        GUAT_nxt_ff_info = supply_info_of_cluster_to_df(
-            GUAT_nxt_ff_info, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=max_cluster_distance)
+        # now, let's re-find miss_abort_nxt_ff_info by considering clusters
+        miss_abort_nxt_ff_info_old = miss_abort_nxt_ff_info.copy()
+        miss_abort_nxt_ff_info = supply_info_of_cluster_to_df(
+            miss_abort_nxt_ff_info, ff_real_position_sorted, ff_life_sorted, monkey_information, max_cluster_distance=max_cluster_distance)
     else:
-        GUAT_nxt_ff_info_old = GUAT_nxt_ff_info.copy()
+        miss_abort_nxt_ff_info_old = miss_abort_nxt_ff_info.copy()
 
-    # find the info of additional columnsfor GUAT_nxt_ff_info
-    GUAT_nxt_ff_info = decision_making_utils.find_many_ff_info_anew(
-        GUAT_nxt_ff_info['ff_index'].values, GUAT_nxt_ff_info['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
+    # find the info of additional columnsfor miss_abort_nxt_ff_info
+    miss_abort_nxt_ff_info = decision_making_utils.find_many_ff_info_anew(
+        miss_abort_nxt_ff_info['ff_index'].values, miss_abort_nxt_ff_info['point_index'].values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
 
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary',
-                                         'time_since_last_vis', 'time_till_next_visible', 'duration_of_last_vis_period', 'point_index', 'ff_index']].copy()
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info.merge(GUAT_nxt_ff_info_old[[
-                                              'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']], on=['point_index', 'ff_index'], how='left')
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[['ff_distance', 'ff_angle', 'abs_ff_angle', 'ff_angle_boundary', 'abs_ff_angle_boundary',
+                                                     'time_since_last_vis', 'time_till_next_visible', 'duration_of_last_vis_period', 'point_index', 'ff_index']].copy()
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info.merge(miss_abort_nxt_ff_info_old[[
+        'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']], on=['point_index', 'ff_index'], how='left')
 
-    GUAT_nxt_ff_info = GUAT_nxt_ff_info[(GUAT_nxt_ff_info['time_since_last_vis'] <= max_time_since_last_vis) |
-                                        (GUAT_nxt_ff_info['time_till_next_visible'] <= GUAT_nxt_ff_info['total_stop_time'] + duration_into_future)]  # either the ff has appeared lately, or will appear shortly
+    miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[(miss_abort_nxt_ff_info['time_since_last_vis'] <= max_time_since_last_vis) |
+                                                    (miss_abort_nxt_ff_info['time_till_next_visible'] <= miss_abort_nxt_ff_info['total_stop_time'] + duration_into_future)]  # either the ff has appeared lately, or will appear shortly
 
-    # # since we just added cluster ff, once again we need to eliminate the info of the ff in GUAT_nxt_ff_info that's also in GUAT_cur_ff_info at the same point indices
-    # GUAT_nxt_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(GUAT_nxt_ff_info, GUAT_cur_ff_info, columns=['point_index', 'ff_index'], whether_share=False)
+    # # since we just added cluster ff, once again we need to eliminate the info of the ff in miss_abort_nxt_ff_info that's also in miss_abort_cur_ff_info at the same point indices
+    miss_abort_nxt_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(miss_abort_nxt_ff_info, miss_abort_cur_ff_info, columns=['point_index', 'ff_index'], whether_share=False)
 
-    GUAT_nxt_ff_info.sort_values(by=['point_index'], inplace=True)
+    miss_abort_nxt_ff_info.sort_values(by=['point_index'], inplace=True)
 
-    GUAT_nxt_ff_info = _clip_time_since_last_vis_and_time_till_next_visible(
-        GUAT_nxt_ff_info)
+    miss_abort_nxt_ff_info = _clip_time_since_last_vis_and_time_till_next_visible(
+        miss_abort_nxt_ff_info)
 
-    GUAT_nxt_ff_info = _add_num_ff_in_cluster(GUAT_nxt_ff_info)
+    miss_abort_nxt_ff_info = _add_num_ff_in_cluster(miss_abort_nxt_ff_info)
 
-    return GUAT_nxt_ff_info
+    return miss_abort_nxt_ff_info
 
 
 def _clip_time_since_last_vis_and_time_till_next_visible(df, max_time_since_last_vis=5, max_time_till_next_visible=5):
@@ -282,27 +316,27 @@ def _add_num_ff_in_cluster(df):
     return df
 
 
-def add_curv_diff_and_ff_number_to_GUAT_cur_ff_info_and_GUAT_nxt_ff_info(GUAT_cur_ff_info, GUAT_nxt_ff_info, ff_caught_T_new, ff_real_position_sorted, monkey_information, curv_of_traj_df=None,
-                                                                         ff_priority_criterion='abs_curv_diff'):
+def add_curv_diff_and_ff_number_to_cur_and_nxt_ff_info(miss_abort_cur_ff_info, miss_abort_nxt_ff_info, ff_caught_T_new, ff_real_position_sorted, monkey_information, curv_of_traj_df=None,
+                                                       ff_priority_criterion='abs_curv_diff'):
 
     # Note: in order not to feed the input with additional data, we will let curv_of_traj_df = curv_of_traj_df
-    GUAT_cur_ff_info = decision_making_utils.add_curv_diff_to_df(
-        GUAT_cur_ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted)
-    GUAT_nxt_ff_info = decision_making_utils.add_curv_diff_to_df(
-        GUAT_nxt_ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted)
+    miss_abort_cur_ff_info = decision_making_utils.add_curv_diff_to_df(
+        miss_abort_cur_ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted)
+    miss_abort_nxt_ff_info = decision_making_utils.add_curv_diff_to_df(
+        miss_abort_nxt_ff_info, monkey_information, curv_of_traj_df, ff_real_position_sorted=ff_real_position_sorted)
 
-    GUAT_cur_ff_info.sort_values(
+    miss_abort_cur_ff_info.sort_values(
         by=['point_index', ff_priority_criterion], inplace=True)
-    GUAT_nxt_ff_info.sort_values(
+    miss_abort_nxt_ff_info.sort_values(
         by=['point_index', ff_priority_criterion], inplace=True)
 
     # assign a ff_number to each ff within each point_index
-    GUAT_cur_ff_info['ff_number'] = GUAT_cur_ff_info.groupby(
+    miss_abort_cur_ff_info['ff_number'] = miss_abort_cur_ff_info.groupby(
         'point_index').cumcount()+1
-    GUAT_nxt_ff_info['ff_number'] = GUAT_nxt_ff_info.groupby(
+    miss_abort_nxt_ff_info['ff_number'] = miss_abort_nxt_ff_info.groupby(
         'point_index').cumcount()+101
 
-    return GUAT_cur_ff_info, GUAT_nxt_ff_info
+    return miss_abort_cur_ff_info, miss_abort_nxt_ff_info
 
 
 def find_additional_ff_info_for_near_future(unique_point_index_and_time_df, ff_dataframe, ff_real_position_sorted, monkey_information, duration_into_future=0.5,

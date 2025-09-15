@@ -6,7 +6,7 @@ from neural_data_analysis.neural_analysis_tools.align_trials import align_trial_
 
 import pandas as pd
 import os
-
+import numpy as np
 
 class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeural, gpfa_helper_class.GPFAHelperClass):
 
@@ -119,11 +119,11 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
 
         self.new_seg_info['prev_ff_caught_time'] = self.ff_caught_T_new[self.new_seg_info['cur_ff_index'].values-1]
 
-    def _get_rebinned_x_var_lags(self, rebinned_max_x_lag_number=3):
+    def _get_rebinned_x_var_lags(self, rebinned_max_x_lag_number=3, lag_numbers=np.arange(-3, 1)):
         trial_vector = self.rebinned_x_var['new_segment'].values
         self.rebinned_max_x_lag_number = rebinned_max_x_lag_number
         self.rebinned_x_var_lags = align_trial_utils.get_rebinned_var_lags(
-            self.rebinned_x_var, trial_vector, rebinned_max_lag_number=rebinned_max_x_lag_number)
+            self.rebinned_x_var, trial_vector, lag_numbers=lag_numbers, rebinned_max_lag_number=rebinned_max_x_lag_number)
 
     def _get_rebinned_y_var_lags(self, rebinned_max_y_lag_number=3):
         trial_vector = self.rebinned_y_var['new_segment'].values

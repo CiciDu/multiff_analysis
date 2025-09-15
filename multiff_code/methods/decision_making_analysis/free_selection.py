@@ -63,7 +63,7 @@ def find_info_of_n_ff_per_point(free_selection_df, ff_dataframe, ff_real_positio
 
     all_point_index = np.unique(
         free_selection_df.starting_point_index.values.astype(int))
-    ff_dataframe_sub = guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=num_ff_per_row, only_select_n_ff_case=only_select_n_ff_case, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff,
+    ff_dataframe_sub = guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=num_ff_per_row, only_select_n_ff_case=only_select_n_ff_case,
                                                                       placeholder_ff_index=placeholder_ff_index, placeholder_ff_distance=placeholder_ff_distance, placeholder_ff_angle=placeholder_ff_angle, placeholder_ff_angle_boundary=placeholder_ff_angle_boundary,
                                                                       placeholder_time_since_last_vis=placeholder_time_since_last_vis, curv_of_traj_df=curv_of_traj_df)
 
@@ -325,9 +325,11 @@ def guarantee_ff_dataframe_include_target_info(target_info, ff_dataframe_sub, ff
     return ff_dataframe_sub
 
 
-def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=3, only_select_n_ff_case=None, selection_criterion_if_too_many_ff='time_since_last_vis',
+def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_index, num_ff_per_row=3, only_select_n_ff_case=None,
                                                    placeholder_ff_index=-10, placeholder_ff_distance=400, placeholder_ff_angle=math.pi/4, placeholder_ff_angle_boundary=math.pi/4, placeholder_time_since_last_vis=3,
                                                    placeholder_time_till_next_visible=10, placeholder_curv_diff=0.6, curv_of_traj_df=None):
+
+    # Note: 'selection_criterion' has to be in ff_dataframe_sub.columns
 
     count_of_ff = ff_dataframe_sub.groupby(
         'point_index').count().reset_index(drop=False)
@@ -335,8 +337,6 @@ def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_i
     point_index_df = pd.DataFrame({'point_index': all_point_index})
     count_of_ff = pd.merge(point_index_df, count_of_ff,
                            on='point_index', how='left').fillna(0)
-    if 'selection_criterion' not in ff_dataframe_sub.columns:
-        ff_dataframe_sub['selection_criterion'] = ff_dataframe_sub[selection_criterion_if_too_many_ff]
     if only_select_n_ff_case is not None:
         count_of_ff = count_of_ff[count_of_ff['ff_index']
                                   == num_ff_per_row].copy()
@@ -371,13 +371,13 @@ def guarantee_n_ff_per_point_index_in_ff_dataframe(ff_dataframe_sub, all_point_i
                 curv_of_traj_df[['point_index', 'curv_of_traj']], on='point_index', how='left')
 
         df_to_add['selection_criterion'] = max(
-            9999, ff_dataframe_sub[selection_criterion_if_too_many_ff].max()+1000)
+            9999, ff_dataframe_sub['selection_criterion'].max()+1000)
 
         # combine the info and the placeholders
         ff_dataframe_sub['mask'] = 1
         df_to_add['mask'] = 0
         ff_dataframe_sub = pd.concat([ff_dataframe_sub, df_to_add], axis=0)
-        # now, we keep only num_ff_per_row ff for each point_index, and we sort them by selection_criterion_if_too_many_ff
+        # now, we keep only num_ff_per_row ff for each point_index, and we sort them by 'selection_criterion'
         ff_dataframe_sub.sort_values(
             ['point_index', 'selection_criterion'], ascending=True, inplace=True)
         ff_dataframe_sub = ff_dataframe_sub.groupby(

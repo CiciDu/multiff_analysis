@@ -328,6 +328,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         # Contains nearby_alive_ff_indices (list of all nearby fireflies) and latest_visible_ff (primary firefly)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
             self.one_stop_df)
+        self.one_stop_w_ff_df['target_index'] = np.searchsorted(
+                    self.ff_caught_T_new, self.one_stop_w_ff_df['first_stop_time'])
 
     def make_distance_and_num_stops_df(self):
         self.distance_df = organize_patterns_and_features.make_distance_df(

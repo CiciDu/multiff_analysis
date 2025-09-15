@@ -51,10 +51,10 @@ class DecisionMakingHelper(further_processing_class.FurtherProcessing):
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
 
-    def get_monkey_data(self, already_retrieved_ok=True, include_ff_dataframe=True, include_GUAT_data=False,
+    def get_monkey_data(self, already_retrieved_ok=True, include_monkey_information=True, include_ff_dataframe=True, include_GUAT_data=False,
                         include_TAFT_data=False):
         self.extract_info_from_raw_data_folder_path(self.raw_data_folder_path)
-        self.retrieve_or_make_monkey_data()
+        self.retrieve_or_make_monkey_data(include_monkey_information=include_monkey_information)
 
         if include_ff_dataframe:
             if (already_retrieved_ok is False) | ((getattr(self, 'ff_dataframe', None) is None)):

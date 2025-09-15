@@ -95,7 +95,7 @@ def prepare_no_capture_and_captures(
         filtered_no_capture_stops_df, stop_debounce
     )
 
-    return valid_captures_df, filtered_no_capture_stops_df.reset_index(drop=True), unique_stops_df.reset_index(drop=True)
+    return captures_df, valid_captures_df, filtered_no_capture_stops_df.reset_index(drop=True), unique_stops_df.reset_index(drop=True)
 
 
 def filter_no_capture_stops_vectorized(no_capture_stops_df, ff_caught_T_new, capture_match_window):

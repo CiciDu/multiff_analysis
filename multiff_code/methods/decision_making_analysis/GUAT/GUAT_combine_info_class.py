@@ -11,7 +11,7 @@ import os
 
 class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
 
-    df_names = ['GUAT_nxt_ff_info', 'GUAT_cur_ff_info',
+    df_names = ['miss_abort_nxt_ff_info', 'miss_abort_cur_ff_info',
                 'traj_data_df', 'more_traj_data_df', 'more_ff_df']
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
 
@@ -116,14 +116,14 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
                 # otherwise, we will remake traj_data_df and more_traj_data_df
                 print('We will remake traj_data_df and more_traj_data_df')
                 # get all_point_index
-                GUAT_nxt_ff_info = pd.read_csv(os.path.join(
-                    gcc.GUAT_folder_path, 'GUAT_nxt_ff_info.csv'))
-                if 'old_point_index' in GUAT_nxt_ff_info.columns:
+                miss_abort_nxt_ff_info = pd.read_csv(os.path.join(
+                    gcc.GUAT_folder_path, 'miss_abort_nxt_ff_info.csv'))
+                if 'old_point_index' in miss_abort_nxt_ff_info.columns:
                     all_point_index = np.unique(
-                        GUAT_nxt_ff_info['old_point_index'].values)
+                        miss_abort_nxt_ff_info['old_point_index'].values)
                 else:
                     all_point_index = np.unique(
-                        GUAT_nxt_ff_info['point_index'].values)
+                        miss_abort_nxt_ff_info['point_index'].values)
                 gcc.streamline_process_to_collect_traj_data_only(
                     all_point_index, curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok)
                 gcc.traj_data_df.to_csv(os.path.join(
@@ -142,8 +142,8 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
             self.all_traj_feature_names = copy.deepcopy(all_traj_feature_names)
             # otherwise, we assume that the all_traj_feature_names is already in self from previous functions
 
-        self.GUAT_nxt_ff_info_reloaded = self.combined_info['GUAT_nxt_ff_info']
-        self.GUAT_cur_ff_info_reloaded = self.combined_info['GUAT_cur_ff_info']
+        self.miss_abort_nxt_ff_info_reloaded = self.combined_info['miss_abort_nxt_ff_info']
+        self.miss_abort_cur_ff_info_reloaded = self.combined_info['miss_abort_cur_ff_info']
         self.traj_data_df = self.combined_info['traj_data_df']
         self.more_traj_data_df = self.combined_info['more_traj_data_df']
         self.more_ff_df = self.combined_info['more_ff_df']
@@ -162,19 +162,19 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
         self.more_traj_stops_df = self.more_traj_data_df.loc[:,
                                                              self.all_traj_feature_names['more_traj_stops']]
 
-        self.num_stops_df = self.GUAT_cur_ff_info_reloaded[[
+        self.num_stops_df = self.miss_abort_cur_ff_info_reloaded[[
             'point_index', 'num_stops']].drop_duplicates().copy()
 
     def process_current_and_alternative_ff_info(self):
-        self.GUAT_nxt_ff_info = self.GUAT_nxt_ff_info_reloaded.copy()
-        self.GUAT_cur_ff_info = self.GUAT_cur_ff_info_reloaded.copy()
+        self.miss_abort_nxt_ff_info = self.miss_abort_nxt_ff_info_reloaded.copy()
+        self.miss_abort_cur_ff_info = self.miss_abort_cur_ff_info_reloaded.copy()
         super().process_current_and_alternative_ff_info(num_old_ff_per_row=self.gc_kwargs['num_old_ff_per_row'],
                                                         num_new_ff_per_row=self.gc_kwargs['num_new_ff_per_row'],
                                                         selection_criterion_if_too_many_ff=self.gc_kwargs['selection_criterion_if_too_many_ff'])
-        self.GUAT_cur_ff_info = curvature_utils.fill_up_NAs_for_placeholders_in_columns_related_to_curvature(
-            self.GUAT_cur_ff_info, curv_of_traj_df=self.relevant_curv_of_traj_df)
-        self.GUAT_nxt_ff_info = curvature_utils.fill_up_NAs_for_placeholders_in_columns_related_to_curvature(
-            self.GUAT_nxt_ff_info, curv_of_traj_df=self.relevant_curv_of_traj_df)
+        self.miss_abort_cur_ff_info = curvature_utils.fill_up_NAs_for_placeholders_in_columns_related_to_curvature(
+            self.miss_abort_cur_ff_info, curv_of_traj_df=self.relevant_curv_of_traj_df)
+        self.miss_abort_nxt_ff_info = curvature_utils.fill_up_NAs_for_placeholders_in_columns_related_to_curvature(
+            self.miss_abort_nxt_ff_info, curv_of_traj_df=self.relevant_curv_of_traj_df)
 
     def find_input_and_output(self,
                               add_arc_info=False,
@@ -192,11 +192,11 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
                 add_current_curv_of_traj = False
                 print('Warning: add_current_curv_of_traj is set to False because \'curv_of_traj\' is already in the trajectory features.')
 
-        self.GUAT_cur_ff_info['group'] = 'Original'
-        self.GUAT_nxt_ff_info['group'] = 'Alternative'
+        self.miss_abort_cur_ff_info['group'] = 'Original'
+        self.miss_abort_nxt_ff_info['group'] = 'Alternative'
 
         self.GUAT_joined_ff_info = pd.concat(
-            [self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info], axis=0)
+            [self.miss_abort_cur_ff_info, self.miss_abort_nxt_ff_info], axis=0)
         self.ff_attributes = ff_attributes.copy()
         self.attributes_for_plotting = [
             'ff_distance', 'ff_angle', 'time_since_last_vis']
@@ -219,9 +219,9 @@ class GUATCombineInfoAcrossSessions(GUAT_helper_class.GUATHelperClass):
             self.free_selection_x_df['curv_of_traj'] = curv_of_traj
 
         if add_num_ff_in_cluster:
-            self.free_selection_x_df['num_current_ff_in_cluster'] = self.GUAT_cur_ff_info.groupby(
+            self.free_selection_x_df['num_current_ff_in_cluster'] = self.miss_abort_cur_ff_info.groupby(
                 'point_index').first()['num_ff_in_cluster'].values
-            self.free_selection_x_df['num_nxt_ff_in_cluster'] = self.GUAT_nxt_ff_info.groupby(
+            self.free_selection_x_df['num_nxt_ff_in_cluster'] = self.miss_abort_nxt_ff_info.groupby(
                 'point_index').first()['num_ff_in_cluster'].values
 
         self.free_selection_time = self.GUAT_joined_ff_info.set_index(

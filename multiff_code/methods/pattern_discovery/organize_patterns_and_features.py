@@ -91,7 +91,9 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
 
     retry = GUAT_w_ff_frequency + try_a_few
     first_miss = retry + one_stop_w_ff_frequency
-    attempt = capture_counted + first_miss
+    capture_not_in_try_a_few = capture_counted - try_a_few
+    # in terms of attempts as denominator, capture_counted include try_a_few
+    first_attempt = capture_counted + GUAT_w_ff_frequency + one_stop_w_ff_frequency
 
     # Choice after miss
     rows.extend([
@@ -104,17 +106,17 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         {'item': "retry_capture_over_miss", 'frequency': try_a_few,
             'denom_count': first_miss, 'group': 2},
     ])
-    
-    # try using attempt instead of first_miss as denom_count
+
+    # try using first_attempt instead of first_miss as denom_count
     rows.extend([
         {'item': "retry_over_attempt", 'frequency': retry,
-            'denom_count': attempt, 'group': 2},
+            'denom_count': first_attempt, 'group': 2},
         {'item': "no_retry_over_attempt", 'frequency': (
-            first_miss - retry), 'denom_count': attempt, 'group': 2},
+            first_miss - retry), 'denom_count': first_attempt, 'group': 2},
         {'item': "retry_fail_over_attempt", 'frequency': GUAT_w_ff_frequency,
-            'denom_count': attempt, 'group': 2},
+            'denom_count': first_attempt, 'group': 2},
         {'item': "retry_capture_over_attempt", 'frequency': try_a_few,
-            'denom_count': attempt, 'group': 2},
+            'denom_count': first_attempt, 'group': 2},
     ])
 
     # Firefly capture rate (per s)
@@ -127,13 +129,16 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             'group': 2
         })
 
-    
     # get miss_over_attempt and capture_over_attempt
     rows.extend([
         {'item': "miss_over_attempt", 'frequency': first_miss,
-            'denom_count': attempt, 'group': 2},
-        {'item': "capture_over_attempt", 'frequency': capture_counted,
-            'denom_count': attempt, 'group': 2},
+            'denom_count': first_attempt, 'group': 2},
+        {'item': "first_shot_capture_over_attempt", 'frequency': capture_not_in_try_a_few,
+            'denom_count': first_attempt, 'group': 2},
+        {'item': "eventual_capture_over_attempt", 'frequency': capture_counted,
+            'denom_count': first_attempt, 'group': 2},
+        {'item': "eventual_miss_over_attempt", 'frequency': GUAT_w_ff_frequency + one_stop_w_ff_frequency,
+            'denom_count': first_attempt, 'group': 2},
     ])
 
     # Stop success rate (guard columns)
@@ -202,7 +207,8 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'retry_over_attempt': 'GUAT+TAFT over all attempt',
         'no_retry_over_attempt': 'No retry over all attempt',
         'miss_over_attempt': 'Miss over attempt',
-        'capture_over_attempt': 'Capture over attempt',
+        'first_shot_capture_over_attempt': 'First shot capture over attempt',
+        'eventual_capture_over_attempt': 'Eventual capture over attempt',
         'two_in_a_row_over_cluster': 'Two in a row over cluster'
     }
     pattern_frequencies['label'] = pattern_frequencies['item'].map(
@@ -504,4 +510,3 @@ def make_num_stops_df(distance_df, closest_stop_to_capture_df, ff_caught_T_new, 
     # print(f'Filtered out {original_length - len(num_stops_df)} outliers out of {original_length} trials, since they have distance ' +
     #       f'or displacement greater than 2000, which is {round(100*(original_length - len(num_stops_df))/original_length, 2)}% of the data')
     return num_stops_df
-

@@ -2,6 +2,7 @@ from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT, GUAT_colle
 from decision_making_analysis import trajectory_info
 from null_behaviors import curvature_utils
 from data_wrangling import base_processing_class
+from decision_making_analysis.GUAT import GUAT_utils
 
 import os
 import copy
@@ -13,13 +14,12 @@ from os.path import exists
 import pandas as pd
 
 
-plt.rcParams["animation.html"] = "html5"
+matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+
+plt.rcParams['animation.html'] = 'html5'
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 rc('animation', html='jshtml')
-matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 matplotlib.rcParams['animation.embed_limit'] = 2**128
-pd.set_option('display.float_format', lambda x: '%.5f' % x)
-np.set_printoptions(suppress=True)
 
 
 class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHelperClass):
@@ -39,6 +39,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
     def streamline_process_to_collect_info_from_one_session(self,
                                                             monkey_data_already_retrieved_ok=True,
                                                             GUAT_info_exists_ok=True,
+                                                            add_one_stop_info=True,
                                                             curv_of_traj_df_exists_ok=True,
                                                             GUAT_w_ff_df_exists_ok=True,
                                                             update_point_index=True,
@@ -60,9 +61,9 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                   'Proceed to collect all GUAT info from one session.')
             self.get_monkey_data(
                 already_retrieved_ok=monkey_data_already_retrieved_ok)
-            self._add_one_stop_info_to_GUAT_w_ff_df()
+            self.get_miss_abort_df(add_one_stop_info=add_one_stop_info)
             self._generate_important_df_to_combine_across_sessions(
-                self.GUAT_w_ff_df, curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, **self.gc_kwargs)
+                curv_of_traj_df_exists_ok=curv_of_traj_df_exists_ok, **self.gc_kwargs)
             if save_data:
                 self._save_important_info()
 
@@ -73,13 +74,12 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         return self.important_info
 
     def _try_retrieve_all_GUAT_info_from_one_session(self,
-                                                     df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df',
-                                                               'curv_of_traj_df'
-                                                               'GUAT_w_ff_df'],
+                                                     df_names=['miss_abort_nxt_ff_info', 'miss_abort_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df',
+                                                               'curv_of_traj_df', 'miss_abort_df'],
                                                      ):
 
         for df in df_names:
-            if df != 'GUAT_w_ff_df':
+            if df != 'miss_abort_df':
                 setattr(self, df, pd.read_csv(os.path.join(
                     self.GUAT_folder_path, df + '.csv')).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore'))
             else:
@@ -87,7 +87,6 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                         '.csv'), sep='\t', converters={'nearby_alive_ff_indices': pd.eval}))
 
     def _generate_important_df_to_combine_across_sessions(self,
-                                                          GUAT_w_ff_df,
                                                           time_with_respect_to_first_stop=-0.1,
                                                           time_with_respect_to_second_stop=None,
                                                           time_with_respect_to_last_stop=None,
@@ -123,8 +122,9 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.gc_kwargs['time_range_of_trajectory_to_plot'] = time_range_of_trajectory_to_plot
         self.gc_kwargs['num_time_points_for_trajectory_to_plot'] = num_time_points_for_trajectory_to_plot
 
-        self.set_time_of_eval(GUAT_w_ff_df, time_with_respect_to_first_stop=time_with_respect_to_first_stop,
-                              time_with_respect_to_second_stop=time_with_respect_to_second_stop, time_with_respect_to_last_stop=time_with_respect_to_last_stop)
+        self.miss_abort_df = GUAT_utils.set_time_of_eval(self.miss_abort_df, self.monkey_information, time_with_respect_to_first_stop=time_with_respect_to_first_stop,
+                                                         time_with_respect_to_second_stop=time_with_respect_to_second_stop, time_with_respect_to_last_stop=time_with_respect_to_last_stop)
+        self.time_of_eval = self.miss_abort_df['time_of_eval']
         self.eliminate_crossing_boundary_cases(n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary,
                                                n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary)
 
@@ -132,10 +132,10 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                                               window_for_curv_of_traj=window_for_curv_of_traj, truncate_curv_of_traj_by_time_of_capture=truncate_curv_of_traj_by_time_of_capture)
         self.add_curv_of_traj_info_to_monkey_information(column_exists_ok=True)
         ff_dataframe_sub = self.ff_dataframe.loc[self.ff_dataframe['point_index'].isin(
-            self.GUAT_w_ff_df['point_index_of_eval'].values)]
+            self.miss_abort_df['point_index_of_eval'].values)]
         self.curvature_df = curvature_utils.make_curvature_df(
             ff_dataframe_sub, self.curv_of_traj_df)
-        self.add_curvature_info_to_ff_dataframe(self)
+        self.add_curvature_info_to_ff_dataframe()
 
         self.trajectory_features = trajectory_features
         self.max_distance_to_stop_for_GUAT_target = max_distance_to_stop_for_GUAT_target
@@ -203,8 +203,8 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
         self.more_traj_data_df['point_index'] = self.point_index_all
 
     def _compile_important_info(self):
-        important_info = {'GUAT_nxt_ff_info': self.GUAT_nxt_ff_info,
-                          'GUAT_cur_ff_info': self.GUAT_cur_ff_info,
+        important_info = {'miss_abort_nxt_ff_info': self.miss_abort_nxt_ff_info,
+                          'miss_abort_cur_ff_info': self.miss_abort_cur_ff_info,
                           'traj_data_df': self.traj_data_df,
                           'more_traj_data_df': self.more_traj_data_df,
                           'more_ff_df': self.more_ff_df,
@@ -223,13 +223,70 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
             pass
 
     def _save_important_info(self,
-                             df_names=['GUAT_nxt_ff_info', 'GUAT_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'curv_of_traj_df']):
+                             df_names=['miss_abort_nxt_ff_info', 'miss_abort_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df', 'curv_of_traj_df']):
         if not exists(self.GUAT_folder_path):
             os.makedirs(self.GUAT_folder_path)
         for df in df_names:
             getattr(self, df).to_csv(os.path.join(
-                self.GUAT_folder_path, df + '.csv'))
+                self.GUAT_folder_path, df + '.csv'), index=False)
 
     def _update_point_index_of_important_df_in_important_info(self):
         self.important_info, self.point_index_to_new_number_df = add_features_GUAT_and_TAFT.update_point_index_of_important_df_in_important_info_func(
             self.important_info, self.new_point_index_start)
+
+    def get_miss_abort_df(self, add_one_stop_info=False):
+        if add_one_stop_info:
+            self.combine_GUAT_and_one_stop()
+        else:
+            self.miss_abort_df = self.GUAT_w_ff_df.copy()
+        self.miss_abort_df.loc[self.miss_abort_df['last_stop_point_index'].isna(
+        ), 'last_stop_point_index'] = self.miss_abort_df.loc[self.miss_abort_df['last_stop_point_index'].isna(), 'first_stop_point_index']
+        self.miss_abort_df.loc[self.miss_abort_df['last_stop_time'].isna(
+        ), 'last_stop_time'] = self.miss_abort_df.loc[self.miss_abort_df['last_stop_time'].isna(), 'first_stop_time']
+        self.miss_abort_df['total_stop_time'] = self.miss_abort_df['last_stop_time'] - \
+            self.miss_abort_df['first_stop_time']
+        return self.miss_abort_df
+
+    def combine_GUAT_and_one_stop(self):
+        self.make_one_stop_w_ff_df()
+
+        # find point_index in self.one_stop_w_ff_df that are also in self.GUAT_w_ff_df
+        common_point_index = np.intersect1d(
+            self.GUAT_w_ff_df['first_stop_point_index'].values, self.one_stop_w_ff_df['first_stop_point_index'].values)
+        if len(common_point_index) > 0:
+            print(
+                f'Out of {len(self.one_stop_w_ff_df)} rows in one_stop_w_ff_df, '
+                f'{len(common_point_index)} rows share first_stop_point_index with GUAT_w_ff_df. '
+                f'These rows are removed from one_stop_w_ff_df.'
+            )
+        one_stop_w_ff_df = self.one_stop_w_ff_df[~self.one_stop_w_ff_df['first_stop_point_index'].isin(
+            common_point_index)].copy()
+        # only keep columns in one_stop_w_ff_df that are also in GUAT_w_ff_df
+        columns_of_one_stop_to_keep = [
+            col for col in one_stop_w_ff_df.columns if col in self.GUAT_w_ff_df.columns]
+        one_stop_w_ff_df = one_stop_w_ff_df[columns_of_one_stop_to_keep].copy()
+        # print columns in one_stop_w_ff_df but not in GUAT_w_ff_df
+        if len(self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns)) > 0:
+            print('Columns in GUAT_w_ff_df but not in one_stop_w_ff_df:',
+                  self.GUAT_w_ff_df.columns.difference(one_stop_w_ff_df.columns))
+
+        self.GUAT_w_ff_df['whether_GUAT'] = 1
+        one_stop_w_ff_df['whether_GUAT'] = 0
+
+        self.miss_abort_df = pd.concat(
+            [self.GUAT_w_ff_df, one_stop_w_ff_df], axis=0).reset_index(drop=True)
+
+        # for col in self.miss_abort_df.columns:
+        #     if '_index' in col:
+        #         if self.miss_abort_df[col].isna().sum() == 0:
+        #             self.miss_abort_df[col] = self.miss_abort_df[col].astype(
+        #                 'int64')
+
+        # At the end, cast index-like columns to nullable Int64 to tolerate NAs
+        for col in self.miss_abort_df.columns:
+            if col.endswith('_index'):
+                try:
+                    self.miss_abort_df[col] = self.miss_abort_df[col].astype(
+                        'Int64')
+                except Exception:
+                    pass

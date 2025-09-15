@@ -24,7 +24,7 @@ def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T
     #     distinct_stops_df, min_distance_from_adjacent_stops)
     # filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(
     #     filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture=min_cum_distance_to_ff_capture)
-    
+
     distinct_stops_df = monkey_information[(monkey_information['whether_new_distinct_stop'] == 1)
                                            & (monkey_information['stop_cluster_size'] == 1)].copy()
     filtered_stops_df = distinct_stops_df.copy()
@@ -43,7 +43,8 @@ def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
     """
 
     # ensure required columns exist
-    required = {"point_index", "ff_index", "time_since_last_vis"}
+    required = {"point_index", "time", "ff_index", "time_since_last_vis",
+                "stop_id", "stop_cluster_id", "stop_cluster_size"}
     missing = required - set(one_stop_df.columns)
     if missing:
         raise KeyError(f"one_stop_df missing columns: {missing}")
@@ -78,7 +79,8 @@ def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
     # bring in stop-level metadata (dedup by point_index)
     stop_meta_cols = [
         "target_index", "time", "point_index", "ff_distance",
-        "distance_to_next_ff_capture", "min_distance_from_adjacent_stops"
+        "distance_to_next_ff_capture", "min_distance_from_adjacent_stops",
+        "stop_id", "stop_cluster_id", "stop_cluster_size"
     ]
     stop_meta_cols = [c for c in stop_meta_cols if c in df.columns]
     stop_meta = df[stop_meta_cols].drop_duplicates("point_index")
@@ -102,11 +104,10 @@ def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
             out[col] = pd.to_numeric(out[col], errors="coerce").astype(
                 "Int64").astype("int64", errors="ignore")
 
-    # rename for consistency
-    out = out.rename(columns={
-        "point_index": "first_stop_point_index",
-        "time": "first_stop_time",
-    })
+    # add column names
+    out['stop_time'] = out['time']
+    out['first_stop_time'] = out['time']
+    out['first_stop_point_index'] = out['point_index']
 
     # per your previous pattern
     out["stop_indices"] = out["first_stop_point_index"].apply(lambda x: [
@@ -305,7 +306,7 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     """
 
     # Step 1: Extract point indices and cluster assignments
-    GUAT_df = GUAT_indices_df[['point_index', 'cluster_index']].copy()
+    GUAT_df = GUAT_indices_df[['point_index', 'stop_cluster_id']].copy()
 
     # Step 2: Merge with firefly dataframe to get firefly context for each stop point
     GUAT_ff_info = GUAT_df.merge(ff_dataframe, on='point_index', how='left')
@@ -321,22 +322,22 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
 
     # Step 5: Aggregate firefly information by cluster
     # Group by cluster_index so that ff_index becomes a list of ff_indices for each cluster
-    GUAT_ff_info2 = GUAT_ff_info[['cluster_index', 'ff_index']].drop_duplicates(
-    ).groupby('cluster_index')['ff_index'].apply(list).reset_index(drop=False)
+    GUAT_ff_info2 = GUAT_ff_info[['stop_cluster_id', 'ff_index']].drop_duplicates(
+    ).groupby('stop_cluster_id')['ff_index'].apply(list).reset_index(drop=False)
     GUAT_ff_info2.rename(
         columns={'ff_index': 'nearby_alive_ff_indices'}, inplace=True)
 
     # Step 6: Find the most recently visible firefly for each cluster
-    GUAT_ff_info.sort_values(by=['cluster_index', 'time_since_last_vis'], ascending=[
+    GUAT_ff_info.sort_values(by=['stop_cluster_id', 'time_since_last_vis'], ascending=[
                              True, True], inplace=True)
-    GUAT_ff_info2['latest_visible_ff'] = GUAT_ff_info.groupby('cluster_index')[
+    GUAT_ff_info2['latest_visible_ff'] = GUAT_ff_info.groupby('stop_cluster_id')[
         'ff_index'].first().values
 
     # Step 7: Create GUAT_expanded_trials_df - merge base trials with firefly context
     # This adds firefly proximity information to all trials (unfiltered)
     GUAT_expanded_trials_df = GUAT_trials_df.merge(
-        GUAT_ff_info2, on='cluster_index', how='left')
-    GUAT_expanded_trials_df.sort_values(by='cluster_index', inplace=True)
+        GUAT_ff_info2, on='stop_cluster_id', how='left')
+    GUAT_expanded_trials_df.sort_values(by='stop_cluster_id', inplace=True)
 
     # Step 8: Add flag indicating whether fireflies are near stops
     # Mark whether_w_ff_near_stops as 1 if nearby_alive_ff_indices is not NA
@@ -366,3 +367,32 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     print('after calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
         GUAT_w_ff_df))
     return GUAT_w_ff_df, GUAT_expanded_trials_df
+
+
+def set_time_of_eval(GUAT_w_ff_df, monkey_information, time_with_respect_to_first_stop=None, time_with_respect_to_second_stop=None, time_with_respect_to_last_stop=None):
+    GUAT_w_ff_df = GUAT_w_ff_df.copy()
+
+    # make sure that only one of the three time_with_respect_to_* is not None
+    if (time_with_respect_to_first_stop is not None) & (time_with_respect_to_second_stop is not None):
+        raise ValueError(
+            'Only one of the three time_with_respect_to_* can be not None.')
+    if (time_with_respect_to_first_stop is not None) & (time_with_respect_to_last_stop is not None):
+        raise ValueError(
+            'Only one of the three time_with_respect_to_* can be not None.')
+    if (time_with_respect_to_second_stop is not None) & (time_with_respect_to_last_stop is not None):
+        raise ValueError(
+            'Only one of the three time_with_respect_to_* can be not None.')
+
+    if time_with_respect_to_first_stop is not None:
+        time_of_eval = GUAT_w_ff_df['first_stop_time'] + \
+            time_with_respect_to_first_stop
+    elif time_with_respect_to_second_stop is not None:
+        time_of_eval = GUAT_w_ff_df['second_stop_time'] + \
+            time_with_respect_to_second_stop
+    else:
+        time_of_eval = GUAT_w_ff_df['last_stop_time'] + \
+            time_with_respect_to_last_stop
+    GUAT_w_ff_df['time_of_eval'] = time_of_eval
+    GUAT_w_ff_df['point_index_of_eval'] = monkey_information['point_index'].values[np.searchsorted(
+        monkey_information['time'].values, time_of_eval, side='right')-1]
+    return GUAT_w_ff_df

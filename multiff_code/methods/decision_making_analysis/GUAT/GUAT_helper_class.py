@@ -30,14 +30,14 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
 
         # The following columns are added so the function further_process_df_related_to_cluster_replacement can be called without errors.
         # But the values in these columns will be updated later
-        self.GUAT_cur_ff_info[['whether_changed',
+        self.miss_abort_cur_ff_info[['whether_changed',
                                'whether_intended_target']] = False
-        self.GUAT_nxt_ff_info[['whether_changed',
+        self.miss_abort_nxt_ff_info[['whether_changed',
                                'whether_intended_target']] = False
 
-        self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info = cluster_replacement_utils.further_process_df_related_to_cluster_replacement(self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info,
+        self.miss_abort_cur_ff_info, self.miss_abort_nxt_ff_info = cluster_replacement_utils.further_process_df_related_to_cluster_replacement(self.miss_abort_cur_ff_info, self.miss_abort_nxt_ff_info,
                                                                                                                                    num_old_ff_per_row=num_old_ff_per_row, num_new_ff_per_row=num_new_ff_per_row, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff)
-        self.GUAT_nxt_ff_info['order'] = self.GUAT_nxt_ff_info['order'] + \
+        self.miss_abort_nxt_ff_info['order'] = self.miss_abort_nxt_ff_info['order'] + \
             num_old_ff_per_row
 
         self.num_old_ff_per_row = num_old_ff_per_row
@@ -76,7 +76,7 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
                 curvature_df = curvature_df[~curvature_df_sub.duplicated()]
 
         self.GUAT_joined_ff_info = pd.concat(
-            [self.GUAT_cur_ff_info, self.GUAT_nxt_ff_info], axis=0)
+            [self.miss_abort_cur_ff_info, self.miss_abort_nxt_ff_info], axis=0)
         if add_arc_info:
             self.GUAT_joined_ff_info = curvature_utils.add_arc_info_to_df(
                 self.GUAT_joined_ff_info, curvature_df, arc_info_to_add=arc_info_to_add, ff_caught_T_new=self.ff_caught_T_new, curv_of_traj_df=curv_of_traj_df)

@@ -16,7 +16,7 @@ import statsmodels.api as sm
 import os
 
 
-def get_key_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno'):
+def get_key_learning_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno'):
 
     sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
         raw_data_dir_name, monkey_name)
@@ -26,9 +26,6 @@ def get_key_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_nam
     all_VBLO_df = pd.DataFrame()
 
     for index, row in sessions_df_for_one_monkey.iterrows():
-        if row['finished'] is True:
-            continue
-
         data_name = row['data_name']
         raw_data_folder_path = os.path.join(
             raw_data_dir_name, row['monkey_name'], data_name)
@@ -42,7 +39,7 @@ def get_key_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_nam
 
         trial_durations = np.diff(data_item.ff_caught_T_new)
         trial_durations_df = pd.DataFrame(
-            {'duration_sec': trial_durations, 'trial_index': np.arange(len(trial_durations))})
+            {'duration_sec': trial_durations, 'trial_index': np.arange(1, len(trial_durations) + 1)}) # trial_index starts from 1 since we don't calculate duration for the first trial
         trial_durations_df['data_name'] = data_name
         all_trial_durations_df = pd.concat(
             [all_trial_durations_df, trial_durations_df])

@@ -59,7 +59,7 @@ def regress_by_variable_type(X_train, X_test, y_train, y_test, columns_of_intere
         print('y_var_column:', y_var_column)
         # if y_var_column is a dummy variable, use logistic regression
         num_unique = y_train[y_var_column].nunique()
-        if num_unique == 1:
+        if int(num_unique) == 1:
             print(
                 f"Skipping target '{y_var_column}' because it has only one unique value.")
             continue
@@ -118,7 +118,7 @@ def regress_by_variable_type_cv(
             print('='*80)
 
         num_unique = y_var_df[y_var_column].nunique()
-        if num_unique == 1:
+        if int(num_unique) == 1:
             if verbose:
                 print(
                     f"Skipping target '{y_var_column}' because it has only one unique value.")
