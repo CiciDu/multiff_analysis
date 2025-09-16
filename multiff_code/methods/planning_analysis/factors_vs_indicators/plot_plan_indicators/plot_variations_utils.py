@@ -56,6 +56,7 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                                                               use_subplots_based_on_changeable_variables=False,
                                                               add_ci_bounds=True,
                                                               is_difference=False,
+                                                              constant_marker_size=None,
                                                               ):
 
     if use_subplots_based_on_changeable_variables & (len(changeable_variables) == 2):
@@ -117,6 +118,7 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                                                                row_number=row_number,
                                                                col_number=col_number,
                                                                is_difference=is_difference,
+                                                               constant_marker_size=constant_marker_size,
                                                                )
             if use_subplots_based_on_changeable_variables:
                 # for trace in fig.data:
@@ -422,15 +424,21 @@ def plot_markers_for_data_comparison(fig,
                                      use_ribbons_to_replace_error_bars=True,
                                      row_number=None,
                                      col_number=None,
-                                     is_difference=False):
+                                     is_difference=False,
+                                     constant_marker_size=None):
 
     # clean rows
     sub_df = sub_df.dropna(subset=[y_var_column]).copy()
 
     # marker sizes scaled & clipped
-    max_n = max(int(sub_df.get('sample_size', pd.Series([1])).max()), 1)
-    scale = 45.0 / max_n
-    min_size, max_size = 6, 18
+    if constant_marker_size is not None:
+        # Use constant marker size
+        marker_size = constant_marker_size
+    else:
+        # Use sample size-based scaling
+        max_n = max(int(sub_df.get('sample_size', pd.Series([1])).max()), 1)
+        scale = 45.0 / max_n
+        min_size, max_size = 6, 18
 
     hovertemplate, custom_cols = _make_hovertemplate(
         sub_df, y_var_column, customdata_columns)
@@ -503,7 +511,7 @@ def plot_markers_for_data_comparison(fig,
                 line=dict(color=marker_color, width=1.5),
                 marker=dict(
                     color=marker_color,
-                    size=np.clip(d['sample_size'].fillna(max_n).astype(
+                    size=marker_size if constant_marker_size is not None else np.clip(d['sample_size'].fillna(max_n).astype(
                         float) * scale, min_size, max_size),
                     opacity=0.8
                 ),
@@ -693,7 +701,8 @@ def make_plotly_plot_to_compare_two_sets_of_data(
     fig=None,
     row_number=None,
     col_number=None,
-    is_difference=False
+    is_difference=False,
+    constant_marker_size=None
 ):
     columns_to_find_unique_combinations_for_color = columns_to_find_unique_combinations_for_color or []
     columns_to_find_unique_combinations_for_line = columns_to_find_unique_combinations_for_line or []
@@ -727,7 +736,7 @@ def make_plotly_plot_to_compare_two_sets_of_data(
     # ===== path 2: multi-bin (your original line/marker workflow) =====
     fig = plot_markers_for_data_comparison(
         fig, sub_df, rest_hover, y_var_column, row_number=row_number, col_number=col_number,
-        is_difference=is_difference
+        is_difference=is_difference, constant_marker_size=constant_marker_size
     )
 
     if not is_difference:

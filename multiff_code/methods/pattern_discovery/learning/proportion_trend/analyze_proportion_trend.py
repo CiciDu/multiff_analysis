@@ -182,19 +182,45 @@ def tertile_phase(df, session_col='session'):
     return g
 
 
-def add_pval_to_plot(ax, pval, fontsize=12):
-    """Annotate an Axes with p-value text and stars if significant."""
-    # p-value text
-    if pval < 0.001:
-        pval_text = 'p < 0.001'
-    elif pval < 0.01:
-        pval_text = f'p = {pval:.3f}'
-    elif pval < 0.05:
-        pval_text = f'p = {pval:.3f}'
-    else:
-        pval_text = f'p = {pval:.3f}'
+import numpy as np
+import matplotlib.pyplot as plt
 
-    # significance stars
+def add_pval_to_plot(
+    ax,
+    pval: float,
+    *,
+    fontsize: int = 12,
+    label_prefix: str = None,
+    loc: str = 'upper left',
+    show_box: bool = False
+):
+    """Annotate an Axes with p-value text and stars if significant.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+        Axis to annotate.
+    pval : float
+        P-value to display. If None or NaN, nothing is drawn.
+    fontsize : int
+        Font size for text.
+    label_prefix : str, optional
+        Optional string prefix (e.g. 'GUAT').
+    loc : {'upper left','upper right','lower left','lower right'}
+        Where to place the annotation.
+    show_box : bool
+        Whether to draw a white background box.
+    """
+    if pval is None or (isinstance(pval, float) and np.isnan(pval)):
+        return
+
+    # Format p-value
+    if pval < 0.001:
+        p_text = 'p < 0.001'
+    else:
+        p_text = f'p = {pval:.3f}'.rstrip('0').rstrip('.')
+
+    # Significance stars
     if pval < 0.001:
         stars = '***'
     elif pval < 0.01:
@@ -205,14 +231,29 @@ def add_pval_to_plot(ax, pval, fontsize=12):
         stars = ''
 
     if stars:
-        pval_text = f'{pval_text} {stars}'
+        p_text = f'{p_text} {stars}'
+    if label_prefix:
+        p_text = f'{label_prefix}: {p_text}'
+
+    # Position mapping
+    loc_map = {
+        'upper left':  (0.02, 0.98, 'left', 'top'),
+        'upper right': (0.98, 0.98, 'right', 'top'),
+        'lower left':  (0.02, 0.02, 'left', 'bottom'),
+        'lower right': (0.98, 0.02, 'right', 'bottom'),
+    }
+    if loc not in loc_map:
+        raise ValueError(f'loc must be one of {list(loc_map.keys())}')
+    x, y, ha, va = loc_map[loc]
+
+    bbox = dict(boxstyle='round', facecolor='white', alpha=0.8) if show_box else None
 
     ax.text(
-        0.02, 0.98, pval_text,
-        transform=ax.transAxes,        # anchor to Axes coordinates
-        va='top', ha='left',           # vertical/horizontal alignment
-        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-        fontsize=fontsize
+        x, y, p_text,
+        transform=ax.transAxes,
+        va=va, ha=ha,
+        fontsize=fontsize,
+        bbox=bbox
     )
 
 

@@ -159,6 +159,7 @@ def summarize_early_late_event_rate_with_glm(df_sessions, session_col="session",
         "metric": "captures_per_min",
         "descriptive_ratio_late_over_early": tstats["ratio"],
         "descriptive_percent_change": tstats["percent_change"],
+        "ttest_pval": tstats["pval"], 
         "GLM_rate_ratio": RR,
         "GLM_95CI": f"[{RR_lo:.3f}, {RR_hi:.3f}]",
         "GLM_pval": pval
@@ -168,6 +169,8 @@ def summarize_early_late_event_rate_with_glm(df_sessions, session_col="session",
     if plot:
         plot_early_late_with_ci(
             phase_tbl,
+            pval=glm_contrast_tbl.loc[0, 'pval'],
+            p_source='GLM (Poisson)',
             mean_col='rate_per_min_mean',
             lo_col='rate_per_min_lo',
             hi_col='rate_per_min_hi',
@@ -269,7 +272,33 @@ def summarize_early_late_duration_with_glm(df_trials, df_sessions,
 
     return phase_tbl, ttest_contrast_tbl, glm_contrast_tbl, effect_summary_tbl
 
-# ---------- Wrapper ----------
+
+
+def analyze_early_late_capture_and_duration(df_sessions, df_trials):
+    """
+    Runs both metrics with plots, and returns:
+      rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
+      dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl
+    """
+    (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl
+     ) = summarize_early_late_event_rate_with_glm(df_sessions)
+
+    (dur_phase_tbl, dur_ttest_tbl, dur_glm_tbl, dur_effect_summary_tbl
+     ) = summarize_early_late_duration_with_glm(df_trials, df_sessions)
+
+    return (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
+            dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl)
+
+
+def _format_p(p, p_fmt='{:.2g}', stars=True):
+    if p is None:
+        return None, ''
+    label = f'p = {p_fmt.format(p)}'
+    if stars:
+        if p < 0.001: label += ' (***)'
+        elif p < 0.01: label += ' (**)'
+        elif p < 0.05: label += ' (*)'
+    return p, label
 
 
 def plot_early_late_with_ci(
@@ -280,25 +309,34 @@ def plot_early_late_with_ci(
     ylabel: str,
     title: str,
     order=('early', 'late'),
-    fmt='{:.2f}'
+    fmt='{:.2f}',
+    # --- NEW ---
+    pval: float | None = None,          # e.g., from Welch t-test or GLM
+    p_source: str = 'Welch t-test',     # label prefix
+    p_fmt: str = '{:.2g}',              # p-value formatting
+    show_bracket: bool = True,          # draw a bracket between bars
+    stars: bool = True,                 # add significance stars
+    return_figax: bool = False
 ):
     """
     Bar plot with asymmetric CI error bars for Early vs Late phases.
+    Optionally annotates a p-value comparing the two bars.
 
     Parameters
     ----------
-    phase_tbl : pd.DataFrame
-        Must contain columns [phase, mean_col, lo_col, hi_col].
-    mean_col, lo_col, hi_col : str
-        Column names for the mean and confidence interval bounds.
-    ylabel : str
-        Y-axis label.
-    title : str
-        Plot title.
-    order : tuple of str
-        Order of phases on the x-axis (default: ('early', 'late')).
-    fmt : str
-        Format string for value labels on top of bars.
+    ...
+    pval : float | None
+        P-value to annotate. If None, no annotation is drawn.
+    p_source : str
+        Label prefix shown before the p-value (e.g., 'GLM', 'Welch t-test').
+    p_fmt : str
+        Format string for the p-value text.
+    show_bracket : bool
+        If True, draws a horizontal bracket spanning the two bars.
+    stars : bool
+        If True, appends significance stars based on p (<.05, <.01, <.001).
+    return_figax : bool
+        If True, returns (fig, ax).
     """
     sub = phase_tbl.set_index('phase').reindex(order)
 
@@ -327,6 +365,7 @@ def plot_early_late_with_ci(
     for spine in ['top', 'right']:
         ax.spines[spine].set_visible(False)
 
+    # bar value labels
     for bar in bars:
         h = bar.get_height()
         ax.text(
@@ -336,21 +375,34 @@ def plot_early_late_with_ci(
             fontsize=9, clip_on=False
         )
 
+    # --- NEW: p-value annotation ---
+    _, p_text = _format_p(pval, p_fmt=p_fmt, stars=stars)
+    if p_text:
+        # determine a y-location above the tallest CI
+        ymax = float(np.nanmax(hi))
+        ylim_top = ymax * 1.18
+        ax.set_ylim(top=ylim_top)
+
+        # x positions for early/late bars (assumes exactly two bars)
+        if len(x) >= 2 and show_bracket:
+            x0 = bars[0].get_x() + bars[0].get_width() / 2
+            x1 = bars[1].get_x() + bars[1].get_width() / 2
+            y_bracket = ymax * 1.08
+            h_tick = (ylim_top - ymax) * 0.12
+
+            # bracket line
+            ax.plot([x0, x0, x1, x1], [y_bracket, y_bracket + h_tick, y_bracket + h_tick, y_bracket],
+                    linewidth=1.2)
+
+            # centered p-text above bracket
+            ax.text((x0 + x1) / 2, y_bracket + h_tick * 1.05,
+                    f'{p_source}: {p_text}', ha='center', va='bottom', fontsize=9)
+        else:
+            # fallback: put p-text in the top-right corner
+            ax.text(0.98, 0.98, f'{p_source}: {p_text}',
+                    transform=ax.transAxes, ha='right', va='top', fontsize=9)
+
     fig.tight_layout()
+    if return_figax:
+        return fig, ax
     plt.show()
-
-
-def analyze_early_late_capture_and_duration(df_sessions, df_trials):
-    """
-    Runs both metrics with plots, and returns:
-      rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
-      dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl
-    """
-    (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl
-     ) = summarize_early_late_event_rate_with_glm(df_sessions)
-
-    (dur_phase_tbl, dur_ttest_tbl, dur_glm_tbl, dur_effect_summary_tbl
-     ) = summarize_early_late_duration_with_glm(df_trials, df_sessions)
-
-    return (rate_phase_tbl, rate_ttest_tbl, rate_glm_tbl, rate_effect_summary_tbl,
-            dur_phase_tbl,  dur_ttest_tbl,  dur_glm_tbl,  dur_effect_summary_tbl)

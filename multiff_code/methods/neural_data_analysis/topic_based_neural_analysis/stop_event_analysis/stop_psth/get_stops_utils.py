@@ -17,7 +17,7 @@ def prepare_no_capture_and_captures(
     max_stop_duration = None,
     capture_match_window: float = 0.3,
     stop_debounce: float = 0.1,
-    distance_thresh: float = 25.0,
+    distance_thresh: float = 40.0, # allow for some recording error
     distance_col: str = "distance_from_ff_to_stop",
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """

@@ -13,6 +13,13 @@ from matplotlib import cm
 from matplotlib.lines import Line2D
 from matplotlib_scalebar.scalebar import ScaleBar
 from math import pi
+import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
+
+import matplotlib.lines as mlines
+from matplotlib.legend_handler import HandlerTuple
+
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 connection_linewidth = {"agent": 0.25, "monkey": 0.5, "combined": 0.3}
@@ -585,11 +592,95 @@ def plot_horizontal_lines_to_show_ff_visible_segments(axes, ff_info, monkey_info
             show_visible_segments_of_ff_dict[ff_index] = color
 
             # Update legend markers and names if not provided
-            if not legend_markers:
+            if legend_markers:
                 legend_markers.extend([marker1, marker2])
                 legend_names.extend(
                     ['Points when fireflies start being visible', 'Points when fireflies stop being visible'])
 
+    return axes, legend_markers, legend_names, show_visible_segments_of_ff_dict
+
+
+def plot_visible_segments_on_trajectory(
+    axes, ff_info, rotation_matrix, x0, y0,
+    legend_markers=[], legend_names=[],
+    how_to_show_ff='circle', unique_ff_indices=None,
+    point_index_gap_threshold_to_sep_vis_intervals=12,
+    linewidth=8
+):
+    unique_ff_indices = (
+        ff_info.ff_index.unique() if unique_ff_indices is None else np.array(unique_ff_indices)
+    )
+    varying_colors = get_varying_colors_for_ff()
+    show_visible_segments_of_ff_dict = {}
+
+    for i, ff_index in enumerate(unique_ff_indices):
+        color = np.append(varying_colors[i % 9], 0.5)
+        temp_df = ff_info[ff_info['ff_index'] == ff_index].copy().sort_values(by=['point_index'])
+        if len(temp_df) == 0:
+            continue
+
+        # firefly position
+        ff_position_rotated = np.matmul(
+            rotation_matrix, temp_df[['ff_x', 'ff_y']].drop_duplicates().values.T
+        )
+        if how_to_show_ff == 'square':
+            axes.scatter(ff_position_rotated[0]-x0, ff_position_rotated[1]-y0,
+                         marker='s', alpha=0.75, s=170, color=color, zorder=3)
+        elif how_to_show_ff == 'circle':
+            circle = plt.Circle((ff_position_rotated[0]-x0, ff_position_rotated[1]-y0),
+                                25, facecolor=color, edgecolor=None, alpha=0.75, zorder=1)
+            axes.add_patch(circle)
+
+
+            # if legend_markers is not None:
+            #     proxy = mlines.Line2D(
+            #         [], [], color=color, marker='o', linestyle='None',
+            #         markersize=10, alpha=0.75
+            #     )
+            #     legend_markers.append(proxy)
+            #     legend_names.append('FF position') 
+                
+    
+        # segment breaks
+        all_point_index = temp_df.point_index.values
+        breaks = np.where(np.diff(all_point_index) >= point_index_gap_threshold_to_sep_vis_intervals)[0] + 1
+        bounds = np.r_[0, breaks, len(all_point_index)]
+
+        for j in range(len(bounds)-1):
+            seg = temp_df.iloc[bounds[j]:bounds[j+1]]
+            if len(seg) < 2:
+                continue
+            monkey_xy = seg[['monkey_x', 'monkey_y']].values
+            monkey_xy_rot = np.matmul(rotation_matrix, monkey_xy.T)
+            # draw the segment
+            marker1, = axes.plot(
+                monkey_xy_rot[0]-x0, monkey_xy_rot[1]-y0,
+                color=color, linewidth=linewidth, solid_capstyle='round'
+            )
+            show_visible_segments_of_ff_dict[ff_index] = color
+
+            # # add one legend entry per ff
+            # if (j == 0) and (legend_markers is not None):
+            #     legend_markers.append(marker1)          # <-- use append, and the handle itself
+            #     legend_names.append('FF visible segments')
+    
+    # when creating the legend:
+    axes.legend(
+        legend_markers, legend_names,
+        handler_map={tuple: HandlerTuple(ndivide=None)}  # <-- key bit
+    )
+
+
+    proxy = mlines.Line2D([], [], color='tab:blue', marker='o', linestyle='None', markersize=10)
+    legend_markers.append(proxy)
+    legend_names.append('Firefly locations (various colors)')
+
+
+    proxy_line = mlines.Line2D([], [], color='tab:blue', linewidth=4, solid_capstyle='round')
+    legend_markers.append(proxy_line)
+    legend_names.append('Visible segments (colored by firefly)')
+
+                
     return axes, legend_markers, legend_names, show_visible_segments_of_ff_dict
 
 
@@ -740,7 +831,16 @@ def set_xy_limits_for_axes(axes, mx_min, mx_max, my_min, my_max, minimal_margin=
     ymin, ymax = ymiddle - bigger_width/2, ymiddle + bigger_width/2
 
     if zoom_in is True:
-        if minimal_margin <= 40:
+        if minimal_margin <= 20:
+            x_width = mx_max - mx_min
+            y_width = my_max - my_min
+            xmin = xmiddle - x_width/2 - 30
+            xmax = xmiddle + x_width/2 + 30
+            ymin = ymiddle - y_width/2 - 30
+            ymax = ymiddle + y_width/2 + 30
+            axes.set_xlim((xmin, xmax))
+            axes.set_ylim((ymin, ymax))
+        elif minimal_margin <= 40:
             axes.set_xlim((xmin - 40, xmax + 40))
             axes.set_ylim((ymin - 20, ymax + 60))
         else:

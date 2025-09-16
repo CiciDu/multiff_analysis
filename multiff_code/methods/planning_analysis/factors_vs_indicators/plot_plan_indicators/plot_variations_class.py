@@ -199,7 +199,8 @@ class _PlotVariations:
                                      y_var_column,
                                      main_y_title,
                                      diff_y_title,
-                                     overall_title
+                                     overall_title,
+                                     constant_marker_size=None,
                                      ):
         # split
         main_data = all_ref_median_info[all_ref_median_info['test_or_control'] != 'difference'].copy(
@@ -221,9 +222,9 @@ class _PlotVariations:
 
         # children
         self.main_fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(
-            main_data, **common, is_difference=False)
+            main_data, **common, is_difference=False, constant_marker_size=constant_marker_size)
         self.diff_fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(
-            difference_data, **common, is_difference=True)
+            difference_data, **common, is_difference=True, constant_marker_size=constant_marker_size)
 
         if not hasattr(self, 'parent_assembler'):
             self.parent_assembler = parent_assembler.ParentFigureAssembler(
@@ -287,6 +288,7 @@ class _PlotVariations:
         columns_to_find_unique_combinations_for_line=[],
         add_ci_bounds=True,
         use_subplots_based_on_changeable_variables=True,
+        constant_marker_size=12,
     ):
 
         if all_ref_median_info is None:
@@ -309,6 +311,7 @@ class _PlotVariations:
             main_y_title="Median Angle (°)",
             diff_y_title="Difference in Median Angle (°)",
             overall_title="Absolute Angle to Next FF: Test vs Control",
+            constant_marker_size=constant_marker_size,
         )
 
     def build_child_fig(self, data, *,

@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 
 
-
 def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno',
                                      max_duration=30.0):
 
@@ -35,8 +34,16 @@ def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monk
         cgt.get_monkey_data(already_retrieved_ok=True, include_ff_dataframe=False, include_GUAT_data=True,
                             include_TAFT_data=True)
 
+        cgt.GUAT_trials_df['old_miss_index'] = np.arange(
+            len(cgt.GUAT_trials_df))
         new_trials_df, cap_old_to_new, miss_old_to_new = reindex_trials_with_misses(
-            cgt.ff_caught_T_new['time'], cgt.GUAT_trials_df['last_stop_time'].values)
+            cgt.ff_caught_T_new, cgt.GUAT_trials_df['last_stop_time'].values)
+
+        cgt.GUAT_trials_df['new_trial_index'] = cgt.GUAT_trials_df['old_miss_index'].map(
+            miss_old_to_new)
+        cgt.TAFT_trials_df['new_trial_index'] = cgt.TAFT_trials_df['trial'].map(
+            cap_old_to_new)
+
         retries_df = build_retries_df_from_new_trials(
             new_trials_df, cgt.GUAT_trials_df, cgt.TAFT_trials_df, max_duration=max_duration)
 
@@ -58,7 +65,7 @@ def summarize_retry_data(retries_df):
     rows = []
 
     # TAFT
-    n_taft = int((retries_df['type'] == 'TAFT').sum())
+    n_taft = retries_df.loc[retries_df['type'] == 'TAFT', 'capture'].sum()
     d_taft = float(
         retries_df.loc[retries_df['type'] == 'TAFT', 'new_duration'].sum())
     sw_taft = float(
@@ -69,7 +76,7 @@ def summarize_retry_data(retries_df):
         'total_new_duration': d_taft,
         'total_stop_window': sw_taft,
         'capture_over_duration': _rate_per_min(n_taft, d_taft),
-        'capture_over_stop_window': _rate_per_min(n_taft, sw_taft),
+        'retry_window_captures': _rate_per_min(n_taft, sw_taft),
     })
 
     # GUAT (rates intentionally 0)
@@ -84,7 +91,7 @@ def summarize_retry_data(retries_df):
         'total_new_duration': d_guat,
         'total_stop_window': sw_guat,
         'capture_over_duration': _rate_per_min(n_guat, d_guat),
-        'capture_over_stop_window': _rate_per_min(n_guat, sw_guat),
+        'retry_window_captures': _rate_per_min(n_guat, sw_guat),
     })
 
     # both = TAFT count only; duration/stop_window = TAFT+GUAT
@@ -99,11 +106,11 @@ def summarize_retry_data(retries_df):
         'total_new_duration': d_both,
         'total_stop_window': sw_both,
         'capture_over_duration': _rate_per_min(n_both, d_both),
-        'capture_over_stop_window': _rate_per_min(n_both, sw_both),
+        'retry_window_captures': _rate_per_min(n_both, sw_both),
     })
 
     # rest
-    n_rest = int((retries_df['type'] == 'rest').sum())
+    n_rest = retries_df.loc[retries_df['type'] == 'rest', 'capture'].sum()
     d_rest = float(
         retries_df.loc[retries_df['type'] == 'rest', 'new_duration'].sum())
     rows.append({
@@ -112,11 +119,11 @@ def summarize_retry_data(retries_df):
         'total_new_duration': d_rest,
         'total_stop_window': 0.0,
         'capture_over_duration': _rate_per_min(n_rest, d_rest),
-        'capture_over_stop_window': np.nan,
+        'retry_window_captures': np.nan,
     })
 
     # all = base intervals; stop_window only from TAFT+GUAT
-    n_all = int(retries_df.shape[0])
+    n_all = retries_df['capture'].sum()
     d_all = float(retries_df['new_duration'].sum())
     sw_all = sw_both
     rows.append({
@@ -125,12 +132,12 @@ def summarize_retry_data(retries_df):
         'total_new_duration': d_all,
         'total_stop_window': sw_all,
         'capture_over_duration': _rate_per_min(n_all, d_all),
-        'capture_over_stop_window': np.nan,
+        'retry_window_captures': np.nan,
     })
 
     retries_summary = pd.DataFrame(rows, columns=[
         'group', 'num_captures', 'total_new_duration',
-        'total_stop_window', 'capture_over_duration', 'capture_over_stop_window'
+        'total_stop_window', 'capture_over_duration', 'retry_window_captures'
     ])
 
     return retries_summary
@@ -148,10 +155,6 @@ def add_stop_window(df, label):
     sub = sub[['trial_index', 'stop_window']].copy()
     sub['type'] = label
     return sub
-
-
-
-
 
 
 def reindex_trials_with_misses(capture_times, fail_times):
@@ -256,7 +259,8 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
         if 'stop_window' not in df.columns:
             if {'first_stop_time', 'last_stop_time'}.issubset(df.columns):
                 df = df.copy()
-                df['stop_window'] = (df['last_stop_time'] - df['first_stop_time']).astype(float)
+                df['stop_window'] = (
+                    df['last_stop_time'] - df['first_stop_time']).astype(float)
             else:
                 df = df.copy()
                 df['stop_window'] = np.nan
@@ -267,38 +271,55 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
     GUAT_df = _ensure_stop_window(GUAT_trials_df)
 
     # ---- 2) TAFT rows: capture events that are TAFT-labeled (inner join) ----
-    taft_rows = nt.merge(TAFT_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
+    taft_rows = nt.merge(
+        TAFT_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
     taft_rows['type'] = 'TAFT'
 
     # ---- 3) GUAT rows: miss events that are GUAT-labeled (inner join) ----
-    guat_rows = nt.merge(GUAT_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
+    guat_rows = nt.merge(
+        GUAT_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
     guat_rows['type'] = 'GUAT'
 
     # ---- 4) REST rows: capture events NOT TAFT ----
-    taft_newidx = set(taft_rows['new_trial_index'].astype(int)) if len(taft_rows) else set()
-    guat_newidx = set(guat_rows['new_trial_index'].astype(int)) if len(guat_rows) else set()
+    taft_newidx = set(taft_rows['new_trial_index'].astype(
+        int)) if len(taft_rows) else set()
+    guat_newidx = set(guat_rows['new_trial_index'].astype(
+        int)) if len(guat_rows) else set()
     blocked = taft_newidx | guat_newidx
 
-    rest_rows = nt[(nt['event'] == 'capture') & ~nt['new_trial_index'].isin(blocked)].copy()
+    rest_rows = nt[(nt['event'] == 'capture') & ~
+                   nt['new_trial_index'].isin(blocked)].copy()
     rest_rows['stop_window'] = 0.0
     rest_rows['type'] = 'rest'
 
     # ---- 5) Assemble; preserve IDs and every qualifying new_trial_index ----
-    keep = ['new_trial_index', 'new_duration', 'stop_window', 'type', 'old_trial_index', 'old_miss_index']
+    keep = ['new_trial_index', 'new_duration', 'stop_window',
+            'type', 'old_trial_index', 'old_miss_index']
     retries_df = (pd.concat([taft_rows[keep], guat_rows[keep], rest_rows[keep]], ignore_index=True)
                     .sort_values(['new_trial_index', 'type'])
                     .reset_index(drop=True))
 
-    retries_df['type_combined'] = np.where(retries_df['type'].isin(['TAFT', 'GUAT']), 'both', 'rest')
+    retries_df['type_combined'] = np.where(
+        retries_df['type'].isin(['TAFT', 'GUAT']), 'both', 'rest')
     retries_df['capture'] = (retries_df['type'] != 'GUAT').astype(int)
 
-    retries_df['old_trial_index'] = retries_df['old_trial_index'].astype('Int64')
+    retries_df['old_trial_index'] = retries_df['old_trial_index'].astype(
+        'Int64')
     retries_df['old_miss_index'] = retries_df['old_miss_index'].astype('Int64')
 
     # Sanity: events should be disjoint across TAFT/GUAT/REST
-    assert not retries_df['new_trial_index'].duplicated(keep=False).any(), 'duplicated new_trial_index found'
-
-    # rename 'new_duration' -> 'duration' if you prefer the shorter name externally
-    retries_df = retries_df.rename(columns={'new_duration': 'duration'})
+    assert not retries_df['new_trial_index'].duplicated(
+        keep=False).any(), 'duplicated new_trial_index found'
 
     return retries_df
+
+
+def get_retry_window_captures(all_retries_df):
+    # retries_summary = summarize_retry_data(all_retries_df)
+    retry_window_captures = all_retries_df[all_retries_df['type'].isin(
+        ['GUAT', 'TAFT'])].copy()
+    retry_window_captures = retry_window_captures[[
+        'session', 'capture', 'stop_window']].groupby('session').sum().reset_index(drop=False)
+    retry_window_captures.rename(
+        columns={'capture': 'captures', 'stop_window': 'total_duration'}, inplace=True)
+    return retry_window_captures

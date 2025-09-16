@@ -48,10 +48,14 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         self.stops_near_ff_df.rename(columns={'ff_index': 'cur_ff_index',
                                               'monkey_angle': 'stop_monkey_angle', }, inplace=True)
 
-        # note that this only works for TAFT, but doesn't work for GUAT
-        self._add_nxt_ff_index()
-        self.stops_near_ff_df['nxt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['nxt_ff_index'].values]
 
+        self._add_nxt_ff_index()
+        try:
+            self.stops_near_ff_df['nxt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['nxt_ff_index'].values]
+        except IndexError:
+            self.stops_near_ff_df = self.stops_near_ff_df.iloc[:-1]
+            print(f"Warning: last row of stops_near_ff_df removed due to IndexError when adding nxt_ff_caught_time, because there is no nxt ff for the last ff.")
+            self.stops_near_ff_df['nxt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['nxt_ff_index'].values]
         # add the next stop time and point index
         closest_stop_to_capture_df2 = self.closest_stop_to_capture_df[[
             'cur_ff_index', 'stop_point_index', 'stop_time']].copy()

@@ -25,6 +25,7 @@ def PlotTrials(duration,
                num_trials=None,
                fig=None,
                axes=None,
+               dpi=100,
                rotation_matrix=None,
                x0=None,
                y0=None,
@@ -60,7 +61,8 @@ def PlotTrials(duration,
                show_connect_path_ff_memory=False,
                connect_path_ff_max_distance=None,
                show_visible_segments_ff_indices=None,
-               how_to_show_ff_for_visible_segments='square',
+               show_visible_segments_on_trajectory_ff_indices=None,
+               how_to_show_ff_for_visible_segments='circle',
                show_connect_path_ff_after_coloring_segments_ff_indices=None,
                show_path_when_cluster_visible=False,
                show_eye_positions=False,
@@ -315,7 +317,7 @@ def PlotTrials(duration,
             fig = plt.figure(figsize=(12, 6))
             axes = fig.add_subplot(1, 2, 1)
         else:
-            fig, axes = plt.subplots(figsize=(8, 8))
+            fig, axes = plt.subplots(figsize=(8, 8), dpi=dpi)
     elif axes is None:
         if show_eye_positions_on_the_right:
             axes = fig.add_subplot(121)
@@ -346,6 +348,21 @@ def PlotTrials(duration,
         axes = plot_behaviors_utils.visualize_monkey_angles_using_triangles(
             axes, cum_mxy_rotated, left_end_xy_rotated, right_end_xy_rotated, linewidth=0.5)
 
+    colorbar_max_value = None
+    if show_trajectory: # insert legend for trajectory here, though the trajectory itself will be plotted later
+        if trail_color_var is None:
+            # make a proxy to use legend
+            line = Line2D([0], [0], linestyle="-", alpha=0.9,
+                          linewidth=3, color="#212529")
+            legend_markers.append(line)
+            legend_names.append('Trajectory')
+        elif trail_color_var == 'abs_ddw':
+            cum_abs_ddw = np.abs(
+                np.array(monkey_information['ang_accel'].iloc[cum_pos_index]))
+            colorbar_max_value = max(cum_abs_ddw)
+
+
+
     if show_start:
         # Plot the start with improved styling
         start_size = {"agent": 280, "monkey": 200, "combined": 120}
@@ -363,7 +380,7 @@ def PlotTrials(duration,
                               marker='*', s=stop_size[player], alpha=0.8, color="#dc3545", zorder=2,
                               edgecolors='#c82333', linewidth=1)
         legend_markers.append(marker)
-        legend_names.append('Low speed/stopping points')
+        legend_names.append('Stops')
 
     if indices_of_ff_to_be_plotted_in_a_basic_way is not None:
         ff_to_be_plotted_in_a_basic_way = indices_of_ff_to_be_plotted_in_a_basic_way.tolist()
@@ -426,7 +443,7 @@ def PlotTrials(duration,
         )
 
         legend_markers.append(marker)
-        legend_names.append('Catching-firefly positions')
+        legend_names.append('Captures')
 
     if indices_of_ff_to_mark is not None:
         shown_ff_indices.extend(indices_of_ff_to_mark)
@@ -540,6 +557,7 @@ def PlotTrials(duration,
             ff_dataframe_in_duration_visible['ff_index'].isin(show_visible_segments_ff_indices)]
         axes, legend_markers, legend_names, show_visible_segments_of_ff_dict = plot_behaviors_utils.plot_horizontal_lines_to_show_ff_visible_segments(axes, ff_dataframe_in_duration_visible_qualified, monkey_information, rotation_matrix, x0, y0, legend_markers, legend_names,
                                                                                                                                                       how_to_show_ff=how_to_show_ff_for_visible_segments, unique_ff_indices=show_visible_segments_ff_indices)
+        shown_ff_indices.extend(show_visible_segments_ff_indices)
 
         if show_connect_path_ff_after_coloring_segments_ff_indices is not None:
             for _ff_index in np.array(show_connect_path_ff_after_coloring_segments_ff_indices):
@@ -547,6 +565,43 @@ def PlotTrials(duration,
                     ff_dataframe_in_duration_visible['ff_index'] == _ff_index]
                 axes, _, _, _, _, = plot_behaviors_utils.plot_lines_to_connect_path_and_ff(
                     axes, ff_dataframe_visible_for_specific_ff, rotation_matrix, x0, y0, 1, 0.5, vary_color_for_connecting_path_ff=False, line_color=show_visible_segments_of_ff_dict[_ff_index])
+
+    if show_visible_segments_on_trajectory_ff_indices is not None:
+        
+        ff_dataframe_in_duration_visible_qualified = ff_dataframe_in_duration_visible.loc[
+            ff_dataframe_in_duration_visible['ff_index'].isin(show_visible_segments_on_trajectory_ff_indices)]
+        axes, legend_markers, legend_names, show_visible_segments_of_ff_dict = plot_behaviors_utils.plot_visible_segments_on_trajectory(axes, ff_dataframe_in_duration_visible_qualified, rotation_matrix, x0, y0, legend_markers, legend_names,
+                                                                                                                                                      how_to_show_ff=how_to_show_ff_for_visible_segments, unique_ff_indices=show_visible_segments_on_trajectory_ff_indices)
+        shown_ff_indices.extend(show_visible_segments_on_trajectory_ff_indices)
+        
+
+        # shown_ff_indices.extend(show_visible_segments_on_trajectory_ff_indices)
+        
+        # varying_colors = plot_behaviors_utils.get_varying_colors_for_ff()
+        # ff_dataframe_in_duration_visible_qualified = ff_dataframe_in_duration_visible.loc[
+        #     ff_dataframe_in_duration_visible['ff_index'].isin(show_visible_segments_on_trajectory_ff_indices)]
+        # unique_ff_indices = ff_dataframe_in_duration_visible_qualified.ff_index.unique()
+        # ff_indices_to_show = [ff for ff in show_visible_segments_on_trajectory_ff_indices if ff in unique_ff_indices]
+        
+        # for i, ff_index in enumerate(np.array(ff_indices_to_show)):
+        #     color = np.append(varying_colors[i % 9], 0.5)
+        #     ff_dataframe_visible_for_specific_ff = ff_dataframe_in_duration_visible.loc[
+        #         ff_dataframe_in_duration_visible['ff_index'] == ff_index]
+        #     monkey_xy = ff_dataframe_visible_for_specific_ff[['monkey_x', 'monkey_y']].values
+        #     monkey_xy_rotated = np.matmul(R, monkey_xy.T)
+        #     axes.plot(monkey_xy_rotated[0]-x0, monkey_xy_rotated[1]-y0, color=color, linewidth=10)
+        #     #axes.scatter(monkey_xy_rotated[0]-x0, monkey_xy_rotated[1]-y0, color=color, marker='s', s=10)
+            
+            
+        #     # also show ff position
+        #     ff_position_rotated = np.matmul(
+        #         rotation_matrix, ff_dataframe_visible_for_specific_ff[['ff_x', 'ff_y']].drop_duplicates().values.T)
+        #     circle = plt.Circle((ff_position_rotated[0]-x0, ff_position_rotated[1]-y0),
+        #                         25, facecolor=color, edgecolor=None, alpha=0.75, zorder=1)
+        #     axes.add_patch(circle)
+            
+            
+            
 
     if show_points_when_ff_start_being_visible or show_points_when_ff_stop_being_visible:
         vary_color_for_connecting_path_ff = True
@@ -682,21 +737,10 @@ def PlotTrials(duration,
         axes2.spines['left'].set_linewidth(1.5)
         axes2.spines['bottom'].set_linewidth(1.5)
 
-    colorbar_max_value = None
+    
     if show_trajectory:
         axes = plot_behaviors_utils.show_trajectory_func(axes, player, cum_pos_index, cum_mxy_rotated, cum_t, cum_speed, monkey_information,
                                                          x0, y0, trail_color_var, show_eye_positions, subplots, hitting_arena_edge)
-        # Some other procedures
-        if trail_color_var is None:
-            # make a proxy to use legend
-            line = Line2D([0], [0], linestyle="-", alpha=0.9,
-                          linewidth=3, color="#212529")
-            legend_markers.append(line)
-            legend_names.append('Monkey trajectory')
-        elif trail_color_var == 'abs_ddw':
-            cum_abs_ddw = np.abs(
-                np.array(monkey_information['ang_accel'].iloc[cum_pos_index]))
-            colorbar_max_value = max(cum_abs_ddw)
 
     if show_null_agent_trajectory:
         axes, legend_markers, legend_names = show_null_trajectory.show_null_agent_trajectory_func(duration, null_agent_starting_time, monkey_information, ff_dataframe, ff_caught_T_new,
@@ -715,10 +759,23 @@ def PlotTrials(duration,
                                                                   show_eye_positions_on_the_right=show_eye_positions_on_the_right, duration=duration, max_value=colorbar_max_value)
 
     if show_legend:
-        axes.legend(legend_markers, legend_names, scatterpoints=1,
-                    bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                    frameon=True, fancybox=True, shadow=True,
-                    fontsize=10, framealpha=0.95)
+        axes.legend(
+            legend_markers, legend_names,
+            scatterpoints=1,
+            bbox_to_anchor=(1.02, 1),
+            loc='upper left',
+            borderaxespad=0.5,
+            handlelength=2.5,
+            handletextpad=0.8,
+            columnspacing=1.2,
+            frameon=False,       # no border
+            fontsize=10,
+            labelspacing=1.2     # <-- more vertical space between lines
+        )
+    else:
+        # make sure the legend is not shown
+        axes.legend_ = None
+
 
     # Set the limits of the x-axis and y-axis
     if adjust_xy_limits:
