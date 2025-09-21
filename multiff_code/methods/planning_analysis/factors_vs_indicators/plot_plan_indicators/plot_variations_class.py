@@ -79,7 +79,7 @@ class _PlotVariations:
                          add_ci_bounds=True,
                          use_subplots_based_on_changeable_variables=False,
                          is_difference=False):
-        
+
         # note: d_curv has already been converted to degrees/m in furnish_diff_in_curv_df function
 
         if all_ref_median_info is None:
@@ -130,15 +130,20 @@ class _PlotVariations:
                                   add_ci_bounds=True,
                                   use_subplots_based_on_changeable_variables=False,
                                   show_fig=True,
-                                  is_difference=False):
+                                  is_difference=False,
+                                  y_min=None,
+                                  y_max=None,
+                                  ):
 
         if perc_info is None:
             perc_info = self.pooled_perc_info
 
+        perc_info['perc'] = perc_info['perc'] * 100
+
         if add_ci_bounds:
-            perc_info['ci_lower'] = perc_info['perc_ci_low_95']
-            perc_info['ci_upper'] = perc_info['perc_ci_high_95']
-            
+            perc_info['ci_lower'] = perc_info['perc_ci_low_95'] * 100
+            perc_info['ci_upper'] = perc_info['perc_ci_high_95'] * 100
+
         if is_difference:
             perc_info = perc_info[perc_info['test_or_control'] == 'difference']
         else:
@@ -157,11 +162,23 @@ class _PlotVariations:
                                                                                                    use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
                                                                                                    )
 
+        # Calculate y-axis limits based on ci_lower and ci_upper
+        if y_min is None:
+            y_min = perc_info['ci_lower'].min(
+            ) if add_ci_bounds else perc_info['perc'].min()
+            y_min = max(0, y_min - 20)
+        if y_max is None:
+            y_max = perc_info['ci_upper'].max(
+            ) if add_ci_bounds else perc_info['perc'].max()
+            y_max = min(100, y_max + 5)
+
         self.fig.update_layout(
-            title="Same-Side Stop Rate (Median ± 2 Bootstrap SE)",
+            title="Same-Side Stop Rate",
             xaxis_title=None,
-            yaxis_title="Same-Side Stop Rate"
+            yaxis_title="Same-Side Stop Rate",
         )
+        # Apply y-axis range to all subplots
+        self.fig.update_yaxes(range=[y_min, y_max])
         if show_fig:
             self.fig.show()
 
@@ -184,7 +201,9 @@ class _PlotVariations:
                                        changeable_variables=changeable_variables,
                                        columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
                                        add_ci_bounds=add_ci_bounds,
-                                       use_subplots_based_on_changeable_variables=True)
+                                       use_subplots_based_on_changeable_variables=True,
+                                       y_min=45,  # Set fixed y_min
+                                       y_max=65)  # Set fixed y_max
 
     # shared engine
 
@@ -201,6 +220,7 @@ class _PlotVariations:
                                      diff_y_title,
                                      overall_title,
                                      constant_marker_size=None,
+                                     x_title='Reference Distance from Stop at Current Target (cm)',
                                      ):
         # split
         main_data = all_ref_median_info[all_ref_median_info['test_or_control'] != 'difference'].copy(
@@ -235,8 +255,14 @@ class _PlotVariations:
             self.main_fig, self.diff_fig,
             main_y_title=main_y_title,
             diff_y_title=diff_y_title,
-            overall_title=overall_title
+            overall_title=overall_title,
+            x_title=x_title,
         )
+        # Retain x and y axis lines across all subplots
+        self.fig.update_xaxes(
+            showline=True, linecolor='black', linewidth=1, mirror=False)
+        self.fig.update_yaxes(
+            showline=True, linecolor='black', linewidth=1, mirror=False)
         return self.fig
 
     # public wrappers (unchanged names)
@@ -293,7 +319,7 @@ class _PlotVariations:
 
         if all_ref_median_info is None:
             all_ref_median_info = self.all_ref_pooled_median_info_heading
-            
+
         all_ref_median_info['diff_in_abs_angle_to_nxt_ff_median'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_median'] * 180/np.pi
 
         if add_ci_bounds:

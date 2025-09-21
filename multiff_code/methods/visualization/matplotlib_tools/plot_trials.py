@@ -423,7 +423,8 @@ def PlotTrials(duration,
     shown_ff_indices = ff_to_be_plotted_in_a_basic_way.copy()
 
     if show_believed_target_positions:
-        target_size = {"agent": 220, "monkey": 350, "combined": 50}
+        #target_size = {"agent": 220, "monkey": 350, "combined": 50}
+        target_size = {"agent": 180, "monkey": 230, "combined": 50}
         marker = {"agent": "*", "monkey": "*", "combined": "o"}
         shown_ff_indices.extend(
             range(currentTrial - num_trials + 1, currentTrial + 1))
@@ -436,7 +437,7 @@ def PlotTrials(duration,
             marker=marker[player],
             s=target_size[player],
             color="#FFD700",          # gold/yellow fill (bright, readable)
-            alpha=0.95,
+            alpha=0.9,
             zorder=4,
             edgecolors="black",       # crisp outline for contrast
             linewidth=1

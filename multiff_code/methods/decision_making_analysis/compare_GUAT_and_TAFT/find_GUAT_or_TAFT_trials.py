@@ -256,10 +256,10 @@ def _take_out_monkey_subset_for_GUAT(
     # Right now, we have changed to filter only based on distance to current target, but we can use the distances to previous and next targets for filteringif needed
     dcols = [
         "distance_to_target",
-        # "distance_to_last_target",
-        # "distance_to_last_last_target",
-        # "distance_to_next_target",
-        # "distance_to_next_next_target",
+        "distance_to_last_target",
+        "distance_to_last_last_target",
+        "distance_to_next_target",
+        "distance_to_next_next_target",
     ]
 
     # Note: this is the opposite of what we do for TAFT

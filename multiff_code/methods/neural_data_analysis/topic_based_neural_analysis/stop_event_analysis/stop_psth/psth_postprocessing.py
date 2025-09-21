@@ -1,3 +1,4 @@
+from matplotlib.colors import TwoSlopeNorm
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional, Literal
 
@@ -233,9 +234,12 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
     vmax = np.nanmax(np.abs(pivot.values))
     if not np.isfinite(vmax) or vmax == 0:
         vmax = 1.0  # fallback if nothing significant at all
-        
+
+    event_a_label = getattr(analyzer, 'event_a_label', 'event_a')
+    event_b_label = getattr(analyzer, 'event_b_label', 'event_b')
+
     if title is None:
-        title = f"{getattr(analyzer,'event_a_label','event_a')} − {getattr(analyzer,'event_b_label','event_b')} effects (Cohen's d)"
+        title = f"{event_a_label} − {event_b_label} effects (Cohen's d)"
 
     fig, ax = plt.subplots(figsize=(8, max(3, 0.4 * len(pivot))))
     im = ax.imshow(pivot.values, aspect="auto",
@@ -248,7 +252,7 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
 
     ax.set_title(title)
     cbar = plt.colorbar(im, ax=ax)
-    cbar.set_label("Cohen's d (event_a − event_b)")
+    cbar.set_label("Cohen's d ({event_a_label} − {event_b_label})")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Cluster")
     ax.grid(False)
@@ -256,25 +260,16 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
     return fig, ax
 
 
-
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.colors import TwoSlopeNorm
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.colors import TwoSlopeNorm
-
 def _pick_sample_sizes(df: pd.DataFrame) -> tuple[int | None, int | None]:
     nA = nB = None
     if 'n_event_a' in df.columns and df['n_event_a'].notna().any():
-        nA = int(pd.to_numeric(df['n_event_a'], errors='coerce').dropna().iloc[0])
+        nA = int(pd.to_numeric(df['n_event_a'],
+                 errors='coerce').dropna().iloc[0])
     if 'n_event_b' in df.columns and df['n_event_b'].notna().any():
-        nB = int(pd.to_numeric(df['n_event_b'], errors='coerce').dropna().iloc[0])
+        nB = int(pd.to_numeric(df['n_event_b'],
+                 errors='coerce').dropna().iloc[0])
     return nA, nB
+
 
 def _shorten_labels(seq):
     # turn 'pre_bump(…)' -> 'pre bump\n(…)' to save horizontal space
@@ -287,12 +282,31 @@ def _shorten_labels(seq):
             out.append(s.replace('_', ' '))
     return out
 
+
+def _extract_paren_content(seq):
+    out = []
+    for s in map(str, seq):
+        if '(' in s and ')' in s:
+            left = s.find('(')
+            right = s.rfind(')')
+            if right > left:
+                out.append(s[left+1:right])
+                continue
+        out.append(s.replace('_', ' '))
+    return out
+
+
 def plot_sig_heatmap(summary: pd.DataFrame,
                      title: str | None = None,
                      window_order: list | None = None,
                      cmap: str = 'coolwarm',
                      drop_empty_windows: bool = False,
-                     xtick_rotation: int = 30):
+                     show_y_tick_label: bool = False,
+                     xtick_rotation: int = 30,
+                     strip_prefix: bool = False,
+                     show_sample_size: bool = False,
+                     dpi=300,
+                     ):
     """
     Heatmap of FDR-significant Cohen's d by cluster × window.
     - Title and sample size are combined into a single two-line suptitle.
@@ -304,7 +318,11 @@ def plot_sig_heatmap(summary: pd.DataFrame,
         title = "Significant effects (Cohen's d)"
 
     nA, nB = _pick_sample_sizes(summary)
-    subtitle = f'sample sizes: n_a={nA}, n_b={nB}' if (nA is not None and nB is not None) else None
+    if show_sample_size:
+        subtitle = f'sample sizes: {nA} and {nB}' if (
+            nA is not None and nB is not None) else None
+    else:
+        subtitle = None
 
     sig = summary[summary['sig_FDR']].copy()
 
@@ -314,13 +332,16 @@ def plot_sig_heatmap(summary: pd.DataFrame,
         ax.axis('off')
         header = title if not subtitle else f'{title}\n{subtitle}'
         fig.suptitle(header, fontsize=13)
-        ax.text(0.5, 0.58, 'No significant results to plot.', ha='center', va='center', fontsize=11)
-        ax.text(0.5, 0.30, 'Try more trials, different windows, or relaxed corrections.', ha='center', va='center', fontsize=9)
+        ax.text(0.5, 0.58, 'No significant results to plot.',
+                ha='center', va='center', fontsize=11)
+        ax.text(0.5, 0.30, 'Try more trials, different windows, or relaxed corrections.',
+                ha='center', va='center', fontsize=9)
         plt.subplots_adjust(top=0.78)
         return fig, ax
 
     if window_order is not None:
-        sig['window'] = pd.Categorical(sig['window'], categories=window_order, ordered=True)
+        sig['window'] = pd.Categorical(
+            sig['window'], categories=window_order, ordered=True)
 
     # pivot clusters × windows; choose whether to keep unobserved categories
     observed_flag = True if drop_empty_windows else False
@@ -336,7 +357,8 @@ def plot_sig_heatmap(summary: pd.DataFrame,
 
     # enforce column order
     if window_order is not None:
-        cols = [w for w in window_order if w in pivot.columns] if drop_empty_windows else window_order
+        cols = [
+            w for w in window_order if w in pivot.columns] if drop_empty_windows else window_order
         pivot = pivot.reindex(columns=cols)
 
     # sort clusters by strongest absolute effect
@@ -352,24 +374,47 @@ def plot_sig_heatmap(summary: pd.DataFrame,
     norm = TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
 
     # figure
-    fig_h = max(3.2, 0.42 * max(1, len(pivot)))
-    fig, ax = plt.subplots(figsize=(9.0, fig_h), dpi=120)
+    fig_h = min(max(3.2, 0.42 * max(1, len(pivot))), 5)
+    fig, ax = plt.subplots(figsize=(9.0, fig_h), dpi=dpi)
 
     im = ax.imshow(pivot.to_numpy(), aspect='auto', cmap=cmap, norm=norm)
 
     ax.set_xticks(range(pivot.shape[1]))
-    ax.set_xticklabels(_shorten_labels(pivot.columns), rotation=xtick_rotation, ha='right')
-    ax.set_yticks(range(pivot.shape[0]))
-    ax.set_yticklabels(pivot.index)
+    if strip_prefix:
+        ax.set_xticklabels(_extract_paren_content(
+            pivot.columns), rotation=xtick_rotation, ha='right')
+    else:
+        ax.set_xticklabels(_shorten_labels(pivot.columns),
+                           rotation=xtick_rotation, ha='right')
+
+    if show_y_tick_label:
+        ax.set_yticks(range(pivot.shape[0]))
+        ax.set_yticklabels(pivot.index)
+    else:
+        ax.set_yticks([])
+        ax.set_yticklabels([])
 
     # single two-line header avoids collisions
     header = title if not subtitle else f'{title}\n{subtitle}'
-    fig.suptitle(header, fontsize=13)
+    fig.suptitle(header, fontsize=17, y=0.95)
 
     cbar = plt.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
-    cbar.set_label("Cohen's d (event_a − event_b)")
+
+    cbar.set_label('Standardized\nmean difference', rotation=0, labelpad=40, fontsize=12)
+    # cbar.set_label("Cohen's d (event_a − event_b)")
 
     # reserve space for the two-line suptitle
-    plt.subplots_adjust(top=0.80)
-    return fig, ax
+    if subtitle:
+        plt.subplots_adjust(top=0.80)
+    else:
+        plt.subplots_adjust(top=0.85)
 
+    ax.set_ylabel('Neurons', fontsize=14)
+    ax.set_xlabel('Window (in seconds)', fontsize=14)
+
+    # find the column whose label spans 0
+    zero_col = [i for i, w in enumerate(pivot.columns) if '0.0' in str(w)]
+    if zero_col:
+        ax.axvline(x=zero_col[0], color='k', linestyle='--', linewidth=1)
+
+    return fig, ax

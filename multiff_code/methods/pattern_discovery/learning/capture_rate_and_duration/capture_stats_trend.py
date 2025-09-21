@@ -112,6 +112,8 @@ def fit_and_plot_capture_rate_and_duration(df_trials: pd.DataFrame,
     return {"po": po, "ols": ols, "po_curve": po_curve, "ols_curve": ols_curve}
 
 
+
+
 def fit_both_models(df_trials: pd.DataFrame,
                     df_sessions: pd.DataFrame,
                     *,
