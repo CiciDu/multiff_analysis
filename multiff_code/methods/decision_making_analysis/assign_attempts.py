@@ -5,6 +5,27 @@ from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_tri
 from decision_making_analysis.GUAT import GUAT_utils
 
 
+def make_stop_category_df(monkey_information, ff_caught_T_new, closest_stop_to_capture_df, TAFT_trials_df, ff_dataframe, ff_real_position_sorted):
+    stop_category_df = init_stop_category_df(
+        monkey_information,
+        ff_caught_T_new,
+    )
+
+    stop_category_df = assign_associated_target(
+        stop_category_df,
+        closest_stop_to_capture_df,
+        TAFT_trials_df,
+        ff_real_position_sorted
+    )
+
+    stop_category_df = add_misses_to_stop_category_df(stop_category_df, monkey_information,
+                                                                    ff_dataframe, ff_real_position_sorted)
+    stop_category_df = add_new_stop_cluster_id(stop_category_df)
+    stop_category_df = reassign_attempt_types(stop_category_df)
+
+    return stop_category_df
+
+
 def init_stop_category_df(monkey_information, ff_caught_T_new):
     # Base subset of distinct stops
     stop_category_df = monkey_information.loc[
@@ -95,13 +116,8 @@ def _deal_with_stops_close_to_targets(stop_category_df, ff_real_position_sorted,
 
 def _categorize_based_on_associated_target(stop_category_df):
     mask = stop_category_df['associated_target'].notna()
-    # 1) Group ID per associated_target (0-based)
-    gid = pd.factorize(stop_category_df.loc[mask, 'associated_target'])[0]
-    stop_category_df['assoc_group_id'] = pd.NA
-    stop_category_df.loc[mask, 'assoc_group_id'] = gid
-    stop_category_df['assoc_group_id'] = stop_category_df['assoc_group_id'].astype('Int64')
 
-    # 2) Group size per associated_target
+    # Group size per associated_target
     sizes = stop_category_df.loc[mask].groupby('associated_target').size()
     stop_category_df['assoc_group_size'] = pd.NA
     stop_category_df.loc[mask, 'assoc_group_size'] = stop_category_df.loc[mask, 'associated_target'].map(sizes)
@@ -111,12 +127,12 @@ def _categorize_based_on_associated_target(stop_category_df):
     stop_category_df.loc[stop_category_df['assoc_group_size'] == 1, 'attempt_type'] = 'capture'
     stop_category_df.loc[stop_category_df['assoc_group_size'] > 1, 'attempt_type'] = 'TAFT'
     
-    stop_category_df.drop(columns=['assoc_group_id', 'assoc_group_size'], inplace=True)
+    stop_category_df.drop(columns=['assoc_group_size'], inplace=True)
 
     return stop_category_df
 
 
-def _take_out_guat_from_leftover_stops(stop_category_df, monkey_information, ff_dataframe, ff_real_position_sorted, max_point_index):
+def _take_out_guat_from_leftover_stops(stop_category_df, monkey_information, ff_dataframe, ff_real_position_sorted):
     # take out subset of stops with no associated target
     stop_sub = stop_category_df[stop_category_df['associated_target'].isna()].copy()
 
@@ -130,7 +146,7 @@ def _take_out_guat_from_leftover_stops(stop_category_df, monkey_information, ff_
 
 
     GUAT_indices_df, GUAT_point_indices_for_anim = find_GUAT_or_TAFT_trials._get_GUAT_or_TAFT_info(
-        new_GUAT_trials_df, monkey_information, max_point_index=max_point_index)
+        new_GUAT_trials_df, monkey_information)
 
     new_GUAT_w_ff_df, GUAT_expanded_trials_df = GUAT_utils.get_GUAT_w_ff_df(GUAT_indices_df,
                                                                         new_GUAT_trials_df,
@@ -154,9 +170,9 @@ def _take_out_one_stop_from_leftover_stops(stop_category_df, ff_dataframe, ff_re
     return new_one_stop_w_ff_df
 
 
-def add_misses_to_stop_category_df(stop_category_df, monkey_information, ff_dataframe, ff_real_position_sorted, max_point_index):
+def add_misses_to_stop_category_df(stop_category_df, monkey_information, ff_dataframe, ff_real_position_sorted):
     # Add GUAT misses
-    new_GUAT_w_ff_df = _take_out_guat_from_leftover_stops(stop_category_df, monkey_information, ff_dataframe, ff_real_position_sorted, max_point_index)
+    new_GUAT_w_ff_df = _take_out_guat_from_leftover_stops(stop_category_df, monkey_information, ff_dataframe, ff_real_position_sorted)
     new_GUAT_w_ff_df['associated_ff'] = new_GUAT_w_ff_df['latest_visible_ff']
     new_GUAT_w_ff_df['guat_attempt_type'] = 'GUAT'
     stop_category_df = stop_category_df.merge(new_GUAT_w_ff_df[['stop_cluster_id', 'associated_ff', 'guat_attempt_type']], on='stop_cluster_id', how='left')
@@ -194,8 +210,8 @@ def reassign_attempt_types(
     Rules per cluster (only where associated_ff is not NA):
       1) If any TAFT -> all TAFT
       2) Else if any capture:
-            size == 1 -> capture
             size > 1  -> TAFT
+            size == 1 -> capture
       3) Else:
             size > 1  -> GUAT
             size == 1 -> one_stop_label
