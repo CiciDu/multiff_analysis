@@ -31,12 +31,12 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
         # The following columns are added so the function further_process_df_related_to_cluster_replacement can be called without errors.
         # But the values in these columns will be updated later
         self.miss_abort_cur_ff_info[['whether_changed',
-                               'whether_intended_target']] = False
+                                     'whether_intended_target']] = False
         self.miss_abort_nxt_ff_info[['whether_changed',
-                               'whether_intended_target']] = False
+                                     'whether_intended_target']] = False
 
         self.miss_abort_cur_ff_info, self.miss_abort_nxt_ff_info = cluster_replacement_utils.further_process_df_related_to_cluster_replacement(self.miss_abort_cur_ff_info, self.miss_abort_nxt_ff_info,
-                                                                                                                                   num_old_ff_per_row=num_old_ff_per_row, num_new_ff_per_row=num_new_ff_per_row, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff)
+                                                                                                                                               num_old_ff_per_row=num_old_ff_per_row, num_new_ff_per_row=num_new_ff_per_row, selection_criterion_if_too_many_ff=selection_criterion_if_too_many_ff)
         self.miss_abort_nxt_ff_info['order'] = self.miss_abort_nxt_ff_info['order'] + \
             num_old_ff_per_row
 
@@ -107,7 +107,7 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
                                                 num_time_points_for_trajectory, ff_attributes=ff_attributes)
 
     def plot_prediction_results(self, selected_cases=None, max_plot_to_make=40, show_direction_of_monkey_on_trajectory=False, show_reward_boundary=False,
-                                use_more_ff_inputs=False, use_more_traj_points=False, max_time_since_last_vis=2.5, predict_num_stops=False, additional_plotting_kwargs={}):
+                                use_more_ff_inputs=False, use_more_traj_points=False, max_time_since_last_vis=3, predict_num_stops=False, additional_plotting_kwargs={}):
 
         # if self.polar_plots_kwargs is None:
         self.prepare_to_plot_prediction_results(use_more_ff_inputs=use_more_ff_inputs, use_more_traj_points=use_more_traj_points,
@@ -125,7 +125,7 @@ class GUATHelperClass(decision_making_class.DecisionMaking):
                                                       )
 
     def make_polar_plots_for_cluster_replacement(self, selected_cases=None, max_plot_to_make=5, show_reward_boundary=False,
-                                                 max_time_since_last_vis=2.5, ff_colormap='Greens',
+                                                 max_time_since_last_vis=3, ff_colormap='Greens',
                                                  predict_num_stops=False, ):
 
         if selected_cases is not None:

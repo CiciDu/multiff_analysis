@@ -187,7 +187,7 @@ def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_so
     ff_dataframe_temp = ff_dataframe.copy()
     ff_dataframe_temp = ff_dataframe_temp[abs(
         ff_dataframe_temp['ff_angle']) <= math.pi/4]
-    ff_dataframe_truncated = ff_dataframe_temp[ff_dataframe_temp['time_since_last_vis'] <= 2.5]
+    ff_dataframe_truncated = ff_dataframe_temp[ff_dataframe_temp['time_since_last_vis'] <= 3]
 
     moit = ModelOfIntendedTargets(ff_dataframe_truncated, ff_caught_T_new, ff_real_position_sorted,
                                   monkey_information, ff_flash_sorted, ff_life_sorted, time_range_of_trajectory=time_range_of_trajectory)
@@ -203,6 +203,6 @@ def test_moit_hyperparameters(ff_dataframe, ff_caught_T_new, ff_real_position_so
         furnish_with_trajectory_data=furnish_with_trajectory_data, trajectory_data_kind=trajectory_data_kind)
     moit.split_data_to_train_and_test(
         scaling_data=True, keep_whole_chunks=keep_whole_chunks)
-    #moit.use_machine_learning_model_for_classification(model=None)
+    # moit.use_machine_learning_model_for_classification(model=None)
 
     return moit.model_comparison_df

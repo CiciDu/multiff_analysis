@@ -271,7 +271,7 @@ def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df
 
 def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, cur_ff_index_array=None, stop_point_index_array=None):
     stop_sub = monkey_information.loc[monkey_information['monkey_speeddummy'] == 0, [
-        'time', 'point_index']].copy()
+        'time', 'point_index', 'stop_id']].copy()
     closest_stop_to_capture_df = pd.DataFrame()
     for i in range(len(ff_caught_T_sorted)):
         caught_time = ff_caught_T_sorted[i]

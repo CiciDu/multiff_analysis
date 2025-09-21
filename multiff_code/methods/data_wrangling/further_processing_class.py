@@ -321,7 +321,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         # Contains stops that are 25-50cm from fireflies, representing potential decision points
         # where the monkey stopped near but not at a firefly (one-stop misses)
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(
-            self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
+            self.monkey_information, self.ff_dataframe, self.ff_caught_T_new, self.ff_real_position_sorted)
         
         # one_stop_w_ff_df: Wide format dataframe with one row per stop
         # Aggregates one_stop_df by grouping stops and selecting the most recently visible firefly

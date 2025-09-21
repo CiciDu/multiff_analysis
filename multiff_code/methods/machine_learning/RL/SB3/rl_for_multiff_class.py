@@ -4,6 +4,7 @@ from visualization.matplotlib_tools import additional_plots, plot_statistics
 from visualization.animation import animation_class, animation_utils
 from machine_learning.RL.env_related import env_for_lstm, env_for_sb3, collect_agent_data_utils
 from machine_learning.RL.SB3 import interpret_neural_network, rl_for_multiff_utils, SB3_functions
+from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 
 
 import time as time_package
@@ -260,6 +261,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
+        
+        self.monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
+            self.monkey_information, self.ff_caught_T_new, col_exists_ok=False)
+        
         return
 
     def save_ff_info_into_npz(self):

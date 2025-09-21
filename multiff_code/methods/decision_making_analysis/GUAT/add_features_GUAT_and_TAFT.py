@@ -55,7 +55,7 @@ def supply_info_of_cluster_to_df(df, ff_real_position_sorted, ff_life_sorted, mo
 
 
 def find_miss_abort_cur_ff_info(miss_abort_df, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information, include_ff_in_near_future=False,
-                                max_time_since_last_vis=2.5,
+                                max_time_since_last_vis=3,
                                 duration_into_future=0.5,
                                 max_cluster_distance=50,
                                 max_distance_to_stop=400,):
@@ -145,7 +145,7 @@ def find_miss_abort_cur_ff_info(miss_abort_df, ff_real_position_sorted, ff_life_
 
 
 def find_miss_abort_nxt_ff_info(miss_abort_cur_ff_info, ff_dataframe, ff_real_position_sorted, monkey_information,
-                                max_time_since_last_vis=2.5,
+                                max_time_since_last_vis=3,
                                 max_distance_to_stop=400,
                                 duration_into_future=0.5,
                                 include_ff_in_near_future=True):
@@ -165,7 +165,7 @@ def find_miss_abort_nxt_ff_info(miss_abort_cur_ff_info, ff_dataframe, ff_real_po
       3) Enforces a maximum distance to the stop and removes duplicate (point_index, ff_index),
          keeping the closest instance.
     """
-    
+
     miss_abort_nxt_ff_info = ff_dataframe[ff_dataframe['point_index'].isin(
         miss_abort_cur_ff_info['point_index'].values)].copy()
     miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[miss_abort_nxt_ff_info['time_since_last_vis']
@@ -259,7 +259,7 @@ def polish_miss_abort_cur_ff_info(miss_abort_cur_ff_info):
 
 def polish_miss_abort_nxt_ff_info(miss_abort_nxt_ff_info, miss_abort_cur_ff_info, ff_real_position_sorted, ff_life_sorted, ff_dataframe, monkey_information,
                                   columns_to_sort_nxt_ff_by=['abs_curv_diff', 'time_since_last_vis'], max_cluster_distance=50,
-                                  max_time_since_last_vis=2.5, duration_into_future=0.5,
+                                  max_time_since_last_vis=3, duration_into_future=0.5,
                                   take_one_row_for_each_point_and_find_cluster=False):
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == True].copy()
@@ -285,10 +285,12 @@ def polish_miss_abort_nxt_ff_info(miss_abort_nxt_ff_info, miss_abort_cur_ff_info
         'point_index', 'ff_index', 'distance_to_monkey', 'total_stop_time']], on=['point_index', 'ff_index'], how='left')
 
     miss_abort_nxt_ff_info = miss_abort_nxt_ff_info[(miss_abort_nxt_ff_info['time_since_last_vis'] <= max_time_since_last_vis) |
-                                                    (miss_abort_nxt_ff_info['time_till_next_visible'] <= miss_abort_nxt_ff_info['total_stop_time'] + duration_into_future)]  # either the ff has appeared lately, or will appear shortly
+                                                    # either the ff has appeared lately, or will appear shortly
+                                                    (miss_abort_nxt_ff_info['time_till_next_visible'] <= miss_abort_nxt_ff_info['total_stop_time'] + duration_into_future)]
 
     # # since we just added cluster ff, once again we need to eliminate the info of the ff in miss_abort_nxt_ff_info that's also in miss_abort_cur_ff_info at the same point indices
-    miss_abort_nxt_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(miss_abort_nxt_ff_info, miss_abort_cur_ff_info, columns=['point_index', 'ff_index'], whether_share=False)
+    miss_abort_nxt_ff_info = retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
+        miss_abort_nxt_ff_info, miss_abort_cur_ff_info, columns=['point_index', 'ff_index'], whether_share=False)
 
     miss_abort_nxt_ff_info.sort_values(by=['point_index'], inplace=True)
 
@@ -458,7 +460,7 @@ def update_point_index_of_important_df_in_important_info_func(important_info, ne
 
 
 def find_possible_objects_of_pursuit(all_relevant_indices, ff_dataframe, max_distance_to_stop_for_GUAT_target=50,
-                                     max_allowed_time_since_last_vis=2.5):
+                                     max_allowed_time_since_last_vis=3):
     # find corresponding info in ff_dataframe at time (in-memory ff and visible ff)
     ff_info = ff_dataframe.loc[ff_dataframe['point_index'].isin(
         all_relevant_indices)].copy()
@@ -474,7 +476,7 @@ def find_possible_objects_of_pursuit(all_relevant_indices, ff_dataframe, max_dis
 
 def find_ff_aimed_at_through_manual_annotation(relevant_indices, monkey_information, manual_anno):
     # try to find confirmation from manual_anno by finding monkey's target at that period
-    # see if for 2.5 s before the earliest stop was made, monkey was aiming at the ff
+    # see if for 3 s before the earliest stop was made, monkey was aiming at the ff
     manual_anno_sub = manual_anno[manual_anno['starting_point_index'] <= max(
         relevant_indices)]
     manual_anno_sub_during_interval = manual_anno_sub[manual_anno_sub['starting_point_index'].between(

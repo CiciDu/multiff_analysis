@@ -61,9 +61,6 @@ def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, 
         if save_data:
             monkey_information.to_csv(monkey_information_path)
             print("Saved monkey_information")
-
-    monkey_information = _process_monkey_information_after_retrieval(
-        monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
     return monkey_information
 
 
@@ -640,8 +637,6 @@ def add_more_columns_to_monkey_information(monkey_information, speed_threshold_f
         monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
     monkey_information = add_whether_new_distinct_stop_and_stop_id(
         monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
-    monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
-        monkey_information)
     # # assign "stop_id" to each stop, with each whether_new_distinct_stop==True marking a new stop id
     # monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum(
     # ) - 1

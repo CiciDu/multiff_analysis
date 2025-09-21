@@ -37,7 +37,7 @@ class ProcessGUATtrials:
                        'show_in_memory_fireflies': True,
                        'connect_path_ff_max_distance': 400}
 
-    def __init__(self, give_up_after_trying_info_bundle, PlotTrials_args, max_distance_to_stop_for_GUAT_target=50, max_allowed_time_since_last_vis=2.5) -> None:
+    def __init__(self, give_up_after_trying_info_bundle, PlotTrials_args, max_distance_to_stop_for_GUAT_target=50, max_allowed_time_since_last_vis=3) -> None:
 
         self.give_up_after_trying_info_bundle = give_up_after_trying_info_bundle
         self.give_up_after_trying_trials, self.GUAT_point_indices_for_anim, self.GUAT_indices_df, self.GUAT_trials_df = give_up_after_trying_info_bundle

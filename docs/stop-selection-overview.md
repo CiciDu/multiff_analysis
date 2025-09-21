@@ -18,7 +18,7 @@
   - (currently not used) At least 25 cm in cum distance from the point when previous or next ff was caught
   - (currently not used) At least 50 cm in absolute distance (which means it has also to be > 50 cm in cum_distance) from the stop before or after
   - (has added) Not in a cluster of stops
-  - Keep stops in the **25–50 cm** band of firefly (that has been visible within the last 2.5 s)
+  - Keep stops in the **25–50 cm** band of firefly (that has been visible within the last 3 s)
 - **Spatial relationship**
   - Focus on stops **near but not at** fireflies  
   - Output in long format: **one row per (stop × nearby firefly)**  
@@ -36,7 +36,7 @@
 - **Multiple stops per trial**
   - Require **≥ 2** stops in a cluster  
 - **Temporal constraints**
-  - Firefly visible **≤ 2.5 s** ago  
+  - Firefly visible **≤ 3 s** ago  
   - Stop within **50 cm** of the firefly position  
 - **Purpose**: identify persistence behavior
 

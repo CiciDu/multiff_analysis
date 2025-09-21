@@ -20,7 +20,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def make_one_polar_plot(max_time_before_next_visible_to_annotate=2.5, **current_polar_plot_kargs):
+def make_one_polar_plot(max_time_before_next_visible_to_annotate=3, **current_polar_plot_kargs):
     """
     Plot a polar plot of fireflies and their behavior, including their trajectory, stops, and direction.
 
@@ -284,7 +284,8 @@ def make_polar_plots_for_decision_making(selected_cases=None, trials=None, max_p
 
 def plot_fireflies_from_input(input, ax, markers, marker_labels, ff_colormap='Greens', max_time=3, add_to_legend=True):
     ax.scatter(input[:, 1], input[:, 0], alpha=0.7, zorder=2, s=30, color=plt.get_cmap(
-        ff_colormap)(1-input[:, 2]/max_time), marker='o')  # originally it was s=15
+        # originally it was s=15
+        ff_colormap)(1-input[:, 2]/max_time), marker='o')
     marker0 = ax.scatter([], [], alpha=0.7, zorder=2, s=30,
                          color="green", marker='o')  # originally it was s=15
     if add_to_legend:
@@ -369,7 +370,7 @@ def plot_a_circle_in_polar_coordinates(ax, circle_center_x, circle_center_y, cir
     return ax
 
 
-def get_current_polar_plot_kargs(i, max_time_since_last_vis=2.5, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None,
+def get_current_polar_plot_kargs(i, max_time_since_last_vis=3, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None,
                                  **polar_plots_kwargs):
 
     ff_inputs = polar_plots_kwargs['ff_inputs']

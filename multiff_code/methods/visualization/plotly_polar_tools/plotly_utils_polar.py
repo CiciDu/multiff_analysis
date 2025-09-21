@@ -139,7 +139,7 @@ def prepare_to_make_one_plotly_polar_plot(i, polar_plots_kwargs, point_index_arr
                                           add_monkey_info_for_ff_in_past_or_future=True):
 
     current_polar_plot_kargs = plot_decision_making.get_current_polar_plot_kargs(
-        i, max_time_since_last_vis=2.5, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None, **polar_plots_kwargs)
+        i, max_time_since_last_vis=3, show_reward_boundary=False, ff_colormap='Greens', null_arcs_bundle=None, **polar_plots_kwargs)
 
     real_label = current_polar_plot_kargs['real_label']
     predicted_label = current_polar_plot_kargs['predicted_label']

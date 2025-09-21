@@ -23,7 +23,7 @@ np.set_printoptions(suppress=True)
 
 class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
 
-    def get_current_ff_info_and_nxt_ff_info_for_info_collection(self, max_cluster_distance=50, max_time_since_last_vis=2.5, include_ff_in_near_future=True, duration_into_future=0.5, max_distance_to_stop=400,
+    def get_current_ff_info_and_nxt_ff_info_for_info_collection(self, max_cluster_distance=50, max_time_since_last_vis=3, include_ff_in_near_future=True, duration_into_future=0.5, max_distance_to_stop=400,
                                                                 columns_to_sort_nxt_ff_by=['abs_curv_diff', 'time_since_last_vis'], last_seen_and_next_seen_attributes_to_add=['ff_distance', 'ff_angle', 'ff_angle_boundary', 'curv_diff', 'abs_curv_diff', 'monkey_x', 'monkey_y']):
 
         self.find_current_and_alternative_ff_info(columns_to_sort_nxt_ff_by=columns_to_sort_nxt_ff_by, max_cluster_distance=max_cluster_distance, max_time_since_last_vis=max_time_since_last_vis,
@@ -51,7 +51,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
                                              columns_to_sort_nxt_ff_by=[
                                                  'abs_curv_diff', 'time_since_last_vis'],
                                              max_cluster_distance=50,
-                                             max_time_since_last_vis=2.5,
+                                             max_time_since_last_vis=3,
                                              max_distance_to_stop=400,
                                              include_ff_in_near_future=True,
                                              duration_into_future=0.5):
@@ -158,7 +158,7 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.get_monkey_data(include_GUAT_data=True,
                              include_TAFT_data=True)
         self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(
-            self.monkey_information, self.ff_dataframe, self.ff_caught_T_new)
+            self.monkey_information, self.ff_dataframe, self.ff_caught_T_new, self.ff_real_position_sorted)
         self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
             self.one_stop_df)
         self.one_stop_w_ff_df['target_index'] = np.searchsorted(

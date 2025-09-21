@@ -1,4 +1,5 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils
+from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 
 import os
 import numpy as np
@@ -17,7 +18,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_new, min_distance_from_adjacent_stops=75,
+def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_new, ff_real_position_sorted, min_distance_from_adjacent_stops=75,
                                    min_cum_distance_to_ff_capture=25, min_distance_from_ff=25, max_distance_to_ff=50):
     # distinct_stops_df = monkey_information[(monkey_information['whether_new_distinct_stop'] == 1)].copy()
     # filtered_stops_df = filter_stops_by_distance_to_adjacent_stops(
@@ -29,8 +30,10 @@ def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T
                                            & (monkey_information['stop_cluster_size'] == 1)].copy()
     filtered_stops_df = distinct_stops_df.copy()
 
+    filtered_stops_df['target_index'] = np.searchsorted(
+        ff_caught_T_new, filtered_stops_df['time'].values)
     one_stop_df = get_one_stop_df(
-        filtered_stops_df, ff_dataframe, min_distance_from_ff, max_distance_to_ff)
+        filtered_stops_df, ff_dataframe, ff_real_position_sorted, min_distance_from_ff, max_distance_to_ff)
 
     return one_stop_df
 
@@ -212,9 +215,11 @@ def filter_stops_based_on_distance_to_ff_capture(
 def get_one_stop_df(
     filtered_stops_df: pd.DataFrame,
     ff_dataframe: pd.DataFrame,
+    ff_real_position_sorted,
     min_distance_from_ff: float = 25,
     max_distance_to_ff: float = 50,
-    max_allowed_time_since_last_vis=2.5,
+    max_allowed_time_since_last_vis=3,
+    eliminate_stops_too_close_to_any_target=True,
 ) -> pd.DataFrame:
     """
     Build a stop×FF table where:
@@ -227,9 +232,15 @@ def get_one_stop_df(
     ff_dataframe = ff_dataframe[ff_dataframe['time_since_last_vis']
                                 <= max_allowed_time_since_last_vis].copy()
 
+    # also make sure that the ff is not the current or the previous target
+    ff_dataframe = ff_dataframe[ff_dataframe['ff_index']
+                                != ff_dataframe['target_index']]
+    ff_dataframe = ff_dataframe[ff_dataframe['ff_index']
+                                != ff_dataframe['target_index'] - 1].copy()
+
     # --- Select only needed columns for a tight merge ---
     stop_cols = [
-        "point_index", "target_index", "time",
+        "point_index", "target_index", "monkey_x", "monkey_y", "time",
         "min_distance_from_adjacent_stops",
         "distance_to_next_ff_capture",
         "stop_id", "stop_cluster_id", "stop_cluster_size",
@@ -263,6 +274,23 @@ def get_one_stop_df(
     one_stop_df["ff_distance"] = pd.to_numeric(
         one_stop_df["ff_distance"], errors="coerce").fillna(np.inf)
 
+    # Also eliminate stops that are too close to any target current, last, or next target
+    if eliminate_stops_too_close_to_any_target:
+        one_stop_df = find_GUAT_or_TAFT_trials._add_target_distances(
+            one_stop_df,
+            ff_real_position_sorted,
+            na_distance_fill=500,
+            trial_col='target_index',
+            pos_cols=('monkey_x', 'monkey_y'),
+        )
+
+        # 3) Filter clusters too close to any target (opposite of TAFT policy)
+        one_stop_df, _close_clusters = find_GUAT_or_TAFT_trials._filter_clusters_too_close_to_any_target(
+            one_stop_df,
+            max_cluster_distance=50,
+            cluster_col='stop_cluster_id',
+        )
+
     # Optional: sort for stability
     sort_cols = [c for c in ["point_index", "time_since_last_vis",
                              "ff_distance"] if c in one_stop_df.columns]
@@ -284,7 +312,7 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
                      monkey_information,
                      ff_real_position_sorted,
                      max_distance_to_stop_for_GUAT_target=50,
-                     max_allowed_time_since_last_vis=2.5):
+                     max_allowed_time_since_last_vis=3):
     """
     Process GUAT trials to add firefly context and filter for trials with nearby fireflies.
 
@@ -319,6 +347,12 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     # (within max_distance_to_stop_for_GUAT_target to the center of the firefly)
     GUAT_ff_info = GUAT_ff_info[GUAT_ff_info['ff_distance']
                                 < max_distance_to_stop_for_GUAT_target].copy()
+
+    # also make sure that the ff is not the current or the previous target
+    GUAT_ff_info = GUAT_ff_info[GUAT_ff_info['ff_index']
+                                != GUAT_ff_info['target_index']]
+    GUAT_ff_info = GUAT_ff_info[GUAT_ff_info['ff_index']
+                                != GUAT_ff_info['target_index'] - 1].copy()
 
     # Step 5: Aggregate firefly information by cluster
     # Group by cluster_index so that ff_index becomes a list of ff_indices for each cluster
@@ -359,13 +393,13 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     # Add stop point indices and handle duplicates
     GUAT_vs_TAFT_utils.add_stop_point_index(
         GUAT_w_ff_df, monkey_information, ff_real_position_sorted)
-    print('before calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
-        GUAT_w_ff_df))
+    # print('before calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
+    #     GUAT_w_ff_df))
     GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(
         GUAT_w_ff_df)
 
-    print('after calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
-        GUAT_w_ff_df))
+    # print('after calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
+    #     GUAT_w_ff_df))
     return GUAT_w_ff_df, GUAT_expanded_trials_df
 
 

@@ -95,7 +95,7 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                                                           max_cluster_distance=50,
                                                           max_distance_to_stop=400,
                                                           max_distance_to_stop_for_GUAT_target=50,
-                                                          max_time_since_last_vis=2.5,
+                                                          max_time_since_last_vis=3,
                                                           columns_to_sort_nxt_ff_by=[
                                                               'abs_curv_diff', 'time_since_last_vis'],
                                                           window_for_curv_of_traj=[

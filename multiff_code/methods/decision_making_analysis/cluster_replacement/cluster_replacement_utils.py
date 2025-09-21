@@ -162,10 +162,10 @@ def further_process_df_related_to_cluster_replacement(joined_old_ff_cluster_df, 
     original_joined_old_ff_cluster_df = joined_old_ff_cluster_df.copy()
     joined_old_ff_cluster_df = free_selection.guarantee_n_ff_per_point_index_in_ff_dataframe(joined_old_ff_cluster_df, np.unique(
         joined_old_ff_cluster_df.point_index.values), num_ff_per_row=num_old_ff_per_row)
-    
-    
+
     # Compute leftovers from OLD via proper anti-join on (ff_index, point_index)
-    chosen_keys = joined_old_ff_cluster_df[['ff_index', 'point_index']].drop_duplicates()
+    chosen_keys = joined_old_ff_cluster_df[[
+        'ff_index', 'point_index']].drop_duplicates()
     leftover_old_ff_cluster_df = (
         original_joined_old_ff_cluster_df
         .merge(chosen_keys, on=['ff_index', 'point_index'], how='left', indicator=True)
@@ -178,13 +178,11 @@ def further_process_df_related_to_cluster_replacement(joined_old_ff_cluster_df, 
         [joined_new_ff_cluster_df, leftover_old_ff_cluster_df],
         axis=0, ignore_index=True
     ).reset_index(drop=True)
-    
-    
+
     joined_new_ff_cluster_df = add_features_GUAT_and_TAFT.retain_rows_in_df1_that_share_or_not_share_columns_with_df2(
         joined_new_ff_cluster_df, joined_old_ff_cluster_df, columns=['point_index', 'ff_index'], whether_share=False)
     joined_new_ff_cluster_df = free_selection.guarantee_n_ff_per_point_index_in_ff_dataframe(joined_new_ff_cluster_df, np.unique(
         joined_old_ff_cluster_df.point_index.values), num_ff_per_row=num_new_ff_per_row)
-
 
     # fill out NAs
     joined_old_ff_cluster_df['whether_intended_target'] = joined_old_ff_cluster_df['whether_intended_target'].fillna(
@@ -356,12 +354,12 @@ def find_more_ff_df(point_index_all, ff_dataframe, ff_real_position_sorted, monk
             all_possible_ff.ff_index.values, all_possible_ff.point_index.values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=True)
         more_ff_df['time_till_next_visible'] = more_ff_df['time_till_next_visible'].clip(
             upper=10)
-        more_ff_df = more_ff_df[(more_ff_df['time_since_last_vis'] <= 2.5) | (
+        more_ff_df = more_ff_df[(more_ff_df['time_since_last_vis'] <= 3) | (
             more_ff_df['time_till_next_visible'] <= 2)].copy()
     else:
         more_ff_df = decision_making_utils.find_many_ff_info_anew(
             all_possible_ff.ff_index.values, all_possible_ff.point_index.values, ff_real_position_sorted, ff_dataframe_visible, monkey_information, add_time_till_next_visible=False)
-        more_ff_df = more_ff_df[more_ff_df['time_since_last_vis'] <= 2.5].copy(
+        more_ff_df = more_ff_df[more_ff_df['time_since_last_vis'] <= 3].copy(
         )
 
     more_ff_df.sort_values(by='point_index', inplace=True)

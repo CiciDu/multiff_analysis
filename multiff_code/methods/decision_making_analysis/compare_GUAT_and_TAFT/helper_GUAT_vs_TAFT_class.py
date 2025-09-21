@@ -48,7 +48,6 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         self.stops_near_ff_df.rename(columns={'ff_index': 'cur_ff_index',
                                               'monkey_angle': 'stop_monkey_angle', }, inplace=True)
 
-
         self._add_nxt_ff_index()
         try:
             self.stops_near_ff_df['nxt_ff_caught_time'] = self.ff_caught_T_new[self.stops_near_ff_df['nxt_ff_index'].values]
@@ -104,7 +103,8 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
             list_of_cur_ff_cluster_radius=[100],
             list_of_nxt_ff_cluster_radius=[200]
         )
-        self.plan_features_df = plan_factors_utils.merge_plan_features1_and_plan_features2(self.plan_features1, self.plan_features2)
+        self.plan_features_df = plan_factors_utils.merge_plan_features1_and_plan_features2(
+            self.plan_features1, self.plan_features2)
 
     def _make_plan_features_step_1(self, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         test_or_ctrl = 'test'
@@ -144,7 +144,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
 
         self.both_ff_at_ref_df = self.get_both_ff_at_ref_df()
         self.both_ff_at_ref_df['stop_point_index'] = self.nxt_ff_df_from_ref['stop_point_index'].values
-        
+
         if getattr(self, 'ff_dataframe', None) is None:
             cvn_from_ref_class.CurVsNxtFfFromRefClass.get_more_monkey_data(
                 self)
@@ -205,7 +205,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
 
     def get_both_ff_at_ref_df(self):
         self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = cvn_from_ref_class.CurVsNxtFfFromRefClass.find_nxt_ff_df_and_cur_ff_df_from_ref(
-                self, self.ref_point_value, self.ref_point_mode)
+            self, self.ref_point_value, self.ref_point_mode)
         self.both_ff_at_ref_df = self.nxt_ff_df_from_ref[[
             'ff_distance', 'ff_angle']].copy()
         self.both_ff_at_ref_df.rename(columns={'ff_distance': 'nxt_ff_distance_at_ref',
@@ -230,8 +230,6 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
 
         self.heading_info_df = show_planning_utils.make_heading_info_df(
             self.cur_and_nxt_ff_from_ref_df, self.stops_near_ff_df_modified, self.monkey_information, self.ff_real_position_sorted)
-
-
 
     def _add_nxt_ff_index(self):
         if self.GUAT_or_TAFT == 'TAFT':
@@ -260,7 +258,7 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         self.stops_near_ff_df, self.nxt_ff_df, self.cur_ff_df = nxt_ff_utils.get_nxt_ff_df_and_cur_ff_df(
             self.stops_near_ff_df)
         self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = cvn_from_ref_class.CurVsNxtFfFromRefClass.find_nxt_ff_df_and_cur_ff_df_from_ref(
-                self, self.ref_point_value, self.ref_point_mode)
+            self, self.ref_point_value, self.ref_point_mode)
         self.nxt_ff_df_modified = self.nxt_ff_df_from_ref.copy()
         self.cur_ff_df_modified = self.cur_ff_df_from_ref.copy()
 
@@ -294,15 +292,22 @@ class HelperGUATavsTAFTclass(decision_making_class.DecisionMaking):
         self.nxt_ff_df_final = _merge_and_compute_heading(self.nxt_ff_df_final)
         self.cur_ff_df_final = _merge_and_compute_heading(self.cur_ff_df_final)
 
-
     def _get_TAFT_df(self):
         self.TAFT_df = GUAT_vs_TAFT_utils.process_trials_df(
             self.TAFT_trials_df, self.monkey_information, self.ff_dataframe, self.ff_real_position_sorted, self.stop_period_duration)
         self.TAFT_df['cur_ff_capture_time'] = self.ff_caught_T_new[self.TAFT_df['ff_index'].values]
+        if self.TAFT_df['ff_index'].max() == len(self.ff_caught_T_new) - 1:
+            # remove the last row since later we need nxt_ff
+            self.TAFT_df = self.TAFT_df[self.TAFT_df['ff_index'] < len(
+                self.ff_caught_T_new) - 1].reset_index(drop=True)
 
     def _get_GUAT_df(self):
         self.GUAT_df = GUAT_vs_TAFT_utils.process_trials_df(
             self.GUAT_w_ff_df, self.monkey_information, self.ff_dataframe, self.ff_real_position_sorted, self.stop_period_duration)
+        if self.GUAT_df['ff_index'].max() == len(self.ff_caught_T_new) - 1:
+            # remove the last row since later we need nxt_ff
+            self.GUAT_df = self.GUAT_df[self.GUAT_df['ff_index'] < len(
+                self.ff_caught_T_new) - 1].reset_index(drop=True)
 
     def _get_TAFT_df2_based_on_ref_point(self):
         self.TAFT_df2 = GUAT_vs_TAFT_utils.further_make_trials_df(
@@ -370,6 +375,6 @@ gc_kwargs = {'time_with_respect_to_first_stop': -0.1,
              'trajectory_features': ['monkey_distance', 'monkey_angle_to_origin', 'time', 'curv_of_traj'],
 
              'include_ff_in_near_future': True,
-             'max_time_since_last_vis': 2.5,
+             'max_time_since_last_vis': 3,
              'duration_into_future': 0.5,
              }
