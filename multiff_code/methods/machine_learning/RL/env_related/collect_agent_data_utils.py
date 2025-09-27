@@ -192,9 +192,6 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
     caught_ff_num = len(ff_caught_T_new)
     total_ff_num = len(ff_life_sorted)
 
-    monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
-        monkey_information, ff_caught_T_new, col_exists_ok=False)
-    
     # Find the indices of ffs in obs for each time point, keeping the indices that will be used by ff_dataframe
     reversed_sorting = reverse_value_and_position(sorted_indices_all)
     temp_obs_in_ff_df['index_in_ff_dataframe'] = reversed_sorting[temp_obs_in_ff_df['index_in_ff_information'].values]
@@ -769,9 +766,6 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(
         env.ff_information, env.ff_flash, env.time)
     caught_ff_num = len(ff_caught_T_new)
-    
-    monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
-        monkey_information, ff_caught_T_new, col_exists_ok=False)
 
     # Find the indices of ffs in obs for each time point, keeping the indices that will be used by ff_dataframe
     reversed_sorting = reverse_value_and_position(sorted_indices_all)

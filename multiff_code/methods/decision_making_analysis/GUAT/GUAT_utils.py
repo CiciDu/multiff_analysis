@@ -18,27 +18,18 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def streamline_getting_one_stop_df(monkey_information, ff_dataframe, ff_caught_T_new, ff_real_position_sorted, min_distance_from_adjacent_stops=75,
-                                   min_cum_distance_to_ff_capture=25, min_distance_from_ff=25, max_distance_to_ff=50):
-    # distinct_stops_df = monkey_information[(monkey_information['whether_new_distinct_stop'] == 1)].copy()
-    # filtered_stops_df = filter_stops_by_distance_to_adjacent_stops(
-    #     distinct_stops_df, min_distance_from_adjacent_stops)
-    # filtered_stops_df = filter_stops_based_on_distance_to_ff_capture(
-    #     filtered_stops_df, monkey_information, ff_caught_T_new, min_cum_distance_to_ff_capture=min_cum_distance_to_ff_capture)
+def make_one_stop_w_ff_df(stop_category_df):
+    one_stop_sub = stop_category_df[stop_category_df['attempt_type'] == 'miss'].reset_index(drop=True)
+    one_stop_w_ff_df = one_stop_sub[['time', 'point_index', 'stop_id', 'stop_cluster_id', 'stop_cluster_size', 'trial', 'target_index']].copy()
+    one_stop_w_ff_df['latest_visible_ff'] = one_stop_sub['associated_ff'].astype(int)
+    one_stop_w_ff_df['ff_index'] = one_stop_sub['associated_ff']
+    one_stop_w_ff_df['num_stops'] = 1
+    one_stop_w_ff_df['stop_time'] = one_stop_sub['time']
+    one_stop_w_ff_df['first_stop_time'] = one_stop_sub['time']
+    one_stop_w_ff_df['first_stop_point_index'] = one_stop_sub['point_index']
+    return one_stop_w_ff_df
 
-    distinct_stops_df = monkey_information[(monkey_information['whether_new_distinct_stop'] == 1)
-                                           & (monkey_information['stop_cluster_size'] == 1)].copy()
-    filtered_stops_df = distinct_stops_df.copy()
-
-    filtered_stops_df['target_index'] = np.searchsorted(
-        ff_caught_T_new, filtered_stops_df['time'].values)
-    one_stop_df = get_one_stop_df(
-        filtered_stops_df, ff_dataframe, ff_real_position_sorted, min_distance_from_ff, max_distance_to_ff)
-
-    return one_stop_df
-
-
-def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
+def make_temp_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
     """
     Build one_stop_w_ff_df from a long one_stop_df (rows = point_index × ff candidates).
     - nearby_alive_ff_indices: unique, stably ordered list per point_index
@@ -47,7 +38,7 @@ def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
 
     # ensure required columns exist
     required = {"point_index", "time", "ff_index", "time_since_last_vis",
-                "stop_id", "stop_cluster_id", "stop_cluster_size"}
+                "stop_id",}
     missing = required - set(one_stop_df.columns)
     if missing:
         raise KeyError(f"one_stop_df missing columns: {missing}")
@@ -83,7 +74,7 @@ def make_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
     stop_meta_cols = [
         "target_index", "time", "point_index", "ff_distance",
         "distance_to_next_ff_capture", "min_distance_from_adjacent_stops",
-        "stop_id", "stop_cluster_id", "stop_cluster_size"
+        "stop_id",
     ]
     stop_meta_cols = [c for c in stop_meta_cols if c in df.columns]
     stop_meta = df[stop_meta_cols].drop_duplicates("point_index")
@@ -212,7 +203,7 @@ def filter_stops_based_on_distance_to_ff_capture(
     return out
 
 
-def get_one_stop_df(
+def make_temp_one_stop_df(
     filtered_stops_df: pd.DataFrame,
     ff_dataframe: pd.DataFrame,
     ff_real_position_sorted,
@@ -274,23 +265,6 @@ def get_one_stop_df(
     one_stop_df["ff_distance"] = pd.to_numeric(
         one_stop_df["ff_distance"], errors="coerce").fillna(np.inf)
 
-    # Also eliminate stops that are too close to any target current, last, or next target
-    if eliminate_stops_too_close_to_any_target:
-        one_stop_df = find_GUAT_or_TAFT_trials._add_target_distances(
-            one_stop_df,
-            ff_real_position_sorted,
-            na_distance_fill=500,
-            trial_col='target_index',
-            pos_cols=('monkey_x', 'monkey_y'),
-        )
-
-        # 3) Filter clusters too close to any target (opposite of TAFT policy)
-        one_stop_df, _close_clusters = find_GUAT_or_TAFT_trials._filter_clusters_too_close_to_any_target(
-            one_stop_df,
-            max_cluster_distance=50,
-            cluster_col='stop_cluster_id',
-        )
-
     # Optional: sort for stability
     sort_cols = [c for c in ["point_index", "time_since_last_vis",
                              "ff_distance"] if c in one_stop_df.columns]
@@ -306,13 +280,13 @@ def get_one_stop_df(
     return one_stop_df
 
 
-def get_GUAT_w_ff_df(GUAT_indices_df,
-                     GUAT_trials_df,
-                     ff_dataframe,
-                     monkey_information,
-                     ff_real_position_sorted,
-                     max_distance_to_stop_for_GUAT_target=50,
-                     max_allowed_time_since_last_vis=3):
+def get_ff_info_for_GUAT(GUAT_indices_df,
+                         GUAT_trials_df,
+                         ff_dataframe,
+                         monkey_information,
+                         ff_real_position_sorted,
+                         max_distance_to_stop_for_GUAT_target=50,
+                         max_allowed_time_since_last_vis=3):
     """
     Process GUAT trials to add firefly context and filter for trials with nearby fireflies.
 
@@ -324,17 +298,17 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
     - GUAT_indices_df: Point-by-point indices for each cluster
 
     Output DataFrames:
-    - GUAT_w_ff_df: Filtered subset of trials that have fireflies near stops
+    - GUAT_ff_info: Filtered subset of trials that have fireflies near stops
     - GUAT_expanded_trials_df: All trials with firefly context added (unfiltered)
 
     Key Differences:
     - GUAT_trials_df: Base trials without firefly context
     - GUAT_expanded_trials_df: Base trials + firefly proximity annotations
-    - GUAT_w_ff_df: Only trials where whether_w_ff_near_stops == 1
+    - GUAT_ff_info: Only trials where whether_w_ff_near_stops == 1
     """
 
     # Step 1: Extract point indices and cluster assignments
-    GUAT_df = GUAT_indices_df[['point_index', 'stop_cluster_id']].copy()
+    GUAT_df = GUAT_indices_df[['point_index', 'temp_stop_cluster_id']].copy()
 
     # Step 2: Merge with firefly dataframe to get firefly context for each stop point
     GUAT_ff_info = GUAT_df.merge(ff_dataframe, on='point_index', how='left')
@@ -356,51 +330,51 @@ def get_GUAT_w_ff_df(GUAT_indices_df,
 
     # Step 5: Aggregate firefly information by cluster
     # Group by cluster_index so that ff_index becomes a list of ff_indices for each cluster
-    GUAT_ff_info2 = GUAT_ff_info[['stop_cluster_id', 'ff_index']].drop_duplicates(
-    ).groupby('stop_cluster_id')['ff_index'].apply(list).reset_index(drop=False)
+    GUAT_ff_info2 = GUAT_ff_info[['temp_stop_cluster_id', 'ff_index']].drop_duplicates(
+    ).groupby('temp_stop_cluster_id')['ff_index'].apply(list).reset_index(drop=False)
     GUAT_ff_info2.rename(
         columns={'ff_index': 'nearby_alive_ff_indices'}, inplace=True)
 
     # Step 6: Find the most recently visible firefly for each cluster
-    GUAT_ff_info.sort_values(by=['stop_cluster_id', 'time_since_last_vis'], ascending=[
+    GUAT_ff_info.sort_values(by=['temp_stop_cluster_id', 'time_since_last_vis'], ascending=[
                              True, True], inplace=True)
-    GUAT_ff_info2['latest_visible_ff'] = GUAT_ff_info.groupby('stop_cluster_id')[
+    GUAT_ff_info2['latest_visible_ff'] = GUAT_ff_info.groupby('temp_stop_cluster_id')[
         'ff_index'].first().values
 
     # Step 7: Create GUAT_expanded_trials_df - merge base trials with firefly context
     # This adds firefly proximity information to all trials (unfiltered)
     GUAT_expanded_trials_df = GUAT_trials_df.merge(
-        GUAT_ff_info2, on='stop_cluster_id', how='left')
-    GUAT_expanded_trials_df.sort_values(by='stop_cluster_id', inplace=True)
+        GUAT_ff_info2, on='temp_stop_cluster_id', how='left')
+    GUAT_expanded_trials_df.sort_values(by='temp_stop_cluster_id', inplace=True)
 
     # Step 8: Add flag indicating whether fireflies are near stops
     # Mark whether_w_ff_near_stops as 1 if nearby_alive_ff_indices is not NA
     GUAT_expanded_trials_df['whether_w_ff_near_stops'] = (
         ~GUAT_expanded_trials_df['nearby_alive_ff_indices'].isna()).values.astype(int)
 
-    # Step 9: Create GUAT_w_ff_df - filter to keep only trials with nearby fireflies
+    # Step 9: Create GUAT_ff_info - filter to keep only trials with nearby fireflies
     # This is the filtered subset where whether_w_ff_near_stops == 1
-    GUAT_w_ff_df = GUAT_expanded_trials_df[GUAT_expanded_trials_df['whether_w_ff_near_stops'] == 1].reset_index(
+    GUAT_ff_info = GUAT_expanded_trials_df[GUAT_expanded_trials_df['whether_w_ff_near_stops'] == 1].reset_index(
         drop=True)
-    # Step 10: Final processing of GUAT_w_ff_df
-    GUAT_w_ff_df['target_index'] = GUAT_w_ff_df['trial']
-    GUAT_w_ff_df['latest_visible_ff'] = GUAT_w_ff_df['latest_visible_ff'].astype(
+    # Step 10: Final processing of GUAT_ff_info
+    GUAT_ff_info['target_index'] = GUAT_ff_info['trial']
+    GUAT_ff_info['latest_visible_ff'] = GUAT_ff_info['latest_visible_ff'].astype(
         'int64')
 
-    GUAT_w_ff_df.sort_values(by=['trial', 'first_stop_time'], inplace=True)
-    GUAT_w_ff_df['ff_index'] = GUAT_w_ff_df['latest_visible_ff']
+    GUAT_ff_info.sort_values(by=['trial', 'first_stop_time'], inplace=True)
+    GUAT_ff_info['ff_index'] = GUAT_ff_info['latest_visible_ff']
 
     # Add stop point indices and handle duplicates
     GUAT_vs_TAFT_utils.add_stop_point_index(
-        GUAT_w_ff_df, monkey_information, ff_real_position_sorted)
-    # print('before calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
-    #     GUAT_w_ff_df))
-    GUAT_w_ff_df = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(
-        GUAT_w_ff_df)
+        GUAT_ff_info, monkey_information, ff_real_position_sorted)
+    # print('before calling deal_with_duplicated_stop_point_index, len(GUAT_ff_info)', len(
+    #     GUAT_ff_info))
+    GUAT_ff_info = GUAT_vs_TAFT_utils.deal_with_duplicated_stop_point_index(
+        GUAT_ff_info)
 
-    # print('after calling deal_with_duplicated_stop_point_index, len(GUAT_w_ff_df)', len(
-    #     GUAT_w_ff_df))
-    return GUAT_w_ff_df, GUAT_expanded_trials_df
+    # print('after calling deal_with_duplicated_stop_point_index, len(GUAT_ff_info)', len(
+    #     GUAT_ff_info))
+    return GUAT_ff_info
 
 
 def set_time_of_eval(GUAT_w_ff_df, monkey_information, time_with_respect_to_first_stop=None, time_with_respect_to_second_stop=None, time_with_respect_to_last_stop=None):

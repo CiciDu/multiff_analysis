@@ -79,12 +79,8 @@ class GUATCollectInfoForSession(GUAT_collect_info_helper_class.GUATCollectInfoHe
                                                      ):
 
         for df in df_names:
-            if df != 'miss_abort_df':
-                setattr(self, df, pd.read_csv(os.path.join(
-                    self.GUAT_folder_path, df + '.csv')).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore'))
-            else:
-                setattr(self, df, pd.read_csv(os.path.join(self.GUAT_folder_path, df +
-                        '.csv'), sep='\t', converters={'nearby_alive_ff_indices': pd.eval}))
+            setattr(self, df, pd.read_csv(os.path.join(
+                self.GUAT_folder_path, df + '.csv')).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore'))
 
     def _generate_important_df_to_combine_across_sessions(self,
                                                           time_with_respect_to_first_stop=-0.1,

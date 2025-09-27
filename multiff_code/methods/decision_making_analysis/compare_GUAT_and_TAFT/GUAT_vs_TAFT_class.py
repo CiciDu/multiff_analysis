@@ -1,6 +1,10 @@
 from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_utils, helper_GUAT_vs_TAFT_class
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from data_wrangling import general_utils
+from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT, GUAT_utils
+from pattern_discovery import cluster_analysis
+from visualization.matplotlib_tools import plot_trials
+
 
 import os
 import numpy as np
@@ -207,3 +211,27 @@ class GUATvsTAFTclass(helper_GUAT_vs_TAFT_class.HelperGUATavsTAFTclass):
         self.max_distance_to_stop_for_GUAT_target = 50
 
         return sub
+
+    def make_GUAT_cluster_df(self):
+        #ff_indices_of_each_cluster = self.GUAT_w_ff_df['nearby_alive_ff_indices'].values
+        ff_indices_of_each_cluster = self.GUAT_w_ff_df['ff_index'].values
+        ff_indices_of_each_cluster = [[ff] for ff in ff_indices_of_each_cluster]
+        
+        GUAT_last_stop_time = self.GUAT_w_ff_df['last_stop_time'].values
+
+        self.GUAT_cluster_df = cluster_analysis.find_ff_cluster_last_vis_df(
+            ff_indices_of_each_cluster, GUAT_last_stop_time, ff_dataframe=self.ff_dataframe, cluster_identifiers=self.GUAT_w_ff_df['stop_cluster_id'].values)
+
+        self.GUAT_cluster_df.rename(
+            columns={'cluster_identifier': 'stop_cluster_id'}, inplace=True)
+
+        self.GUAT_cluster_df = self.GUAT_cluster_df.merge(self.GUAT_w_ff_df[['stop_cluster_id', 'first_stop_time', 'second_stop_time', 'last_stop_time', 'first_stop_point_index',
+                                                                             'second_stop_point_index', 'last_stop_point_index', 'target_index', 'num_stops']],
+                                                          on='stop_cluster_id', how='left')
+
+        # to prepare for free selection
+        self.GUAT_cluster_df['latest_visible_time_before_last_stop'] = self.GUAT_cluster_df['last_stop_time'] - \
+            self.GUAT_cluster_df['time_since_last_vis']
+
+        # sort by last_stop_time (note that the order in GUAT_cluster_df will henceforward be different from other variables)
+        self.GUAT_cluster_df.sort_values(by='last_stop_time', inplace=True)

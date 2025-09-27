@@ -7,6 +7,7 @@ from pattern_discovery import pattern_by_points
 from null_behaviors import find_best_arc, curvature_utils, curv_of_traj_utils, opt_arc_utils
 from decision_making_analysis.decision_making import decision_making_utils
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
+from decision_making_analysis import assign_attempts
 
 import math
 import numpy as np
@@ -128,17 +129,18 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.target_clust_df_short, self.ff_caught_T_new)
 
     def get_try_a_few_times_info(self):
-
-        self.try_a_few_times_trials, self.TAFT_indices_df, self.TAFT_trials_df, self.try_a_few_times_indices_for_anim = find_GUAT_or_TAFT_trials.try_a_few_times_func(
-            self.monkey_information, self.ff_caught_T_new,  self.ff_real_position_sorted, max_point_index=self.max_point_index)
+        if not hasattr(self, 'stop_category_df'):
+            self.make_or_retrieve_stop_category_df()
+        self.TAFT_trials_df = find_GUAT_or_TAFT_trials.make_TAFT_trials_df(
+            self.stop_category_df)
+        self.try_a_few_times_trials = self.TAFT_trials_df['trial'].values
 
     def get_give_up_after_trying_info(self):
-
-        self.give_up_after_trying_trials, self.GUAT_indices_df, self.GUAT_trials_df, self.GUAT_point_indices_for_anim, self.GUAT_w_ff_df = find_GUAT_or_TAFT_trials.give_up_after_trying_func(
-            self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted, max_point_index=self.max_point_index)
-        self.give_up_after_trying_indices = self.GUAT_indices_df['point_index'].values
-        self.give_up_after_trying_info_bundle = (
-            self.give_up_after_trying_trials, self.GUAT_point_indices_for_anim, self.GUAT_indices_df, self.GUAT_trials_df)
+        if not hasattr(self, 'stop_category_df'):
+            self.make_or_retrieve_stop_category_df()
+        self.GUAT_trials_df, self.GUAT_w_ff_df = find_GUAT_or_TAFT_trials.make_GUAT_trials_df(
+            self.stop_category_df, self.ff_real_position_sorted, self.monkey_information)
+        self.give_up_after_trying_trials = self.GUAT_w_ff_df['trial'].values
 
     def make_or_retrieve_all_trial_patterns(self, exists_ok=True):
         self.all_trial_patterns = self.try_retrieving_df(
@@ -316,20 +318,10 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def make_one_stop_w_ff_df(self):
         self._prepare_to_find_patterns_and_features(find_patterns=False)
-
-        # one_stop_df: Long format dataframe with one row per (stop × nearby firefly)
-        # Contains stops that are 25-50cm from fireflies, representing potential decision points
-        # where the monkey stopped near but not at a firefly (one-stop misses)
-        self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(
-            self.monkey_information, self.ff_dataframe, self.ff_caught_T_new, self.ff_real_position_sorted)
-        
-        # one_stop_w_ff_df: Wide format dataframe with one row per stop
-        # Aggregates one_stop_df by grouping stops and selecting the most recently visible firefly
-        # Contains nearby_alive_ff_indices (list of all nearby fireflies) and latest_visible_ff (primary firefly)
-        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
-            self.one_stop_df)
-        self.one_stop_w_ff_df['target_index'] = np.searchsorted(
-                    self.ff_caught_T_new, self.one_stop_w_ff_df['first_stop_time'])
+        if not hasattr(self, 'stop_category_df'):
+            self.make_or_retrieve_stop_category_df()
+            
+        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.stop_category_df)
 
     def make_distance_and_num_stops_df(self):
         self.distance_df = organize_patterns_and_features.make_distance_df(
@@ -501,3 +493,32 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if fill_na:
             self.target_clust_df_short = prep_target_data.fill_na_in_target_df(
                 self.target_clust_df_short)
+
+    def make_or_retrieve_stop_category_df(self, exists_ok=True, already_made_ok=True):
+        if already_made_ok & (getattr(self, 'stop_category_df', None) is not None) & ('stop_cluster_id' in self.monkey_information.columns):
+            return
+        
+        stop_category_df_filepath = os.path.join(
+            self.patterns_and_features_data_folder_path, 'stop_category_df.csv')
+        if exists(stop_category_df_filepath) & exists_ok:
+            self.stop_category_df = pd.read_csv(stop_category_df_filepath)
+            print("Retrieved stop_category_df")
+        else:
+            monkey_information = self.monkey_information.copy()
+            monkey_information = find_GUAT_or_TAFT_trials.add_temp_stop_cluster_id(
+                monkey_information, self.ff_caught_T_new, col_exists_ok=False)
+            
+            temp_TAFT_trials_df = find_GUAT_or_TAFT_trials.make_temp_TAFT_trials_df(
+                monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted)
+
+            self.stop_category_df = assign_attempts.make_stop_category_df(monkey_information, self.ff_caught_T_new,
+                                                                          self.closest_stop_to_capture_df, temp_TAFT_trials_df, self.ff_dataframe,
+                                                                          self.ff_real_position_sorted)
+            self.stop_category_df.to_csv(
+                stop_category_df_filepath, index=False)
+            print("Made new stop_category_df and saved to ",
+                  stop_category_df_filepath)
+
+        cols_to_add = ['stop_cluster_id', 'stop_cluster_start_point', 'stop_cluster_end_point', 'stop_cluster_size']
+        self.monkey_information.drop(columns=cols_to_add, inplace=True, errors='ignore')
+        self.monkey_information = self.monkey_information.merge(self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')

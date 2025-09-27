@@ -92,17 +92,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         self.time_all = self.monkey_information.loc[self.point_index_all, 'time'].values
         return
 
-    def retrieve_or_make_GUAT_trials_df(self, exists_ok=True):
-        filepath = os.path.join(self.GUAT_folder_path, 'GUAT_trials_df.csv')
-        if exists(filepath) & exists_ok:
-            self.GUAT_trials_df = pd.read_csv(filepath)
-            print('Retrieved GUAT_trials_df')
-        else:
-            self.GUAT_trials_df = GUAT_utils.make_GUAT_trials_df(
-                self.GUAT_w_ff_df, self.ff_life_sorted, self.ff_real_position_sorted, self.monkey_information)
-            self.GUAT_trials_df.to_csv(filepath, index=False)
-            print('Made and saved GUAT_trials_df')
-
     def add_arc_info_to_each_df_of_ff_info(self, curvature_df):
         # add best_arc_info to miss_abort_cur_ff_info and miss_abort_nxt_ff_info
         curvature_df_temp = pd.concat(
@@ -154,15 +143,6 @@ class GUATCollectInfoHelperClass(GUAT_helper_class.GUATHelperClass):
         print("miss_abort_df:", len(self.time_of_eval),
               "out of", original_length, "rows remains")
 
-    def make_one_stop_w_ff_df(self):
-        self.get_monkey_data(include_GUAT_data=True,
-                             include_TAFT_data=True)
-        self.one_stop_df = GUAT_utils.streamline_getting_one_stop_df(
-            self.monkey_information, self.ff_dataframe, self.ff_caught_T_new, self.ff_real_position_sorted)
-        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
-            self.one_stop_df)
-        self.one_stop_w_ff_df['target_index'] = np.searchsorted(
-            self.ff_caught_T_new, self.one_stop_w_ff_df['first_stop_time'])
 
     def add_curvature_info_to_ff_dataframe(self, column_exists_ok=False):
         # add the column abs_curv_diff to ff_dataframe through merging with curvature_df

@@ -84,18 +84,7 @@ def find_miss_abort_cur_ff_info(miss_abort_df, ff_real_position_sorted, ff_life_
 
     miss_abort_df = miss_abort_df.rename(columns={'point_index_of_eval': 'point_index',
                                                   'time_of_eval': 'time', })
-
-    for index, row in miss_abort_df.iterrows():
-        if len(row.nearby_alive_ff_indices) > 0:
-            for ff_index in row.nearby_alive_ff_indices:
-                list_of_ff_index.append(ff_index)
-                list_of_target_index.append(row.target_index)
-                list_of_point_index.append(row.point_index)
-
-    GUAT_cur_ff = pd.DataFrame({'ff_index': list_of_ff_index,
-                                'point_index': list_of_point_index,
-                                'target_index': list_of_target_index
-                                })
+    GUAT_cur_ff = miss_abort_df[['ff_index', 'point_index', 'target_index']].copy()
 
     GUAT_cur_ff = GUAT_cur_ff.astype(int)
 

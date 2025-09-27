@@ -288,15 +288,6 @@ def _calculate_num_stops_since_last_vis(monkey_information, caught_ff_num, t_las
     return num_stops_since_last_vis
 
 
-def _calculate_num_stops_near_target(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance):
-    caught_ff_num = len(ff_caught_T_new)
-    monkey_sub = find_GUAT_or_TAFT_trials._take_out_monkey_subset_to_get_num_stops_near_target(
-        monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=max_cluster_distance)
-    num_stops_near_target = _use_merge_to_get_num_stops_for_each_trial(
-        monkey_sub, caught_ff_num)
-    return num_stops_near_target
-
-
 def _use_merge_to_get_num_stops_for_each_trial(monkey_sub, caught_ff_num):
     monkey_sub = monkey_sub[['trial', 'point_index']].groupby('trial').count()
     monkey_sub = monkey_sub.merge(pd.DataFrame(
@@ -320,8 +311,6 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, c
         monkey_information, np.arange(len(ff_caught_T_new)))
     num_stops_since_last_vis = _calculate_num_stops_since_last_vis(
         monkey_information, caught_ff_num, target_clust_last_vis_df['time_since_last_vis'].values)
-    num_stops_near_target = _calculate_num_stops_near_target(
-        monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance)
     n_ff_in_a_row = pattern_by_trials.n_ff_in_a_row_func(
         ff_believed_position_sorted, distance_between_ff=50)
     num_ff_around_target = np.array(
@@ -335,7 +324,6 @@ def make_all_trial_features(ff_dataframe, monkey_information, ff_caught_T_new, c
                    'hitting_arena_edge': hitting_arena_edge,
                    'num_stops': num_stops_array,
                    'num_stops_since_last_vis': num_stops_since_last_vis,
-                   'num_stops_near_target': num_stops_near_target,
                    'num_ff_around_target': num_ff_around_target.tolist(),
                    'n_ff_in_a_row': n_ff_in_a_row[:len(trial_array)].tolist()
                    }
@@ -382,8 +370,6 @@ def make_feature_statistics(all_trial_features, data_folder_name=None):
                            'abs_angle_last_vis', 'label'] = 'abs angle target last seen'
     feature_statistics.loc[feature_statistics['item']
                            == 'num_stops', 'label'] = 'num stops'
-    feature_statistics.loc[feature_statistics['item'] ==
-                           'num_stops_near_target', 'label'] = 'num stops near target'
 
     feature_statistics.loc[feature_statistics['item'] ==
                            'hitting_arena_edge', 'label'] = 'hitting arena edge'

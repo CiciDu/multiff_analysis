@@ -32,7 +32,7 @@ class PatternsAndFeatures():
                      'give_up_after_trying', 'try_a_few_times', 'ignore_sudden_flash']
 
     feature_order = ['t', 't_last_vis', 'd_last_vis', 'abs_angle_last_vis',
-                     'num_stops', 'num_stops_since_last_vis', 'num_stops_near_target']
+                     'num_stops', 'num_stops_since_last_vis']
 
     def __init__(self, monkey_name='monkey_Bruno'):
         self.monkey_name = monkey_name

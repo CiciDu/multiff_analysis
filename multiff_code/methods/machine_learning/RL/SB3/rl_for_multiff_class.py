@@ -261,10 +261,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.make_or_retrieve_closest_stop_to_capture_df()
         self.make_ff_caught_T_new()
-        
-        self.monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
-            self.monkey_information, self.ff_caught_T_new, col_exists_ok=False)
-        
+
         return
 
     def save_ff_info_into_npz(self):

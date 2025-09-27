@@ -745,7 +745,7 @@ def _initialize_last_seen_columns(target_df):
     return target_df
 
 
-def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num_stops, num_stops_near_target, num_stops_since_last_vis):
+def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num_stops, num_stops_since_last_vis):
     """
     Add the number of stops information to the target last visit DataFrame.
 
@@ -753,7 +753,6 @@ def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num
     - target_last_vis_df: DataFrame containing target last visit data.
     - ff_caught_T_new: Array of caught fireflies.
     - num_stops: Number of stops.
-    - num_stops_near_target: Number of stops near the target.
     - num_stops_since_last_vis: Number of stops since the last visit.
 
     Returns:
@@ -766,7 +765,6 @@ def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num
 
     target_last_vis_df.sort_values(by='target_index', inplace=True)
     target_last_vis_df['num_stops'] = num_stops
-    target_last_vis_df['num_stops_near_target'] = num_stops_near_target
     target_last_vis_df['num_stops_since_last_vis'] = num_stops_since_last_vis
     target_last_vis_df.dropna(inplace=True)
     target_last_vis_df = target_last_vis_df[target_last_vis_df['last_vis_dist'] != 9999]

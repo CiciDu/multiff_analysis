@@ -266,7 +266,6 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
                 df['stop_window'] = np.nan
         return df
 
-    # (fixed swap)
     TAFT_df = _ensure_stop_window(TAFT_trials_df)
     GUAT_df = _ensure_stop_window(GUAT_trials_df)
 

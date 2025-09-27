@@ -270,9 +270,6 @@ class BaseProcessing:
         if (not already_made_ok) | (getattr(self, 'closest_stop_to_capture_df', None) is None) | (getattr(self, 'ff_caught_T_new', None) is None):
             self.make_or_retrieve_closest_stop_to_capture_df()
             self.make_ff_caught_T_new()
-            
-            self.monkey_information = find_GUAT_or_TAFT_trials.add_stop_cluster_id(
-                self.monkey_information, self.ff_caught_T_new, col_exists_ok=False)
 
 
     def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):
@@ -281,7 +278,7 @@ class BaseProcessing:
                                                                                                  exists_ok=exists_ok, save_data=save_data, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
 
         self.monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
-            self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop) 
+            self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
         return
 
     def get_more_monkey_data(self, exists_ok=True, already_made_ok=True):

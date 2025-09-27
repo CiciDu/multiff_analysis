@@ -98,17 +98,6 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     plt.legend(labels=["Agent(LSTM)", 'monkey'],
                fontsize=11, loc="upper right")
 
-    variable_of_interest = "num_stops_near_target"
-    counter += 1
-    axes = fig.add_subplot(num_rows, num_cols, counter)
-    sns.histplot(data=all_trial_features_valid_agent[variable_of_interest], kde=False, alpha=0.3,
-                 color="green", binwidth=0.5, binrange=(-0.25, 5.25), stat="probability", edgecolor='grey')
-    sns.histplot(data=all_trial_features_valid_monkey[variable_of_interest], kde=False, alpha=0.3,
-                 color="blue", binwidth=0.5, binrange=(-0.1, 5.4), stat="probability", edgecolor='grey')
-    axes.set_title("Number of Stops Near Targets", fontsize=11)
-    axes.set_xlim(-0.25, 5)
-    axes.set_xlabel("Number of Stops", fontsize=11)
-
     variable_of_interest = "n_ff_in_a_row"
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
@@ -301,7 +290,7 @@ def plot_feature_statistics(feature_statistics, compare_monkey_and_agent=False, 
 
     else:
         subset = feature_statistics[feature_statistics['item'].isin(
-            ['t', 't_last_vis', 'abs_angle_last_vis', 'num_stops', 'num_stops_near_target'])]
+            ['t', 't_last_vis', 'abs_angle_last_vis', 'num_stops'])]
 
         # Create a 1x2 subplot
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
@@ -410,16 +399,6 @@ def plot_num_ff_around_target_in_barplot(all_trial_features):
         all_trial_features, var_of_interest='num_ff_around_target')
     plt.title('Maximum Number of Alive Fireflies Around the Target During a Trial')
     plt.xlabel('Number of Fireflies')
-    plt.ylabel('Percentage(%)')
-    plt.show()
-
-
-def plot_num_stops_near_target_in_barplot(all_trial_features):
-    # all_trial_features = all_trial_features.sort_values('num_stops_near_target', inplace=True)
-    plot_categorical_variable_in_barplot(
-        all_trial_features, var_of_interest='num_stops_near_target')
-    plt.title('Number of Stops Near Target')
-    plt.xlabel('Number of Stops')
     plt.ylabel('Percentage(%)')
     plt.show()
 
@@ -597,7 +576,7 @@ def plot_correlations_in_record(df, parameter_columns=['action_noise_std', 'ffxy
 
 
 def plot_last_seen_info_vs_stops(last_vis_df, filter_by_p_value=True):
-    for y_column in ['num_stops', 'num_stops_near_target', 'num_stops_since_last_vis']:
+    for y_column in ['num_stops', 'num_stops_since_last_vis']:
         for x_column in ['time_since_last_vis', 'last_vis_dist',
                          # 'last_vis_ang', 'last_vis_ang_to_bndry', 'last_vis_cum_dist',
                          'abs_last_vis_ang', 'abs_last_vis_ang_to_bndry']:
