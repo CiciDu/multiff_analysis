@@ -416,7 +416,33 @@ def turn_visibility_of_vertical_lines_on_or_off_in_time_series_plot(fig_time_ser
     return fig_time_series
 
 
-def find_monkey_hoverdata_value_for_both_fig_time_series(hoverdata_column, monkey_hoverdata_value, trajectory_df):
+def find_monkey_hoverdata_value_for_both_fig_time_series(hoverdata_column, monkey_hoverdata_value, trajectory_df, hover_lookup=None):
+    """Return both hover values (s, cm) using a fast lookup when possible.
+
+    If hover_lookup is provided, it should be a dict with entries for
+    'rel_time' and/or 'rel_distance', each containing sorted 'x' and matching
+    'y' arrays. We then use np.searchsorted for O(log n) lookup.
+
+    Falls back to DataFrame-based approach if no cache is available.
+    """
+    # Fast path using prebuilt lookup cache
+    if isinstance(hover_lookup, dict) and hoverdata_column in hover_lookup:
+        entry = hover_lookup[hoverdata_column]
+        xs = entry.get('x')
+        ys = entry.get('y')
+        if xs is not None and ys is not None and getattr(xs, 'size', 0) > 0:
+            pos = int(np.searchsorted(xs, monkey_hoverdata_value, side='left'))
+            if pos >= xs.size:
+                pos = xs.size - 1
+            if hoverdata_column == 'rel_time':
+                monkey_hoverdata_value_s = float(monkey_hoverdata_value)
+                monkey_hoverdata_value_cm = float(ys[pos])
+            else:
+                monkey_hoverdata_value_cm = float(monkey_hoverdata_value)
+                monkey_hoverdata_value_s = float(ys[pos])
+            return monkey_hoverdata_value_s, monkey_hoverdata_value_cm
+
+    # Fallback: DataFrame scan
     if hoverdata_column == 'rel_time':
         monkey_hoverdata_value_s = monkey_hoverdata_value
         trajectory_hover_row = trajectory_df.loc[trajectory_df['rel_time']

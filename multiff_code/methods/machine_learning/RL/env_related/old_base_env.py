@@ -1,5 +1,3 @@
-# machine_learning/RL/env_related/MultiFF.py
-
 from machine_learning.RL.env_related import env_utils
 
 import os
@@ -9,13 +7,8 @@ import math
 from math import pi
 import gymnasium
 from torch.linalg import vector_norm
-
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-# ---- Tunables for transforms ----
-DEFAULT_D0 = 25.0      # anchor for d_log = log1p(dist/d0)
-CLIP_DMAX = 500.0      # clip distance before log
-TMAX_DEFAULT = 3.0     # seconds cap for t_seen normalization
 
 
 class MultiFF(gymnasium.Env):
@@ -43,18 +36,13 @@ class MultiFF(gymnasium.Env):
                  print_ff_capture_incidents=True,
                  print_episode_reward_rates=True,
                  add_action_to_obs=True,
-                 noise_mode='linear',
                  ):
 
         super().__init__()
-
-        # Identity-tracked slot config and transforms
-        self.d0 = DEFAULT_D0
-        self.D_max = CLIP_DMAX
-        self.T_max = TMAX_DEFAULT
-
         self.linear_terminal_vel = linear_terminal_vel
         self.angular_terminal_vel = angular_terminal_vel
+        # self.linear_terminal_vel = 0.0005 #0.1/200
+        # self.angular_terminal_vel = 0.00222   #0.0035/(pi/2)
         self.num_alive_ff = num_alive_ff
         self.flash_on_interval = flash_on_interval
         self.invisible_distance = invisible_distance
@@ -70,7 +58,6 @@ class MultiFF(gymnasium.Env):
         self.print_episode_reward_rates = print_episode_reward_rates
         self.add_action_to_obs = add_action_to_obs
         self.add_cost_when_catching_ff_only = add_cost_when_catching_ff_only
-        self.noise_mode = noise_mode
 
         # parameters
         self.action_noise_std = action_noise_std
@@ -79,12 +66,8 @@ class MultiFF(gymnasium.Env):
         self.max_in_memory_time = max_in_memory_time
         self.full_memory = math.ceil(self.max_in_memory_time/self.dt)
 
-        # Observation spec (per slot)
-        # [d_log, sinθ, cosθ, theta_half, delta_theta_boundary_abs, t_seen_norm, visible, valid]
-        self.num_elem_per_ff = 8
-        self.include_valid_mask_tail = True  # append a K-length valid mask
-        self._make_observation_space()
-
+        self.num_elem_per_ff = 4
+        self._make_observation_space(self.num_elem_per_ff)
         self.action_space = gymnasium.spaces.Box(
             low=-1., high=1., shape=(2,), dtype=np.float32)
         self.vgain = 200
@@ -96,8 +79,8 @@ class MultiFF(gymnasium.Env):
         self.epi_num = 0
         self.time = 0
         self.current_obs = torch.zeros(self.obs_space_length)
+        # self.reward_per_episode = []
 
-        # world state buffers
         self.ffx = torch.zeros(self.num_alive_ff)
         self.ffy = torch.zeros(self.num_alive_ff)
         self.ffx_noisy = torch.zeros(self.num_alive_ff)
@@ -109,11 +92,6 @@ class MultiFF(gymnasium.Env):
         self.ff_in_memory_indices = torch.tensor([])
         self.visible_ff_indices = torch.tensor([])
 
-        # identity slot state & visibility timers
-        self.slot_ids = None             # shape [K], global ff indices or -1 for empty
-        self.ff_t_seen = None            # per global ff id, seconds since last seen
-        self.ff_visible = None           # per global ff id, {0,1}
-
     def reset(self, seed=None, use_random_ff=True):
         """
         reset the environment
@@ -121,14 +99,14 @@ class MultiFF(gymnasium.Env):
         Returns
         -------
         obs: np.array
-            return an observation based on the reset environment
+            return an observation based on the reset environment  
         """
         print('TIME before resetting:', self.time)
         super().reset(seed=seed)
 
-        print('current linear_terminal_vel: ', self.linear_terminal_vel)
-        print('current angular_terminal_vel: ', self.angular_terminal_vel)
-        print('current dt: ', self.dt)
+        print("current linear_terminal_vel: ", self.linear_terminal_vel)
+        print("current angular_terminal_vel: ", self.angular_terminal_vel)
+        print("current dt: ", self.dt)
         print('current full_memory: ', self.full_memory)
 
         print('current dv_cost_factor: ', self.dv_cost_factor)
@@ -144,32 +122,22 @@ class MultiFF(gymnasium.Env):
             if self.make_ff_always_flash_on:
                 self.ff_flash = None
             else:
-                self.ff_flash = env_utils.make_ff_flash_from_random_sampling(
-                    self.num_alive_ff,
-                    duration=self.episode_len * self.dt,
-                    non_flashing_interval_mean=3,
-                    flash_on_interval=self.flash_on_interval
-                )
+                self.ff_flash = env_utils.make_ff_flash_from_random_sampling(self.num_alive_ff, duration=self.episode_len * self.dt,
+                                                                             non_flashing_interval_mean=3, flash_on_interval=self.flash_on_interval)
             self._random_ff_positions(ff_index=torch.arange(self.num_alive_ff))
         self.ff_memory_all = torch.ones([self.num_alive_ff, ])
         self.ff_time_since_start_visible = torch.zeros([self.num_alive_ff, ])
 
-        # reset agent
-        self.agentr = torch.tensor([0.0], dtype=torch.float32)
-        self.agentx = torch.tensor([0.0], dtype=torch.float32)
-        self.agenty = torch.tensor([0.0], dtype=torch.float32)
-        self.agentxy = torch.tensor([0.0, 0.0], dtype=torch.float32)
-        self.agentheading = torch.zeros(1, dtype=torch.float32).uniform_(0, 2*pi)
+        # reset the information of the agent
+        self.agentx = torch.tensor([0])
+        self.agenty = torch.tensor([0])
+        self.agentr = torch.tensor([0])
+        self.agentxy = torch.tensor([0, 0])
+        self.agentheading = torch.zeros(1).uniform_(0, 2 * pi)
         self.v = torch.zeros(1).uniform_(-0.05, 0.05) * self.vgain
         self.w = torch.zeros(1)  # initialize with no angular velocity
         self.prev_w = self.w
         self.prev_v = self.v
-
-        # new trackers
-        self.ff_t_seen = torch.full([self.num_alive_ff, ], 1e9)
-        self.ff_visible = torch.zeros([self.num_alive_ff, ], dtype=torch.int)
-        self._init_identity_slots()
-        self._slot_valid_mask = torch.zeros(self.num_obs_ff, dtype=torch.int)
 
         # reset or update other variables
         self.time = 0
@@ -183,7 +151,7 @@ class MultiFF(gymnasium.Env):
         self.action = np.array([0, 0])
         self.obs = self.beliefs().numpy()
         if self.epi_num > 0:
-            print('\n episode: ', self.epi_num)
+            print("\n episode: ", self.epi_num)
         self.epi_num += 1
         self.num_ff_caught_in_episode = 0
         info = {}
@@ -193,20 +161,29 @@ class MultiFF(gymnasium.Env):
     def calculate_reward(self):
         """
         Calculate the reward gained by taking an action
+
+        Returns
+        -------
+        reward: num
+            the reward for the current step
+
         """
         self.vgain = 200
         self.wgain = pi / 2
-
+        # dv_cost = ((self.previous_action[1]-self.action[1])/self.dt)**2 * self.dv_cost_factor
+        # dw_cost = ((self.previous_action[0]-self.action[0])/self.dt)**2 * self.dw_cost_factor
+        # w_cost = (self.action[0]/self.dt)**2 * self.w_cost_factor
         self.dv = (self.prev_v - self.v)/self.dt
         self.dw = (self.prev_w - self.w)/self.dt
         w = self.action[0]
-
+        # a denominator is used to prevent the cost from being too large
         dv_cost = self.dv**2 * self.dt * self.dv_cost_factor/160000
         dw_cost = self.dw**2 * self.dt * self.dw_cost_factor/630
         w_cost = w**2 * self.dt * self.w_cost_factor/2
         self.cost_breakdown['dv_cost'] += dv_cost
         self.cost_breakdown['dw_cost'] += dw_cost
         self.cost_breakdown['w_cost'] += w_cost
+        # Note: To incorporate action_cost as done above, we need to store previous_action and also incorporate it into decision_info
 
         if self.add_cost_when_catching_ff_only:
             self.cost_for_the_current_ff += dv_cost + dw_cost + w_cost
@@ -215,26 +192,47 @@ class MultiFF(gymnasium.Env):
             reward = - dv_cost - dw_cost - w_cost
 
         if self.num_targets > 0:
+            # reward = reward + self.reward_per_ff * self.num_targets
             if self.add_cost_when_catching_ff_only:
                 self.catching_ff_reward = max(
-                    self.reward_per_ff * self.num_targets - self.cost_for_the_current_ff,
-                    0.2 * self.catching_ff_reward
-                )
+                    self.reward_per_ff * self.num_targets - self.cost_for_the_current_ff, 0.2 * self.catching_ff_reward)
             reward += self.catching_ff_reward
             self.reward_for_each_ff.extend(
                 [self.catching_ff_reward/self.num_targets] * self.num_targets)
             self.cost_for_the_current_ff = 0
 
+            # make ff_memory to be zero for those captured ff
             if self.print_ff_capture_incidents:
-                print(round(self.time, 2), 'sys_vel: ', [round(i, 4) for i in self.sys_vel.tolist(
-                )], 'n_targets: ', self.num_targets, 'reward: ', round(self.catching_ff_reward, 2))
-        self.num_ff_caught_in_episode = self.num_ff_caught_in_episode + self.num_targets
+                print(round(self.time, 2), "sys_vel: ", [round(i, 4) for i in self.sys_vel.tolist(
+                )], "n_targets: ", self.num_targets, "reward: ", round(self.catching_ff_reward, 2))
+                # print('prev_obs:', self.prev_obs.reshape([self.num_obs_ff, -1]))
+                # print('current_obs:', self.current_obs.reshape([self.num_obs_ff, -1]))
+                # print('top_k_indices:', self.topk_indices)
+                # print('captured_ff_index:', self.captured_ff_index)
+        self.num_ff_caught_in_episode = self.num_ff_caught_in_episode+self.num_targets
         self.reward = reward
         return reward
 
     def step(self, action):
         """
         take a step; the function involves calling the function state_step in the middle
+
+        Parameters
+        ----------
+        action: array-like, shape=(2,) 
+            containing the linear and angular velocities for the current point, in the range of (-1, 1)
+
+        Returns
+        -------
+        self.obs: np.array
+            the new observation
+        reward: num
+            the reward gained by taking the action
+        self.end_episode: bool
+            whether to end the current episode
+        {}: dic
+            a placeholder, for conforming to the format of the gym environment
+
         """
 
         self.previous_action = self.action
@@ -270,6 +268,12 @@ class MultiFF(gymnasium.Env):
     def state_step(self, action):
         """
         transition to a new state based on action
+
+        Parameters
+        ----------
+        action: array-like, shape=(2,) 
+            containing the linear and angular velocities for the current point, in the range of (-1, 1)
+
         """
         self.prev_w = self.w
         self.prev_v = self.v
@@ -288,10 +292,14 @@ class MultiFF(gymnasium.Env):
         self.agentheading = torch.remainder(
             self.agentheading + self.w.item() * self.dt, 2*pi)
 
-        # If the agent hits the boundary of the arena, it will come out from the opposite end
+        # If the agent hits the boundary of the arena, it will come out form the opposite end
         if self.agentr >= self.arena_radius:
+            # Calculate how far the agent has stepped out of the arena, which will be counted as
+            # going towards the center from the other end of the arena
             self.agentr = 2 * self.arena_radius - self.agentr
+            # the direction of the agent turns 180 degrees as it comes out from the other side of the arena
             self.agenttheta = self.agenttheta + pi
+            # update the position and direction of the agent
             self.agentx = (
                 self.agentr * torch.cos(self.agenttheta)).reshape(1, )
             self.agenty = (
@@ -302,21 +310,19 @@ class MultiFF(gymnasium.Env):
         else:
             self.JUST_CROSSED_BOUNDARY = False
 
-        # keep identity slots in sync after movement
-        self._tick_seen_and_visibility()
-        self._update_identity_slots()
-
     def beliefs(self):
-        # FF info
+        # The beliefs function will be rewritten because the observation no longer has a memory component;
+        # The manually added noise to the observation is also eliminated, because the LSTM network will contain noise;
+        # Thus, in the environment for LSTM agents, ffxy_noisy is equivalent to ffxy.
+
         self._get_ff_info()
 
-        # check captures
+        # see if any ff is caught; if so, they will be removed from the memory so that the new ff (with a new location) will not be included in the observation
         self._check_for_num_targets()
 
         self._further_process_after_check_for_num_targets()
 
-        # Build observation from identity-tracked slots (no per-step resorting)
-        self._get_ff_array_for_belief_identity_slots()
+        self._get_ff_array_for_belief()
 
         obs = torch.flatten(self.ff_array.transpose(0, 1))
 
@@ -329,14 +335,10 @@ class MultiFF(gymnasium.Env):
             action_for_obs = torch.tensor([self.action[0] + wnoise, self.action[1] + vnoise])
             obs = torch.cat((obs, action_for_obs), dim=0)
 
-        # append valid_mask tail if enabled
-        if self.include_valid_mask_tail:
-            obs = torch.cat((obs, self._slot_valid_mask.float()), dim=0)
-
         self.prev_obs = self.current_obs.clone()
         self.current_obs = obs
 
-        # bounds check
+        # if any element in obs has its absolute value greater than 1, raise an error
         if torch.any(torch.abs(obs) > 1):
             raise ValueError(
                 'The observation has an element with an absolute value greater than 1')
@@ -344,71 +346,17 @@ class MultiFF(gymnasium.Env):
         return obs
 
     # ========================================================================================================
-    # ================== Helper functions ====================================================================
-
-    # ---- Identity slot lifecycle ----
-    def _init_identity_slots(self):
-        # Seed slots with currently visible ff (nearest-first); otherwise leave empty (-1)
-        K = self.num_obs_ff
-        self.slot_ids = torch.full([K], -1, dtype=torch.int)
-        # ensure distances/visibility are fresh before ranking
-        self._get_ff_info()
-        if len(self.visible_ff_indices) > 0:
-            vis = self.visible_ff_indices
-            dists = self.ff_distance_all[vis]
-            order = torch.argsort(dists)  # nearest → farthest
-            seed = vis[order][:min(K, len(vis))]
-            self.slot_ids[:len(seed)] = seed
-        self._slot_valid_mask = (self.slot_ids >= 0).int()
-
-    def _tick_seen_and_visibility(self):
-        # advance timers; mark visibles; reset t_seen for visibles
-        self.ff_t_seen = self.ff_t_seen + self.dt
-        if len(self.visible_ff_indices) > 0:
-            self.ff_t_seen[self.visible_ff_indices] = 0.0
-            self.ff_visible = torch.zeros_like(self.ff_visible)
-            self.ff_visible[self.visible_ff_indices] = 1
-        else:
-            self.ff_visible = torch.zeros_like(self.ff_visible)
-
-    def _update_identity_slots(self):
-        # refresh distances/visibility so nearest-choice is correct
-        self._get_ff_info()
-
-        # drop bindings that disappeared (captured/out-of-range/angle>90°/memory zero)
-        K = self.num_obs_ff
-        for i in range(K):
-            ffid = int(self.slot_ids[i].item())
-            if ffid < 0:
-                continue
-            if (self.ff_memory_all[ffid] <= 0) or \
-               (self.ff_distance_all[ffid] > self.invisible_distance) or \
-               (torch.abs(self.angle_to_boundary_all[ffid]) > pi/2):
-                self.slot_ids[i] = -1
-
-        # fill empty slots with newly visible, not-yet-bound ff, nearest-first
-        bound = set(self.slot_ids[self.slot_ids >= 0].tolist())
-        vis = self.visible_ff_indices
-        if len(vis) > 0:
-            mask = torch.tensor([int(x) not in bound for x in vis.tolist()],
-                                dtype=torch.bool, device=vis.device)
-            cand = vis[mask]
-            if len(cand) > 0:
-                dists = self.ff_distance_all[cand]
-                order = torch.argsort(dists)
-                candidates = cand[order].tolist()
-            else:
-                candidates = []
-        else:
-            candidates = []
-        for i in range(K):
-            if self.slot_ids[i] < 0 and len(candidates) > 0:
-                self.slot_ids[i] = candidates.pop(0)
-        self._slot_valid_mask = (self.slot_ids >= 0).int()
+    # ================== The following functions are helper functions ========================================
 
     def _random_ff_positions(self, ff_index):
         """
         generate random positions for ff
+
+        Parameters
+        -------
+        ff_index: array-like
+            indices of fireflies whose positions will be randomly generated
+
         """
         num_alive_ff = len(ff_index)
         self.ffr[ff_index] = torch.sqrt(
@@ -419,16 +367,14 @@ class MultiFF(gymnasium.Env):
         self.ffy[ff_index] = torch.sin(
             self.fftheta[ff_index]) * self.ffr[ff_index]
         self.ffxy = torch.stack((self.ffx, self.ffy), dim=1)
-        # with uncertainties
+        # The following variables store the locations of all the fireflies with uncertainties
         self.ffx_noisy[ff_index] = self.ffx[ff_index].clone()
         self.ffy_noisy[ff_index] = self.ffy[ff_index].clone()
         self.ffxy_noisy = torch.stack((self.ffx_noisy, self.ffy_noisy), dim=1)
 
-    def _make_observation_space(self):
-        base = self.num_obs_ff * self.num_elem_per_ff
-        if self.include_valid_mask_tail:
-            base += self.num_obs_ff
-        self.obs_space_length = base + (2 if self.add_action_to_obs else 0)
+    def _make_observation_space(self, num_elem_per_ff):
+        self.obs_space_length = self.num_obs_ff * self.num_elem_per_ff + \
+            2 if self.add_action_to_obs else self.num_obs_ff * self.num_elem_per_ff
         self.observation_space = gymnasium.spaces.Box(
             low=-1., high=1., shape=(self.obs_space_length,), dtype=np.float32)
 
@@ -438,6 +384,8 @@ class MultiFF(gymnasium.Env):
             catching_ff_reward = max(self.reward_per_ff * self.num_targets -
                                      self.cost_for_the_current_ff, 0.2 * catching_ff_reward)
         if self.distance2center_cost > 0:
+            # At the earlier stage of the curriculum training, the reward gained by catching each firefly will
+            # decrease based on how far away the agent is from the center of the firefly
             total_deviated_distance = torch.sum(
                 self.ff_distance_all[self.captured_ff_index]).item()
             catching_ff_reward = catching_ff_reward - \
@@ -446,9 +394,11 @@ class MultiFF(gymnasium.Env):
 
     def _check_for_num_targets(self):
         self.num_targets = 0
+        # If the velocity of the current step is low enough for the action to be considered a stop
         if not self.JUST_CROSSED_BOUNDARY:
             try:
                 if (abs(self.sys_vel[0]) <= self.angular_terminal_vel) & (abs(self.sys_vel[1]) <= self.linear_terminal_vel):
+                    # if (abs(self.sys_vel[1]) <= self.linear_terminal_vel):
                     self.captured_ff_index = (
                         self.ff_distance_all <= self.reward_boundary).nonzero().reshape(-1).tolist()
                     self.num_targets = len(self.captured_ff_index)
@@ -456,35 +406,25 @@ class MultiFF(gymnasium.Env):
                         self.catching_ff_reward = self._get_catching_ff_reward()
                         self.ff_memory_all[self.captured_ff_index] = 0
                         self.ff_time_since_start_visible[self.captured_ff_index] = 0
-                        # Replace captured ffs with new locations
+                        # Replace the captured ffs with ffs of new locations
                         self._random_ff_positions(self.captured_ff_index)
-                        # Update info for the new ffs
+                        # need to call get_ff_info again to update the information of the new ffs
                         self._update_ff_info(self.captured_ff_index)
-                        
-                        # ★ unbind captured ids from slots immediately
-                        if self.slot_ids is not None:
-                            cap_set = set(self.captured_ff_index)
-                            for s in range(self.num_obs_ff):
-                                if int(self.slot_ids[s].item()) in cap_set:
-                                    self.slot_ids[s] = -1
 
-                        # ★ refresh visibility/distances and refill nearest-visible now
-                        self._get_ff_info()
-                        self._update_identity_slots()
             except AttributeError:
-                pass
+                pass  # This is to prevent the error that occurs when sys_vel is not defined in the first step
 
     def _get_ff_array_given_indices(self, add_memory=True, add_ff_time_since_start_visible=False):
-        # legacy helper (unused by new slot path) kept for compatibility
         self.ffxy_topk_noisy = self.ffxy_noisy[self.topk_indices]
         self.distance_topk_noisy = vector_norm(
             self.ffxy_topk_noisy - self.agentxy, dim=1)
+        # cap self.distance_topk_noisy to be less than self.invisible_distance
         self.distance_topk_noisy = torch.minimum(
             self.distance_topk_noisy, torch.tensor(self.invisible_distance))
-        self.angle_to_center_topk_noisy, angle_to_boundary_topk_noisy = env_utils.calculate_angles_to_ff_in_pytorch(
-            self.ffxy_topk_noisy, self.agentx, self.agenty, self.agentheading,
-            self.ff_radius, ffdistance=self.distance_topk_noisy)
+        self.angle_to_center_topk_noisy, angle_to_boundary_topk_noisy = env_utils.calculate_angles_to_ff_in_pytorch(self.ffxy_topk_noisy, self.agentx, self.agenty, self.agentheading,
+                                                                                                                    self.ff_radius, ffdistance=self.distance_topk_noisy)
         if add_memory:
+            # Concatenate angles, distance, and memory
             self.ff_array = torch.stack((self.angle_to_center_topk_noisy, angle_to_boundary_topk_noisy, self.distance_topk_noisy,
                                          self.ff_memory_all[self.topk_indices]), dim=0)
         elif add_ff_time_since_start_visible:
@@ -496,7 +436,6 @@ class MultiFF(gymnasium.Env):
         return self.ff_array
 
     def _get_ff_array_for_belief_common(self, ff_indices, add_memory, add_ff_time_since_start_visible):
-        # legacy helper (unused by new slot path)
         if torch.numel(ff_indices) >= self.num_obs_ff:
             self.topk_indices = env_utils._get_topk_indices(
                 ff_indices, self.ff_distance_all, self.num_obs_ff)
@@ -528,20 +467,24 @@ class MultiFF(gymnasium.Env):
         self._update_ff_time_since_start_visible()
 
     def _update_ff_memory_and_uncertainty(self):
-        # legacy memory update (used elsewhere)
+        # update memory of all fireflies
         self.ff_memory_all[self.ff_memory_all >
                            0] = self.ff_memory_all[self.ff_memory_all > 0] - 1
         if len(self.visible_ff_indices) > 0:
             self.ff_memory_all[self.visible_ff_indices] = self.full_memory
 
+        # for ff whose absolute angle_to_boundary is greater than 90 degrees, make memory 0
         self.ff_memory_all[torch.abs(self.angle_to_boundary_all) > pi/2] = 0
         self.ff_memory_all[self.ff_distance_all > self.invisible_distance] = 0
 
+        # find ffs that are in memory
         self.ff_in_memory_indices = (
             self.ff_memory_all > 0).nonzero().reshape(-1)
 
+        # calculate the std of the uncertainty that will be added to the distance and angle of each firefly
         ff_uncertainty_all = np.sign(self.full_memory - self.ff_memory_all) * (
             self.ffxy_noise_std * self.dt) * np.sqrt(self.ff_distance_all)
+        # update the positions of fireflies with uncertainties added; note that uncertainties are cummulative across steps
         self.ffx_noisy, self.ffy_noisy, self.ffxy_noisy = env_utils.update_noisy_ffxy(
             self.ffx_noisy, self.ffy_noisy, self.ffx, self.ffy, ff_uncertainty_all, self.visible_ff_indices)
         return
@@ -558,9 +501,8 @@ class MultiFF(gymnasium.Env):
             self.prev_visible_ff_indices = torch.tensor([])
 
         self.ff_distance_all = vector_norm(self.ffxy - self.agentxy, dim=1)
-        self.angle_to_center_all, self.angle_to_boundary_all = env_utils.calculate_angles_to_ff_in_pytorch(
-            self.ffxy, self.agentx, self.agenty, self.agentheading,
-            self.ff_radius, ffdistance=self.ff_distance_all)
+        self.angle_to_center_all, self.angle_to_boundary_all = env_utils.calculate_angles_to_ff_in_pytorch(self.ffxy, self.agentx, self.agenty, self.agentheading,
+                                                                                                           self.ff_radius, ffdistance=self.ff_distance_all)
         self.visible_ff_indices = env_utils.find_visible_ff(
             self.time, self.ff_distance_all, self.angle_to_boundary_all, self.invisible_distance, self.invisible_angle, self.ff_flash)
         return
@@ -568,28 +510,27 @@ class MultiFF(gymnasium.Env):
     def _update_ff_info(self, ff_index):
         self.ff_distance_all[ff_index] = vector_norm(
             self.ffxy[ff_index] - self.agentxy, dim=1)
-        self.angle_to_center_all[ff_index], self.angle_to_boundary_all[ff_index] = env_utils.calculate_angles_to_ff_in_pytorch(
-            self.ffxy[ff_index], self.agentx, self.agenty, self.agentheading,
-            self.ff_radius, ffdistance=self.ff_distance_all[ff_index])
-        
-        if self.ff_flash is None:
-            ff_flash_subset = None
-        else:
-            ff_flash_subset = [self.ff_flash[int(i)] for i in ff_index]
-            
-        self.visible_ff_indices_among_updated_ff = env_utils.find_visible_ff(
-            self.time, self.ff_distance_all[ff_index], self.angle_to_boundary_all[ff_index], self.invisible_distance, self.invisible_angle,
-            ff_flash_subset)
+        self.angle_to_center_all[ff_index], self.angle_to_boundary_all[ff_index] = env_utils.calculate_angles_to_ff_in_pytorch(self.ffxy[ff_index], self.agentx, self.agenty, self.agentheading,
+                                                                                                                               self.ff_radius, ffdistance=self.ff_distance_all[ff_index])
+        # find visible ff among the updated ff
+        self.visible_ff_indices_among_updated_ff = env_utils.find_visible_ff(self.time, self.ff_distance_all[ff_index], self.angle_to_boundary_all[ff_index], self.invisible_distance, self.invisible_angle,
+                                                                             [self.ff_flash[i] for i in ff_index])
+        # delete from the visible_ff_indices the indices that are in ff_index
         self.visible_ff_indices = torch.tensor(
             [i for i in self.visible_ff_indices if i not in ff_index])
+        # concatenate the visible_ff_indices_among_updated_ff to the visible_ff_indices
         self.visible_ff_indices = torch.cat(
             (self.visible_ff_indices, self.visible_ff_indices_among_updated_ff), dim=0)
+        # change dtype to int
         self.visible_ff_indices = self.visible_ff_indices.int()
+
         return
 
     def _update_ff_time_since_start_visible_base_func(self, not_visible_ff_indices):
         self.ff_time_since_start_visible += self.dt
         self.ff_time_since_start_visible[not_visible_ff_indices] = 0
+
+        # get ff that has turned from not visible to visible
         self.newly_visible_ff = torch.tensor(list(set(
             self.visible_ff_indices) - set(self.prev_visible_ff_indices)), dtype=torch.int)
         self.ff_time_since_start_visible[self.newly_visible_ff] = self.dt
@@ -599,222 +540,3 @@ class MultiFF(gymnasium.Env):
             self.num_alive_ff)) - set(self.visible_ff_indices.tolist())), dtype=torch.int)
         self._update_ff_time_since_start_visible_base_func(
             self.ff_not_visible_indices)
-
-    def _get_ff_array_for_belief_identity_slots(self):
-        K = self.num_obs_ff
-        feats = []
-
-        # Apply once per step, not per slot
-        self._apply_noise()
-
-        for i in range(K):
-            ffid = int(self.slot_ids[i].item()) if self.slot_ids is not None else -1
-            if ffid >= 0:
-                row = self._compute_slot_features(ffid)
-            else:
-                row = torch.zeros(self.num_elem_per_ff)
-                row[7] = 0.0
-            feats.append(row.unsqueeze(0))
-
-        self.ff_array = torch.cat(feats, dim=0).transpose(0, 1)
-        self.ff_array_unnormalized = self.ff_array.clone()
-        self.ff_array[0, :] = (self.ff_array[0, :] - 0.5) * 2
-        self.ff_array[5, :] = (self.ff_array[5, :] - 0.5) * 2
-
-
-    def _compute_slot_features(self, ffid: int) -> torch.Tensor:
-        """
-        Build one slot feature row for a given global ff id using the order:
-        [d_log, sinθ, cosθ, theta_half, delta_theta_boundary_abs, t_seen_norm, visible, valid]
-        """
-        ffxy = self.ffxy_noisy[ffid]
-        # angles wrt agent (center angle and boundary)
-        angle_to_center, angle_to_boundary = env_utils.calculate_angles_to_ff_in_pytorch(
-            ffxy.reshape(1, 2), self.agentx, self.agenty, self.agentheading, self.ff_radius
-        )
-        theta = angle_to_center[0].item()
-        theta_half, delta_theta_boundary_abs = env_utils.theta_half_and_delta_abs(
-            theta, angle_to_boundary[0].item()
-        )
-        # sinθ, cosθ
-        sin_theta = math.sin(theta)
-        cos_theta = math.cos(theta)
-        # distance → d_log in [0,1]
-        dist = vector_norm(ffxy - self.agentxy, dim=0).item()
-        dist_clip = min(dist, self.D_max)
-        d_log01 = math.log1p(dist_clip / self.d0) / math.log1p(self.D_max / self.d0)
-        # t_seen normalized 0..1
-        t_seen = min(float(self.ff_t_seen[ffid].item()), self.T_max)
-        t_seen01 = t_seen / self.T_max
-        # visible and valid
-        visible = float(self.ff_visible[ffid].item())
-        valid = 1.0
-        # angles to [-1,1]
-        theta_half_scaled = theta_half / math.pi
-        delta_abs_scaled = delta_theta_boundary_abs / math.pi
-        return torch.tensor([
-            d_log01,
-            sin_theta,
-            cos_theta,
-            theta_half_scaled,
-            delta_abs_scaled,
-            t_seen01,
-            visible,
-            valid
-        ], dtype=torch.float32)
-
-    def _apply_noise(self, mode='linear', randomwalk_frame='world'):
-        """
-        mode:
-        'linear'     → 1a additive Gaussian in polar, linear time growth
-        'saturating' → 1b additive Gaussian in polar, saturating time growth
-        'lognormal'  → 1c multiplicative on radius in polar
-        'randomwalk' → 2  state diffusion (default world-Cartesian; optional ego-polar)
-        randomwalk_frame: 'world' (default) or 'ego' (polar)
-        """
-
-        # visible refresh happens inside each branch
-
-        # Common base scales
-        # distance to agent (needed for polar scalings)
-        self._get_ff_info()  # ensures self.ff_distance_all up-to-date
-
-        r_true, _ = self._to_egocentric_polar(self.ffx, self.ffy)  # true r (for scaling)
-        r_noisy, th_noisy = self._to_egocentric_polar(self.ffx_noisy, self.ffy_noisy)
-
-        # Base radial scale ∝ sqrt(distance) as before
-        base_r = (self.ffxy_noise_std * self.dt) * torch.sqrt(torch.clamp(r_true, min=1.0))
-
-        # Angular scale: if you don't have a separate hyperparam, a reasonable default
-        # is inversely proportional to distance to keep arc-length noise comparable:
-        # std_theta ~ (base_r / r_true). Clamp to avoid blow-up near r=0.
-        std_theta_base = base_r / torch.clamp(r_true, min=10.0)  # 10.0 prevents huge angles near origin
-
-        if mode == 'linear':
-            # 1a: linear growth with unseen time (clip to 1)
-            seen_scale = torch.clamp(self.ff_t_seen / self.T_max, 0.0, 1.0)
-            std_r   = base_r * seen_scale
-            std_th  = std_theta_base * seen_scale
-            self._update_noisy_ff_polar(std_r, std_th, mode='additive')
-
-        elif mode == 'saturating':
-            # 1b: saturating growth (exponential precision decay)
-            seen_scale = 1.0 - torch.exp(-self.ff_t_seen / self.T_max)
-            # tiny floor to avoid exactly-zero at first unseen frame
-            seen_scale = torch.clamp(seen_scale, 1e-6, 1.0)
-            std_r  = base_r * seen_scale
-            std_th = std_theta_base * seen_scale
-            self._update_noisy_ff_polar(std_r, std_th, mode='additive')
-
-        elif mode == 'lognormal':
-            # 1c: multiplicative on radius only (proportional error)
-            # use a log-std proportional to base_r / r_true (dimensionless)
-            log_std_r = torch.clamp(base_r / torch.clamp(r_true, min=10.0), max=0.5)
-            # Angle unchanged here (you could add a small additive theta noise if desired)
-            self._update_noisy_ff_polar(log_std_r, torch.zeros_like(log_std_r), mode='lognormal')
-
-        elif mode == 'randomwalk':
-            vis = self.visible_ff_indices
-            all_idx = torch.arange(self.num_alive_ff, dtype=torch.long, device=self.ffx_noisy.device)
-            mem = all_idx
-            if len(vis) > 0:
-                mem = torch.tensor([i for i in all_idx.tolist() if i not in vis.tolist()],
-                                dtype=torch.long, device=self.ffx_noisy.device)
-
-            if randomwalk_frame == 'world':
-                # world-Cartesian random walk on memory trace
-                std_rw = base_r  # reuse magnitude scale
-                self.ffx_noisy[mem] += torch.normal(mean=0.0, std=std_rw[mem])
-                self.ffy_noisy[mem] += torch.normal(mean=0.0, std=std_rw[mem])
-                # refresh visibles
-                if len(vis) > 0:
-                    self.ffx_noisy[vis] = self.ffx[vis]
-                    self.ffy_noisy[vis] = self.ffy[vis]
-                self.ffxy_noisy = torch.stack((self.ffx_noisy, self.ffy_noisy), dim=1)
-
-            elif randomwalk_frame == 'ego':
-                # ego-polar random walk (agent-pose-dependent)
-                std_r  = base_r
-                std_th = std_theta_base
-                # treat as additive step on (r,theta), then map back
-                self._update_noisy_ff_polar(std_r, std_th, mode='additive')
-            else:
-                raise ValueError("randomwalk_frame must be 'world' or 'ego'")
-
-        else:
-            raise ValueError(f'Unknown noise mode: {mode}')
-
-
-
-    def _update_noisy_ff_polar(self, std_r, std_theta, mode='additive'):
-        """
-        Update self.ffx_noisy, self.ffy_noisy by adding noise in ego-polar space
-        for memory-only FFs, then convert back to world (x,y).
-        Visible FFs are reset to truth.
-        mode: 'additive' (Gaussian on r,theta) or 'lognormal' (multiplicative on r only).
-        """
-        # 1) start from current noisy world coords
-        x = self.ffx_noisy.clone()
-        y = self.ffy_noisy.clone()
-
-        # 2) convert to ego polar
-        r, th = self._to_egocentric_polar(x, y)
-
-        # 3) indices
-        vis = self.visible_ff_indices
-        all_idx = torch.arange(self.num_alive_ff, dtype=torch.long, device=r.device)
-        mem = all_idx
-        if len(vis) > 0:
-            mem = torch.tensor([i for i in all_idx.tolist() if i not in vis.tolist()],
-                            dtype=torch.long, device=r.device)
-
-        # 4) apply noise to memory-only in polar
-        if mode == 'additive':
-            dr = torch.normal(mean=0.0, std=std_r)
-            dth = torch.normal(mean=0.0, std=std_theta)
-            r[mem]  = torch.clamp(r[mem]  + dr[mem], min=0.0)
-            th[mem] = self._wrap_pi(th[mem] + dth[mem])
-
-        elif mode == 'lognormal':
-            # multiplicative on radius only; angle has no added noise here
-            # interpret std_r as the log-std for multiplicative error on r
-            lr = torch.normal(mean=0.0, std=std_r)  # log-factor
-            scale = torch.exp(lr)
-            r[mem] = torch.clamp(r[mem] * scale[mem], min=0.0)
-
-        else:
-            raise ValueError(f"unknown polar mode: {mode}")
-
-        # 5) back to world
-        x_new, y_new = self._from_egocentric_polar(r, th)
-
-        # 6) refresh visibles to ground truth
-        if len(vis) > 0:
-            x_new[vis] = self.ffx[vis]
-            y_new[vis] = self.ffy[vis]
-
-        # 7) write back
-        self.ffx_noisy = x_new
-        self.ffy_noisy = y_new
-        self.ffxy_noisy = torch.stack((self.ffx_noisy, self.ffy_noisy), dim=1)
-
-
-
-    def _wrap_pi(self, a):
-        return torch.remainder(a + math.pi, 2*math.pi) - math.pi
-
-    def _to_egocentric_polar(self, x, y):
-        # world → ego polar relative to (agentx, agenty, heading)
-        dx = x - self.agentx
-        dy = y - self.agenty
-        r = torch.sqrt(dx*dx + dy*dy)
-        theta_world = torch.atan2(dy, dx)
-        theta_ego = self._wrap_pi(theta_world - self.agentheading)
-        return r, theta_ego
-
-    def _from_egocentric_polar(self, r, theta_ego):
-        # ego polar → world
-        theta_world = self._wrap_pi(theta_ego + self.agentheading)
-        x = self.agentx + r * torch.cos(theta_world)
-        y = self.agenty + r * torch.sin(theta_world)
-        return x, y

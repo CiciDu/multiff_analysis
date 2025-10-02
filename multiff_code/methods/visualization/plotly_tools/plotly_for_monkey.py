@@ -295,67 +295,83 @@ def _plot_or_update_eye_positions_in_plotly(fig, x0, y0, monkey_subset, all_rel_
     return fig
 
 
-def _plot_or_update_arrow_to_eye_positions_in_plotly(fig, x0, y0, monkey_subset, all_rel_time_in_duration=None, trace_name='arrow_to_eye_positions', update_if_already_exist=True, marker='circle', marker_size=4, arrowcolor=None):
+def _plot_or_update_arrow_to_eye_positions_in_plotly(
+    fig, x0, y0, monkey_subset,
+    all_rel_time_in_duration=None,
+    trace_name='arrow_to_eye_positions',
+    update_if_already_exist=True,
+    marker='circle',
+    marker_size=4,
+    arrowcolor=None
+):
     """
-    Plot or update eye positions in a Plotly figure.
-
-    Parameters:
-    fig: Plotly figure
-    x0, y0: coordinates
-    marker: marker style
-    overall_valid_indices: indices of valid data
-    rel_time: relative time data
-    gaze_world_xy_rotated: rotated gaze world coordinates
-    all_rel_time_in_duration: all relative times in duration (optional)
-
-    Returns:
-    fig: updated Plotly figure
-    gaze_world_xy_rotated_valid: valid rotated gaze world coordinates
+    Add the gaze arrow once, then move it on subsequent calls by updating only x, y, ax, ay.
+    The annotation index is cached in fig.layout.meta under key f'arrow_idx::{trace_name}'.
     """
-
-    monkey_subset_meaningful = monkey_subset[monkey_subset['valid_view_point'] == True].copy(
-    )
-
-    if monkey_subset_meaningful.shape[0] == 0:
-        # logging.warning(f'Failed to update arrow to eye positions for trace_name: {trace_name} because no valid eye position data are found.')
+    # 1) select a single valid row
+    subset = monkey_subset[monkey_subset['valid_view_point'] == True].copy()
+    if subset.shape[0] == 0:
         return fig
-    elif monkey_subset_meaningful.shape[0] > 1:
-        # make a warning
-        # logging.warning('More than one meaningful eye position found, only the first one is used to plot the arrow.')
-        monkey_subset_meaningful = monkey_subset_meaningful.iloc[0:1]
-    # else:
-    #     logging.info('Meaningful eye position is found, using it to plot the arrow.')
+    if subset.shape[0] > 1:
+        subset = subset.iloc[0:1]
 
-    if arrowcolor is None:
-        arrowcolor = 'black'
-    # if arrowcolor is None:
-    #     if all_rel_time_in_duration is None:
-    #         arrowcolor = 'black'
-    #     else:
-    #         arrowcolor = get_color(monkey_subset_meaningful['rel_time'], min(all_rel_time_in_duration), max(all_rel_time_in_duration), cmap_name='viridis')
+    # 2) compute coordinates
+    x = subset['gaze_world_x_rotated'].item() - x0
+    y = subset['gaze_world_y_rotated'].item() - y0
+    ax = subset['monkey_x'].item() - x0
+    ay = subset['monkey_y'].item() - y0
 
-    trace_kwargs = {
-        'ax': monkey_subset_meaningful['monkey_x'].item() - x0,
-        'ay': monkey_subset_meaningful['monkey_y'].item() - y0,
-        'x': monkey_subset_meaningful['gaze_world_x_rotated'].item() - x0,
-        'y': monkey_subset_meaningful['gaze_world_y_rotated'].item() - y0,
-        'arrowcolor': arrowcolor,
-    }
+    # 3) prepare meta dict and key
+    if fig.layout.meta is None or not isinstance(fig.layout.meta, dict):
+        fig.layout.meta = {}
+    meta = fig.layout.meta
+    key = f'arrow_idx::{trace_name}'
 
-    fig.add_annotation(
-        **trace_kwargs,
-        xref='x',
-        yref='y',
-        axref='x',
-        ayref='y',
-        text='',
-        showarrow=True,
-        arrowhead=2,
-        arrowsize=1,
-        arrowwidth=2,
-    )
+    # 4) try fast path: move existing arrow by stored index
+    idx = meta.get(key, None)
+    ann_list = list(fig.layout.annotations) if getattr(fig.layout, 'annotations', None) else []
 
+    def _add_arrow_once():
+        nonlocal ann_list
+        color = 'black' if arrowcolor is None else arrowcolor
+        fig.add_annotation(
+            x=x, y=y,
+            ax=ax, ay=ay,
+            xref='x', yref='y',
+            axref='x', ayref='y',
+            text=trace_name,                    # identifier (hidden)
+            font=dict(color='rgba(0,0,0,0)'),   # hide label text
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=2,
+            arrowcolor=color,
+        )
+        # store index for O(1) updates later
+        meta[key] = len(ann_list)
+        # refresh local view if needed
+        ann_list = list(fig.layout.annotations)
+
+    if update_if_already_exist and idx is not None:
+        # sanity-check index still valid and points to the right annotation
+        if 0 <= idx < len(ann_list) and getattr(ann_list[idx], 'text', None) == trace_name:
+            # move only coordinates (fast + safe)
+            ann_list[idx].update(x=x, y=y, ax=ax, ay=ay)
+            # optionally allow color update if provided
+            if arrowcolor is not None:
+                ann_list[idx].update(arrowcolor=arrowcolor)
+            return fig
+        else:
+            # index stale (e.g., figure rebuilt) -> fall through to add and re-cache
+            pass
+
+    # If we get here:
+    #   - either no cached index,
+    #   - or update_if_already_exist is False,
+    #   - or cached index stale. Add once and cache.
+    _add_arrow_once()
     return fig
+
 
 
 def get_color(value, cmin, cmax, cmap_name='viridis'):

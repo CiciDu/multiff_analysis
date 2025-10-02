@@ -36,7 +36,6 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         super().__init__(raw_data_folder_path=raw_data_folder_path, opt_arc_type=opt_arc_type)
         self.freeze_time_series = False
 
-
     def make_dash_for_main_plots(self, show_trajectory_time_series=True, show_neural_plots=True,
                                  port=DEFAULT_PORT):
 
@@ -67,17 +66,13 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         print(f"Opening dash in browser at: http://127.0.0.1:{chosen_port}")
         # If you're SSH-forwarding, forward *chosen_port* (both sides) instead of the original.
         self.app.run(debug=False, use_reloader=False, mode='external',
-                    port=chosen_port, host='0.0.0.0')
-    
-    
+                     port=chosen_port, host='0.0.0.0')
+
     def _get_empty_figure(self):
         """Get a copy of the empty figure template to avoid race conditions"""
         empty_fig = go.Figure()
         empty_fig.update_layout(height=10, width=10)
         return empty_fig
-
-    def _clone_all(self, *figs):
-        return tuple(f for f in figs)
 
     def prepare_dash_for_main_plots_layout(self, id_prefix='main_plots_'):
         self.id_prefix = id_prefix
@@ -113,7 +108,6 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
         ]
         layout.extend(more_to_add)
         return html.Div(layout)
-
 
     def _register_all_callbacks(self):
         """Register all callbacks in one place for better organization"""
@@ -169,20 +163,22 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     raise PreventUpdate(
                         "No update was made for the current trigger.")
 
-                return self._clone_all(
+                return (
                     self.fig,
                     self.fig_time_series_combd,
                     self.fig_scatter_or_reg,
-                    self.fig_scatter_or_reg2
-                ) + ('Updated successfully',)
+                    self.fig_scatter_or_reg2,
+                    'Updated successfully'
+                )
 
             except Exception as e:
-                return self._clone_all(
+                return (
                     self.fig,
                     self.fig_time_series_combd,
                     self.fig_scatter_or_reg,
-                    self.fig_scatter_or_reg2
-                ) + (f"An error occurred. No update was made. Error: {e}",)
+                    self.fig_scatter_or_reg2,
+                    f"An error occurred. No update was made. Error: {e}"
+                )
 
     def make_function_to_update_all_plots_based_on_hover_data(self, app):
         @app.callback(
@@ -264,20 +260,22 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
                     raise PreventUpdate(
                         "No update was made for the current trigger.")
 
-                return self._clone_all(
+                return (
                     self.fig,
                     self.fig_time_series_combd,
                     self.fig_raster,
-                    self.fig_fr
-                ) + ('Updated successfully',)
+                    self.fig_fr,
+                    'Updated successfully'
+                )
 
             except Exception as e:
-                return self._clone_all(
+                return (
                     self.fig,
                     self.fig_time_series_combd,
                     self.fig_raster,
-                    self.fig_fr
-                ) + (f"An error occurred. No update was made. Error: {e}",)
+                    self.fig_fr,
+                    f"An error occurred. No update was made. Error: {e}"
+                )
 
     def make_function_to_update_based_on_correlation_plot(self, app):
         @app.callback(
@@ -327,7 +325,7 @@ class DashMainPlots(dash_main_helper_class.DashMainHelper):
 
             self.other_messages = self.generate_other_messages()
 
-            return self._clone_all(
+            return (
                 self.fig,
                 self.fig_time_series_combd,
                 self.fig_scatter_or_reg,

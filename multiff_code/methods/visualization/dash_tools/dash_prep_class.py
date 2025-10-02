@@ -235,8 +235,10 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
         return self.curv_of_traj_in_duration
 
     def _produce_fig_time_series(self, use_two_y_axes=False):
+        # Use hover lookup if available on subclasses
+        hover_lookup = getattr(self, '_hover_lookup', None)
         self.monkey_hoverdata_value_s, self.monkey_hoverdata_value_cm = plotly_for_time_series.find_monkey_hoverdata_value_for_both_fig_time_series(
-            self.hoverdata_column, self.monkey_hoverdata_value, self.current_plotly_key_comp['trajectory_df'])
+            self.hoverdata_column, self.monkey_hoverdata_value, self.current_plotly_key_comp['trajectory_df'], hover_lookup=hover_lookup)
 
         if self.monkey_plot_params['show_visible_segments'] is True:
             self.visible_segments_info = {'ff_info': self.current_plotly_key_comp['ff_dataframe_in_duration_visible_qualified'],
@@ -451,6 +453,8 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
                 self.trajectory_data_trace_index = i
             if trace.name == 'trajectory before stop':
                 self.traj_portion_trace_index = i
+
+        self._build_hover_lookup_cache()
 
         return self.fig
 

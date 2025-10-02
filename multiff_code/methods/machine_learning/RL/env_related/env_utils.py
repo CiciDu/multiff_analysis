@@ -5,6 +5,22 @@ from math import pi
 from torch.linalg import vector_norm
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
+def theta_half_and_delta_abs(theta_center: float, theta_boundary: float):
+    import math
+    def wrap(a):
+        return (a + math.pi) % (2*math.pi) - math.pi
+    theta_c = wrap(theta_center)
+    theta_b = wrap(theta_boundary)
+    options = [
+        (theta_c, theta_b),
+        (theta_c + 2*math.pi, theta_b),
+        (theta_c - 2*math.pi, theta_b),
+    ]
+    th, tb = min(options, key=lambda ab: abs(ab[0]-ab[1]))
+    theta_half = 0.5*(th + tb)
+    delta_abs = abs(th - tb)
+    return wrap(theta_half), min(delta_abs, math.pi)
+
 
 def make_ff_flash_from_random_sampling(num_alive_ff, duration, non_flashing_interval_mean=3, flash_on_interval=0.3):
     """
