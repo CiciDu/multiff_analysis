@@ -2,9 +2,12 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import json
+import time
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.monitor import LoadMonitorResultsError
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000
@@ -76,17 +79,53 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         self.save_path = os.path.join(model_folder_name, model_name)
         self.best_mean_traing_reward = -np.inf
 
+        # Create the monitor directory immediately
+        os.makedirs(self.model_folder_name, exist_ok=True)
+
+    def _create_empty_monitor_file(self):
+        """Create an empty monitor file with proper format"""
+        monitor_file = os.path.join(self.model_folder_name, 'monitor.csv')
+
+        # Only create if it doesn't exist
+        if not os.path.exists(monitor_file):
+            # Create JSON header with current timestamp
+            header = {
+                "t_start": time.time(),
+                "env_id": "custom_env"
+            }
+
+            # Write the monitor file with proper format
+            with open(monitor_file, 'w') as f:
+                # JSON header line
+                f.write(f"#{json.dumps(header)}\n")
+                # CSV header line
+                f.write("r,l,t\n")
+
+            if self.verbose > 0:
+                print(f"Created empty monitor file at: {monitor_file}")
+
     def _init_callback(self) -> None:
         # Create folder if needed
         if self.save_path is not None:
             # find the parent dir of self.save_path
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
 
+        # Also create the monitor directory to ensure it exists
+        os.makedirs(self.model_folder_name, exist_ok=True)
+
     def _on_step(self) -> bool:
         if self.n_calls % self.check_freq == 0:
 
             # Retrieve training reward
-            x, y = ts2xy(load_results(self.model_folder_name), 'timesteps')
+            try:
+                x, y = ts2xy(load_results(self.model_folder_name), 'timesteps')
+            except LoadMonitorResultsError:
+                # Create an empty monitor file if it doesn't exist
+                self._create_empty_monitor_file()
+                if self.verbose > 0:
+                    print(f"No monitor files found in {self.model_folder_name}. "
+                          f"Created empty monitor file. Will start tracking rewards once episodes complete.")
+                return True
             if len(x) > 0:
                 # Mean training reward over the last 100 episodes
                 mean_reward = np.mean(y[-100:])

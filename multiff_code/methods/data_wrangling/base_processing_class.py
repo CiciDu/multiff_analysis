@@ -153,7 +153,6 @@ class BaseProcessing:
 
         self.ff_dataframe = self.ff_dataframe.drop_duplicates()
         # do some final processing
-        self.ff_dataframe['memory'] = self.ff_dataframe['memory'].astype('int')
         if len(self.ff_dataframe) > 0:
             self.min_point_index, self.max_point_index = np.min(np.array(
                 self.ff_dataframe['point_index'])), np.max(np.array(self.ff_dataframe['point_index']))

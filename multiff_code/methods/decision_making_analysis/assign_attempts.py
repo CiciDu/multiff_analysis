@@ -23,6 +23,8 @@ def make_stop_category_df(monkey_information, ff_caught_T_new, closest_stop_to_c
     stop_category_df = add_stop_cluster_id(stop_category_df)
     stop_category_df = reassign_attempt_types(stop_category_df)
 
+    stop_category_df['stop_id_duration'] = stop_category_df['stop_id_end_time'] - stop_category_df['stop_id_start_time']
+            
     return stop_category_df
 
 

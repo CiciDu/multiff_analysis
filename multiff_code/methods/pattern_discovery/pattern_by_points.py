@@ -196,8 +196,8 @@ def find_number_of_visible_or_in_memory_ff_at_beginning_of_trials(prev_trials, f
         ff_dataframe_sub = ff_dataframe[ff_dataframe['time'].between(
             *duration)]
         ff_dataframe_sub = ff_dataframe_sub.groupby(['ff_index']).max()
-        visible_ff = ff_dataframe_sub[ff_dataframe_sub['memory'] == 100]
-        in_memory_ff = ff_dataframe_sub[ff_dataframe_sub['memory'] < 100]
+        visible_ff = ff_dataframe_sub[ff_dataframe_sub['visible'] == 1]
+        in_memory_ff = ff_dataframe_sub[ff_dataframe_sub['visible'] == 0]
         list_of_num_visible_ff.append(len(visible_ff))
         list_of_num_in_memory_ff.append(len(in_memory_ff))
         num_visible_ff = np.array(list_of_num_visible_ff)

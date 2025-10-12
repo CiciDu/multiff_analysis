@@ -118,9 +118,7 @@ def PlotPolar(duration,
                                                                       data_folder_name=None, print_progress=False)
         # add the information about memory from ff_dataframe to ff_dataframe_v2 by merging the two dataframes
         ff_dataframe = ff_dataframe_v2.merge(
-            ff_dataframe[['ff_index', 'memory']], on='ff_index', how='left')
-        # fill up the na in "memory" with 0
-        ff_dataframe['memory'] = ff_dataframe['memory'].fillna(0)
+            ff_dataframe[['ff_index', 'time_since_last_vis']], on='ff_index', how='left')
 
     target_info = ff_dataframe[ff_dataframe["ff_index"].isin(target_indices)]
 
@@ -159,9 +157,9 @@ def PlotPolar(duration,
         ) - np.array(target_info['point_index'].astype('int'))]
     else:
         # color is based on memory
-        ff_color = colors_ffs[np.array(ff_info['memory'].astype('int'))]
+        ff_color = colors_ffs[np.array((ff_info['time_since_last_vis'] * 30).astype('int'))]
         target_color = colors_target[np.array(
-            target_info['memory'].astype('int'))]
+            target_info['time_since_last_vis'].astype('int'))]
 
     if show_alive_ff & (not show_all_positions_of_all_fireflies):
         ff_dataframe_v2 = make_ff_dataframe.make_ff_dataframe_v2_func(duration, monkey_information, ff_caught_T_new, ff_flash_sorted,

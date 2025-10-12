@@ -80,7 +80,6 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     ff_index = []
     point_index = []
     visible = []
-    memory = []
     time_since_last_vis = []
     total_ff_num = len(ff_life_sorted)
 
@@ -88,35 +87,53 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     for i in range(starting_ff[player], total_ff_num):
         current_ff_index = i
 
-        visible_indices, in_memory_indices, memory_array, time_since_last_vis_array = ff_dataframe_utils.find_visible_indices_AND_memory_array_AND_time_since_last_vis(current_ff_index, monkey_information, obs_ff_indices_in_ff_dataframe, ff_flash_sorted,
-                                                                                                                                                                       ff_real_position_sorted, ff_caught_T_new, max_distance, player, max_memory, truncate_info_beyond_capture=truncate_info_beyond_capture)
-        if len(visible_indices) > 0:
-            num_points_in_memory = len(memory_array)
+        visible_indices, in_memory_indices, memory_array, time_since_last_vis_array = ff_dataframe_utils.find_visible_indices_AND_memory_array_AND_time_since_last_vis(
+            current_ff_index,
+            monkey_information,
+            obs_ff_indices_in_ff_dataframe,
+            ff_flash_sorted,
+            ff_real_position_sorted,
+            ff_caught_T_new,
+            max_distance,
+            player,
+            max_memory,
+            truncate_info_beyond_capture=truncate_info_beyond_capture,
+        )
+        # memory_array/in_memory_indices define relevance; skip if empty
+        if len(in_memory_indices) > 0:
+            num_points_in_memory = len(in_memory_indices)
 
-            # Append the values for this ff; Using list operations is faster than np.append here
-            ff_index = ff_index + [current_ff_index] * num_points_in_memory
-            point_index = point_index + in_memory_indices.tolist()
-            visible = visible + \
-                [1 if point == max_memory else 0 for point in memory_array.tolist()]
-            memory = memory + memory_array.tolist()
-            time_since_last_vis = time_since_last_vis + time_since_last_vis_array.tolist()
-            # In the following, "relevant" means in memory
+            # Append the values for this ff efficiently
+            ff_index.extend([current_ff_index] * num_points_in_memory)
+            point_index.extend(in_memory_indices.tolist())
+            m_arr = np.asarray(memory_array)
+            visible.extend((m_arr == max_memory).astype(np.int8).tolist())
+            time_since_last_vis.extend(np.asarray(
+                time_since_last_vis_array).tolist())
 
-        if i % 100 == 0:
+        if i % 200 == 0:
             if print_progress:
                 print("Making ff_dataframe: ", i, " out of ",
                       total_ff_num, " total number of fireflies ")
 
     ff_dict = {'ff_index': ff_index, 'point_index': point_index,
-               'visible': visible, 'memory': memory, 'time_since_last_vis': time_since_last_vis}
+               'visible': visible, 'time_since_last_vis': time_since_last_vis}
 
-    ff_dataframe = pd.DataFrame(ff_dict).reset_index(drop=True)
+    ff_dataframe = pd.DataFrame(ff_dict, copy=False)
 
-    # make sure the point_index in ff_dataframe are within monkey_information['point_index'].values
-    ff_dataframe = ff_dataframe[ff_dataframe['point_index'].isin(
-        monkey_information['point_index'].values)]
-    # also make sure max target_index is less than len(ff_caught_T_new)
-    ff_dataframe['time'] = monkey_information.loc[ff_dataframe['point_index'].values, 'time'].values
+    if len(ff_dataframe) == 0:
+        return ff_dataframe_utils.make_empty_ff_dataframe()
+
+    # Ensure point_index bounds without costly isin
+    max_idx = len(monkey_information)
+    mask_pi = (ff_dataframe['point_index'] >= 0) & (
+        ff_dataframe['point_index'] < max_idx)
+    if not mask_pi.all():
+        ff_dataframe = ff_dataframe.loc[mask_pi].reset_index(drop=True)
+
+    # Map time via direct numpy indexing
+    time_array = monkey_information['time'].to_numpy()
+    ff_dataframe['time'] = time_array[ff_dataframe['point_index'].to_numpy()]
     ff_dataframe['target_index'] = np.searchsorted(
         ff_caught_T_new, ff_dataframe['time'])
     ff_dataframe = ff_dataframe[ff_dataframe['target_index'] < len(
@@ -125,8 +142,9 @@ def make_ff_dataframe_func(monkey_information, ff_caught_T_new, ff_flash_sorted,
     if ff_in_obs_df is not None:
         ff_dataframe[['ff_x', 'ff_y']
                      ] = ff_real_position_sorted[ff_dataframe['ff_index'].values]
-        ff_dataframe = pd.merge(ff_dataframe, ff_in_obs_df, how="left", on=[
-                                "ff_index", "point_index"])
+        ff_dataframe = pd.merge(
+            ff_dataframe, ff_in_obs_df, how="left", on=["ff_index", "point_index"], sort=False, copy=False
+        )
         ff_dataframe.loc[ff_dataframe['ff_x_noisy'].isnull(
         ), 'ff_x_noisy'] = ff_dataframe.loc[ff_dataframe['ff_x_noisy'].isnull(), 'ff_x']
         ff_dataframe.loc[ff_dataframe['ff_y_noisy'].isnull(
@@ -164,9 +182,9 @@ def add_essential_columns_to_ff_dataframe(ff_dataframe, monkey_information, ff_r
 
 
 def process_ff_dataframe(ff_dataframe, max_distance, max_time_since_last_vis):
-    # set ff_index, point_index, target_index, visible, memory, left_right all to be int
-    ff_dataframe[['ff_index', 'point_index', 'visible', 'memory']] = ff_dataframe[[
-        'ff_index', 'point_index', 'visible', 'memory']].astype('int')
+    # set ff_index, point_index, target_index, visible, left_right all to be int
+    ff_dataframe[['ff_index', 'point_index', 'visible']] = ff_dataframe[[
+        'ff_index', 'point_index', 'visible']].astype('int')
     if max_distance is not None:
         ff_dataframe = ff_dataframe[ff_dataframe['ff_distance']
                                     < max_distance + 100]

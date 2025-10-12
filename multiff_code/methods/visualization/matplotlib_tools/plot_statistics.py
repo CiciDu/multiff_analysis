@@ -547,7 +547,7 @@ def fit_and_plot_linear_regression(x_array, y_array, show_regression=True, show_
                  f'r = {round(r_value, 2)}; p = {round(p_value, 2)}', fontsize=15)
 
 
-def plot_correlations_in_record(df, parameter_columns=['action_noise_std', 'ffxy_noise_std', 'num_obs_ff', 'max_in_memory_time'],
+def plot_correlations_in_record(df, parameter_columns=['v_noise_std', 'w_noise_std', 'ffr_noise_scale', 'num_obs_ff', 'max_in_memory_time'],
                                 outcome_columns=None, color_column=None, show_regression=True, show_r=True, print_r_squared=False):
     sns.set_style(style="darkgrid")
     matplotlib.rcParams.update({'font.size': 15})

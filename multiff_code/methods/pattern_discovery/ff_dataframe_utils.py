@@ -11,7 +11,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 def make_empty_ff_dataframe():
     ff_dataframe = pd.DataFrame(columns=['ff_index', 'point_index', 'time', 'target_index', 'ff_x', 'ff_y',
-                                         'monkey_x', 'monkey_y', 'visible', 'memory', 'ff_distance', 'ff_angle',
+                                         'monkey_x', 'monkey_y', 'visible', 'ff_distance', 'ff_angle',
                                          'ff_angle_boundary', 'left_right', 'abs_delta_ff_angle',
                                          'abs_delta_ff_angle_boundary', 'target_x', 'target_y',
                                          'ffdistance2target', 'abs_ffangle_decreasing',

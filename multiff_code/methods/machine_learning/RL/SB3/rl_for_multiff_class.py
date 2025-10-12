@@ -14,6 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from os.path import exists
 import time as time_package
+import copy
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000
@@ -32,14 +33,12 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  flash_on_interval=0.3,
                  max_in_memory_time=3,
                  add_date_to_model_folder_name=False,
-                 use_env2=False,
                  data_name='data_0',
                  **additional_env_kwargs):
 
         self.player = "agent"
         self.agent_params = None
         self.overall_folder = overall_folder
-        self.use_env2 = use_env2
 
         self.env_kwargs = {'dt': dt,
                            'dv_cost_factor': dv_cost_factor,
@@ -54,7 +53,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.env_kwargs.update(additional_env_kwargs)
         self.agent_id = "dv" + str(dv_cost_factor) + \
                         "_dw" + str(dw_cost_factor) + "_w" + str(w_cost_factor) + \
-                        "_mem" + str(self.env_kwargs['max_in_memory_time'])
+                        "_memT" + str(self.env_kwargs['max_in_memory_time'])
 
         if len(overall_folder) > 0:
             os.makedirs(self.overall_folder, exist_ok=True)
@@ -113,8 +112,13 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         if model_folder_name is None:
             model_folder_name = self.model_folder_name
 
-        self.env_kwargs = rl_for_multiff_utils.retrieve_params(
-            model_folder_name)
+        try:
+            self.env_kwargs = rl_for_multiff_utils.retrieve_params(
+                model_folder_name)
+        except Exception as e:
+            print(
+                f"Warning: failed to retrieve env params. Error message: {e}")
+            self.env_kwargs = {}
         return self.env_kwargs
 
     def curriculum_training(self, best_model_after_curriculum_exists_ok=True, load_replay_buffer_of_best_model_after_curriculum=True):
@@ -135,7 +139,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.original_agent_id = self.agent_id
         self.agent_id = 'no_cost'
         print('Starting curriculum training')
-        self._make_initial_env_for_curriculum_training()
+        self.make_initial_env_for_curriculum_training()
         self._make_agent_for_curriculum_training()
         self.successful_training = False
 
@@ -144,6 +148,13 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                                          video_dir=self.best_model_after_curriculum_dir_name)
         self.agent_id = self.original_agent_id
+
+    def _make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_angular_terminal_vel=0.32):
+        self.env_kwargs_for_curriculum_training = copy.deepcopy(
+            self.env_kwargs)
+        self._make_env_suitable_for_curriculum_training()
+        self._update_env_dt(dt=initial_dt)
+        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = initial_angular_terminal_vel
 
     def _make_env_suitable_for_curriculum_training(self):
         if self.sb3_or_lstm == 'sb3':
@@ -523,8 +534,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                 'dw_cost_factor': self.env_kwargs['dw_cost_factor'],
                                 'w_cost_factor': self.env_kwargs['w_cost_factor']}
 
-        # minimal_current_info = {'action_noise_std': self.action_noise_std,
-        #                         'ffxy_noise_std': self.ffxy_noise_std,
+        # minimal_current_info = {'v_noise_std': self.v_noise_std,
+        #                         'w_noise_std': self.w_noise_std,
+        #                         'ffr_noise_scale': self.ffr_noise_scale,
         #                         'num_obs_ff': self.num_obs_ff,
         #                         'max_in_memory_time': self.max_in_memory_time}
         return minimal_current_info

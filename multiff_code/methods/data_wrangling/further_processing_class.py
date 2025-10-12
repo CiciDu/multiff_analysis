@@ -503,6 +503,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if exists(stop_category_df_filepath) & exists_ok:
             self.stop_category_df = pd.read_csv(stop_category_df_filepath)
             print("Retrieved stop_category_df")
+            if 'stop_id_duration' not in self.stop_category_df.columns:
+                self.stop_category_df['stop_id_duration'] = self.stop_category_df['stop_id_end_time'] - self.stop_category_df['stop_id_start_time']
         else:
             monkey_information = self.monkey_information.copy()
             monkey_information = find_GUAT_or_TAFT_trials.add_temp_stop_cluster_id(
@@ -518,7 +520,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                 stop_category_df_filepath, index=False)
             print("Made new stop_category_df and saved to ",
                   stop_category_df_filepath)
-
+            
         cols_to_add = ['stop_cluster_id', 'stop_cluster_start_point', 'stop_cluster_end_point', 'stop_cluster_size']
         self.monkey_information.drop(columns=cols_to_add, inplace=True, errors='ignore')
         self.monkey_information = self.monkey_information.merge(self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')

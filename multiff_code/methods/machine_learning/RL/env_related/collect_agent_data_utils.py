@@ -8,7 +8,6 @@ import shutil
 import numpy as np
 import matplotlib
 import pandas as pd
-import torch
 import math
 from matplotlib import rc
 from math import pi
@@ -16,12 +15,11 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 rc('animation', html='jshtml')
 matplotlib.rcParams['animation.embed_limit'] = 2**128
-torch.set_printoptions(sci_mode=False)
 np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+device = "cpu"  # Default to CPU since we're removing torch dependencies
 
 
 def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_dim=128, deterministic=True, first_obs=None):
@@ -83,8 +81,8 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
         else:
             state = first_obs
         last_action = env.action_space.sample()
-        hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(
-            device), torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
+        hidden_out = (np.zeros([1, 1, hidden_dim], dtype=np.float32),
+                      np.zeros([1, 1, hidden_dim], dtype=np.float32))
     else:
         if first_obs is None:
             obs, _ = env.reset()
@@ -105,7 +103,7 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
     corresponding_time = []
     ff_x_noisy = []
     ff_y_noisy = []
-    ff_memory = []
+    time_since_last_vis_list = []
     all_steps = []
 
     for step in range(n_steps):
@@ -125,19 +123,22 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
             obs, reward, done, _, info = env.step(action)
             # memory_ff_indices_all.append(env.ff_in_memory_indices)
 
-        monkey_x.append(env.agentx.item())
-        monkey_y.append(env.agenty.item())
-        monkey_speed.append(env.v.item())
-        monkey_dw.append(env.w.item())
-        monkey_angles.append(env.agentheading.item())
+        monkey_x.append(env.agentx[0])
+        monkey_y.append(env.agenty[0])
+        monkey_speed.append(float(env.v))
+        monkey_dw.append(float(env.w))
+        monkey_angles.append(env.agentheading[0])
         time.append(env.time)
 
         env.topk_indices = env.topk_indices.tolist()
         indexes_in_ff_flash.extend(env.topk_indices)
         corresponding_time.extend([env.time]*len(env.topk_indices))
         all_steps.extend([step]*len(env.topk_indices))
-        ff_memory.extend(
-            env.ff_array_unnormalized[-1, :len(env.topk_indices)].tolist())
+        if len(env.topk_indices) > 0:
+            t_last_seen = env.ff_t_since_last_seen[env.topk_indices]
+            time_since_last_vis_list.extend(t_last_seen.tolist())
+        else:
+            time_since_last_vis_list.extend([])
         if len(env.ffxy_topk_noisy) > 0:
             if env.ffxy_topk_noisy.shape[0] != len(env.topk_indices):
                 raise ValueError(
@@ -148,19 +149,12 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
         if done:
             break
 
-    ff_time_since_last_vis = (
-        1 - np.array(ff_memory)/env.full_memory) * env.max_in_memory_time
-
     temp_obs_in_ff_df = pd.DataFrame({'index_in_ff_flash': indexes_in_ff_flash,
                                       'time': corresponding_time,
                                       'point_index': all_steps,
                                       'ff_x_noisy': ff_x_noisy,
                                       'ff_y_noisy': ff_y_noisy,
-                                      'memory': ff_memory,
-                                      'time_since_last_vis': ff_time_since_last_vis})
-    if LSTM:
-        temp_obs_in_ff_df['memory'] = 1
-        temp_obs_in_ff_df['time_since_last_vis'] = 0
+                                      'time_since_last_vis': time_since_last_vis_list})
     ff_information_temp = env.ff_information.copy()
     ff_information_temp['index_in_ff_information'] = range(
         len(ff_information_temp))
@@ -203,7 +197,7 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
     temp_obs_in_ff_df.reset_index(drop=True, inplace=True)
 
     ff_in_obs_df = temp_obs_in_ff_df[['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index', 'ff_x_noisy', 'ff_y_noisy',
-                                      'memory', 'time_since_last_vis']].copy()
+                                      'time_since_last_vis']].copy()
     ff_in_obs_df.rename(
         columns={'index_in_ff_dataframe': 'ff_index'}, inplace=True)
 
@@ -334,7 +328,7 @@ def make_ff_flash_sorted(env_ff_flash, ff_information, sorted_indices_all, env_e
 
     Parameters
     ----------
-    env_ff_flash: torch.tensor
+    env_ff_flash: np.ndarray
         containing the intervals that each firefly flashes on in the environment
     ff_information: df
         contains information about each firefly, with the following columns:
@@ -355,7 +349,7 @@ def make_ff_flash_sorted(env_ff_flash, ff_information, sorted_indices_all, env_e
     if env_ff_flash is not None:
         ff_flash_sorted = []
         for index, ff in ff_information.iloc[sorted_indices_all].iterrows():
-            ff_flash = env_ff_flash[int(ff["index_in_ff_flash"])].numpy()
+            ff_flash = env_ff_flash[int(ff["index_in_ff_flash"])]
             lifetime = [ff["time_start_to_be_alive"], ff["time_captured"]]
             if ff["time_captured"] == -9999:
                 lifetime[1] = env_end_time
@@ -384,7 +378,7 @@ def make_env_ff_flash_from_real_data(ff_flash_sorted_of_monkey, alive_ffs, ff_fl
 
     Returns
     -------
-    env_ff_flash: torch.tensor
+    env_ff_flash: np.ndarray
         containing the intervals that each firefly flashes on in the environment
 
     """
@@ -401,7 +395,7 @@ def make_env_ff_flash_from_real_data(ff_flash_sorted_of_monkey, alive_ffs, ff_fl
             # because time starts from 0 for the environment, we need to subtract the
             # starting time from the monkey data
             ff_flash_valid = ff_flash_valid-start_time
-        env_ff_flash.append(torch.tensor(ff_flash_valid))
+        env_ff_flash.append(np.array(ff_flash_valid))
     return env_ff_flash
 
 
@@ -488,7 +482,7 @@ def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
         contains information about each firefly, with the following columns:
         [unique_identifier, ffx, ffy, time_start_to_be_alive, time_captured, 
         mx_when_catching_ff, my_when_catching_ff, index_in_ff_flash]
-    env_ff_flash: torch.tensor
+    env_ff_flash: np.ndarray
         containing the intervals that each firefly flashes on in the environment
     env_end_time: num
         the last time point traversed by the agent
@@ -645,8 +639,8 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     # Make the RL environment
     if LSTM:
         env = env_for_lstm.CollectInformationLSTM(**env_kwargs)
-        hidden_out = (torch.zeros([1, 1, sac_model.hidden_dim], dtype=torch.float), torch.zeros(
-            [1, 1, sac_model.hidden_dim], dtype=torch.float))
+        hidden_out = (np.zeros([1, 1, sac_model.hidden_dim], dtype=np.float32),
+                      np.zeros([1, 1, sac_model.hidden_dim], dtype=np.float32))
     else:
         env = env_for_sb3.CollectInformation(**env_kwargs)
     env.flash_on_interval = 0.3
@@ -659,8 +653,8 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     # Replicate the monkey's environment
     env.ff_flash = make_env_ff_flash_from_real_data(
         info_of_monkey['ff_flash_sorted'], alive_ffs, plot_whole_duration)
-    env_ffxy = torch.tensor(
-        info_of_monkey['ff_real_position_sorted'][alive_ffs], dtype=torch.float)
+    env_ffxy = np.array(
+        info_of_monkey['ff_real_position_sorted'][alive_ffs], dtype=np.float32)
     env.ffxy, env.ffxy_noisy = env_ffxy, env_ffxy
     env.ffx, env.ffx_noisy = env.ffxy[:, 0], env.ffxy[:, 0]
     env.ffy, env.ffy_noisy = env.ffxy[:, 1], env.ffxy[:, 1]
@@ -681,13 +675,15 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
     # ======================================= Agent Replicating Monkey's Actions ==========================================
     # In order to replicate the monkey's action, we need to turn the action noise temporarily to zero.
-    original_action_noise_std = env.action_noise_std
-    env.action_noise_std = 0
+    original_v_noise_std = env.v_noise_std
+    original_w_noise_std = env.w_noise_std
+    env.v_noise_std = 0
+    env.w_noise_std = 0
     # Find the right starting time for the environment, so the ff_flash can match
     env.time = M_cum_t[0] - start_time
-    env.agentheading = torch.tensor([A_cum_angle[0]])
-    env.agentx = torch.tensor([A_cum_mx[0]])
-    env.agenty = torch.tensor([A_cum_my[0]])
+    env.agentheading = np.array([A_cum_angle[0]])
+    env.agentx = np.array([A_cum_mx[0]])
+    env.agenty = np.array([A_cum_my[0]])
 
     for step in range(1, num_imitation_steps_agent):
         # Starting to replicate from the second step in the data
@@ -704,14 +700,14 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
             obs, reward, done, _, info = env.step(monkey_actions[step])
         # We replace the agent's position with monkey's real position so that small differences (due to problems
         # such as inconsistent time intervals) can be corrected
-        env.agentheading = torch.tensor([A_cum_angle[step]])
-        env.agentx = torch.tensor([A_cum_mx[step]])
-        env.agenty = torch.tensor([A_cum_my[step]])
+        env.agentheading = np.array([A_cum_angle[step]])
+        env.agentx = np.array([A_cum_mx[step]])
+        env.agenty = np.array([A_cum_my[step]])
 
-        monkey_x.append(env.agentx.item())
+        monkey_x.append(env.agentx[0])
         monkey_y.append(env.agenty.item())
-        monkey_speed.append(env.v.item())
-        monkey_dw.append(env.w.item())
+        monkey_speed.append(float(env.v))
+        monkey_dw.append(float(env.w))
         monkey_angles.append(env.agentheading.item())
         time.append(env.time)
 
@@ -720,12 +716,13 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
             # Find and append the row index of the last firefly (the row that has the largest row number)
             # in ff_information that has the same index_in_ff_lash
             last_corresponding_ff_index = np.where(
-                prev_ff_information.loc[:, "index_in_ff_flash"] == index.item())[0][-1]
+                prev_ff_information.loc[:, "index_in_ff_flash"] == index)[0][-1]
             indexes_in_ff_information.append(last_corresponding_ff_index)
         obs_ff_unique_identifiers.append(indexes_in_ff_information)
 
     # ======================================= Agent Moving Independently ==========================================
-    env.action_noise_std = original_action_noise_std
+    env.v_noise_std = original_v_noise_std
+    env.w_noise_std = original_w_noise_std
     num_total_steps = int(
         np.ceil((plot_whole_duration[1]-plot_whole_duration[0])/agent_dt))
     for step in range(num_imitation_steps_agent, num_total_steps+10):
@@ -739,17 +736,17 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
         else:
             action, _ = sac_model.predict(obs, deterministic=True)
             obs, reward, done, _, info = env.step(action)
-        monkey_x.append(env.agentx.item())
-        monkey_y.append(env.agenty.item())
-        monkey_speed.append(env.v.item())
-        monkey_dw.append(env.w.item())
-        monkey_angles.append(env.agentheading.item())
+        monkey_x.append(env.agentx[0])
+        monkey_y.append(env.agenty[0])
+        monkey_speed.append(float(env.v))
+        monkey_dw.append(float(env.w))
+        monkey_angles.append(env.agentheading[0])
         time.append(env.time)
 
         indexes_in_ff_information = []
         for index in env.topk_indices:
             last_corresponding_ff_index = np.where(
-                prev_ff_information.loc[:, "index_in_ff_flash"] == index.item())[0][-1]
+                prev_ff_information.loc[:, "index_in_ff_flash"] == index)[0][-1]
             indexes_in_ff_information.append(last_corresponding_ff_index)
         obs_ff_unique_identifiers.append(indexes_in_ff_information)
 

@@ -1,4 +1,5 @@
 from data_wrangling import specific_utils, general_utils
+from data_wrangling import process_monkey_information
 from planning_analysis.show_planning import examine_null_arcs
 
 import os
@@ -270,6 +271,10 @@ def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df
     return scatter_around_target_df
 
 def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, cur_ff_index_array=None, stop_point_index_array=None):
+    
+    if 'stop_id' not in monkey_information:
+        monkey_information = process_monkey_information.add_whether_new_distinct_stop_and_stop_id(monkey_information)
+    
     stop_sub = monkey_information.loc[monkey_information['monkey_speeddummy'] == 0, [
         'time', 'point_index', 'stop_id']].copy()
     closest_stop_to_capture_df = pd.DataFrame()
@@ -281,6 +286,10 @@ def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_informa
         closest_point_row['caught_time'] = caught_time
         closest_stop_to_capture_df = pd.concat(
             [closest_stop_to_capture_df, closest_point_row], axis=0)
+    if len(closest_stop_to_capture_df) == 0:
+        print("No closest stop to capture found")
+        return pd.DataFrame()
+        
     closest_stop_to_capture_df['diff_from_caught_time'] = closest_stop_to_capture_df['time'] - \
         closest_stop_to_capture_df['caught_time']
     if cur_ff_index_array is not None:

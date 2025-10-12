@@ -167,6 +167,134 @@ def apply_formulas_to_convert_eye_position_to_ff_position(hor_theta, ver_theta, 
     return gaze_mky_view_x, gaze_mky_view_y, gaze_mky_view_angle, gaze_world_x, gaze_world_y
 
 
+def eye_angles_from_head_polar(ff_angle,
+                               ff_distance,
+                               *,
+                               monkey_height=-10.0,
+                               interocular_dist=4.0,
+                               left_or_right_eye='left',
+                               wrap='pm_pi'):
+    """
+    Compute oculocentric eye-rotation angles (horizontal, vertical) from
+    head-centered polar coordinates, as you've used in multiFF:
+      - ff_angle: azimuth of the target relative to head midline (+x forward),
+                  radians CCW; 0 = straight ahead, +pi/2 = left.
+      - ff_distance: planar distance from HEAD CENTER (midpoint between eyes)
+                     to the target, in the same units as interocular_dist.
+
+    Parameters
+    ----------
+    ff_angle : array-like
+        Head-centered azimuth to target (radians).
+    ff_distance : array-like
+        Head-centered planar distance to target (same units as cm).
+    monkey_height : float, optional
+        z offset (target - eye) in the head frame. Negative means target below eye.
+        Default -10.0 (e.g., eye 10 cm above the ground target).
+    interocular_dist : float, optional
+        Distance between the eyes (e.g., 4.0 cm).
+    left_or_right_eye : {'left','right'}
+        Which eye to compute geometry for.
+    wrap : {'pm_pi','0_2pi'}, optional
+        Wrapping convention for horizontal angle.
+
+    Returns
+    -------
+    hor_theta : np.ndarray
+        Horizontal eye rotation (azimuth), radians. Positive = leftward.
+    ver_theta : np.ndarray
+        Vertical eye rotation (elevation), radians. Negative = downward.
+    """
+    ff_angle     = np.asarray(ff_angle)
+    ff_distance  = np.asarray(ff_distance, dtype=float)
+
+    # Convert head-centered polar (origin = between eyes) → Cartesian in head frame
+    # Head frame axes: +x forward, +y left, +z up (here z is applied via monkey_height)
+    x_head = ff_distance * np.cos(ff_angle)   # forward distance from head center
+    y_head = ff_distance * np.sin(ff_angle)   # left-right distance from head center
+
+    # Shift origin from head center to chosen eye by ± interocular_dist/2 along +y
+    half_D = interocular_dist / 2.0
+    if left_or_right_eye == 'left':
+        # Left eye center is at +half_D in head +y; subtract that to express target in eye coords
+        y_eye = y_head - (+half_D)
+    elif left_or_right_eye == 'right':
+        # Right eye center is at -half_D in head +y
+        y_eye = y_head - (-half_D)
+    else:
+        raise ValueError('left_or_right_eye must be "left" or "right"')
+
+    x_eye = x_head
+    z_eye = float(monkey_height)  # negative → target below eye
+
+    # Oculocentric angles
+    hor_theta = np.arctan2(y_eye, x_eye)                          # azimuth
+    r_xy      = np.hypot(x_eye, y_eye)
+    ver_theta = np.arctan2(z_eye, np.maximum(r_xy, 1e-9))         # elevation
+
+    # Optional wrapping of horizontal angle
+    if wrap == '0_2pi':
+        hor_theta = np.mod(hor_theta, 2*np.pi)
+    elif wrap == 'pm_pi':
+        hor_theta = (hor_theta + np.pi) % (2*np.pi) - np.pi
+
+    return hor_theta, ver_theta
+
+
+def invert_world_position_to_eye_angles(ff_world_x, ff_world_y, monkey_angle, body_x, body_y,
+                                        monkey_height=-10.0,
+                                        interocular_dist=4.0,
+                                        left_or_right_eye='left',
+                                        wrap='pm_pi'):
+    """
+    World → head → eye pipeline, now delegating the final geometry to
+    `eye_angles_from_head_polar`.
+
+    Inputs
+    ------
+    ff_world_x, ff_world_y : array-like
+        Target world coords.
+    monkey_angle : array-like
+        Heading (radians CCW from world +X), aligns head +x with facing direction.
+    body_x, body_y : array-like
+        Monkey body center in world coords.
+    monkey_height, interocular_dist, left_or_right_eye, wrap
+        Passed through to `eye_angles_from_head_polar`.
+
+    Returns
+    -------
+    hor_theta, ver_theta : np.ndarray
+        Oculocentric horizontal/vertical rotations (radians).
+    """
+    ff_world_x  = np.asarray(ff_world_x)
+    ff_world_y  = np.asarray(ff_world_y)
+    body_x      = np.asarray(body_x)
+    body_y      = np.asarray(body_y)
+    monkey_angle = np.asarray(monkey_angle)
+
+    # 1) Body→target displacement in world frame
+    dx_w = ff_world_x - body_x
+    dy_w = ff_world_y - body_y
+
+    # 2) Rotate world → head frame by -monkey_angle (so head +x = facing direction)
+    ca = np.cos(-monkey_angle)
+    sa = np.sin(-monkey_angle)
+    x_head = ca * dx_w - sa * dy_w   # forward
+    y_head = sa * dx_w + ca * dy_w   # left
+
+    # 3) Convert to the head-centric polar quantities used across your project
+    ff_distance = np.hypot(x_head, y_head)
+    ff_angle    = np.arctan2(y_head, x_head)  # radians CCW from head +x
+
+    # 4) Delegate to the reusable head-polar → eye-angles helper
+    return eye_angles_from_head_polar(ff_angle,
+                                      ff_distance,
+                                      monkey_height=monkey_height,
+                                      interocular_dist=interocular_dist,
+                                      left_or_right_eye=left_or_right_eye,
+                                      wrap=wrap)
+
+
 def find_eye_positions_rotated_in_world_coordinates(monkey_information, duration, rotation_matrix, eye_col_suffix=''):
     monkey_sub = monkey_information[(monkey_information['time'] >= duration[0]) & (
         monkey_information['time'] <= duration[1])].copy()

@@ -72,7 +72,7 @@ def only_get_point_indices_for_anim(trials_df, monkey_information, max_point_ind
 
 def make_TAFT_trials_df(stop_category_df):
     new_TAFT_df = stop_category_df.loc[stop_category_df['attempt_type'] == 'TAFT', [
-        'stop_cluster_id', 'stop_cluster_size', 'trial', 'time', 'point_index', 'associated_ff']].copy()
+        'point_index', 'stop_id_duration', 'stop_cluster_id', 'stop_cluster_size', 'trial', 'time', 'associated_ff']].copy()
     new_TAFT_df = new_TAFT_df.rename(columns={'associated_ff': 'ff_index'})
 
     TAFT_trials_df = _make_trials_df(new_TAFT_df)
@@ -83,7 +83,7 @@ def make_TAFT_trials_df(stop_category_df):
 def make_GUAT_trials_df(stop_category_df, ff_real_position_sorted, monkey_information):
 
     new_GUAT_df = stop_category_df.loc[stop_category_df['attempt_type'] == 'GUAT', [
-        'stop_cluster_id', 'stop_cluster_size', 'trial', 'time', 'point_index', 'associated_ff']].copy()
+        'point_index', 'stop_id_duration', 'stop_cluster_id', 'stop_cluster_size', 'trial', 'time', 'associated_ff']].copy()
     new_GUAT_df = new_GUAT_df.rename(columns={'associated_ff': 'ff_index'})
 
     GUAT_trials_df = _make_trials_df(new_GUAT_df)
@@ -110,7 +110,7 @@ def make_GUAT_trials_df(stop_category_df, ff_real_position_sorted, monkey_inform
 
 
 def make_temp_TAFT_trials_df(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
-            
+
     # Extract a subset of monkey information that is relevant for GUAT analysis
     monkey_sub = _take_out_monkey_subset_for_TAFT(
         monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance)
@@ -214,7 +214,8 @@ def add_temp_stop_cluster_id(
                 max_cluster_distance)) | has_cap_between]
 
     # Assign cluster ids per stop
-    stop_table["temp_stop_cluster_id"] = np.cumsum(new_cluster.astype(np.int64)) - 1
+    stop_table["temp_stop_cluster_id"] = np.cumsum(
+        new_cluster.astype(np.int64)) - 1
 
     # Per-cluster stats (ensure key remains a column)
     bounds = (
@@ -239,7 +240,8 @@ def add_temp_stop_cluster_id(
     # Final dtypes
     df['temp_stop_cluster_id'] = df["temp_stop_cluster_id"].astype("Int64")
     if "temp_stop_cluster_size" in df.columns:
-        df["temp_stop_cluster_size"] = df["temp_stop_cluster_size"].astype("Int64")
+        df["temp_stop_cluster_size"] = df["temp_stop_cluster_size"].astype(
+            "Int64")
 
     return df
 
@@ -267,6 +269,7 @@ def _make_trials_df(monkey_sub: pd.DataFrame, stop_cluster_id_col='stop_cluster_
         'second_stop_time': ('time', lambda s: s.iloc[1] if len(s) > 1 else pd.NA),
         'last_stop_time': ('time', 'last'),
         'stop_cluster_size': (stop_cluster_size_col, 'max'),  # keep it
+        'stop_id_duration': ('stop_id_duration', 'max'), # keep it
     }
 
     trials_df = g.agg(**agg_spec).reset_index()
@@ -355,10 +358,10 @@ def _take_out_monkey_subset_for_GUAT_or_TAFT(monkey_information, ff_caught_T_new
     cluster_counts = monkey_sub['temp_stop_cluster_id'].value_counts()
     valid_clusters = cluster_counts[cluster_counts >=
                                     min_stop_per_cluster].index
-    monkey_sub = monkey_sub[monkey_sub['temp_stop_cluster_id'].isin(valid_clusters)]
+    monkey_sub = monkey_sub[monkey_sub['temp_stop_cluster_id'].isin(
+        valid_clusters)]
 
     return monkey_sub
-
 
 
 def further_identify_cluster_start_and_end_based_on_ff_capture_time(stop_points_df):

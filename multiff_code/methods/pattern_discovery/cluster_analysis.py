@@ -48,18 +48,12 @@ def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey=500, max_clu
     if duration_per_step is None:
         duration_per_step = ff_dataframe['time'].iloc[100] - \
             ff_dataframe['time'].iloc[99]
-    max_steps_past = math.floor(max_time_past/duration_per_step)
-
-    # Since the "memory" of a firefly is 100 when it is visible, and decrease by 1 for each step that it is not visible,
-    # thus, the minimum "memory" of a firefly to be included in the consideration of whether it belongs to a cluster is
-    # 100 - max_steps_apart
-    min_memory_of_ff = 100-max_steps_past
 
     # Initiate a list to store the result
     # Structure: [[point_index, ff_index, cluster_label], [point_index, ff_index, cluster_label], ...]
     point_vs_cluster = []
 
-    ff_dataframe_subset = ff_dataframe[(ff_dataframe['memory'] >= (min_memory_of_ff)) & (
+    ff_dataframe_subset = ff_dataframe[(ff_dataframe['time_since_last_vis'] <= (max_time_past)) & (
         ff_dataframe['ff_distance'] <= max_ff_distance_from_monkey)][['point_index', 'ff_x', 'ff_y', 'ff_index', 'target_index']]
 
     for i in range(min_point_index, max_point_index+1):

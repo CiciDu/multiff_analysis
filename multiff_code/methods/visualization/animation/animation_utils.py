@@ -477,7 +477,6 @@ def plot_in_memory_ff_reward_boundary_for_animation(in_memory_ffs, ax):
 
 
 def show_ff_indices_for_animation(relevant_ff, ax):
-    # selected_ffs = relevant_ff[relevant_ff['memory'] > 50]
     selected_ffs = relevant_ff.copy()
     if 'ff_x_rotated' in selected_ffs.columns:
         ff_x_column = 'ff_x_rotated'

@@ -11,7 +11,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 def sample_and_visualize_from_neural_network(sac_model,
                                              sample_size=1000,
-                                             full_memory=4,
+                                             full_memory=None,
                                              ff_radius=10,
                                              invisible_distance=400,
                                              color_variable="dv",
@@ -195,7 +195,7 @@ def visualize_generated_actions(stacked_array,
 def generate_observations_and_actions(
     sac_model,
     sample_size=1000,
-    full_memory=4,
+    full_memory=None,
     ff_radius=10,
     invisible_distance=400,
     const_distance=None,
@@ -220,8 +220,7 @@ def generate_observations_and_actions(
         the agent
     sample_size: num
         the number of dots to be plotted in the plot
-    full_memory: num
-        the value for memory when a firefly is visible; in other words, the maximum value for memory
+    full_memory: deprecated
     ff_radius: num
         the reward boundary of the firefly
     invisible_distance: num
@@ -253,7 +252,7 @@ def generate_observations_and_actions(
     else:
         distance_upper_limits = invisible_distance
     angle2center, angle2boundary, distances, memories = sample_observations_for_one_ff(
-        const_distance, const_angle, const_memory, sample_size, full_memory, distance_upper_limits)
+        const_distance, const_angle, const_memory, sample_size, distance_upper_limits)
     # stack the attributes together, so that each row is an observation
     stacked_array = np.stack(
         (angle2center, angle2boundary, distances, memories), axis=1)
@@ -261,7 +260,7 @@ def generate_observations_and_actions(
     # If applicable, sample for the 1st ff in the obs space
     if add_2nd_ff:
         angle2center2, angle2boundary2, distances2, memories2 = sample_observations_for_one_ff(
-            const_distance2, const_angle2, const_memory2, sample_size, full_memory, distance_upper_limits=distances)
+            const_distance2, const_angle2, const_memory2, sample_size, distance_upper_limits=distances)
         stacked_array2 = np.stack(
             (angle2center2, angle2boundary2, distances2, memories2), axis=1)
         stacked_array = np.hstack((stacked_array, stacked_array2))
@@ -280,8 +279,7 @@ def generate_observations_and_actions(
                 num_default_ff, stacked_array, sample_size, invisible_distance)
 
     if norm_input is True:
-        stacked_array = norm_input(
-            stacked_array, invisible_distance, full_memory)
+        stacked_array = norm_input(stacked_array, invisible_distance)
 
     # for each observation, use the network to generate the agent's action
     all_actions = generate_actions(stacked_array, sample_size, sac_model)
@@ -289,7 +287,7 @@ def generate_observations_and_actions(
     return stacked_array, all_actions, angle2center, distances
 
 
-def sample_observations_for_one_ff(const_distance, const_angle, const_memory, sample_size, full_memory, distance_upper_limits):
+def sample_observations_for_one_ff(const_distance, const_angle, const_memory, sample_size, distance_upper_limits):
     if const_distance is None:
         # Need to sample random distances
         distances = np.random.uniform(low=np.zeros(
@@ -310,11 +308,11 @@ def sample_observations_for_one_ff(const_distance, const_angle, const_memory, sa
         angle2boundary = specific_utils.calculate_angles_to_ff_boundaries(
             angles_to_ff=angle2center, distances_to_ff=distances)
 
+    # memory is represented as time-since-last-visible in seconds; sample from a modest range (0..3s)
     if const_memory is None:
-        memories = np.random.randint(
-            low=0, high=full_memory+1, size=[sample_size, ])
+        memories = np.random.uniform(low=0.0, high=3.0, size=[sample_size, ])
     else:
-        memories = np.ones(sample_size)*const_memory
+        memories = np.ones(sample_size) * float(const_memory)
 
     return angle2center, angle2boundary, distances, memories
 
@@ -324,8 +322,7 @@ def make_title_with_constant_distance(color_variable, const_distance, stacked_ar
               ", with distance = " + str(round(const_distance)), y=1.08)
     plt.xlabel("Memory", labelpad=10)
     plt.ylabel("Angle to center (rad)", labelpad=10)
-    plt.xticks(range(math.floor(min(stacked_array[:, 3])), math.ceil(
-        max(stacked_array[:, 3]))+1))
+    # memory axis is continuous time (s)
 
 
 def make_title_with_constant_angle(color_variable, const_angle, stacked_array):
@@ -333,8 +330,7 @@ def make_title_with_constant_angle(color_variable, const_angle, stacked_array):
               ", with angle = " + str(round(const_angle, 2)), y=1.08)
     plt.xlabel("Memory", labelpad=10)
     plt.ylabel("Distance (cm)", labelpad=10)
-    plt.xticks(range(math.floor(min(stacked_array[:, 3])), math.ceil(
-        max(stacked_array[:, 3]))+1))
+    # memory axis is continuous time (s)
 
 
 def make_title_with_constant_memory(color_variable, const_memory, stacked_array):
@@ -344,11 +340,11 @@ def make_title_with_constant_memory(color_variable, const_memory, stacked_array)
     plt.ylabel("Egocentric y-coord (cm)", labelpad=10)
 
 
-def norm_input(stacked_array, invisible_distance, full_memory):
+def norm_input(stacked_array, invisible_distance):
     stacked_array[0::4] = stacked_array[0::4]/pi
     stacked_array[1::4] = stacked_array[1::4]/pi
     stacked_array[2::4] = (stacked_array[2::4]/invisible_distance-0.5)*2
-    stacked_array[3::4] = (stacked_array[3::4]/full_memory-0.5)*2
+    # memory/time-since-last-visible left unnormalized here; adjust if needed per model
     return stacked_array
 
 
@@ -407,7 +403,7 @@ def convert_to_xy_coord(angle2center, distances):
 
 
 def combine_6_plots_for_neural_network(sac_model,
-                                       full_memory=4,
+                                       full_memory=None,
                                        ff_radius=10,
                                        invisible_distance=400,
                                        const_distance=100,

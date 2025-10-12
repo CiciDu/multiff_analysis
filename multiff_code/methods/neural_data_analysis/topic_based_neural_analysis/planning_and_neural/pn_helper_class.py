@@ -7,6 +7,7 @@ from neural_data_analysis.neural_analysis_tools.model_neural_data import base_ne
 from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.show_planning import show_planning_utils
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
+from eye_position_analysis import eye_positions
 import numpy as np
 import pandas as pd
 import os
@@ -88,6 +89,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.both_ff_across_time_df = self.get_both_ff_across_time_df()
         self.planning_data_by_point = self.both_ff_across_time_df
         self.add_heading_info_to_planning_data_by_point()
+        
+        self.add_cur_and_nxt_ff_eye_positions_to_planning_data_by_point()
 
         # Ensure that each segment maps to exactly one target_index
         n_unique_targets_per_segment = self.planning_data_by_point.groupby('segment')[
@@ -96,6 +99,38 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         ), "Each segment must map to exactly one target_index"
 
         return self.planning_data_by_point
+
+
+    def add_cur_and_nxt_ff_eye_positions_to_planning_data_by_point(self, *, wrap='pm_pi'):
+        """
+        Compute oculocentric eye angles (hor/ver) for current and next fireflies,
+        for both eyes, and write them into self.planning_data_by_point.
+
+        Adds columns:
+        cur_eye_hor_l, cur_eye_ver_l, nxt_eye_hor_l, nxt_eye_ver_l,
+        cur_eye_hor_r, cur_eye_ver_r, nxt_eye_hor_r, nxt_eye_ver_r
+        """
+        pdp = self.planning_data_by_point
+        eye_fn = eye_positions.eye_angles_from_head_polar
+        shared = {
+            'interocular_dist': self.interocular_dist,
+            'wrap': wrap,
+        }
+
+        # small helper to cut repetition
+        def compute(angle_key, dist_key, eye):
+            return eye_fn(pdp[angle_key], pdp[dist_key],
+                        left_or_right_eye=eye, **shared)
+
+        for eye, suffix in (('left', 'l'), ('right', 'r')):
+            cur_h, cur_v = compute('cur_ff_angle', 'cur_ff_distance', eye)
+            nxt_h, nxt_v = compute('nxt_ff_angle', 'nxt_ff_distance', eye)
+
+            pdp[f'cur_eye_hor_{suffix}'] = cur_h
+            pdp[f'cur_eye_ver_{suffix}'] = cur_v
+            pdp[f'nxt_eye_hor_{suffix}'] = nxt_h
+            pdp[f'nxt_eye_ver_{suffix}'] = nxt_v
+
 
     def _only_make_stops_near_ff_df(self):
         self.load_raw_data()

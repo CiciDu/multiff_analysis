@@ -28,14 +28,11 @@ class LSTMforMultifirefly(rl_for_multiff_class._RLforMultifirefly):
         super().__init__(overall_folder,
                          add_date_to_model_folder_name=add_date_to_model_folder_name,
                          model_folder_name=model_folder_name,
+                         max_in_memory_time=0,
                          **additional_env_kwargs)
 
         self.sb3_or_lstm = 'lstm'
-
-        if self.use_env2:
-            self.env_class = env_for_lstm.EnvForLSTM2
-        else:
-            self.env_class = env_for_lstm.EnvForLSTM
+        self.env_class = env_for_lstm.EnvForLSTM
 
     def make_env(self, **additional_env_kwargs):
         self.env_kwargs.update(additional_env_kwargs)
@@ -84,21 +81,13 @@ class LSTMforMultifirefly(rl_for_multiff_class._RLforMultifirefly):
         self.agent_params['replay_buffer'] = self.replay_buffer
         self.sac_model = LSTM_functions.SAC_Trainer(**self.agent_params)
 
-    def _make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_flash_on_interval=3.3, initial_angular_terminal_vel=1):
-
+    def make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_flash_on_interval=3.3, initial_angular_terminal_vel=1):
         self.make_env()
-        self._make_env_suitable_for_curriculum_training()
-        self._update_env_dt(dt=initial_dt)
-
-        # self.env.angular_terminal_vel = 0.32
+        self._make_initial_env_for_curriculum_training(initial_dt=initial_dt,
+                                                         initial_angular_terminal_vel=initial_angular_terminal_vel)
         self.env.angular_terminal_vel = initial_angular_terminal_vel
         self._update_env_flash_on_interval(
             flash_on_interval=initial_flash_on_interval)
-        self.env_kwargs_for_curriculum_training = copy.deepcopy(
-            self.env_kwargs)
-        self.env_kwargs_for_curriculum_training['dt'] = initial_dt
-        self.env_kwargs_for_curriculum_training['flash_on_interval'] = initial_flash_on_interval
-        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = initial_angular_terminal_vel
 
     def _make_agent_for_curriculum_training(self):
         self.make_agent()

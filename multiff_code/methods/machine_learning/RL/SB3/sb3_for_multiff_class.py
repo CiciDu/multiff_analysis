@@ -32,10 +32,7 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
         self.sb3_or_lstm = 'sb3'
         self.monkey_name = None
 
-        if self.use_env2:
-            self.env_class = env_for_sb3.EnvForSB3_2
-        else:
-            self.env_class = env_for_sb3.EnvForSB3
+        self.env_class = env_for_sb3.EnvForSB3
 
     def save_best_model_after_curriculum(self, whether_save_replay_buffer=True):
         self.save_agent(whether_save_replay_buffer=whether_save_replay_buffer,
@@ -115,23 +112,17 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
                         train_freq=10,
                         gradient_steps=1)
 
-    def _make_initial_env_for_curriculum_training(self):
-        self.env_kwargs_for_curriculum_training = copy.deepcopy(
-            self.env_kwargs)
+    def make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_angular_terminal_vel=0.32):
         self.make_env(monitor_dir=self.best_model_after_curriculum_dir_name)
-        self._make_env_suitable_for_curriculum_training()
-        self.env.env.angular_terminal_vel = 0.32
-        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = self.env.env.angular_terminal_vel
-        self._update_env_dt(dt=0.25)
+        self._make_initial_env_for_curriculum_training(initial_dt=initial_dt,
+                                                       initial_angular_terminal_vel=initial_angular_terminal_vel)
+        self.env.env.angular_terminal_vel = initial_angular_terminal_vel
 
     def _update_env_dt(self, dt=0.25):
         self.env.env.dt = dt
-        self.env.env.full_memory = math.floor(
-            self.env.env.max_in_memory_time/self.env.env.dt)
         self.env.env.visible_time_range = self.env.env.flash_on_interval + \
             self.env.env.max_in_memory_time + self.env.env.dt
         self.env_kwargs_for_curriculum_training['dt'] = self.env.env.dt
-        self.env_kwargs_for_curriculum_training['full_memory'] = self.env.env.full_memory
         self.env_kwargs_for_curriculum_training['visible_time_range'] = self.env.env.visible_time_range
 
     def _train_till_reaching_reward_threshold(self, n_eval_episodes=1, ff_caught_rate_threshold=1/5):
@@ -171,7 +162,6 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
             self.env.env.angular_terminal_vel/2, 0.01)
         self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = self.env.env.angular_terminal_vel
         print('Current dt:', self.env.env.dt)
-        print('Current full memory:', self.env.env.full_memory)
         print('Current gamma:', self.sac_model.gamma)
         print('Current angular_terminal_vel:',
               self.env.env.angular_terminal_vel)
@@ -198,9 +188,7 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
         self.make_env(**self.env_kwargs)
         self.load_best_model_after_curriculum(load_replay_buffer=True)
         self._restore_env_params_after_curriculum_training()
-        self.env.env.full_memory = math.floor(
-            self.env.env.max_in_memory_time/self.env.env.dt)
-        self.env_kwargs_for_curriculum_training['full_memory'] = self.env.env.full_memory
+        # No longer using full_memory; visible_time_range already updated elsewhere
 
     def _restore_env_params_after_curriculum_training(self):
         self.env.env.dt = self.env_kwargs['dt']

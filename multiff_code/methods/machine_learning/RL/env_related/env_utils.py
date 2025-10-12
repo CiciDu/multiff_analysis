@@ -1,12 +1,13 @@
 import os
-import torch
+import numpy as np
 import math
 from math import pi
-from torch.linalg import vector_norm
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
 
 def theta_half_and_delta_abs(theta_center: float, theta_boundary: float):
     import math
+
     def wrap(a):
         return (a + math.pi) % (2*math.pi) - math.pi
     theta_c = wrap(theta_center)
@@ -22,107 +23,149 @@ def theta_half_and_delta_abs(theta_center: float, theta_boundary: float):
     return wrap(theta_half), min(delta_abs, math.pi)
 
 
-def make_ff_flash_from_random_sampling(num_alive_ff, duration, non_flashing_interval_mean=3, flash_on_interval=0.3):
-    """
-    Randomly sample flashing-on durations for each firefly
+def make_ff_flash_from_random_sampling(
+    num_alive_ff: int,
+    duration: float,
+    non_flashing_interval_mean: float = 3.0,
+    flash_on_interval: float = 0.3,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+    *,
+    chunk: int = 16,  # number of intervals generated per active FF per iteration
+):
+    '''
+    Fast NumPy version (chunked & vectorized).
 
-    Parameters
-    ----------
-    num_alive_ff: num
-        number of fireflies for which flashing-on durations will be sampled
-    duration: num
-        total length of time
-    non_flashing_interval_mean: num
-        the mean length of the gap between every two flashing-on intervals
-    flash_on_interval: num
-        the length of each flashing-on interval
+    Each firefly alternates: Poisson(off) then fixed on=flash_on_interval,
+    starting at t=-10. Intervals overlapping [0, duration] are kept and clipped.
+    If a firefly has no overlapping interval, add a fallback [0, min(on, duration)].
+
+    Args
+    ----
+    num_alive_ff : int
+    duration : float
+    non_flashing_interval_mean : float
+    flash_on_interval : float
+    rng : np.random.Generator | None
+    seed : int | None
+    chunk : int
+        How many intervals to simulate per active firefly per loop iteration.
+        Larger = fewer Python iterations (usually faster), but more temporary memory.
 
     Returns
     -------
-    ff_flash: list
-      containing the time that each firefly flashes on and off
+    ff_flash : list[np.ndarray]  # each (Mi, 2) float32 array of [start, end]
+    '''
+    if rng is None:
+        rng = np.random.default_rng(seed)
 
-    """
+    N = int(num_alive_ff)
+    duration = float(duration)
+    on = float(flash_on_interval)
 
+    if N <= 0 or duration <= 0.0:
+        return [np.zeros((0, 2), dtype=np.float32) for _ in range(max(N, 0))]
+
+    # time cursors per firefly; warmup so initial state at t≈0 feels natural
+    t = np.full(N, -10.0, dtype=np.float32)
+
+    # per-FF ragged collectors
+    starts_lists = [[] for _ in range(N)]
+    ends_lists = [[] for _ in range(N)]
+
+    # precompute k*on for a chunk [0..chunk-1]
+    k = np.arange(chunk, dtype=np.float32)
+    k_on = k * on
+
+    while True:
+        active = t < duration
+        if not np.any(active):
+            break
+
+        idx = np.nonzero(active)[0]
+        n_active = idx.size
+
+        # Sample Poisson gaps in a (n_active, chunk) block
+        gaps = rng.poisson(non_flashing_interval_mean, size=(
+            n_active, chunk)).astype(np.float32)
+
+        # Cumulative sums along chunk-axis
+        csum_gaps = np.cumsum(gaps, axis=1)  # (n_active, chunk)
+
+        # start_k = t0 + csum_gaps_k + k*on
+        # end_k   = start_k + on
+        t0 = t[idx][:, None]                               # (n_active, 1)
+        starts = t0 + csum_gaps + k_on[None, :]           # (n_active, chunk)
+        ends = starts + on
+
+        # Keep only intervals overlapping [0, duration]
+        # (end > 0) and (start < duration) — clip to horizon
+        valid = (ends > 0.0) & (starts < duration)
+
+        if np.any(valid):
+            # Clip in vectorized form
+            starts_clipped = np.maximum(
+                starts, 0.0, where=valid, out=np.zeros_like(starts))
+            ends_clipped = np.minimum(
+                ends,   duration, where=valid, out=np.zeros_like(ends))
+
+            # Append per-FF (one small Python loop over active FFs)
+            for row, i in enumerate(idx):
+                m = valid[row]
+                if m.any():
+                    s_row = starts_clipped[row, m]
+                    e_row = ends_clipped[row, m]
+                    # extend with small batches (fast)
+                    starts_lists[i].extend(s_row.tolist())
+                    ends_lists[i].extend(e_row.tolist())
+
+        # Advance time cursors by the final end in this chunk:
+        # t_final = t0 + sum(gaps) + chunk*on  (i.e., end of the last interval in the chunk)
+        t[idx] = (t0[:, 0] + csum_gaps[:, -1] + chunk * on).astype(np.float32)
+
+    # Finalize ragged outputs with fallback if empty
     ff_flash = []
-    # for each firefly in the 200
-    for i in range(num_alive_ff):
-        num_intervals = int(duration)
-        # eandomly generate a series of intervals that will be the durations between the flashing intervals
-        non_flashing_intervals = torch.poisson(
-            torch.ones(num_intervals) * non_flashing_interval_mean)
-        # also generate a series of intervals, 0.3s each, for the durations of the flashing intervals
-        flashing_intervals = torch.ones(num_intervals) * flash_on_interval
-        # make a tensor of all the starting-flashing time for the firefly; pretend that time starts from -10s so that
-        # the condition at time 0 is more natural
-        t0 = torch.cumsum(non_flashing_intervals, dim=0) + \
-            torch.cumsum(flashing_intervals, dim=0) - 10
-        # Also make a tensor of all the stopping-flashing time for the firefly
-        t1 = t0 + flashing_intervals
-        # and we should start at the interval where t1 is greater than zero
-        meaningful = (t1 > 0)
-        t0 = t0[meaningful]
-        t1 = t1[meaningful]
-        # then, to prevent future errors, make all negative values 0
-        t0[t0 < 0] = 0
-        ff_flash.append(torch.stack((t0, t1), dim=1))
-
-        if max(t1) < duration:
-            raise ValueError(
-                'The flashing-on duration is too short for the given duration')
+    fallback_end = float(min(on, duration))
+    for s_list, e_list in zip(starts_lists, ends_lists):
+        if not s_list:
+            s_list, e_list = [0.0], [fallback_end]
+        arr = np.column_stack((np.asarray(s_list, dtype=np.float32),
+                               np.asarray(e_list, dtype=np.float32)))
+        ff_flash.append(arr)
     return ff_flash
 
 
-def calculate_angles_to_ff_in_pytorch(ffxy, agentx, agenty, agentheading, ff_radius, ffdistance=None):
+def calculate_angles_to_ff(ffxy, agentx, agenty, agentheading, ff_radius, ffdistance=None):
     """
-    Calculate the angle of a firefly from the monkey's or the agent's perspective
-
-    Parameters
-    ----------
-    ffxy: torch.tensor
-        containing the x-coordinates and the y-coordinates of all fireflies
-    agentx: torch.tensor, shape (1,)
-        the x-coordinate of the agent
-    agenty: torch.tensor, shape (1,)
-        the y-coordinate of the agent
-    agentheading: torch.tensor, shape (1,)
-        the angle that the agent heads toward
-    ff_radius: num
-        the radius of the reward boundary of each firefly  
-    ffdistance: torch.tensor, optional
-        containing the distances of the fireflies to the agent
-
-    Returns
-    -------
-    angle_to_center: torch.tensor
-        containing the angles of the centers of the fireflies to the agent
-    angle_to_boundary: torch.tensor
-        containing the smallest angles of the reward boundaries of the fireflies to the agent
-
+    NumPy version. Returns (angle_to_center, angle_to_boundary), each ∈ (-pi, pi].
+    ffxy: array shape (N,2)
+    agentx, agenty, agentheading: shape (1,) or scalars
     """
+    ffxy = np.asarray(ffxy, dtype=float)
+    agentx = float(np.asarray(agentx).reshape(-1)[0])
+    agenty = float(np.asarray(agenty).reshape(-1)[0])
+    agentheading = float(np.asarray(agentheading).reshape(-1)[0])
 
     if ffdistance is None:
-        agentxy = torch.cat((agentx, agenty))
-        ffdistance = vector_norm(ffxy - agentxy, dim=1)
-    # find the angles of the given fireflies to the agent
-    angle_to_center = torch.atan2(
+        dx = ffxy[:, 0] - agentx
+        dy = ffxy[:, 1] - agenty
+        ffdistance = np.sqrt(dx*dx + dy*dy)
+    else:
+        ffdistance = np.asarray(ffdistance, dtype=float)
+
+    # angle to centers, then wrap to (-pi, pi]
+    angle_to_center = np.arctan2(
         ffxy[:, 1] - agenty, ffxy[:, 0] - agentx) - agentheading
-    # make sure that the angles are between (-pi, pi]
-    angle_to_center = torch.remainder(angle_to_center, 2*pi)
-    angle_to_center[angle_to_center >
-                    pi] = angle_to_center[angle_to_center > pi] - 2 * pi
-    # Adjust the angle based on reward boundary (i.e. find the smallest angle from the agent to the reward boundary)
-    # using trignometry
-    side_opposite = ff_radius
-    # hypotenuse cannot be smaller than side_opposite
-    hypotenuse = torch.clamp(ffdistance, min=side_opposite)
-    theta = torch.arcsin(torch.div(side_opposite, hypotenuse))
-    # we use absolute values of angles here so that the adjustment will only make the angles smaller
-    angle_adjusted_abs = torch.abs(angle_to_center) - torch.abs(theta)
-    # thus we can find the smallest absolute angle to the firefly, which is the absolute angle to the boundary of the firefly
-    angle_to_boundary_abs = torch.clamp(angle_adjusted_abs, min=0)
-    # restore the signs of the angles
-    angle_to_boundary = torch.sign(angle_to_center) * angle_to_boundary_abs
+    angle_to_center = np.remainder(angle_to_center, 2*np.pi)
+    angle_to_center[angle_to_center > np.pi] -= 2*np.pi
+
+    # boundary-adjusted angle (smallest angle to reward boundary)
+    side_opposite = float(ff_radius)
+    hyp = np.clip(ffdistance, side_opposite, None)
+    theta = np.arcsin(side_opposite / hyp)  # ≥ 0
+    angle_to_boundary_abs = np.clip(np.abs(angle_to_center) - theta, 0.0, None)
+    angle_to_boundary = np.sign(angle_to_center) * angle_to_boundary_abs
+
     return angle_to_center, angle_to_boundary
 
 
@@ -133,27 +176,27 @@ def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visibl
 
     Parameters
     ----------
-    ffx_noisy: torch.tensor
+    ffx_noisy: np.ndarray
         containing the x-coordinates of all fireflies with noise
-    ffy_noisy: torch.tensor
+    ffy_noisy: np.ndarray
         containing the y-coordinates of all fireflies with noise
-    ffx: torch.tensor
+    ffx: np.ndarray
         containing the accurate x-coordinates of all fireflies
-    ffy: torch.tensor
+    ffy: np.ndarray
         containing the accurate y-coordinates of all fireflies
-    ff_uncertainty_all: torch.tensor
+    ff_uncertainty_all: np.ndarray
         containing the values of uncertainty of all fireflies; scaling is based on a parameter for the environment
-    visible_ff_indices: torch.tensor
+    visible_ff_indices: np.ndarray
         containing the indices of the visible fireflies
 
 
     Returns
     -------
-    ffx_noisy: torch.tensor
+    ffx_noisy: np.ndarray
         containing the x-coordinates of all fireflies with noise
-    ffy_noisy: torch.tensor
+    ffy_noisy: np.ndarray
         containing the y-coordinates of all fireflies with noise
-    ffxy_noisy: torch.tensor
+    ffxy_noisy: np.ndarray
         containing the x-coordinates and the y-coordinates of all fireflies with noise
 
     """
@@ -161,88 +204,59 @@ def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visibl
     # update the positions of fireflies with uncertainties added; note that uncertainties are cummulative across steps
     num_alive_ff = len(ff_uncertainty_all)
     ffx_noisy = ffx_noisy + \
-        torch.normal(torch.zeros([num_alive_ff, ]), ff_uncertainty_all)
+        np.random.normal(0, ff_uncertainty_all)
     ffy_noisy = ffy_noisy + \
-        torch.normal(torch.zeros([num_alive_ff, ]), ff_uncertainty_all)
+        np.random.normal(0, ff_uncertainty_all)
     # for the visible fireflies, their positions are updated to be the real positions
-    ffx_noisy[visible_ff_indices] = ffx[visible_ff_indices].clone()
-    ffy_noisy[visible_ff_indices] = ffy[visible_ff_indices].clone()
-    ffxy_noisy = torch.stack((ffx_noisy, ffy_noisy), dim=1)
+    ffx_noisy[visible_ff_indices] = ffx[visible_ff_indices].copy()
+    ffy_noisy[visible_ff_indices] = ffy[visible_ff_indices].copy()
+    ffxy_noisy = np.stack((ffx_noisy, ffy_noisy), axis=1)
     return ffx_noisy, ffy_noisy, ffxy_noisy
 
 
-def find_visible_ff(time, ff_distance_all, ff_angle_all, invisible_distance, invisible_angle, ff_flash):
+def find_visible_ff(time, ff_distance_all, ff_angle_all,
+                    invisible_distance, invisible_angle, ff_flash):
     """
-    Find the indices of the fireflies that are visible at a given time
-
-    Parameters
-    ----------
-    time: num
-        the current moment 
-    ff_distance_all: torch.tensor
-        containing the distances of all the fireflies to the agent
-    ff_angle_all: torch.tensor
-        containing the angles (to the reward boundaries) of all the fireflies to the agent   
-    invisible_distance: num
-        the distance beyond which a firefly will be considered invisible
-    invisible_angle: num    
-        the angle beyond which a firefly will be considered invisible 
-    ff_flash: list
-      containing the time that each firefly flashes on and off
-
-    Returns
-    -------
-    visible_ff_indices: torch.tensor
-      containing the indices of the fireflies that are visible at the given time
-
+    Returns indices (relative to inputs) of fireflies visible at `time`.
+    Uses NumPy arrays (not torch).
     """
+    ff_distance_all = np.asarray(ff_distance_all)
+    ff_angle_all = np.asarray(ff_angle_all)
 
-    # find fireflies that are within the visible distance and angle at this point
-    visible_ff = torch.logical_and(
-        ff_distance_all < invisible_distance, torch.abs(ff_angle_all) < invisible_angle)
+    # distance + angle gates
+    visible_ff = np.logical_and(
+        ff_distance_all < invisible_distance,
+        np.abs(ff_angle_all) < invisible_angle
+    )
+
     if ff_flash is not None:
-        # among these fireflies, eliminate those that are not flashing on at this point
-        for index in visible_ff.nonzero().reshape(-1):
-            ff_flashing_durations = ff_flash[index].clone().detach()
-            # if no interval contains the current time point
-            if not torch.any(torch.logical_and(ff_flashing_durations[:, 0] <= time, ff_flashing_durations[:, 1] >= time)):
-                visible_ff[index] = False
-    visible_ff_indices = visible_ff.nonzero().reshape(-1)
-    return visible_ff_indices
+        # Among currently geometrically visible, keep only those flashing now
+        idx = np.where(visible_ff)[0]
+        for i in idx:
+            intervals = np.asarray(ff_flash[i])
+            # Expect shape (M, 2) with [start, end]
+            on_now = np.any((intervals[:, 0] <= time)
+                            & (intervals[:, 1] >= time))
+            if not on_now:
+                visible_ff[i] = False
+
+    return np.where(visible_ff)[0]
 
 
-# for making ff_array in the belief
 
-def _normalize_ff_array(ff_array, invisible_distance, full_memory, add_memory, add_ff_time_since_start_visible, visible_time_range=None):
-    ff_array[0:2, :] = ff_array[0:2, :] / math.pi
-    ff_array[2, :] = (ff_array[2, :] / invisible_distance - 0.5) * 2
-    if add_ff_time_since_start_visible:
-        ff_array[3, :] = (ff_array[3, :] / visible_time_range - 0.5) * 2
-    elif add_memory:
-        ff_array[3, :] = (ff_array[3, :] / full_memory - 0.5) * 2
-    return ff_array
-
-
-def _normalize_ff_array_for_env2(ff_array, invisible_distance, visible_time_range):
-    # If normalizing the observation
-    ff_array[0, :] = ff_array[0, :]/math.pi
-    ff_array[1, :] = (ff_array[1, :]/invisible_distance-0.5)*2
-    ff_array[2, :] = (ff_array[2, :]/visible_time_range-0.5)*2
-    return ff_array
-
-
-def _get_placeholder_ff(add_memory, add_ff_time_since_start_visible, invisible_distance):
-    if add_memory | add_ff_time_since_start_visible:
-        return torch.tensor([[0.], [0.], [invisible_distance], [0.]])
+def _get_placeholder_ff(add_memory, add_ff_t_since_start_seen, invisible_distance):
+    if add_memory | add_ff_t_since_start_seen:
+        return np.array([[0.], [0.], [invisible_distance], [0.]])
     else:
-        return torch.tensor([[0.], [0.], [invisible_distance]])
+        return np.array([[0.], [0.], [invisible_distance]])
 
 
 def _get_topk_indices(ff_indices, ff_distance_all, num_obs_ff):
-    topk_ff = torch.topk(-ff_distance_all[ff_indices], num_obs_ff).indices
+    # Get the top-k indices with smallest distances (largest negative distances)
+    topk_ff = np.argsort(-ff_distance_all[ff_indices])[:num_obs_ff]
     return ff_indices[topk_ff]
 
 
 def _get_sorted_indices(ff_indices, ff_distance_all):
-    _, sorted_indices = torch.sort(-ff_distance_all[ff_indices])
+    sorted_indices = np.argsort(-ff_distance_all[ff_indices])
     return ff_indices[sorted_indices]

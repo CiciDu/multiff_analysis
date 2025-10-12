@@ -430,14 +430,12 @@ def _add_num_visible_ff(binned_features, ff_dataframe):
 
 
 def _add_min_ff_info(binned_features, ff_dataframe):
-    # min_ff_info = ff_dataframe[['bin', 'ff_distance', 'ff_angle', 'ff_angle_boundary', 'memory']]
     min_ff_info = ff_dataframe[[
         'bin', 'ff_distance', 'ff_angle', 'ff_angle_boundary']]
     min_ff_info = min_ff_info.groupby('bin').min().reset_index(drop=False)
     min_ff_info.rename(columns={'ff_distance': 'min_ff_distance',
                                 'ff_angle': 'min_abs_ff_angle',
                                 'ff_angle_boundary': 'min_abs_ff_angle_boundary'}, inplace=True)
-    # 'memory': 'min_ff_memory'}, inplace=True) # memory is currently not used bc the whole column is 100
     binned_features = binned_features.merge(min_ff_info, how='left', on='bin')
     return binned_features
 
