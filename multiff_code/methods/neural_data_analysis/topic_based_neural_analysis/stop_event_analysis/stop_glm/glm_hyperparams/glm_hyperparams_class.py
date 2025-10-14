@@ -87,7 +87,7 @@ class SweepAndCompare:
         show_plots: bool = False,
         auto_pick_forest_term: bool = False,
         alpha_for_forest: float = 0.05,
-        out_dir: str | Path = 'sweep_compare_out',
+        out_dir: str | Path = 'glm_sweep_compare_out',
         run_id: Optional[str] = None,
         autosave: bool = True,
         autosave_every: int = 1,       # checkpoint every N configs

@@ -144,7 +144,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def make_or_retrieve_all_trial_patterns(self, exists_ok=True):
         self.all_trial_patterns = self.try_retrieving_df(
-            df_name='all_trial_patterns', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
+            df_name='all_trial_patterns', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
         if self.all_trial_patterns is None:
             if getattr(self, 'n_ff_in_a_row', None) is None:
@@ -154,7 +154,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def make_or_retrieve_pattern_frequencies(self, exists_ok=True):
         self.pattern_frequencies = self.try_retrieving_df(
-            df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
+            df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
         self.make_one_stop_w_ff_df()
         # Count one-stop misses (stops near but not at fireflies) for pattern frequency analysis
         self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
@@ -168,38 +168,38 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                 self.retrieve_or_make_monkey_data(already_made_ok=True)
             self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_new, self.monkey_information,
                                                                                                self.GUAT_w_ff_frequency, self.one_stop_w_ff_frequency,
-                                                                                               data_folder_name=self.patterns_and_features_data_folder_path)
+                                                                                               data_folder_name=self.patterns_and_features_folder_path)
             print("made pattern_frequencies")
 
     def make_or_retrieve_all_trial_features(self, exists_ok=True):
         self.all_trial_features = self.try_retrieving_df(
-            df_name='all_trial_features', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
+            df_name='all_trial_features', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
         if self.all_trial_features is None:
             if getattr(self, 'cluster_around_target_indices', None) is None:
                 self._prepare_to_find_patterns_and_features()
             self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.cluster_around_target_indices,
-                                                                                             self.ff_real_position_sorted, self.ff_believed_position_sorted, data_folder_name=self.patterns_and_features_data_folder_path)
+                                                                                             self.ff_real_position_sorted, self.ff_believed_position_sorted, data_folder_name=self.patterns_and_features_folder_path)
             print("made all_trial_features")
 
     def make_or_retrieve_feature_statistics(self, exists_ok=True):
         self.feature_statistics = self.try_retrieving_df(
-            df_name='feature_statistics', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
+            df_name='feature_statistics', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
         if self.feature_statistics is None:
             self.feature_statistics = organize_patterns_and_features.make_feature_statistics(
-                self.all_trial_features, data_folder_name=self.patterns_and_features_data_folder_path)
+                self.all_trial_features, data_folder_name=self.patterns_and_features_folder_path)
             print("made feature_statistics")
 
     def make_or_retrieve_scatter_around_target_df(self, exists_ok=True):
         self.scatter_around_target_df = self.try_retrieving_df(
-            df_name='scatter_around_target_df', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_data_folder_path)
+            df_name='scatter_around_target_df', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
         if self.scatter_around_target_df is None:
             self.scatter_around_target_df = monkey_landing_in_ff.make_scatter_around_target_df(self.monkey_information,
                                                                                                self.closest_stop_to_capture_df,
                                                                                                self.ff_real_position_sorted,
-                                                                                               data_folder_name=self.patterns_and_features_data_folder_path)
+                                                                                               data_folder_name=self.patterns_and_features_folder_path)
             print("made scatter_around_target_df")
 
     def plot_scatter_around_target_df(self):
@@ -310,9 +310,9 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         self.all_trial_patterns = pd.DataFrame(all_trial_patterns_dict)
 
-        if self.patterns_and_features_data_folder_path:
+        if self.patterns_and_features_folder_path:
             general_utils.save_df_to_csv(
-                self.all_trial_patterns, 'all_trial_patterns', self.patterns_and_features_data_folder_path)
+                self.all_trial_patterns, 'all_trial_patterns', self.patterns_and_features_folder_path)
 
         return self.all_trial_patterns
 
@@ -320,8 +320,9 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self._prepare_to_find_patterns_and_features(find_patterns=False)
         if not hasattr(self, 'stop_category_df'):
             self.make_or_retrieve_stop_category_df()
-            
-        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(self.stop_category_df)
+
+        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
+            self.stop_category_df)
 
     def make_distance_and_num_stops_df(self):
         self.distance_df = organize_patterns_and_features.make_distance_df(
@@ -356,18 +357,18 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     # these may need to be run again if they're to be used
     def make_or_retrieve_target_closest(self, exists_ok=False):
         filepath = os.path.join(
-            self.patterns_and_features_data_folder_path, 'target_closest.csv')
+            self.patterns_and_features_folder_path, 'target_closest.csv')
         if exists(filepath) & exists_ok:
             self.target_closest = np.genfromtxt(
                 filepath, delimiter=',').astype('int')
             print("Retrieved target_closest")
         else:
             self.target_closest = pattern_by_points.make_target_closest(
-                self.ff_dataframe, self.max_point_index, data_folder_name=self.patterns_and_features_data_folder_path)
+                self.ff_dataframe, self.max_point_index, data_folder_name=self.patterns_and_features_folder_path)
             print("made target_closest")
 
     def make_or_retrieve_target_angle_smallest(self, exists_ok=False):
-        filepath = self.patterns_and_features_data_folder_path + '/target_angle_smallest.csv'
+        filepath = self.patterns_and_features_folder_path + '/target_angle_smallest.csv'
         if exists(filepath) & exists_ok:
             self.target_angle_smallest = np.genfromtxt(
                 filepath, delimiter=',').astype('int')
@@ -380,7 +381,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             # 0 means the target is neither visible or in memory, but there is at least one other ff visible or in memory
             # -1 means both the target and other ff are neither visible or in memory
             self.target_angle_smallest = pattern_by_points.make_target_angle_smallest(
-                self.ff_dataframe, self.max_point_index, data_folder_name=self.patterns_and_features_data_folder_path)
+                self.ff_dataframe, self.max_point_index, data_folder_name=self.patterns_and_features_folder_path)
             print("made target_angle_smallest")
 
     def make_curvature_df(self, window_for_curv_of_traj=[-25, 25], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False, ff_radius_for_opt_arc=10, clean=True,
@@ -459,7 +460,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def make_or_retrieve_target_cluster_df(self, exists_ok=True, fill_na=False):
         target_cluster_df_filepath = os.path.join(
-            self.patterns_and_features_data_folder_path, 'target_cluster_df.csv')
+            self.patterns_and_features_folder_path, 'target_cluster_df.csv')
         if exists(target_cluster_df_filepath) & exists_ok:
             self.target_cluster_df = pd.read_csv(target_cluster_df_filepath)
             print("Retrieved target_cluster_df")
@@ -477,7 +478,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
     def make_or_retrieve_target_clust_df_short(self, exists_ok=True, fill_na=False):
         target_clust_df_short_filepath = os.path.join(
-            self.patterns_and_features_data_folder_path, 'target_clust_df_short.csv')
+            self.patterns_and_features_folder_path, 'target_clust_df_short.csv')
         if exists(target_clust_df_short_filepath) & exists_ok:
             self.target_clust_df_short = pd.read_csv(
                 target_clust_df_short_filepath)
@@ -497,19 +498,20 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def make_or_retrieve_stop_category_df(self, exists_ok=True, already_made_ok=True):
         if already_made_ok & (getattr(self, 'stop_category_df', None) is not None) & ('stop_cluster_id' in self.monkey_information.columns):
             return
-        
+
         stop_category_df_filepath = os.path.join(
-            self.patterns_and_features_data_folder_path, 'stop_category_df.csv')
+            self.patterns_and_features_folder_path, 'stop_category_df.csv')
         if exists(stop_category_df_filepath) & exists_ok:
             self.stop_category_df = pd.read_csv(stop_category_df_filepath)
             print("Retrieved stop_category_df")
             if 'stop_id_duration' not in self.stop_category_df.columns:
-                self.stop_category_df['stop_id_duration'] = self.stop_category_df['stop_id_end_time'] - self.stop_category_df['stop_id_start_time']
+                self.stop_category_df['stop_id_duration'] = self.stop_category_df['stop_id_end_time'] - \
+                    self.stop_category_df['stop_id_start_time']
         else:
             monkey_information = self.monkey_information.copy()
             monkey_information = find_GUAT_or_TAFT_trials.add_temp_stop_cluster_id(
                 monkey_information, self.ff_caught_T_new, col_exists_ok=False)
-            
+
             temp_TAFT_trials_df = find_GUAT_or_TAFT_trials.make_temp_TAFT_trials_df(
                 monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted)
 
@@ -520,7 +522,10 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                 stop_category_df_filepath, index=False)
             print("Made new stop_category_df and saved to ",
                   stop_category_df_filepath)
-            
-        cols_to_add = ['stop_cluster_id', 'stop_cluster_start_point', 'stop_cluster_end_point', 'stop_cluster_size']
-        self.monkey_information.drop(columns=cols_to_add, inplace=True, errors='ignore')
-        self.monkey_information = self.monkey_information.merge(self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')
+
+        cols_to_add = ['stop_cluster_id', 'stop_cluster_start_point',
+                       'stop_cluster_end_point', 'stop_cluster_size']
+        self.monkey_information.drop(
+            columns=cols_to_add, inplace=True, errors='ignore')
+        self.monkey_information = self.monkey_information.merge(
+            self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')

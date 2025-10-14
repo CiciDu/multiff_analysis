@@ -32,6 +32,7 @@ import csv
 import math
 from typing import Dict, Any, List, Tuple, Optional
 from contextlib import nullcontext
+import copy
 
 # ===========================
 # Third-party imports
@@ -819,10 +820,11 @@ class AttnRNNSACforMultifirefly:
         )
 
     # ---- Env ----
-    def make_env(self, **kwargs):
+    def make_env(self, **env_kwargs):
         '''Instantiate the MultiFF env with stored + provided kwargs.'''
-        self.env_kwargs.update(kwargs)
-        self.env = EnvForAttentionSAC(**self.env_kwargs)
+        current_env_kwargs = copy.deepcopy(self.env_kwargs)
+        current_env_kwargs.update(env_kwargs)
+        self.env = EnvForAttentionSAC(**current_env_kwargs)
         return self.env
 
     # ---- Agent ----

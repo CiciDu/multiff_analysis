@@ -42,10 +42,15 @@ class PlanFactorsAcrossAgents():
             self.pooled_perc_info_across_agents = pd.DataFrame()
             for folder in folders_with_params:
                 print('folder:', folder)
-                if 'best_model_after_curriculum' in folder:
-                    print('Ignoring best_model_after_curriculum')
+                if 'best_model_postcurriculum' in folder:
+                    print('Ignoring best_model_postcurriculum')
                     continue
-                params = rl_for_multiff_utils.retrieve_params(folder)
+                manifest = rl_for_multiff_utils.read_checkpoint_manifest(folder)
+                if isinstance(manifest, dict) and ('env_params' in manifest):
+                    params = manifest['env_params']
+                else:
+                    raise Exception('No env params found in manifest.')
+                
                 agent_name = rl_for_multiff_utils.get_agent_name_from_params(
                     params)
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(

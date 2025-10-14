@@ -1,4 +1,4 @@
-# machine_learning/RL/env_related/MultiFF.py
+# machine_learning/RL_models/env_related/MultiFF.py
 
 from typing import Optional, Dict
 from dataclasses import dataclass
@@ -16,7 +16,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 # ---- Tunables for transforms ----
 DEFAULT_D0 = 25.0      # anchor for d_log = log1p(dist/d0)
 CLIP_DMAX = 500.0      # clip distance before log
-TMAX_DEFAULT = 3.0     # seconds cap for t_seen normalization
+TMAX_DEFAULT = 5.0     # seconds cap for t_seen normalization
 
 
 @dataclass
@@ -62,6 +62,7 @@ class MultiFF(gymnasium.Env):
         't_start_seen': 4,
         't_last_seen': 5,
         'visible': 6,
+        'pose_unreliable': 7,
     }
 
     def __init__(self,
@@ -78,7 +79,9 @@ class MultiFF(gymnasium.Env):
                  dw_cost_factor=10,
                  w_cost_factor=10,
                  distance2center_cost=0,
-                 add_cost_when_catching_ff_only=False,
+                 stop_vel_cost=100,
+                 reward_boundary=25,
+                 add_vel_cost_when_catching_ff_only=False,
                  linear_terminal_vel=0.01,
                  angular_terminal_vel=0.01,
                  dt=0.1,
@@ -89,7 +92,9 @@ class MultiFF(gymnasium.Env):
                  noise_mode='linear',
                  slot_fields: Optional[List[str]] = None,
                  include_valid_mask_tail: bool = True,
-                 obs_visible_only: bool = True,
+                 obs_visible_only: bool = False,
+                 zero_invisible_ff_features: bool = False,
+                 use_prev_obs_for_invisible_pose: bool = False,
                  obs_noise: Optional[ObsNoiseCfg | dict] = None,
                  identity_slot_strategy: str = 'drop_fill',
                  **kwargs
@@ -127,12 +132,13 @@ class MultiFF(gymnasium.Env):
         self.dw_cost_factor = dw_cost_factor
         self.w_cost_factor = w_cost_factor
         self.distance2center_cost = distance2center_cost
+        self.stop_vel_cost = stop_vel_cost
         self.dt = dt
         self.episode_len = episode_len
         self.print_ff_capture_incidents = print_ff_capture_incidents
         self.print_episode_reward_rates = print_episode_reward_rates
         self.add_action_to_obs = add_action_to_obs
-        self.add_cost_when_catching_ff_only = add_cost_when_catching_ff_only
+        self.add_vel_cost_when_catching_ff_only = add_vel_cost_when_catching_ff_only
         self.noise_mode = noise_mode
         # identity slot strategy: 'drop_fill' (default) or 'rank_keep'
         self.identity_slot_strategy = identity_slot_strategy
@@ -144,16 +150,23 @@ class MultiFF(gymnasium.Env):
         self.max_in_memory_time = max_in_memory_time
 
         # Observation spec (per slot)
-        # [valid, d_log, sinθ, cosθ, t_start_seen, t_last_seen, visible]
-        self.slot_fields = slot_fields or ['d_log', 'sin', 'cos', 'valid']
+        # [valid, d_log, sinθ, cosθ, t_start_seen, t_last_seen, visible, pose_unreliable]
+        self.slot_fields = slot_fields or [
+            'valid', 'd_log', 'sin', 'cos', 't_start_seen', 't_last_seen', 'visible', 'pose_unreliable']
         self._slot_idx = [self.FIELD_INDEX[f] for f in self.slot_fields]
         self.num_elem_per_ff = len(self.slot_fields)
         self.include_valid_mask_tail = include_valid_mask_tail
         self.add_action_to_obs = add_action_to_obs
         # control whether to keep only visible ff in observation slots
         self.obs_visible_only = obs_visible_only
+        # if True, zero out feature rows for invisible ff bound to slots
+        self.zero_invisible_ff_features = zero_invisible_ff_features
+        # if True, copy pose features for invisible slots from previous step's obs
+        self.use_prev_obs_for_invisible_pose = use_prev_obs_for_invisible_pose
         # validity buffer for tails
         self._slot_valid_mask = np.zeros(self.num_obs_ff, dtype=np.int32)
+        # previous step slot features snapshot (S,N)
+        self._prev_slots_SN = None
         # Cache for performance optimization
         self._valid_field_index = self.slot_fields.index(
             'valid') if 'valid' in self.slot_fields else None
@@ -165,15 +178,16 @@ class MultiFF(gymnasium.Env):
         self.wgain = pi / 2
         self.arena_radius = 1000
         self.ff_radius = 10
-        self.reward_boundary = 25
         self.invisible_angle = 2 * pi / 9
         self.epi_num = 0
         self.time = 0
+        self.reward_boundary = reward_boundary
         self.current_obs = np.zeros(self.obs_space_length, dtype=np.float32)
 
         # world state buffers (contiguous, float32)
         self.ffxy = np.zeros((self.num_alive_ff, 2), dtype=np.float32)
         self.ffxy_noisy = np.zeros((self.num_alive_ff, 2), dtype=np.float32)
+        # last-seen feature buffers removed in favor of prev-obs snapshot approach
         self.ffr = np.zeros(self.num_alive_ff, dtype=np.float32)
         self.fftheta = np.zeros(self.num_alive_ff, dtype=np.float32)
 
@@ -181,7 +195,6 @@ class MultiFF(gymnasium.Env):
         self._scratch_dist2 = np.zeros(self.num_alive_ff, dtype=np.float32)
         self._ff_is_visible = np.zeros(self.num_alive_ff, dtype=bool)
 
-        self.visible_time_range = None
         self.ff_in_memory_indices = np.array([], dtype=np.int32)
         self.visible_ff_indices = np.array([], dtype=np.int32)
 
@@ -191,6 +204,11 @@ class MultiFF(gymnasium.Env):
         # per global ff id, seconds since last seen
         self.ff_t_since_last_seen = None
         self.ff_visible = None           # per global ff id, {0,1}
+
+    def _update_ff_visible(self):
+        self.ff_visible = np.zeros_like(self.ff_visible)
+        if len(self.visible_ff_indices) > 0:
+            self.ff_visible[self.visible_ff_indices] = 1
 
     def reset(self, seed=None, use_random_ff=True):
         '''
@@ -218,8 +236,10 @@ class MultiFF(gymnasium.Env):
         print('current dw_cost_factor: ', self.dw_cost_factor)
         print('current w_cost_factor: ', self.w_cost_factor)
         print('current distance2center_cost: ', self.distance2center_cost)
+        print('current stop_vel_cost: ', self.stop_vel_cost)
         print('current flash_on_interval: ', self.flash_on_interval)
         print('current num_obs_ff: ', self.num_obs_ff)
+        print('current reward_boundary: ', self.reward_boundary)
         print('current max_in_memory_time: ', self.max_in_memory_time)
 
         # randomly generate the information of the fireflies
@@ -234,8 +254,6 @@ class MultiFF(gymnasium.Env):
                     flash_on_interval=self.flash_on_interval
                 )
             self._random_ff_positions(ff_index=np.arange(self.num_alive_ff))
-        self.ff_t_since_start_seen = np.zeros(
-            self.num_alive_ff, dtype=np.float32)
 
         # reset agent
         self.agentr = np.array([0.0], dtype=np.float32)
@@ -248,9 +266,21 @@ class MultiFF(gymnasium.Env):
         self.prev_w = self.w
         self.prev_v = self.v
 
-        # new trackers
+        # prev-obs snapshot starts empty; will be populated in beliefs()
+        # ff_t_since_start_seen: per-ff timer that accumulates WHILE the ff is visible.
+        # - Reset to 0 when the ff becomes invisible.
+        # - Set to dt on the first update after an ff becomes newly visible (see _update_ff_visibility).
+        # Interprets "time since this visibility episode started".
+        self.ff_t_since_start_seen = np.zeros(
+            self.num_alive_ff, dtype=np.float32)
+
+        # ff_t_since_last_seen: per-ff timer that accumulates when the ff is NOT visible.
+        # - Reset to 0 every step for ff that are currently visible.
+        # - Increments by dt otherwise (see _update_ff_visibility).
+        # Interprets "time elapsed since the ff was last visible" (useful for memory eligibility).
         self.ff_t_since_last_seen = np.full(
             self.num_alive_ff, 1e9, dtype=np.float32)
+
         self.ff_visible = np.zeros(self.num_alive_ff, dtype=np.int32)
         self._init_identity_slots()
         self._slot_valid_mask = np.zeros(self.num_obs_ff, dtype=np.int32)
@@ -259,7 +289,6 @@ class MultiFF(gymnasium.Env):
         self.time = 0
         self.num_targets = 0
         self.episode_reward = 0
-        self.cost_for_the_current_ff = 0
         self.JUST_CROSSED_BOUNDARY = False
         self.cost_breakdown = {'dv_cost': 0, 'dw_cost': 0, 'w_cost': 0}
         self.reward_for_each_ff = []
@@ -290,26 +319,33 @@ class MultiFF(gymnasium.Env):
         self.cost_breakdown['dw_cost'] += dw_cost
         self.cost_breakdown['w_cost'] += w_cost
 
-        if self.add_cost_when_catching_ff_only:
-            self.cost_for_the_current_ff += dv_cost + dw_cost + w_cost
+        self.vel_cost = dv_cost + dw_cost + w_cost
+
+        if self.add_vel_cost_when_catching_ff_only:
             reward = 0
         else:
-            reward = - dv_cost - dw_cost - w_cost
+            reward = - self.vel_cost
 
         if self.num_targets > 0:
-            if self.add_cost_when_catching_ff_only:
-                self.catching_ff_reward = max(
-                    self.reward_per_ff * self.num_targets - self.cost_for_the_current_ff,
-                    0.2 * self.catching_ff_reward
-                )
+            self.catching_ff_reward = self._get_catching_ff_reward()
+
             reward += self.catching_ff_reward
+
+            # record the reward for each ff; if more than one ff is captured, the reward is divided by the number of ff captured
             self.reward_for_each_ff.extend(
                 [self.catching_ff_reward / self.num_targets] * self.num_targets)
-            self.cost_for_the_current_ff = 0
 
             if self.print_ff_capture_incidents:
-                print(round(self.time, 2), 'action: ', [round(i, 4) for i in self.action.tolist()
-                                                        ], 'n_targets: ', self.num_targets, 'reward: ', round(self.catching_ff_reward, 2))
+                reward_breakdown = (
+                    f'{float(self.time):.2f} action: [{round(float(self.action[0]), 3)} {round(float(self.action[1]), 3)}] '
+                    f'n_targets: {self.num_targets} reward: {float(self.catching_ff_reward):.2f}'
+                )
+                if self.distance2center_cost > 0:
+                    reward_breakdown += f' cost_for_distance2center: {float(self.cost_for_distance2center):.2f}'
+                if self.stop_vel_cost > 0:
+                    reward_breakdown += f' cost_for_stop_vel: {float(self.cost_for_stop_vel):.2f}'
+                print(reward_breakdown)
+
         self.num_ff_caught_in_episode = self.num_ff_caught_in_episode + self.num_targets
         self.reward = reward
         return reward
@@ -328,6 +364,14 @@ class MultiFF(gymnasium.Env):
         self.time += self.dt
         # update the position of the agent
         self.state_step()
+
+        self._check_for_captured_ff()
+        self._get_ff_info()
+        self._update_ff_visibility()
+        self._update_identity_slots()
+
+        self._store_topk_ff_noisy_pos()
+
         # update the observation
         self.obs = self.beliefs()
         # get reward
@@ -340,7 +384,7 @@ class MultiFF(gymnasium.Env):
                     f'Firely capture rate for the episode:  {self.num_ff_caught_in_episode} ff for {self.time} s: -------------------> {round(self.num_ff_caught_in_episode/self.time, 2)}')
                 print('Total reward for the episode: ', self.episode_reward)
                 print('Cost breakdown: ', self.cost_breakdown)
-                if self.distance2center_cost > 0:
+                if self.distance2center_cost > 0 or self.stop_vel_cost > 0:
                     print('Reward for each ff: ', np.array(
                         self.reward_for_each_ff))
         is_time_limit = self.time >= self.episode_len * self.dt
@@ -350,14 +394,19 @@ class MultiFF(gymnasium.Env):
         '''
         add noise to the action
         '''
-        if (abs(action[0]) <= self.angular_terminal_vel) & (abs(action[1] / 2 + 0.5) <= self.linear_terminal_vel):
+        if (abs(action[0]) <= self.angular_terminal_vel) & ((action[1] / 2 + 0.5) <= self.linear_terminal_vel):
             self.vnoise = 0.0
             self.wnoise = 0.0
             self.is_stop = True
+            # calculate the deviation of the action from the terminal velocity
+            self.v_stop_deviance = action[1] / 2 + 0.5
+            self.w_stop_deviance = abs(action[0])
         else:
             self.vnoise = float(self.rng.normal(0.0, self.v_noise_std))
             self.wnoise = float(self.rng.normal(0.0, self.w_noise_std))
             self.is_stop = False
+            self.v_stop_deviance = 0
+            self.w_stop_deviance = 0
         new_action = np.empty_like(action, dtype=np.float32)
         new_action[0] = np.clip(float(action[0]) + self.wnoise, -1.0, 1.0)
         new_action[1] = np.clip(float(action[1]) + self.vnoise, -1.0, 1.0)
@@ -403,18 +452,22 @@ class MultiFF(gymnasium.Env):
         else:
             self.JUST_CROSSED_BOUNDARY = False
 
-        # keep identity slots in sync after movement
-        self._tick_seen_and_visibility()
-        self._update_identity_slots()
-
     # -------------- flat observation (Gym API) --------------
 
     def beliefs(self):
-        self._check_for_num_targets()
-        self._further_process_after_check_for_num_targets()
 
         # Build identity-slot matrix
+        # snapshot previous slot features if needed
+        if getattr(self, 'use_prev_obs_for_invisible_pose', False):
+            if hasattr(self, '_ff_slots_SN') and self._ff_slots_SN is not None:
+                if self._prev_slots_SN is None or self._prev_slots_SN.shape != self._ff_slots_SN.shape:
+                    self._prev_slots_SN = np.zeros_like(self._ff_slots_SN)
+                else:
+                    self._prev_slots_SN[:, :] = self._ff_slots_SN[:, :]
         self._get_ff_array_for_belief_identity_slots()
+
+        # print('self.slot_ids:', self.slot_ids)
+        # print('self.pose_unreliable:', self.pose_unreliable)
 
         # Fill preallocated obs buffer without new allocations
         obs = self.current_obs
@@ -454,16 +507,19 @@ class MultiFF(gymnasium.Env):
             self.slot_ids[:len(seed)] = seed
         self._slot_valid_mask = (self.slot_ids >= 0).astype(np.int32)
 
-    def _tick_seen_and_visibility(self):
+    def _update_ff_visibility(self):
         # advance timers; mark visibles; reset t_seen for visibles
+
+        self.ff_t_since_start_seen += self.dt
         self.ff_t_since_last_seen = self.ff_t_since_last_seen + self.dt
+
         if len(self.visible_ff_indices) > 0:
             self.ff_t_since_last_seen[self.visible_ff_indices] = 0.0
-            self.ff_visible = np.zeros_like(self.ff_visible)
-            self.ff_visible[self.visible_ff_indices] = 1
-        else:
-            self.ff_visible = np.zeros_like(self.ff_visible)
 
+        if len(self.ff_not_visible_indices) > 0:
+            self.ff_t_since_start_seen[self.ff_not_visible_indices] = 0
+
+        self.ff_t_since_start_seen[self.newly_visible_ff] = self.dt
 
     def _random_ff_positions(self, ff_index):
         '''
@@ -493,18 +549,25 @@ class MultiFF(gymnasium.Env):
                 low=-1., high=1., shape=(self.obs_space_length,), dtype=np.float32)
 
     def _get_catching_ff_reward(self):
+        self.cost_for_distance2center = 0
+        self.cost_for_stop_vel = 0
         catching_ff_reward = self.reward_per_ff * self.num_targets
-        if self.add_cost_when_catching_ff_only:
+        if self.add_vel_cost_when_catching_ff_only:
             catching_ff_reward = max(self.reward_per_ff * self.num_targets -
-                                     self.cost_for_the_current_ff, 0.2 * catching_ff_reward)
+                                     self.vel_cost, 0.2 * catching_ff_reward)
         if self.distance2center_cost > 0:
-            total_deviated_distance = np.sum(
-                self.ff_distance_all[self.captured_ff_index])
-            catching_ff_reward = catching_ff_reward - \
-                total_deviated_distance * self.distance2center_cost
+            self.cost_for_distance2center = self.total_deviated_target_distance * \
+                (self.distance2center_cost/self.reward_boundary * 25)
+            catching_ff_reward = catching_ff_reward - self.cost_for_distance2center
+        if self.stop_vel_cost > 0:
+            self.total_deviated_vel = self.v_stop_deviance + self.w_stop_deviance
+            print('total_deviated_vel: ', self.total_deviated_vel)
+            self.cost_for_stop_vel = self.total_deviated_vel * self.stop_vel_cost
+            catching_ff_reward = catching_ff_reward - self.cost_for_stop_vel
+
         return catching_ff_reward
 
-    def _check_for_num_targets(self):
+    def _check_for_captured_ff(self):
         self.num_targets = 0
         if not self.JUST_CROSSED_BOUNDARY:
             try:
@@ -515,7 +578,8 @@ class MultiFF(gymnasium.Env):
                         self.ff_distance2_all <= rb2)[0].tolist()
                     self.num_targets = len(self.captured_ff_index)
                     if self.num_targets > 0:
-                        self.catching_ff_reward = self._get_catching_ff_reward()
+                        self.total_deviated_target_distance = np.sum(
+                            self.ff_distance_all[self.captured_ff_index])
                         self.ff_t_since_start_seen[self.captured_ff_index] = 0
                         # Replace captured ffs with new locations
                         self._random_ff_positions(self.captured_ff_index)
@@ -535,8 +599,21 @@ class MultiFF(gymnasium.Env):
             except AttributeError:
                 pass
 
-    def _further_process_after_check_for_num_targets(self):
-        self._update_ff_t_since_start_seen()
+    def _store_topk_ff_noisy_pos(self):
+        # Provide compatibility fields expected by data collectors
+        # Map current identity-bound observation slots -> indices and noisy positions
+        if getattr(self, 'slot_ids', None) is None:
+            self.topk_indices = np.array([], dtype=np.int32)
+            self.ffxy_topk_noisy = np.empty((0, 2), dtype=np.float32)
+            return
+        valid_mask = self.slot_ids >= 0
+        if np.any(valid_mask):
+            topk = self.slot_ids[valid_mask].astype(np.int32)
+            self.topk_indices = topk
+            self.ffxy_topk_noisy = self.ffxy_noisy[topk]
+        else:
+            self.topk_indices = np.array([], dtype=np.int32)
+            self.ffxy_topk_noisy = np.empty((0, 2), dtype=np.float32)
 
     def _update_variables_when_no_ff_is_in_obs(self):
         self.ffxy_topk_noisy = np.array([])
@@ -544,8 +621,6 @@ class MultiFF(gymnasium.Env):
         self.angle_to_center_topk_noisy = np.array([])
 
     def _get_ff_info(self):
-        self.prev_visible_ff_indices = self.visible_ff_indices.copy() if hasattr(
-            self, 'visible_ff_indices') else np.array([], dtype=np.int32)
 
         # squared distances (N,)
         dx = self.ffxy[:, 0] - self.agentxy[0]
@@ -567,9 +642,26 @@ class MultiFF(gymnasium.Env):
             mask[vis_mask] = True
             vis_mask = mask
         self._ff_is_visible[:] = vis_mask
-        self.visible_ff_indices = np.nonzero(self._ff_is_visible)[
+        visible_ff_indices = np.nonzero(self._ff_is_visible)[
             0].astype(np.int32)
+        self._update_visible_ff_indices(visible_ff_indices)
+
         return
+
+    def _update_visible_ff_indices(self, visible_ff_indices):
+        self.prev_visible_ff_indices = self.visible_ff_indices.copy() if hasattr(
+            self, 'visible_ff_indices') else np.array([], dtype=np.int32)
+        self.visible_ff_indices = visible_ff_indices
+        self.newly_visible_ff = np.array(list(set(
+            self.visible_ff_indices) - set(self.prev_visible_ff_indices)), dtype=np.int32)
+
+        self.ff_not_visible_indices = np.array(list(set(range(
+            self.num_alive_ff)) - set(self.visible_ff_indices.tolist())), dtype=np.int32)
+
+        # get visible mask
+        self.ff_visible = np.zeros_like(self.ff_visible)
+        if len(self.visible_ff_indices) > 0:
+            self.ff_visible[self.visible_ff_indices] = 1
 
     def _update_ff_info(self, ff_index):
         '''
@@ -621,23 +713,11 @@ class MultiFF(gymnasium.Env):
             mask_keep = ~np.isin(self.visible_ff_indices, ff_index)
             base_visible = self.visible_ff_indices[mask_keep]
 
-        self.visible_ff_indices = np.unique(
+        visible_ff_indices = np.unique(
             np.concatenate([base_visible.astype(np.int32),
                             visible_global.astype(np.int32)])
         ).astype(np.int32)
-
-    def _update_ff_t_since_start_seen_base_func(self, not_visible_ff_indices):
-        self.ff_t_since_start_seen += self.dt
-        self.ff_t_since_start_seen[not_visible_ff_indices] = 0
-        self.newly_visible_ff = np.array(list(set(
-            self.visible_ff_indices) - set(self.prev_visible_ff_indices)), dtype=np.int32)
-        self.ff_t_since_start_seen[self.newly_visible_ff] = self.dt
-
-    def _update_ff_t_since_start_seen(self):
-        self.ff_not_visible_indices = np.array(list(set(range(
-            self.num_alive_ff)) - set(self.visible_ff_indices.tolist())), dtype=np.int32)
-        self._update_ff_t_since_start_seen_base_func(
-            self.ff_not_visible_indices)
+        self._update_visible_ff_indices(visible_ff_indices)
 
     def _get_ff_array_for_belief_identity_slots(self):
         # Number of slots
@@ -670,22 +750,37 @@ class MultiFF(gymnasium.Env):
         valid_slots = np.where(valid_mask)[0]
         if valid_slots.size > 0:
             ffids = self.slot_ids[valid_slots].astype(np.int32)
-            ffxy = self.ffxy_noisy[ffids]  # [K,2]
-
-            # Angles wrt agent (vectorized)
+            # choose pose source for content features
+            ffxy = self.ffxy_noisy[ffids]
             theta_center, _ = env_utils.calculate_angles_to_ff(
                 ffxy, self.agentx, self.agenty, self.agentheading, self.ff_radius
-            )  # [K]
+            )
             sin_theta = np.sin(theta_center).astype(np.float32)
             cos_theta = np.cos(theta_center).astype(np.float32)
-
-            # Distance → d_log in [0,1] (vectorized)
             dx = ffxy[:, 0] - self.agentxy[0]
             dy = ffxy[:, 1] - self.agentxy[1]
             dist = np.sqrt(dx * dx + dy * dy).astype(np.float32)
             dist_clip = np.minimum(dist, self.D_max)
             d_log01 = (np.log1p(dist_clip / self.d0) *
                        self._inv_log_denom).astype(np.float32)
+
+            # If using prev-obs for invisible pose, pull from previous slot snapshot
+            if getattr(self, 'use_prev_obs_for_invisible_pose', False) and (self._prev_slots_SN is not None):
+                invis_rows = self.ff_visible[ffids] < 0.5
+                if np.any(invis_rows):
+                    def col_for(field):
+                        idx_full = self.FIELD_INDEX[field]
+                        return idx_full if isinstance(out_idx, slice) else (out_idx.index(idx_full) if idx_full in out_idx else None)
+                    j_dlog = col_for('d_log')
+                    j_sin = col_for('sin')
+                    j_cos = col_for('cos')
+                    prev_rows = valid_slots[np.where(invis_rows)[0]]
+                    if j_dlog is not None:
+                        d_log01[invis_rows] = self._prev_slots_SN[prev_rows, j_dlog]
+                    if j_sin is not None:
+                        sin_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_sin]
+                    if j_cos is not None:
+                        cos_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_cos]
 
             # Time features normalized 0..1 using T_max (vectorized)
             t_start = np.minimum(
@@ -696,17 +791,72 @@ class MultiFF(gymnasium.Env):
             t_last01 = (t_last / self.T_max).astype(np.float32)
 
             # Visible and valid flags
-            visible = self.ff_visible[ffids].astype(np.float32)
-            valid = np.ones_like(visible, dtype=np.float32)
+            self.visible = self.ff_visible[ffids].astype(np.float32)
+            valid = np.ones_like(self.visible, dtype=np.float32)
 
-            # assemble selected fields directly into (K,N)
-            full7 = (valid, d_log01, sin_theta, cos_theta,
-                     t_start01, t_last01, visible)
-            if isinstance(out_idx, slice):
-                outK = np.stack(full7, axis=1).astype(np.float32)
+            # If using prev obs for invisible pose, overwrite content from previous slots snapshot
+            if getattr(self, 'use_prev_obs_for_invisible_pose', False) and (self._prev_slots_SN is not None):
+                invis_rows = self.ff_visible[ffids] < 0.5
+                if np.any(invis_rows):
+                    # map field names to indices within out_idx
+                    def col_for(field):
+                        idx_full = self.FIELD_INDEX[field]
+                        return idx_full if isinstance(out_idx, slice) else (out_idx.index(idx_full) if idx_full in out_idx else None)
+                    j_dlog = col_for('d_log')
+                    j_sin = col_for('sin')
+                    j_cos = col_for('cos')
+                    prev_rows = valid_slots[np.where(invis_rows)[0]]
+                    if j_dlog is not None:
+                        d_log01[invis_rows] = self._prev_slots_SN[prev_rows, j_dlog]
+                    if j_sin is not None:
+                        sin_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_sin]
+                    if j_cos is not None:
+                        cos_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_cos]
+
+            # compute pose_unreliable = 1 - visible
+            if getattr(self, 'use_prev_obs_for_invisible_pose', False) or getattr(self, 'use_prev_obs_for_invisible_pose', False):
+                self.pose_unreliable = (self.visible < 0.5).astype(np.float32)
             else:
-                full7_stack = np.stack(full7, axis=1)  # (K,7)
-                outK = full7_stack[:, out_idx].astype(np.float32)  # (K,N)
+                self.pose_unreliable = np.zeros_like(
+                    self.visible, dtype=np.float32)
+            # assemble selected fields directly into (K,N)
+            full_fields = (valid, d_log01, sin_theta, cos_theta,
+                           t_start01, t_last01, self.visible, self.pose_unreliable)
+            if isinstance(out_idx, slice):
+                outK = np.stack(full_fields, axis=1).astype(np.float32)
+            else:
+                full_stack = np.stack(full_fields, axis=1)  # (K,F)
+                outK = full_stack[:, out_idx].astype(np.float32)  # (K,N)
+            # Optionally zero features for invisible fireflies assigned to slots
+            if getattr(self, 'zero_invisible_ff_features', False):
+                invis_rows = self.visible < 0.5
+                if np.any(invis_rows):
+                    # preserve 'valid', 't_start_seen', 't_last_seen'
+                    # and optionally pose features ('d_log','sin','cos') if requested
+                    protected_fields = ['valid', 't_start_seen', 't_last_seen']
+                    if getattr(self, 'use_prev_obs_for_invisible_pose', False):
+                        protected_fields = protected_fields + \
+                            ['d_log', 'sin', 'cos']
+                    if isinstance(out_idx, slice):
+                        protected_cols = [self.FIELD_INDEX[f]
+                                          for f in protected_fields]
+                    else:
+                        protected_cols = []
+                        for f in protected_fields:
+                            idx_full = self.FIELD_INDEX[f]
+                            try:
+                                j = out_idx.index(idx_full)
+                                protected_cols.append(j)
+                            except ValueError:
+                                pass
+                    N_cols = outK.shape[1]
+                    zero_mask = np.ones(N_cols, dtype=bool)
+                    if len(protected_cols) > 0:
+                        zero_mask[np.array(protected_cols, dtype=int)] = False
+                    col_idx = np.where(zero_mask)[0]
+                    row_idx = np.where(invis_rows)[0]
+                    if row_idx.size and col_idx.size:
+                        outK[np.ix_(row_idx, col_idx)] = 0.0
             # write into (S,N) rows for valid slots
             slots_SN[valid_slots, :] = outK
 
@@ -717,8 +867,6 @@ class MultiFF(gymnasium.Env):
 
         # produce flat view once (no new alloc) in Fortran order
         self.ff_slots_flat = slots_SN.ravel(order='F')
-        # optional: keep unnormalized view if needed elsewhere
-        self.ff_array_unnormalized = slots_SN.T  # view
 
     def _apply_noise_to_ff_in_obs(self, alpha_first_mem=1.0):
         # Apply perception and memory noise independently per component
@@ -806,6 +954,7 @@ class MultiFF(gymnasium.Env):
         theta_world = self._wrap_pi(th_n + self.agentheading[0])
         self.ffxy_noisy[vis, 0] = self.agentx[0] + r_n * np.cos(theta_world)
         self.ffxy_noisy[vis, 1] = self.agenty[0] + r_n * np.sin(theta_world)
+        # last-seen feature buffers removed; prev-obs snapshot is used instead
 
     def _from_egocentric_polar(self, r, theta_ego):
         # ego polar → world
@@ -818,7 +967,6 @@ class MultiFF(gymnasium.Env):
     def _wrap_pi(theta):
         return (theta + np.pi) % (2 * np.pi) - np.pi
 
-
     def _update_identity_slots(self):
         """
         Refresh identity slots based on current ff info and strategy.
@@ -829,10 +977,6 @@ class MultiFF(gymnasium.Env):
                     fill remaining empty slots with nearest-first new IDs.
         default    : drop invalids; fill empties with nearest visible, not-yet-bound IDs.
         """
-        
-
-        # Always refresh distances/visibility so nearest-choice is correct
-        self._get_ff_info()
 
         # Normalize slot_ids shape/dtype
         K = int(self.num_obs_ff)
@@ -849,25 +993,24 @@ class MultiFF(gymnasium.Env):
 
         self._slot_valid_mask = (self.slot_ids >= 0).astype(np.int32)
 
-
-    def _eligibility_mask(self):
+    def _eligibility_mask(self, max_ff_distance=500, max_ff_angle=np.pi/2):
         """
         Compute and return a boolean mask over firefly indices that satisfy:
         - recently seen (within self.max_in_memory_time)
-        - within self.invisible_distance
+        - within some distance (drop if too far)
         - within ±90° (front half-plane)
         - and, if obs_visible_only, currently visible.
         """
-        
-        mem_ok = self.ff_t_since_last_seen <= self.max_in_memory_time
-        dist_ok = self.ff_distance_all <= self.invisible_distance
-        angle_ok = np.abs(self.angle_to_boundary_all) <= (np.pi / 2)
 
-        mask = mem_ok & dist_ok & angle_ok
+        mem_ok = self.ff_t_since_last_seen <= self.max_in_memory_time
+        # dist_ok = self.ff_distance_all <= max_ff_distance
+        # angle_ok = np.abs(self.angle_to_boundary_all) <= max_ff_angle
+        # mask = mem_ok & dist_ok & angle_ok
+        mask = mem_ok
+
         if self.obs_visible_only and (self.ff_visible is not None):
             mask = mask & self.ff_visible.astype(bool)
         return mask
-
 
     def _assign_slots_rank_keep(self, K):
         """
@@ -876,7 +1019,6 @@ class MultiFF(gymnasium.Env):
         2) keep persistent ones in their old slots
         3) fill empty slots with nearest unbound FFs
         """
-        
 
         ff_dist = np.asarray(self.ff_distance_all, dtype=float)
         base_mask = self._eligibility_mask()
@@ -907,7 +1049,8 @@ class MultiFF(gymnasium.Env):
             new_slots[persistent_pos] = persistent_ids
 
         # fill empty slots with new nearest IDs
-        remaining = ranked[~np.isin(ranked, persistent_ids)] if persistent_ids.size else ranked
+        remaining = ranked[~np.isin(
+            ranked, persistent_ids)] if persistent_ids.size else ranked
         empty = np.where(new_slots < 0)[0]
         if empty.size and remaining.size:
             n = min(empty.size, remaining.size)
@@ -915,14 +1058,13 @@ class MultiFF(gymnasium.Env):
 
         return new_slots
 
-
     def _assign_slots_default(self):
         """
         Default assignment:
         - drop invalids among currently bound FFs
         - fill empties with nearest visible, unbound FFs
         """
-    
+
         slots = np.asarray(self.slot_ids, dtype=np.int32).copy()
         base_mask = self._eligibility_mask()
         ff_dist = np.asarray(self.ff_distance_all, dtype=float)
@@ -937,7 +1079,8 @@ class MultiFF(gymnasium.Env):
                 slots[drop_positions] = -1
 
         # fill empties with nearest visible ones
-        vis = np.asarray(getattr(self, 'visible_ff_indices', []), dtype=np.int32)
+        vis = np.asarray(
+            getattr(self, 'visible_ff_indices', []), dtype=np.int32)
         if vis.size:
             bound = slots[slots >= 0]
             cand = vis[~np.isin(vis, bound)] if bound.size else vis

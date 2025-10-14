@@ -30,7 +30,7 @@ def test_agent(env, obs, model, n_steps=10000):
 
 class TrialEvalCallback(EvalCallback):
     """
-    Original source: https://github.com/optuna/optuna-examples/blob/main/rl/sb3_simple.py
+    Original source: https://github.com/optuna/optuna-examples/blob/main/RL_models/sb3_simple.py
     Provided by Optuna.
     Callback used for evaluating and reporting a trial.
     """
@@ -231,6 +231,7 @@ class SaveOnBestTrainingRewardAndStopTrainingOnNoTestingRewardImprovement(SaveOn
     """
     This class combines SaveOnBestTrainingRewardCallback and StopTrainingOnNoModelImprovement
 
+    !!!!!!!!!!!!!!!!!!
     In reality, this new class is not useful, because I can just add best_model_save_path to EvalCallback which can also call StopTrainingOnNoModelImprovement. 
 
     Example:

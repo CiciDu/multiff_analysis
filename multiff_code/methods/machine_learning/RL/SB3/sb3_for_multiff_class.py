@@ -34,30 +34,26 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
 
         self.env_class = env_for_sb3.EnvForSB3
 
-    def save_best_model_after_curriculum(self, whether_save_replay_buffer=True):
-        self.save_agent(whether_save_replay_buffer=whether_save_replay_buffer,
-                        dir_name=self.best_model_after_curriculum_dir_name)
 
-    def load_best_model_after_curriculum(self, load_replay_buffer=True):
+    def load_best_model_postcurriculum(self, load_replay_buffer=True):
+        dir_name = self.best_model_postcurriculum_dir
         self.load_agent(load_replay_buffer=load_replay_buffer,
-                        dir_name=self.best_model_after_curriculum_dir_name)
+                        dir_name=dir_name)
 
-    def make_env(self, monitor_dir=None, **additional_env_kwargs):
+    def load_best_model_in_curriculum(self, load_replay_buffer=True):
+        dir_name = self.best_model_in_curriculum_dir
+        self.load_agent(load_replay_buffer=load_replay_buffer,
+                        dir_name=dir_name)
+
+    def make_env(self, monitor_dir=None, **env_kwargs):
         os.makedirs(self.model_folder_name, exist_ok=True)
-        self.env_kwargs.update(additional_env_kwargs)
-        self.env = self.env_class(**self.env_kwargs)
+        current_env_kwargs = copy.deepcopy(self.env_kwargs)
+        current_env_kwargs.update(env_kwargs)
+        self.env = self.env_class(**current_env_kwargs)
+        print(f'Made env with the following kwargs: {env_kwargs}')
         if monitor_dir is None:
             monitor_dir = self.model_folder_name
         self.env = Monitor(self.env, monitor_dir)
-        # check if monitor file is present
-        if not exists(os.path.join(monitor_dir, 'monitor.csv')):
-            # make the env again
-            self.env = self.env_class(**self.env_kwargs)
-            self.env = Monitor(self.env, monitor_dir)
-            # check again
-            if not exists(os.path.join(monitor_dir, 'monitor.csv')):
-                raise ValueError(
-                    "Monitor file not found after making the env.")
 
     def make_agent(self, **kwargs):
 
@@ -67,7 +63,7 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
                                  'target_update_interval': kwargs.get('target_update_interval', 50),
                                  'buffer_size': kwargs.get('buffer_size', 1000000),
                                  'learning_starts': kwargs.get('learning_starts', 10000),
-                                 'train_freq': kwargs.get('train_freq', 100),
+                                 'train_freq': kwargs.get('train_freq', 10),
                                  # 'train_freq': kwargs.get('train_freq', 1,),
                                  'gradient_steps': kwargs.get('gradient_steps', 10),
                                  'ent_coef': kwargs.get('ent_coef', 'auto'),
@@ -96,14 +92,16 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
 
         if env_params_to_save is None:
             env_params_to_save = self.env_kwargs
-        self.store_env_params(
-            model_folder_name=best_model_save_path, env_params_to_save=env_params_to_save)
 
         stop_train_callback = SB3_functions.StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=15, verbose=1, model_folder_name=self.model_folder_name,
                                                                              overall_folder=self.overall_folder, agent_id=self.agent_id)
-        self.callback = EvalCallback(self.env, eval_freq=10000, callback_after_eval=stop_train_callback, verbose=1,
-                                     best_model_save_path=best_model_save_path, n_eval_episodes=3)
 
+        # Note: by adding best_model_save_path, the callback can save the best model after each evaluation
+        if best_model_save_path is not None:
+            os.makedirs(best_model_save_path, exist_ok=True)
+        self.callback = EvalCallback(self.env, eval_freq=15000, callback_after_eval=stop_train_callback, verbose=1,
+                                     best_model_save_path=best_model_save_path, n_eval_episodes=3)
+        self.write_checkpoint_manifest(best_model_save_path, env_params_to_save)
         self.sac_model.learn(total_timesteps=int(
             timesteps), callback=self.callback)
 
@@ -112,27 +110,32 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
                         train_freq=10,
                         gradient_steps=1)
 
-    def make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_angular_terminal_vel=0.32):
-        self.make_env(monitor_dir=self.best_model_after_curriculum_dir_name)
-        self._make_initial_env_for_curriculum_training(initial_dt=initial_dt,
-                                                       initial_angular_terminal_vel=initial_angular_terminal_vel)
-        self.env.env.angular_terminal_vel = initial_angular_terminal_vel
+    def make_initial_env_for_curriculum_training(self, initial_angular_terminal_vel=0.32, 
+                                                 initial_distance2center_cost=2,
+                                                 initial_flash_on_interval=0.3, 
+                                                 initial_reward_boundary=75):
+        monitor_dir = self.best_model_postcurriculum_dir
+        os.makedirs(monitor_dir, exist_ok=True)
+        print(f'Making initial env for curriculum training...')
+        self.make_env(monitor_dir=monitor_dir, **self.env_kwargs)
+        self._make_initial_env_for_curriculum_training(initial_angular_terminal_vel=initial_angular_terminal_vel,
+                                                         initial_flash_on_interval=initial_flash_on_interval,
+                                                         initial_distance2center_cost=initial_distance2center_cost,
+                                                         initial_reward_boundary=initial_reward_boundary)
 
-    def _update_env_dt(self, dt=0.25):
-        self.env.env.dt = dt
-        self.env.env.visible_time_range = self.env.env.flash_on_interval + \
-            self.env.env.max_in_memory_time + self.env.env.dt
-        self.env_kwargs_for_curriculum_training['dt'] = self.env.env.dt
-        self.env_kwargs_for_curriculum_training['visible_time_range'] = self.env.env.visible_time_range
 
-    def _train_till_reaching_reward_threshold(self, n_eval_episodes=1, ff_caught_rate_threshold=1/5):
+    def _train_till_reaching_reward_threshold(self, n_eval_episodes=1, ff_caught_rate_threshold=0.1, env_params_to_save=None):
         reward_threshold = rl_for_multiff_utils.calculate_reward_threshold_for_curriculum_training(
             self.env.env, n_eval_episodes=n_eval_episodes, ff_caught_rate_threshold=ff_caught_rate_threshold)
         print('reward_threshold:', reward_threshold)
         stop_train_callback = StopTrainingOnRewardThreshold(
             reward_threshold=reward_threshold)  # or 10ff/250s
         callback = EvalCallback(
-            self.env, eval_freq=8000, callback_after_eval=stop_train_callback, verbose=1, n_eval_episodes=n_eval_episodes)
+            self.env, eval_freq=15000, callback_after_eval=stop_train_callback, verbose=1, n_eval_episodes=n_eval_episodes,
+            best_model_save_path=self.best_model_in_curriculum_dir)
+        if env_params_to_save is None:
+            env_params_to_save = self.env_kwargs
+        self.write_checkpoint_manifest(self.best_model_in_curriculum_dir, env_params_to_save)
         self.sac_model.learn(total_timesteps=1000000, callback=callback)
         if callback.best_mean_reward < reward_threshold:
             raise ValueError(
@@ -143,61 +146,26 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
             gc.collect()
             # Note: 0.00222 = 0.0035/(pi/2), same as the monkey's threshold
             try:
-                self._train_till_reaching_reward_threshold()
+                self._train_till_reaching_reward_threshold(env_params_to_save=self.env_kwargs_for_curriculum_training)
             except ValueError as e:
                 print(f"Error message: {e}")
                 break
-            self.save_best_model_after_curriculum()
             self._change_env_after_meeting_reward_threshold()
-
-        # after all the conditions are met, train the agent once again to ensure performance (stop training with no improvement)
-        self.regular_training(best_model_save_path=self.best_model_after_curriculum_dir_name,
-                              env_params_to_save=self.env_kwargs_for_curriculum_training)
-
-    def _change_env_after_meeting_reward_threshold(self):
-        self._update_env_dt(dt=max(self.env.env.dt/2, self.env_kwargs['dt']))
-        self.sac_model.gamma = rl_for_multiff_utils.calculate_model_gamma(
-            self.env.env.dt)
-        self.env.env.angular_terminal_vel = max(
-            self.env.env.angular_terminal_vel/2, 0.01)
-        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = self.env.env.angular_terminal_vel
-        print('Current dt:', self.env.env.dt)
-        print('Current gamma:', self.sac_model.gamma)
-        print('Current angular_terminal_vel:',
-              self.env.env.angular_terminal_vel)
-
-    def _fill_up_replay_buffer_for_best_model_after_curriculum_training(self):
-        self.make_env(
-            monitor_dir=self.best_model_after_curriculum_dir_name, **self.env_kwargs)
-        self._make_env_suitable_for_curriculum_training()
-        # need to do this after changing env
-        self.load_best_model_after_curriculum(load_replay_buffer=True)
-
-        # continue to train agent so as to fill up the replay buffer
-        callback = SB3_functions.SaveOnBestTrainingRewardCallback(
-            check_freq=20000, model_folder_name=self.best_model_after_curriculum_dir_name)
-        self.sac_model.learn(total_timesteps=int(
-            self.buffer_size * 1.2), callback=callback)
-        # # save replay_buffer
-        # self.sac_model.save_replay_buffer(os.path.join(dir_name, 'buffer')) # I added this
-
-    def _further_process_best_model_after_curriculum_training(self):
-
-        # self._fill_up_replay_buffer_for_best_model_after_curriculum_training()
-        # Now, change the env back to train the current agent
+            
+        # After all the conditions are met, train the agent once again to ensure performance (stop training with no improvement)
+        # After curriculum ends, copy best from in-curriculum to post-curriculum
+        os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
         self.make_env(**self.env_kwargs)
-        self.load_best_model_after_curriculum(load_replay_buffer=True)
-        self._restore_env_params_after_curriculum_training()
-        # No longer using full_memory; visible_time_range already updated elsewhere
+        self.load_best_model_in_curriculum(load_replay_buffer=True)
+        self.regular_training(best_model_save_path=self.best_model_postcurriculum_dir,
+                              env_params_to_save=self.env_kwargs_for_curriculum_training)
+        
+        # Now, load the best model in post-curriculum folder and save it to the agent folder
+        self.load_best_model_postcurriculum(load_replay_buffer=True)
 
-    def _restore_env_params_after_curriculum_training(self):
-        self.env.env.dt = self.env_kwargs['dt']
-        self.env.env.dv_cost_factor = self.env_kwargs['dv_cost_factor']
-        self.env.env.dw_cost_factor = self.env_kwargs['dw_cost_factor']
-        self.env.env.w_cost_factor = self.env_kwargs['w_cost_factor']
-        self.env.distance2center_cost = 0
 
-    def save_agent(self, whether_save_replay_buffer=False, dir_name=None, model_name='best_model'):
+    def save_agent(self, whether_save_replay_buffer=False, dir_name=None, env_params_to_save=None):
+        model_name = 'best_model'
         if dir_name is None:
             dir_name = self.model_folder_name
 
@@ -209,35 +177,48 @@ class SB3forMultifirefly(rl_for_multiff_class._RLforMultifirefly):
                 os.path.join(dir_name, 'buffer'))  # I added this
             print('Saved replay buffer:', os.path.join(dir_name, 'buffer'))
 
+        if env_params_to_save is None:
+            env_params_to_save = self.env_kwargs
+        self.write_checkpoint_manifest(dir_name, env_params_to_save)
+        
+        
+    def write_checkpoint_manifest(self, dir_name, env_params_to_save=None):
+        if env_params_to_save is None:
+            env_params_to_save = self.env_kwargs
+        rl_for_multiff_utils.write_checkpoint_manifest(dir_name, {
+            'algorithm': 'sb3_sac',
+            'model_file': f'best_model.zip',
+            'replay_buffer': 'buffer',
+            'num_timesteps': getattr(self.sac_model, 'num_timesteps', None),
+            'env_params_path': 'env_params.txt',
+            'env_params': env_params_to_save,
+        })
+
     def load_agent(self, load_replay_buffer=True, keep_current_agent_params=True, dir_name=None, model_name='best_model'):
-        if dir_name is None:
-            dir_name = self.model_folder_name
+        manifest = rl_for_multiff_utils.read_checkpoint_manifest(dir_name)
+        model_file = manifest.get('model_file') if isinstance(manifest, dict) else None
+        path = os.path.join(dir_name, model_file) if model_file else os.path.join(dir_name, model_name + '.zip')
 
-        path = os.path.join(dir_name, model_name + '.zip')
-        try:
-            self.sac_model = self.sac_model.load(path, env=self.env)
-            print("Loaded existing agent:", path)
+        self.make_env(**manifest['env_params'])
+        self.make_agent()
+        self.sac_model = self.sac_model.load(path, env=self.env)
+        print("Loaded existing agent:", path)
 
-            if load_replay_buffer:
-                path2 = os.path.join(dir_name, 'buffer')
+        if load_replay_buffer:
+            buffer_name = manifest.get('replay_buffer') if isinstance(manifest, dict) else 'buffer'
+            path2 = os.path.join(dir_name, buffer_name)
+            if os.path.exists(path2):
                 self.sac_model.load_replay_buffer(path2)
                 print("Loaded existing replay buffer:", path2)
+            else:
+                print(f"Replay buffer not found at {path2}; proceeding without it.")
 
-            if keep_current_agent_params:
-                for key, item in self.agent_params.items():
-                    setattr(self.sac_model, key, item)
+        if keep_current_agent_params and (self.agent_params is not None):
+            for key, item in self.agent_params.items():
+                setattr(self.sac_model, key, item)
 
-            print('Params from agent after loading:')
-            print(rl_for_multiff_utils.get_agent_params_from_the_current_sac_model(
-                self.sac_model))
-
-        except Exception as e:
-            print(
-                f"There was an error retrieving agent or replay_buffer in {path}. Error message {e}")
-            raise ValueError(
-                f"There was an error retrieving agent or replay_buffer in {path}. Error message {e}")
-
-    def _run_current_agent_after_curriculum_training(self):
-        timesteps = 2000000
-        self.regular_training(timesteps=timesteps)
-        self.successful_training = True
+        print('Params from agent after loading:')
+        print(rl_for_multiff_utils.get_agent_params_from_the_current_sac_model(
+            self.sac_model))
+        self.loaded_agent_dir = dir_name
+        return

@@ -6,6 +6,7 @@ from machine_learning.RL.lstm import LSTM_functions
 
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
 import gc
 import torch
 import pickle
@@ -23,20 +24,23 @@ class LSTMforMultifirefly(rl_for_multiff_class._RLforMultifirefly):
                  overall_folder='RL_models/LSTM_stored_models/all_agents/gen_0/',
                  model_folder_name=None,
                  add_date_to_model_folder_name=False,
+                 max_in_memory_time=1,
                  **additional_env_kwargs):
 
         super().__init__(overall_folder,
                          add_date_to_model_folder_name=add_date_to_model_folder_name,
                          model_folder_name=model_folder_name,
-                         max_in_memory_time=0,
+                         max_in_memory_time=max_in_memory_time,
                          **additional_env_kwargs)
 
         self.sb3_or_lstm = 'lstm'
         self.env_class = env_for_lstm.EnvForLSTM
 
-    def make_env(self, **additional_env_kwargs):
-        self.env_kwargs.update(additional_env_kwargs)
-        self.env = self.env_class(**self.env_kwargs)
+    def make_env(self, **env_kwargs):
+        current_env_kwargs = copy.deepcopy(self.env_kwargs)
+        current_env_kwargs.update(env_kwargs)
+        self.env = self.env_class(**current_env_kwargs)
+        print(f'Made env with the following kwargs: {env_kwargs}')
 
     def make_agent(self,
                    agent_params_already_set_ok=True,
@@ -81,126 +85,68 @@ class LSTMforMultifirefly(rl_for_multiff_class._RLforMultifirefly):
         self.agent_params['replay_buffer'] = self.replay_buffer
         self.sac_model = LSTM_functions.SAC_Trainer(**self.agent_params)
 
-    def make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_flash_on_interval=3.3, initial_angular_terminal_vel=1):
-        self.make_env()
-        self._make_initial_env_for_curriculum_training(initial_dt=initial_dt,
-                                                         initial_angular_terminal_vel=initial_angular_terminal_vel)
-        self.env.angular_terminal_vel = initial_angular_terminal_vel
-        self._update_env_flash_on_interval(
-            flash_on_interval=initial_flash_on_interval)
+    def make_initial_env_for_curriculum_training(self, initial_flash_on_interval=3, initial_angular_terminal_vel=0.64, initial_reward_boundary=75):
+        self.make_env(**self.env_kwargs)
+        self._make_initial_env_for_curriculum_training(initial_angular_terminal_vel=initial_angular_terminal_vel,
+                                                         initial_flash_on_interval=initial_flash_on_interval,
+                                                         initial_reward_boundary=initial_reward_boundary)
 
     def _make_agent_for_curriculum_training(self):
         self.make_agent()
 
-    def _update_env_dt(self, dt=0.25):
-        self.env.dt = dt
-        self.sac_model.gamma = rl_for_multiff_utils.calculate_model_gamma(
-            self.env.dt)
-        self.env.visible_time_range = self.env.flash_on_interval + self.env.dt
-        self.env_kwargs_for_curriculum_training['dt'] = dt
 
-    def _update_env_flash_on_interval(self, flash_on_interval=0.3):
-        self.env.flash_on_interval = flash_on_interval
-        self.env.visible_time_range = self.env.flash_on_interval + self.env.dt
-        self.env_kwargs_for_curriculum_training['flash_on_interval'] = flash_on_interval
-
-    def _change_env_after_meeting_reward_threshold(self):
-        flash_on_interval = max(
-            self.env.flash_on_interval - 0.3, self.env_kwargs['flash_on_interval'])
-        self._update_env_flash_on_interval(flash_on_interval=flash_on_interval)
-        # self._update_env_dt(dt=max(self.env.dt/2, 0.1))
-        # self.env.angular_terminal_vel = max(self.env.angular_terminal_vel/4, 0.01)
-        # self.env.distance2center_cost = max(self.env.distance2center_cost - 0.5, 0)
-
-        print('Current dt:', self.env.dt)
-        print('Current gamma:', self.sac_model.gamma)
-        print('Current angular_terminal_vel:', self.env.angular_terminal_vel)
-        print('Current flash_on_interval:', self.env.flash_on_interval)
-        print('Current distance2center_cost:', self.env.distance2center_cost)
-
-    def _use_while_loop_for_curriculum_training(self, eval_eps_freq=20):
-        # while (self.env.dt > self.env_kwargs['dt']) | (self.env.angular_terminal_vel > 0.01) | \
-        #     (self.env.flash_on_interval > self.env_kwargs['flash_on_interval']) | (self.env.distance2center_cost > 0):
-
-        while self.env.flash_on_interval > self.env_kwargs['flash_on_interval']:
+    def _use_while_loop_for_curriculum_training(self, eval_eps_freq=20, num_eval_episodes=2):
+        while (self.env.flash_on_interval > self.env_kwargs['flash_on_interval']) or (self.env.angular_terminal_vel > 0.01) or \
+              ('reward_boundary' in self.env_kwargs_for_curriculum_training and self.env.reward_boundary > self.env_kwargs['reward_boundary']):
 
             gc.collect()
-            # Note: 0.00222 = 0.0035/(pi/2), same as the monkey's threshold
-            num_eval_episodes = 1
             reward_threshold = rl_for_multiff_utils.calculate_reward_threshold_for_curriculum_training(
-                self.env, n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=1/5)
+                self.env, n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=0.1)
+            print('Current reward_threshold to progress in curriculum training:', reward_threshold)
             # reward_threshold = 1000
             self.regular_training(eval_eps_freq=eval_eps_freq, num_eval_episodes=num_eval_episodes,
-                                  reward_threshold_to_stop_on=reward_threshold, dir_name=self.best_model_after_curriculum_dir_name,
+                                  reward_threshold_to_stop_on=reward_threshold, 
+                                  dir_name=self.best_model_in_curriculum_dir,
                                   env_params_to_save=self.env_kwargs_for_curriculum_training)
-            print('reward_threshold:', reward_threshold)
+            
             self._change_env_after_meeting_reward_threshold()
 
         # after all condition is met, train the agent once more until it reaches the desired performance
+        os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
+        self.make_env(**self.env_kwargs)
+        self.load_best_model_in_curriculum(load_replay_buffer=True)
+        
         reward_threshold = rl_for_multiff_utils.calculate_reward_threshold_for_curriculum_training(
-            self.env, n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=1/5)
+            self.env, n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=0.1)
         self.regular_training(eval_eps_freq=eval_eps_freq, num_eval_episodes=num_eval_episodes,
-                              reward_threshold_to_stop_on=reward_threshold, dir_name=self.best_model_after_curriculum_dir_name,
+                              reward_threshold_to_stop_on=reward_threshold, dir_name=self.best_model_postcurriculum_dir,
                               env_params_to_save=self.env_kwargs_for_curriculum_training)
         print('reward_threshold:', reward_threshold)
+        
+        self.load_best_model_postcurriculum(load_replay_buffer=True)
 
-    def _fill_up_replay_buffer_for_best_model_after_curriculum_training(self, eval_eps_freq):
-        self.make_env(**self.env_kwargs)
-        self._make_env_suitable_for_curriculum_training()
-        self.load_best_model_after_curriculum(load_replay_buffer=True)
-        self.regular_training(num_train_episodes=int(self.agent_params['replay_buffer_size'] * 1.3), eval_eps_freq=eval_eps_freq, num_eval_episodes=1, dir_name=self.best_model_after_curriculum_dir_name,
-                              env_params_to_save=self.env_kwargs_for_curriculum_training)
-        # # save replay buffer only, since the best model has been saved already
-        # LSTM_functions.save_replay_buffer(self.sac_model, self.best_model_after_curriculum_dir_name)
-
-    def _further_process_best_model_after_curriculum_training(self, eval_eps_freq=20):
-        # to ensure that we get the monitor file at the correct place
-        self.save_best_model_after_curriculum()
-        # _fill_up_replay_buffer_for_best_model_after_curriculum_training(eval_eps_freq)
-
-        # need to remake env to ensure the monitor_dir is in the folder for the specific agent
-        self.make_env(**self.env_kwargs)
-        self.load_best_model_after_curriculum(load_replay_buffer=True)
-        self._restore_env_params_after_curriculum_training()
-        flash_on_interval = self.env_kwargs['flash_on_interval']
-        self._update_env_flash_on_interval(flash_on_interval=flash_on_interval)
-        self.env.distance2center_cost = 0
-        self.env_kwargs_for_curriculum_training['distance2center_cost'] = 0
-
-    def _restore_env_params_after_curriculum_training(self):
-
-        self._update_env_dt(self, dt=self.env_kwargs['dt'])
-        self.env.dv_cost_factor = self.env_kwargs['dv_cost_factor']
-        self.env.dw_cost_factor = self.env_kwargs['dw_cost_factor']
-        self.env.w_cost_factor = self.env_kwargs['w_cost_factor']
-        self.env.distance2center_cost = 0
-
-    def _run_current_agent_after_curriculum_training(self):
-
-        # Now, the condition has restored to the original condition. We shall store the trained agent in the current condition.
-        self.regular_training()
-        self.successful_training = True
 
     def regular_training(self, num_train_episodes=10000, eval_eps_freq=15, num_eval_episodes=2,
                          print_episode_reward=True, reward_threshold_to_stop_on=None, dir_name=None,
                          env_params_to_save=None):
         max_steps_per_eps = self.env.episode_len
 
+        self.sac_model, self.best_avg_reward_record, self.alpha_df = self.train_LSTM_agent(self.env,
+                                                                                            num_train_episodes=num_train_episodes, eval_eps_freq=eval_eps_freq, max_steps_per_eps=max_steps_per_eps,
+                                                                                            num_eval_episodes=num_eval_episodes, print_episode_reward=print_episode_reward,
+                                                                                            reward_threshold_to_stop_on=reward_threshold_to_stop_on, dir_name=dir_name,
+                                                                                            env_params_to_save=env_params_to_save)
+        # Write/refresh checkpoint manifest if a training dir is provided
         if dir_name is not None:
             if env_params_to_save is None:
                 env_params_to_save = self.env_kwargs
-                self.store_env_params(
-                    model_folder_name=dir_name, env_params_to_save=env_params_to_save)
-
-        self.sac_model, self.best_avg_reward_record, self.alpha_df = LSTM_functions.train_LSTM_agent(self.env, self.sac_model,
-                                                                                                     num_train_episodes=num_train_episodes, eval_eps_freq=eval_eps_freq, max_steps_per_eps=max_steps_per_eps,
-                                                                                                     num_eval_episodes=num_eval_episodes, print_episode_reward=print_episode_reward,
-                                                                                                     reward_threshold_to_stop_on=reward_threshold_to_stop_on, dir_name=dir_name)
+            self.write_checkpoint_manifest(dir_name, env_params_to_save)
         return self.best_avg_reward_record
+
 
     def test_agent(self, num_test_episode=5, max_steps_per_eps=1024, deterministic=True):
         self.env = self.env_class(**self.env_kwargs)
-        self.load_agent(load_replay_buffer=False)
+        self.load_latest_agent(load_replay_buffer=False)
         reward_rate = LSTM_functions.evaluate_agent(self.env_for_test, self.sac_model, max_steps_per_eps, num_test_episode,
                                                     deterministic=deterministic)
         print("Average reward per episode: ", reward_rate)
@@ -212,40 +158,133 @@ class LSTMforMultifirefly(rl_for_multiff_class._RLforMultifirefly):
             dir_name = self.model_folder_name
         LSTM_functions.save_best_model(
             self.sac_model, whether_save_replay_buffer=whether_save_replay_buffer, dir_name=dir_name)
+        # Write checkpoint manifest similar to SB3
+        self.write_checkpoint_manifest(dir_name, self.env_kwargs)
+        
+    def write_checkpoint_manifest(self, dir_name, env_params_to_save):
+        rl_for_multiff_utils.write_checkpoint_manifest(dir_name, {
+            'algorithm': 'lstm_sac',
+            'model_files': ['lstm_q1', 'lstm_q2', 'lstm_policy'],
+            'replay_buffer': 'buffer.pkl',
+            'env_params': env_params_to_save,
+        })
 
-    def load_agent(self, load_replay_buffer=True, dir_name=None, model_name=''):
-        # model_name is not really used here, but put here to be consistent with the SB3 version
+    def load_agent(self, load_replay_buffer=True, dir_name=None):
+        manifest = rl_for_multiff_utils.read_checkpoint_manifest(dir_name)
+        self.make_env(**manifest['env_params'])
+        self.make_agent()
+        self.sac_model.load_model(dir_name)
 
-        try:
-            if dir_name is None:
-                dir_name = self.model_folder_name
+        if load_replay_buffer:
+            buffer_name = 'buffer.pkl'
+            if isinstance(manifest, dict):
+                buffer_name = manifest.get('replay_buffer', buffer_name)
+            buffer_path = os.path.join(dir_name, buffer_name)
+            with open(buffer_path, 'rb') as f:
+                loaded_buffer_list = CPU_Unpickler(f).load()
+            # Reconstruct ReplayBufferLSTM2 from saved list
+            if isinstance(loaded_buffer_list, list):
+                capacity = max(self.agent_params.get('replay_buffer_size', 500), len(loaded_buffer_list))
+                rb = LSTM_functions.ReplayBufferLSTM2(capacity)
+                rb.buffer = loaded_buffer_list
+                rb.position = len(loaded_buffer_list) % capacity
+                self.replay_buffer = rb
+            else:
+                self.replay_buffer = loaded_buffer_list
 
-            self.sac_model.load_model(dir_name)
+            self.sac_model.replay_buffer = self.replay_buffer
+            print(f'length of replay buffer: {len(self.sac_model.replay_buffer)}')
 
-            if load_replay_buffer:
-                buffer_path = os.path.join(dir_name, 'buffer.pkl')
-                with open(buffer_path, 'rb') as f:
-                    self.replay_buffer = CPU_Unpickler(f).load()
-                print(
-                    f'length of replay buffer: {len(self.sac_model.replay_buffer)}')
+        print("Loaded existing agent:", dir_name)
+        self.loaded_agent_dir = dir_name
+        return
 
-        except Exception as e:
-            print(
-                f"There's a problem retrieving existing agent or replay_buffer found in {dir_name}. Need to train a new agent. Error message {e}")
-            raise ValueError(
-                f"There's a problem retrieving existing agent or replay_buffer found in {dir_name}. Need to train a new agent.")
 
-    def save_best_model_after_curriculum(self, whether_save_replay_buffer=True):
-        self.save_agent(whether_save_replay_buffer=whether_save_replay_buffer,
-                        dir_name=self.best_model_after_curriculum_dir_name)
-
-    def load_best_model_after_curriculum(self, load_replay_buffer=True):
+    def load_best_model_postcurriculum(self, load_replay_buffer=True):
         self.make_agent()
         self.load_agent(load_replay_buffer=load_replay_buffer,
-                        dir_name=self.best_model_after_curriculum_dir_name)
+                        dir_name=self.best_model_postcurriculum_dir)
+
+    def load_best_model_in_curriculum(self, load_replay_buffer=True):
+        self.make_agent()
+        self.load_agent(load_replay_buffer=load_replay_buffer,
+                        dir_name=self.best_model_in_curriculum_dir)
 
     def make_animation(self, **kwargs):
         super().make_animation(max_num_frames=None, **kwargs)
+
+
+
+    def train_LSTM_agent(self, env,
+                        num_train_episodes=10000, eval_eps_freq=15, max_steps_per_eps=1024, num_eval_episodes=2,
+                        print_episode_reward=False,
+                        reward_threshold_to_stop_on=None, dir_name=None,
+                        env_params_to_save=None):
+        
+        if env_params_to_save is None:
+            env_params_to_save = self.env_kwargs
+
+        self.sac_model.soft_q_net1.train()
+        self.sac_model.soft_q_net2.train()
+        self.sac_model.policy_net.train()
+
+        self.eval_rewards = []
+        self.best_avg_reward = -9999
+        self.best_avg_reward_record = -9999
+
+        list_of_epi_for_alpha = []
+        list_of_alpha = []
+        list_of_epi_rewards = []
+        for eps in range(num_train_episodes):
+            episode_reward = LSTM_functions._train_episode(env, self.sac_model, max_steps_per_eps)
+            try:
+                print('ALPHA (entropy-related): ', self.sac_model.alpha)
+                list_of_alpha.append(self.sac_model.alpha.item())
+                list_of_epi_for_alpha.append(eps)
+                list_of_epi_rewards.append(episode_reward)
+                LSTM_functions.print_last_n_alphas(list_of_alpha, n=10)
+
+            except AttributeError:
+                pass
+
+            if eps % eval_eps_freq == 0 and eps > 0:
+                LSTM_functions.print_last_n_alphas(list_of_alpha, n=100)
+                avg_reward = LSTM_functions.evaluate_agent(
+                    env, self.sac_model, max_steps_per_eps, num_eval_episodes, deterministic=True)
+                print(
+                    f"Best average reward: {self.best_avg_reward}, Current average reward: {avg_reward}")
+
+                if avg_reward > self.best_avg_reward:
+                    self.best_avg_reward = avg_reward
+                    if self.best_avg_reward > self.best_avg_reward_record:
+                        self.best_avg_reward_record = self.best_avg_reward
+                    if dir_name is not None:
+                        LSTM_functions.save_best_model(self.sac_model, dir_name=dir_name)
+                        self.write_checkpoint_manifest(dir_name, env_params_to_save)
+                    print(f"Best average reward = {self.best_avg_reward}")
+                    print(f"Best model saved at episode {eps} to {dir_name}")
+
+                    if reward_threshold_to_stop_on is not None:
+                        if self.best_avg_reward_record >= reward_threshold_to_stop_on:
+                            break
+
+                self.eval_rewards.append(avg_reward)
+                print('Evaluation rewards:', self.eval_rewards)
+                # plot_eval_rewards(eval_rewards)
+                # plot_alpha(list_of_epi_for_alpha, list_of_alpha)
+                if len(self.eval_rewards) > 100:
+                    self.eval_rewards = self.eval_rewards[-100:]
+
+            if print_episode_reward:
+                print(f'Episode: {eps}, Episode Reward: {episode_reward}')
+                print('============================================================')
+
+            alpha_dict = {'epi': list_of_epi_for_alpha,
+                        'alpha': list_of_alpha, 'rewards': list_of_epi_rewards}
+            alpha_df = pd.DataFrame(alpha_dict)
+
+        return self.sac_model, self.best_avg_reward_record, alpha_df
+
 
 
 class CPU_Unpickler(pickle.Unpickler):

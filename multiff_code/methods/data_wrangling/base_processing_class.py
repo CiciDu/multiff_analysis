@@ -75,8 +75,10 @@ class BaseProcessing:
             'raw_monkey_data', 'planning')
         self.planning_and_neural_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'planning_and_neural')
-        self.patterns_and_features_data_folder_path = raw_data_folder_path.replace(
+        self.patterns_and_features_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'patterns_and_features')
+        self.learning_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'learning')
         self.decision_making_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'decision_making')
         self.neural_data_folder_path = raw_data_folder_path.replace(
@@ -92,7 +94,7 @@ class BaseProcessing:
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
         os.makedirs(self.planning_data_folder_path, exist_ok=True)
         os.makedirs(self.planning_and_neural_folder_path, exist_ok=True)
-        os.makedirs(self.patterns_and_features_data_folder_path, exist_ok=True)
+        os.makedirs(self.patterns_and_features_folder_path, exist_ok=True)
         os.makedirs(self.decision_making_folder_path, exist_ok=True)
         os.makedirs(self.neural_data_folder_path, exist_ok=True)
         os.makedirs(self.processed_neural_data_folder_path, exist_ok=True)
@@ -269,7 +271,6 @@ class BaseProcessing:
         if (not already_made_ok) | (getattr(self, 'closest_stop_to_capture_df', None) is None) | (getattr(self, 'ff_caught_T_new', None) is None):
             self.make_or_retrieve_closest_stop_to_capture_df()
             self.make_ff_caught_T_new()
-
 
     def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):
         self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3

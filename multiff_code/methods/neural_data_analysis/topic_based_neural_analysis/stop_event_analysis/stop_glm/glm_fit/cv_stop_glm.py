@@ -25,7 +25,7 @@ def ll_poisson(y, mu):
 # ---------- optional plotting helpers (headless-safe) ----------
 import matplotlib.pyplot as plt
 
-def plot_cv_scores(scores: pd.DataFrame, outpath: str = 'glm_cv_scores.png', title: str | None = None):
+def plot_cv_scores(scores: pd.DataFrame, title: str | None = None):
     """
     Bar plot of McFadden's R^2 (CV) per unit. Saves to disk (no GUI).
     """
@@ -40,9 +40,7 @@ def plot_cv_scores(scores: pd.DataFrame, outpath: str = 'glm_cv_scores.png', tit
     plt.title(title)
     plt.tight_layout()
     plt.show()
-    # plt.savefig(outpath, dpi=200)
-    # plt.close()
-    return outpath
+    return 
 
 
 import numpy as np

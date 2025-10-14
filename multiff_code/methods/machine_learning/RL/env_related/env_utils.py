@@ -242,21 +242,3 @@ def find_visible_ff(time, ff_distance_all, ff_angle_all,
 
     return np.where(visible_ff)[0]
 
-
-
-def _get_placeholder_ff(add_memory, add_ff_t_since_start_seen, invisible_distance):
-    if add_memory | add_ff_t_since_start_seen:
-        return np.array([[0.], [0.], [invisible_distance], [0.]])
-    else:
-        return np.array([[0.], [0.], [invisible_distance]])
-
-
-def _get_topk_indices(ff_indices, ff_distance_all, num_obs_ff):
-    # Get the top-k indices with smallest distances (largest negative distances)
-    topk_ff = np.argsort(-ff_distance_all[ff_indices])[:num_obs_ff]
-    return ff_indices[topk_ff]
-
-
-def _get_sorted_indices(ff_indices, ff_distance_all):
-    sorted_indices = np.argsort(-ff_distance_all[ff_indices])
-    return ff_indices[sorted_indices]

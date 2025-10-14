@@ -25,6 +25,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy
 
 from machine_learning.RL.ff_attention.env_attn_multiff import EnvForAttentionSAC, get_action_limits, batch_obs_to_attn_tensors
 
@@ -400,8 +401,9 @@ class AttnSACforMultifirefly:
 
     # ---- Env ----
     def make_env(self, **kwargs):
-        self.env_kwargs.update(kwargs)
-        self.env = EnvForAttentionSAC(**self.env_kwargs)
+        current_env_kwargs = copy.deepcopy(self.env_kwargs)
+        current_env_kwargs.update(kwargs)
+        self.env = EnvForAttentionSAC(**current_env_kwargs)
         return self.env
 
     # ---- Agent ----

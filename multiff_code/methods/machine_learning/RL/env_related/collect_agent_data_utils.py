@@ -6,6 +6,7 @@ from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_tri
 import os
 import shutil
 import numpy as np
+import torch
 import matplotlib
 import pandas as pd
 import math
@@ -81,8 +82,11 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
         else:
             state = first_obs
         last_action = env.action_space.sample()
-        hidden_out = (np.zeros([1, 1, hidden_dim], dtype=np.float32),
-                      np.zeros([1, 1, hidden_dim], dtype=np.float32))
+        model_device = next(sac_model.policy_net.parameters()).device
+        hidden_out = (
+            torch.zeros([1, 1, hidden_dim], dtype=torch.float32, device=model_device),
+            torch.zeros([1, 1, hidden_dim], dtype=torch.float32, device=model_device)
+        )
     else:
         if first_obs is None:
             obs, _ = env.reset()
@@ -103,6 +107,7 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
     corresponding_time = []
     ff_x_noisy = []
     ff_y_noisy = []
+    pose_unreliable = []
     time_since_last_vis_list = []
     all_steps = []
 
@@ -145,28 +150,30 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
                     'The number of fireflies in the observation does not match the number of fireflies in the environment.')
             ff_x_noisy.extend(env.ffxy_topk_noisy[:, 0].tolist())
             ff_y_noisy.extend(env.ffxy_topk_noisy[:, 1].tolist())
+            pose_unreliable.extend(env.pose_unreliable.tolist())
 
         if done:
             break
 
-    temp_obs_in_ff_df = pd.DataFrame({'index_in_ff_flash': indexes_in_ff_flash,
+    ff_in_obs_df = pd.DataFrame({'index_in_ff_flash': indexes_in_ff_flash,
                                       'time': corresponding_time,
                                       'point_index': all_steps,
                                       'ff_x_noisy': ff_x_noisy,
                                       'ff_y_noisy': ff_y_noisy,
+                                      'pose_unreliable': pose_unreliable,
                                       'time_since_last_vis': time_since_last_vis_list})
     ff_information_temp = env.ff_information.copy()
     ff_information_temp['index_in_ff_information'] = range(
         len(ff_information_temp))
     ff_information_temp.loc[ff_information_temp['time_captured']
                             < 0, 'time_captured'] = env.time + 10
-    temp_obs_in_ff_df = temp_obs_in_ff_df.merge(
+    ff_in_obs_df = ff_in_obs_df.merge(
         ff_information_temp, on='index_in_ff_flash', how='left')
-    temp_obs_in_ff_df = temp_obs_in_ff_df[temp_obs_in_ff_df['time'].between(
-        temp_obs_in_ff_df['time_start_to_be_alive'], temp_obs_in_ff_df['time_captured'], inclusive='left')].copy()
+    ff_in_obs_df = ff_in_obs_df[ff_in_obs_df['time'].between(
+        ff_in_obs_df['time_start_to_be_alive'], ff_in_obs_df['time_captured'], inclusive='left')].copy()
 
     # do a simple check
-    if temp_obs_in_ff_df.groupby('point_index').count().max().max() > env.num_obs_ff:
+    if ff_in_obs_df.groupby('point_index').count().max().max() > env.num_obs_ff:
         raise ValueError('The number of fireflies in the observation exceeds the number of fireflies in the environment. There must be an error.' +
                          'Try using groupby(["point_index", "index_in_ff_flash"]).last() after sorting to correct the error.')
 
@@ -188,15 +195,15 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False, hidden_di
 
     # Find the indices of ffs in obs for each time point, keeping the indices that will be used by ff_dataframe
     reversed_sorting = reverse_value_and_position(sorted_indices_all)
-    temp_obs_in_ff_df['index_in_ff_dataframe'] = reversed_sorting[temp_obs_in_ff_df['index_in_ff_information'].values]
-    temp_obs_in_ff_df = temp_obs_in_ff_df.astype(
+    ff_in_obs_df['index_in_ff_dataframe'] = reversed_sorting[ff_in_obs_df['index_in_ff_information'].values]
+    ff_in_obs_df = ff_in_obs_df.astype(
         {'index_in_ff_information': 'int', 'index_in_ff_dataframe': 'int',  'point_index': 'int'})
     num_decimals_of_dt = find_decimals(env.dt)
-    temp_obs_in_ff_df['time_since_last_vis'] = np.round(
-        temp_obs_in_ff_df['time_since_last_vis'], num_decimals_of_dt)
-    temp_obs_in_ff_df.reset_index(drop=True, inplace=True)
+    ff_in_obs_df['time_since_last_vis'] = np.round(
+        ff_in_obs_df['time_since_last_vis'], num_decimals_of_dt)
+    ff_in_obs_df.reset_index(drop=True, inplace=True)
 
-    ff_in_obs_df = temp_obs_in_ff_df[['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index', 'ff_x_noisy', 'ff_y_noisy',
+    ff_in_obs_df = ff_in_obs_df[['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index', 'ff_x_noisy', 'ff_y_noisy',
                                       'time_since_last_vis']].copy()
     ff_in_obs_df.rename(
         columns={'index_in_ff_dataframe': 'ff_index'}, inplace=True)
@@ -639,15 +646,14 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     # Make the RL environment
     if LSTM:
         env = env_for_lstm.CollectInformationLSTM(**env_kwargs)
-        hidden_out = (np.zeros([1, 1, sac_model.hidden_dim], dtype=np.float32),
-                      np.zeros([1, 1, sac_model.hidden_dim], dtype=np.float32))
+        model_device = next(sac_model.policy_net.parameters()).device
+        hidden_out = (
+            torch.zeros([1, 1, sac_model.hidden_dim], dtype=torch.float32, device=model_device),
+            torch.zeros([1, 1, sac_model.hidden_dim], dtype=torch.float32, device=model_device)
+        )
     else:
         env = env_for_sb3.CollectInformation(**env_kwargs)
     env.flash_on_interval = 0.3
-    if LSTM:
-        env.visible_time_range = env.flash_on_interval + env.dt
-    else:
-        env.visible_time_range = env.flash_on_interval + env.max_in_memory_time + env.dt
 
     env.distance2center_cost = 0
     # Replicate the monkey's environment

@@ -2,12 +2,13 @@ from data_wrangling import general_utils, retrieve_raw_data, process_monkey_info
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
 from visualization.matplotlib_tools import additional_plots, plot_statistics
 from visualization.animation import animation_class, animation_utils
-from machine_learning.RL.env_related import env_for_lstm, env_for_sb3, collect_agent_data_utils
+from machine_learning.RL.env_related import env_for_lstm, env_for_sb3, collect_agent_data, process_agent_data
 from machine_learning.RL.SB3 import interpret_neural_network, rl_for_multiff_utils, SB3_functions
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 
 
 import time as time_package
+import json
 import os
 import numpy as np
 import pandas as pd
@@ -33,6 +34,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  flash_on_interval=0.3,
                  max_in_memory_time=3,
                  add_date_to_model_folder_name=False,
+                 reward_per_ff=100,
+                 reward_boundary=25,
+                 angular_terminal_vel=0.01,
+                 distance2center_cost=0,
+                 stop_vel_cost=100,
                  data_name='data_0',
                  **additional_env_kwargs):
 
@@ -40,17 +46,24 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.agent_params = None
         self.overall_folder = overall_folder
 
-        self.env_kwargs = {'dt': dt,
+        self.target_env_kwargs = {'dt': dt,
                            'dv_cost_factor': dv_cost_factor,
                            'dw_cost_factor': dw_cost_factor,
                            'w_cost_factor': w_cost_factor,
                            'print_ff_capture_incidents': True,
                            'print_episode_reward_rates': True,
-                           'flash_on_interval': flash_on_interval,
                            'max_in_memory_time': max_in_memory_time,
+                           'flash_on_interval': flash_on_interval,
+                           'angular_terminal_vel': angular_terminal_vel,
+                           'distance2center_cost': distance2center_cost,
+                           'stop_vel_cost': stop_vel_cost,
+                           'reward_boundary': reward_boundary,
                            }
+        self.target_env_kwargs.update(additional_env_kwargs)
 
-        self.env_kwargs.update(additional_env_kwargs)
+        self.env_kwargs = copy.deepcopy(self.target_env_kwargs)
+        
+        
         self.agent_id = "dv" + str(dv_cost_factor) + \
                         "_dw" + str(dw_cost_factor) + "_w" + str(w_cost_factor) + \
                         "_memT" + str(self.env_kwargs['max_in_memory_time'])
@@ -70,8 +83,12 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.get_related_folder_names_from_model_folder_name(
             self.model_folder_name, data_name=data_name)
 
-        self.best_model_after_curriculum_dir_name = os.path.join(
-            self.overall_folder, 'best_model_after_curriculum')
+        # Per-agent best-after-curriculum directory under the agent folder
+        self.best_model_postcurriculum_dir = os.path.join(
+            self.model_folder_name, 'best_model_postcurriculum')
+        # Per-agent best-during-curriculum directory
+        self.best_model_in_curriculum_dir = os.path.join(
+            self.model_folder_name, 'best_model_in_curriculum')
 
     def get_related_folder_names_from_model_folder_name(self, model_folder_name, data_name='data_0'):
         self.model_folder_name = model_folder_name
@@ -79,7 +96,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             'all_agents', 'all_collected_data/processed_data'), f'individual_data_sessions/{data_name}')
         self.planning_data_folder_path = os.path.join(model_folder_name.replace(
             'all_agents', 'all_collected_data/planning'), f'individual_data_sessions/{data_name}')
-        self.patterns_and_features_data_folder_path = os.path.join(model_folder_name.replace(
+        self.patterns_and_features_folder_path = os.path.join(model_folder_name.replace(
             'all_agents', 'all_collected_data/patterns_and_features'), f'individual_data_sessions/{data_name}')
         self.decision_making_folder_path = os.path.join(model_folder_name.replace(
             'all_agents', 'all_collected_data/decision_making'), f'individual_data_sessions/{data_name}')
@@ -87,8 +104,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         os.makedirs(self.model_folder_name, exist_ok=True)
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
         os.makedirs(self.planning_data_folder_path, exist_ok=True)
-        os.makedirs(self.patterns_and_features_data_folder_path, exist_ok=True)
+        os.makedirs(self.patterns_and_features_folder_path, exist_ok=True)
         os.makedirs(self.decision_making_folder_path, exist_ok=True)
+
+    # removed resolve_best_model_postcurriculum_dir; callers should use
+    # self.best_model_postcurriculum_dir and create dirs as needed
 
     def get_current_info_condition(self, df):
         minimal_current_info = self.get_minimum_current_info()
@@ -99,79 +119,142 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 df[key] == value)
         return current_info_condition
 
-    def store_env_params(self, model_folder_name=None, env_params_to_save=None):
-        if model_folder_name is None:
-            model_folder_name = self.model_folder_name
-        if env_params_to_save is None:
-            env_params_to_save = self.env_kwargs
-
-        rl_for_multiff_utils.store_params(
-            model_folder_name, env_params_to_save)
-
     def retrieve_env_params(self, model_folder_name=None):
         if model_folder_name is None:
             model_folder_name = self.model_folder_name
 
-        try:
-            self.env_kwargs = rl_for_multiff_utils.retrieve_params(
-                model_folder_name)
-        except Exception as e:
-            print(
-                f"Warning: failed to retrieve env params. Error message: {e}")
-            self.env_kwargs = {}
-        return self.env_kwargs
+        # Prefer manifest-based env params; try agent dir then curriculum dir
+        candidate_dirs = [model_folder_name,
+                          self.best_model_in_curriculum_dir,
+                          self.best_model_postcurriculum_dir]
 
-    def curriculum_training(self, best_model_after_curriculum_exists_ok=True, load_replay_buffer_of_best_model_after_curriculum=True):
+        seen = set()
+        candidate_dirs = [d for d in candidate_dirs if not (
+            d in seen or seen.add(d))]
+
+        env_kwargs = {}
+        for d in candidate_dirs:
+            manifest = rl_for_multiff_utils.read_checkpoint_manifest(d)
+            if isinstance(manifest, dict) and ('env_params' in manifest):
+                env_kwargs = manifest['env_params']
+                print(f'Loaded env params from {d}')
+                return env_kwargs
+            
+        print("Warning: checkpoint_manifest.json not found or missing env_params; using existing env_kwargs.")
+        return env_kwargs
+
+    def curriculum_training(self, best_model_in_curriculum_exists_ok=True, best_model_postcurriculum_exists_ok=True, load_replay_buffer_of_best_model_postcurriculum=True):
         try:
-            if not best_model_after_curriculum_exists_ok:
+            if not best_model_postcurriculum_exists_ok:
                 raise Exception()
-            self.load_best_model_after_curriculum(
-                load_replay_buffer=load_replay_buffer_of_best_model_after_curriculum)
-            print('Loaded best_model_after_curriculum')
+            self.load_best_model_postcurriculum(
+                load_replay_buffer=load_replay_buffer_of_best_model_postcurriculum)
+            print('Loaded best_model_postcurriculum')
         except Exception:
-            print('Need to train a new best_model_after_curriculum')
-            self._progress_in_curriculum()
-        self._run_current_agent_after_curriculum_training()
+            print('Need to train a new best_model_postcurriculum')
+            self._progress_in_curriculum(
+                best_model_in_curriculum_exists_ok=best_model_in_curriculum_exists_ok)
+        self.regular_training()
+        self.successful_training = True
 
-    def _progress_in_curriculum(self):
-
-        os.makedirs(self.best_model_after_curriculum_dir_name, exist_ok=True)
+    def _progress_in_curriculum(self, best_model_in_curriculum_exists_ok=True):
+        os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
         self.original_agent_id = self.agent_id
         self.agent_id = 'no_cost'
         print('Starting curriculum training')
-        self.make_initial_env_for_curriculum_training()
-        self._make_agent_for_curriculum_training()
-        self.successful_training = False
+        if best_model_in_curriculum_exists_ok:
+            try:
+                self.load_best_model_in_curriculum(load_replay_buffer=True)
+                # use env_kwargs in manifest
+                self.env_kwargs_for_curriculum_training = rl_for_multiff_utils.read_checkpoint_manifest(
+                    self.loaded_agent_dir)['env_params']
+                print('Loaded best_model_in_curriculum')
+                print(
+                    f'Made env based on env params saved in {self.loaded_agent_dir}')
+                self.make_env(**self.env_kwargs_for_curriculum_training)
 
+            except Exception:
+                print('Need to train a new best_model_in_curriculum')
+                self.make_initial_env_for_curriculum_training()
+                self._make_agent_for_curriculum_training()
+        else:
+            print('Making initial env and agent for curriculum training')
+            self.make_initial_env_for_curriculum_training()
+            self._make_agent_for_curriculum_training()
+        self.successful_training = False
         self._use_while_loop_for_curriculum_training()
-        self._further_process_best_model_after_curriculum_training()
         self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
-                                         video_dir=self.best_model_after_curriculum_dir_name)
+                                         video_dir=self.best_model_postcurriculum_dir)
         self.agent_id = self.original_agent_id
 
-    def _make_initial_env_for_curriculum_training(self, initial_dt=0.25, initial_angular_terminal_vel=0.32):
+    def _make_initial_env_for_curriculum_training(self,
+                                                  initial_flash_on_interval=3,
+                                                  initial_angular_terminal_vel=0.64,
+                                                  initial_distance2center_cost=2,
+                                                  initial_stop_vel_cost=100,
+                                                  initial_reward_boundary=75):
         self.env_kwargs_for_curriculum_training = copy.deepcopy(
             self.env_kwargs)
-        self._make_env_suitable_for_curriculum_training()
-        self._update_env_dt(dt=initial_dt)
-        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = initial_angular_terminal_vel
-
-    def _make_env_suitable_for_curriculum_training(self):
+        print('Made initial env for curriculum training')
         if self.sb3_or_lstm == 'sb3':
-            self.env.env.reward_per_ff = 80
-            self.env.env.dv_cost_factor = 0
-            self.env.env.dw_cost_factor = 0
-            self.env.env.w_cost_factor = 0
-            self.env_kwargs_for_curriculum_training['reward_per_ff'] = 80
+            env = self.env.env
         else:
-            # self.env.reward_per_ff = 80
-            self.env.dv_cost_factor = 0
-            self.env.dw_cost_factor = 0
-            self.env.w_cost_factor = 0
+            env = self.env
 
+        env.flash_on_interval = initial_flash_on_interval
+        env.angular_terminal_vel = initial_angular_terminal_vel
+        env.reward_boundary = initial_reward_boundary
+        env.distance2center_cost = initial_distance2center_cost
+        env.stop_vel_cost = initial_stop_vel_cost
+        env.dv_cost_factor = 0
+        env.dw_cost_factor = 0
+        env.w_cost_factor = 0
+
+        self.env_kwargs_for_curriculum_training['flash_on_interval'] = initial_flash_on_interval
+        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = initial_angular_terminal_vel
+        self.env_kwargs_for_curriculum_training['reward_boundary'] = initial_reward_boundary
+        self.env_kwargs_for_curriculum_training['distance2center_cost'] = initial_distance2center_cost
+        self.env_kwargs_for_curriculum_training['stop_vel_cost'] = initial_stop_vel_cost
         self.env_kwargs_for_curriculum_training['dv_cost_factor'] = 0
         self.env_kwargs_for_curriculum_training['dw_cost_factor'] = 0
         self.env_kwargs_for_curriculum_training['w_cost_factor'] = 0
+
+        if self.sb3_or_lstm == 'sb3':
+            self.env.env = env
+        else:
+            self.env = env
+
+    def _change_env_after_meeting_reward_threshold(self):
+
+        if self.sb3_or_lstm == 'sb3':
+            env = self.env.env
+        else:
+            env = self.env
+
+        flash_on_interval = max(
+            env.flash_on_interval - 0.3, self.target_env_kwargs['flash_on_interval'])
+        env.flash_on_interval = flash_on_interval
+        env.angular_terminal_vel = max(env.angular_terminal_vel/2,  self.target_env_kwargs['angular_terminal_vel'])
+        env.distance2center_cost = max(env.distance2center_cost - 0.5,  self.target_env_kwargs['distance2center_cost'])
+        env.stop_vel_cost = max(env.stop_vel_cost - 50,  self.target_env_kwargs['stop_vel_cost'])
+        env.reward_boundary = max(env.reward_boundary - 25, self.target_env_kwargs['reward_boundary'])
+
+        self.env_kwargs_for_curriculum_training['flash_on_interval'] = env.flash_on_interval
+        self.env_kwargs_for_curriculum_training['angular_terminal_vel'] = env.angular_terminal_vel
+        self.env_kwargs_for_curriculum_training['distance2center_cost'] = env.distance2center_cost
+        self.env_kwargs_for_curriculum_training['stop_vel_cost'] = env.stop_vel_cost
+        self.env_kwargs_for_curriculum_training['reward_boundary'] = env.reward_boundary
+
+        print('Current angular_terminal_vel:', env.angular_terminal_vel)
+        print('Current flash_on_interval:', env.flash_on_interval)
+        print('Current distance2center_cost:', env.distance2center_cost)
+        print('Current stop_vel_cost:', env.stop_vel_cost)
+        print('Current reward_boundary:', env.reward_boundary)
+
+        if self.sb3_or_lstm == 'sb3':
+            self.env.env = env
+        else:
+            self.env = env
 
     def collect_data(self, n_steps=8000, exists_ok=False, save_data=False):
 
@@ -227,7 +310,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     print('Removed all files in the folder:',
                           self.processed_data_folder_path)
             # also remove all derived data
-            collect_agent_data_utils.remove_all_data_derived_from_current_agent_data(
+            process_agent_data.remove_all_data_derived_from_current_agent_data(
                 self.processed_data_folder_path)
 
         self.n_steps = n_steps
@@ -235,7 +318,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.monkey_information, self.ff_flash_sorted, self.ff_caught_T_sorted, self.ff_believed_position_sorted, \
             self.ff_real_position_sorted, self.ff_life_sorted, self.ff_flash_end_sorted, self.caught_ff_num, self.total_ff_num, \
             self.obs_ff_indices_in_ff_dataframe, self.sorted_indices_all, self.ff_in_obs_df \
-            = collect_agent_data_utils.collect_agent_data_func(self.env_for_data_collection, self.sac_model, n_steps=self.n_steps, LSTM=LSTM)
+            = collect_agent_data.collect_agent_data_func(self.env_for_data_collection, self.sac_model, n_steps=self.n_steps, LSTM=LSTM)
         self.ff_index_sorted = np.arange(len(self.ff_life_sorted))
         self.eval_ff_capture_rate = len(
             self.ff_flash_end_sorted)/self.monkey_information['time'].max()
@@ -325,7 +408,35 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.ff_dataframe = make_ff_dataframe.process_ff_dataframe(
             self.ff_dataframe, max_distance=None, max_time_since_last_vis=3)
 
-    def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=False, load_replay_buffer=False, **env_kwargs):
+    def load_latest_agent(self, load_replay_buffer=True, dir_name=None, model_name=''):
+        # model_name is not really used here, but put here to be consistent with the SB3 version
+        if dir_name is None:
+            dir_name = self.model_folder_name
+
+        # Try current directory first; if it's a curriculum subdir, fall back to agent root
+        candidates = [dir_name]
+        for best_model_dir in ['best_model_in_curriculum', 'best_model_postcurriculum']:
+            best_model_path = os.path.join(dir_name, best_model_dir)
+            if os.path.exists(best_model_path):
+                candidates.append(best_model_path)
+
+        last_error = None
+        self.loaded_agent_dir = None
+        for d in candidates:
+            try:
+                self.load_agent(
+                    load_replay_buffer=load_replay_buffer, dir_name=d)
+            except Exception as e:
+                last_error = (dir_name, e)
+                raise ValueError(
+                    f"There was an error retrieving agent or replay_buffer in {dir_name}. Error message {e}")
+
+        if last_error is not None:
+            d, e = last_error
+            raise ValueError(
+                f"There was an error retrieving agent or replay_buffer in {d}. Error message {e}")
+
+    def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=False,                  load_replay_buffer=False, **env_kwargs):
         if exists_ok:
             try:
                 self.retrieve_monkey_data()
@@ -340,7 +451,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.env_kwargs.update(env_kwargs)
         self.make_env(**self.env_kwargs)
         self.make_agent()
-        self.load_agent(load_replay_buffer=load_replay_buffer)
+        self.load_latest_agent(load_replay_buffer=load_replay_buffer)
         self.collect_data(
             n_steps=n_steps, exists_ok=exists_ok, save_data=save_data)
 
@@ -354,7 +465,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.sac_model
         except AttributeError:
             self.make_agent()
-        self.load_agent(load_replay_buffer=False)
+        self.load_latest_agent(load_replay_buffer=False)
         self.streamline_making_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                                          duration=duration, n_steps=n_steps, file_name=None)
 
@@ -370,9 +481,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.call_animation_function(file_name=file_name, video_dir=video_dir)
 
     def streamline_everything(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
-                              use_curriculum_training=True, load_replay_buffer_of_best_model_after_curriculum=True,
-                              best_model_after_curriculum_exists_ok=True,
-                              model_exists_ok=True):
+                              use_curriculum_training=True, load_replay_buffer_of_best_model_postcurriculum=True,
+                              best_model_in_curriculum_exists_ok=True,
+                              best_model_postcurriculum_exists_ok=True,
+                              model_exists_ok=True,
+                              to_train_agent=True):
 
         self.family_of_agents_log = rl_for_multiff_utils.retrieve_or_make_family_of_agents_log(
             self.overall_folder)
@@ -382,25 +495,25 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         #            Skip to the next set of parameters")
         #     return
 
+        self.use_curriculum_training = use_curriculum_training
         to_load_agent = model_exists_ok
 
-        self.make_env(**self.env_kwargs)
-        self.make_agent()
-
-        to_train_agent = True
         if to_load_agent:
-            print("Loaded existing agent")
             try:
-                self.load_agent(load_replay_buffer=False)
-                to_train_agent = False
+                self.load_latest_agent(load_replay_buffer=False)
+                print("Loaded existing agent")
             except Exception as e:
                 print(
                     "Failed to load existing agent. Need to train a new agent. Error: ", e)
-                to_train_agent = True
+        else:
+            self.make_env(**self.env_kwargs)
+            self.make_agent()
 
         if to_train_agent:
-            self.train_agent(use_curriculum_training=use_curriculum_training, best_model_after_curriculum_exists_ok=best_model_after_curriculum_exists_ok,
-                             load_replay_buffer_of_best_model_after_curriculum=load_replay_buffer_of_best_model_after_curriculum)
+            self.train_agent(use_curriculum_training=use_curriculum_training,
+                             best_model_in_curriculum_exists_ok=best_model_in_curriculum_exists_ok,
+                             best_model_postcurriculum_exists_ok=best_model_postcurriculum_exists_ok,
+                             load_replay_buffer_of_best_model_postcurriculum=load_replay_buffer_of_best_model_postcurriculum)
             if not self.successful_training:
                 print("The set of parameters has failed to produce a well-trained agent in the past. \
                     Skip to the next set of parameters")
@@ -423,16 +536,18 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         return
 
-    def train_agent(self, use_curriculum_training=True, best_model_after_curriculum_exists_ok=True,
-                    load_replay_buffer_of_best_model_after_curriculum=True, timesteps=1000000):
+    def train_agent(self, use_curriculum_training=True, best_model_in_curriculum_exists_ok=True,
+                    best_model_postcurriculum_exists_ok=True,
+                    load_replay_buffer_of_best_model_postcurriculum=True, timesteps=1000000):
 
         self.training_start_time = time_package.time()
         if not use_curriculum_training:
             print('Starting regular training')
             self.regular_training(timesteps=timesteps)
         else:
-            self.curriculum_training(best_model_after_curriculum_exists_ok=best_model_after_curriculum_exists_ok,
-                                     load_replay_buffer_of_best_model_after_curriculum=load_replay_buffer_of_best_model_after_curriculum)
+            self.curriculum_training(best_model_in_curriculum_exists_ok=best_model_in_curriculum_exists_ok,
+                                     best_model_postcurriculum_exists_ok=best_model_postcurriculum_exists_ok,
+                                     load_replay_buffer_of_best_model_postcurriculum=load_replay_buffer_of_best_model_postcurriculum)
         self.training_time = time_package.time()-self.training_start_time
         print("Finished training using", self.training_time, 's.')
 
@@ -500,19 +615,19 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         to_update_record = len(
             pattern_frequencies_record.loc[self.current_info_condition_for_pattern_frequencies]) == 0
 
-        to_make_plots = (not exists(os.path.join(self.patterns_and_features_data_folder_path, 'compare_pattern_frequencies.png')))\
+        to_make_plots = (not exists(os.path.join(self.patterns_and_features_folder_path, 'compare_pattern_frequencies.png')))\
             or (not exists(self.overall_folder + 'all_compare_pattern_frequencies/'+self.agent_id + '.png'))
 
         return to_update_record, to_make_plots
 
     def save_plots_in_data_folders(self):
         plot_statistics.plot_pattern_frequencies(
-            self.agent_monkey_pattern_frequencies, compare_monkey_and_agent=True, data_folder_name=self.patterns_and_features_data_folder_path)
+            self.agent_monkey_pattern_frequencies, compare_monkey_and_agent=True, data_folder_name=self.patterns_and_features_folder_path)
         plot_statistics.plot_feature_statistics(
-            self.agent_monkey_feature_statistics, compare_monkey_and_agent=True, data_folder_name=self.patterns_and_features_data_folder_path)
+            self.agent_monkey_feature_statistics, compare_monkey_and_agent=True, data_folder_name=self.patterns_and_features_folder_path)
 
         plot_statistics.plot_feature_histograms_for_monkey_and_agent(
-            self.all_trial_features_valid_m, self.all_trial_features_valid, data_folder_name=self.patterns_and_features_data_folder_path)
+            self.all_trial_features_valid_m, self.all_trial_features_valid, data_folder_name=self.patterns_and_features_folder_path)
         print("Made new plots")
 
     def save_plots_in_plot_folders(self):
@@ -645,7 +760,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.add_2nd_ff = False
         interpret_neural_network.combine_6_plots_for_neural_network(self.sac_model, full_memory=self.full_memory, invisible_distance=self.invisible_distance,
-                                                                    add_2nd_ff=self.add_2nd_ff, data_folder_name=self.patterns_and_features_data_folder_path, const_memory=self.full_memory,
+                                                                    add_2nd_ff=self.add_2nd_ff, data_folder_name=self.patterns_and_features_folder_path, const_memory=self.full_memory,
                                                                     data_folder_name2=self.overall_folder + 'all_' +
                                                                     'combined_6_plots_for_neural_network',
                                                                     file_name2=self.agent_id + '.png')
@@ -693,7 +808,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
             for currentTrial in [12, 69, 138, 221, 235]:
                 # more: 259, 263, 265, 299, 393, 496, 523, 556, 601, 666, 698, 760, 805, 808, 930, 946, 955, 1002, 1003
-                info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = collect_agent_data.find_corresponding_info_of_agent(
+                info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = process_agent_data.find_corresponding_info_of_agent(
                     self.info_of_monkey, currentTrial, num_trials, self.sac_model, self.agent_dt, LSTM=False, env_kwargs=self.env_kwargs)
 
                 with general_utils.initiate_plot(20, 20, 400):
@@ -706,5 +821,5 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                                     num_trials=num_trials,
                                                     rotation_matrix=rotation_matrix,
                                                     plotting_params=plotting_params,
-                                                    data_folder_name=self.patterns_and_features_data_folder_path
+                                                    data_folder_name=self.patterns_and_features_folder_path
                                                     )

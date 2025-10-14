@@ -15,6 +15,7 @@ import pandas as pd
 from os.path import exists
 from functools import partial
 from matplotlib import animation
+from IPython.display import Video
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -81,6 +82,12 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         if save_video:
             self._save_animation(fps, video_dir, file_name)
+            try:
+                print('Rendering animation ......')
+                Video(self.video_path_name, embed=True)
+            except Exception as e:
+                print('Error rendering animation:', e)
+
 
     def _call_prepare_for_animation_func(self, currentTrial=None, num_trials=None, duration=None, k=1, max_num_frames=None,
                                          max_duration=30, min_duration=1, rotated=True):
@@ -144,12 +151,12 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                     f'__{self.duration[0]}s_to_{self.duration[1]}s.mp4'
 
         os.makedirs(video_dir, exist_ok=True)
-        video_path_name = f"{video_dir}/{file_name}"
+        self.video_path_name = f"{video_dir}/{file_name}"
 
-        print("Saving animation as:", video_path_name)
+        print("Saving animation as:", self.video_path_name)
         writervideo = animation.FFMpegWriter(fps=fps)
-        self.anim.save(video_path_name, writer=writervideo)
-        print("Animation is saved at:", video_path_name)
+        self.anim.save(self.video_path_name, writer=writervideo)
+        print("Animation is saved at:", self.video_path_name)
 
         # save animation as gif
         # self.anim.save(f"{self.processed_data_folder_path}/agent_animation.gif", writer='imagemagick', fps=int(62/self.k)) #SB3

@@ -71,7 +71,7 @@ class PlanFactorsOfAgent():
 
         self.pf.processed_data_folder_path = self.processed_data_folder_path
         self.pf.planning_data_folder_path = self.planning_data_folder_path
-        self.pf.patterns_and_features_data_folder_path = self.patterns_and_features_data_folder_path
+        self.pf.patterns_and_features_folder_path = self.patterns_and_features_folder_path
         self.pf.decision_making_folder_path = self.decision_making_folder_path
         self.pf.monkey_name = 'monkey_agent'
 

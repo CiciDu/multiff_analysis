@@ -21,7 +21,6 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.one_point_index_per_bin = one_point_index_per_bin
         self.max_bin = None
 
-
     def get_basic_data(self):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
         self.make_or_retrieve_ff_dataframe(
@@ -58,7 +57,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
     def _make_or_retrieve_target_df(self, exists_ok=True, fill_na=False):
         target_df_filepath = os.path.join(
-            self.patterns_and_features_data_folder_path, 'target_df.csv')
+            self.patterns_and_features_folder_path, 'target_df.csv')
         if exists(target_df_filepath) & exists_ok:
             self.target_df = pd.read_csv(target_df_filepath)
             print("Retrieved target_df")
@@ -75,7 +74,6 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         self.target_df = prep_target_data.add_columns_to_target_df(
             self.target_df)
-
 
     def _add_ff_info(self, binned_features):
         ff_info = prep_monkey_data.get_ff_info_for_bins(

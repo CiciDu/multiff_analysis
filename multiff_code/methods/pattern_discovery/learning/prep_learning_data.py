@@ -14,9 +14,68 @@ from scipy.stats import norm
 import statsmodels.formula.api as smf
 import statsmodels.api as sm
 import os
+from pathlib import Path
 
 
-def get_key_learning_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno'):
+def get_key_learning_data(
+    monkey_name='monkey_Bruno',
+    exists_ok=True,
+    output_base_dir='all_monkey_data/learning',
+    raw_data_dir_name='all_monkey_data/raw_monkey_data',
+    verbose=False,
+):
+    """Get key learning data for a monkey with robust caching.
+
+    Args:
+        monkey_name (str): Name of the monkey to get data for.
+        exists_ok (bool): If True, attempt to load cached CSVs. If False, recompute and overwrite.
+        output_base_dir (str): Base directory to store per-monkey outputs.
+        raw_data_dir_name (str): Root directory containing raw data per monkey.
+        verbose (bool): If True, prints basic progress messages.
+    """
+    file_dir = Path(output_base_dir) / monkey_name
+    file_dir.mkdir(parents=True, exist_ok=True)
+
+    trial_path = file_dir / 'all_trial_durations_df.csv'
+    stop_path = file_dir / 'all_stop_df.csv'
+    vblo_path = file_dir / 'all_VBLO_df.csv'
+
+    def _load_if_exists(path: Path):
+        if not path.exists():
+            return None
+        try:
+            return pd.read_csv(path, index_col=False)
+        except Exception:
+            return None
+
+    if exists_ok:
+        all_trial_durations_df = _load_if_exists(trial_path)
+        all_stop_df = _load_if_exists(stop_path)
+        all_VBLO_df = _load_if_exists(vblo_path)
+        if all_trial_durations_df is not None and all_stop_df is not None and all_VBLO_df is not None:
+            if verbose:
+                print(
+                    f"Loaded cached learning data for {monkey_name} from {file_dir}")
+            return all_trial_durations_df, all_stop_df, all_VBLO_df
+
+    if verbose:
+        print(
+            f"Computing learning data for {monkey_name} (exists_ok={exists_ok}) …")
+
+    all_trial_durations_df, all_stop_df, all_VBLO_df = _get_key_learning_data(
+        raw_data_dir_name=raw_data_dir_name, monkey_name=monkey_name
+    )
+
+    # Persist results
+    all_trial_durations_df.to_csv(trial_path, index=False)
+    all_stop_df.to_csv(stop_path, index=False)
+    all_VBLO_df.to_csv(vblo_path, index=False)
+    if verbose:
+        print(f"Saved learning data to {file_dir}")
+    return all_trial_durations_df, all_stop_df, all_VBLO_df
+
+
+def _get_key_learning_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno'):
 
     sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
         raw_data_dir_name, monkey_name)
@@ -39,7 +98,7 @@ def get_key_learning_data(raw_data_dir_name='all_monkey_data/raw_monkey_data', m
 
         trial_durations = np.diff(data_item.ff_caught_T_new)
         trial_durations_df = pd.DataFrame(
-            {'duration_sec': trial_durations, 'trial_index': np.arange(1, len(trial_durations) + 1)}) # trial_index starts from 1 since we don't calculate duration for the first trial
+            {'duration_sec': trial_durations, 'trial_index': np.arange(1, len(trial_durations) + 1)})  # trial_index starts from 1 since we don't calculate duration for the first trial
         trial_durations_df['data_name'] = data_name
         all_trial_durations_df = pd.concat(
             [all_trial_durations_df, trial_durations_df])

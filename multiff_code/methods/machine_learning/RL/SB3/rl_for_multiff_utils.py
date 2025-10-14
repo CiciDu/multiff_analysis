@@ -35,12 +35,9 @@ def retrieve_or_make_family_of_agents_log(overall_folder):
 
 
 def calculate_model_gamma(dt):
-    gamma_0 = 0.995
-    dt_0 = 0.25
-
-    n = math.log(dt_0/dt, 2)
-    gamma = 1 - 1/(2**n) + gamma_0/(2**n)
-
+    gamma_0 = 0.998
+    dt_0 = 0.1
+    gamma = gamma_0 ** (dt / dt_0)
     return gamma
 
 
@@ -58,7 +55,7 @@ def get_agent_params_from_the_current_sac_model(sac_model):
     return params
 
 
-def calculate_reward_threshold_for_curriculum_training(env, n_eval_episodes=1, ff_caught_rate_threshold=1/5):
+def calculate_reward_threshold_for_curriculum_training(env, n_eval_episodes=1, ff_caught_rate_threshold=0.1):
     reward_threshold = (n_eval_episodes * env.episode_len * env.dt) * \
         ff_caught_rate_threshold * \
         (env.reward_per_ff - env.distance2center_cost * 15)
@@ -99,23 +96,6 @@ def get_agent_name_from_params(params):
 
     agent_name = ff_indicator + '_' + memory_indicator + '_' + cost_indicator
     return agent_name
-
-
-def store_params(model_folder_name, params):
-    if model_folder_name is None:
-        raise ValueError('model_folder_name is None')
-
-    params_file = os.path.join(model_folder_name, 'env_params.txt')
-
-    # clear the content of the file if it exists
-    if os.path.exists(params_file):
-        open(params_file, 'w').close()
-
-    with open(params_file, "w") as fp:
-        json.dump(params, fp)  # encode dict into JSON
-        print('Saving env params to', params_file)
-    return
-
 
 def retrieve_params(model_folder_name):
     if model_folder_name is None:
@@ -168,3 +148,21 @@ def add_essential_agent_params_info(df, params, agent_name=None):
     if agent_name is not None:
         df['id'] = agent_name
     return df
+
+def read_checkpoint_manifest(checkpoint_dir):
+    manifest_path = os.path.join(checkpoint_dir, 'checkpoint_manifest.json')
+    try:
+        with open(manifest_path, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def write_checkpoint_manifest(checkpoint_dir, payload):
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    manifest_path = os.path.join(checkpoint_dir, 'checkpoint_manifest.json')
+    try:
+        with open(manifest_path, 'w') as f:
+            json.dump(payload, f, indent=2, default=str)
+    except Exception as e:
+        print(f"Warning: failed to write manifest at {manifest_path}: {e}")

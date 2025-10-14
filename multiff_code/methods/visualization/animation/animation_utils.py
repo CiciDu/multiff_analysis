@@ -429,7 +429,9 @@ def plot_trajectory_for_animation(anim_monkey_info, frame, show_speed_through_pa
     return ax
 
 
-def plot_visible_ff_reward_boundary_for_animation(visible_ffs, ax):
+def plot_visible_ff_reward_boundary_for_animation(visible_ffs, ax, reward_boundary_radius=25):
+    visible_ffs = visible_ffs.copy()
+    
     if 'ff_x_rotated' in visible_ffs.columns:
         ff_x_column = 'ff_x_rotated'
         ff_y_column = 'ff_y_rotated'
@@ -438,6 +440,9 @@ def plot_visible_ff_reward_boundary_for_animation(visible_ffs, ax):
         ff_y_column = 'ff_y'
 
     if "ff_x_noisy" in visible_ffs.columns:
+        if 'pose_unreliable' not in visible_ffs.columns:
+            visible_ffs['pose_unreliable'] = False
+
         # plot both the real positions and the noisy positions
         if 'ff_x_noisy_rotated' in visible_ffs.columns:
             ff_x_noisy_column = 'ff_x_noisy_rotated'
@@ -447,22 +452,28 @@ def plot_visible_ff_reward_boundary_for_animation(visible_ffs, ax):
             ff_y_noisy_column = 'ff_y_noisy'
 
         for k in range(len(visible_ffs)):
-            circle = plt.Circle((visible_ffs[ff_x_column].iloc[k], visible_ffs[ff_y_column].iloc[k]),
-                                25, facecolor='yellow', edgecolor='gray', alpha=0.7, zorder=1)
-            ax.add_patch(circle)
-            circle = plt.Circle((visible_ffs[ff_x_noisy_column].iloc[k], visible_ffs[ff_y_noisy_column].iloc[k]),
-                                25, facecolor='gray', edgecolor='gray', alpha=0.5, zorder=1)
-            ax.add_patch(circle)
+            if not visible_ffs['pose_unreliable'].iloc[k]:
+                edgecolor = 'red' if visible_ffs['visible'].iloc[k] else 'gray'
+                circle = plt.Circle((visible_ffs[ff_x_column].iloc[k], visible_ffs[ff_y_column].iloc[k]),
+                                    reward_boundary_radius, facecolor='yellow', edgecolor=edgecolor, alpha=0.7, zorder=1)
+                ax.add_patch(circle)
+                circle = plt.Circle((visible_ffs[ff_x_noisy_column].iloc[k], visible_ffs[ff_y_noisy_column].iloc[k]),
+                                    reward_boundary_radius, facecolor='gray', edgecolor=edgecolor, alpha=0.5, zorder=1)
+                ax.add_patch(circle)
+            else:
+                circle = plt.Circle((visible_ffs[ff_x_column].iloc[k], visible_ffs[ff_y_column].iloc[k]),
+                                    reward_boundary_radius, facecolor='black', edgecolor='black', alpha=0.7, zorder=1)
+                ax.add_patch(circle)
     else:
         # plot the real positions only
         for k in range(len(visible_ffs)):
             circle = plt.Circle((visible_ffs[ff_x_column].iloc[k], visible_ffs[ff_y_column].iloc[k]),
-                                25, facecolor='yellow', edgecolor='gray', alpha=0.7, zorder=1)
+                                reward_boundary_radius, facecolor='yellow', edgecolor='gray', alpha=0.7, zorder=1)
             ax.add_patch(circle)
     return ax
 
 
-def plot_in_memory_ff_reward_boundary_for_animation(in_memory_ffs, ax):
+def plot_in_memory_ff_reward_boundary_for_animation(in_memory_ffs, ax, reward_boundary_radius=25):
     if 'ff_x_rotated' in in_memory_ffs.columns:
         ff_x_column = 'ff_x_rotated'
         ff_y_column = 'ff_y_rotated'
@@ -471,7 +482,7 @@ def plot_in_memory_ff_reward_boundary_for_animation(in_memory_ffs, ax):
         ff_y_column = 'ff_y'
     for j in range(len(in_memory_ffs)):
         circle = plt.Circle((in_memory_ffs[ff_x_column].iloc[j], in_memory_ffs[ff_y_column].iloc[j]),
-                            25, facecolor='purple', edgecolor='orange', alpha=0.3, zorder=1)
+                            reward_boundary_radius, facecolor='purple', edgecolor='orange', alpha=0.3, zorder=1)
         ax.add_patch(circle)
     return ax
 
