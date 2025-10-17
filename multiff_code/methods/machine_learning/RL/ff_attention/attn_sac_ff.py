@@ -372,7 +372,7 @@ class AttnSACforMultifirefly:
         self.model_folder = model_folder
         self.device = torch.device(device) if device is not None else torch.device(
             'cuda' if torch.cuda.is_available() else ('mps' if torch.backends.mps.is_available() else 'cpu'))
-        self.env_kwargs = env_kwargs.copy()
+        self.input_env_kwargs = env_kwargs.copy()
         self.env = None
 
         # nets/opts
@@ -399,12 +399,14 @@ class AttnSACforMultifirefly:
             log_every=1000, eval_every=0, eval_episodes=3, save_every=0
         )
 
-    # ---- Env ----
-    def make_env(self, **kwargs):
-        current_env_kwargs = copy.deepcopy(self.env_kwargs)
-        current_env_kwargs.update(kwargs)
-        self.env = EnvForAttentionSAC(**current_env_kwargs)
-        return self.env
+        self.env_class = EnvForAttentionSAC
+
+    # # ---- Env ----
+    # def make_env(self, **kwargs):
+    #     self.current_env_kwargs = copy.deepcopy(self.input_env_kwargs)
+    #     self.current_env_kwargs.update(kwargs)
+    #     self.env = EnvForAttentionSAC(**self.current_env_kwargs)
+    #     return self.env
 
     # ---- Agent ----
     def make_agent(self, **overrides):
@@ -580,6 +582,8 @@ class AttnSACforMultifirefly:
                                 reward=self.replay.reward[:self.replay.size],
                                 done=self.replay.done[:self.replay.size])
         print(f"Saved to {path}")
+
+        self.write_checkpoint_manifest(dir_name)
 
     def load_agent(self, dir_name: Optional[str] = None):
         path = self.model_folder if dir_name is None else dir_name

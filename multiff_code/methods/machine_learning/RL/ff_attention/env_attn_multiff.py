@@ -54,7 +54,7 @@ class EnvForAttentionSAC(base_env.MultiFF):
 
     The wrapper:
       * keeps identity-bound slots (no resorting each step),
-      * appends previous action tail and/or valid-mask tail if configured by base,
+      * appends previous action tail if configured by base,
       * offers conversion helpers to attention-ready tensors.
     """
 
@@ -63,10 +63,10 @@ class EnvForAttentionSAC(base_env.MultiFF):
         obs_visible_only=True,
         **kwargs
     ):
-        super().__init__(obs_visible_only=obs_visible_only,**kwargs)
-
+        super().__init__(obs_visible_only=obs_visible_only, **kwargs)
 
     # -------------- one-sample converter: flat obs -> attention tensors --------------
+
     def obs_to_attn_tensors(self, obs_flat: np.ndarray, device='cpu', use_prev_action_as_self=True):
         """
         Convert a single flat observation into attention-ready arrays.
@@ -82,8 +82,8 @@ class EnvForAttentionSAC(base_env.MultiFF):
         # Pre-calculate segment boundaries for efficient slicing
         slots_len = S * N
         action_len = 2 if self.add_action_to_obs else 0
-        mask_len = S if self.include_valid_mask_tail else 0
-        total_len = slots_len + action_len + mask_len
+        mask_len = 0
+        total_len = slots_len + action_len
 
         assert obs_flat.size == total_len, f"obs length mismatch: expected {total_len}, got {obs_flat.size}"
 
@@ -92,8 +92,6 @@ class EnvForAttentionSAC(base_env.MultiFF):
         slot_end = slots_len
         action_start = slot_end
         action_end = action_start + action_len
-        mask_start = action_end
-        mask_end = mask_start + mask_len
 
         # Extract components
         raw_slots = obs_flat[slot_start:slot_end].reshape(
@@ -102,17 +100,12 @@ class EnvForAttentionSAC(base_env.MultiFF):
         # Create slot features
         slot_feats = raw_slots.reshape(1, S, N)
 
-        # Create slot mask
-        if mask_len > 0:
-            slot_mask = obs_flat[mask_start:mask_end].astype(
+        # Create slot mask from 'valid' field or default to ones
+        if self._valid_field_index is not None:
+            slot_mask = (raw_slots[:, self._valid_field_index] > 0.5).astype(
                 np.float32).reshape(1, S)
         else:
-            # Fallback to 'valid' column or default using cached index
-            if self._valid_field_index is not None:
-                slot_mask = (raw_slots[:, self._valid_field_index] > 0.5).astype(
-                    np.float32).reshape(1, S)
-            else:
-                slot_mask = np.ones((1, S), dtype=np.float32)
+            slot_mask = np.ones((1, S), dtype=np.float32)
 
         # Create self features
         if use_prev_action_as_self and action_len > 0:
@@ -147,7 +140,7 @@ def batch_obs_to_attn_tensors(obs_batch: np.ndarray, env: EnvForAttentionSAC, de
     # Pre-calculate segment boundaries for efficient batch processing
     slots_len = S * N
     action_len = 2 if env.add_action_to_obs else 0
-    mask_len = S if env.include_valid_mask_tail else 0
+    mask_len = 0
 
     # Efficient batch slicing
     slot_feats = obs_batch[:, :slots_len].reshape(B, S, N).astype(np.float32)
@@ -159,17 +152,12 @@ def batch_obs_to_attn_tensors(obs_batch: np.ndarray, env: EnvForAttentionSAC, de
     else:
         action_tail = np.zeros((B, 2), dtype=np.float32)
 
-    # Handle mask tail
-    if mask_len > 0:
-        slot_mask = obs_batch[:, slots_len + action_len:slots_len +
-                              action_len + mask_len].astype(np.float32)
+    # Derive slot mask from 'valid' field or default to ones
+    if env._valid_field_index is not None:
+        slot_mask = (slot_feats[..., env._valid_field_index] > 0.5).astype(
+            np.float32)
     else:
-        # Fallback to 'valid' column or default using cached index
-        if env._valid_field_index is not None:
-            slot_mask = (slot_feats[..., env._valid_field_index] > 0.5).astype(
-                np.float32)
-        else:
-            slot_mask = np.ones((B, S), dtype=np.float32)
+        slot_mask = np.ones((B, S), dtype=np.float32)
 
     # Handle self features
     if use_prev_action_as_self:
@@ -202,7 +190,7 @@ def seq_obs_to_attn_tensors(obs_seq_batch: np.ndarray, env: EnvForAttentionSAC, 
     # Pre-calculate segment boundaries for efficient sequence processing
     slots_len = S * N
     action_len = 2 if env.add_action_to_obs else 0
-    mask_len = S if env.include_valid_mask_tail else 0
+    mask_len = 0
 
     # Efficient sequence slicing
     slot_feats = obs_seq_batch[:, :, :slots_len].reshape(
@@ -215,17 +203,12 @@ def seq_obs_to_attn_tensors(obs_seq_batch: np.ndarray, env: EnvForAttentionSAC, 
     else:
         action_tail = np.zeros((B, T, 2), dtype=np.float32)
 
-    # Handle mask tail
-    if mask_len > 0:
-        slot_mask = obs_seq_batch[:, :, slots_len +
-                                  action_len:slots_len + action_len + mask_len].astype(np.float32)
+    # Derive slot mask from 'valid' field or default to ones
+    if env._valid_field_index is not None:
+        slot_mask = (slot_feats[..., env._valid_field_index] > 0.5).astype(
+            np.float32)
     else:
-        # Fallback to 'valid' column or default using cached index
-        if env._valid_field_index is not None:
-            slot_mask = (slot_feats[..., env._valid_field_index] > 0.5).astype(
-                np.float32)
-        else:
-            slot_mask = np.ones((B, T, S), dtype=np.float32)
+        slot_mask = np.ones((B, T, S), dtype=np.float32)
 
     # Handle self features
     if use_prev_action_as_self:
@@ -258,7 +241,7 @@ def seq_obs_to_attn_tensors_torch(obs_seq_batch: torch.Tensor, env: EnvForAttent
 
     slots_len = S * N
     action_len = 2 if env.add_action_to_obs else 0
-    mask_len = S if env.include_valid_mask_tail else 0
+    mask_len = 0
 
     # Ensure dtype float32 and on target device
     x = obs_seq_batch.to(device=device, dtype=torch.float32)
@@ -271,17 +254,13 @@ def seq_obs_to_attn_tensors_torch(obs_seq_batch: torch.Tensor, env: EnvForAttent
         action_tail = torch.zeros(
             (B, T, 2), dtype=torch.float32, device=device)
 
-    if mask_len > 0:
-        slot_mask = x[:, :, slots_len +
-                      action_len: slots_len + action_len + mask_len]
+    # Derive slot mask from 'valid' field if available, else all ones
+    if env._valid_field_index is not None:
+        slot_mask = (slot_feats[..., env._valid_field_index] > 0.5).to(
+            torch.float32)
     else:
-        # Fallback to 'valid' column if available, else all ones
-        if env._valid_field_index is not None:
-            slot_mask = (slot_feats[..., env._valid_field_index] > 0.5).to(
-                torch.float32)
-        else:
-            slot_mask = torch.ones(
-                (B, T, S), dtype=torch.float32, device=device)
+        slot_mask = torch.ones(
+            (B, T, S), dtype=torch.float32, device=device)
 
     self_feats = action_tail if use_prev_action_as_self else torch.zeros(
         (B, T, 2), dtype=torch.float32, device=device)

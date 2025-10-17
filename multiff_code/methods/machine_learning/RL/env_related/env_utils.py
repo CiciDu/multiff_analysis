@@ -2,6 +2,7 @@ import os
 import numpy as np
 import math
 from math import pi
+import inspect
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
@@ -242,3 +243,25 @@ def find_visible_ff(time, ff_distance_all, ff_angle_all,
 
     return np.where(visible_ff)[0]
 
+
+import inspect
+
+
+def get_env_default_kwargs(env_cls):
+    """Return all __init__ keyword arguments and their defaults for an environment class.
+    If both child and parent define the same arg, the child's value overrides the parent's.
+    """
+    kwargs = {}
+
+    # reversed MRO → child first, parent last
+    for base in reversed(inspect.getmro(env_cls)):
+        if base is object:
+            continue
+        if '__init__' in base.__dict__:
+            sig = inspect.signature(base.__init__)
+            for name, param in sig.parameters.items():
+                if name == 'self':
+                    continue
+                if param.default is not inspect.Parameter.empty:
+                    kwargs[name] = param.default
+    return kwargs

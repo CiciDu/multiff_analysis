@@ -1,5 +1,6 @@
 # machine_learning/RL_models/env_related/MultiFF.py
 
+import inspect
 from typing import Optional, Dict
 from dataclasses import dataclass
 from machine_learning.RL.env_related import env_utils
@@ -17,6 +18,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 DEFAULT_D0 = 25.0      # anchor for d_log = log1p(dist/d0)
 CLIP_DMAX = 500.0      # clip distance before log
 TMAX_DEFAULT = 5.0     # seconds cap for t_seen normalization
+
 
 
 @dataclass
@@ -79,19 +81,18 @@ class MultiFF(gymnasium.Env):
                  dw_cost_factor=10,
                  w_cost_factor=10,
                  distance2center_cost=0,
-                 stop_vel_cost=100,
+                 stop_vel_cost=50,
                  reward_boundary=25,
                  add_vel_cost_when_catching_ff_only=False,
                  linear_terminal_vel=0.01,
                  angular_terminal_vel=0.01,
                  dt=0.1,
-                 episode_len=1024,
+                 episode_len=512,
                  print_ff_capture_incidents=True,
                  print_episode_reward_rates=True,
                  add_action_to_obs=True,
                  noise_mode='linear',
                  slot_fields: Optional[List[str]] = None,
-                 include_valid_mask_tail: bool = True,
                  obs_visible_only: bool = False,
                  zero_invisible_ff_features: bool = False,
                  use_prev_obs_for_invisible_pose: bool = False,
@@ -111,7 +112,7 @@ class MultiFF(gymnasium.Env):
         self.rng = np.random.default_rng(obs_noise.seed)
 
         kwargs.setdefault('add_action_to_obs', add_action_to_obs)
-        kwargs.setdefault('episode_len', 1024)
+        kwargs.setdefault('episode_len', 512)
 
         # Identity-tracked slot config and transforms
         self.d0 = DEFAULT_D0
@@ -152,10 +153,9 @@ class MultiFF(gymnasium.Env):
         # Observation spec (per slot)
         # [valid, d_log, sinθ, cosθ, t_start_seen, t_last_seen, visible, pose_unreliable]
         self.slot_fields = slot_fields or [
-            'valid', 'd_log', 'sin', 'cos', 't_start_seen', 't_last_seen', 'visible', 'pose_unreliable']
+            'valid', 'd_log', 'sin', 'cos', 't_start_seen', 't_last_seen', 'visible']
         self._slot_idx = [self.FIELD_INDEX[f] for f in self.slot_fields]
         self.num_elem_per_ff = len(self.slot_fields)
-        self.include_valid_mask_tail = include_valid_mask_tail
         self.add_action_to_obs = add_action_to_obs
         # control whether to keep only visible ff in observation slots
         self.obs_visible_only = obs_visible_only
@@ -360,6 +360,8 @@ class MultiFF(gymnasium.Env):
         # work on a copy and keep dtype consistent
         action = np.asarray(action, dtype=np.float32).copy()
         self.action = self._add_noise_to_action(action)
+        # if action[1] < 1:
+        #     print('time: ', round(self.time, 2), 'action: ', action)
 
         self.time += self.dt
         # update the position of the agent
@@ -399,8 +401,8 @@ class MultiFF(gymnasium.Env):
             self.wnoise = 0.0
             self.is_stop = True
             # calculate the deviation of the action from the terminal velocity
-            self.v_stop_deviance = action[1] / 2 + 0.5
-            self.w_stop_deviance = abs(action[0])
+            self.v_stop_deviance = max(0, action[1] / 2 + 0.5 - 0.01)
+            self.w_stop_deviance = max(0, abs(action[0]) - 0.01)
         else:
             self.vnoise = float(self.rng.normal(0.0, self.v_noise_std))
             self.wnoise = float(self.rng.normal(0.0, self.w_noise_std))
@@ -478,9 +480,6 @@ class MultiFF(gymnasium.Env):
         if self.add_action_to_obs:
             obs[off:off + 2] = self.action
             off += 2
-        if self.include_valid_mask_tail:
-            obs[off:off + self.num_obs_ff] = self._slot_valid_mask
-            off += self.num_obs_ff
 
         # Sanity: keep within [-1,1]
         if np.any(np.abs(obs) > 1 + 1e-6):
@@ -541,8 +540,6 @@ class MultiFF(gymnasium.Env):
         base = self.num_obs_ff * self.num_elem_per_ff
         if self.add_action_to_obs:
             base += 2
-        if self.include_valid_mask_tail:
-            base += self.num_obs_ff
         self.obs_space_length = base
         if gymnasium is not None:
             self.observation_space = gymnasium.spaces.Box(
@@ -561,8 +558,7 @@ class MultiFF(gymnasium.Env):
             catching_ff_reward = catching_ff_reward - self.cost_for_distance2center
         if self.stop_vel_cost > 0:
             self.total_deviated_vel = self.v_stop_deviance + self.w_stop_deviance
-            print('total_deviated_vel: ', self.total_deviated_vel)
-            self.cost_for_stop_vel = self.total_deviated_vel * self.stop_vel_cost
+            self.cost_for_stop_vel = self.total_deviated_vel * (self.stop_vel_cost/self.angular_terminal_vel)
             catching_ff_reward = catching_ff_reward - self.cost_for_stop_vel
 
         return catching_ff_reward
@@ -814,7 +810,7 @@ class MultiFF(gymnasium.Env):
                         cos_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_cos]
 
             # compute pose_unreliable = 1 - visible
-            if getattr(self, 'use_prev_obs_for_invisible_pose', False) or getattr(self, 'use_prev_obs_for_invisible_pose', False):
+            if getattr(self, 'use_prev_obs_for_invisible_pose', False) or getattr(self, 'zero_invisible_ff_features', False):
                 self.pose_unreliable = (self.visible < 0.5).astype(np.float32)
             else:
                 self.pose_unreliable = np.zeros_like(
@@ -833,7 +829,8 @@ class MultiFF(gymnasium.Env):
                 if np.any(invis_rows):
                     # preserve 'valid', 't_start_seen', 't_last_seen'
                     # and optionally pose features ('d_log','sin','cos') if requested
-                    protected_fields = ['valid', 't_start_seen', 't_last_seen']
+                    protected_fields = [
+                        'valid', 't_start_seen', 't_last_seen', 'pose_unreliable']
                     if getattr(self, 'use_prev_obs_for_invisible_pose', False):
                         protected_fields = protected_fields + \
                             ['d_log', 'sin', 'cos']
@@ -900,6 +897,18 @@ class MultiFF(gymnasium.Env):
         self._prev_vis = vis.copy()
 
     def _apply_memory_noise_ego_weber_subset(self, idx, step_scale=1.0):
+        """
+        Applies cumulative egocentric memory noise to a subset of feature positions.
+
+        Models gradual memory drift in egocentric polar coordinates (r, θ), where 
+        radial noise scales linearly with distance (σ_r ∝ r) and angular noise 
+        scales inversely with distance (σ_θ ∝ 1/r), following a Weber-like law. 
+        The noise magnitude is scaled by `step_scale`, making it cumulative across 
+        simulation steps to reflect progressive memory degradation. 
+
+        Unlike perception noise, memory noise accumulates over time for non-visible features.
+        """
+
         if idx.size == 0:
             return
         # compute ego polar only for idx
@@ -930,6 +939,16 @@ class MultiFF(gymnasium.Env):
         self.ffxy_noisy[idx, 1] = self.agenty[0] + r_new * np.sin(theta_world)
 
     def _apply_perception_noise_visible(self):
+        """
+        Applies instantaneous egocentric perceptual noise to currently visible features.
+
+        Just like memory noise, models sensory uncertainty in egocentric polar coordinates (r, θ), where 
+        radial noise scales linearly with distance (σ_r ∝ r) and angular noise 
+        scales inversely with distance (σ_θ ∝ 1/r), following a Weber-like law. 
+
+        But unlike memory noise, perception noise is applied once per observation and 
+        does not accumulate over time.
+        """
         vis = self.visible_ff_indices
         if vis.size == 0:
             return

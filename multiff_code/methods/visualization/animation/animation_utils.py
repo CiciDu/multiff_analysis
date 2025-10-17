@@ -425,7 +425,7 @@ def plot_trajectory_for_animation(anim_monkey_info, frame, show_speed_through_pa
     else:
         color = 'royalblue'
     ax.scatter(anim_monkey_info['anim_mx'][:frame+1],
-               anim_monkey_info['anim_my'][:frame+1], s=15, c=color)
+               anim_monkey_info['anim_my'][:frame+1], s=10, c=color)
     return ax
 
 

@@ -12,7 +12,7 @@ class EnvForSB3(base_env.MultiFF):
     def __init__(self,
                  **kwargs):
 
-        super().__init__(obs_visible_only=False, 
+        super().__init__(obs_visible_only=False,
                          identity_slot_strategy='rank_keep',
                          **kwargs)
 
@@ -23,7 +23,6 @@ class CollectInformation(more_envs.BaseCollectInformation):
     Note when using this wrapper, the number of steps cannot exceed that of one episode.   
 
     """
+
     def __init__(self, episode_len=16000, **kwargs):
         super().__init__(episode_len=episode_len, **kwargs)
-
-

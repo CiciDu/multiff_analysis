@@ -158,11 +158,11 @@ def read_checkpoint_manifest(checkpoint_dir):
         return None
 
 
-def write_checkpoint_manifest(checkpoint_dir, payload):
+def write_checkpoint(checkpoint_dir, current_env_kwargs):
     os.makedirs(checkpoint_dir, exist_ok=True)
     manifest_path = os.path.join(checkpoint_dir, 'checkpoint_manifest.json')
     try:
         with open(manifest_path, 'w') as f:
-            json.dump(payload, f, indent=2, default=str)
+            json.dump(current_env_kwargs, f, indent=2, default=str)
     except Exception as e:
         print(f"Warning: failed to write manifest at {manifest_path}: {e}")

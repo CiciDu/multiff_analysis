@@ -215,7 +215,7 @@ def collect_agent_data_func(env, sac_model, n_steps=15000, LSTM=False,
 
     ff_in_obs_df = ff_in_obs_df[
         ['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index',
-         'ff_x_noisy', 'ff_y_noisy', 'time_since_last_vis']
+         'ff_x_noisy', 'ff_y_noisy', 'time_since_last_vis', 'visible', 'pose_unreliable']
     ].copy()
     ff_in_obs_df.rename(columns={'index_in_ff_dataframe': 'ff_index'}, inplace=True)
 

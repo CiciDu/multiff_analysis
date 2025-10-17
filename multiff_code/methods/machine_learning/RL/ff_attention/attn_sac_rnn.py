@@ -698,7 +698,8 @@ class SequenceReplay:
         if not self.episodes:
             return np.array([], dtype=np.int64)
         counts = np.fromiter(
-            (max(0, ep['obs'].shape[0] - seq_len_total + 1) for ep in self.episodes),
+            (max(0, ep['obs'].shape[0] - seq_len_total + 1)
+             for ep in self.episodes),
             dtype=np.int64,
             count=len(self.episodes),
         )
@@ -791,7 +792,7 @@ class AttnRNNSACforMultifirefly:
             'cuda' if torch.cuda.is_available() else (
                 'mps' if torch.backends.mps.is_available() else 'cpu')
         )
-        self.env_kwargs = env_kwargs.copy()
+        self.input_env_kwargs = env_kwargs.copy()
         self.env = None
 
         # Model handles
@@ -819,15 +820,18 @@ class AttnRNNSACforMultifirefly:
             log_every=1000, eval_every=0, eval_episodes=3, save_every=0
         )
 
-    # ---- Env ----
-    def make_env(self, **env_kwargs):
-        '''Instantiate the MultiFF env with stored + provided kwargs.'''
-        current_env_kwargs = copy.deepcopy(self.env_kwargs)
-        current_env_kwargs.update(env_kwargs)
-        self.env = EnvForAttentionSAC(**current_env_kwargs)
-        return self.env
+        self.env_class = EnvForAttentionSAC
+
+    # # ---- Env ----
+    # def make_env(self, **env_kwargs):
+    #     '''Instantiate the MultiFF env with stored + provided kwargs.'''
+    #     self.current_env_kwargs = copy.deepcopy(self.input_env_kwargs)
+    #     self.current_env_kwargs.update(env_kwargs)
+    #     self.env = EnvForAttentionSAC(**self.current_env_kwargs)
+    #     return self.env
 
     # ---- Agent ----
+
     def make_agent(self, **overrides):
         '''
         Build actor/critic networks (+targets) and their optimizers.
@@ -1074,6 +1078,8 @@ class AttnRNNSACforMultifirefly:
         )
         torch.save(payload, os.path.join(path, 'model.pt'))
         print(f'Saved to {path}')
+
+        self.write_checkpoint_manifest(dir_name)
 
     def load_agent(self, dir_name: Optional[str] = None):
         '''Load model + optimizer states from disk.'''
