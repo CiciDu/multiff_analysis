@@ -1,1 +1,0 @@
-{"dt": 0.1, "dv_cost_factor": 10, "dw_cost_factor": 10, "w_cost_factor": 3, "print_ff_capture_incidents": true, "print_episode_reward_rates": true, "flash_on_interval": 0.3, "max_in_memory_time": 3}

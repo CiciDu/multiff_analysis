@@ -4,7 +4,7 @@ from planning_analysis.show_planning import show_planning_class
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
 from planning_analysis.agent_analysis import agent_plan_factors_class
 from planning_analysis.factors_vs_indicators import variations_base_class
-from machine_learning.RL.SB3 import rl_for_multiff_class
+from reinforcement_learning.base_classes import rl_base_class
 
 import pandas as pd
 import os
@@ -28,7 +28,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.model_folder_name = model_folder_name
         self.opt_arc_type = opt_arc_type
         self.num_steps_per_dataset = num_steps_per_dataset
-        rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
+        rl_base_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name)
         self.monkey_name = None
 

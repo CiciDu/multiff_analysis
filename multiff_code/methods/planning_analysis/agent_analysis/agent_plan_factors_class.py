@@ -1,5 +1,6 @@
 from planning_analysis.plan_factors import plan_factors_class
-from machine_learning.RL.SB3 import sb3_for_multiff_class, rl_for_multiff_class
+from reinforcement_learning.agents.feedforward import sb3_class
+from reinforcement_learning.base_classes import rl_base_class
 
 
 class PlanFactorsOfAgent():
@@ -18,14 +19,14 @@ class PlanFactorsOfAgent():
         self.data_name = data_name
         self.use_curv_to_ff_center = use_curv_to_ff_center
         self.opt_arc_type = opt_arc_type
-        rl_for_multiff_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
+        rl_base_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name, data_name=data_name)
 
     def get_agent_data(self, n_steps=8000, exists_ok=False, save_data=False, **env_kwargs):
         episode_len = int(n_steps * 1.2)
         env_kwargs['episode_len'] = episode_len
 
-        self.rl_ff = sb3_for_multiff_class.SB3forMultifirefly(model_folder_name=self.model_folder_name,
+        self.rl_ff = sb3_class.SB3forMultifirefly(model_folder_name=self.model_folder_name,
                                                               data_name=self.data_name,
                                                               overall_folder='',
                                                               **env_kwargs)

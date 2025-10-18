@@ -1,7 +1,7 @@
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
 from planning_analysis.factors_vs_indicators import plot_variations_utils, process_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
-from machine_learning.RL.SB3 import rl_for_multiff_utils
+from reinforcement_learning.base_classes import rl_base_utils
 
 import pandas as pd
 import os
@@ -33,7 +33,7 @@ class PlanFactorsAcrossAgents():
             self.pooled_perc_info_across_agents = pd.read_csv(
                 pooled_perc_info_across_agents_path)
         else:
-            folders_with_params = rl_for_multiff_utils.get_folders_with_params(
+            folders_with_params = rl_base_utils.get_folders_with_params(
                 path=self.overall_folder_name)
             if len(folders_with_params) == 0:
                 raise Exception('No folders with params found.')
@@ -45,25 +45,25 @@ class PlanFactorsAcrossAgents():
                 if 'best_model_postcurriculum' in folder:
                     print('Ignoring best_model_postcurriculum')
                     continue
-                manifest = rl_for_multiff_utils.read_checkpoint_manifest(folder)
+                manifest = rl_base_utils.read_checkpoint_manifest(folder)
                 if isinstance(manifest, dict) and ('env_params' in manifest):
                     params = manifest['env_params']
                 else:
                     raise Exception('No env params found in manifest.')
                 
-                agent_name = rl_for_multiff_utils.get_agent_name_from_params(
+                agent_name = rl_base_utils.get_agent_name_from_params(
                     params)
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
                     model_folder_name=folder)
                 self.pfas.streamline_getting_y_values(
                     model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok, **params)
 
-                agent_all_ref_pooled_median_info = rl_for_multiff_utils.add_essential_agent_params_info(
+                agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.all_ref_pooled_median_info, params, agent_name)
                 self.all_ref_pooled_median_info_across_agents = pd.concat(
                     [self.all_ref_pooled_median_info_across_agents, agent_all_ref_pooled_median_info], axis=0)
 
-                agent_all_perc_df = rl_for_multiff_utils.add_essential_agent_params_info(
+                agent_all_perc_df = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.pooled_perc_info, params, agent_name)
                 self.pooled_perc_info_across_agents = pd.concat(
                     [self.pooled_perc_info_across_agents, agent_all_perc_df], axis=0)
