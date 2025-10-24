@@ -11,7 +11,7 @@ class CompareMonkeyAgentPlan(variations_base_class._VariationsBase):
 
     def __init__(self,
                  opt_arc_type='opt_arc_stop_closest',
-                 model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3'):
+                 model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3'):
         self.model_folder_name = model_folder_name
         self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
             model_folder_name=self.model_folder_name, opt_arc_type=opt_arc_type)

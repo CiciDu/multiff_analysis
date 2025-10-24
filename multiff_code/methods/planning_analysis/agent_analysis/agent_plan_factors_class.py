@@ -6,8 +6,8 @@ from reinforcement_learning.base_classes import rl_base_class
 class PlanFactorsOfAgent():
 
     def __init__(self,
-                 # overall_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu',
-                 model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
+                 # overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu',
+                 model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  data_name='data_0',
                  use_curv_to_ff_center=False,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
@@ -27,9 +27,9 @@ class PlanFactorsOfAgent():
         env_kwargs['episode_len'] = episode_len
 
         self.rl_ff = sb3_class.SB3forMultifirefly(model_folder_name=self.model_folder_name,
-                                                              data_name=self.data_name,
-                                                              overall_folder='',
-                                                              **env_kwargs)
+                                                  data_name=self.data_name,
+                                                  overall_folder='',
+                                                  **env_kwargs)
         self.rl_ff.streamline_getting_data_from_agent(
             n_steps=n_steps, exists_ok=exists_ok, save_data=save_data)
 

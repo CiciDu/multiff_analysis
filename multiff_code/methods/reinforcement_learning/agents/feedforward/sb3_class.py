@@ -23,7 +23,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
     def __init__(self,
-                 overall_folder='RL_models/SB3_stored_models/all_agents/env1_relu/',
+                 overall_folder='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/',
                  add_date_to_model_folder_name=False,
                  **kwargs):
 
@@ -31,19 +31,19 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
                          add_date_to_model_folder_name=add_date_to_model_folder_name,
                          **kwargs)
 
-        self.sb3_or_rnn = 'sb3'
+        self.agent_type = 'sb3'
         self.monkey_name = None
 
         self.env_class = env_for_sb3.EnvForSB3
 
-        self.default_env_kwargs = env_utils.get_env_default_kwargs(self.env_class)
+        self.default_env_kwargs = env_utils.get_env_default_kwargs(
+            self.env_class)
         self.input_env_kwargs = {
             **self.default_env_kwargs,
             **self.class_instance_env_kwargs,
             **self.additional_env_kwargs
         }
-        
-        
+
     def load_best_model_postcurriculum(self, load_replay_buffer=True):
         dir_name = self.best_model_postcurriculum_dir
         self.load_agent(load_replay_buffer=load_replay_buffer,
@@ -75,7 +75,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
                                  'gradient_steps': kwargs.get('gradient_steps', 10),
                                  'ent_coef': kwargs.get('ent_coef', 'auto'),
                                  'policy_kwargs': kwargs.get('policy_kwargs', dict(activation_fn=nn.ReLU, net_arch=[256, 128])),
-                                 'gamma': rl_base_utils.calculate_model_gamma(self.env.env.dt),
+                                 'gamma': 0.99,
                                  }
         else:
             self.agent_params.update(kwargs)
@@ -98,7 +98,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             best_model_save_path = self.model_folder_name
 
         stop_train_callback = sb3_utils.StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=15, verbose=1, model_folder_name=self.model_folder_name,
-                                                                             overall_folder=self.overall_folder, agent_id=self.agent_id)
+                                                                         overall_folder=self.overall_folder, agent_id=self.agent_id)
 
         # Note: by adding best_model_save_path, the callback can save the best model after each evaluation
         if best_model_save_path is not None:
@@ -152,7 +152,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             except ValueError as e:
                 print(f"Error message: {e}")
                 break
-            self._change_env_after_meeting_reward_threshold()
+            self._update_env_after_meeting_reward_threshold()
 
         # After all the conditions are met, train the agent once again to ensure performance (stop training with no improvement)
         # After curriculum ends, copy best from in-curriculum to post-curriculum

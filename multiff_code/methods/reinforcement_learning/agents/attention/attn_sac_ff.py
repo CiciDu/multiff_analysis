@@ -364,7 +364,7 @@ class AttnSACforMultifirefly:
     """
 
     def __init__(self,
-                 model_folder: str = 'RL_models/ATTN_FF/agent_0/',
+                 model_folder: str = 'multiff_analysis/RL_models/ATTN_FF/agent_0/',
                  device: Optional[str] = None,
                  seed: int = 42,
                  **env_kwargs):
@@ -382,6 +382,8 @@ class AttnSACforMultifirefly:
         self.log_alpha = torch.nn.Parameter(
             torch.tensor(0.0, device=self.device))
         self.alpha_opt = None
+
+        self.agent_type = 'attention'
 
         # replay
         self.replay = None

@@ -781,7 +781,7 @@ class AttnRNNSACforMultifirefly:
     '''
 
     def __init__(self,
-                 model_folder: str = 'RL_models/ATTN_RNN/agent_0/',
+                 model_folder: str = 'multiff_analysis/RL_models/ATTN_RNN/agent_0/',
                  device: Optional[str] = None,
                  seed: int = 42,
                  **env_kwargs):
@@ -806,6 +806,8 @@ class AttnRNNSACforMultifirefly:
         # Sequence replay buffer
         self.replay_seq = SequenceReplay(
             capacity_episodes=1000, device=self.device)
+
+        self.agent_type = 'attention'
 
         # Default configuration (override via make_agent(overrides))
         self.cfg = dict(

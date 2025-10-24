@@ -58,7 +58,8 @@ def get_agent_params_from_the_current_sac_model(sac_model):
 def calculate_reward_threshold_for_curriculum_training(env, n_eval_episodes=1, ff_caught_rate_threshold=0.1):
     reward_threshold = (n_eval_episodes * env.episode_len * env.dt) * \
         ff_caught_rate_threshold * \
-        (env.reward_per_ff - env.distance2center_cost * 15)
+        (env.reward_per_ff - env.distance2center_cost * 15) - \
+        200  # including the rest of the cost like velocity cost
     return reward_threshold
 
 
@@ -83,8 +84,8 @@ def get_agent_name_from_params(params):
 
     memory_indicator = 'mem' + str(params['max_in_memory_time'])
 
-    if ((params['dv_cost_factor']) == 10) & \
-            ((params['dw_cost_factor']) == 10) & ((params['w_cost_factor']) == 10):
+    if ((params['dv_cost_factor']) == 1) & \
+            ((params['dw_cost_factor']) == 1) & ((params['w_cost_factor']) == 1):
         cost_indicator = 'costT'
     elif ((params['dv_cost_factor']) == 0) & \
             ((params['dw_cost_factor']) == 0) & ((params['w_cost_factor']) == 0):
@@ -96,6 +97,7 @@ def get_agent_name_from_params(params):
 
     agent_name = ff_indicator + '_' + memory_indicator + '_' + cost_indicator
     return agent_name
+
 
 def retrieve_params(model_folder_name):
     if model_folder_name is None:
@@ -112,7 +114,7 @@ def retrieve_params(model_folder_name):
     return params
 
 
-def get_folders_with_params(path='RL_models/SB3_stored_models/all_agents/env1_relu'):
+def get_folders_with_params(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
 
     dirs = [f for f in os.listdir(
         path) if os.path.isdir(os.path.join(path, f))]
@@ -149,10 +151,11 @@ def add_essential_agent_params_info(df, params, agent_name=None):
         df['id'] = agent_name
     return df
 
+
 def read_checkpoint_manifest(checkpoint_dir):
     if not isinstance(checkpoint_dir, str) or len(checkpoint_dir) == 0:
-        print(f"Warning: checkpoint_dir is not a string or is empty: {checkpoint_dir}")
-        return {}
+        raise ValueError(
+            f"Warning: checkpoint_dir is not a string or is empty: {checkpoint_dir}")
     manifest_path = os.path.join(checkpoint_dir, 'checkpoint_manifest.json')
     try:
         with open(manifest_path, 'r') as f:
@@ -162,8 +165,7 @@ def read_checkpoint_manifest(checkpoint_dir):
                 return data
             return {'env_params': data}
     except Exception as e:
-        print(f"Failed to read manifest at {manifest_path}: {e}")
-        return {}
+        raise ValueError(f"Failed to read manifest at {manifest_path}: {e}")
 
 
 def write_checkpoint(checkpoint_dir, current_env_kwargs):

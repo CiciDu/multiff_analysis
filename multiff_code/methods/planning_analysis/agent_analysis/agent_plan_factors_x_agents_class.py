@@ -12,7 +12,7 @@ class PlanFactorsAcrossAgents():
     def __init__(self,
                  # this is the monkey whose data will be used for comparison
                  monkey_name='monkey_Bruno',
-                 overall_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu'):
+                 overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
         self.monkey_name = monkey_name
         self.overall_folder_name = overall_folder_name
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
@@ -50,7 +50,7 @@ class PlanFactorsAcrossAgents():
                     params = manifest['env_params']
                 else:
                     raise Exception('No env params found in manifest.')
-                
+
                 agent_name = rl_base_utils.get_agent_name_from_params(
                     params)
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(

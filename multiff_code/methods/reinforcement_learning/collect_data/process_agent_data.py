@@ -2,6 +2,10 @@ from data_wrangling import general_utils
 from pattern_discovery import pattern_by_trials, make_ff_dataframe
 from reinforcement_learning.agents.rnn import env_for_rnn
 from reinforcement_learning.agents.feedforward import env_for_sb3
+from reinforcement_learning.agents.attention.env_attn_multiff import (
+    EnvForAttentionSAC as EnvForAttention,
+    get_action_limits as attn_get_action_limits,
+)
 
 import os
 import shutil
@@ -28,7 +32,8 @@ def find_flash_time_for_one_ff(ff_flash, lifetime):
         containing the intervals that the firefly flashes on within the ff's life time.
     """
 
-    indices_of_overlapped_intervals = general_utils.find_intersection(ff_flash, lifetime)
+    indices_of_overlapped_intervals = general_utils.find_intersection(
+        ff_flash, lifetime)
     if len(indices_of_overlapped_intervals) > 0:
         ff_flash_valid = ff_flash[indices_of_overlapped_intervals]
         ff_flash_valid[0][0] = max(ff_flash_valid[0][0], lifetime[0])
@@ -52,7 +57,8 @@ def make_ff_flash_sorted(env_ff_flash, ff_information, sorted_indices_all, env_e
             ff_flash_valid = find_flash_time_for_one_ff(ff_flash, lifetime)
             ff_flash_sorted.append(ff_flash_valid)
     else:
-        ff_flash_sorted = [np.array([[0, env_end_time]])] * len(sorted_indices_all)
+        ff_flash_sorted = [
+            np.array([[0, env_end_time]])] * len(sorted_indices_all)
     return ff_flash_sorted
 
 
@@ -64,7 +70,8 @@ def make_env_ff_flash_from_real_data(ff_flash_sorted_of_monkey, alive_ffs, ff_fl
     start_time = ff_flash_duration[0]
     for index in alive_ffs:
         ff_flash = ff_flash_sorted_of_monkey[index]
-        ff_flash_valid = find_flash_time_for_one_ff(ff_flash, ff_flash_duration)
+        ff_flash_valid = find_flash_time_for_one_ff(
+            ff_flash, ff_flash_duration)
         if ff_flash_valid[-1, -1] != -1:
             ff_flash_valid = ff_flash_valid - start_time
         env_ff_flash.append(np.array(ff_flash_valid))
@@ -110,17 +117,24 @@ def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
     captured_ff_indices = np.where(ff_time_captured_all != -9999)[0]
     not_captured_ff_indices = np.where(ff_time_captured_all == -9999)[0]
 
-    sorted_indices_captured = captured_ff_indices[np.argsort(ff_time_captured_all[captured_ff_indices])]
-    sorted_indices_all = np.concatenate([sorted_indices_captured, not_captured_ff_indices])
+    sorted_indices_captured = captured_ff_indices[np.argsort(
+        ff_time_captured_all[captured_ff_indices])]
+    sorted_indices_all = np.concatenate(
+        [sorted_indices_captured, not_captured_ff_indices])
 
-    ff_flash_sorted = make_ff_flash_sorted(env_ff_flash, ff_information, sorted_indices_all, env_end_time)
+    ff_flash_sorted = make_ff_flash_sorted(
+        env_ff_flash, ff_information, sorted_indices_all, env_end_time)
 
     ff_caught_T_new = np.array(ff_time_captured_all[sorted_indices_captured])
-    ff_believed_position_sorted = np.array(ff_information.iloc[sorted_indices_captured, 5:7])
-    ff_real_position_sorted = np.array(ff_information.iloc[sorted_indices_all, 1:3])
+    ff_believed_position_sorted = np.array(
+        ff_information.iloc[sorted_indices_captured, 5:7])
+    ff_real_position_sorted = np.array(
+        ff_information.iloc[sorted_indices_all, 1:3])
     ff_life_sorted = np.array(ff_information.iloc[sorted_indices_all, 3:5])
-    ff_life_sorted[:, 1][np.where(ff_life_sorted[:, 1] == -9999)[0]] = env_end_time
-    ff_flash_end_sorted = [flash[-1, 1] if len(flash) > 0 else env_end_time for flash in ff_flash_sorted]
+    ff_life_sorted[:, 1][np.where(
+        ff_life_sorted[:, 1] == -9999)[0]] = env_end_time
+    ff_flash_end_sorted = [
+        flash[-1, 1] if len(flash) > 0 else env_end_time for flash in ff_flash_sorted]
     ff_flash_end_sorted = np.array(ff_flash_end_sorted)
 
     return ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all
@@ -134,50 +148,79 @@ def reverse_value_and_position(sorted_indices_all):
     return reversed_sorting
 
 
-def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, sac_model, agent_dt, LSTM=False, env_kwargs=None):
+def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, sac_model, agent_dt, env_kwargs=None, agent_type=None):
     """
     Run the agent in a replicated environment around a monkey trial segment, returning agent info used in plots.
     """
     # Set a duration that the plot will encompass
-    start_time = min(info_of_monkey['ff_caught_T_new'][currentTrial - 3], info_of_monkey['ff_caught_T_new'][currentTrial] - num_trials)
-    plot_whole_duration = [start_time, info_of_monkey['ff_caught_T_new'][currentTrial]]
-    monkey_acting_duration = [start_time, info_of_monkey['ff_caught_T_new'][currentTrial] - 1.5]
+    start_time = min(info_of_monkey['ff_caught_T_new'][currentTrial - 3],
+                     info_of_monkey['ff_caught_T_new'][currentTrial] - num_trials)
+    plot_whole_duration = [start_time,
+                           info_of_monkey['ff_caught_T_new'][currentTrial]]
+    monkey_acting_duration = [
+        start_time, info_of_monkey['ff_caught_T_new'][currentTrial] - 1.5]
 
-    alive_ffs = np.array([index for index, life in enumerate(info_of_monkey['ff_life_sorted']) if (life[1] >= plot_whole_duration[0]) and (life[0] < plot_whole_duration[1])])
-    M_cum_indices = np.where((info_of_monkey['monkey_information']['time'] >= monkey_acting_duration[0]) & (info_of_monkey['monkey_information']['time'] <= monkey_acting_duration[1]))[0]
-    M_cum_t = np.array(info_of_monkey['monkey_information']['time'][M_cum_indices])
-    M_cum_mx, M_cum_my = np.array(info_of_monkey['monkey_information']['monkey_x'][M_cum_indices]), np.array(info_of_monkey['monkey_information']['monkey_y'][M_cum_indices])
-    A_cum_t, A_cum_mx, A_cum_my, A_cum_speed, A_cum_angle, A_cum_dw = increase_dt_for_monkey_information(M_cum_t, M_cum_mx, M_cum_my, agent_dt)
+    alive_ffs = np.array([index for index, life in enumerate(info_of_monkey['ff_life_sorted']) if (
+        life[1] >= plot_whole_duration[0]) and (life[0] < plot_whole_duration[1])])
+    M_cum_indices = np.where((info_of_monkey['monkey_information']['time'] >= monkey_acting_duration[0]) & (
+        info_of_monkey['monkey_information']['time'] <= monkey_acting_duration[1]))[0]
+    M_cum_t = np.array(
+        info_of_monkey['monkey_information']['time'][M_cum_indices])
+    M_cum_mx, M_cum_my = np.array(info_of_monkey['monkey_information']['monkey_x'][M_cum_indices]), np.array(
+        info_of_monkey['monkey_information']['monkey_y'][M_cum_indices])
+    A_cum_t, A_cum_mx, A_cum_my, A_cum_speed, A_cum_angle, A_cum_dw = increase_dt_for_monkey_information(
+        M_cum_t, M_cum_mx, M_cum_my, agent_dt)
     num_imitation_steps_agent = len(A_cum_t)
     num_imitation_steps_monkey = len(M_cum_t)
 
-    theta = pi / 2 - np.arctan2(M_cum_my[-1] - M_cum_my[0], M_cum_mx[-1] - M_cum_mx[0])
+    theta = pi / 2 - \
+        np.arctan2(M_cum_my[-1] - M_cum_my[0], M_cum_mx[-1] - M_cum_mx[0])
     c, s = np.cos(theta), np.sin(theta)
     rotation_matrix = np.array(((c, -s), (s, c)))
 
     env_kwargs['dt'] = agent_dt
     env_kwargs['num_alive_ff'] = len(alive_ffs)
 
-    if LSTM:
+    # Normalize agent_type and default to sb3
+    agent_type = str(agent_type).lower() if agent_type is not None else "sb3"
+
+    is_rnn = agent_type in ("lstm", "gru")
+    is_attn_ff = agent_type in ("attn", "attention", "attn_ff", "attention_ff")
+    is_attn_rnn = agent_type in ("attn_rnn", "attention_rnn")
+
+    if is_rnn:
         env = env_for_rnn.CollectInformationLSTM(**env_kwargs)
         model_device = next(sac_model.policy_net.parameters()).device
-        hidden_out = (
-            torch.zeros([1, 1, sac_model.hidden_dim], dtype=torch.float32, device=model_device),
-            torch.zeros([1, 1, sac_model.hidden_dim], dtype=torch.float32, device=model_device)
-        )
+        if agent_type == "lstm":
+            hidden_out = (
+                torch.zeros([1, 1, sac_model.hidden_dim],
+                            dtype=torch.float32, device=model_device),
+                torch.zeros([1, 1, sac_model.hidden_dim],
+                            dtype=torch.float32, device=model_device)
+            )
+        else:
+            hidden_out = torch.zeros(
+                [1, 1, sac_model.hidden_dim], dtype=torch.float32, device=model_device)
+    elif is_attn_ff or is_attn_rnn:
+        env = EnvForAttention(**env_kwargs)
+        hidden_out = None
     else:
         env = env_for_sb3.CollectInformation(**env_kwargs)
+        hidden_out = None
     env.flash_on_interval = 0.3
 
     env.distance2center_cost = 0
-    env.ff_flash = make_env_ff_flash_from_real_data(info_of_monkey['ff_flash_sorted'], alive_ffs, plot_whole_duration)
-    env_ffxy = np.array(info_of_monkey['ff_real_position_sorted'][alive_ffs], dtype=np.float32)
+    env.ff_flash = make_env_ff_flash_from_real_data(
+        info_of_monkey['ff_flash_sorted'], alive_ffs, plot_whole_duration)
+    env_ffxy = np.array(
+        info_of_monkey['ff_real_position_sorted'][alive_ffs], dtype=np.float32)
     env.ffxy, env.ffxy_noisy = env_ffxy, env_ffxy
     env.ffx, env.ffx_noisy = env.ffxy[:, 0], env.ffxy[:, 0]
     env.ffy, env.ffy_noisy = env.ffxy[:, 1], env.ffxy[:, 1]
     obs, _ = env.reset(use_random_ff=False)
 
-    monkey_actions = np.stack((A_cum_dw / env.wgain, (A_cum_speed / env.vgain - 0.5) * 2), axis=1)
+    monkey_actions = np.stack(
+        (A_cum_dw / env.wgain, (A_cum_speed / env.vgain - 0.5) * 2), axis=1)
 
     monkey_x, monkey_y, monkey_speed, monkey_dw, monkey_angles, time = [], [], [], [], [], []
     obs_ff_unique_identifiers = []
@@ -193,13 +236,23 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
     for step in range(1, num_imitation_steps_agent):
         prev_ff_information = env.ff_information.copy()
-        if LSTM:
+        if is_rnn:
             if step > 0:
                 hidden_in = hidden_out
-                action, hidden_out = sac_model.policy_net.get_action(state, last_action, hidden_in, deterministic=True)
+                action, hidden_out = sac_model.policy_net.get_action(
+                    state, last_action, hidden_in, deterministic=True)
             last_action = monkey_actions[step]
             next_state, reward, done, _, _ = env.step(monkey_actions[step])
             state = next_state
+        elif is_attn_ff or is_attn_rnn:
+            # During imitation, still step env with monkey actions; update hidden_out for attention RNN
+            if is_attn_rnn and hasattr(env, 'obs_to_attn_tensors') and hasattr(sac_model, 'actor'):
+                sf, sm, ss = env.obs_to_attn_tensors(
+                    obs, device=next(sac_model.actor.parameters()).device)
+                with torch.no_grad():
+                    mu_seq, std_seq, _, hidden_out = sac_model.actor(
+                        sf.unsqueeze(1), sm.unsqueeze(1), ss.unsqueeze(1), hx=hidden_out)
+            obs, reward, done, _, info = env.step(monkey_actions[step])
         else:
             obs, reward, done, _, info = env.step(monkey_actions[step])
         env.agentheading = np.array([A_cum_angle[step]])
@@ -215,20 +268,59 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
         indexes_in_ff_information = []
         for index in env.topk_indices:
-            last_corresponding_ff_index = np.where(prev_ff_information.loc[:, "index_in_ff_flash"] == index)[0][-1]
+            last_corresponding_ff_index = np.where(
+                prev_ff_information.loc[:, "index_in_ff_flash"] == index)[0][-1]
             indexes_in_ff_information.append(last_corresponding_ff_index)
         obs_ff_unique_identifiers.append(indexes_in_ff_information)
 
     env.v_noise_std = original_v_noise_std
     env.w_noise_std = original_w_noise_std
-    num_total_steps = int(np.ceil((plot_whole_duration[1] - plot_whole_duration[0]) / agent_dt))
+    num_total_steps = int(
+        np.ceil((plot_whole_duration[1] - plot_whole_duration[0]) / agent_dt))
     for step in range(num_imitation_steps_agent, num_total_steps + 10):
-        if LSTM:
+        if is_rnn:
             hidden_in = hidden_out
-            action, hidden_out = sac_model.policy_net.get_action(state, last_action, hidden_in, deterministic=True)
+            action, hidden_out = sac_model.policy_net.get_action(
+                state, last_action, hidden_in, deterministic=True)
             last_action = action
             next_state, reward, done, _, _ = env.step(action)
             state = next_state
+        elif is_attn_ff or is_attn_rnn:
+            attn_limits = attn_get_action_limits(env)
+            if hasattr(env, 'obs_to_attn_tensors') and hasattr(sac_model, 'actor'):
+                if is_attn_rnn:
+                    sf, sm, ss = env.obs_to_attn_tensors(
+                        obs, device=next(sac_model.actor.parameters()).device)
+                    with torch.no_grad():
+                        mu_seq, std_seq, _, hidden_out = sac_model.actor(
+                            sf.unsqueeze(1), sm.unsqueeze(1), ss.unsqueeze(1), hx=hidden_out)
+                        mu = mu_seq[:, -1]
+                        a = torch.tanh(mu)
+                        scaled = []
+                        for j in range(a.size(-1)):
+                            lo, hi = attn_limits[j]
+                            mid, half = 0.5 * (hi + lo), 0.5 * (hi - lo)
+                            scaled.append(mid + half * a[:, j:j+1])
+                        act_tensor = torch.cat(scaled, dim=-1)
+                    action = act_tensor.squeeze(
+                        0).detach().cpu().numpy().astype(np.float32)
+                else:
+                    sf, sm, ss = env.obs_to_attn_tensors(
+                        obs, device=next(sac_model.actor.parameters()).device)
+                    with torch.no_grad():
+                        mu, std, _, _ = sac_model.actor(sf, sm, ss)
+                        a = torch.tanh(mu)
+                        scaled = []
+                        for j in range(a.size(-1)):
+                            lo, hi = attn_limits[j]
+                            mid, half = 0.5 * (hi + lo), 0.5 * (hi - lo)
+                            scaled.append(mid + half * a[0, j:j+1])
+                        act_tensor = torch.cat(scaled, dim=-1)
+                    action = act_tensor.squeeze(
+                        0).detach().cpu().numpy().astype(np.float32)
+            else:
+                action, _ = sac_model.predict(obs, deterministic=True)
+            obs, reward, done, _, info = env.step(action)
         else:
             action, _ = sac_model.predict(obs, deterministic=True)
             obs, reward, done, _, info = env.step(action)
@@ -241,7 +333,8 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
 
         indexes_in_ff_information = []
         for index in env.topk_indices:
-            last_corresponding_ff_index = np.where(prev_ff_information.loc[:, "index_in_ff_flash"] == index)[0][-1]
+            last_corresponding_ff_index = np.where(
+                prev_ff_information.loc[:, "index_in_ff_flash"] == index)[0][-1]
             indexes_in_ff_information.append(last_corresponding_ff_index)
         obs_ff_unique_identifiers.append(indexes_in_ff_information)
 
@@ -255,18 +348,24 @@ def find_corresponding_info_of_agent(info_of_monkey, currentTrial, num_trials, s
     }
     monkey_information['point_index'] = range(len(monkey_information['time']))
 
-    ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(env.ff_information, env.ff_flash, env.time)
+    ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(
+        env.ff_information, env.ff_flash, env.time)
     caught_ff_num = len(ff_caught_T_new)
 
     reversed_sorting = reverse_value_and_position(sorted_indices_all)
-    obs_ff_indices_in_ff_dataframe = [reversed_sorting[indices] for indices in obs_ff_unique_identifiers]
+    obs_ff_indices_in_ff_dataframe = [
+        reversed_sorting[indices] for indices in obs_ff_unique_identifiers]
 
-    ff_dataframe_args = (pd.DataFrame(monkey_information), ff_caught_T_new, ff_flash_sorted, ff_real_position_sorted, ff_life_sorted)
+    ff_dataframe_args = (pd.DataFrame(monkey_information), ff_caught_T_new,
+                         ff_flash_sorted, ff_real_position_sorted, ff_life_sorted)
     ff_dataframe_kargs = {"max_distance": 400}
-    ff_dataframe = make_ff_dataframe.make_ff_dataframe_func(*ff_dataframe_args, **ff_dataframe_kargs, player="agent", obs_ff_indices_in_ff_dataframe=obs_ff_indices_in_ff_dataframe)
+    ff_dataframe = make_ff_dataframe.make_ff_dataframe_func(
+        *ff_dataframe_args, **ff_dataframe_kargs, player="agent", obs_ff_indices_in_ff_dataframe=obs_ff_indices_in_ff_dataframe)
     if len(ff_dataframe) > 0:
-        ff_dataframe = ff_dataframe[ff_dataframe['time'] <= plot_whole_duration[1] - plot_whole_duration[0]]
-        _, _, cluster_around_target_indices, _ = pattern_by_trials.cluster_around_target_func(ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted)
+        ff_dataframe = ff_dataframe[ff_dataframe['time'] <=
+                                    plot_whole_duration[1] - plot_whole_duration[0]]
+        _, _, cluster_around_target_indices, _ = pattern_by_trials.cluster_around_target_func(
+            ff_dataframe, caught_ff_num, ff_caught_T_new, ff_real_position_sorted)
     else:
         cluster_around_target_indices = []
 
@@ -294,8 +393,9 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
     if 'processed_data/' not in processed_data_folder_path:
         raise ValueError("'processed_data/' not found in the provided path.")
 
-    after_processed_data = processed_data_folder_path.split('processed_data/', 1)[1]
-    search_root = 'RL_models/SB3_stored_models/all_collected_data'
+    after_processed_data = processed_data_folder_path.split(
+        'processed_data/', 1)[1]
+    search_root = 'multiff_analysis/RL_models/SB3_stored_models/all_collected_data'
 
     matching_dirs = []
     for root, dirs, files in os.walk(search_root, topdown=True):
@@ -322,5 +422,3 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
                     shutil.rmtree(item_path, ignore_errors=True)
             except Exception as e:
                 print(f"Failed to delete {item_path}: {e}")
-
-

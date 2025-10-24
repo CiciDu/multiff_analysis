@@ -11,6 +11,7 @@ import math
 from math import pi
 import gymnasium
 from typing import Optional, List
+from typing import Union
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -77,15 +78,15 @@ class MultiFF(gymnasium.Env):
                  invisible_distance=500,
                  make_ff_always_flash_on=False,
                  reward_per_ff=100,
-                 dv_cost_factor=10,
-                 dw_cost_factor=10,
-                 w_cost_factor=10,
+                 dv_cost_factor=1,
+                 dw_cost_factor=1,
+                 w_cost_factor=1,
                  distance2center_cost=0,
                  stop_vel_cost=50,
                  reward_boundary=25,
                  add_vel_cost_when_catching_ff_only=False,
-                 linear_terminal_vel=0.01,
-                 angular_terminal_vel=0.01,
+                 linear_terminal_vel=0.05,
+                 angular_terminal_vel=0.05,
                  dt=0.1,
                  episode_len=512,
                  print_ff_capture_incidents=True,
@@ -96,7 +97,7 @@ class MultiFF(gymnasium.Env):
                  obs_visible_only: bool = False,
                  zero_invisible_ff_features: bool = False,
                  use_prev_obs_for_invisible_pose: bool = False,
-                 obs_noise: Optional[ObsNoiseCfg | dict] = None,
+                 obs_noise: Optional[Union[ObsNoiseCfg, dict]] = None,
                  identity_slot_strategy: str = 'drop_fill',
                  **kwargs
                  ):
@@ -205,10 +206,6 @@ class MultiFF(gymnasium.Env):
         self.ff_t_since_last_seen = None
         self.ff_visible = None           # per global ff id, {0,1}
 
-    def _update_ff_visible(self):
-        self.ff_visible = np.zeros_like(self.ff_visible)
-        if len(self.visible_ff_indices) > 0:
-            self.ff_visible[self.visible_ff_indices] = 1
 
     def reset(self, seed=None, use_random_ff=True):
         '''
@@ -228,18 +225,17 @@ class MultiFF(gymnasium.Env):
         except Exception:
             pass
 
-        print('current linear_terminal_vel: ', self.linear_terminal_vel)
+        print('current reward_boundary: ', self.reward_boundary)
+        print('current distance2center_cost: ', self.distance2center_cost)
         print('current angular_terminal_vel: ', self.angular_terminal_vel)
-        print('current dt: ', self.dt)
+        print('current flash_on_interval: ', self.flash_on_interval)
+        print('current stop_vel_cost: ', self.stop_vel_cost)
 
         print('current dv_cost_factor: ', self.dv_cost_factor)
         print('current dw_cost_factor: ', self.dw_cost_factor)
         print('current w_cost_factor: ', self.w_cost_factor)
-        print('current distance2center_cost: ', self.distance2center_cost)
-        print('current stop_vel_cost: ', self.stop_vel_cost)
-        print('current flash_on_interval: ', self.flash_on_interval)
+        
         print('current num_obs_ff: ', self.num_obs_ff)
-        print('current reward_boundary: ', self.reward_boundary)
         print('current max_in_memory_time: ', self.max_in_memory_time)
 
         # randomly generate the information of the fireflies
@@ -310,11 +306,10 @@ class MultiFF(gymnasium.Env):
 
         self.dv = (self.prev_v - self.v) / self.dt
         self.dw = (self.prev_w - self.w) / self.dt
-        w = self.action[0]
 
         dv_cost = self.dv**2 * self.dt * self.dv_cost_factor / 160000
-        dw_cost = self.dw**2 * self.dt * self.dw_cost_factor / 630
-        w_cost = w**2 * self.dt * self.w_cost_factor / 2
+        dw_cost = self.dw**2 * self.dt * self.dw_cost_factor / 100
+        w_cost = self.w**2 * self.dt * self.w_cost_factor
         self.cost_breakdown['dv_cost'] += dv_cost
         self.cost_breakdown['dw_cost'] += dw_cost
         self.cost_breakdown['w_cost'] += w_cost
@@ -389,29 +384,32 @@ class MultiFF(gymnasium.Env):
                 if self.distance2center_cost > 0 or self.stop_vel_cost > 0:
                     print('Reward for each ff: ', np.array(
                         self.reward_for_each_ff))
-        is_time_limit = self.time >= self.episode_len * self.dt
-        return self.obs, reward, False, is_time_limit, {}
+        terminated = False
+        truncated = self.time >= self.episode_len * self.dt
+        return self.obs, reward, terminated, truncated, {}
+
 
     def _add_noise_to_action(self, action):
         '''
         add noise to the action
         '''
-        if (abs(action[0]) <= self.angular_terminal_vel) & ((action[1] / 2 + 0.5) <= self.linear_terminal_vel):
+        new_action = np.empty_like(action, dtype=np.float32)
+        if (abs(action[0]) <= self.angular_terminal_vel) and ((action[1] / 2 + 0.5) <= self.linear_terminal_vel):
             self.vnoise = 0.0
             self.wnoise = 0.0
             self.is_stop = True
-            # calculate the deviation of the action from the terminal velocity
-            self.v_stop_deviance = max(0, action[1] / 2 + 0.5 - 0.01)
-            self.w_stop_deviance = max(0, abs(action[0]) - 0.01)
+            # calculate the deviation of the angular velocity from the target angular terminal velocity; useful in curriculum training
+            self.w_stop_deviance = max(0, abs(action[0]) - 0.05)
+            # set linear velocity to 0
+            new_action[0] = np.clip(float(action[0]), -1.0, 1.0)
+            new_action[1] = float(0)
         else:
             self.vnoise = float(self.rng.normal(0.0, self.v_noise_std))
             self.wnoise = float(self.rng.normal(0.0, self.w_noise_std))
             self.is_stop = False
-            self.v_stop_deviance = 0
             self.w_stop_deviance = 0
-        new_action = np.empty_like(action, dtype=np.float32)
-        new_action[0] = np.clip(float(action[0]) + self.wnoise, -1.0, 1.0)
-        new_action[1] = np.clip(float(action[1]) + self.vnoise, -1.0, 1.0)
+            new_action[0] = np.clip(float(action[0]) + self.wnoise, -1.0, 1.0)
+            new_action[1] = np.clip(float(action[1]) + self.vnoise, -1.0, 1.0)
         return new_action
 
     def state_step(self):
@@ -436,7 +434,7 @@ class MultiFF(gymnasium.Env):
         self.agentxy[1] = self.agenty[0]
         r2 = self.agentxy[0] * self.agentxy[0] + \
             self.agentxy[1] * self.agentxy[1]
-        self.agentr = np.sqrt(r2).astype(np.float32)
+        self.agentr = np.sqrt(r2).astype(np.float32).reshape(-1)
         self.agenttheta = np.arctan2(self.agenty, self.agentx)
         self.agentheading = np.remainder(
             self.agentheading + self.w * self.dt, 2 * pi)
@@ -557,8 +555,7 @@ class MultiFF(gymnasium.Env):
                 (self.distance2center_cost/self.reward_boundary * 25)
             catching_ff_reward = catching_ff_reward - self.cost_for_distance2center
         if self.stop_vel_cost > 0:
-            self.total_deviated_vel = self.v_stop_deviance + self.w_stop_deviance
-            self.cost_for_stop_vel = self.total_deviated_vel * (self.stop_vel_cost/self.angular_terminal_vel)
+            self.cost_for_stop_vel = self.w_stop_deviance * (self.stop_vel_cost/self.angular_terminal_vel)
             catching_ff_reward = catching_ff_reward - self.cost_for_stop_vel
 
         return catching_ff_reward
@@ -617,7 +614,6 @@ class MultiFF(gymnasium.Env):
         self.angle_to_center_topk_noisy = np.array([])
 
     def _get_ff_info(self):
-
         # squared distances (N,)
         dx = self.ffxy[:, 0] - self.agentxy[0]
         dy = self.ffxy[:, 1] - self.agentxy[1]
@@ -667,11 +663,12 @@ class MultiFF(gymnasium.Env):
         ff_index = np.asarray(ff_index, dtype=np.int32)
         if ff_index.size == 0:
             return
-
+        
         # 1) distances & angles for the subset (global write-back)
         sub = self.ffxy[ff_index] - self.agentxy
+        self.ff_distance2_all[ff_index] = np.sum(sub * sub, axis=1)
         self.ff_distance_all[ff_index] = np.sqrt(
-            np.sum(sub * sub, axis=1)).astype(np.float32)
+            self.ff_distance2_all[ff_index]).astype(np.float32)
         angle_to_center_sub, angle_to_boundary_sub = env_utils.calculate_angles_to_ff(
             self.ffxy[ff_index], self.agentx, self.agenty, self.agentheading,
             self.ff_radius, ffdistance=self.ff_distance_all[ff_index]
@@ -759,6 +756,7 @@ class MultiFF(gymnasium.Env):
             dist_clip = np.minimum(dist, self.D_max)
             d_log01 = (np.log1p(dist_clip / self.d0) *
                        self._inv_log_denom).astype(np.float32)
+            d_log01 = np.clip(d_log01, 0.0, 1.0).astype(np.float32)
 
             # If using prev-obs for invisible pose, pull from previous slot snapshot
             if getattr(self, 'use_prev_obs_for_invisible_pose', False) and (self._prev_slots_SN is not None):
@@ -789,25 +787,6 @@ class MultiFF(gymnasium.Env):
             # Visible and valid flags
             self.visible = self.ff_visible[ffids].astype(np.float32)
             valid = np.ones_like(self.visible, dtype=np.float32)
-
-            # If using prev obs for invisible pose, overwrite content from previous slots snapshot
-            if getattr(self, 'use_prev_obs_for_invisible_pose', False) and (self._prev_slots_SN is not None):
-                invis_rows = self.ff_visible[ffids] < 0.5
-                if np.any(invis_rows):
-                    # map field names to indices within out_idx
-                    def col_for(field):
-                        idx_full = self.FIELD_INDEX[field]
-                        return idx_full if isinstance(out_idx, slice) else (out_idx.index(idx_full) if idx_full in out_idx else None)
-                    j_dlog = col_for('d_log')
-                    j_sin = col_for('sin')
-                    j_cos = col_for('cos')
-                    prev_rows = valid_slots[np.where(invis_rows)[0]]
-                    if j_dlog is not None:
-                        d_log01[invis_rows] = self._prev_slots_SN[prev_rows, j_dlog]
-                    if j_sin is not None:
-                        sin_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_sin]
-                    if j_cos is not None:
-                        cos_theta[invis_rows] = self._prev_slots_SN[prev_rows, j_cos]
 
             # compute pose_unreliable = 1 - visible
             if getattr(self, 'use_prev_obs_for_invisible_pose', False) or getattr(self, 'zero_invisible_ff_features', False):

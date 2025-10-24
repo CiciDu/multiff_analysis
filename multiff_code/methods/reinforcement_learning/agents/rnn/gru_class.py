@@ -18,28 +18,30 @@ n_steps = 1000
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
-
 class GRUforMultifirefly(lstm_class.LSTMforMultifirefly):
 
     def __init__(self,
-                 overall_folder='RL_models/GRU_stored_models/all_agents/gen_0/',
+                 overall_folder='multiff_analysis/RL_models/GRU_stored_models/all_agents/gen_0/',
                  model_folder_name=None,
                  add_date_to_model_folder_name=False,
                  max_in_memory_time=1,
+                 seq_len=128,
+                 burn_in=0,
                  **additional_env_kwargs):
 
         super().__init__(overall_folder,
                          add_date_to_model_folder_name=add_date_to_model_folder_name,
                          model_folder_name=model_folder_name,
                          max_in_memory_time=max_in_memory_time,
+                         seq_len=seq_len,
+                         burn_in=burn_in,
                          **additional_env_kwargs)
 
-        # keep 'rnn' branch behavior for env handling; mark subtype for clarity
-        self.sb3_or_rnn = 'rnn'
-        self.rnn_type = 'gru'
+        # mark subtype for clarity
+        self.agent_type = 'gru'
         self.algorithm_name = 'gru_sac'
         self.model_files = ['gru_q1', 'gru_q2', 'gru_policy']
-        
+
         self.replay_buffer_class = gru_utils.ReplayBufferGRU
         self.trainer_class = gru_utils.GRU_SAC_Trainer
         self.env_class = env_for_rnn.EnvForRNN
@@ -57,7 +59,8 @@ class GRUforMultifirefly(lstm_class.LSTMforMultifirefly):
             env,
             train_episode_fn=gru_utils._train_gru_episode,
             eval_agent_fn=gru_utils.evaluate_gru_agent,
-            save_fn=lambda model, dir_name: lstm_utils.save_best_model(model, dir_name=dir_name),
-            track_alpha=False,
+            save_fn=lambda model, dir_name: lstm_utils.save_best_model(
+                model, dir_name=dir_name),
+            track_alpha=True,
             **kwargs
         )

@@ -63,14 +63,23 @@ venv.bak/
 logs/
 log/
 
-# Large directories
+# Large / raw data
 all_monkey_data/
 raw_monkey_data/
 processed_data/
+
+# Model checkpoints and outputs
 RL_models/
+**/RL_models/
+
+# Manual and backup folders
 for_manual_annotation/
 data_backup/
 backups/
+
+# Logs
+logs/
+**/logs/
 
 # Temporary files
 *.tmp

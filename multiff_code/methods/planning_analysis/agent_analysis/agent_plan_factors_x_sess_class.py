@@ -18,7 +18,7 @@ import os
 class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
     def __init__(self,
-                 model_folder_name='RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
+                 model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
                  num_steps_per_dataset=40000,  # note, currently we use 10000s / dt = 40000 steps
