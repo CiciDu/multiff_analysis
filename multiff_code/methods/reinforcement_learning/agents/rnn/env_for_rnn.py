@@ -11,10 +11,18 @@ class EnvForRNN(base_env.MultiFF):
 
     def __init__(self, episode_len=512,
                  max_in_memory_time=2,
-                 use_prev_obs_for_invisible_pose=True,
+                 use_prev_obs_for_invisible_pose=False,
+                 obs_noise = {'perc_r': 0,
+                    'perc_th': 0,
+                    'mem_r': 0,
+                    'mem_th': 0,
+                },  
                  **kwargs):
 
-        super().__init__(  # obs_visible_only=True,
+
+
+
+        super().__init__(obs_noise=obs_noise,  # obs_visible_only=True,
             use_prev_obs_for_invisible_pose=use_prev_obs_for_invisible_pose,
             # for LSTM, max_in_memory_time must be 1
             max_in_memory_time=max_in_memory_time,

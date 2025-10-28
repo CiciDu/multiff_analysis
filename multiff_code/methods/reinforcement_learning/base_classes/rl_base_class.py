@@ -7,6 +7,7 @@ from reinforcement_learning.agents.feedforward import env_for_sb3
 from reinforcement_learning.collect_data import collect_agent_data, process_agent_data
 from reinforcement_learning.agents.feedforward import interpret_neural_network, sb3_utils
 from reinforcement_learning.base_classes import rl_base_utils
+from reinforcement_learning.base_classes import run_logger
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 from reinforcement_learning.base_classes import base_env
 from reinforcement_learning.base_classes import env_utils
@@ -46,7 +47,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  distance2center_cost=0,
                  stop_vel_cost=50,
                  data_name='data_0',
-                 std_anneal_preserve_fraction=0.05,
+                 std_anneal_preserve_fraction=1,
                  **additional_env_kwargs):
 
         self.player = "agent"
@@ -208,9 +209,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                                   initial_distance2center_cost=2,
                                                   initial_stop_vel_cost=50,
                                                   initial_reward_boundary=75,
-                                                  initial_dv_cost_factor=0.5,
-                                                  initial_dw_cost_factor=0.5,
-                                                  initial_w_cost_factor=0.5,
+                                                  initial_dv_cost_factor=0,
+                                                  initial_dw_cost_factor=0,
+                                                  initial_w_cost_factor=0,
                                                   ):
         self.curriculum_env_kwargs = copy.deepcopy(
             self.input_env_kwargs)
@@ -255,6 +256,88 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         else:
             self.env = env
 
+    def _prune_or_clear_replay_buffer(self, keep_fraction: float = 0.2):
+        """
+        Prune or clear replay buffer to avoid stale data after curriculum stage change.
+
+        Behavior:
+          - If a buffer exists, retain the most recent keep_fraction (default 20%).
+          - Handles both episode-list buffers (LSTM/GRU) and array-based buffers (FF attention).
+          - If keep_fraction <= 0, clears the buffer completely.
+        """
+        try:
+            rb = None
+            # Find replay buffer on sac_model or self
+            if hasattr(self, 'sac_model') and hasattr(self.sac_model, 'replay_buffer'):
+                rb = self.sac_model.replay_buffer
+            elif hasattr(self, 'replay'):
+                # FF attention agent uses self.replay
+                rb = getattr(self, 'replay', None)
+            elif hasattr(self, 'replay_buffer'):
+                rb = getattr(self, 'replay_buffer', None)
+
+            if rb is None:
+                print('No replay buffer found to prune/clear')
+                return
+
+            # Episode-list style: has attribute 'buffer' as list
+            if hasattr(rb, 'buffer') and isinstance(getattr(rb, 'buffer'), list):
+                buf_list = rb.buffer
+                n = len(buf_list)
+                if n == 0:
+                    return
+                if keep_fraction <= 0:
+                    rb.buffer = []
+                    rb.position = 0 if hasattr(rb, 'position') else 0
+                    print('Cleared episode replay buffer')
+                    return
+                k = max(1, int(n * float(keep_fraction)))
+                # Keep the most recent k episodes according to ring-buffer semantics
+                if hasattr(rb, 'position'):
+                    pos = int(rb.position)
+                    # reconstruct chronological order from ring buffer
+                    ordered = buf_list[pos:] + buf_list[:pos]
+                    trimmed = ordered[-k:]
+                    rb.buffer = trimmed
+                    rb.position = len(trimmed) % max(1, getattr(rb, 'capacity', len(trimmed)))
+                else:
+                    rb.buffer = buf_list[-k:]
+                print(f'Pruned episode replay buffer to last {k} episodes (~{int(keep_fraction*100)}%)')
+                return
+
+            # Array-based style (FF): has numpy arrays and size/ptr
+            if all(hasattr(rb, attr) for attr in ('obs', 'next_obs', 'action', 'reward', 'done')) and hasattr(rb, 'size'):
+                size = int(getattr(rb, 'size', 0))
+                if size <= 0:
+                    return
+                if keep_fraction <= 0:
+                    # reset size and pointer only; arrays can remain allocated
+                    rb.size = 0
+                    if hasattr(rb, 'ptr'):
+                        rb.ptr = 0
+                    print('Cleared array replay buffer (size=0)')
+                    return
+                k = max(1, int(size * float(keep_fraction)))
+                # compute indices of last k transitions respecting circular buffer
+                ptr = int(getattr(rb, 'ptr', size))
+                idx = (np.arange(size - k, size) + ptr) % max(1, getattr(rb, 'capacity', size))
+                # compact into front of arrays
+                rb.obs[:k] = rb.obs[idx]
+                rb.next_obs[:k] = rb.next_obs[idx]
+                rb.action[:k] = rb.action[idx]
+                rb.reward[:k] = rb.reward[idx]
+                rb.done[:k] = rb.done[idx]
+                rb.size = k
+                rb.ptr = k % max(1, getattr(rb, 'capacity', k))
+                print(f'Pruned array replay buffer to last {k} steps (~{int(keep_fraction*100)}%)')
+                return
+
+            print('Replay buffer format not recognized; skipping prune')
+        except Exception as e:
+            print('Warning: failed to prune/clear replay buffer:', e)
+
+    
+    # Wire pruning after curriculum env updates
     def _update_env_after_meeting_reward_threshold(self):
         
         print('Updating env after meeting reward threshold...')
@@ -287,25 +370,29 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             'dw_cost_factor': self.input_env_kwargs['dw_cost_factor'],
             'w_cost_factor': self.input_env_kwargs['w_cost_factor'],
         }
-
+        
         if env.reward_boundary > self.input_env_kwargs['reward_boundary']:
             env.reward_boundary = max(
                 env.reward_boundary - 10, self.input_env_kwargs['reward_boundary'])
             self.curriculum_env_kwargs['reward_boundary'] = env.reward_boundary
             print('Updated reward_boundary to:', env.reward_boundary)
+            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
         elif env.distance2center_cost > self.input_env_kwargs['distance2center_cost']:
             env.distance2center_cost = max(
                 env.distance2center_cost - 0.5, self.input_env_kwargs['distance2center_cost'])
             self.curriculum_env_kwargs['distance2center_cost'] = env.distance2center_cost
             print('Updated distance2center_cost to:', env.distance2center_cost)
+            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
         elif env.angular_terminal_vel > self.input_env_kwargs['angular_terminal_vel']:
             env.angular_terminal_vel = max(env.angular_terminal_vel/2, self.input_env_kwargs['angular_terminal_vel'])
             self.curriculum_env_kwargs['angular_terminal_vel'] = env.angular_terminal_vel
             print('Updated angular_terminal_vel to:', env.angular_terminal_vel)
+            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
         elif env.flash_on_interval > self.input_env_kwargs['flash_on_interval']:
             env.flash_on_interval = max(env.flash_on_interval - 0.3, self.input_env_kwargs['flash_on_interval'])
             self.curriculum_env_kwargs['flash_on_interval'] = env.flash_on_interval
             print('Updated flash_on_interval to:', env.flash_on_interval)
+            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
         elif env.stop_vel_cost > self.input_env_kwargs['stop_vel_cost']:
             env.stop_vel_cost = max(env.stop_vel_cost - 50,
                                     self.input_env_kwargs['stop_vel_cost'])
@@ -342,6 +429,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 setattr(self.sac_model.policy_net, 'anneal_step', int(max(0, int(current * self.std_anneal_preserve_fraction))))
             except Exception as e:
                 print('Warning: failed to reset std-anneal progress:', e)
+            print('std_anneal step before: ', current)
+            print('std_anneal step after: ', int(max(0, int(current * self.std_anneal_preserve_fraction))))
+        else:
+            print('No policy net found. No update to std_anneal step')
 
         # Softly reset SAC temperature (alpha) for auto-entropy after curriculum env change
         if hasattr(self, 'sac_model') and hasattr(self.sac_model, 'log_alpha'):
@@ -527,10 +618,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.ff_dataframe = pd.read_csv(self.ff_dataframe_path).drop(
                 columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         else:
-            print('Warnings: currently, only ff in obs at each step are used in ff_dataframe. All ff are labeled \'visible\' regardless of their actual time since last visible.')
-            if str(getattr(self, 'agent_type', 'sb3')).lower() in ('lstm', 'gru', 'rnn'):
-                print('It is possible that an RNN agent has memory of past ff; code may need updates to reflect that. For planning analysis, info of in-memory ff is not needed.')
-
             self.make_ff_dataframe_from_ff_in_obs_df()
             # base_processing_class.BaseProcessing.make_or_retrieve_ff_dataframe(self, exists_ok=False, save_into_h5=False)
             print("made ff_dataframe")
@@ -542,7 +629,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     def make_ff_dataframe_from_ff_in_obs_df(self):
         self.ff_dataframe = self.ff_in_obs_df.copy()
-        # self.ff_dataframe['visible'] = 1
 
         make_ff_dataframe.add_essential_columns_to_ff_dataframe(
             self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted)
@@ -607,8 +693,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.streamline_making_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                                          duration=duration, n_steps=n_steps, file_name=None)
 
-    def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None):
-        self.collect_data(n_steps=n_steps)
+    def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
+                                    data_exists_ok=False):
+        self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                             duration=duration, file_name=file_name, video_dir=video_dir)
@@ -678,6 +765,24 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     best_model_postcurriculum_exists_ok=True,
                     load_replay_buffer_of_best_model_postcurriculum=True, timesteps=1000000):
 
+        # Emit run_start once per training invocation
+        try:
+            # Prefer externally provided sweep params
+            sweep_params = dict(getattr(self, 'sweep_params', {}))
+            # Add common env params if available
+            env_info = {}
+            try:
+                env_info['num_obs_ff'] = self.input_env_kwargs.get('num_obs_ff')
+                env_info['max_in_memory_time'] = self.input_env_kwargs.get('max_in_memory_time')
+                env_info['angular_terminal_vel'] = self.input_env_kwargs.get('angular_terminal_vel')
+                env_info['dt'] = self.input_env_kwargs.get('dt')
+            except Exception:
+                pass
+            sweep_params.update({k: v for k, v in env_info.items() if v is not None})
+            run_logger.log_run_start(self.overall_folder, agent_type=getattr(self, 'agent_type', 'rnn'), sweep_params=sweep_params)
+        except Exception as e:
+            print('[logger] failed to log run start from base class:', e)
+
         self.training_start_time = time_package.time()
         if not use_curriculum_training:
             print('Starting regular training')
@@ -702,6 +807,18 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.overall_folder + 'family_of_agents_log.csv')
         # Also check if the information is in parameters_record. If not, add it.
         # self.check_and_update_parameters_record()
+
+        # Emit run_end with basic metric
+        try:
+            metrics = {}
+            try:
+                metrics['best_avg_reward'] = getattr(self, 'best_avg_reward', None)
+            except Exception:
+                pass
+            sweep_params = dict(getattr(self, 'sweep_params', {}))
+            run_logger.log_run_end(self.overall_folder, agent_type=getattr(self, 'agent_type', 'rnn'), sweep_params=sweep_params, status='finished', metrics=metrics)
+        except Exception as e:
+            print('[logger] failed to log run end from base class:', e)
 
     def _evaluate_model_and_retrain_if_necessary(self, use_curriculum_training=False):
 
@@ -800,8 +917,12 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.minimal_current_info = self.get_minimum_current_info()
         retrieved_current_info = self.family_of_agents_log.loc[self.current_info_condition]
 
-        exist_best_model = exists(os.path.join(
-            self.model_folder_name, 'best_model.zip'))
+        # Detect existence of a best model for both SB3 (.zip) and RNN (manifest) schemes
+        candidate_paths = [
+            os.path.join(self.model_folder_name, 'best_model.zip'),
+            os.path.join(self.model_folder_name, 'checkpoint_manifest.json'),
+        ]
+        exist_best_model = any(exists(p) for p in candidate_paths)
         finished_training = np.any(retrieved_current_info['finished_training'])
         print('exist_best_model', exist_best_model)
         print('finished_training', finished_training)
@@ -937,31 +1058,34 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         sb3_utils.add_row_to_feature_means_record(
             self.feature_statistics, self.minimal_current_info, self.overall_folder)
 
-    def plot_side_by_side(self):
-        with general_utils.HiddenPrints():
-            num_trials = 2
-            plotting_params = {"show_stops": True,
-                               "show_believed_target_positions": True,
-                               "show_reward_boundary": True,
-                               "show_connect_path_ff": True,
-                               "show_scale_bar": True,
-                               "hitting_arena_edge_ok": True,
-                               "trial_too_short_ok": True}
+    # def plot_side_by_side(self):
+    
+    # Note: I've deleted the old find_corresponding_info_of_agent function on 2025/10/28
+    
+    #     with general_utils.HiddenPrints():
+    #         num_trials = 2
+    #         plotting_params = {"show_stops": True,
+    #                            "show_believed_target_positions": True,
+    #                            "show_reward_boundary": True,
+    #                            "show_connect_path_ff": True,
+    #                            "show_scale_bar": True,
+    #                            "hitting_arena_edge_ok": True,
+    #                            "trial_too_short_ok": True}
 
-            for currentTrial in [12, 69, 138, 221, 235]:
-                # more: 259, 263, 265, 299, 393, 496, 523, 556, 601, 666, 698, 760, 805, 808, 930, 946, 955, 1002, 1003
-                info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = process_agent_data.find_corresponding_info_of_agent(
-                    self.info_of_monkey, currentTrial, num_trials, self.sac_model, self.agent_dt, env_kwargs=self.current_env_kwargs, agent_type=getattr(self, 'agent_type', None))
+    #         for currentTrial in [12, 69, 138, 221, 235]:
+    #             # more: 259, 263, 265, 299, 393, 496, 523, 556, 601, 666, 698, 760, 805, 808, 930, 946, 955, 1002, 1003
+    #             info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = process_agent_data.find_corresponding_info_of_agent(
+    #                 self.info_of_monkey, currentTrial, num_trials, self.sac_model, self.agent_dt, env_kwargs=self.current_env_kwargs, agent_type=getattr(self, 'agent_type', None))
 
-                with general_utils.initiate_plot(20, 20, 400):
-                    additional_plots.PlotSidebySide(plot_whole_duration=plot_whole_duration,
-                                                    info_of_monkey=self.info_of_monkey,
-                                                    info_of_agent=info_of_agent,
-                                                    num_imitation_steps_monkey=num_imitation_steps_monkey,
-                                                    num_imitation_steps_agent=num_imitation_steps_agent,
-                                                    currentTrial=currentTrial,
-                                                    num_trials=num_trials,
-                                                    rotation_matrix=rotation_matrix,
-                                                    plotting_params=plotting_params,
-                                                    data_folder_name=self.patterns_and_features_folder_path
-                                                    )
+    #             with general_utils.initiate_plot(20, 20, 400):
+    #                 additional_plots.PlotSidebySide(plot_whole_duration=plot_whole_duration,
+    #                                                 info_of_monkey=self.info_of_monkey,
+    #                                                 info_of_agent=info_of_agent,
+    #                                                 num_imitation_steps_monkey=num_imitation_steps_monkey,
+    #                                                 num_imitation_steps_agent=num_imitation_steps_agent,
+    #                                                 currentTrial=currentTrial,
+    #                                                 num_trials=num_trials,
+    #                                                 rotation_matrix=rotation_matrix,
+    #                                                 plotting_params=plotting_params,
+    #                                                 data_folder_name=self.patterns_and_features_folder_path
+    #                                                 )

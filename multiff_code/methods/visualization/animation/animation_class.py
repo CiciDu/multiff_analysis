@@ -1,4 +1,5 @@
 from data_wrangling import specific_utils, further_processing_class
+from data_wrangling import general_utils
 from visualization.matplotlib_tools import plot_trials
 from visualization.animation import animation_utils, animation_func
 from data_wrangling import specific_utils
@@ -32,7 +33,8 @@ class AnimationClass(further_processing_class.FurtherProcessing):
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
 
-    def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left=False, max_num_frames=150, max_duration=30, min_duration=1, rotated=True):
+    def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left=False, max_num_frames=150, 
+                                 max_duration=30, min_duration=1, rotated=True, figsize=(14, 9), dpi=None):
         # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
         currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
             self.ff_caught_T_new, currentTrial, num_trials, duration)
@@ -45,9 +47,17 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         if static_plot_on_the_left:
             self.fig, self.ax = self._make_static_plot_on_the_left(
-                currentTrial=currentTrial, num_trials=num_trials, duration=duration, animation_plot_kwargs=animation_plot_kwargs)
+                currentTrial=currentTrial, num_trials=num_trials, duration=duration, animation_plot_kwargs=animation_plot_kwargs, figsize=figsize, dpi=dpi)
         else:
-            self.fig, self.ax = plt.subplots()
+            if figsize is not None:
+                self.fig, self.ax = plt.subplots(figsize=figsize)
+            else:
+                self.fig, self.ax = plt.subplots()
+            if dpi is not None:
+                try:
+                    self.fig.set_dpi(dpi)
+                except Exception:
+                    pass
 
         self.currentTrial = currentTrial
         self.num_trials = num_trials
@@ -59,7 +69,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
     def call_animation_function(self, with_annotation=False,
                                 margin=100, dt=0.0165, plot_time_index=False, fps=None,
-                                save_video=True, video_dir=None, file_name=None,
+                                save_video=True, video_dir=None, file_name=None, dpi=None,
                                 **animate_kwargs):
         # dt is to be used to determine the fps(frame per second) of the animation
 
@@ -81,13 +91,12 @@ class AnimationClass(further_processing_class.FurtherProcessing):
             self.fig, animate_func, frames=self.num_frames, interval=dt*1000*self.k, repeat=True)
 
         if save_video:
-            self._save_animation(fps, video_dir, file_name)
+            self._save_animation(fps, video_dir, file_name, dpi)
             try:
                 print('Rendering animation ......')
                 Video(self.video_path_name, embed=True)
             except Exception as e:
                 print('Error rendering animation:', e)
-
 
     def _call_prepare_for_animation_func(self, currentTrial=None, num_trials=None, duration=None, k=1, max_num_frames=None,
                                          max_duration=30, min_duration=1, rotated=True):
@@ -108,8 +117,14 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                                                             duration=duration)
         print("Number of frames for the animation is:", self.num_frames)
 
-    def _make_static_plot_on_the_left(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None):
-        self.fig = plt.figure(figsize=(14.5, 7))
+    def _make_static_plot_on_the_left(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, figsize=None, dpi=None):
+        self.fig = plt.figure(
+            figsize=(figsize if figsize is not None else (14.5, 7)))
+        if dpi is not None:
+            try:
+                self.fig.set_dpi(dpi)
+            except Exception:
+                pass
         PlotTrials_args = (self.monkey_information, self.ff_dataframe, self.ff_life_sorted, self.ff_real_position_sorted,
                            self.ff_believed_position_sorted, self.cluster_around_target_indices, self.ff_caught_T_new)
 
@@ -132,7 +147,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         return self.fig, self.ax
 
-    def _save_animation(self, fps, video_dir, file_name):
+    def _save_animation(self, fps, video_dir, file_name, dpi=None):
         if fps is None:
             if self.player == 'agent':
                 fps = int(4/self.k)  # the real life speed
@@ -155,7 +170,16 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         print("Saving animation as:", self.video_path_name)
         writervideo = animation.FFMpegWriter(fps=fps)
-        self.anim.save(self.video_path_name, writer=writervideo)
+        if dpi is not None:
+            try:
+                self.anim.save(self.video_path_name,
+                               writer=writervideo, dpi=dpi)
+            except TypeError:
+                # Fallback if writer doesn't accept dpi in this backend
+                self.fig.set_dpi(dpi)
+                self.anim.save(self.video_path_name, writer=writervideo)
+        else:
+            self.anim.save(self.video_path_name, writer=writervideo)
         print("Animation is saved at:", self.video_path_name)
 
         # save animation as gif
@@ -166,7 +190,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                        save_video=False, video_dir=None, file_name=None,
                        dt=0.0165, k=3, with_annotation=False, plot_time_index=False,
                        static_plot_on_the_left=True, margin=100, max_num_frames=150, max_duration=30, min_duration=1,
-                       fps=None, rotated=True, **animate_kwargs):
+                       fps=None, rotated=True, figsize=None, dpi=None, **animate_kwargs):
         if file_name is None:
             if currentTrial is not None:
                 file_name = f"{self.data_name}_{currentTrial-num_trials+1}-{currentTrial}.mp4"
@@ -181,9 +205,9 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         animate_kwargs['margin'] = margin
         self.set_animation_parameters(currentTrial=currentTrial, num_trials=num_trials, duration=duration, animation_plot_kwargs=animation_plot_kwargs, k=k, rotated=rotated,
-                                      static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, max_duration=max_duration, min_duration=min_duration)
+                                      static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, max_duration=max_duration, min_duration=min_duration, figsize=figsize, dpi=dpi)
         self.call_animation_function(save_video=save_video, video_dir=video_dir, plot_time_index=plot_time_index,
-                                     file_name=file_name, dt=dt, with_annotation=with_annotation, fps=fps, **animate_kwargs)
+                                     file_name=file_name, dt=dt, with_annotation=with_annotation, fps=fps, dpi=dpi, **animate_kwargs)
 
     def make_animation_from_a_category(self, category_name, max_trial_to_plot, sampling_frame_ratio=3, max_duration=30, min_duration=1,
                                        num_trials=3, save_video=True, video_dir=None, additional_kwargs=None, animation_exists_ok=True,

@@ -529,3 +529,5 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             columns=cols_to_add, inplace=True, errors='ignore')
         self.monkey_information = self.monkey_information.merge(
             self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')
+        
+        self.monkey_information['stop_cluster_id'] = self.monkey_information['stop_cluster_id'].astype('int')

@@ -25,8 +25,8 @@ class GRUforMultifirefly(lstm_class.LSTMforMultifirefly):
                  model_folder_name=None,
                  add_date_to_model_folder_name=False,
                  max_in_memory_time=1,
-                 seq_len=128,
-                 burn_in=0,
+                 seq_len=192,
+                 burn_in=64,
                  **additional_env_kwargs):
 
         super().__init__(overall_folder,

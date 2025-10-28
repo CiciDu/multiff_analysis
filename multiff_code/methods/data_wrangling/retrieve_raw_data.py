@@ -34,7 +34,8 @@ def extract_smr_data(raw_data_folder_path):
     # loop 2 files one by one
     for index, file_name in enumerate(smr_file_paths):
         seg_reader = neo.io.Spike2IO(
-            filename=file_name, try_signal_grouping=False).read_segment()  # read out segments
+            # read out segments
+            filename=file_name, try_signal_grouping=False).read_segment()
 
         # get sampling rate, only need to get it once
         if index == 0:
@@ -155,7 +156,7 @@ def make_or_retrieve_ff_info_from_txt_data(raw_data_folder_path, exists_ok=True,
                 f"Failed to retrieve ff info from txt data. Will get the data anew. Error: {e}")
 
     # Process raw data to get firefly information
-    return _get_ff_info_from_txt_data(raw_data_folder_path, save_data=save_data)
+    return _get_ff_pos_from_txt_data(raw_data_folder_path, save_data=save_data)
 
 
 def make_or_retrieve_ff_flash_sorted_from_txt_data(raw_data_folder_path, exists_ok=True, save_data=True):
@@ -177,7 +178,7 @@ def make_or_retrieve_ff_flash_sorted_from_txt_data(raw_data_folder_path, exists_
     return ff_flash_sorted
 
 
-def _get_ff_info_from_txt_data(raw_data_folder_path, save_data=True):
+def _get_ff_pos_from_txt_data(raw_data_folder_path, save_data=True):
 
     raw_ff_information = _get_raw_ff_information(raw_data_folder_path)
 

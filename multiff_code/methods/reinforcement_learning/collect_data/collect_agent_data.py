@@ -12,7 +12,6 @@ from reinforcement_learning.collect_data.process_agent_data import (
     increase_dt_for_monkey_information,
     unpack_ff_information_of_agent,
     reverse_value_and_position,
-    find_corresponding_info_of_agent,
 )
 from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
 
@@ -47,7 +46,8 @@ def _initialize_agent_state(env, sac_model, hidden_dim=128, first_obs=None, seed
     np.random.seed(seed)
     random.seed(seed)
 
-    derived_agent_type = str(agent_type).lower() if agent_type is not None else "sb3"
+    derived_agent_type = str(agent_type).lower(
+    ) if agent_type is not None else "sb3"
 
     if derived_agent_type in ("lstm", "gru"):
         if first_obs is None:
@@ -60,11 +60,14 @@ def _initialize_agent_state(env, sac_model, hidden_dim=128, first_obs=None, seed
         model_hidden_dim = getattr(sac_model, 'hidden_dim', hidden_dim)
         if derived_agent_type == "lstm":
             hidden_out = (
-                torch.zeros([1, 1, model_hidden_dim], dtype=torch.float32, device=model_device),
-                torch.zeros([1, 1, model_hidden_dim], dtype=torch.float32, device=model_device)
+                torch.zeros([1, 1, model_hidden_dim],
+                            dtype=torch.float32, device=model_device),
+                torch.zeros([1, 1, model_hidden_dim],
+                            dtype=torch.float32, device=model_device)
             )
         else:  # GRU
-            hidden_out = torch.zeros([1, 1, model_hidden_dim], dtype=torch.float32, device=model_device)
+            hidden_out = torch.zeros(
+                [1, 1, model_hidden_dim], dtype=torch.float32, device=model_device)
         return state, last_action, hidden_out
     elif derived_agent_type in ("attn", "attention", "attn_ff", "attn_rnn", "attention_ff", "attention_rnn"):
         if first_obs is None:
@@ -86,14 +89,19 @@ def _initialize_agent_state(env, sac_model, hidden_dim=128, first_obs=None, seed
 def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, deterministic,
                                 state_or_obs, last_action, hidden_out, agent_type=None):
     """Core loop for collecting agent, monkey, and firefly data across agent types."""
-    monkey_x, monkey_y, speed, ang_speed, monkey_angle, is_stop, time = ([] for _ in range(7))
-    indexes_in_ff_flash, corresponding_time, ff_x_noisy, ff_y_noisy = ([] for _ in range(4))
-    pose_unreliable, visible, time_since_last_vis_list, all_steps = ([] for _ in range(4))
-    
-    derived_agent_type = str(agent_type).lower() if agent_type is not None else "sb3"
+    monkey_x, monkey_y, speed, ang_speed, monkey_angle, is_stop, time = (
+        [] for _ in range(7))
+    indexes_in_ff_flash, corresponding_time, ff_x_noisy, ff_y_noisy = (
+        [] for _ in range(4))
+    pose_unreliable, visible, time_since_last_vis_list, all_steps = (
+        [] for _ in range(4))
+
+    derived_agent_type = str(agent_type).lower(
+    ) if agent_type is not None else "sb3"
 
     is_rnn = derived_agent_type in ("lstm", "gru")
-    is_attn_ff = derived_agent_type in ("attn", "attention", "attn_ff", "attention_ff")
+    is_attn_ff = derived_agent_type in (
+        "attn", "attention", "attn_ff", "attention_ff")
     is_attn_rnn = derived_agent_type in ("attn_rnn", "attention_rnn")
     attn_limits = None
     if is_attn_ff or is_attn_rnn:
@@ -117,7 +125,8 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
         elif is_attn_ff or is_attn_rnn:
             if hasattr(env, "obs_to_attn_tensors") and hasattr(sac_model, "actor"):
                 if is_attn_rnn:
-                    sf, sm, ss = env.obs_to_attn_tensors(state_or_obs, device=device)
+                    sf, sm, ss = env.obs_to_attn_tensors(
+                        state_or_obs, device=device)
                     with torch.no_grad():
                         mu_seq, std_seq, _, hidden_out = sac_model.actor(
                             sf.unsqueeze(1), sm.unsqueeze(1), ss.unsqueeze(1), hx=hidden_out
@@ -140,11 +149,14 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
                             for j in range(act_tensor.size(-1)):
                                 lo, hi = attn_limits[j]
                                 mid, half = 0.5 * (hi + lo), 0.5 * (hi - lo)
-                                scaled.append(mid + half * act_tensor[:, j:j+1])
+                                scaled.append(
+                                    mid + half * act_tensor[:, j:j+1])
                             act_tensor = torch.cat(scaled, dim=-1)
-                    action = act_tensor.squeeze(0).detach().cpu().numpy().astype(np.float32)
+                    action = act_tensor.squeeze(
+                        0).detach().cpu().numpy().astype(np.float32)
                 else:
-                    sf, sm, ss = env.obs_to_attn_tensors(state_or_obs, device=device)
+                    sf, sm, ss = env.obs_to_attn_tensors(
+                        state_or_obs, device=device)
                     with torch.no_grad():
                         mu, std, _, _ = sac_model.actor(sf, sm, ss)
                         if deterministic:
@@ -162,20 +174,27 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
                             for j in range(act_tensor.size(-1)):
                                 lo, hi = attn_limits[j]
                                 mid, half = 0.5 * (hi + lo), 0.5 * (hi - lo)
-                                scaled.append(mid + half * act_tensor[0, j:j+1])
+                                scaled.append(
+                                    mid + half * act_tensor[0, j:j+1])
                             act_tensor = torch.cat(scaled, dim=-1)
-                    action = act_tensor.squeeze(0).detach().cpu().numpy().astype(np.float32)
-                state_or_obs, reward, terminated, truncated, info = env.step(action)
+                    action = act_tensor.squeeze(
+                        0).detach().cpu().numpy().astype(np.float32)
+                state_or_obs, reward, terminated, truncated, info = env.step(
+                    action)
             else:
-                action, _ = sac_model.predict(state_or_obs, deterministic=deterministic)
-                state_or_obs, reward, terminated, truncated, info = env.step(action)
+                action, _ = sac_model.predict(
+                    state_or_obs, deterministic=deterministic)
+                state_or_obs, reward, terminated, truncated, info = env.step(
+                    action)
         else:
-            action, _ = sac_model.predict(state_or_obs, deterministic=deterministic)
-            state_or_obs, reward, terminated, truncated, info = env.step(action)
+            action, _ = sac_model.predict(
+                state_or_obs, deterministic=deterministic)
+            state_or_obs, reward, terminated, truncated, info = env.step(
+                action)
 
         # Collect monkey data
-        monkey_x.append(env.agentx[0])
-        monkey_y.append(env.agenty[0])
+        monkey_x.append(env.agentxy[0] + env.arena_center_global[0])
+        monkey_y.append(env.agentxy[1] + env.arena_center_global[1])
         speed.append(float(env.v))
         ang_speed.append(float(env.w))
         monkey_angle.append(env.agentheading[0])
@@ -192,18 +211,19 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
             t_last_seen = env.ff_t_since_last_seen[topk_indices]
             time_since_last_vis_list.extend(t_last_seen.tolist())
 
-        if len(env.ffxy_topk_noisy) > 0:
-            if env.ffxy_topk_noisy.shape[0] != len(topk_indices):
+        if len(env.ffxy_slot_noisy) > 0:
+            if env.ffxy_slot_noisy.shape[0] != len(topk_indices):
                 raise ValueError(
                     "Number of fireflies in observation does not match the environment."
                 )
-            ff_x_noisy.extend(env.ffxy_topk_noisy[:, 0].tolist())
-            ff_y_noisy.extend(env.ffxy_topk_noisy[:, 1].tolist())
+            ff_x_noisy.extend((env.ffxy_slot_noisy[:, 0] + env.arena_center_global[0]).tolist())
+            ff_y_noisy.extend((env.ffxy_slot_noisy[:, 1] + env.arena_center_global[1]).tolist())
             pose_unreliable.extend(env.pose_unreliable.tolist())
             visible.extend(env.visible.tolist())
 
         if terminated or truncated:
-            logging.info("Episode ended (terminated or truncated) by environment.")
+            logging.info(
+                "Episode ended (terminated or truncated) by environment.")
             break
 
     return (
@@ -252,14 +272,16 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
     })
 
     ff_information_temp = env.ff_information.copy()
-    ff_information_temp['index_in_ff_information'] = range(len(ff_information_temp))
-    ff_information_temp.loc[ff_information_temp['time_captured'] < 0, 'time_captured'] = env.time + 10
+    ff_information_temp['index_in_ff_information'] = range(
+        len(ff_information_temp))
+    ff_information_temp.loc[ff_information_temp['t_capture']
+                            < 0, 't_capture'] = env.time + 10
 
     ff_in_obs_df = ff_in_obs_df.merge(
         ff_information_temp, on='index_in_ff_flash', how='left'
     )
     ff_in_obs_df = ff_in_obs_df[ff_in_obs_df['time'].between(
-        ff_in_obs_df['time_start_to_be_alive'], ff_in_obs_df['time_captured'], inclusive='left'
+        ff_in_obs_df['t_spawn'], ff_in_obs_df['t_capture'], inclusive='left'
     )].copy()
 
     if ff_in_obs_df.groupby('point_index').count().max().max() > env.num_obs_ff:
@@ -269,21 +291,18 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
 
     # Collect all monkey data
     monkey_information = pack_monkey_information(
-        time, monkey_x, monkey_y, speed, ang_speed, is_stop,monkey_angle, env.dt
+        time, monkey_x, monkey_y, speed, ang_speed, is_stop, monkey_angle, env.dt
     )
     monkey_information['point_index'] = range(len(monkey_information))
-    monkey_information['monkey_speeddummy'] = (
-        (monkey_information['speed'] > env.linear_terminal_vel * 200) |
-        (np.abs(monkey_information['ang_speed']) > env.angular_terminal_vel * pi / 2)
-    ).astype(int)
 
-    process_monkey_information.add_more_columns_to_monkey_information(monkey_information)
+    process_monkey_information.add_more_columns_to_monkey_information(
+        monkey_information)
 
     # Get information about fireflies
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, \
         ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(
             env.ff_information, env.ff_flash, env.time
-    )
+        )
 
     caught_ff_num = len(ff_caught_T_new)
     total_ff_num = len(ff_life_sorted)
@@ -294,14 +313,16 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
         'index_in_ff_information': 'int', 'index_in_ff_dataframe': 'int', 'point_index': 'int'
     })
     num_decimals_of_dt = find_decimals(env.dt)
-    ff_in_obs_df['time_since_last_vis'] = np.round(ff_in_obs_df['time_since_last_vis'], num_decimals_of_dt)
+    ff_in_obs_df['time_since_last_vis'] = np.round(
+        ff_in_obs_df['time_since_last_vis'], num_decimals_of_dt)
     ff_in_obs_df.reset_index(drop=True, inplace=True)
 
     ff_in_obs_df = ff_in_obs_df[
         ['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index',
          'ff_x_noisy', 'ff_y_noisy', 'time_since_last_vis', 'visible', 'pose_unreliable']
     ].copy()
-    ff_in_obs_df.rename(columns={'index_in_ff_dataframe': 'ff_index'}, inplace=True)
+    ff_in_obs_df.rename(
+        columns={'index_in_ff_dataframe': 'ff_index'}, inplace=True)
 
     obs_ff_indices_in_ff_dataframe = pd.DataFrame(
         ff_in_obs_df.groupby('point_index')['ff_index'].apply(list)
@@ -311,14 +332,16 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
         on='point_index', how='right'
     )
 
-    obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe['ff_index'].tolist()
+    obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe['ff_index'].tolist(
+    )
     obs_ff_indices_in_ff_dataframe = [
         np.array(x) if isinstance(x, list) else np.array([]) for x in obs_ff_indices_in_ff_dataframe
     ]
 
     # Capture rate
     if monkey_information['time'].max() > 0:
-        ff_capture_rate = len(set(ff_caught_T_new)) / monkey_information['time'].max()
+        ff_capture_rate = len(set(ff_caught_T_new)) / \
+            monkey_information['time'].max()
         logging.info(f"Firefly capture rate: {ff_capture_rate:.4f}")
     else:
         logging.warning("Monkey time max is 0; capture rate undefined.")
@@ -331,7 +354,6 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
             total_ff_num, obs_ff_indices_in_ff_dataframe, sorted_indices_all, ff_in_obs_df)
 
 
-
 def find_decimals(x):
     if x == 0:
         return 0
@@ -340,7 +362,7 @@ def find_decimals(x):
 
 
 def pack_monkey_information(time, monkey_x, monkey_y, speed, ang_speed, is_stop, monkey_angle, dt,
-                           ):
+                            ):
     """
     Organize the information of the monkey/agent into a dictionary
 
@@ -380,7 +402,7 @@ def pack_monkey_information(time, monkey_x, monkey_y, speed, ang_speed, is_stop,
         'monkey_y': monkey_y,
         'speed': speed,
         'ang_speed': ang_speed,
-        'monkey_speeddummy': 1 - is_stop,
+        'monkey_speeddummy': [1-i for i in is_stop],
         'monkey_angle': monkey_angle,
     }
 
@@ -393,4 +415,3 @@ def pack_monkey_information(time, monkey_x, monkey_y, speed, ang_speed, is_stop,
     monkey_information = pd.DataFrame(monkey_information)
 
     return monkey_information
-

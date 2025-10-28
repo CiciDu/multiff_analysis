@@ -1,5 +1,4 @@
 from reinforcement_learning.base_classes import base_env
-
 import os
 import numpy as np
 import pandas as pd
@@ -8,74 +7,113 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 class BaseCollectInformation(base_env.MultiFF):
     """
-    The class wraps around the MultiFF environment so that it keeps a dataframe called ff_information that stores information crucial for later use.
-    Specifically, ff_information has 8 columns: 
-    [unique_identifier, ffx, ffy, time_start_to_be_alive, time_captured, mx_when_catching_ff, my_when_catching_ff, index_in_ff_flash]
-    Note when using this wrapper, the number of steps cannot exceed that of one episode.   
-
+    Wrapper around MultiFF that maintains a DataFrame `ff_information`
+    tracking firefly lifetimes across captures and respawns.
+    Columns:
+        [ff_lifetime_id, ffx, ffy, t_spawn, t_despawn, t_capture,
+         agent_x_at_capture, agent_y_at_capture, index_in_ff_flash]
     """
 
     def __init__(self, episode_len=16000, print_ff_capture_incidents=True,
                  print_episode_reward_rates=True, **kwargs):
-        super().__init__(episode_len=episode_len, print_ff_capture_incidents=print_ff_capture_incidents,
-                         print_episode_reward_rates=print_episode_reward_rates, **kwargs)
+        super().__init__(episode_len=episode_len,
+                         print_ff_capture_incidents=print_ff_capture_incidents,
+                         print_episode_reward_rates=print_episode_reward_rates,
+                         **kwargs)
 
-        self.ff_information_colnames = ["unique_identifier", "ffx", "ffy", "time_start_to_be_alive", "time_captured",
-                                        "mx_when_catching_ff", "my_when_catching_ff", "index_in_ff_flash"]
+        self.ff_information_colnames = [
+            "ff_lifetime_id", "ffx", "ffy",
+            "t_spawn", "t_despawn", "t_capture",
+            "agent_x_at_capture", "agent_y_at_capture",
+            "index_in_ff_flash"
+        ]
 
     def reset(self, seed=None, use_random_ff=True):
         self.obs, _ = super().reset(use_random_ff=use_random_ff, seed=seed)
         self.initialize_ff_information()
-        info = {}
-        return self.obs, info
+        return self.obs, {}
 
     def initialize_ff_information(self):
+        """Initialize ff_information with one row per currently alive firefly."""
         self.ff_information = pd.DataFrame(
-            np.ones([self.num_alive_ff, 8])*(-9999), columns=self.ff_information_colnames)
-        self.ff_information.loc[:, "unique_identifier"] = np.arange(
-            self.num_alive_ff)
-        self.ff_information.loc[:, "index_in_ff_flash"] = np.arange(
-            self.num_alive_ff)
-        # base_env exposes positions via ffxy; split into x/y
-        self.ff_information.loc[:, "ffx"] = self.ffxy[:, 0]
-        self.ff_information.loc[:, "ffy"] = self.ffxy[:, 1]
-        self.ff_information.loc[:, "time_start_to_be_alive"] = 0
-        self.ff_information[["index_in_ff_flash", "unique_identifier"]] = self.ff_information[[
-            "index_in_ff_flash", "unique_identifier"]].astype(int)
+            np.ones([self.num_alive_ff, len(self.ff_information_colnames)]) * (-9999),
+            columns=self.ff_information_colnames
+        )
+        self.ff_information.loc[:, "ff_lifetime_id"] = np.arange(self.num_alive_ff)
+        self.ff_information.loc[:, "index_in_ff_flash"] = np.arange(self.num_alive_ff)
+        self.ff_information.loc[:, "ffx"] = self.ffxy[:, 0] + self.arena_center_global[0]
+        self.ff_information.loc[:, "ffy"] = self.ffxy[:, 1] + self.arena_center_global[1]
+        self.ff_information.loc[:, "t_spawn"] = 0
+        self.ff_information[["index_in_ff_flash", "ff_lifetime_id"]] = (
+            self.ff_information[["index_in_ff_flash", "ff_lifetime_id"]].astype(int)
+        )
 
     def calculate_reward(self):
-        # print('action:', self.action)
         reward = super().calculate_reward()
         self.add_to_ff_information_after_capturing_ff()
         return reward
 
     def add_to_ff_information_after_capturing_ff(self):
+        """Update ff_information when fireflies are captured."""
         if self.num_targets > 0:
-            for index_in_ff_flash in self.captured_ff_index:
-                # Find the row index of the last firefly (the row that has the largest row number) in ff_information that has the same index_in_ff_lash.
-                last_corresponding_ff_identifier = np.where(
-                    self.ff_information.loc[:, "index_in_ff_flash"] == index_in_ff_flash)[0][-1]
-                # Here, last_corresponding_ff_index is equivalent to unique_identifier, which is equivalent to the index of the dataframe
-                self.ff_information.loc[last_corresponding_ff_identifier,
-                                        "time_captured"] = self.time
-                self.ff_information.loc[last_corresponding_ff_identifier,
-                                        "mx_when_catching_ff"] = self.agentx.item()
-                self.ff_information.loc[last_corresponding_ff_identifier,
-                                        "my_when_catching_ff"] = self.agenty.item()
-            # Since the captured fireflies will be replaced, we shall add new rows to ff_information to store the information of the new fireflies
-            self.new_ff_info = pd.DataFrame(
-                np.ones([self.num_targets, 8])*(-9999), columns=self.ff_information_colnames)
-            self.new_ff_info.loc[:, "unique_identifier"] = np.arange(
-                len(self.ff_information), len(self.ff_information)+self.num_targets)
-            self.new_ff_info.loc[:, "index_in_ff_flash"] = np.array(
-                self.captured_ff_index)
-            self.new_ff_info[["unique_identifier", "index_in_ff_flash"]] = self.new_ff_info[[
-                "unique_identifier", "index_in_ff_flash"]].astype(int)
-            # base_env exposes positions via ffxy; split into x/y for captured ff indices
-            self.new_ff_info.loc[:,
-                                 "ffx"] = self.ffxy[self.captured_ff_index, 0]
-            self.new_ff_info.loc[:,
-                                 "ffy"] = self.ffxy[self.captured_ff_index, 1]
-            self.new_ff_info.loc[:, "time_start_to_be_alive"] = self.time
+            for slot_idx in self.captured_ff_index:
+                last_idx = np.where(
+                    self.ff_information["index_in_ff_flash"] == slot_idx
+                )[0][-1]
+                self.ff_information.loc[last_idx, "t_capture"] = self.time
+                self.ff_information.loc[last_idx, "t_despawn"] = self.time
+                self.ff_information.loc[last_idx, "agent_x_at_capture"] = self.agentxy[0].item() + self.arena_center_global[0].item()
+                self.ff_information.loc[last_idx, "agent_y_at_capture"] = self.agentxy[1].item() + self.arena_center_global[1].item()
+
+            new_ff_info = pd.DataFrame(
+                np.ones([self.num_targets, len(self.ff_information_colnames)]) * (-9999),
+                columns=self.ff_information_colnames
+            )
+            new_ff_info.loc[:, "ff_lifetime_id"] = np.arange(
+                len(self.ff_information),
+                len(self.ff_information) + self.num_targets
+            )
+            ffxy_global = self.ffxy + self.arena_center_global
+            new_ff_info.loc[:, "index_in_ff_flash"] = np.array(self.captured_ff_index)
+            new_ff_info.loc[:, "ffx"] = ffxy_global[self.captured_ff_index, 0]
+            new_ff_info.loc[:, "ffy"] = ffxy_global[self.captured_ff_index, 1]
+            new_ff_info.loc[:, "t_spawn"] = self.time
+            new_ff_info[["ff_lifetime_id", "index_in_ff_flash"]] = new_ff_info[
+                ["ff_lifetime_id", "index_in_ff_flash"]
+            ].astype(int)
             self.ff_information = pd.concat(
-                [self.ff_information, self.new_ff_info], axis=0).reset_index(drop=True)
+                [self.ff_information, new_ff_info], axis=0
+            ).reset_index(drop=True)
+
+    def recenter_and_respawn_ff(self, respawn_outer_radius=1000):
+        """Override MultiFF.recenter_and_respawn_ff to also update ff_information."""
+        super().recenter_and_respawn_ff(respawn_outer_radius=respawn_outer_radius)
+
+        if self.respawn_idx.size == 0:
+            return
+
+        # mark their despawn times
+        self.ff_information.loc[self.respawn_idx, "t_despawn"] = self.time
+
+        # add new rows for new lifetimes
+        new_ff_info = pd.DataFrame(
+            np.ones([len(self.respawn_idx), len(self.ff_information_colnames)]) * (-9999),
+            columns=self.ff_information_colnames
+        )
+        new_ff_info.loc[:, "ff_lifetime_id"] = np.arange(
+            len(self.ff_information),
+            len(self.ff_information) + len(self.respawn_idx)
+        )
+        
+        ffxy_global = self.ffxy + self.arena_center_global
+        new_ff_info.loc[:, "index_in_ff_flash"] = self.respawn_idx.astype(int)
+        new_ff_info.loc[:, "ffx"] = ffxy_global[self.respawn_idx, 0]
+        new_ff_info.loc[:, "ffy"] = ffxy_global[self.respawn_idx, 1]
+        new_ff_info.loc[:, "t_spawn"] = self.time
+        new_ff_info[["ff_lifetime_id", "index_in_ff_flash"]] = new_ff_info[
+            ["ff_lifetime_id", "index_in_ff_flash"]
+        ].astype(int)
+
+        self.ff_information = pd.concat(
+            [self.ff_information, new_ff_info], axis=0
+        ).reset_index(drop=True)

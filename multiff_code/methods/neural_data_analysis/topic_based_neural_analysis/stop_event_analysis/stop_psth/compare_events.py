@@ -3,9 +3,11 @@ import pandas as pd
 from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, get_stops_utils, psth_postprocessing, psth_stats
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
 
 # ---------- schema & key utilities ----------
+
+
 def _ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if 'stop_time' not in out.columns:
@@ -20,12 +22,14 @@ def _ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
             out['stop_point_index'] = np.nan
     return out.sort_values('stop_time', kind='stable').reset_index(drop=True)
 
+
 def _infer_key_cols(df: pd.DataFrame) -> list[str]:
     if 'stop_id' in df.columns:
         return ['stop_id']
     if {'stop_point_index', 'stop_time'}.issubset(df.columns):
         return ['stop_point_index', 'stop_time']
     return ['stop_time']
+
 
 def _key_series(df: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3) -> pd.Series:
     if keys is None:
@@ -38,11 +42,13 @@ def _key_series(df: pd.DataFrame, keys: list[str] | None = None, time_round: int
             vals.append(df[k])
     return pd.Series(list(zip(*vals)), index=df.index)
 
+
 def _dedupe_within(df: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3):
     ks = _key_series(df, keys, time_round)
     keep = ~ks.duplicated(keep='first')
     removed = int((~keep).sum())
     return df.loc[keep].copy(), {'removed_within': removed}
+
 
 def _report_overlap(A: pd.DataFrame, B: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3):
     kA = _key_series(A, keys, time_round)
@@ -55,6 +61,8 @@ def _report_overlap(A: pd.DataFrame, B: pd.DataFrame, keys: list[str] | None = N
     return info
 
 # ---------- optional per-stop matching ----------
+
+
 def _standardize_concat(A: pd.DataFrame, B: pd.DataFrame, features: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
     combo = pd.concat([A[features], B[features]], axis=0)
     mu = combo.mean(axis=0)
@@ -62,6 +70,7 @@ def _standardize_concat(A: pd.DataFrame, B: pd.DataFrame, features: list[str]) -
     ZA = (A[features] - mu) / sd
     ZB = (B[features] - mu) / sd
     return ZA, ZB
+
 
 def match_events(
     A: pd.DataFrame,
@@ -90,7 +99,8 @@ def match_events(
     # pairwise squared distances (may be large; use greedy if memory is tight)
     if strategy == 'hungarian':
         D = ((A_mat[:, None, :] - B_mat[None, :, :]) ** 2).sum(axis=2)
-        r_ind, c_ind = linear_sum_assignment(D)  # returns min(lenA, lenB) pairs
+        r_ind, c_ind = linear_sum_assignment(
+            D)  # returns min(lenA, lenB) pairs
         dsel = D[r_ind, c_ind]
         mask = np.ones_like(dsel, dtype=bool)
         if caliper is not None:
@@ -124,7 +134,8 @@ def match_events(
 
 def match_features_func(results, key, A1, B1, match_features, match_strategy, match_caliper):
     try:
-        A2, B2 = match_events(A1, B1, match_features, strategy=match_strategy, caliper=match_caliper)
+        A2, B2 = match_events(A1, B1, match_features,
+                              strategy=match_strategy, caliper=match_caliper)
         results['matching_logs'][key] = {
             'strategy': match_strategy,
             'caliper': match_caliper,
@@ -133,11 +144,11 @@ def match_features_func(results, key, A1, B1, match_features, match_strategy, ma
             'len_B_in': len(B1),
         }
     except Exception as e:
-        print(f'warning [{key}]: matching failed with error: {e}. continuing without matching.')
+        print(
+            f'warning [{key}]: matching failed with error: {e}. continuing without matching.')
         results['matching_logs'][key] = {'error': str(e)}
         A2, B2 = A1, B1
     return A2, B2, results
-
 
 
 def ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
@@ -155,12 +166,14 @@ def ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
             out['stop_point_index'] = np.nan
     return out.sort_values('stop_time', kind='stable').reset_index(drop=True)
 
+
 def dedupe_within(df: pd.DataFrame,
                   keys: list[str] | None = None,
                   time_round: int = 3) -> pd.DataFrame:
     """Drop exact duplicate stops within a set."""
     if keys is None:
-        keys = ['stop_id'] if 'stop_id' in df.columns else ['stop_point_index', 'stop_time'] if {'stop_point_index','stop_time'}.issubset(df.columns) else ['stop_time']
+        keys = ['stop_id'] if 'stop_id' in df.columns else ['stop_point_index', 'stop_time'] if {
+            'stop_point_index', 'stop_time'}.issubset(df.columns) else ['stop_time']
     key_vals = []
     for k in keys:
         v = df[k].round(time_round) if k == 'stop_time' else df[k]
@@ -169,11 +182,13 @@ def dedupe_within(df: pd.DataFrame,
     keep = ~key.duplicated(keep='first')
     return df.loc[keep].copy()
 
+
 def diff_by(a: pd.DataFrame, b: pd.DataFrame, key: str = 'stop_id') -> pd.DataFrame:
     """Set difference a minus b on a key column."""
     if key not in a.columns or key not in b.columns:
         raise ValueError(f"diff_by requires key '{key}' in both DataFrames")
     return a.loc[~a[key].isin(b[key])].copy()
+
 
 def titleize(name: str) -> str:
     """Pretty label from a snake key."""
@@ -192,15 +207,16 @@ def titleize(name: str) -> str:
     return ' '.join(pretty)
 
 
-    
 ACRONYMS = {'GUAT', 'TAFT'}
+
 
 def _cap_first_segment(name: str) -> str:
     parts = name.split('_')
-    if not parts: 
+    if not parts:
         return name
     parts[0] = parts[0][:1].upper() + parts[0][1:]
     return '_'.join(parts)
+
 
 def _pascalize(name: str, acronyms: set[str] = ACRONYMS) -> str:
     out = []
@@ -212,6 +228,7 @@ def _pascalize(name: str, acronyms: set[str] = ACRONYMS) -> str:
         else:
             out.append(w)
     return ''.join(out)
+
 
 def _pretty_word(w: str) -> str:
     # lightweight prettifier for common tokens
@@ -225,6 +242,7 @@ def _pretty_word(w: str) -> str:
         return w.upper()
     return mapping.get(w, w.replace('_', ' '))
 
+
 def _titleize_side(name: str) -> str:
     # turn 'giveup_GUAT_last' -> 'Give-up GUAT last'
     parts = name.split('_')
@@ -232,6 +250,7 @@ def _titleize_side(name: str) -> str:
     for p in parts[1:]:
         pretty.append(_pretty_word(p))
     return ' '.join(pretty)
+
 
 def build_comparisons(specs: list[dict]) -> list[dict]:
     """Each spec needs {'a': <dataset_key>, 'b': <dataset_key>} and optional 'key'."""
@@ -274,13 +293,16 @@ def shared_cols(*dfs: pd.DataFrame,
 
 # ---------- comparisons ----------
 # You can omit labels and let them auto-fill from keys. Keep explicit if you want custom phrasing.
+
+
 def with_labels(specs: list[dict]) -> list[dict]:
     out = []
     for s in specs:
         a_lab = s.get('a_label') or titleize(s['a'])
         b_lab = s.get('b_label') or titleize(s['b'])
         key = s.get('key') or f"{s['a']}_vs_{s['b']}"
-        out.append({'key': key, 'a': s['a'], 'b': s['b'], 'a_label': a_lab, 'b_label': b_lab})
+        out.append(
+            {'key': key, 'a': s['a'], 'b': s['b'], 'a_label': a_lab, 'b_label': b_lab})
     return out
 
 
@@ -315,7 +337,8 @@ def run_all_comparisons(
     time_round: int = 3,
     warn_on_overlap: bool = True,
     # matching knobs
-    match_features: list[str] | None = None,     # e.g., ['stop_duration','dist_to_target','cluster_order']
+    # e.g., ['stop_duration','dist_to_target','cluster_order']
+    match_features: list[str] | None = None,
     match_strategy: str = 'hungarian',
     match_caliper: float | None = None,
     align_by_stop_end=False,
@@ -346,11 +369,12 @@ def run_all_comparisons(
 
         # optional per-stop matching (applied to already-deduped A1/B1)
         if match_features:
-            A2, B2, results = match_features_func(results, key, A1, B1, match_features, match_strategy, match_caliper)
+            A2, B2, results = match_features_func(
+                results, key, A1, B1, match_features, match_strategy, match_caliper)
         else:
             A2, B2 = A1, B1
-            results['matching_logs'][key] = {'strategy': 'none', 'n_matched': None}
-
+            results['matching_logs'][key] = {
+                'strategy': 'none', 'n_matched': None}
 
         if align_by_stop_end:
             alignment = 'Align by stop End'
@@ -373,9 +397,9 @@ def run_all_comparisons(
             event_a_label=a_label,
             event_b_label=b_label,
         )
-        
+
         print(alignment)
-        #plot_title = f'{title}: Event-Aligned Standardized Mean Difference'
+        # plot_title = f'{title}: Event-Aligned Standardized Mean Difference'
         plot_title = f'{title}'
         show_results(an, title=plot_title)
 
@@ -393,15 +417,17 @@ def run_all_comparisons(
 
     # concat
     if results['psth_long']:
-        results['psth_long'] = pd.concat(results['psth_long'], ignore_index=True)
+        results['psth_long'] = pd.concat(
+            results['psth_long'], ignore_index=True)
     else:
-        results['psth_long'] = pd.DataFrame(columns=['time', 'cluster', 'condition', 'mean', 'sem', 'lower', 'upper', 'comparison'])
+        results['psth_long'] = pd.DataFrame(columns=[
+                                            'time', 'cluster', 'condition', 'mean', 'sem', 'lower', 'upper', 'comparison'])
 
     if results['epoch_summaries']:
-        results['epoch_summaries'] = pd.concat(results['epoch_summaries'], ignore_index=True)
+        results['epoch_summaries'] = pd.concat(
+            results['epoch_summaries'], ignore_index=True)
     else:
         results['epoch_summaries'] = pd.DataFrame()
-        
 
     return results
 
@@ -416,7 +442,7 @@ def show_results(an, title=None):
     #     "early_dip(0.0–0.3)": (0.0, 0.3),
     #     "late_rebound(0.3–0.8)": (0.3, 0.8),
     # }
-    
+
     # windows = {
     #     "-0.5–-0.2": (-0.5, -0.2),
     #     "-0.2–-0.1": (-0.2, -0.1),
@@ -435,25 +461,23 @@ def show_results(an, title=None):
         '-0.3–-0.2': (-0.3, -0.2),
         '-0.2–-0.1': (-0.2, -0.1),
         '-0.1–0.0':  (-0.1,  0.0),
-        '0.0–0.1':   ( 0.0,  0.1),
-        '0.1–0.2':   ( 0.1,  0.2),
-        '0.2–0.3':   ( 0.2,  0.3),
-        '0.3–0.4':   ( 0.3,  0.4),
-        '0.4–0.5':   ( 0.4,  0.5),
-        '0.5–0.7':   ( 0.5,  0.7),
-        '0.7–0.9':   ( 0.7,  0.9),
-        '0.9–1.2':   ( 0.9,  1.2),
+        '0.0–0.1':   (0.0,  0.1),
+        '0.1–0.2':   (0.1,  0.2),
+        '0.2–0.3':   (0.2,  0.3),
+        '0.3–0.4':   (0.3,  0.4),
+        '0.4–0.5':   (0.4,  0.5),
+        '0.5–0.7':   (0.5,  0.7),
+        '0.7–0.9':   (0.7,  0.9),
+        '0.9–1.2':   (0.9,  1.2),
     }
 
     window_order = list(windows.keys())
-        
+
     summary = psth_postprocessing.compare_windows(an, windows, alpha=0.05)
-    psth_postprocessing.plot_sig_heatmap(summary, title=title, window_order=window_order)
-    
+    psth_postprocessing.plot_sig_heatmap(
+        summary, title=title, window_order=window_order)
+
     plt.show()
     # summary_sub = summary.loc[summary['sig_FDR'], ['cluster', 'window', 'p', 'cohens_d', 'sig_FDR']].copy()
     # summary_sub = summary_sub.sort_values(["sig_FDR", "window", "p"], ascending=[False, True, True])
     # print(summary_sub)
-    
-    
-    

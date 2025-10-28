@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
 from typing import Optional
+from reinforcement_learning.base_classes import run_logger
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
@@ -21,7 +22,7 @@ class SAC_PolicyNetworkGRU(lstm_utils.PolicyNetworkBase):
         self.hidden_size = hidden_size
         # Exploration std annealing is driven externally by global_step via set_anneal_step
         self.anneal_step = 0
-        self.std_anneal_min = 0.1   # final multiplicative scale on std
+        self.std_anneal_min = 1.0   # final multiplicative scale on std
         self.std_anneal_max = 1.0   # initial multiplicative scale on std
         self.std_anneal_steps = 1000000  # steps to reach min scale
 
@@ -266,6 +267,9 @@ class GRU_SAC_Trainer():
         self.seq_len = kwargs.get('seq_len', None)
         self.burn_in = kwargs.get('burn_in', 0)
         self.device = kwargs.get('device', "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"),)
+        # Alpha (entropy temperature) clipping bounds
+        self.alpha_min = kwargs.get('alpha_min', 1e-3)
+        self.alpha_max = kwargs.get('alpha_max', 4.0)
 
 
         state_space = kwargs.get('state_space')
@@ -302,8 +306,38 @@ class GRU_SAC_Trainer():
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
+        # Logging / diagnostics
+        self.log_every = kwargs.get('log_every', 200)
+        self._update_step = 0
+        self.overall_folder = kwargs.get('overall_folder')
+        self.agent_type = kwargs.get('agent_type', 'gru')
+        self.sweep_params = kwargs.get('sweep_params', {})
+        self.metrics = {
+            'policy_loss': [],
+            'q1_loss': [],
+            'q2_loss': [],
+            'q_pi_mean': [],
+            'q_pi_median': [],
+            'q_pi_max': [],
+            'target_q_mean': [],
+            'target_q_median': [],
+            'td1_std': [],
+            'td2_std': [],
+            'alpha': [],
+            'entropy': [],
+            'log_prob_mean': [],
+            'action_mean': [],
+            'action_std': [],
+            'grad_norm_policy': [],
+            'grad_norm_q1': [],
+            'grad_norm_q2': [],
+            'reward_mean': [],
+            'reward_std': [],
+            'done_frac': [],
+        }
     
     def update(self, batch_size, reward_scale=1, auto_entropy=True, target_entropy=-2, gamma=0.975, soft_tau=1e-2):
+        self._update_step += 1
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(
             batch_size, to_torch=True, device=self.device, seq_len=self.seq_len, burn_in=self.burn_in, random_window=True
         )
@@ -344,6 +378,12 @@ class GRU_SAC_Trainer():
         predicted_q_value2, _ = self.soft_q_net2(state, action, last_action, hidden_in)
         new_action, log_prob, z, mean, log_std, _ = self.policy_net.evaluate(state, last_action, hidden_in)
         new_next_action, next_log_prob, _, _, _, _ = self.policy_net.evaluate(next_state, action, hidden_out)
+        # sanitize
+        new_action = torch.nan_to_num(new_action, nan=0.0).clamp_(-1.0, 1.0)
+        new_next_action = torch.nan_to_num(new_next_action, nan=0.0).clamp_(-1.0, 1.0)
+        log_prob = torch.nan_to_num(log_prob, nan=0.0)
+        next_log_prob = torch.nan_to_num(next_log_prob, nan=0.0)
+        log_std = torch.nan_to_num(log_std, nan=-5.0, posinf=2.0, neginf=-20.0)
         #reward = reward_scale * (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
         reward = reward_scale * reward
     # Updating alpha wrt entropy
@@ -361,9 +401,13 @@ class GRU_SAC_Trainer():
             # Clamp temperature to avoid runaway
             with torch.no_grad():
                 self.log_alpha.clamp_(min=-10.0, max=10.0)
-            self.alpha = self.log_alpha.exp()
+            # Compute alpha from log_alpha and clip to configured bounds
+            self.alpha = self.log_alpha.exp().detach()
+            self.alpha.clamp_(min=self.alpha_min, max=self.alpha_max)
         else:
-            self.alpha = 1.
+            # Ensure alpha is a tensor on device and clipped
+            self.alpha = torch.as_tensor(1.0, device=self.device, dtype=torch.float32)
+            self.alpha.clamp_(min=self.alpha_min, max=self.alpha_max)
             alpha_loss = 0
 
     # Training Q Function
@@ -378,11 +422,11 @@ class GRU_SAC_Trainer():
 
         self.soft_q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        torch.nn.utils.clip_grad_norm_(self.soft_q_net1.parameters(), max_norm=5.0)
+        grad_norm_q1 = torch.nn.utils.clip_grad_norm_(self.soft_q_net1.parameters(), max_norm=5.0)
         self.soft_q_optimizer1.step()
         self.soft_q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        torch.nn.utils.clip_grad_norm_(self.soft_q_net2.parameters(), max_norm=5.0)
+        grad_norm_q2 = torch.nn.utils.clip_grad_norm_(self.soft_q_net2.parameters(), max_norm=5.0)
         self.soft_q_optimizer2.step()  
 
     # Training Policy Function
@@ -394,11 +438,15 @@ class GRU_SAC_Trainer():
 
         self.policy_optimizer.zero_grad()
         policy_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=5.0)
+        grad_norm_policy = torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=5.0)
         self.policy_optimizer.step()
         
-        # print('q loss: ', q_value_loss1, q_value_loss2)
-        # print('policy loss: ', policy_loss )
+        # TD-error diagnostics (no grad)
+        with torch.no_grad():
+            td1 = predicted_q_value1[:, tr, :] - target_q_value[:, tr, :]
+            td2 = predicted_q_value2[:, tr, :] - target_q_value[:, tr, :]
+            td1_std = td1.float().std().item() if td1.numel() > 1 else float('nan')
+            td2_std = td2.float().std().item() if td2.numel() > 1 else float('nan')
 
 
     # Soft update the target value net
@@ -410,7 +458,110 @@ class GRU_SAC_Trainer():
             target_param.data.copy_(  # copy data value into target parameters
                 target_param.data * (1.0 - soft_tau) + param.data * soft_tau
             )
+        
+        # Compute diagnostic stats (no grad)
+        with torch.no_grad():
+            q_pi = predicted_new_q_value[:, tr, :]
+            q_pi_mean = q_pi.mean().item() if q_pi.numel() > 0 else float('nan')
+            q_pi_median = q_pi.median().item() if q_pi.numel() > 0 else float('nan')
+            q_pi_max = q_pi.max().item() if q_pi.numel() > 0 else float('nan')
+            tgt_q = target_q_value[:, tr, :]
+            tgt_q_mean = tgt_q.mean().item() if tgt_q.numel() > 0 else float('nan')
+            tgt_q_median = tgt_q.median().item() if tgt_q.numel() > 0 else float('nan')
+            act = new_action[:, tr, :]
+            act_mean = act.mean().item() if act.numel() > 0 else float('nan')
+            act_std = act.std().item() if act.numel() > 1 else float('nan')
+            lp = log_prob[:, tr, :]
+            log_prob_mean = lp.mean().item() if lp.numel() > 0 else float('nan')
+            entropy = (-lp).mean().item() if lp.numel() > 0 else float('nan')
+            a_std = log_std[:, tr, :].exp()
+            a_std_mean = a_std.mean().item() if a_std.numel() > 0 else float('nan')
+            rew = reward[:, tr, :]
+            rew_mean = rew.mean().item() if rew.numel() > 0 else float('nan')
+            rew_std = rew.std().item() if rew.numel() > 1 else float('nan')
+            dn = done[:, tr, :]
+            done_frac = dn.mean().item() if dn.numel() > 0 else float('nan')
+            alpha_val = float(self.alpha.detach().item()) if torch.is_tensor(self.alpha) else float(self.alpha)
+
+        # Prepare scalar grad norms
+        grad_norm_policy_value = float(grad_norm_policy.item()) if torch.is_tensor(grad_norm_policy) else float(grad_norm_policy)
+        grad_norm_q1_value = float(grad_norm_q1.item()) if torch.is_tensor(grad_norm_q1) else float(grad_norm_q1)
+        grad_norm_q2_value = float(grad_norm_q2.item()) if torch.is_tensor(grad_norm_q2) else float(grad_norm_q2)
+
+        # Persist metrics history
+        self.metrics['policy_loss'].append(float(policy_loss.detach().item()))
+        self.metrics['q1_loss'].append(float(q_value_loss1.detach().item()))
+        self.metrics['q2_loss'].append(float(q_value_loss2.detach().item()))
+        self.metrics['q_pi_mean'].append(q_pi_mean)
+        self.metrics['q_pi_median'].append(q_pi_median)
+        self.metrics['q_pi_max'].append(q_pi_max)
+        self.metrics['target_q_mean'].append(tgt_q_mean)
+        self.metrics['target_q_median'].append(tgt_q_median)
+        self.metrics['td1_std'].append(td1_std)
+        self.metrics['td2_std'].append(td2_std)
+        self.metrics['alpha'].append(alpha_val)
+        self.metrics['entropy'].append(entropy)
+        self.metrics['log_prob_mean'].append(log_prob_mean)
+        self.metrics['action_mean'].append(act_mean)
+        self.metrics['action_std'].append(a_std_mean)
+        self.metrics['grad_norm_policy'].append(grad_norm_policy_value)
+        self.metrics['grad_norm_q1'].append(grad_norm_q1_value)
+        self.metrics['grad_norm_q2'].append(grad_norm_q2_value)
+        self.metrics['reward_mean'].append(rew_mean)
+        self.metrics['reward_std'].append(rew_std)
+        self.metrics['done_frac'].append(done_frac)
+
+        # Periodic concise print for fast diagnosis
+        if self._update_step % int(max(1, self.log_every)) == 0:
+            print(
+                f"Logging metrics: "
+                f"[upd {self._update_step}] pi={self.metrics['policy_loss'][-1]:.3f} "
+                f"q1={self.metrics['q1_loss'][-1]:.3f} q2={self.metrics['q2_loss'][-1]:.3f} "
+                f"Qpi(mu/med/max)={q_pi_mean:.2f}/{q_pi_median:.2f}/{q_pi_max:.2f} "
+                f"tQ(mu/med)={tgt_q_mean:.2f}/{tgt_q_median:.2f} "
+                f"TDstd(q1/q2)={td1_std:.2f}/{td2_std:.2f} "
+                f"alpha={alpha_val:.3f} H~={entropy:.3f} act_std={a_std_mean:.3f} "
+                f"|g| p={grad_norm_policy_value:.2f} q1={grad_norm_q1_value:.2f} q2={grad_norm_q2_value:.2f} "
+                f"r(mu±sd)={rew_mean:.2f}±{rew_std:.2f} done%={done_frac*100:.1f}"
+            )
+            # Also persist to CSV under logs
+            try:
+                run_logger.log_training_metrics(
+                    overall_folder=self.overall_folder,
+                    agent_type=self.agent_type,
+                    sweep_params=self.sweep_params,
+                    step=self._update_step,
+                    metrics={
+                        'policy_loss': float(self.metrics['policy_loss'][-1]),
+                        'q1_loss': float(self.metrics['q1_loss'][-1]),
+                        'q2_loss': float(self.metrics['q2_loss'][-1]),
+                        'q_pi_mean': q_pi_mean,
+                        'q_pi_median': q_pi_median,
+                        'q_pi_max': q_pi_max,
+                        'target_q_mean': tgt_q_mean,
+                        'target_q_median': tgt_q_median,
+                        'td1_std': td1_std,
+                        'td2_std': td2_std,
+                        'alpha': alpha_val,
+                        'entropy': entropy,
+                        'log_prob_mean': log_prob_mean,
+                        'action_mean': act_mean,
+                        'action_std': a_std_mean,
+                        'grad_norm_policy': grad_norm_policy_value,
+                        'grad_norm_q1': grad_norm_q1_value,
+                        'grad_norm_q2': grad_norm_q2_value,
+                        'reward_mean': rew_mean,
+                        'reward_std': rew_std,
+                        'done_frac': done_frac,
+                    }
+                )
+            except Exception:
+                pass
+
         return predicted_new_q_value.mean()
+
+    def get_latest_metrics(self):
+        return {k: (v[-1] if len(v) > 0 else None) for k, v in self.metrics.items()}
 
     def save_model(self, path):
         torch.save(self.soft_q_net1.state_dict(), path+'/gru_q1')
@@ -531,6 +682,8 @@ def evaluate_gru_agent(env, sac_model, max_steps_per_eps, num_eval_episodes, det
                 next_state, reward, done, _, _ = env.step(action)
                 cum_reward += reward
                 state, last_action = next_state, action
+                # print('state: ', state)
+                # print('action: ', action)
                 if done:
                     break
     if was_training:

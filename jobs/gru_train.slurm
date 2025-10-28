@@ -5,7 +5,7 @@
 #SBATCH -c 8
 #SBATCH --mem=32G
 #SBATCH -t 24:00:00
-#SBATCH --array=1-12     # 12 combinations (2×3×2), run 3 at a time
+#SBATCH --array=1-8 
 #SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/logs/gru_sweep-%A_%a.out
 #SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/logs/gru_sweep-%A_%a.err
 
@@ -21,8 +21,8 @@ conda activate multiff_clean
 # ---------------------
 # Define hyperparameter lists
 # ---------------------
-declare -a LRS=(1e-3 3e-4)
-declare -a NUM_OBS_FF_LIST=(6 7 8)
+declare -a LRS=(1e-4 3e-4)
+declare -a NUM_OBS_FF_LIST=(6 7)
 declare -a MAX_IN_MEMORY_TIME_LIST=(2 1)
 
 # total combinations = 2 × 3 × 2 = 12
@@ -50,7 +50,7 @@ mkdir -p "$OVERALL_FOLDER"
 # ---------------------
 echo "[jobinfo] Starting GRU training for LR=${LR}, NUM_OBS_FF=${NUM_OBS_FF}, MAX_IN_MEMORY_TIME=${MAX_IN_MEMORY_TIME}"
 
-srun python -u multiff_analysis/multiff_code/notebooks/reinforcement_learning/GRU_training.py \
+srun python -u multiff_analysis/scripts/gru_training.py \
   --overall-folder "$OVERALL_FOLDER" \
   --max-in-memory-time "$MAX_IN_MEMORY_TIME" \
   --lr "$LR" \

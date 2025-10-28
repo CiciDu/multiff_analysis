@@ -58,8 +58,8 @@ def get_agent_params_from_the_current_sac_model(sac_model):
 def calculate_reward_threshold_for_curriculum_training(env, n_eval_episodes=1, ff_caught_rate_threshold=0.1):
     reward_threshold = (n_eval_episodes * env.episode_len * env.dt) * \
         ff_caught_rate_threshold * \
-        (env.reward_per_ff - env.distance2center_cost * 15) - \
-        200  # including the rest of the cost like velocity cost
+        (env.reward_per_ff - env.distance2center_cost * 15)
+        #- 200  # including the rest of the cost like velocity cost
     return reward_threshold
 
 

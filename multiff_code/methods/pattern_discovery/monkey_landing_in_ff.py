@@ -1,3 +1,5 @@
+from typing import Optional
+import warnings
 from data_wrangling import specific_utils, general_utils
 from data_wrangling import process_monkey_information
 from planning_analysis.show_planning import examine_null_arcs
@@ -107,7 +109,8 @@ def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
         mxy_rotated, x0, y0 = find_mxy_rotated_w_ff_center_to_the_north(
             monkey_sub, ff_center=ff_real_position_sorted[int(row.cur_ff_index)], reward_boundary_radius=reward_boundary_radius)
 
-        ax = examine_null_arcs.show_xy_overlapped(ax, mxy_rotated, x0, y0, color=color, plot_path_to_landing=plot_path_to_landing)
+        ax = examine_null_arcs.show_xy_overlapped(
+            ax, mxy_rotated, x0, y0, color=color, plot_path_to_landing=plot_path_to_landing)
 
         if trial_counter > max_trials:
             break
@@ -115,7 +118,7 @@ def plot_monkey_landings_in_ff(closest_stop_to_capture_df,
 
     # plot the ff center
     ax.plot(0, 0, '*', markersize=10, color='brown')
-    
+
     # show the reward boundary
     ax = examine_null_arcs._make_a_circle_to_show_reward_boundary(
         ax, reward_boundary_radius=reward_boundary_radius, set_xy_limit=True, color='purple')
@@ -270,13 +273,26 @@ def make_scatter_around_target_df(monkey_information, closest_stop_to_capture_df
 
     return scatter_around_target_df
 
+
 def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_information, ff_real_position_sorted, cur_ff_index_array=None, stop_point_index_array=None):
-    
+
     if 'stop_id' not in monkey_information:
-        monkey_information = process_monkey_information.add_whether_new_distinct_stop_and_stop_id(monkey_information)
-    
+        monkey_information = process_monkey_information.add_whether_new_distinct_stop_and_stop_id(
+            monkey_information)
+
     stop_sub = monkey_information.loc[monkey_information['monkey_speeddummy'] == 0, [
         'time', 'point_index', 'stop_id']].copy()
+    # Guard against empty stop set to avoid argmin on empty sequence
+    if stop_sub.empty:
+        import warnings
+        warnings.warn(
+            "No stop samples (monkey_speeddummy==0) found; returning empty closest_stop_to_capture_df.")
+        empty_cols = [
+            'time', 'point_index', 'stop_id', 'caught_time', 'cur_ff_index',
+            'stop_point_index', 'stop_time', 'distance_from_ff_to_stop',
+            'whether_stop_inside_boundary', 'diff_from_caught_time'
+        ]
+        return pd.DataFrame(columns=empty_cols)
     closest_stop_to_capture_df = pd.DataFrame()
     for i in range(len(ff_caught_T_sorted)):
         caught_time = ff_caught_T_sorted[i]
@@ -289,7 +305,7 @@ def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_informa
     if len(closest_stop_to_capture_df) == 0:
         print("No closest stop to capture found")
         return pd.DataFrame()
-        
+
     closest_stop_to_capture_df['diff_from_caught_time'] = closest_stop_to_capture_df['time'] - \
         closest_stop_to_capture_df['caught_time']
     if cur_ff_index_array is not None:
@@ -309,12 +325,6 @@ def get_closest_stop_time_to_all_capture_time(ff_caught_T_sorted, monkey_informa
     closest_stop_to_capture_df.sort_values(by='cur_ff_index', inplace=True)
     return closest_stop_to_capture_df
 
-
-
-import numpy as np
-import pandas as pd
-import warnings
-from typing import Optional
 
 def get_closest_stop_to_all_capture_position(
     ff_caught_T_sorted: np.ndarray,
@@ -336,7 +346,8 @@ def get_closest_stop_to_all_capture_position(
     Returns one row per capture, sorted by cur_ff_index.
     """
     # --- validation ---
-    needed_cols = {"time", "monkey_speeddummy", "monkey_x", "monkey_y", "point_index"}
+    needed_cols = {"time", "monkey_speeddummy",
+                   "monkey_x", "monkey_y", "point_index"}
     missing = needed_cols - set(monkey_information.columns)
     if missing:
         raise ValueError(f"monkey_information missing columns: {missing}")
@@ -346,7 +357,8 @@ def get_closest_stop_to_all_capture_position(
     F = len(ff_caught_T_sorted)
 
     if ff_real_position_sorted.shape != (F, 2):
-        ff_real_position_sorted = ff_real_position_sorted[:len(ff_caught_T_sorted)]
+        ff_real_position_sorted = ff_real_position_sorted[:len(
+            ff_caught_T_sorted)]
         assert ff_real_position_sorted.shape == (F, 2)
 
     # --- gather all stops ---
@@ -415,26 +427,27 @@ def get_closest_stop_to_all_capture_position(
     chosen["caught_time"] = ff_caught_T_sorted
     if cur_ff_index_array is not None:
         if len(cur_ff_index_array) != F:
-            raise ValueError("cur_ff_index_array must have same length as ff_caught_T_sorted.")
+            raise ValueError(
+                "cur_ff_index_array must have same length as ff_caught_T_sorted.")
         chosen["cur_ff_index"] = cur_ff_index_array.astype(int)
     else:
         chosen["cur_ff_index"] = np.arange(F, dtype=int)
 
     if stop_point_index_array is not None:
         if len(stop_point_index_array) != F:
-            raise ValueError("stop_point_index_array must have same length as ff_caught_T_sorted.")
+            raise ValueError(
+                "stop_point_index_array must have same length as ff_caught_T_sorted.")
         chosen["stop_point_index"] = stop_point_index_array.astype(int)
     else:
         chosen["stop_point_index"] = chosen["point_index"].astype(int)
 
     chosen["stop_time"] = chosen["time"]
     chosen["distance_from_ff_to_stop"] = sel_dist.astype(float)
-    chosen["whether_stop_inside_boundary"] = chosen["distance_from_ff_to_stop"] <= float(boundary_cm)
+    chosen["whether_stop_inside_boundary"] = chosen["distance_from_ff_to_stop"] <= float(
+        boundary_cm)
     chosen["diff_from_caught_time"] = chosen["time"] - chosen["caught_time"]
 
     # final order & clean index
     chosen.sort_values("cur_ff_index", inplace=True)
     chosen.reset_index(drop=True, inplace=True)
     return chosen
-
-

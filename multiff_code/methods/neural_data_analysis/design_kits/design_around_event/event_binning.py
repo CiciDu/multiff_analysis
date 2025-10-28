@@ -4,7 +4,7 @@ from pandas.api import types as pdt
 import statsmodels.api as sm
 
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, get_stops_utils, psth_postprocessing, psth_stats
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
 
 
 def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
