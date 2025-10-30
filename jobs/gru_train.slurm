@@ -2,10 +2,10 @@
 #SBATCH -J gru_sweep
 #SBATCH -p gpu
 #SBATCH --gres=gpu:1
-#SBATCH -c 8
+#SBATCH -c 10
 #SBATCH --mem=32G
 #SBATCH -t 24:00:00
-#SBATCH --array=1-8 
+#SBATCH --array=1-10 
 #SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/logs/gru_sweep-%A_%a.out
 #SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/logs/gru_sweep-%A_%a.err
 
@@ -21,9 +21,9 @@ conda activate multiff_clean
 # ---------------------
 # Define hyperparameter lists
 # ---------------------
-declare -a LRS=(1e-4 3e-4)
-declare -a NUM_OBS_FF_LIST=(6 7)
-declare -a MAX_IN_MEMORY_TIME_LIST=(2 1)
+declare -a LRS=(3e-4)
+declare -a NUM_OBS_FF_LIST=(1 2 3 4 5)
+declare -a MAX_IN_MEMORY_TIME_LIST=(2 3)
 
 # total combinations = 2 × 3 × 2 = 12
 IDX=$((SLURM_ARRAY_TASK_ID - 1))
@@ -40,7 +40,9 @@ MAX_IN_MEMORY_TIME=${MAX_IN_MEMORY_TIME_LIST[$MEM_IDX]}
 # Create a unique folder name
 # ---------------------
 BASE_DIR="multiff_analysis/RL_models/GRU_stored_models/all_agents"
-RUN_NAME="lr${LR}_numobs${NUM_OBS_FF}_mem${MAX_IN_MEMORY_TIME}_job${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+# Sanitize decimal points in memory time for folder names (e.g., 1.5 -> 1p5)
+SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
+RUN_NAME="lr${LR}_numobs${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_job${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
 OVERALL_FOLDER="${BASE_DIR}/${RUN_NAME}"
 
 mkdir -p "$OVERALL_FOLDER"

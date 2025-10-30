@@ -162,7 +162,7 @@ class StopTrainingOnNoModelImprovement(BaseCallback):
     """
 
     def __init__(self, max_no_improvement_evals: int, min_evals: int = 0, verbose: int = 0,
-                 model_folder_name=None, overall_folder=None, agent_id=None):
+                 model_folder_name=None, overall_folder=None, agent_id=None, best_model_save_path=None):
         super().__init__(verbose=verbose)
         self.max_no_improvement_evals = max_no_improvement_evals
         self.min_evals = min_evals
@@ -171,6 +171,7 @@ class StopTrainingOnNoModelImprovement(BaseCallback):
         self.model_folder_name = model_folder_name
         self.overall_folder = overall_folder
         self.agent_id = agent_id
+        self.best_model_save_path = best_model_save_path
 
     def _on_step(self) -> bool:
         assert self.parent is not None, "``StopTrainingOnNoModelImprovement`` callback must be used with an ``EvalCallback``"
@@ -181,6 +182,14 @@ class StopTrainingOnNoModelImprovement(BaseCallback):
             if self.parent.best_mean_reward > self.last_best_mean_reward:
                 # My notes: here the parent means EvalCallback, because somewhere else it's designated that the parent of the current class (StopTrainingOnNoModelImprovement) is EvalCallback
                 self.no_improvement_evals = 0
+                # Also persist the replay buffer alongside the best model when we see a new best
+                try:
+                    if self.best_model_save_path is not None:
+                        os.makedirs(self.best_model_save_path, exist_ok=True)
+                        self.model.save_replay_buffer(os.path.join(self.best_model_save_path, 'buffer'))
+                except Exception as e:
+                    if self.verbose >= 1:
+                        print('Warning: failed to save replay buffer with new best model:', e)
             else:
                 self.no_improvement_evals += 1
                 if self.no_improvement_evals > self.max_no_improvement_evals:

@@ -78,39 +78,6 @@ def make_env_ff_flash_from_real_data(ff_flash_sorted_of_monkey, alive_ffs, ff_fl
     return env_ff_flash
 
 
-def increase_dt_for_monkey_information(time, monkey_x, monkey_y, new_dt, old_dt=0.0166):
-    """
-    Extract data points from monkey's information by increasing the interval between the points
-    """
-    ratio = new_dt / old_dt
-    agent_indices = np.arange(0, len(time) - 1, ratio)
-    agent_indices = np.round(agent_indices).astype('int')
-
-    time = time[agent_indices]
-    monkey_x = monkey_x[agent_indices]
-    monkey_y = monkey_y[agent_indices]
-
-    delta_time = np.diff(time)
-    delta_x = np.diff(monkey_x)
-    delta_y = np.diff(monkey_y)
-    delta_position = np.sqrt(np.square(delta_x) + np.square(delta_y))
-    monkey_speed = np.divide(delta_position, delta_time)
-    monkey_speed = np.append(monkey_speed[0], monkey_speed)
-
-    while np.where(monkey_speed >= 200)[0].size > 0:
-        index = np.where(monkey_speed >= 200)[0]
-        monkey_speed1 = np.append(monkey_speed[0], monkey_speed)
-        monkey_speed[index] = monkey_speed1[index]
-
-    monkey_angles = np.arctan2(delta_y, delta_x)
-    monkey_angles = np.append(monkey_angles[0], monkey_angles)
-
-    delta_angle = np.remainder(np.diff(monkey_angles), 2 * pi)
-    monkey_dw = np.divide(delta_angle, delta_time)
-    monkey_dw = np.append(monkey_dw[0], monkey_dw)
-
-    return time, monkey_x, monkey_y, monkey_speed, monkey_angles, monkey_dw
-
 
 def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
     """

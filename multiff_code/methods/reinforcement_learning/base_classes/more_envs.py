@@ -93,7 +93,7 @@ class BaseCollectInformation(base_env.MultiFF):
             return
 
         # mark their despawn times
-        self.ff_information.loc[self.respawn_idx, "t_despawn"] = self.time
+        self.ff_information.loc[self.ff_information['index_in_ff_flash'].isin(self.respawn_idx), "t_despawn"] = self.time
 
         # add new rows for new lifetimes
         new_ff_info = pd.DataFrame(

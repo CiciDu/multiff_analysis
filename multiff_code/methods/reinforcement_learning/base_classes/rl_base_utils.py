@@ -63,40 +63,26 @@ def calculate_reward_threshold_for_curriculum_training(env, n_eval_episodes=1, f
     return reward_threshold
 
 
-def get_agent_name_from_folder_name(prefix, agent_folder):
-    if '/' in agent_folder:
-        agent_folder = agent_folder.split('/')[-1]
+# # write code to get agent name from params
+# def get_agent_name_from_params(params):
 
-    try:
-        _ = extract_cost_params_from_folder_name(agent_folder)
-        whether_with_cost = 'costT'
-    except ValueError:
-        # print('No cost params extracted.')
-        whether_with_cost = 'costF'
-    agent_name = f'{prefix}_{whether_with_cost}'
-    return agent_name
+#     ff_indicator = 'ff' + str(params['num_obs_ff'])
 
+#     memory_indicator = 'mem' + str(params['max_in_memory_time'])
 
-# write code to get agent name from params
-def get_agent_name_from_params(params):
+#     if ((params['dv_cost_factor']) == 1) & \
+#             ((params['dw_cost_factor']) == 1) & ((params['w_cost_factor']) == 1):
+#         cost_indicator = 'costT'
+#     elif ((params['dv_cost_factor']) == 0) & \
+#             ((params['dw_cost_factor']) == 0) & ((params['w_cost_factor']) == 0):
+#         cost_indicator = 'costF'
+#     else:
+#         cost_indicator = "dv" + str(params['dv_cost_factor']) + \
+#             "_dw" + str(params['dw_cost_factor']) + \
+#             "_w" + str(params['w_cost_factor'])
 
-    ff_indicator = 'ff' + str(params['num_obs_ff'])
-
-    memory_indicator = 'mem' + str(params['max_in_memory_time'])
-
-    if ((params['dv_cost_factor']) == 1) & \
-            ((params['dw_cost_factor']) == 1) & ((params['w_cost_factor']) == 1):
-        cost_indicator = 'costT'
-    elif ((params['dv_cost_factor']) == 0) & \
-            ((params['dw_cost_factor']) == 0) & ((params['w_cost_factor']) == 0):
-        cost_indicator = 'costF'
-    else:
-        cost_indicator = "dv" + str(params['dv_cost_factor']) + \
-            "_dw" + str(params['dw_cost_factor']) + \
-            "_w" + str(params['w_cost_factor'])
-
-    agent_name = ff_indicator + '_' + memory_indicator + '_' + cost_indicator
-    return agent_name
+#     agent_name = ff_indicator + '_' + memory_indicator + '_' + cost_indicator
+#     return agent_name
 
 
 def retrieve_params(model_folder_name):
@@ -137,7 +123,7 @@ def get_folders_with_params(path='multiff_analysis/RL_models/SB3_stored_models/a
     return folders_with_params
 
 
-def add_essential_agent_params_info(df, params, agent_name=None):
+def add_essential_agent_params_info(df, params):
     df = df.copy()
     df['num_obs_ff'] = params['num_obs_ff']
     df['max_in_memory_time'] = params['max_in_memory_time']
@@ -147,8 +133,6 @@ def add_essential_agent_params_info(df, params, agent_name=None):
     df['dw_cost_factor'] = params['dw_cost_factor']
     df['w_cost_factor'] = params['w_cost_factor']
 
-    if agent_name is not None:
-        df['id'] = agent_name
     return df
 
 

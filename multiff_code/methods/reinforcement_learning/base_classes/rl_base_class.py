@@ -48,6 +48,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  stop_vel_cost=50,
                  data_name='data_0',
                  std_anneal_preserve_fraction=1,
+                 replay_keep_fraction=0.8,
                  **additional_env_kwargs):
 
         self.player = "agent"
@@ -79,10 +80,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.loaded_agent_name = ''
 
-        self.agent_id = "dv" + str(dv_cost_factor) + \
-                        "_dw" + str(dw_cost_factor) + "_w" + str(w_cost_factor) + \
-                        "_memT" + \
-            str(self.input_env_kwargs['max_in_memory_time'])
+        # self.agent_id = "dv" + str(dv_cost_factor) + \
+        #                 "_dw" + str(dw_cost_factor) + "_w" + str(w_cost_factor) + \
+        #                 "_memT" + \
+        #     str(self.input_env_kwargs['max_in_memory_time'])
+        self.agent_id = 'agent_1'
 
         if len(overall_folder) > 0:
             os.makedirs(self.overall_folder, exist_ok=True)
@@ -92,6 +94,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         print('model_folder_name:', self.model_folder_name)
         
         self.std_anneal_preserve_fraction = std_anneal_preserve_fraction
+        self.replay_keep_fraction = replay_keep_fraction
 
         if add_date_to_model_folder_name:
             self.model_folder_name = self.model_folder_name + "_date" + \
@@ -175,8 +178,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     def _progress_in_curriculum(self, best_model_in_curriculum_exists_ok=True):
         os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
-        self.original_agent_id = self.agent_id
-        self.agent_id = 'no_cost'
         print('Starting curriculum training')
         if best_model_in_curriculum_exists_ok:
             try:
@@ -201,7 +202,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self._use_while_loop_for_curriculum_training()
         self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                                          video_dir=self.best_model_postcurriculum_dir)
-        self.agent_id = self.original_agent_id
 
     def _make_initial_env_for_curriculum_training(self,
                                                   initial_flash_on_interval=3,
@@ -376,23 +376,23 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 env.reward_boundary - 10, self.input_env_kwargs['reward_boundary'])
             self.curriculum_env_kwargs['reward_boundary'] = env.reward_boundary
             print('Updated reward_boundary to:', env.reward_boundary)
-            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
+            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
         elif env.distance2center_cost > self.input_env_kwargs['distance2center_cost']:
             env.distance2center_cost = max(
                 env.distance2center_cost - 0.5, self.input_env_kwargs['distance2center_cost'])
             self.curriculum_env_kwargs['distance2center_cost'] = env.distance2center_cost
             print('Updated distance2center_cost to:', env.distance2center_cost)
-            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
+            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
         elif env.angular_terminal_vel > self.input_env_kwargs['angular_terminal_vel']:
             env.angular_terminal_vel = max(env.angular_terminal_vel/2, self.input_env_kwargs['angular_terminal_vel'])
             self.curriculum_env_kwargs['angular_terminal_vel'] = env.angular_terminal_vel
             print('Updated angular_terminal_vel to:', env.angular_terminal_vel)
-            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
+            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
         elif env.flash_on_interval > self.input_env_kwargs['flash_on_interval']:
             env.flash_on_interval = max(env.flash_on_interval - 0.3, self.input_env_kwargs['flash_on_interval'])
             self.curriculum_env_kwargs['flash_on_interval'] = env.flash_on_interval
             print('Updated flash_on_interval to:', env.flash_on_interval)
-            self._prune_or_clear_replay_buffer(keep_fraction=float(getattr(self, 'replay_keep_fraction', 0.2)))
+            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
         elif env.stop_vel_cost > self.input_env_kwargs['stop_vel_cost']:
             env.stop_vel_cost = max(env.stop_vel_cost - 50,
                                     self.input_env_kwargs['stop_vel_cost'])

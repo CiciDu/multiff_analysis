@@ -152,7 +152,7 @@ class MultiFF(gymnasium.Env):
         # Observation spec (per slot)
         # [valid, d_log, sinθ, cosθ, t_start_seen, t_last_seen, visible, pose_unreliable, ff_about_to_fade, new_ff]
         self.slot_fields = slot_fields or [
-            'valid', 'd_log', 'sin', 'cos', 't_start_seen', 't_last_seen', 'visible', 'ff_about_to_fade']
+            'valid', 'd_log', 'sin', 'cos', 't_start_seen', 't_last_seen', 'visible']
         if 'ff_about_to_fade' in self.slot_fields:
             assert self.identity_slot_strategy == 'drop_fill'
 
@@ -654,8 +654,8 @@ class MultiFF(gymnasium.Env):
             ffids = self.slot_ids[valid_slots].astype(np.int32)
             # choose pose source for content features
             ffxy = self.ffxy_noisy[ffids]
-            print('obs_ffxy:')
-            print(ffxy)
+            # print('obs_ffxy:')
+            # print(ffxy)
             theta_center, _ = env_utils.calculate_angles_to_ff(
                 ffxy, self.agentxy[0], self.agentxy[1], self.agentheading, self.ff_radius
             )
@@ -1054,11 +1054,13 @@ class MultiFF(gymnasium.Env):
         obs[:n_slots] = self.ff_slots_flat
         off = n_slots
 
-        print('self.time:', self.time)
-        print('self.slots_SN:')
-        print(self.slots_SN)
+        # print('self.time:', self.time)
+        # print('self.slots_SN:')
+        # print('self.agentheading:', self.agentheading * 180/np.pi)
+        # print('self.topk_indices: ', self.topk_indices)
+        # print(self.slots_SN)
 
-        print('agentxy:', self.agentxy)
+        # print('agentxy:', self.agentxy)
 
         if self.add_action_to_obs:
             obs[off:off + 2] = self.action

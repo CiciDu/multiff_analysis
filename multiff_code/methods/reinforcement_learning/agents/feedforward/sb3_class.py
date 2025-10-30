@@ -98,7 +98,8 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             best_model_save_path = self.model_folder_name
 
         stop_train_callback = sb3_utils.StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=15, verbose=1, model_folder_name=self.model_folder_name,
-                                                                         overall_folder=self.overall_folder, agent_id=self.agent_id)
+                                                                         overall_folder=self.overall_folder, agent_id=self.agent_id,
+                                                                         best_model_save_path=best_model_save_path)
 
         # Note: by adding best_model_save_path, the callback can save the best model after each evaluation
         if best_model_save_path is not None:
@@ -212,8 +213,14 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
                 self.sac_model.load_replay_buffer(path2)
                 print("Loaded existing replay buffer:", path2)
             else:
-                print(
-                    f"Replay buffer not found at {path2}; proceeding without it.")
+                # Fallback: look in the parent directory (agent root)
+                fallback_path = os.path.join(os.path.dirname(dir_name), buffer_name)
+                if os.path.exists(fallback_path):
+                    self.sac_model.load_replay_buffer(fallback_path)
+                    print("Loaded existing replay buffer from fallback:", fallback_path)
+                else:
+                    print(
+                        f"Replay buffer not found at {path2}; proceeding without it.")
 
         if keep_current_agent_params and (self.agent_params is not None):
             for key, item in self.agent_params.items():

@@ -51,20 +51,18 @@ class PlanFactorsAcrossAgents():
                 else:
                     raise Exception('No env params found in manifest.')
 
-                agent_name = rl_base_utils.get_agent_name_from_params(
-                    params)
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
                     model_folder_name=folder)
                 self.pfas.streamline_getting_y_values(
                     model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok, **params)
 
                 agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
-                    self.pfas.all_ref_pooled_median_info, params, agent_name)
+                    self.pfas.all_ref_pooled_median_info, params)
                 self.all_ref_pooled_median_info_across_agents = pd.concat(
                     [self.all_ref_pooled_median_info_across_agents, agent_all_ref_pooled_median_info], axis=0)
 
                 agent_all_perc_df = rl_base_utils.add_essential_agent_params_info(
-                    self.pfas.pooled_perc_info, params, agent_name)
+                    self.pfas.pooled_perc_info, params)
                 self.pooled_perc_info_across_agents = pd.concat(
                     [self.pooled_perc_info_across_agents, agent_all_perc_df], axis=0)
 

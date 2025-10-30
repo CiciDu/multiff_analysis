@@ -9,7 +9,6 @@ from reinforcement_learning.collect_data.process_agent_data import (
     find_flash_time_for_one_ff,
     make_ff_flash_sorted,
     make_env_ff_flash_from_real_data,
-    increase_dt_for_monkey_information,
     unpack_ff_information_of_agent,
     reverse_value_and_position,
 )
@@ -125,8 +124,8 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
         elif is_attn_ff or is_attn_rnn:
             if hasattr(env, "obs_to_attn_tensors") and hasattr(sac_model, "actor"):
                 if is_attn_rnn:
-                    sf, sm, ss = env.obs_to_attn_tensors(
-                        state_or_obs, device=device)
+                    model_device = next(sac_model.actor.parameters()).device
+                    sf, sm, ss = env.obs_to_attn_tensors(state_or_obs, device=model_device)
                     with torch.no_grad():
                         mu_seq, std_seq, _, hidden_out = sac_model.actor(
                             sf.unsqueeze(1), sm.unsqueeze(1), ss.unsqueeze(1), hx=hidden_out
@@ -206,6 +205,7 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
         indexes_in_ff_flash.extend(topk_indices)
         corresponding_time.extend([env.time] * len(topk_indices))
         all_steps.extend([step] * len(topk_indices))
+        # print('topk_indices in collect_agent_data: ', topk_indices)
 
         if len(topk_indices) > 0:
             t_last_seen = env.ff_t_since_last_seen[topk_indices]
@@ -276,12 +276,14 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
         len(ff_information_temp))
     ff_information_temp.loc[ff_information_temp['t_capture']
                             < 0, 't_capture'] = env.time + 10
-
+    ff_information_temp.loc[ff_information_temp['t_despawn']
+                            < 0, 't_despawn'] = env.time + 10
+    
     ff_in_obs_df = ff_in_obs_df.merge(
         ff_information_temp, on='index_in_ff_flash', how='left'
     )
     ff_in_obs_df = ff_in_obs_df[ff_in_obs_df['time'].between(
-        ff_in_obs_df['t_spawn'], ff_in_obs_df['t_capture'], inclusive='left'
+        ff_in_obs_df['t_spawn'], ff_in_obs_df['t_despawn'], inclusive='left'
     )].copy()
 
     if ff_in_obs_df.groupby('point_index').count().max().max() > env.num_obs_ff:
