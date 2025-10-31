@@ -480,10 +480,37 @@ def plot_in_memory_ff_reward_boundary_for_animation(in_memory_ffs, ax, reward_bo
     else:
         ff_x_column = 'ff_x'
         ff_y_column = 'ff_y'
-    for j in range(len(in_memory_ffs)):
-        circle = plt.Circle((in_memory_ffs[ff_x_column].iloc[j], in_memory_ffs[ff_y_column].iloc[j]),
-                            reward_boundary_radius, facecolor='purple', edgecolor='orange', alpha=0.3, zorder=1)
-        ax.add_patch(circle)
+        
+    if "ff_x_noisy" in in_memory_ffs.columns:
+        if 'pose_unreliable' not in in_memory_ffs.columns:
+            in_memory_ffs['pose_unreliable'] = False
+
+        # plot both the real positions and the noisy positions
+        if 'ff_x_noisy_rotated' in in_memory_ffs.columns:
+            ff_x_noisy_column = 'ff_x_noisy_rotated'
+            ff_y_noisy_column = 'ff_y_noisy_rotated'
+        else:
+            ff_x_noisy_column = 'ff_x_noisy'
+            ff_y_noisy_column = 'ff_y_noisy'
+
+        for k in range(len(in_memory_ffs)):
+            if not in_memory_ffs['pose_unreliable'].iloc[k]:
+                edgecolor = 'red' if in_memory_ffs['visible'].iloc[k] else 'gray'
+                circle = plt.Circle((in_memory_ffs[ff_x_column].iloc[k], in_memory_ffs[ff_y_column].iloc[k]),
+                                    reward_boundary_radius, facecolor='yellow', edgecolor=edgecolor, alpha=0.7, zorder=1)
+                ax.add_patch(circle)
+                circle = plt.Circle((in_memory_ffs[ff_x_noisy_column].iloc[k], in_memory_ffs[ff_y_noisy_column].iloc[k]),
+                                    reward_boundary_radius, facecolor='gray', edgecolor=edgecolor, alpha=0.5, zorder=1)
+                ax.add_patch(circle)
+            else:
+                circle = plt.Circle((in_memory_ffs[ff_x_column].iloc[k], in_memory_ffs[ff_y_column].iloc[k]),
+                                    reward_boundary_radius, facecolor='black', edgecolor='black', alpha=0.7, zorder=1)
+                ax.add_patch(circle)
+    else:    
+        for j in range(len(in_memory_ffs)):
+            circle = plt.Circle((in_memory_ffs[ff_x_column].iloc[j], in_memory_ffs[ff_y_column].iloc[j]),
+                                reward_boundary_radius, facecolor='purple', edgecolor='orange', alpha=0.3, zorder=1)
+            ax.add_patch(circle)
     return ax
 
 

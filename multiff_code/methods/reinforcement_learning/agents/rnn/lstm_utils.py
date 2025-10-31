@@ -98,7 +98,14 @@ class ReplayBufferLSTM2:
         self.position = int((self.position + 1) %
                             self.capacity)  # as a ring buffer
 
-    def sample(self, batch_size, *, seq_len: Optional[int] = None, burn_in: int = 0, random_window: bool = True):
+    def sample(self, batch_size, *, seq_len: Optional[int] = None, burn_in: int = 0, random_window: bool = True, policy_net=None, device='cpu'):
+        """
+        Sample random subsequences with optional burn-in reconstruction.
+
+        If policy_net is provided, it will be used to roll the LSTM forward
+        for burn_in steps (no gradients) to recompute hidden_in that matches
+        the start of the sampled subsequence.
+        """
         batch = random.sample(self.buffer, batch_size)
 
         # Determine a common core length and prefix across the batch
@@ -123,16 +130,34 @@ class ReplayBufferLSTM2:
             t0_b = t0_core - prefix
             t1 = t0_core + core_T
 
+            # ------------------------------
+            # 🔹 Burn-in reconstruction
+            # ------------------------------
+            if policy_net is not None and burn_in > 0 and t0_b > 0:
+                with torch.no_grad():
+                    h, c = h_in.to(device), c_in.to(device)
+                    # roll forward up to t0_b
+                    for t in range(t0_b):
+                        s_t = torch.as_tensor(state[t], dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+                        la_t = torch.as_tensor(last_action[t], dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+                        x = torch.cat([s_t, la_t], dim=-1)
+                        x = F.relu(policy_net.linear2(x))
+                        _, (h, c) = policy_net.lstm1(x, (h, c))
+                    h_in_eff, c_in_eff = h.detach().cpu(), c.detach().cpu()
+            else:
+                h_in_eff, c_in_eff = h_in.detach().cpu(), c_in.detach().cpu()
+
+            # slice subsequence
             s_lst.append(state[t0_b:t1])
             a_lst.append(action[t0_b:t1])
             la_lst.append(last_action[t0_b:t1])
             r_lst.append(reward[t0_b:t1])
             ns_lst.append(next_state[t0_b:t1])
             d_lst.append(done[t0_b:t1])
-            hi_lst.append(h_in.detach().to('cpu'))
-            ci_lst.append(c_in.detach().to('cpu'))
-            ho_lst.append(h_out.detach().to('cpu'))
-            co_lst.append(c_out.detach().to('cpu'))
+            hi_lst.append(h_in_eff)
+            ci_lst.append(c_in_eff)
+            ho_lst.append(h_out.detach().cpu())
+            co_lst.append(c_out.detach().cpu())
 
         hi_lst = torch.cat(hi_lst, dim=-2)
         ho_lst = torch.cat(ho_lst, dim=-2)
@@ -143,6 +168,7 @@ class ReplayBufferLSTM2:
         hidden_out = (ho_lst, co_lst)
 
         return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst
+
 
     def __len__(
             # cannot work in multiprocessing case, len(replay_buffer) is not available in proxy of manager!
@@ -569,7 +595,8 @@ class LSTM_SAC_Trainer():
         self._update_step += 1
         # Sample a batch from the replay buffer
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(
-            self.batch_size, seq_len=self.seq_len, burn_in=self.burn_in, random_window=True)
+            self.batch_size, seq_len=self.seq_len, burn_in=self.burn_in, random_window=True,
+            policy_net=self.policy_net, device=device)
 
         # Convert to tensors and move to the specified device
         state = torch.FloatTensor(np.array(state)).to(device)

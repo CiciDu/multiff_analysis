@@ -125,7 +125,8 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
             if hasattr(env, "obs_to_attn_tensors") and hasattr(sac_model, "actor"):
                 if is_attn_rnn:
                     model_device = next(sac_model.actor.parameters()).device
-                    sf, sm, ss = env.obs_to_attn_tensors(state_or_obs, device=model_device)
+                    sf, sm, ss = env.obs_to_attn_tensors(
+                        state_or_obs, device=model_device)
                     with torch.no_grad():
                         mu_seq, std_seq, _, hidden_out = sac_model.actor(
                             sf.unsqueeze(1), sm.unsqueeze(1), ss.unsqueeze(1), hx=hidden_out
@@ -216,8 +217,10 @@ def _collect_monkey_and_ff_data(env, sac_model, n_steps, hidden_dim, determinist
                 raise ValueError(
                     "Number of fireflies in observation does not match the environment."
                 )
-            ff_x_noisy.extend((env.ffxy_slot_noisy[:, 0] + env.arena_center_global[0]).tolist())
-            ff_y_noisy.extend((env.ffxy_slot_noisy[:, 1] + env.arena_center_global[1]).tolist())
+            ff_x_noisy.extend(
+                (env.ffxy_slot_noisy[:, 0] + env.arena_center_global[0]).tolist())
+            ff_y_noisy.extend(
+                (env.ffxy_slot_noisy[:, 1] + env.arena_center_global[1]).tolist())
             pose_unreliable.extend(env.pose_unreliable.tolist())
             visible.extend(env.visible.tolist())
 
@@ -278,18 +281,39 @@ def collect_agent_data_func(env, sac_model, n_steps=15000,
                             < 0, 't_capture'] = env.time + 10
     ff_information_temp.loc[ff_information_temp['t_despawn']
                             < 0, 't_despawn'] = env.time + 10
-    
+
     ff_in_obs_df = ff_in_obs_df.merge(
         ff_information_temp, on='index_in_ff_flash', how='left'
     )
     ff_in_obs_df = ff_in_obs_df[ff_in_obs_df['time'].between(
         ff_in_obs_df['t_spawn'], ff_in_obs_df['t_despawn'], inclusive='left'
     )].copy()
+    # Deduplicate any accidental duplicates per time step and firefly id after merge
+    ff_in_obs_df.sort_values(
+        ['point_index', 'index_in_ff_flash', 'time'], inplace=True)
+    # ff_in_obs_df = ff_in_obs_df.drop_duplicates(
+    #     subset=['point_index', 'index_in_ff_flash'], keep='last')
 
-    if ff_in_obs_df.groupby('point_index').count().max().max() > env.num_obs_ff:
+    # Enforce environment cap per observation step defensively
+    try:
+        max_per_step = ff_in_obs_df.groupby(
+            'point_index')['index_in_ff_flash'].nunique().max()
+    except Exception:
+        max_per_step = None
+        
+    if max_per_step > env.num_obs_ff:
         raise ValueError(
             "The number of fireflies in the observation exceeds the number in the environment."
         )
+        
+    # if pd.notna(max_per_step) and int(max_per_step) > int(env.num_obs_ff):
+    #     # Keep at most env.num_obs_ff rows per step deterministically
+    #     ff_in_obs_df = (
+    #         ff_in_obs_df
+    #         .groupby('point_index', group_keys=False)
+    #         .apply(lambda g: g.head(int(env.num_obs_ff)))
+    #         .reset_index(drop=True)
+    #     )
 
     # Collect all monkey data
     monkey_information = pack_monkey_information(

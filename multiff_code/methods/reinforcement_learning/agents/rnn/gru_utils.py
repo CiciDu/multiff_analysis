@@ -150,13 +150,22 @@ class ReplayBufferGRU:
         self.buffer[self.position] = (hidden_in, hidden_out, state, action, last_action, reward, next_state, done)
         self.position = int((self.position + 1) % self.capacity)  # as a ring buffer
 
-    def sample(self, batch_size, to_torch: bool = False, device: Optional[torch.device] = None,
-               seq_len: Optional[int] = None, burn_in: int = 0, random_window: bool = True):
-        # First pick the batch
+    def sample(self, batch_size,
+            to_torch: bool = False,
+            device: Optional[torch.device] = None,
+            seq_len: Optional[int] = None,
+            burn_in: int = 0,
+            random_window: bool = True,
+            policy_net=None):
+        """
+        Sample random subsequences with optional burn-in hidden-state reconstruction.
+        If policy_net is provided, we roll the GRU forward (no grad) for burn_in steps
+        to reconstruct hidden_in that matches the start of the sampled subsequence.
+        """
         batch = random.sample(self.buffer, batch_size)
 
-        # Determine a common core length and prefix across the batch to ensure rectangular tensors
-        T_full_list = [len(sample[2]) for sample in batch]  # len(state) per episode
+        # Determine a common core length and prefix
+        T_full_list = [len(sample[2]) for sample in batch]  # len(state)
         if len(T_full_list) == 0:
             raise ValueError('ReplayBufferGRU is empty')
         core_T = min(T_full_list) if seq_len is None else int(min(seq_len, min(T_full_list)))
@@ -168,26 +177,38 @@ class ReplayBufferGRU:
 
         for h_in, h_out, state, action, last_action, reward, next_state, done in batch:
             T = len(state)
-            # choose core start between [prefix, T - core_T]
             low = prefix
             high = max(prefix, T - core_T)
-            if random_window and high > low:
-                t0_core = random.randint(low, high)
-            else:
-                t0_core = low
+            t0_core = random.randint(low, high) if (random_window and high > low) else low
             t0_b = t0_core - prefix
             t1 = t0_core + core_T
 
+            # 🔹 Burn-in reconstruction (for GRU)
+            if policy_net is not None and burn_in > 0 and t0_b > 0:
+                with torch.no_grad():
+                    h = h_in.to(device or torch.device("cpu"))
+                    for t in range(t0_b):
+                        s_t = torch.as_tensor(state[t], dtype=torch.float32, device=h.device).unsqueeze(0).unsqueeze(0)
+                        la_t = torch.as_tensor(last_action[t], dtype=torch.float32, device=h.device).unsqueeze(0).unsqueeze(0)
+                        # match GRU policy forward preprocessing
+                        x = torch.cat([s_t, la_t], dim=-1)
+                        x = F.relu(policy_net.linear2(x))
+                        _, h = policy_net.gru1(x, h)
+                    h_in_eff = h.detach().cpu()
+            else:
+                h_in_eff = h_in.detach().cpu()
+
+            # Slice subsequence window
             s_lst.append(state[t0_b:t1])
             a_lst.append(action[t0_b:t1])
             la_lst.append(last_action[t0_b:t1])
             r_lst.append(reward[t0_b:t1])
             ns_lst.append(next_state[t0_b:t1])
             d_lst.append(done[t0_b:t1])
-            hi_lst.append(h_in.detach().to('cpu'))  # (1, 1, H)
-            ho_lst.append(h_out.detach().to('cpu'))
+            hi_lst.append(h_in_eff)
+            ho_lst.append(h_out.detach().cpu())
 
-        hi_lst = torch.cat(hi_lst, dim=-2).detach()  # (1, B, H)
+        hi_lst = torch.cat(hi_lst, dim=-2).detach()
         ho_lst = torch.cat(ho_lst, dim=-2).detach()
 
         if not to_torch:
@@ -199,7 +220,7 @@ class ReplayBufferGRU:
         hi_lst = hi_lst.to(dev)
         ho_lst = ho_lst.to(dev)
 
-        # Convert lists of sequences to contiguous tensors on device (rectangular by construction)
+        # Convert lists of sequences to rectangular tensors
         state      = torch.as_tensor(np.array(s_lst), dtype=torch.float32, device=dev)
         action     = torch.as_tensor(np.array(a_lst), dtype=torch.float32, device=dev)
         last_action= torch.as_tensor(np.array(la_lst), dtype=torch.float32, device=dev)
@@ -208,6 +229,7 @@ class ReplayBufferGRU:
         done       = torch.as_tensor(np.array(d_lst), dtype=torch.float32, device=dev)
 
         return hi_lst, ho_lst, state, action, last_action, reward, next_state, done
+
 
     def __len__(
             self):  # cannot work in multiprocessing case, len(replay_buffer) is not available in proxy of manager!
@@ -339,7 +361,8 @@ class GRU_SAC_Trainer():
     def update(self, batch_size, reward_scale=1, auto_entropy=True, target_entropy=-2, gamma=0.975, soft_tau=1e-2):
         self._update_step += 1
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.replay_buffer.sample(
-            batch_size, to_torch=True, device=self.device, seq_len=self.seq_len, burn_in=self.burn_in, random_window=True
+            batch_size, to_torch=True, device=self.device, seq_len=self.seq_len, burn_in=self.burn_in, random_window=True,
+            policy_net=self.policy_net,
         )
 
         batch_size = self.batch_size
