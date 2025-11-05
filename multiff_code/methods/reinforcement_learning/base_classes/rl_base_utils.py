@@ -41,25 +41,72 @@ def calculate_model_gamma(dt):
     return gamma
 
 
-def get_agent_params_from_the_current_sac_model(sac_model):
-    params = {'learning_rate': sac_model.learning_rate,
-              'batch_size': sac_model.batch_size,
-              'target_update_interval': sac_model.target_update_interval,
-              'buffer_size': sac_model.buffer_size,
-              'learning_starts': sac_model.learning_starts,
-              'train_freq': sac_model.train_freq,
-              'gradient_steps': sac_model.gradient_steps,
-              'ent_coef': sac_model.ent_coef,
-              'policy_kwargs': sac_model.policy_kwargs,
-              'gamma': sac_model.gamma}
+def get_agent_params_from_the_current_sac_model(rl_agent):
+    params = {'learning_rate': rl_agent.learning_rate,
+              'batch_size': rl_agent.batch_size,
+              'target_update_interval': rl_agent.target_update_interval,
+              'buffer_size': rl_agent.buffer_size,
+              'learning_starts': rl_agent.learning_starts,
+              'train_freq': rl_agent.train_freq,
+              'gradient_steps': rl_agent.gradient_steps,
+              'ent_coef': rl_agent.ent_coef,
+              'policy_kwargs': rl_agent.policy_kwargs,
+              'gamma': rl_agent.gamma}
     return params
 
 
 def calculate_reward_threshold_for_curriculum_training(env, n_eval_episodes=1, ff_caught_rate_threshold=0.1):
-    reward_threshold = (n_eval_episodes * env.episode_len * env.dt) * \
+    """
+    Compute a curriculum reward threshold.
+
+    Supports both raw envs and vectorized envs (Dummy/Subproc). For vectorized envs,
+    queries a small helper method on the wrapper to retrieve base parameters.
+    """
+    # Try direct unwrap through .env chain (non-vectorized)
+    base_env = env
+    while hasattr(base_env, 'env'):
+        try:
+            base_env = base_env.env
+        except Exception:
+            break
+
+    def _try_get(obj, name):
+        try:
+            return getattr(obj, name)
+        except Exception:
+            return None
+
+    episode_len = _try_get(base_env, 'episode_len')
+    dt = _try_get(base_env, 'dt')
+    reward_per_ff = _try_get(base_env, 'reward_per_ff')
+    distance2center_cost = _try_get(base_env, 'distance2center_cost')
+
+    # If any missing, try vectorized env query via env_method on index 0
+    if any(x is None for x in [episode_len, dt, reward_per_ff, distance2center_cost]):
+        try:
+            if hasattr(env, 'env_method'):
+                params_list = env.env_method('get_basic_params', indices=0)
+                params = params_list[0] if isinstance(
+                    params_list, (list, tuple)) else params_list
+                if isinstance(params, dict):
+                    episode_len = episode_len if episode_len is not None else params.get(
+                        'episode_len', None)
+                    dt = dt if dt is not None else params.get('dt', None)
+                    reward_per_ff = reward_per_ff if reward_per_ff is not None else params.get(
+                        'reward_per_ff', None)
+                    distance2center_cost = distance2center_cost if distance2center_cost is not None else params.get(
+                        'distance2center_cost', None)
+        except Exception:
+            pass
+
+    if any(x is None for x in [episode_len, dt, reward_per_ff, distance2center_cost]):
+        raise AttributeError(
+            'Unable to retrieve basic environment parameters required for reward threshold calculation.')
+
+    reward_threshold = (n_eval_episodes * episode_len * dt) * \
         ff_caught_rate_threshold * \
-        (env.reward_per_ff - env.distance2center_cost * 15)
-        #- 200  # including the rest of the cost like velocity cost
+        (reward_per_ff - distance2center_cost * 15)
+    # - 200  # including the rest of the cost like velocity cost
     return reward_threshold
 
 

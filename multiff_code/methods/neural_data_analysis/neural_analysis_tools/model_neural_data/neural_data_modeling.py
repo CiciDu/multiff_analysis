@@ -7,8 +7,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib import rc
 from sklearn.linear_model import LinearRegression
+from sklearn.cross_decomposition import CCA as SklearnCCA
 import statsmodels.api as sm
-import rcca
+from cca_zoo.linear import rCCA
+from types import SimpleNamespace
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -70,27 +72,35 @@ def get_y_var_lr_df(binned_spikes_matrix, final_behavioral_data, verbose=False):
 
 
 def conduct_cca(X1_sc, X2_sc, n_components=10, plot_correlations=True, reg=1e-2):
-    cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
-    cca.train([X1_sc, X2_sc])
-    print('Canonical Correlation Per Component Pair:', cca.cancorrs)
-    print('% Shared Variance:', cca.cancorrs**2)
-    canon_corr = cca.cancorrs
+    # Prefer cca_zoo regularized CCA; fall back to sklearn CCA if unavailable/incompatible
+    try:
+        cca = rCCA(latent_dimensions=n_components, c=[reg, reg])
+        cca.fit([X1_sc, X2_sc])
+        X1_c, X2_c = cca.transform([X1_sc, X2_sc])
+    except Exception as e:
+        print(f"Fallback: use scikit-learn CCA (no ridge regularization). Error: {e}")
+        cca = SklearnCCA(n_components=n_components, scale=False, max_iter=5000)
+        cca.fit(X1_sc, X2_sc)
+        X1_c, X2_c = cca.transform(X1_sc, X2_sc)
 
-    # Transform datasets to obtain canonical variates
-    X1_c = np.dot(X1_sc, cca.ws[0])
-    X2_c = np.dot(X2_sc, cca.ws[1])
+    # Compute canonical correlations
+    k = min(X1_c.shape[1], X2_c.shape[1])
+    canon_corr = np.array(
+        [np.corrcoef(X1_c[:, i], X2_c[:, i])[0, 1] for i in range(k)])
 
-    # Calculate canonical correlations
+    print('Canonical Correlation per Component Pair:', canon_corr)
+    print('% Shared Variance:', np.round(canon_corr ** 2 * 100, 2))
+
+    # Optional: plot canonical correlations
     if plot_correlations:
-        bar_names = [f'CC {i+1}' for i in range(n_components)]
-        plt.bar(bar_names, canon_corr, color='lightgrey',
-                width=0.8, edgecolor='k')
-
-        # Label y value on each bar
+        bar_names = [f'CC {i+1}' for i in range(len(canon_corr))]
+        plt.bar(bar_names, canon_corr, color='lightgrey', edgecolor='k')
         for i, val in enumerate(canon_corr):
             plt.text(i, val, f'{val:.2f}', ha='center', va='bottom')
-
+        plt.ylabel('Correlation')
+        plt.title('Canonical Correlations per Component')
         plt.show()
+
     return cca, X1_c, X2_c, canon_corr
 
 

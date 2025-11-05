@@ -2,8 +2,8 @@ from data_wrangling import general_utils, retrieve_raw_data, process_monkey_info
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
 from visualization.matplotlib_tools import additional_plots, plot_statistics
 from visualization.animation import animation_class, animation_utils
-from reinforcement_learning.agents.rnn import env_for_rnn
-from reinforcement_learning.agents.feedforward import env_for_sb3
+from reinforcement_learning.agents.rnn import rnn_env
+from reinforcement_learning.agents.feedforward import sb3_env
 from reinforcement_learning.collect_data import collect_agent_data, process_agent_data
 from reinforcement_learning.agents.feedforward import interpret_neural_network, sb3_utils
 from reinforcement_learning.base_classes import rl_base_utils
@@ -14,6 +14,7 @@ from reinforcement_learning.base_classes import env_utils
 
 
 import time as time_package
+import gc
 import json
 import os
 import numpy as np
@@ -45,7 +46,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  reward_boundary=25,
                  angular_terminal_vel=0.05,
                  distance2center_cost=0,
-                 stop_vel_cost=50,
+                 stop_vel_cost=1,
                  data_name='data_0',
                  std_anneal_preserve_fraction=1,
                  replay_keep_fraction=0.8,
@@ -59,18 +60,18 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             base_env.MultiFF)
         self.additional_env_kwargs = additional_env_kwargs
         self.class_instance_env_kwargs = {'dt': dt,
-                                         'dv_cost_factor': dv_cost_factor,
-                                         'dw_cost_factor': dw_cost_factor,
-                                         'w_cost_factor': w_cost_factor,
-                                         'print_ff_capture_incidents': True,
-                                         'print_episode_reward_rates': True,
-                                         'max_in_memory_time': max_in_memory_time,
-                                         'flash_on_interval': flash_on_interval,
-                                         'angular_terminal_vel': angular_terminal_vel,
-                                         'distance2center_cost': distance2center_cost,
-                                         'stop_vel_cost': stop_vel_cost,
-                                         'reward_boundary': reward_boundary,
-                                         }
+                                          'dv_cost_factor': dv_cost_factor,
+                                          'dw_cost_factor': dw_cost_factor,
+                                          'w_cost_factor': w_cost_factor,
+                                          'print_ff_capture_incidents': True,
+                                          'print_episode_reward_rates': True,
+                                          'max_in_memory_time': max_in_memory_time,
+                                          'flash_on_interval': flash_on_interval,
+                                          'angular_terminal_vel': angular_terminal_vel,
+                                          'distance2center_cost': distance2center_cost,
+                                          'stop_vel_cost': stop_vel_cost,
+                                          'reward_boundary': reward_boundary,
+                                          }
 
         self.input_env_kwargs = {
             **self.default_env_kwargs,
@@ -92,7 +93,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.model_folder_name = model_folder_name if model_folder_name is not None else os.path.join(
             self.overall_folder, self.agent_id)
         print('model_folder_name:', self.model_folder_name)
-        
+
         self.std_anneal_preserve_fraction = std_anneal_preserve_fraction
         self.replay_keep_fraction = replay_keep_fraction
 
@@ -146,6 +147,16 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.env = self.env_class(**self.current_env_kwargs)
         print(f'Made env with the following kwargs: {env_kwargs}')
 
+    def load_best_model_postcurriculum(self, load_replay_buffer=True):
+        # load_agent will recreate env and agent using saved manifest
+        self.load_agent(load_replay_buffer=load_replay_buffer,
+                        dir_name=self.best_model_postcurriculum_dir)
+
+    def load_best_model_in_curriculum(self, load_replay_buffer=True):
+        # load_agent will recreate env and agent using saved manifest
+        self.load_agent(load_replay_buffer=load_replay_buffer,
+                        dir_name=self.best_model_in_curriculum_dir)
+
     def curriculum_training(self, best_model_in_curriculum_exists_ok=True, best_model_postcurriculum_exists_ok=True, load_replay_buffer_of_best_model_postcurriculum=True):
         if self.loaded_agent_name == 'model':
             self.regular_training()
@@ -155,7 +166,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self._progress_in_curriculum(best_model_in_curriculum_exists_ok)
             self.regular_training()
             self.successful_training = True
-            return 
+            return
         elif self.loaded_agent_name == 'best_model_postcurriculum':
             self.regular_training()
             self.successful_training = True
@@ -168,13 +179,17 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     print('Loaded best_model_postcurriculum')
                 except Exception:
                     print('Need to train a new best_model_postcurriculum')
-                    self._progress_in_curriculum(best_model_in_curriculum_exists_ok)
+                    self._progress_in_curriculum(
+                        best_model_in_curriculum_exists_ok)
             else:
-                self._progress_in_curriculum(best_model_in_curriculum_exists_ok)
+                self._progress_in_curriculum(
+                    best_model_in_curriculum_exists_ok)
             self.regular_training()
             self.successful_training = True
             return
 
+    def _make_agent_for_curriculum_training(self):
+        self.make_agent()
 
     def _progress_in_curriculum(self, best_model_in_curriculum_exists_ok=True):
         os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
@@ -192,48 +207,76 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
             except Exception:
                 print('Need to train a new best_model_in_curriculum')
-                self.make_initial_env_for_curriculum_training()
+                self.make_init_env_for_curriculum_training()
                 self._make_agent_for_curriculum_training()
         else:
             print('Making initial env and agent for curriculum training')
-            self.make_initial_env_for_curriculum_training()
+            self.make_init_env_for_curriculum_training()
             self._make_agent_for_curriculum_training()
         self.successful_training = False
         self._use_while_loop_for_curriculum_training()
         self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                                          video_dir=self.best_model_postcurriculum_dir)
 
-    def _make_initial_env_for_curriculum_training(self,
-                                                  initial_flash_on_interval=3,
-                                                  initial_angular_terminal_vel=0.32,
-                                                  initial_distance2center_cost=2,
-                                                  initial_stop_vel_cost=50,
-                                                  initial_reward_boundary=75,
-                                                  initial_dv_cost_factor=0,
-                                                  initial_dw_cost_factor=0,
-                                                  initial_w_cost_factor=0,
-                                                  ):
+    def _make_init_env_for_curriculum_training(self,
+                                               initial_flash_on_interval=1,
+                                               initial_angular_terminal_vel=0.32,
+                                               initial_reward_boundary=50,
+                                               initial_stop_vel_cost=1,
+                                               initial_distance2center_cost=1,
+                                               initial_dv_cost_factor=0,
+                                               initial_dw_cost_factor=0,
+                                               initial_w_cost_factor=0,
+                                               ):
         self.curriculum_env_kwargs = copy.deepcopy(
             self.input_env_kwargs)
         print('Made initial env for curriculum training')
-        # Determine wrapped vs direct env from agent_type
-        agent_type = getattr(self, 'agent_type', None)
-        if agent_type is None:
-            # backward: infer from presence of .env on env
-            env = self.env.env if hasattr(self.env, 'env') else self.env
-        elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-            env = self.env.env
+        # If vectorized (e.g., RPPO), broadcast via env_method on wrapper
+        if hasattr(self, 'env') and hasattr(self.env, 'env_method'):
+            try:
+                self.env.env_method(
+                    'set_curriculum_params', indices=None,
+                    flash_on_interval=initial_flash_on_interval,
+                    angular_terminal_vel=initial_angular_terminal_vel,
+                    reward_boundary=initial_reward_boundary,
+                    distance2center_cost=initial_distance2center_cost,
+                    stop_vel_cost=initial_stop_vel_cost,
+                    dv_cost_factor=initial_dv_cost_factor,
+                    dw_cost_factor=initial_dw_cost_factor,
+                    w_cost_factor=initial_w_cost_factor,
+                )
+            except Exception as e:
+                print(
+                    'Warning: failed to set initial curriculum params via env_method:', e)
         else:
-            env = self.env
+            # Determine wrapped vs direct env from agent_type
+            agent_type = getattr(self, 'agent_type', None)
+            if agent_type is None:
+                # backward: infer from presence of .env on env
+                env = self.env.env if hasattr(self.env, 'env') else self.env
+            elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
+                env = self.env.env
+            else:
+                env = self.env
 
-        env.flash_on_interval = initial_flash_on_interval
-        env.angular_terminal_vel = initial_angular_terminal_vel
-        env.reward_boundary = initial_reward_boundary
-        env.distance2center_cost = initial_distance2center_cost
-        env.stop_vel_cost = initial_stop_vel_cost
-        env.dv_cost_factor = initial_dv_cost_factor
-        env.dw_cost_factor = initial_dw_cost_factor
-        env.w_cost_factor = initial_w_cost_factor
+            env.flash_on_interval = initial_flash_on_interval
+            env.angular_terminal_vel = initial_angular_terminal_vel
+            env.reward_boundary = initial_reward_boundary
+            env.distance2center_cost = initial_distance2center_cost
+            env.stop_vel_cost = initial_stop_vel_cost
+            env.dv_cost_factor = initial_dv_cost_factor
+            env.dw_cost_factor = initial_dw_cost_factor
+            env.w_cost_factor = initial_w_cost_factor
+
+            if agent_type is None:
+                if hasattr(self.env, 'env'):
+                    self.env.env = env
+                else:
+                    self.env = env
+            elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
+                self.env.env = env
+            else:
+                self.env = env
 
         self.curriculum_env_kwargs['flash_on_interval'] = initial_flash_on_interval
         self.curriculum_env_kwargs['angular_terminal_vel'] = initial_angular_terminal_vel
@@ -246,16 +289,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.current_env_kwargs = self.curriculum_env_kwargs
 
-        if agent_type is None:
-            if hasattr(self.env, 'env'):
-                self.env.env = env
-            else:
-                self.env = env
-        elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-            self.env.env = env
-        else:
-            self.env = env
-
     def _prune_or_clear_replay_buffer(self, keep_fraction: float = 0.2):
         """
         Prune or clear replay buffer to avoid stale data after curriculum stage change.
@@ -267,9 +300,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         """
         try:
             rb = None
-            # Find replay buffer on sac_model or self
-            if hasattr(self, 'sac_model') and hasattr(self.sac_model, 'replay_buffer'):
-                rb = self.sac_model.replay_buffer
+            # Find replay buffer on rl_agent or self
+            if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'replay_buffer'):
+                rb = self.rl_agent.replay_buffer
             elif hasattr(self, 'replay'):
                 # FF attention agent uses self.replay
                 rb = getattr(self, 'replay', None)
@@ -299,10 +332,12 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     ordered = buf_list[pos:] + buf_list[:pos]
                     trimmed = ordered[-k:]
                     rb.buffer = trimmed
-                    rb.position = len(trimmed) % max(1, getattr(rb, 'capacity', len(trimmed)))
+                    rb.position = len(trimmed) % max(
+                        1, getattr(rb, 'capacity', len(trimmed)))
                 else:
                     rb.buffer = buf_list[-k:]
-                print(f'Pruned episode replay buffer to last {k} episodes (~{int(keep_fraction*100)}%)')
+                print(
+                    f'Pruned episode replay buffer to last {k} episodes (~{int(keep_fraction*100)}%)')
                 return
 
             # Array-based style (FF): has numpy arrays and size/ptr
@@ -320,7 +355,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 k = max(1, int(size * float(keep_fraction)))
                 # compute indices of last k transitions respecting circular buffer
                 ptr = int(getattr(rb, 'ptr', size))
-                idx = (np.arange(size - k, size) + ptr) % max(1, getattr(rb, 'capacity', size))
+                idx = (np.arange(size - k, size) + ptr) % max(1,
+                                                              getattr(rb, 'capacity', size))
                 # compact into front of arrays
                 rb.obs[:k] = rb.obs[idx]
                 rb.next_obs[:k] = rb.next_obs[idx]
@@ -329,38 +365,21 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 rb.done[:k] = rb.done[idx]
                 rb.size = k
                 rb.ptr = k % max(1, getattr(rb, 'capacity', k))
-                print(f'Pruned array replay buffer to last {k} steps (~{int(keep_fraction*100)}%)')
+                print(
+                    f'Pruned array replay buffer to last {k} steps (~{int(keep_fraction*100)}%)')
                 return
 
             print('Replay buffer format not recognized; skipping prune')
         except Exception as e:
             print('Warning: failed to prune/clear replay buffer:', e)
 
-    
     # Wire pruning after curriculum env updates
-    def _update_env_after_meeting_reward_threshold(self):
-        
-        print('Updating env after meeting reward threshold...')
-        agent_type = getattr(self, 'agent_type', None)
-        if agent_type is None:
-            env = self.env.env if hasattr(self.env, 'env') else self.env
-        elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-            env = self.env.env
-        else:
-            env = self.env
-        
-        # Snapshot values before update and targets
-        before = {
-            'flash_on_interval': env.flash_on_interval,
-            'angular_terminal_vel': env.angular_terminal_vel,
-            'distance2center_cost': env.distance2center_cost,
-            'stop_vel_cost': env.stop_vel_cost,
-            'reward_boundary': env.reward_boundary,
-            'dv_cost_factor': env.dv_cost_factor,
-            'dw_cost_factor': env.dw_cost_factor,
-            'w_cost_factor': env.w_cost_factor,
-        }
-        targets = {
+
+    # ------------------------------------------------------------------
+    # Curriculum helpers (targets, getters, setters, step selection)
+    # ------------------------------------------------------------------
+    def _get_curriculum_targets(self):
+        return {
             'flash_on_interval': self.input_env_kwargs['flash_on_interval'],
             'angular_terminal_vel': self.input_env_kwargs['angular_terminal_vel'],
             'distance2center_cost': self.input_env_kwargs['distance2center_cost'],
@@ -370,121 +389,213 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             'dw_cost_factor': self.input_env_kwargs['dw_cost_factor'],
             'w_cost_factor': self.input_env_kwargs['w_cost_factor'],
         }
-        
-        if env.reward_boundary > self.input_env_kwargs['reward_boundary']:
-            env.reward_boundary = max(
-                env.reward_boundary - 10, self.input_env_kwargs['reward_boundary'])
-            self.curriculum_env_kwargs['reward_boundary'] = env.reward_boundary
-            print('Updated reward_boundary to:', env.reward_boundary)
-            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
-        elif env.distance2center_cost > self.input_env_kwargs['distance2center_cost']:
-            env.distance2center_cost = max(
-                env.distance2center_cost - 0.5, self.input_env_kwargs['distance2center_cost'])
-            self.curriculum_env_kwargs['distance2center_cost'] = env.distance2center_cost
-            print('Updated distance2center_cost to:', env.distance2center_cost)
-            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
-        elif env.angular_terminal_vel > self.input_env_kwargs['angular_terminal_vel']:
-            env.angular_terminal_vel = max(env.angular_terminal_vel/2, self.input_env_kwargs['angular_terminal_vel'])
-            self.curriculum_env_kwargs['angular_terminal_vel'] = env.angular_terminal_vel
-            print('Updated angular_terminal_vel to:', env.angular_terminal_vel)
-            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
-        elif env.flash_on_interval > self.input_env_kwargs['flash_on_interval']:
-            env.flash_on_interval = max(env.flash_on_interval - 0.3, self.input_env_kwargs['flash_on_interval'])
-            self.curriculum_env_kwargs['flash_on_interval'] = env.flash_on_interval
-            print('Updated flash_on_interval to:', env.flash_on_interval)
-            self._prune_or_clear_replay_buffer(keep_fraction=self.replay_keep_fraction)
-        elif env.stop_vel_cost > self.input_env_kwargs['stop_vel_cost']:
-            env.stop_vel_cost = max(env.stop_vel_cost - 50,
-                                    self.input_env_kwargs['stop_vel_cost'])
-            self.curriculum_env_kwargs['stop_vel_cost'] = env.stop_vel_cost
-            print('Updated stop_vel_cost to:', env.stop_vel_cost)
-        elif env.dv_cost_factor < self.input_env_kwargs['dv_cost_factor']:
-            env.dv_cost_factor = min(env.dv_cost_factor + 0.5, self.input_env_kwargs['dv_cost_factor'])
-            self.curriculum_env_kwargs['dv_cost_factor'] = env.dv_cost_factor
-            print('Updated dv_cost_factor to:', env.dv_cost_factor)
-        elif env.dw_cost_factor < self.input_env_kwargs['dw_cost_factor']:
-            env.dw_cost_factor = min(env.dw_cost_factor + 0.5, self.input_env_kwargs['dw_cost_factor'])
-            self.curriculum_env_kwargs['dw_cost_factor'] = env.dw_cost_factor
-            print('Updated dw_cost_factor to:', env.dw_cost_factor)
-        elif env.w_cost_factor < self.input_env_kwargs['w_cost_factor']:
-            env.w_cost_factor = min(env.w_cost_factor + 0.5, self.input_env_kwargs['w_cost_factor'])
-            self.curriculum_env_kwargs['w_cost_factor'] = env.w_cost_factor
-        
-        # Snapshot after update
-        after = {
-            'flash_on_interval': env.flash_on_interval,
-            'angular_terminal_vel': env.angular_terminal_vel,
-            'distance2center_cost': env.distance2center_cost,
-            'stop_vel_cost': env.stop_vel_cost,
-            'reward_boundary': env.reward_boundary,
-            'dv_cost_factor': env.dv_cost_factor,
-            'dw_cost_factor': env.dw_cost_factor,
-            'w_cost_factor': env.w_cost_factor,
-        }
-            
-        # Reset or partially reset policy std-anneal progress after curriculum env change
-        if hasattr(self, 'sac_model') and hasattr(self.sac_model, 'policy_net'):
+
+    def _get_curriculum_params(self):
+        if hasattr(self, 'env') and hasattr(self.env, 'env_method'):
             try:
-                current = getattr(self.sac_model.policy_net, 'anneal_step', 0)
-                setattr(self.sac_model.policy_net, 'anneal_step', int(max(0, int(current * self.std_anneal_preserve_fraction))))
+                params_list = self.env.env_method(
+                    'get_curriculum_params', indices=0)
+                params = params_list[0] if isinstance(
+                    params_list, (list, tuple)) else params_list
+                if isinstance(params, dict):
+                    return params
+            except Exception:
+                pass
+        env = self._get_active_env()
+        return {
+            'flash_on_interval': getattr(env, 'flash_on_interval', None),
+            'angular_terminal_vel': getattr(env, 'angular_terminal_vel', None),
+            'distance2center_cost': getattr(env, 'distance2center_cost', None),
+            'stop_vel_cost': getattr(env, 'stop_vel_cost', None),
+            'reward_boundary': getattr(env, 'reward_boundary', None),
+            'dv_cost_factor': getattr(env, 'dv_cost_factor', None),
+            'dw_cost_factor': getattr(env, 'dw_cost_factor', None),
+            'w_cost_factor': getattr(env, 'w_cost_factor', None),
+        }
+
+    def _apply_curriculum_params(self, updates: dict):
+        if not isinstance(updates, dict) or len(updates) == 0:
+            return
+        for k, v in updates.items():
+            self.curriculum_env_kwargs[k] = v
+        if hasattr(self, 'env') and hasattr(self.env, 'env_method'):
+            try:
+                self.env.env_method('set_curriculum_params',
+                                    indices=None, **updates)
+            except Exception as e:
+                print('Warning: failed to broadcast curriculum param update:', e)
+        else:
+            env = self._get_active_env()
+            for key, value in updates.items():
+                try:
+                    setattr(env, key, value)
+                except Exception:
+                    pass
+        self.current_env_kwargs = self.curriculum_env_kwargs
+
+    def _choose_next_curriculum_update(self, current: dict, targets: dict):
+        """
+        Choose the next curriculum update.
+
+        If the sign of (current - target) is opposite the intended direction,
+        apply the same step magnitude but in the reverse direction (toward target).
+
+        Returns:
+        - updates: dict of key -> new_value (empty if no change)
+        - do_prune: whether to prune/clear replay buffer after applying updates
+        """
+
+        # -----------------------------
+        # 1. Handle higher-priority single-parameter updates
+        # -----------------------------
+        singles = [
+            ('reward_boundary', lambda c, t: c >
+             t, lambda c, t: max(c - 10, t), True),
+            ('angular_terminal_vel', lambda c, t: c >
+             t, lambda c, t: max(c / 2, t), True),
+            ('flash_on_interval', lambda c, t: c >
+             t, lambda c, t: max(c - 0.3, t), True),
+        ]
+
+        for key, need, step, prune in singles:
+            c_val = current.get(key)
+            t_val = targets.get(key)
+            if c_val is None or t_val is None:
+                continue
+            try:
+                # --- Normal direction update (as originally defined)
+                if need(c_val, t_val):
+                    return {key: step(c_val, t_val)}, prune
+
+                # --- Reverse direction: sign is opposite (e.g., c < t when expecting c > t)
+                elif not need(c_val, t_val) and c_val != t_val:
+                    # Compute how large the *normal* step would be if direction were reversed
+                    step_size = abs(step(t_val, c_val) - t_val)
+
+                    # Apply same magnitude but move c toward t (not past it)
+                    if c_val < t_val:
+                        new_val = min(c_val + step_size, t_val)
+                    else:
+                        new_val = max(c_val - step_size, t_val)
+
+                    return {key: new_val}, prune
+
+            except Exception:
+                continue
+
+        # -----------------------------
+        # 2. Handle grouped parameter updates
+        # -----------------------------
+        grouped_specs = [
+            ('distance2center_cost', lambda c, t: c >
+             t, lambda c, t: max(c - 1, t), True),
+            ('stop_vel_cost', lambda c, t: c > t,
+             lambda c, t: max(c - 1, t), False),
+            ('dv_cost_factor', lambda c, t: c < t,
+             lambda c, t: min(c + 1, t), False),
+            ('dw_cost_factor', lambda c, t: c < t,
+             lambda c, t: min(c + 1, t), False),
+            ('w_cost_factor', lambda c, t: c < t,
+             lambda c, t: min(c + 1, t), False),
+        ]
+
+        updates = {}
+        do_prune = False
+        for key, need, step, prune in grouped_specs:
+            c_val = current.get(key)
+            t_val = targets.get(key)
+            if c_val is None or t_val is None:
+                continue
+            try:
+                # --- Normal direction update
+                if need(c_val, t_val):
+                    updates[key] = step(c_val, t_val)
+                    do_prune = do_prune or prune
+
+                # --- Reverse direction: apply same logic as above
+                elif not need(c_val, t_val) and c_val != t_val:
+                    # Determine how large the "normal" update would have been
+                    step_size = abs(step(t_val, c_val) - t_val)
+
+                    # Move c toward t by the same magnitude, without overshooting
+                    if c_val < t_val:
+                        new_val = min(c_val + step_size, t_val)
+                    else:
+                        new_val = max(c_val - step_size, t_val)
+
+                    updates[key] = new_val
+                    do_prune = do_prune or prune
+
+            except Exception:
+                continue
+
+        # -----------------------------
+        # 3. Return updates if any
+        # -----------------------------
+        if updates:
+            return updates, do_prune
+
+        # No updates needed
+        return {}, False
+
+    def _after_curriculum_env_change(self, updated_key: str):
+        if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'policy_net'):
+            try:
+                current = getattr(self.rl_agent.policy_net, 'anneal_step', 0)
+                setattr(self.rl_agent.policy_net, 'anneal_step', int(
+                    max(0, int(current * self.std_anneal_preserve_fraction))))
+                print('std_anneal step before: ', current)
+                print('std_anneal step after: ', int(
+                    max(0, int(current * self.std_anneal_preserve_fraction))))
             except Exception as e:
                 print('Warning: failed to reset std-anneal progress:', e)
-            print('std_anneal step before: ', current)
-            print('std_anneal step after: ', int(max(0, int(current * self.std_anneal_preserve_fraction))))
-        else:
-            print('No policy net found. No update to std_anneal step')
-
-        # Softly reset SAC temperature (alpha) for auto-entropy after curriculum env change
-        if hasattr(self, 'sac_model') and hasattr(self.sac_model, 'log_alpha'):
+        if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'log_alpha'):
             try:
                 with torch.no_grad():
                     alpha_reset_beta = getattr(self, 'alpha_reset_beta', 0.6)
-                    current_log_alpha = self.sac_model.log_alpha
+                    current_log_alpha = self.rl_agent.log_alpha
                     target_log_alpha = torch.zeros_like(current_log_alpha)
-                    alpha_before = getattr(self.sac_model, 'alpha', current_log_alpha.exp())
-                    new_log_alpha = alpha_reset_beta * current_log_alpha + (1 - alpha_reset_beta) * target_log_alpha
-                    self.sac_model.log_alpha.copy_(new_log_alpha)
-                    if hasattr(self.sac_model, 'alpha'):
-                        self.sac_model.alpha = self.sac_model.log_alpha.exp()
-                    alpha_after = getattr(self.sac_model, 'alpha', self.sac_model.log_alpha.exp())
-                # Clear gradients/state so temperature restarts cleanly
-                if getattr(self.sac_model, 'alpha_optimizer', None) is not None:
+                    alpha_before = getattr(
+                        self.rl_agent, 'alpha', current_log_alpha.exp())
+                    new_log_alpha = alpha_reset_beta * current_log_alpha + \
+                        (1 - alpha_reset_beta) * target_log_alpha
+                    self.rl_agent.log_alpha.copy_(new_log_alpha)
+                    if hasattr(self.rl_agent, 'alpha'):
+                        self.rl_agent.alpha = self.rl_agent.log_alpha.exp()
+                    alpha_after = getattr(
+                        self.rl_agent, 'alpha', self.rl_agent.log_alpha.exp())
+                if getattr(self.rl_agent, 'alpha_optimizer', None) is not None:
                     try:
-                        self.sac_model.alpha_optimizer.zero_grad(set_to_none=True)
+                        self.rl_agent.alpha_optimizer.zero_grad(
+                            set_to_none=True)
                     except TypeError:
-                        self.sac_model.alpha_optimizer.zero_grad()
-                if getattr(self.sac_model.log_alpha, 'grad', None) is not None:
-                    self.sac_model.log_alpha.grad = None
+                        self.rl_agent.alpha_optimizer.zero_grad()
+                if getattr(self.rl_agent.log_alpha, 'grad', None) is not None:
+                    self.rl_agent.log_alpha.grad = None
             except Exception as e:
                 print('Warning: failed to reset entropy temperature (alpha):', e)
 
-        # Emit a compact stage summary dict
+    def _update_env_after_meeting_reward_threshold(self):
+
+        print('Updating env after meeting reward threshold...')
+        before = self._get_curriculum_params()
+        targets = self._get_curriculum_targets()
+        updates, do_prune = self._choose_next_curriculum_update(
+            before, targets)
+        if updates:
+            self._apply_curriculum_params(updates)
+            print('Updated params:', updates)
+            if do_prune:
+                self._prune_or_clear_replay_buffer(
+                    keep_fraction=self.replay_keep_fraction)
+        rep_key = next(iter(updates.keys())) if isinstance(
+            updates, dict) and len(updates) > 0 else None
+        self._after_curriculum_env_change(rep_key)
+        after = self._get_curriculum_params()
         stage_summary = {'before': before, 'after': after, 'targets': targets}
-        try:
-            stage_summary['alpha_reset_beta'] = getattr(self, 'alpha_reset_beta', 0.6)
-            if 'alpha_before' in locals():
-                stage_summary['alpha_before'] = float(alpha_before.detach().cpu().mean())
-            if 'alpha_after' in locals():
-                stage_summary['alpha_after'] = float(alpha_after.detach().cpu().mean())
-            if hasattr(self, 'sac_model') and hasattr(self.sac_model, 'policy_net'):
-                stage_summary['policy_anneal_step'] = int(getattr(self.sac_model.policy_net, 'anneal_step', 0))
-        except Exception:
-            pass
         print('Stage summary:', stage_summary)
 
-        if agent_type is None:
-            if hasattr(self.env, 'env'):
-                self.env.env = env
-            else:
-                self.env = env
-        elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-            self.env.env = env
-        else:
-            self.env = env
-
-        self.current_env_kwargs = self.curriculum_env_kwargs
-
-    def collect_data(self, n_steps=8000, exists_ok=False, save_data=False):
+    def collect_data(self, n_steps=8000, exists_ok=False, save_data=True):
 
         if exists_ok:
             try:
@@ -517,18 +628,32 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         agent_type = getattr(self, 'agent_type', None)
         at = str(agent_type).lower() if agent_type is not None else None
         if at in ('lstm', 'gru', 'rnn'):
-            self.env_for_data_collection = env_for_rnn.CollectInformationLSTM(
+            self.env_for_data_collection = rnn_env.CollectInformationLSTM(
                 **env_data_collection_kwargs)
             LSTM = True
         else:
-            self.env_for_data_collection = env_for_sb3.CollectInformation(
+            self.env_for_data_collection = sb3_env.CollectInformation(
                 **env_data_collection_kwargs)
             LSTM = False
+
+        # Ensure an agent/model exists before collecting data
+        if not hasattr(self, 'rl_agent') or getattr(self, 'rl_agent') is None:
+            try:
+                # Prefer loading an existing agent if available
+                self.load_latest_agent(load_replay_buffer=True)
+            except Exception:
+                # Fall back to creating a fresh env and agent
+                print('No agent found. Creating a fresh env and agent...')
+                try:
+                    self.env
+                except AttributeError:
+                    self.make_env(**self.input_env_kwargs)
+                self.make_agent()
 
         self._run_agent_to_collect_data(
             n_steps=n_steps, save_data=save_data, LSTM=LSTM)
 
-    def _run_agent_to_collect_data(self, exists_ok=False, n_steps=8000, save_data=False, LSTM=False):
+    def _run_agent_to_collect_data(self, exists_ok=False, n_steps=8000, save_data=True, LSTM=False):
 
         # first, make self.processed_data_folder_path empty
         print('Collecting new agent data......')
@@ -550,7 +675,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.monkey_information, self.ff_flash_sorted, self.ff_caught_T_sorted, self.ff_believed_position_sorted, \
             self.ff_real_position_sorted, self.ff_life_sorted, self.ff_flash_end_sorted, self.caught_ff_num, self.total_ff_num, \
             self.obs_ff_indices_in_ff_dataframe, self.sorted_indices_all, self.ff_in_obs_df \
-            = collect_agent_data.collect_agent_data_func(self.env_for_data_collection, self.sac_model, n_steps=self.n_steps, agent_type=self.agent_type)
+            = collect_agent_data.collect_agent_data_func(self.env_for_data_collection, self.rl_agent, n_steps=self.n_steps, agent_type=self.agent_type)
         self.ff_index_sorted = np.arange(len(self.ff_life_sorted))
         self.eval_ff_capture_rate = len(
             self.ff_flash_end_sorted)/self.monkey_information['time'].max()
@@ -662,10 +787,14 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 last_error = (dir_name, e)
         if last_error is not None:
             d, e = last_error
-            raise ValueError(
-                f"There was an error retrieving agent or replay_buffer in {d}. Error message {e}")
+            agent_type = getattr(self, 'agent_type', None)
+            if isinstance(agent_type, str) and agent_type.lower() == 'rppo':
+                msg = f"There was an error retrieving agent in {d}. Error message {e}"
+            else:
+                msg = f"There was an error retrieving agent or replay_buffer in {d}. Error message {e}"
+            raise ValueError(msg)
 
-    def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=False, load_replay_buffer=False):
+    def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=True, load_replay_buffer=False):
         if exists_ok:
             try:
                 self.retrieve_monkey_data()
@@ -686,7 +815,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.make_env(**self.input_env_kwargs)
 
         try:
-            self.sac_model
+            self.rl_agent
         except AttributeError:
             self.make_agent()
         self.load_latest_agent(load_replay_buffer=False)
@@ -772,14 +901,19 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             # Add common env params if available
             env_info = {}
             try:
-                env_info['num_obs_ff'] = self.input_env_kwargs.get('num_obs_ff')
-                env_info['max_in_memory_time'] = self.input_env_kwargs.get('max_in_memory_time')
-                env_info['angular_terminal_vel'] = self.input_env_kwargs.get('angular_terminal_vel')
+                env_info['num_obs_ff'] = self.input_env_kwargs.get(
+                    'num_obs_ff')
+                env_info['max_in_memory_time'] = self.input_env_kwargs.get(
+                    'max_in_memory_time')
+                env_info['angular_terminal_vel'] = self.input_env_kwargs.get(
+                    'angular_terminal_vel')
                 env_info['dt'] = self.input_env_kwargs.get('dt')
             except Exception:
                 pass
-            sweep_params.update({k: v for k, v in env_info.items() if v is not None})
-            run_logger.log_run_start(self.overall_folder, agent_type=getattr(self, 'agent_type', 'rnn'), sweep_params=sweep_params)
+            sweep_params.update(
+                {k: v for k, v in env_info.items() if v is not None})
+            run_logger.log_run_start(self.overall_folder, agent_type=getattr(
+                self, 'agent_type', 'rnn'), sweep_params=sweep_params)
         except Exception as e:
             print('[logger] failed to log run start from base class:', e)
 
@@ -794,7 +928,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.training_time = time_package.time()-self.training_start_time
         print("Finished training using", self.training_time, 's.')
 
-        # self.sac_model.save_replay_buffer(os.path.join(self.model_folder_name, 'buffer')) # I added this
+        # self.rl_agent.save_replay_buffer(os.path.join(self.model_folder_name, 'buffer')) # I added this
         self.current_info_condition = self.get_current_info_condition(
             self.family_of_agents_log)
         self.family_of_agents_log.loc[self.current_info_condition,
@@ -804,7 +938,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.family_of_agents_log.loc[self.current_info_condition,
                                       'successful_training'] += self.successful_training
         self.family_of_agents_log.to_csv(
-            self.overall_folder + 'family_of_agents_log.csv')
+            os.path.join(self.overall_folder, 'family_of_agents_log.csv'))
         # Also check if the information is in parameters_record. If not, add it.
         # self.check_and_update_parameters_record()
 
@@ -812,13 +946,201 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         try:
             metrics = {}
             try:
-                metrics['best_avg_reward'] = getattr(self, 'best_avg_reward', None)
+                metrics['best_avg_reward'] = getattr(
+                    self, 'best_avg_reward', None)
             except Exception:
                 pass
             sweep_params = dict(getattr(self, 'sweep_params', {}))
-            run_logger.log_run_end(self.overall_folder, agent_type=getattr(self, 'agent_type', 'rnn'), sweep_params=sweep_params, status='finished', metrics=metrics)
+            run_logger.log_run_end(self.overall_folder, agent_type=getattr(
+                self, 'agent_type', 'rnn'), sweep_params=sweep_params, status='finished', metrics=metrics)
         except Exception as e:
             print('[logger] failed to log run end from base class:', e)
+
+    def _get_active_env(self):
+        env = getattr(self, 'env', None)
+        if env is None:
+            return None
+        # Prefer single underlying env when vectorized (e.g., SB3 DummyVecEnv)
+        if hasattr(env, 'envs') and isinstance(getattr(env, 'envs', None), (list, tuple)) and len(env.envs) > 0:
+            return env.envs[0]
+        # Fallback to .env wrapped gym environment
+        if hasattr(env, 'env'):
+            return env.env
+        # Return as-is
+        return env
+
+    def _compute_reward_threshold(self, n_eval_episodes: int = 2, ff_caught_rate_threshold: float = 0.1) -> float:
+        env_for_eval = self._get_active_env()
+        return rl_base_utils.calculate_reward_threshold_for_curriculum_training(
+            env_for_eval, n_eval_episodes=n_eval_episodes, ff_caught_rate_threshold=ff_caught_rate_threshold)
+
+    def _ensure_curriculum_log(self) -> str:
+        log_path = os.path.join(
+            self.best_model_in_curriculum_dir, 'curriculum_log.csv')
+        columns = [
+            'stage', 'reward_threshold', 'best_avg_reward',
+            'flash_on_interval', 'angular_terminal_vel', 'reward_boundary',
+            'distance2center_cost', 'stop_vel_cost',
+            'dv_cost_factor', 'dw_cost_factor', 'w_cost_factor',
+            'finished_curriculum', 'attempt_passed'
+        ]
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        if not os.path.exists(log_path):
+            try:
+                pd.DataFrame(columns=columns).to_csv(log_path, index=False)
+            except Exception:
+                pass
+        return log_path
+
+    def _use_while_loop_for_curriculum_training(self, eval_eps_freq: int = 20, num_eval_episodes: int = 2):
+        stage = 0
+        finished_curriculum = False
+        log_path = self._ensure_curriculum_log()
+
+        while True:
+            stage += 1
+            gc.collect()
+
+            # Compute dynamic reward threshold based on current env
+            reward_threshold = self._compute_reward_threshold(
+                n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=0.1)
+            print(
+                f'[Stage {stage}] Current reward threshold: {reward_threshold:.2f}')
+
+            # Delegate training logic to subclass
+            try:
+                passed, best_avg_reward = self._curriculum_train_step(
+                    reward_threshold=reward_threshold,
+                    eval_eps_freq=eval_eps_freq,
+                    num_eval_episodes=num_eval_episodes,
+                )
+            except NotImplementedError:
+                raise
+            except Exception as e:
+                print('[curriculum] training step failed:', e)
+                passed = False
+                best_avg_reward = float('-inf')
+
+            # Build payload and log
+            env = self._get_active_env()
+            payload = {
+                'stage': stage,
+                'reward_threshold': reward_threshold,
+                'best_avg_reward': best_avg_reward,
+                'flash_on_interval': getattr(env, 'flash_on_interval', None),
+                'angular_terminal_vel': getattr(env, 'angular_terminal_vel', None),
+                'reward_boundary': getattr(env, 'reward_boundary', None),
+                'distance2center_cost': getattr(env, 'distance2center_cost', None),
+                'stop_vel_cost': getattr(env, 'stop_vel_cost', None),
+                'dv_cost_factor': getattr(env, 'dv_cost_factor', None),
+                'dw_cost_factor': getattr(env, 'dw_cost_factor', None),
+                'w_cost_factor': getattr(env, 'w_cost_factor', None),
+                'finished_curriculum': finished_curriculum,
+                'attempt_passed': passed,
+            }
+
+            # Per-agent CSV
+            try:
+                pd.DataFrame([payload]).to_csv(
+                    log_path, mode='a', header=False, index=False)
+            except Exception:
+                pass
+            # Aggregate logger
+            try:
+                sweep_params = getattr(self, 'sweep_params', {})
+                run_logger.log_curriculum_stage(
+                    self.overall_folder,
+                    agent_type=getattr(self, 'agent_type', 'rnn'),
+                    sweep_params=sweep_params,
+                    stage_payload=payload,
+                )
+            except Exception as e:
+                print('[logger] failed to log curriculum stage:', e)
+
+            if not passed:
+                print(
+                    f'[Stage {stage}] Warning: best reward {best_avg_reward:.2f} < threshold {reward_threshold:.2f}. Retrying...')
+                continue
+
+            print(
+                f'[Stage {stage}] Progressed: best reward {best_avg_reward:.2f} ≥ threshold {reward_threshold:.2f}')
+
+            # Advance curriculum environment
+            self._update_env_after_meeting_reward_threshold()
+            env_after = self._get_active_env()
+
+            # Check if all target curriculum conditions are met
+            # Use tolerant comparison for floating point curriculum params
+            current_params = self._get_curriculum_params()
+            targets = self._get_curriculum_targets()
+
+            def _close(a, b):
+                try:
+                    if a is None or b is None:
+                        return False
+                    return bool(np.isclose(float(a), float(b), rtol=1e-6, atol=1e-8))
+                except Exception:
+                    return a == b
+            if all([
+                _close(current_params.get('flash_on_interval'),
+                       targets.get('flash_on_interval')),
+                _close(current_params.get('angular_terminal_vel'),
+                       targets.get('angular_terminal_vel')),
+                _close(current_params.get('reward_boundary'),
+                       targets.get('reward_boundary')),
+                _close(current_params.get('distance2center_cost'),
+                       targets.get('distance2center_cost')),
+                _close(current_params.get('stop_vel_cost'),
+                       targets.get('stop_vel_cost')),
+                _close(current_params.get('dv_cost_factor'),
+                       targets.get('dv_cost_factor')),
+                _close(current_params.get('dw_cost_factor'),
+                       targets.get('dw_cost_factor')),
+                _close(current_params.get('w_cost_factor'),
+                       targets.get('w_cost_factor')),
+            ]):
+                print(
+                    f'[Stage {stage}] All curriculum conditions met. Curriculum training complete.')
+                finished_curriculum = True
+                break
+
+        # Final post-curriculum training
+        os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
+        self.make_env(**self.input_env_kwargs)
+        self.load_best_model_in_curriculum(
+            load_replay_buffer=True)
+
+        final_reward_threshold = self._compute_reward_threshold(
+            n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=0.1)
+
+        print(
+            f'Starting post-curriculum training with reward threshold: {final_reward_threshold:.2f}')
+        self._post_curriculum_final_train(
+            reward_threshold=final_reward_threshold,
+            eval_eps_freq=eval_eps_freq,
+            num_eval_episodes=num_eval_episodes,
+        )
+
+        # Ensure the final best model is loaded into memory for downstream use
+        try:
+            self.load_best_model_postcurriculum(load_replay_buffer=True)
+        except Exception as e:
+            print('[curriculum] failed to load best post-curriculum model:', e)
+
+        print('Finished post-curriculum training.')
+
+    def _curriculum_train_step(self, reward_threshold: float, eval_eps_freq: int, num_eval_episodes: int):
+        """
+        To be implemented by subclasses.
+        Must return a tuple (passed: bool, best_avg_reward: float).
+        """
+        raise NotImplementedError
+
+    def _post_curriculum_final_train(self, reward_threshold: float, eval_eps_freq: int, num_eval_episodes: int):
+        """
+        To be implemented by subclasses. Executes the final post-curriculum training.
+        """
+        raise NotImplementedError
 
     def _evaluate_model_and_retrain_if_necessary(self, use_curriculum_training=False):
 
@@ -955,7 +1277,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.family_of_agents_log = pd.concat([self.family_of_agents_log, pd.DataFrame(
                 current_info, index=[0])]).reset_index(drop=True)
             self.family_of_agents_log.to_csv(
-                self.overall_folder + 'family_of_agents_log.csv')
+                os.path.join(self.overall_folder, 'family_of_agents_log.csv'))
             to_load_latest_agent = False
             to_train_agent = True
 
@@ -1001,13 +1323,19 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         file_name = file_name + '.mp4'
 
-        agent_type = getattr(self, 'agent_type', None)
-        if agent_type is None:
-            dt = self.env.env.dt if hasattr(self.env, 'env') else self.env.dt
-        elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-            dt = self.env.env.dt
-        else:
-            dt = self.env.dt
+        # Robustly unwrap to the base (single) env and read dt
+        base_env = None
+        env_obj = getattr(self, 'env', None)
+        if env_obj is not None:
+            if hasattr(env_obj, 'envs') and isinstance(getattr(env_obj, 'envs', None), (list, tuple)) and len(env_obj.envs) > 0:
+                base_env = env_obj.envs[0]
+            elif hasattr(env_obj, 'env'):
+                base_env = env_obj.env
+            else:
+                base_env = env_obj
+        dt = getattr(base_env, 'dt', None)
+        if dt is None:
+            dt = self.input_env_kwargs.get('dt', 0.1)
 
         super().call_animation_function(margin=margin, save_video=save_video, video_dir=video_dir, file_name=file_name, plot_eye_position=plot_eye_position,
                                         set_xy_limits=set_xy_limits, plot_flash_on_ff=plot_flash_on_ff, in_obs_ff_dict=self.obs_ff_indices_in_ff_dataframe_dict,
@@ -1022,7 +1350,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # self.add_2nd_ff = False if if self.num_obs_ff < 2 else True
 
         self.add_2nd_ff = False
-        interpret_neural_network.combine_6_plots_for_neural_network(self.sac_model, full_memory=self.full_memory, invisible_distance=self.invisible_distance,
+        interpret_neural_network.combine_6_plots_for_neural_network(self.rl_agent, full_memory=self.full_memory, invisible_distance=self.invisible_distance,
                                                                     add_2nd_ff=self.add_2nd_ff, data_folder_name=self.patterns_and_features_folder_path, const_memory=self.full_memory,
                                                                     data_folder_name2=self.overall_folder + 'all_' +
                                                                     'combined_6_plots_for_neural_network',
@@ -1059,9 +1387,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.feature_statistics, self.minimal_current_info, self.overall_folder)
 
     # def plot_side_by_side(self):
-    
+
     # Note: I've deleted the old find_corresponding_info_of_agent function on 2025/10/28
-    
+
     #     with general_utils.HiddenPrints():
     #         num_trials = 2
     #         plotting_params = {"show_stops": True,
@@ -1075,7 +1403,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     #         for currentTrial in [12, 69, 138, 221, 235]:
     #             # more: 259, 263, 265, 299, 393, 496, 523, 556, 601, 666, 698, 760, 805, 808, 930, 946, 955, 1002, 1003
     #             info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = process_agent_data.find_corresponding_info_of_agent(
-    #                 self.info_of_monkey, currentTrial, num_trials, self.sac_model, self.agent_dt, env_kwargs=self.current_env_kwargs, agent_type=getattr(self, 'agent_type', None))
+    #                 self.info_of_monkey, currentTrial, num_trials, self.rl_agent, self.agent_dt, env_kwargs=self.current_env_kwargs, agent_type=getattr(self, 'agent_type', None))
 
     #             with general_utils.initiate_plot(20, 20, 400):
     #                 additional_plots.PlotSidebySide(plot_whole_duration=plot_whole_duration,

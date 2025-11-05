@@ -8,21 +8,6 @@ from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_p
 # ---------- schema & key utilities ----------
 
 
-def _ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    if 'stop_time' not in out.columns:
-        if 'time' in out.columns:
-            out = out.rename(columns={'time': 'stop_time'})
-        else:
-            raise ValueError('event df must have stop_time or time')
-    if 'stop_point_index' not in out.columns:
-        if 'point_index' in out.columns:
-            out = out.rename(columns={'point_index': 'stop_point_index'})
-        else:
-            out['stop_point_index'] = np.nan
-    return out.sort_values('stop_time', kind='stable').reset_index(drop=True)
-
-
 def _infer_key_cols(df: pd.DataFrame) -> list[str]:
     if 'stop_id' in df.columns:
         return ['stop_id']
@@ -41,13 +26,6 @@ def _key_series(df: pd.DataFrame, keys: list[str] | None = None, time_round: int
         else:
             vals.append(df[k])
     return pd.Series(list(zip(*vals)), index=df.index)
-
-
-def _dedupe_within(df: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3):
-    ks = _key_series(df, keys, time_round)
-    keep = ~ks.duplicated(keep='first')
-    removed = int((~keep).sum())
-    return df.loc[keep].copy(), {'removed_within': removed}
 
 
 def _report_overlap(A: pd.DataFrame, B: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3):
@@ -150,37 +128,57 @@ def match_features_func(results, key, A1, B1, match_features, match_strategy, ma
         A2, B2 = A1, B1
     return A2, B2, results
 
-
 def ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
     """Standardize minimal schema: stop_time, stop_point_index; sort by stop_time."""
     out = df.copy()
+
+    # Ensure stop_time
     if 'stop_time' not in out.columns:
         if 'time' in out.columns:
+            warnings.warn("Renaming 'time' column to 'stop_time'", UserWarning)
             out = out.rename(columns={'time': 'stop_time'})
         else:
             raise ValueError('event df must have stop_time or time')
+
+    # Ensure stop_point_index
     if 'stop_point_index' not in out.columns:
         if 'point_index' in out.columns:
+            warnings.warn("Renaming 'point_index' column to 'stop_point_index'", UserWarning)
             out = out.rename(columns={'point_index': 'stop_point_index'})
         else:
+            warnings.warn("'stop_point_index' not found; filling with NaN", UserWarning)
             out['stop_point_index'] = np.nan
+
     return out.sort_values('stop_time', kind='stable').reset_index(drop=True)
 
 
 def dedupe_within(df: pd.DataFrame,
                   keys: list[str] | None = None,
                   time_round: int = 3) -> pd.DataFrame:
-    """Drop exact duplicate stops within a set."""
+    """Raise a warning if there are duplicate stops within a set."""
     if keys is None:
-        keys = ['stop_id'] if 'stop_id' in df.columns else ['stop_point_index', 'stop_time'] if {
-            'stop_point_index', 'stop_time'}.issubset(df.columns) else ['stop_time']
+        if 'stop_id' in df.columns:
+            keys = ['stop_id']
+        elif {'stop_point_index', 'stop_time'}.issubset(df.columns):
+            keys = ['stop_point_index', 'stop_time']
+        else:
+            keys = ['stop_time']
+
+    # Build deduplication key
     key_vals = []
     for k in keys:
         v = df[k].round(time_round) if k == 'stop_time' else df[k]
         key_vals.append(v)
     key = pd.Series(list(zip(*key_vals)), index=df.index)
-    keep = ~key.duplicated(keep='first')
-    return df.loc[keep].copy()
+
+    # Detect duplicates
+    duplicated_mask = key.duplicated(keep=False)
+    n_dupes = duplicated_mask.sum()
+    if n_dupes > 0:
+        warnings.warn(f'{n_dupes} duplicate rows found based on keys {keys}', UserWarning)
+
+    return df.loc[~duplicated_mask].copy()
+
 
 
 def diff_by(a: pd.DataFrame, b: pd.DataFrame, key: str = 'stop_id') -> pd.DataFrame:
@@ -198,7 +196,7 @@ def titleize(name: str) -> str:
         'nonfinal': 'Non-final', 'middle': 'Middle',
         'giveup': 'Give-up', 'captures': 'Captures',
         'single_miss': 'Single-miss', 'all_misses': 'All misses',
-        'first_misses': 'First-misses', 'both_first': 'Both first'
+        'first_misses': 'First-misses', 'both_first_miss': 'Both first'
     }
     parts = name.split('_')
     pretty = []
@@ -244,7 +242,7 @@ def _pretty_word(w: str) -> str:
 
 
 def _titleize_side(name: str) -> str:
-    # turn 'giveup_GUAT_last' -> 'Give-up GUAT last'
+    # turn 'GUAT_last' -> 'Give-up GUAT last'
     parts = name.split('_')
     pretty = [_pretty_word(parts[0])]
     for p in parts[1:]:
@@ -323,6 +321,76 @@ def validate(datasets: dict[str, pd.DataFrame], comparisons: list[dict]) -> None
         print('warning: empty datasets in some comparisons:', empties)
 
 
+def build_analyzer(comp, datasets, spikes_df, monkey_information, config,
+                   align_by_stop_end=False,
+                   dedupe_keys: list[str] | None = None,
+                   time_round: int = 3,
+                   warn_on_overlap: bool = True,
+                   # matching knobs
+                   # e.g., ['stop_duration','dist_to_target','cluster_order']
+                   match_features: list[str] | None = None,
+                   match_strategy: str = 'hungarian',
+                   match_caliper: float | None = None,
+                   results=None,
+                   verbose=True,
+                   ):
+
+    if results is None:
+        results = {
+            'analyzers': {},
+            'psth_long': [],
+            'epoch_summaries': [],
+            'dedupe_logs': {},
+            'overlap_logs': {},
+            'matching_logs': {}}
+
+    key = comp['key']
+    a_name, b_name = comp['a'], comp['b']
+    a_label, b_label = comp['a_label'], comp['b_label']
+
+    A1, B1 = datasets[a_name], datasets[b_name]
+
+    # across-set overlap: report only, do NOT remove
+    overlap_info = _report_overlap(A1, B1, dedupe_keys, time_round)
+    results['overlap_logs'][key] = overlap_info
+    if warn_on_overlap and overlap_info['overlap_pairs'] > 0:
+        print(f'warning [{key}]: {overlap_info["overlap_pairs"]} overlapping stops between {a_name} and {b_name}. '
+              f'leaving them in place. examples: {overlap_info["example_keys"]}')
+
+    # optional per-stop matching (applied to already-deduped A1/B1)
+    if match_features:
+        A2, B2, results = match_features_func(
+            results, key, A1, B1, match_features, match_strategy, match_caliper)
+    else:
+        A2, B2 = A1, B1
+        results['matching_logs'][key] = {
+            'strategy': 'none', 'n_matched': None}
+
+    if align_by_stop_end:
+        if verbose:
+            print(f'aligning {a_name} and {b_name} by stop end')
+        A2['stop_time'] = A2['stop_id_end_time']
+        B2['stop_time'] = B2['stop_id_end_time']
+    else:
+        if verbose:
+            print(f'aligning {a_name} and {b_name} by stop start')
+        A2['stop_time'] = A2['stop_id_start_time']
+        B2['stop_time'] = B2['stop_id_start_time']
+
+    # build analyzer
+    an = core_stops_psth.PSTHAnalyzer(
+        spikes_df=spikes_df,
+        monkey_information=monkey_information,
+        config=config,
+        event_a_df=A2,
+        event_b_df=B2,
+        event_a_label=a_label,
+        event_b_label=b_label,
+    )
+
+    return an, results
+
+
 # ---------- main runner (dedupe-within + overlap warning + optional matching) ----------
 def run_all_comparisons(
     comparisons: list[dict],
@@ -330,9 +398,9 @@ def run_all_comparisons(
     spikes_df: pd.DataFrame,
     monkey_information: pd.DataFrame,
     config,
+    align_by_stop_end=False,
     windows_summary: bool = True,
     # dedupe knobs
-    dedupe_within_sets: bool = False,
     dedupe_keys: list[str] | None = None,
     time_round: int = 3,
     warn_on_overlap: bool = True,
@@ -341,7 +409,6 @@ def run_all_comparisons(
     match_features: list[str] | None = None,
     match_strategy: str = 'hungarian',
     match_caliper: float | None = None,
-    align_by_stop_end=False,
 ) -> dict:
     results = {
         'analyzers': {},
@@ -353,58 +420,26 @@ def run_all_comparisons(
     }
 
     for comp in comparisons:
-        key = comp['key']
-        a_name, b_name = comp['a'], comp['b']
-        a_label, b_label = comp['a_label'], comp['b_label']
+        an, results = build_analyzer(comp, datasets, spikes_df, monkey_information, config,
+                                     results=results,
+                                     align_by_stop_end=align_by_stop_end,
+                                     dedupe_keys=dedupe_keys,
+                                     time_round=time_round,
+                                     warn_on_overlap=warn_on_overlap,
+                                     match_features=match_features,
+                                     match_strategy=match_strategy,
+                                     match_caliper=match_caliper)
+
         title = comp['title']
-
-        A1, B1 = datasets[a_name], datasets[b_name]
-
-        # across-set overlap: report only, do NOT remove
-        overlap_info = _report_overlap(A1, B1, dedupe_keys, time_round)
-        results['overlap_logs'][key] = overlap_info
-        if warn_on_overlap and overlap_info['overlap_pairs'] > 0:
-            print(f'warning [{key}]: {overlap_info["overlap_pairs"]} overlapping stops between {a_name} and {b_name}. '
-                  f'leaving them in place. examples: {overlap_info["example_keys"]}')
-
-        # optional per-stop matching (applied to already-deduped A1/B1)
-        if match_features:
-            A2, B2, results = match_features_func(
-                results, key, A1, B1, match_features, match_strategy, match_caliper)
-        else:
-            A2, B2 = A1, B1
-            results['matching_logs'][key] = {
-                'strategy': 'none', 'n_matched': None}
-
-        if align_by_stop_end:
-            alignment = 'Align by stop End'
-            print(f'aligning {a_name} and {b_name} by stop end')
-            A2['stop_time'] = A2['stop_id_end_time']
-            B2['stop_time'] = B2['stop_id_end_time']
-        else:
-            alignment = 'Align by stop Start'
-            print(f'aligning {a_name} and {b_name} by stop start')
-            A2['stop_time'] = A2['stop_id_start_time']
-            B2['stop_time'] = B2['stop_id_start_time']
-
-        # build analyzer
-        an = core_stops_psth.PSTHAnalyzer(
-            spikes_df=spikes_df,
-            monkey_information=monkey_information,
-            config=config,
-            event_a_df=A2,
-            event_b_df=B2,
-            event_a_label=a_label,
-            event_b_label=b_label,
-        )
-
-        print(alignment)
+        alignment = 'Align by stop End' if align_by_stop_end else 'Align by stop Start'
+        print(f'{title}: {alignment}')
         # plot_title = f'{title}: Event-Aligned Standardized Mean Difference'
         plot_title = f'{title}'
         show_results(an, title=plot_title)
 
         # export
         psth_df = psth_postprocessing.export_psth_to_df(an)
+        key = comp['key']
         psth_df['comparison'] = key
         results['psth_long'].append(psth_df)
 

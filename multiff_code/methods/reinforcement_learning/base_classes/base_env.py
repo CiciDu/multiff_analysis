@@ -82,7 +82,7 @@ class MultiFF(gymnasium.Env):
                  dw_cost_factor=1,
                  w_cost_factor=1,
                  distance2center_cost=0,
-                 stop_vel_cost=50,
+                 stop_vel_cost=1,
                  reward_boundary=25,
                  add_vel_cost_when_catching_ff_only=False,
                  linear_terminal_vel=0.05,
@@ -530,11 +530,11 @@ class MultiFF(gymnasium.Env):
                                      self.vel_cost, 0.2 * catching_ff_reward)
         if self.distance2center_cost > 0:
             self.cost_for_distance2center = self.total_deviated_target_distance * \
-                (self.distance2center_cost/self.reward_boundary * 25)
+                (self.distance2center_cost/self.reward_boundary * 25) * 2
             catching_ff_reward = catching_ff_reward - self.cost_for_distance2center
         if self.stop_vel_cost > 0:
             self.cost_for_stop_vel = self.w_stop_deviance * \
-                (self.stop_vel_cost/self.angular_terminal_vel)
+                (self.stop_vel_cost/self.angular_terminal_vel) * 50
             catching_ff_reward = catching_ff_reward - self.cost_for_stop_vel
 
         return catching_ff_reward

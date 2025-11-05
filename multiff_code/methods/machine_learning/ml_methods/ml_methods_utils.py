@@ -167,7 +167,7 @@ def regress_by_variable_type_cv(
 def convert_results_to_wide_df(results_df, index_columns=['Feature', 'Model']):
     wide_df = (
         results_df
-        .pivot_table(
+        .pivot(
             index=index_columns,
             columns='Metric',
             values=['mean', 'Std']

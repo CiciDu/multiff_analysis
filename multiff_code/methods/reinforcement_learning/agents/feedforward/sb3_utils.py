@@ -186,7 +186,8 @@ class StopTrainingOnNoModelImprovement(BaseCallback):
                 try:
                     if self.best_model_save_path is not None:
                         os.makedirs(self.best_model_save_path, exist_ok=True)
-                        self.model.save_replay_buffer(os.path.join(self.best_model_save_path, 'buffer'))
+                        if hasattr(self.model, "save_replay_buffer"):
+                            self.model.save_replay_buffer(os.path.join(self.best_model_save_path, 'buffer'))
                 except Exception as e:
                     if self.verbose >= 1:
                         print('Warning: failed to save replay buffer with new best model:', e)

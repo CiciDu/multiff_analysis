@@ -51,7 +51,7 @@ def _align_meta_to_pos(meta, pos):
     return m, meta_by_bin
 
 
-def _build_per_event_table(new_seg_info, extras=('cond', 'duration', 'captured')):
+def build_per_event_table(new_seg_info, extras=('cond', 'duration', 'captured')):
     """
     Build a per-event table:
       - event_id, event_time
@@ -74,7 +74,8 @@ def _build_per_event_table(new_seg_info, extras=('cond', 'duration', 'captured')
     event_tbl['next_event_time'] = event_tbl['event_time'].shift(-1)
     return event_tbl
 
-def _join_event_tbl_avoid_collisions(m, event_tbl):
+
+def join_event_tbl_avoid_collisions(m, event_tbl):
     """
     Left-join per-event features into per-bin metadata without overwriting existing columns.
     """
@@ -208,7 +209,8 @@ def _make_history_block(
     ts_next_post = prepost * ts_next_f           # active in POST window
 
     isi_len = ts_prev + ts_next
-    mid_offset = 0.5 * (ts_next - ts_prev)    # negative -> closer to prev event
+    # negative -> closer to prev event
+    mid_offset = 0.5 * (ts_next - ts_prev)
     isi_len_f = np.nan_to_num(isi_len, nan=0.0)
     mid_offset_f = np.nan_to_num(mid_offset, nan=0.0)
 
@@ -293,8 +295,8 @@ def build_event_design_from_meta(
     m, meta_by_bin = _align_meta_to_pos(meta, pos)
 
     # 2) per-event table
-    event_tbl = _build_per_event_table(new_seg_info)
-    m = _join_event_tbl_avoid_collisions(m, event_tbl)
+    event_tbl = build_per_event_table(new_seg_info)
+    m = join_event_tbl_avoid_collisions(m, event_tbl)
 
     # 3) core event features
     rel_t, prepost, straddle, k_norm = _compute_core_event_features(
@@ -380,7 +382,7 @@ def build_event_design_from_meta(
     X_event = np.nan_to_num(X_event, nan=0.0, posinf=0.0, neginf=0.0)
 
     X_event_df = pd.DataFrame(X_event, columns=names,
-                             index=np.arange(len(X_event)))
+                              index=np.arange(len(X_event)))
     return X_event_df
 
 # ------------------------- programmatic feature glossary ---------------------

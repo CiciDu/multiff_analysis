@@ -131,7 +131,7 @@ def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_posit
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1].copy()
 
-    processed_df = trials_df[['stop_point_index', 'ff_index']].copy()
+    processed_df = trials_df[['stop_point_index', 'ff_index', 'stop_id_duration']].copy()
     processed_df[['stop_time', 'stop_cum_distance']
                  ] = monkey_information.loc[processed_df.stop_point_index, ['time', 'cum_distance']].values
 

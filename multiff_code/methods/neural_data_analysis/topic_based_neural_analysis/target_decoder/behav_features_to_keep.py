@@ -72,7 +72,7 @@ shared_columns_to_keep = (
 )
 
 # Additional columns for stitched time data
-extra_columns_for_concat_trials = [
+retries_columns_for_concat_trials = [
     'time',
     'monkey_x',
     'monkey_y',
@@ -87,7 +87,7 @@ extra_columns_for_concat_trials = [
 ]
 
 # Additional columns for aligned trials
-extra_columns_for_aligned_trials = []
+retries_columns_for_aligned_trials = []
 
 
 behav_features_to_drop = [

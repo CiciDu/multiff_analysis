@@ -1,0 +1,52 @@
+[
+  {
+    "key": "first_giveup_vs_first_persist",
+    "a": "one_stop_miss",
+    "b": "both_first_miss",
+    "a_label": "one stop miss",
+    "b_label": "both first miss",
+    "slug_capfirst": "One_stop_miss_vs_Both_first_miss",
+    "slug_pascal": "OneStopMiss_vs_BothFirstMiss",
+    "title": "First-Attempt Give-up vs First-Attempt Persist"
+  },
+  {
+    "key": "guat_first_vs_taft_first",
+    "a": "GUAT_first",
+    "b": "TAFT_first",
+    "a_label": "GUAT first",
+    "b_label": "TAFT first",
+    "slug_capfirst": "GUAT_first_vs_TAFT_first",
+    "slug_pascal": "GUATFirst_vs_TAFTFirst",
+    "title": "GUAT First vs TAFT First"
+  },
+  {
+    "key": "guat_middle_vs_taft_middle",
+    "a": "GUAT_middle",
+    "b": "TAFT_middle",
+    "a_label": "GUAT middle",
+    "b_label": "TAFT middle",
+    "slug_capfirst": "GUAT_middle_vs_TAFT_middle",
+    "slug_pascal": "GUATMiddle_vs_TAFTMiddle",
+    "title": "GUAT Middle vs TAFT Middle"
+  },
+  {
+    "key": "switch_vs_retry_after_miss",
+    "a": "switch_after_miss",
+    "b": "retry_after_miss",
+    "a_label": "switch after miss",
+    "b_label": "retry after miss",
+    "slug_capfirst": "Switch_after_miss_vs_Retry_after_miss",
+    "slug_pascal": "SwitchAfterMiss_vs_RetryAfterMiss",
+    "title": "Switch vs Retry After Miss"
+  },
+  {
+    "key": "switch_vs_retry_after_retry",
+    "a": "GUAT_last",
+    "b": "both_middle",
+    "a_label": "GUAT last",
+    "b_label": "both middle",
+    "slug_capfirst": "GUAT_last_vs_Both_middle",
+    "slug_pascal": "GUATLast_vs_BothMiddle",
+    "title": "Switch vs Retry After Retry"
+  }
+]

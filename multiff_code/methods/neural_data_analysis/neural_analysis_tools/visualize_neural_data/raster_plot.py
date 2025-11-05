@@ -17,7 +17,8 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def prepare_aligned_spike_trains(new_seg_info, spikes_df):
+def prepare_aligned_spike_trains(new_seg_info, spikes_df,
+                                 columns_to_preserve=['event_time', 'stop_time', 'prev_ff_caught_time']):
     """
     Aligns spike times to new segment information and appends event-related timing columns.
 
@@ -49,10 +50,11 @@ def prepare_aligned_spike_trains(new_seg_info, spikes_df):
         spikes_df, new_seg_info,
     )
 
-    # Merge in additional timing info per segment
+    cols_to_merge = [col for col in columns_to_preserve if (col in new_seg_info.columns) & (col not in aligned_spike_trains.columns)
+                     ] + ['new_segment']
+
     aligned_spike_trains = aligned_spike_trains.merge(
-        new_seg_info[['new_segment', 'event_time',
-                      'stop_time', 'prev_ff_caught_time']],
+        new_seg_info[cols_to_merge],
         on='new_segment',
         how='left'
     )
@@ -90,6 +92,8 @@ def add_relative_times(aligned_spike_trains, reference_time_col):
     ]
 
     for col in time_columns:
+        if col not in df.columns:
+            continue
         rel_col = f"rel_{col}"
         df[rel_col] = df[col] - df['reference_time']
 
@@ -219,6 +223,14 @@ def _prepare_clusters(aligned_spike_trains, cluster_col, max_clusters_to_plot):
 
 
 def _plot_segment_event_lines(aligned_spike_trains, column, segments, color, label=None, scale_spike_times=False):
+    if column not in aligned_spike_trains.columns:
+        # see if the column without 'rel_' exists
+        base_column = column.replace('rel_', '')
+        if base_column in aligned_spike_trains.columns:
+            aligned_spike_trains[f'rel_{base_column}'] = aligned_spike_trains[base_column] - aligned_spike_trains['reference_time']
+        else:
+            print(f"Warning: Column '{column}' not found in aligned_spike_trains; skipping event line plot.")
+            return
     unique_events = aligned_spike_trains[[
         'new_segment', column]].drop_duplicates().copy()
     event_values = unique_events.set_index(
@@ -280,13 +292,17 @@ def _plot_events(aligned_spike_trains, events_to_plot, segments, scale_spike_tim
         'rel_new_seg_end_time': ['Segment end time', 'purple'],
         'rel_stop_time': ['Stop time', 'green'],
         'rel_prev_ff_caught_time': ['Prev FF caught time', 'orange'],
-        'rel_event_time': ['Event time', 'red']
+        'rel_event_time': ['Event time', 'red'],
+        'rel_stop_id_end_time': ['Stop end time', 'brown'],
+        'rel_next_stop_time': ['Next stop time', 'cyan'],
     }
     for event in events_to_plot:
         if event in events_to_plot_dict:
             label, color = events_to_plot_dict[event]
             _plot_segment_event_lines(aligned_spike_trains, event, segments,
                                       color=color, label=label, scale_spike_times=scale_spike_times)
+        else:
+            print(f"Warning: Event '{event}' not recognized and will be skipped.")
 
 
 def _rearrange_segments(aligned_spike_trains, col_to_rearrange_segments):
@@ -328,7 +344,7 @@ def plot_rasters(
     title_prefix="Raster Plot for Cluster",
     xmin=None,
     xmax=None,
-    col_to_rearrange_segments='rel_stop_time',
+    col_to_rearrange_segments=None,
     scale_spike_times=False,
     max_clusters_to_plot=None,
     max_segments_to_plot=None,

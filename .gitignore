@@ -15,8 +15,11 @@ __pycache__/
 # Logs
 *.log
 logs/
+logs_decode/
 **/logs/
     
+results/
+
 # OS junk
 .DS_Store
 **/.DS_Store

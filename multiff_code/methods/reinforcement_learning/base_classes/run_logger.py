@@ -76,7 +76,7 @@ def _flatten_dict(prefix, d):
     return out
 
 
-def log_run_start(overall_folder: str, agent_type: str, sweep_params: dict, extra_info: dict = None):
+def log_run_start(overall_folder: str, agent_type: str, sweep_params: dict, retries_info: dict = None):
     now = time_package.strftime('%Y-%m-%d %H:%M:%S', time_package.localtime())
     record = {
         'timestamp': now,
@@ -86,8 +86,8 @@ def log_run_start(overall_folder: str, agent_type: str, sweep_params: dict, extr
         **_flatten_dict('param_', sweep_params),
         **_flatten_dict('slurm_', _slurm_context()),
     }
-    if isinstance(extra_info, dict):
-        record.update(_flatten_dict('extra_', extra_info))
+    if isinstance(retries_info, dict):
+        record.update(_flatten_dict('extra_', retries_info))
 
     path = _runs_log_path(overall_folder)
     _ensure_csv(path, columns=list(record.keys()))
@@ -183,7 +183,8 @@ def collect_model_to_job_dir(overall_folder: str, source_dir: str, preferred_nam
         return
     source_dir = os.path.abspath(os.path.expanduser(source_dir))
     overall_folder = os.path.abspath(os.path.expanduser(overall_folder))
-    stored_models_root = os.path.abspath(os.path.join(overall_folder, os.pardir, os.pardir))
+    stored_models_root = os.path.abspath(
+        os.path.join(overall_folder, os.pardir, os.pardir))
     job_root = os.path.join(stored_models_root, 'jobs', str(job_id))
     os.makedirs(job_root, exist_ok=True)
 
@@ -215,5 +216,3 @@ def collect_model_to_job_dir(overall_folder: str, source_dir: str, preferred_nam
     except Exception as e:
         # Last resort: do nothing but print a warning
         print('[logger] failed to collect model to job dir:', e)
-
-

@@ -88,6 +88,8 @@ if __name__ == "__main__":
                         default=2, help="Max in-memory time for env")
     parser.add_argument("--angular-terminal-vel", type=float,
                         default=0.05, help="Angular terminal velocity threshold")
+    parser.add_argument("--identity-slot-strategy", type=str, default="rank_keep",
+                        help="Strategy for identity slot handling in env")
     parser.add_argument("--no-train", dest="to_train_agent",
                         action="store_false", help="Disable training (evaluate only)")
     parser.set_defaults(to_train_agent=True)
@@ -108,6 +110,7 @@ if __name__ == "__main__":
         'angular_terminal_vel': args.angular_terminal_vel,
         "dt": args.dt,
         "max_in_memory_time": args.max_in_memory_time,
+        'identity_slot_strategy': args.identity_slot_strategy,
     }
 
     rl = gru_class.GRUforMultifirefly(overall_folder=overall_folder,
@@ -120,6 +123,7 @@ if __name__ == "__main__":
         'max_in_memory_time': args.max_in_memory_time,
         'angular_terminal_vel': args.angular_terminal_vel,
         'dt': args.dt,
+        'identity_slot_strategy': args.identity_slot_strategy,
     }
     try:
         run_logger.log_run_start(overall_folder, agent_type='gru', sweep_params=sweep_params)

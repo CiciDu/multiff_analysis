@@ -1,20 +1,20 @@
 import numpy as np
 from sklearn.model_selection import GroupKFold, KFold
-import rcca
+from cca_zoo.linear import rCCA, CCA
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
 
-def conduct_cca_cv(X1_unscaled, 
+def conduct_cca_cv(X1_unscaled,
                    X2_unscaled,
-                n_components=10,
-                trial_ids=None,
-                reg=1e-2,
-                n_splits=5,
-                shuffle=True,
-                random_state=None):
+                   n_components=10,
+                   trial_ids=None,
+                   reg=1e-2,
+                   n_splits=5,
+                   shuffle=True,
+                   random_state=None):
     """
     Run CCA on full data (for weights/loadings) and compute cross-validated
     canonical correlations (held-out) to check generalization.
@@ -24,14 +24,14 @@ def conduct_cca_cv(X1_unscaled,
     - Stores results under results['cv'].
     """
 
-
     # --- guard components ---
-    n_components = min(n_components, len(X1_unscaled.columns), len(X2_unscaled.columns))
+    n_components = min(n_components, len(
+        X1_unscaled.columns), len(X2_unscaled.columns))
 
     scaler = StandardScaler()
     X1_sc, X2_sc = scaler.fit_transform(
         X1_unscaled), scaler.fit_transform(X2_unscaled)
-        
+
     # --- cross-validation setup ---
     X1 = np.asarray(X1_sc, dtype=float)
     X2 = np.asarray(X2_sc, dtype=float)
@@ -56,15 +56,21 @@ def conduct_cca_cv(X1_unscaled,
         split_iter = splitter.split(np.arange(n))
 
     # --- helpers ---
-    def _fit_cca(X1_tr, X2_tr):
-        cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
-        cca.train([X1_tr, X2_tr])
+
+    def _fit_cca(X1_tr, X2_tr, n_components=10, reg=1e-2, regularized=True):
+        if regularized:
+            cca = rCCA(latent_dimensions=n_components, c=[reg, reg])
+        else:
+            cca = CCA(latent_dimensions=n_components)
+        cca.fit([X1_tr, X2_tr])
         return cca
 
     def _transform(cca, X1_te, X2_te):
-        # rcca stores projection matrices in cca.ws
-        Z1 = X1_te @ cca.ws[0]
-        Z2 = X2_te @ cca.ws[1]
+        if hasattr(cca, "weights"):
+            Z1 = X1_te @ cca.weights[0]
+            Z2 = X2_te @ cca.weights[1]
+        else:
+            Z1, Z2 = cca.transform((X1_te, X2_te))
         return Z1, Z2
 
     def _corr_vec(A, B):
@@ -91,7 +97,7 @@ def conduct_cca_cv(X1_unscaled,
         test_corrs.append(_corr_vec(Z1_te, Z2_te))
 
     train_corrs = np.vstack(train_corrs)  # (n_folds, n_components)
-    test_corrs  = np.vstack(test_corrs)
+    test_corrs = np.vstack(test_corrs)
 
     cv_summary = {
         "train_corrs_by_fold": train_corrs,
@@ -107,23 +113,22 @@ def conduct_cca_cv(X1_unscaled,
     # (Optional) quick printout
     m = cv_summary["test_corrs_mean"]
     s = cv_summary["test_corrs_std"]
-    print(f"[CCA CV] Test canonical correlations (mean±sd) for first {len(m)} comps:")
-    print("  " + "  ".join([f"{i+1}:{m[i]:.3f}±{s[i]:.3f}" for i in range(len(m))]))
-    
+    print(
+        f"[CCA CV] Test canonical correlations (mean±sd) for first {len(m)} comps:")
+    print(
+        "  " + "  ".join([f"{i+1}:{m[i]:.3f}±{s[i]:.3f}" for i in range(len(m))]))
+
     return cv_summary
-
-
-
 
 
 def plot_cv_cca_overlay(cv_summary, title="CV canonical correlations",
                         show_train=True, jitter=0.06, alpha_points=0.35):
     test = np.asarray(cv_summary["test_corrs_by_fold"])   # (F, K)
     mean_ = np.asarray(cv_summary["test_corrs_mean"])
-    std_  = np.asarray(cv_summary["test_corrs_std"])
+    std_ = np.asarray(cv_summary["test_corrs_std"])
     comps = np.arange(1, test.shape[1] + 1)
 
-    plt.figure(figsize=(8,5))
+    plt.figure(figsize=(8, 5))
 
     # --- overlay all folds as jittered points ---
     F = test.shape[0]
@@ -132,7 +137,8 @@ def plot_cv_cca_overlay(cv_summary, title="CV canonical correlations",
         plt.scatter(x, test[f], s=18, alpha=alpha_points, label=None)
 
     # --- mean ± SD band + mean line ---
-    plt.fill_between(comps, mean_ - std_, mean_ + std_, alpha=0.2, label="Mean ± SD")
+    plt.fill_between(comps, mean_ - std_, mean_ + std_,
+                     alpha=0.2, label="Mean ± SD")
     plt.plot(comps, mean_, lw=2, marker="o", label="Mean (test)")
 
     # Optional: overlay training as hollow markers
@@ -143,8 +149,8 @@ def plot_cv_cca_overlay(cv_summary, title="CV canonical correlations",
             plt.scatter(x, train[f], s=18, facecolors='none', edgecolors='black',
                         alpha=0.25, label=None)
         # also plot mean
-        plt.plot(comps, train.mean(axis=0), lw=2, marker="o", label="Mean (train)", color='black')
-
+        plt.plot(comps, train.mean(axis=0), lw=2, marker="o",
+                 label="Mean (train)", color='black')
 
     plt.xlabel("Canonical component")
     plt.ylabel("Correlation")
@@ -162,16 +168,17 @@ def plot_cv_cca_violin(cv_summary, title="CV canonical correlations (violin+poin
     K = test.shape[1]
     comps = np.arange(1, K + 1)
 
-    plt.figure(figsize=(8,5))
-    parts = plt.violinplot([test[:,k] for k in range(K)], positions=comps,
+    plt.figure(figsize=(8, 5))
+    parts = plt.violinplot([test[:, k] for k in range(K)], positions=comps,
                            showmeans=False, showmedians=True)
     for pc in parts['bodies']:
         pc.set_alpha(0.15)
 
     # scatter all folds
     for k in range(K):
-        x = np.full(test.shape[0], comps[k]) + np.random.uniform(-jitter, jitter, size=test.shape[0])
-        plt.scatter(x, test[:,k], s=18, alpha=alpha_points)
+        x = np.full(test.shape[0], comps[k]) + \
+            np.random.uniform(-jitter, jitter, size=test.shape[0])
+        plt.scatter(x, test[:, k], s=18, alpha=alpha_points)
 
     plt.xlabel("Canonical component")
     plt.ylabel("Correlation (test)")
@@ -187,7 +194,7 @@ def plot_cv_cca_lines(cv_summary, title="CV canonical correlations (per-fold lin
     comps = np.arange(1, test.shape[1] + 1)
     mean_ = np.asarray(cv_summary["test_corrs_mean"])
 
-    plt.figure(figsize=(8,5))
+    plt.figure(figsize=(8, 5))
     for f in range(test.shape[0]):
         plt.plot(comps, test[f], lw=1, alpha=0.4)
     plt.plot(comps, mean_, lw=2, marker="o", label="Mean (test)")

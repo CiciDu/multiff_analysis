@@ -1,6 +1,6 @@
 
 
-from reinforcement_learning.agents.rnn import env_for_rnn
+from reinforcement_learning.agents.rnn import rnn_env
 from reinforcement_learning.base_classes import rl_base_utils, rl_base_class
 from reinforcement_learning.agents.rnn import lstm_utils
 from reinforcement_learning.agents.rnn import gru_utils
@@ -44,7 +44,7 @@ class GRUforMultifirefly(lstm_class.LSTMforMultifirefly):
 
         self.replay_buffer_class = gru_utils.ReplayBufferGRU
         self.trainer_class = gru_utils.GRU_SAC_Trainer
-        self.env_class = env_for_rnn.EnvForRNN
+        self.env_class = rnn_env.EnvForRNN
 
         self.default_env_kwargs = env_utils.get_env_default_kwargs(
             self.env_class)

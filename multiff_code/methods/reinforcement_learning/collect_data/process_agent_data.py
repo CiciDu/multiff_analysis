@@ -1,7 +1,7 @@
 from data_wrangling import general_utils
 from pattern_discovery import pattern_by_trials, make_ff_dataframe
-from reinforcement_learning.agents.rnn import env_for_rnn
-from reinforcement_learning.agents.feedforward import env_for_sb3
+from reinforcement_learning.agents.rnn import rnn_env
+from reinforcement_learning.agents.feedforward import sb3_env
 from reinforcement_learning.agents.attention.env_attn_multiff import (
     EnvForAttentionSAC as EnvForAttention,
     get_action_limits as attn_get_action_limits,
@@ -76,7 +76,6 @@ def make_env_ff_flash_from_real_data(ff_flash_sorted_of_monkey, alive_ffs, ff_fl
             ff_flash_valid = ff_flash_valid - start_time
         env_ff_flash.append(np.array(ff_flash_valid))
     return env_ff_flash
-
 
 
 def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
@@ -173,7 +172,6 @@ def reverse_value_and_position(sorted_indices_all):
         value = sorted_indices_all[position]
         reversed_sorting[value] = position
     return reversed_sorting
-
 
 
 def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):

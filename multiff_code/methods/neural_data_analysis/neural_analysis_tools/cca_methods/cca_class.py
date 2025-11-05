@@ -35,8 +35,17 @@ class CCAclass():
 
         self.cca, self.X1_c, self.X2_c, self.canon_corr = neural_data_modeling.conduct_cca(
             self.X1_sc, self.X2_sc, n_components=n_components, plot_correlations=plot_correlations, reg=reg)
-        self.X1_weights = self.cca.ws[0]
-        self.X2_weights = self.cca.ws[1]
+        # Try common attribute names for weights across implementations
+        if hasattr(self.cca, "weights") and isinstance(self.cca.weights, (list, tuple)):
+            self.X1_weights, self.X2_weights = self.cca.weights[0], self.cca.weights[1]
+        elif hasattr(self.cca, "x_weights_") and hasattr(self.cca, "y_weights_"):
+            self.X1_weights, self.X2_weights = self.cca.x_weights_, self.cca.y_weights_
+        else:
+            # Fallback: derive weights via least squares mapping to canonical variates
+            self.X1_weights = np.linalg.lstsq(
+                self.X1_sc, self.X1_c, rcond=None)[0]
+            self.X2_weights = np.linalg.lstsq(
+                self.X2_sc, self.X2_c, rcond=None)[0]
         self.X1_loading = neural_data_modeling.calculate_loadings(
             self.X1_sc, self.X1_c)
         self.X2_loading = neural_data_modeling.calculate_loadings(
@@ -54,7 +63,7 @@ class CCAclass():
             'X1_loading': self.X1_loading,
             'X2_loading': self.X2_loading,
         }
-        
+
     # def conduct_cca_cv(self, n_components=10, plot_correlations=True, reg=1e-2, n_splits=10, random_state=42):
     #     cca_cv_utils.combine_cca_cv_results(self, n_components=n_components, plot_correlations=plot_correlations, reg=reg, n_splits=n_splits, random_state=random_state)
 
@@ -87,7 +96,8 @@ class CCAclass():
             self.test_results = stats_cca.corr_test()
             self.CanCorr_canonical_corrs = self.test_results.stats['Canonical Correlation'].values.astype(
                 float)
-            self.p_values = self.test_results.stats['Pr > F'].values.astype(float)
+            self.p_values = self.test_results.stats['Pr > F'].values.astype(
+                float)
             print(self.test_results)
             # check if self.CanCorr_canonical_corrs and self.canon_corr are the same (with shared components).
             # If not, raise an warning and print the components that are different.
@@ -101,11 +111,11 @@ class CCAclass():
                     f"Components that are different: {component_diff + 1}, {self.CanCorr_canonical_corrs[component_diff]} vs {self.canon_corr[component_diff]}")
         except ValueError as e:
             print("Warning: p_values not found. Error message:", e)
-                
+
     def plot_X1_loadings(self, max_components=20, features_per_fig=25):
         if not hasattr(self, 'p_values'):
             self.test_for_p_values()
-            
+
         cca_plotting.plot_loading_heatmap(
             loadings=self.X1_loading,
             feature_names=self.X1_loading_df.feature.values,
@@ -171,6 +181,3 @@ class CCAclass():
                                                                              keep_one_value_for_each_feature=keep_one_value_for_each_feature,
                                                                              max_features_to_show_per_plot=max_features_to_show_per_plot
                                                                              )
-
-
-

@@ -9,7 +9,7 @@ from math import pi
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
-def sample_and_visualize_from_neural_network(sac_model,
+def sample_and_visualize_from_neural_network(rl_agent,
                                              sample_size=1000,
                                              full_memory=None,
                                              ff_radius=10,
@@ -35,7 +35,7 @@ def sample_and_visualize_from_neural_network(sac_model,
                                              ):
 
     plt.rcdefaults()
-    stacked_array, all_actions, angle2center, distances = generate_observations_and_actions(sac_model, sample_size=sample_size, full_memory=full_memory,
+    stacked_array, all_actions, angle2center, distances = generate_observations_and_actions(rl_agent, sample_size=sample_size, full_memory=full_memory,
                                                                                             const_distance=const_distance, const_angle=const_angle, const_memory=const_memory,
                                                                                             fill_empty_observational_space_with_placeholders=fill_empty_observational_space_with_placeholders, norm_input=norm_input, add_2nd_ff=add_2nd_ff,
                                                                                             const_distance2=const_distance2, const_angle2=const_angle2, const_memory2=const_memory2)
@@ -72,7 +72,7 @@ def visualize_generated_actions(stacked_array,
 
     Parameters
     ----------
-    sac_model: obj
+    rl_agent: obj
         the agent
     stacked_array: np.array
         containing a stack of simulated observations
@@ -193,7 +193,7 @@ def visualize_generated_actions(stacked_array,
 
 
 def generate_observations_and_actions(
-    sac_model,
+    rl_agent,
     sample_size=1000,
     full_memory=None,
     ff_radius=10,
@@ -216,7 +216,7 @@ def generate_observations_and_actions(
 
     Parameters
     ----------
-    sac_model: obj
+    rl_agent: obj
         the agent
     sample_size: num
         the number of dots to be plotted in the plot
@@ -269,7 +269,7 @@ def generate_observations_and_actions(
     distances = distances
 
     if fill_empty_observational_space_with_placeholders:
-        total_ff = int(sac_model.observation_space.shape[0]/4)
+        total_ff = int(rl_agent.observation_space.shape[0]/4)
         existing_ff = 2 if add_2nd_ff else 1
         num_default_ff = total_ff - existing_ff
         if num_default_ff > 0:
@@ -282,7 +282,7 @@ def generate_observations_and_actions(
         stacked_array = norm_input(stacked_array, invisible_distance)
 
     # for each observation, use the network to generate the agent's action
-    all_actions = generate_actions(stacked_array, sample_size, sac_model)
+    all_actions = generate_actions(stacked_array, sample_size, rl_agent)
 
     return stacked_array, all_actions, angle2center, distances
 
@@ -348,12 +348,12 @@ def norm_input(stacked_array, invisible_distance):
     return stacked_array
 
 
-def generate_actions(stacked_array, sample_size, sac_model):
+def generate_actions(stacked_array, sample_size, rl_agent):
     # for each observation, use the network to generate the agent's action
     all_actions = np.zeros([sample_size, 2])
     for i in range(sample_size):
         obs = stacked_array[i]
-        action, _ = sac_model.predict(obs, deterministic=True)
+        action, _ = rl_agent.predict(obs, deterministic=True)
         all_actions[i] = action.copy()
     return all_actions
 
@@ -402,7 +402,7 @@ def convert_to_xy_coord(angle2center, distances):
     return all_x, all_y, valid_indices
 
 
-def combine_6_plots_for_neural_network(sac_model,
+def combine_6_plots_for_neural_network(rl_agent,
                                        full_memory=None,
                                        ff_radius=10,
                                        invisible_distance=400,
@@ -443,37 +443,37 @@ def combine_6_plots_for_neural_network(sac_model,
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     fig, axes = sample_and_visualize_from_neural_network(
-        sac_model, axes=axes, fig=fig, sample_size=sample_size_for_const_memory, const_memory=const_memory, color_variable="dv", **shared_kwargs)
+        rl_agent, axes=axes, fig=fig, sample_size=sample_size_for_const_memory, const_memory=const_memory, color_variable="dv", **shared_kwargs)
 
     # angle vs. distance, dw
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     fig, axes = sample_and_visualize_from_neural_network(
-        sac_model, axes=axes, fig=fig, sample_size=sample_size_for_const_memory, const_memory=const_memory, color_variable="dw", **shared_kwargs)
+        rl_agent, axes=axes, fig=fig, sample_size=sample_size_for_const_memory, const_memory=const_memory, color_variable="dw", **shared_kwargs)
 
     # angle vs. memory, dv
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     fig, axes = sample_and_visualize_from_neural_network(
-        sac_model, axes=axes, fig=fig, sample_size=sample_size_for_const_distance, const_distance=const_distance, color_variable="dv", **shared_kwargs)
+        rl_agent, axes=axes, fig=fig, sample_size=sample_size_for_const_distance, const_distance=const_distance, color_variable="dv", **shared_kwargs)
 
     # angle vs. memory, dw
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     fig, axes = sample_and_visualize_from_neural_network(
-        sac_model, axes=axes, fig=fig, sample_size=sample_size_for_const_distance, const_distance=const_distance, color_variable="dw", **shared_kwargs)
+        rl_agent, axes=axes, fig=fig, sample_size=sample_size_for_const_distance, const_distance=const_distance, color_variable="dw", **shared_kwargs)
 
     # distance vs. memory, dv
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     fig, axes = sample_and_visualize_from_neural_network(
-        sac_model, axes=axes, fig=fig, sample_size=sample_size_for_const_angle, const_angle=const_angle, color_variable="dv", **shared_kwargs)
+        rl_agent, axes=axes, fig=fig, sample_size=sample_size_for_const_angle, const_angle=const_angle, color_variable="dv", **shared_kwargs)
 
     # distance vs. memory, dw
     counter += 1
     axes = fig.add_subplot(num_rows, num_cols, counter)
     fig, axes = sample_and_visualize_from_neural_network(
-        sac_model, axes=axes, fig=fig, sample_size=sample_size_for_const_angle, const_angle=const_angle, color_variable="dw", **shared_kwargs)
+        rl_agent, axes=axes, fig=fig, sample_size=sample_size_for_const_angle, const_angle=const_angle, color_variable="dw", **shared_kwargs)
 
     plt.tight_layout()
     if data_folder_name is not None:

@@ -358,15 +358,15 @@ class PSTHAnalyzer:
 
     def run_full_analysis(self, cluster_idx: Optional[int] = None) -> Dict:
         """Runs segment extraction and PSTH computation; stores in self.psth_data."""
-        segments = self.extract_neural_segments()
-        psth = self.compute_psth(segments, cluster_idx)
+        self.segments = self.extract_neural_segments()
+        psth = self.compute_psth(self.segments, cluster_idx)
         self.psth_data = {
-            "segments": segments,
+            "segments": self.segments,
             "psth": psth,
             "config": self.config,
-            "n_events": {k: int(segments[k].shape[0]) for k in ["event_a", "event_b"]},
+            "n_events": {k: int(self.segments[k].shape[0]) for k in ["event_a", "event_b"]},
         }
-        return self.psth_data
+
 
     # ------------------------------ Plotting ---------------------------------
 
@@ -542,34 +542,3 @@ class PSTHAnalyzer:
 
         return results
 
-
-# ---------------------------- Convenience API --------------------------------
-
-def create_psth_around_stops(
-    spikes_df: pd.DataFrame,
-    monkey_information: pd.DataFrame,
-    event_a_df: pd.DataFrame,
-    event_b_df: pd.DataFrame,
-    event_a_label: str = "Capture",
-    event_b_label: str = "Non-capture",
-    config: Optional[PSTHConfig] = None,
-    cluster_idx: Optional[int] = None,
-) -> PSTHAnalyzer:
-    """
-    Convenience function to create and run PSTH analysis around stops.
-
-    For this project:
-      - event_a_df = captures
-      - event_b_df = non-captures
-    """
-    analyzer = PSTHAnalyzer(
-        spikes_df=spikes_df,
-        monkey_information=monkey_information,
-        config=config,
-        event_a_df=event_a_df,
-        event_b_df=event_b_df,
-        event_a_label=event_a_label,
-        event_b_label=event_b_label,
-    )
-    analyzer.run_full_analysis(cluster_idx)
-    return analyzer

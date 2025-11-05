@@ -10,48 +10,6 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
         super().__init__(raw_data_folder_path=raw_data_folder_path, time_range_of_trajectory=time_range_of_trajectory,
                          num_time_points_for_trajectory=num_time_points_for_trajectory)
 
-    def retrieve_manual_anno(self):
-        super().retrieve_manual_anno()
-
-    def get_and_process_manual_anno_long(self, n_seconds_before_crossing_boundary=None, n_seconds_after_crossing_boundary=None):
-        self.get_manual_anno_long()
-        self.eliminate_crossing_boundary_cases(n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary,
-                                               n_seconds_after_crossing_boundary=n_seconds_after_crossing_boundary)
-        self.invalidate_ff_already_caught_as_intended_target()
-        self.update_invalid_ff_indices_in_manual_anno_long()
-
-    def get_manual_anno_long(self):
-        super().retrieve_manual_anno()
-        self.manual_anno_trimmed = self.manual_anno[self.manual_anno.target_index !=
-                                                    self.manual_anno.target_index.min()]
-        self.manual_anno_trimmed = self.manual_anno_trimmed[self.manual_anno_trimmed.target_index !=
-                                                            self.manual_anno_trimmed.target_index.min()]
-        # furnish manual_anno so that every point index has a row
-        min_point = self.manual_anno_trimmed.starting_point_index.min()
-        max_point = self.manual_anno_trimmed.starting_point_index.max()
-        self.manual_anno_long = self.manual_anno_trimmed.copy()
-        self.manual_anno_long['original_starting_point_index'] = self.manual_anno['starting_point_index']
-        self.manual_anno_long = self.manual_anno_long.set_index(
-            'starting_point_index')
-        self.manual_anno_long = self.manual_anno_long.reindex(
-            range(min_point, max_point+1))
-        self.manual_anno_long = self.manual_anno_long.fillna(method='ffill')
-        self.manual_anno_long = self.manual_anno_long.reset_index()
-
-        # recalculate time and target_index based on starting_point_index
-        self.manual_anno_long['time'] = self.monkey_information['time'].loc[self.manual_anno_long.starting_point_index.values].values
-        self.manual_anno_long['target_index'] = np.searchsorted(
-            self.ff_caught_T_new, self.manual_anno_long['time'].values)
-
-        # change data type
-        self.manual_anno_long['original_starting_point_index'] = self.manual_anno_long['original_starting_point_index'].astype(
-            'int')
-        self.manual_anno_long['starting_point_index'] = self.manual_anno_long['starting_point_index'].astype(
-            'int')
-        self.manual_anno_long['target_index'] = self.manual_anno_long['target_index'].astype(
-            'int')
-        self.manual_anno_long['ff_index'] = self.manual_anno_long['ff_index'].astype(
-            'int')
 
     def eliminate_crossing_boundary_cases(self, n_seconds_before_crossing_boundary=None, n_seconds_after_crossing_boundary=None):
         n_seconds_before_crossing_boundary, n_seconds_after_crossing_boundary = self.determine_n_seconds_before_or_after_crossing_boundary(
@@ -68,63 +26,6 @@ class ModelOfIntendedTargets(decision_making_class.DecisionMaking):
         self.manual_anno_long = self.manual_anno_long.iloc[non_CB_indices]
         # print("self.manual_anno_long:", self.manual_anno_long.shape[0], "out of", original_length, "rows remains")
 
-    def invalidate_ff_already_caught_as_intended_target(self):
-        # take out all the points where the ff_index is a ff that has just been captured, and change the ff_index = -9
-
-        self.manual_anno_long['ff_capture_time'] = 99999
-        valid_caught_ff_indices = self.manual_anno_long[(self.manual_anno_long['ff_index'] >= 0) & (
-            self.manual_anno_long['ff_index'] < len(self.ff_caught_T_new))].index.values
-        self.manual_anno_long.loc[valid_caught_ff_indices, 'ff_capture_time'] = self.ff_caught_T_new[
-            self.manual_anno_long.loc[valid_caught_ff_indices, 'ff_index'].values.astype(int)]
-        self.manual_anno_long.loc[self.manual_anno_long['time'] >
-                                  self.manual_anno_long['ff_capture_time'], 'ff_index'] = -9
-
-    def update_invalid_ff_indices_in_manual_anno_long(self):
-        manual_anno_long = self.manual_anno_long.copy()
-        # get sub_ff_index which is a candidate for substituting ff_index
-        manual_anno_long['sub_ff_index'] = manual_anno_long['ff_index']
-        # make sub_ff_index below 0 to be NA
-        manual_anno_long.loc[manual_anno_long['sub_ff_index']
-                             < 0, 'sub_ff_index'] = np.nan
-        # fill NA with backward fill
-        manual_anno_long['sub_ff_index'] = manual_anno_long['sub_ff_index'].fillna(
-            method='bfill')
-        # And then, in case there are leftover NAs near the end of the df, we fill it with -9
-        manual_anno_long['sub_ff_index'] = manual_anno_long['sub_ff_index'].fillna(
-            -9)
-        manual_anno_long['sub_ff_index'] = manual_anno_long['sub_ff_index'].astype(
-            int)
-
-        # Now, we'll test whether the substitute (if it's a valid ff_index) is actually usable
-        valid_sub_ff_index = manual_anno_long[manual_anno_long['sub_ff_index'] >= 0]['sub_ff_index'].unique(
-        )
-        # for each valid sub_ff_index
-        for ff_index in valid_sub_ff_index:
-            # get an array of visible time from ff_dataframe
-            ff_time = self.ff_dataframe[self.ff_dataframe['ff_index']
-                                        == ff_index]['time']
-            # find correponding part in manual_anno_long where the new sub_ff_index cannot be used (because it's not available at that time point)
-            manual_anno_long_invalid_indices = manual_anno_long[(manual_anno_long['sub_ff_index'] == ff_index) & (
-                ~manual_anno_long['time'].isin(ff_time))].index.values
-            if len(manual_anno_long_invalid_indices) > 0:
-                # for those rows, discard the substitution (a.k.a. replace the sub_ff_index with ff_index)
-                manual_anno_long.loc[manual_anno_long_invalid_indices,
-                                     'sub_ff_index'] = manual_anno_long.loc[manual_anno_long_invalid_indices, 'ff_index']
-
-        # Also change the invalid ff_index back to the original numbers
-        manual_anno_long.loc[manual_anno_long['sub_ff_index'] < 0,
-                             'sub_ff_index'] = manual_anno_long.loc[manual_anno_long['sub_ff_index'] < 0, 'ff_index']
-
-        # print what percentage of manual_anno_long has invalid ff_index, and out of those, what percentage has been updated, and what percentage has not been updated
-        print('Percentage of manual_anno_long has invalid ff_index: ', round(len(
-            manual_anno_long[manual_anno_long['ff_index'] < 0])/len(manual_anno_long)*100, 1), '%')
-        print('Out of the above:')
-        print('Percentage of invalid ff_index that has been updated: ', round(len(manual_anno_long[(manual_anno_long['ff_index'] < 0) & (
-            manual_anno_long['sub_ff_index'] >= 0)])/len(manual_anno_long[manual_anno_long['ff_index'] < 0])*100, 1), '%')
-        print('percentage of invalid ff_index that has not been updated: ', round(len(manual_anno_long[(manual_anno_long['ff_index'] < 0) & (
-            manual_anno_long['sub_ff_index'] < 0)])/len(manual_anno_long[manual_anno_long['ff_index'] < 0])*100, 1), '%')
-
-        self.manual_anno_long['ff_index'] = manual_anno_long['sub_ff_index']
 
     def get_input_data(self, num_ff_per_row=5, select_every_nth_row=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'], curvature_df=None, curv_of_traj_df=None, **kwargs):
         self.free_selection_df = self.manual_anno_long

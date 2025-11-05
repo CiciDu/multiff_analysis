@@ -128,7 +128,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
         # Filter for relevant features
         self.behav_data = self.behav_data_by_bin[
             behav_features_to_keep.shared_columns_to_keep +
-            behav_features_to_keep.extra_columns_for_concat_trials
+            behav_features_to_keep.retries_columns_for_concat_trials
         ]
 
     def get_pursuit_data(self):
@@ -155,7 +155,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
                     'segment_start_dummy', 'segment_end_dummy']
 
         self.pursuit_data = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep +
-                                             behav_features_to_keep.extra_columns_for_concat_trials + seg_vars]
+                                             behav_features_to_keep.retries_columns_for_concat_trials + seg_vars]
 
         self.pursuit_data_by_trial = pursuit_data_all[behav_features_to_keep.shared_columns_to_keep + seg_vars]
 
@@ -224,7 +224,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
 
     def _select_behav_features(self):
         self.behav_data = self.behav_data_by_bin[behav_features_to_keep.shared_columns_to_keep +
-                                                 behav_features_to_keep.extra_columns_for_concat_trials]
+                                                 behav_features_to_keep.retries_columns_for_concat_trials]
 
         # Now, as a sanity check, see if the differences between behav_data and behav_data_by_bin are all contained in
         # behav_features_to_keep.behav_features_to_drop. If not, raise a warning

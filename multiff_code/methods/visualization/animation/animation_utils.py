@@ -272,8 +272,8 @@ def match_points_to_alive_ff_positions(anim_t, anim_indices, ff_caught_T_new, ff
         index = anim_indices[i]
         trial_num = array_of_trial_nums[i]
         current_t = anim_t[i]
-        alive_ff_indices = np.where((ff_life_sorted[:, 1] >= current_t-0.01)
-                                    & (ff_life_sorted[:, 0] <= current_t+0.01))[0]
+        alive_ff_indices = np.where((ff_life_sorted[:, 1] >= current_t)
+                                    & (ff_life_sorted[:, 0] < current_t))[0]
         alive_ff_positions = ff_real_position_sorted[alive_ff_indices]
         alive_ff_dict[index] = alive_ff_positions
 

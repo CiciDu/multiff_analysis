@@ -1,7 +1,7 @@
 from sklearn.model_selection import KFold, GroupKFold
 import numpy as np
 import pandas as pd
-import rcca
+from cca_zoo.linear import rCCA, CCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
 
@@ -204,15 +204,16 @@ def crossvalidated_cca_analysis(
         X2_tr_sc = scaler2.fit_transform(X2_tr)
         X2_te_sc = scaler2.transform(X2_te)
 
-        cca = rcca.CCA(kernelcca=False, reg=reg, numCC=n_components)
-        cca.train([X1_tr_sc, X2_tr_sc])
+        cca = rCCA(latent_dims=n_components, c=[reg, reg])
+        cca.fit((X1_tr_sc, X2_tr_sc))
 
-        canonical_corrs = cca.cancorrs
+        U_tr, V_tr = cca.transform((X1_tr_sc, X2_tr_sc))
+        U_te, V_te = cca.transform((X1_te_sc, X2_te_sc))
+
+        k = min(U_tr.shape[1], V_tr.shape[1])
+        canonical_corrs = np.array(
+            [np.corrcoef(U_tr[:, i], V_tr[:, i])[0, 1] for i in range(k)])
         fold_canonical_corrs.append(canonical_corrs)
-
-        U_tr, V_tr = cca.comps
-        U_te = X1_te_sc @ cca.ws[0]
-        V_te = X2_te_sc @ cca.ws[1]
 
         fold_loadings.append({
             'X1_train': np.corrcoef(X1_tr_sc.T, U_tr.T)[:X1.shape[1], X1.shape[1]:],
@@ -221,12 +222,20 @@ def crossvalidated_cca_analysis(
             'X2_test': np.corrcoef(X2_te_sc.T, V_te.T)[:X2.shape[1], X2.shape[1]:]
         })
 
-        tr_corrs, te_corrs = cca.validate(
-            [X1_tr, X2_tr]), cca.validate([X1_te, X2_te])
-        cross_view_corr_stats['X1_train'].append(tr_corrs[0])
-        cross_view_corr_stats['X2_train'].append(tr_corrs[1])
-        cross_view_corr_stats['X1_test'].append(te_corrs[0])
-        cross_view_corr_stats['X2_test'].append(te_corrs[1])
+        # Compute variable-wise cross-view correlations as mean absolute structure coefficients across components
+        sc_X1_tr = np.corrcoef(X1_tr_sc.T, U_tr.T)[:X1.shape[1], X1.shape[1]:]
+        sc_X2_tr = np.corrcoef(X2_tr_sc.T, V_tr.T)[:X2.shape[1], X2.shape[1]:]
+        sc_X1_te = np.corrcoef(X1_te_sc.T, U_te.T)[:X1.shape[1], X1.shape[1]:]
+        sc_X2_te = np.corrcoef(X2_te_sc.T, V_te.T)[:X2.shape[1], X2.shape[1]:]
+
+        cross_view_corr_stats['X1_train'].append(
+            np.mean(np.abs(sc_X1_tr), axis=1))
+        cross_view_corr_stats['X2_train'].append(
+            np.mean(np.abs(sc_X2_tr), axis=1))
+        cross_view_corr_stats['X1_test'].append(
+            np.mean(np.abs(sc_X1_te), axis=1))
+        cross_view_corr_stats['X2_test'].append(
+            np.mean(np.abs(sc_X2_te), axis=1))
 
     # Identify best fold
     fold_avg_corrs = [np.mean(corrs) for corrs in fold_canonical_corrs]

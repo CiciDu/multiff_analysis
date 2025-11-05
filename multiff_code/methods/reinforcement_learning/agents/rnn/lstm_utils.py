@@ -17,7 +17,8 @@ from typing import Optional
 from reinforcement_learning.base_classes import run_logger
 
 # device priority: CUDA → MPS → CPU
-device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
+device = "cuda" if torch.cuda.is_available() else (
+    "mps" if torch.backends.mps.is_available() else "cpu")
 
 
 def linear_weights_init(m):
@@ -112,8 +113,10 @@ class ReplayBufferLSTM2:
         T_full_list = [len(sample[2]) for sample in batch]  # len(state)
         if len(T_full_list) == 0:
             raise ValueError('ReplayBufferLSTM2 is empty')
-        core_T = min(T_full_list) if seq_len is None else int(min(seq_len, min(T_full_list)))
-        max_prefix_allowed = min([T - core_T for T in T_full_list]) if core_T > 0 else 0
+        core_T = min(T_full_list) if seq_len is None else int(
+            min(seq_len, min(T_full_list)))
+        max_prefix_allowed = min(
+            [T - core_T for T in T_full_list]) if core_T > 0 else 0
         prefix = int(max(0, min(burn_in, max_prefix_allowed)))
 
         s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst = [], [], [], [], [], []
@@ -138,8 +141,10 @@ class ReplayBufferLSTM2:
                     h, c = h_in.to(device), c_in.to(device)
                     # roll forward up to t0_b
                     for t in range(t0_b):
-                        s_t = torch.as_tensor(state[t], dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
-                        la_t = torch.as_tensor(last_action[t], dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+                        s_t = torch.as_tensor(
+                            state[t], dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+                        la_t = torch.as_tensor(
+                            last_action[t], dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
                         x = torch.cat([s_t, la_t], dim=-1)
                         x = F.relu(policy_net.linear2(x))
                         _, (h, c) = policy_net.lstm1(x, (h, c))
@@ -168,7 +173,6 @@ class ReplayBufferLSTM2:
         hidden_out = (ho_lst, co_lst)
 
         return hidden_in, hidden_out, s_lst, a_lst, la_lst, r_lst, ns_lst, d_lst
-
 
     def __len__(
             # cannot work in multiprocessing case, len(replay_buffer) is not available in proxy of manager!
@@ -517,7 +521,8 @@ class LSTM_SAC_Trainer():
         self.replay_buffer = kwargs.get('replay_buffer', 100)
         self.seq_len = kwargs.get('seq_len', None)
         self.burn_in = kwargs.get('burn_in', 0)
-        self.device = kwargs.get('device', "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"),)
+        self.device = kwargs.get('device', "cuda" if torch.cuda.is_available() else (
+            "mps" if torch.backends.mps.is_available() else "cpu"),)
         # Alpha (entropy temperature) clipping bounds
         self.alpha_min = kwargs.get('alpha_min', 1e-3)
         self.alpha_max = kwargs.get('alpha_max', 4.0)
@@ -612,9 +617,12 @@ class LSTM_SAC_Trainer():
 
         # Sanitize batch tensors to avoid propagating NaNs/Infs
         state = torch.nan_to_num(state, nan=0.0, posinf=0.0, neginf=0.0)
-        next_state = torch.nan_to_num(next_state, nan=0.0, posinf=0.0, neginf=0.0)
-        action = torch.nan_to_num(action, nan=0.0, posinf=0.0, neginf=0.0).clamp_(-1.0, 1.0)
-        last_action = torch.nan_to_num(last_action, nan=0.0, posinf=0.0, neginf=0.0).clamp_(-1.0, 1.0)
+        next_state = torch.nan_to_num(
+            next_state, nan=0.0, posinf=0.0, neginf=0.0)
+        action = torch.nan_to_num(
+            action, nan=0.0, posinf=0.0, neginf=0.0).clamp_(-1.0, 1.0)
+        last_action = torch.nan_to_num(
+            last_action, nan=0.0, posinf=0.0, neginf=0.0).clamp_(-1.0, 1.0)
         reward = torch.nan_to_num(reward, nan=0.0, posinf=0.0, neginf=0.0)
         done = torch.nan_to_num(done, nan=1.0, posinf=1.0, neginf=1.0)
 
@@ -622,10 +630,14 @@ class LSTM_SAC_Trainer():
         if isinstance(hidden_in, tuple) and isinstance(hidden_out, tuple):
             hi, ci = hidden_in
             ho, co = hidden_out
-            hi = torch.nan_to_num(hi.to(device), nan=0.0, posinf=0.0, neginf=0.0)
-            ci = torch.nan_to_num(ci.to(device), nan=0.0, posinf=0.0, neginf=0.0)
-            ho = torch.nan_to_num(ho.to(device), nan=0.0, posinf=0.0, neginf=0.0)
-            co = torch.nan_to_num(co.to(device), nan=0.0, posinf=0.0, neginf=0.0)
+            hi = torch.nan_to_num(hi.to(device), nan=0.0,
+                                  posinf=0.0, neginf=0.0)
+            ci = torch.nan_to_num(ci.to(device), nan=0.0,
+                                  posinf=0.0, neginf=0.0)
+            ho = torch.nan_to_num(ho.to(device), nan=0.0,
+                                  posinf=0.0, neginf=0.0)
+            co = torch.nan_to_num(co.to(device), nan=0.0,
+                                  posinf=0.0, neginf=0.0)
             hidden_in = (hi, ci)
             hidden_out = (ho, co)
 
@@ -646,7 +658,8 @@ class LSTM_SAC_Trainer():
             new_next_action, nan=0.0).clamp_(-1.0, 1.0)
         log_prob = torch.nan_to_num(log_prob, nan=0.0)
         next_log_prob = torch.nan_to_num(next_log_prob, nan=0.0)
-        dist_log_std = torch.nan_to_num(dist_log_std, nan=-5.0, posinf=2.0, neginf=-20.0)
+        dist_log_std = torch.nan_to_num(
+            dist_log_std, nan=-5.0, posinf=2.0, neginf=-20.0)
 
         # Scale rewards (avoid per-batch normalization which can stall learning)
         reward = self.reward_scale * reward
@@ -670,7 +683,8 @@ class LSTM_SAC_Trainer():
             self.alpha.clamp_(min=self.alpha_min, max=self.alpha_max)
         else:
             # Ensure alpha is a tensor on device and clipped
-            self.alpha = torch.as_tensor(1.0, device=self.device, dtype=torch.float32)
+            self.alpha = torch.as_tensor(
+                1.0, device=self.device, dtype=torch.float32)
             self.alpha.clamp_(min=self.alpha_min, max=self.alpha_max)
             alpha_loss = 0
 
@@ -699,12 +713,14 @@ class LSTM_SAC_Trainer():
         # Update Q-value networks
         self.soft_q_optimizer1.zero_grad()
         q_value_loss1.backward()
-        grad_norm_q1 = torch.nn.utils.clip_grad_norm_(self.soft_q_net1.parameters(), max_norm=5.0)
+        grad_norm_q1 = torch.nn.utils.clip_grad_norm_(
+            self.soft_q_net1.parameters(), max_norm=5.0)
         self.soft_q_optimizer1.step()
 
         self.soft_q_optimizer2.zero_grad()
         q_value_loss2.backward()
-        grad_norm_q2 = torch.nn.utils.clip_grad_norm_(self.soft_q_net2.parameters(), max_norm=5.0)
+        grad_norm_q2 = torch.nn.utils.clip_grad_norm_(
+            self.soft_q_net2.parameters(), max_norm=5.0)
         self.soft_q_optimizer2.step()
 
         # Compute policy loss
@@ -713,7 +729,8 @@ class LSTM_SAC_Trainer():
         predict_q2, _ = self.soft_q_net2(
             state, new_action, last_action, hidden_in)
         predicted_new_q_value = torch.min(predict_q1, predict_q2)
-        policy_loss = (self.alpha * log_prob[:, tr, :] - predicted_new_q_value[:, tr, :]).mean()
+        policy_loss = (
+            self.alpha * log_prob[:, tr, :] - predicted_new_q_value[:, tr, :]).mean()
 
         # Update policy network with gradient clipping
         self.policy_optimizer.zero_grad()
@@ -753,12 +770,16 @@ class LSTM_SAC_Trainer():
             rew_std = rew.std().item() if rew.numel() > 1 else float('nan')
             dn = done[:, tr, :]
             done_frac = dn.mean().item() if dn.numel() > 0 else float('nan')
-            alpha_val = float(self.alpha.detach().item()) if torch.is_tensor(self.alpha) else float(self.alpha)
+            alpha_val = float(self.alpha.detach().item()) if torch.is_tensor(
+                self.alpha) else float(self.alpha)
 
         # Prepare scalar grad norms
-        grad_norm_policy_value = float(grad_norm_policy.item()) if torch.is_tensor(grad_norm_policy) else float(grad_norm_policy)
-        grad_norm_q1_value = float(grad_norm_q1.item()) if torch.is_tensor(grad_norm_q1) else float(grad_norm_q1)
-        grad_norm_q2_value = float(grad_norm_q2.item()) if torch.is_tensor(grad_norm_q2) else float(grad_norm_q2)
+        grad_norm_policy_value = float(grad_norm_policy.item()) if torch.is_tensor(
+            grad_norm_policy) else float(grad_norm_policy)
+        grad_norm_q1_value = float(grad_norm_q1.item()) if torch.is_tensor(
+            grad_norm_q1) else float(grad_norm_q1)
+        grad_norm_q2_value = float(grad_norm_q2.item()) if torch.is_tensor(
+            grad_norm_q2) else float(grad_norm_q2)
 
         # Persist metrics history
         self.metrics['policy_loss'].append(float(policy_loss.detach().item()))
@@ -786,15 +807,15 @@ class LSTM_SAC_Trainer():
         # Periodic concise print for fast diagnosis
         if self._update_step % int(max(1, self.log_every)) == 0:
             print(f"Logging metrics: "
-                f"[upd {self._update_step}] pi={self.metrics['policy_loss'][-1]:.3f} "
-                f"q1={self.metrics['q1_loss'][-1]:.3f} q2={self.metrics['q2_loss'][-1]:.3f} "
-                f"Qpi(mu/med/max)={q_pi_mean:.2f}/{q_pi_median:.2f}/{q_pi_max:.2f} "
-                f"tQ(mu/med)={tgt_q_mean:.2f}/{tgt_q_median:.2f} "
-                f"TDstd(q1/q2)={td1_std:.2f}/{td2_std:.2f} "
-                f"alpha={alpha_val:.3f} H~={entropy:.3f} act_std={a_std_mean:.3f} "
-                f"|g| p={grad_norm_policy_value:.2f} q1={grad_norm_q1_value:.2f} q2={grad_norm_q2_value:.2f} "
-                f"r(mu±sd)={rew_mean:.2f}±{rew_std:.2f} done%={done_frac*100:.1f}"
-            )
+                  f"[upd {self._update_step}] pi={self.metrics['policy_loss'][-1]:.3f} "
+                  f"q1={self.metrics['q1_loss'][-1]:.3f} q2={self.metrics['q2_loss'][-1]:.3f} "
+                  f"Qpi(mu/med/max)={q_pi_mean:.2f}/{q_pi_median:.2f}/{q_pi_max:.2f} "
+                  f"tQ(mu/med)={tgt_q_mean:.2f}/{tgt_q_median:.2f} "
+                  f"TDstd(q1/q2)={td1_std:.2f}/{td2_std:.2f} "
+                  f"alpha={alpha_val:.3f} H~={entropy:.3f} act_std={a_std_mean:.3f} "
+                  f"|g| p={grad_norm_policy_value:.2f} q1={grad_norm_q1_value:.2f} q2={grad_norm_q2_value:.2f} "
+                  f"r(mu±sd)={rew_mean:.2f}±{rew_std:.2f} done%={done_frac*100:.1f}"
+                  )
             # Also persist to CSV under logs
             try:
                 run_logger.log_training_metrics(
@@ -870,7 +891,8 @@ class LSTM_SAC_Trainer():
                     self.log_alpha.copy_(payload['log_alpha'].to(self.device))
                 if 'alpha_opt' in payload and isinstance(payload['alpha_opt'], dict):
                     try:
-                        self.alpha_optimizer.load_state_dict(payload['alpha_opt'])
+                        self.alpha_optimizer.load_state_dict(
+                            payload['alpha_opt'])
                     except Exception:
                         pass
                 # Ensure runtime alpha reflects restored log_alpha
@@ -879,12 +901,15 @@ class LSTM_SAC_Trainer():
                 print('Loaded alpha while loading model')
         except Exception:
             # If restore fails, fall back to current initialization
-            fallback_alpha = getattr(self, 'alpha', self.log_alpha.exp().detach())
+            fallback_alpha = getattr(
+                self, 'alpha', self.log_alpha.exp().detach())
             if not torch.is_tensor(fallback_alpha):
-                fallback_alpha = torch.as_tensor(fallback_alpha, device=self.device, dtype=torch.float32)
+                fallback_alpha = torch.as_tensor(
+                    fallback_alpha, device=self.device, dtype=torch.float32)
             self.alpha = fallback_alpha
             self.alpha.clamp_(min=self.alpha_min, max=self.alpha_max)
             print('Failed to load alpha while loading model')
+
 
 def plot(rewards):
     # clear_output(True)
@@ -925,7 +950,7 @@ def _initialize_hidden_state(hidden_dim, device):
             torch.zeros([1, 1, hidden_dim], dtype=torch.float).to(device))
 
 
-def _train_episode(env, sac_model, max_steps_per_eps):
+def _train_episode(env, rl_agent, max_steps_per_eps):
     state, _ = env.reset()
     last_action = env.action_space.sample()
     episode_data = {
@@ -933,7 +958,7 @@ def _train_episode(env, sac_model, max_steps_per_eps):
         'next_state': [], 'done': []
     }
     hidden_out = _initialize_hidden_state(
-        sac_model.hidden_dim, sac_model.device)
+        rl_agent.hidden_dim, rl_agent.device)
     ini_hidden_in, ini_hidden_out = None, None
 
     epi_ctx = {}
@@ -952,11 +977,11 @@ def _train_episode(env, sac_model, max_steps_per_eps):
                 _maybe_warn_nans(True, 'train.hidden_in',
                                  epi_ctx, numerics_cfg)
                 hidden_in = _initialize_hidden_state(
-                    sac_model.hidden_dim, sac_model.device)
+                    rl_agent.hidden_dim, rl_agent.device)
         # Select action without tracking gradients and detach hidden state to avoid graph growth
         with torch.no_grad():
             # use current policy anneal step snapshot
-            action, hidden_out = sac_model.policy_net.get_action(
+            action, hidden_out = rl_agent.policy_net.get_action(
                 state, last_action, hidden_in, deterministic=False)
         # Reuse a detached hidden state at the next step
         if isinstance(hidden_out, tuple):
@@ -966,8 +991,8 @@ def _train_episode(env, sac_model, max_steps_per_eps):
             hidden_out = hidden_out.detach()
         next_state, reward, done, _, _ = env.step(action)
         # increment policy's anneal step after each env step (training-only)
-        current_as = getattr(sac_model.policy_net, 'anneal_step', 0)
-        setattr(sac_model.policy_net, 'anneal_step', int(current_as) + 1)
+        current_as = getattr(rl_agent.policy_net, 'anneal_step', 0)
+        setattr(rl_agent.policy_net, 'anneal_step', int(current_as) + 1)
 
         if step == 0:
             ini_hidden_in, ini_hidden_out = hidden_in, hidden_out
@@ -981,29 +1006,29 @@ def _train_episode(env, sac_model, max_steps_per_eps):
 
         state, last_action = next_state, action
 
-        if step % sac_model.train_freq == 0 and len(sac_model.replay_buffer) > sac_model.batch_size:
-            for _ in range(sac_model.update_itr):
-                sac_model.update(device=sac_model.device)
+        if step % rl_agent.train_freq == 0 and len(rl_agent.replay_buffer) > rl_agent.batch_size:
+            for _ in range(rl_agent.update_itr):
+                rl_agent.update(device=rl_agent.device)
 
         if done:
             break
 
-    sac_model.replay_buffer.push(ini_hidden_in, ini_hidden_out, episode_data['state'], episode_data['action'],
-                                 episode_data['last_action'], episode_data['reward'], episode_data['next_state'], episode_data['done'])
+    rl_agent.replay_buffer.push(ini_hidden_in, ini_hidden_out, episode_data['state'], episode_data['action'],
+                                episode_data['last_action'], episode_data['reward'], episode_data['next_state'], episode_data['done'])
     return np.sum(episode_data['reward'])
 
 
-def evaluate_lstm_agent(env, sac_model, max_steps_per_eps, num_eval_episodes, deterministic=True):
+def evaluate_lstm_agent(env, rl_agent, max_steps_per_eps, num_eval_episodes, deterministic=True):
     cum_reward = 0
-    was_training = sac_model.policy_net.training
-    sac_model.policy_net.eval()
+    was_training = rl_agent.policy_net.training
+    rl_agent.policy_net.eval()
     with torch.no_grad():
         for _ in range(num_eval_episodes):
             state, _ = env.reset()
             last_action = env.action_space.sample()
 
             hidden_out = _initialize_hidden_state(
-                sac_model.hidden_dim, sac_model.device)
+                rl_agent.hidden_dim, rl_agent.device)
 
             epi_ctx = {}
             numerics_cfg = NumericsConfig(
@@ -1021,10 +1046,10 @@ def evaluate_lstm_agent(env, sac_model, max_steps_per_eps, num_eval_episodes, de
                         _maybe_warn_nans(True, 'eval.hidden_in',
                                          epi_ctx, numerics_cfg)
                         hidden_in = _initialize_hidden_state(
-                            sac_model.hidden_dim, sac_model.device)
+                            rl_agent.hidden_dim, rl_agent.device)
 
                 # Select action without grads during evaluation and detach hidden state
-                action, hidden_out = sac_model.policy_net.get_action(
+                action, hidden_out = rl_agent.policy_net.get_action(
                     state, last_action, hidden_in, deterministic=deterministic)
                 if step < 50:
                     print('Action in evaluation: ', action)
@@ -1039,22 +1064,22 @@ def evaluate_lstm_agent(env, sac_model, max_steps_per_eps, num_eval_episodes, de
                 if done:
                     break
     if was_training:
-        sac_model.policy_net.train()
+        rl_agent.policy_net.train()
     return cum_reward / num_eval_episodes
 
 
-def save_best_model(sac_model, whether_save_replay_buffer=True, dir_name=None):
+def save_best_model(rl_agent, whether_save_replay_buffer=True, dir_name=None):
     if dir_name is None:
-        dir_name = sac_model.model_folder_name
+        dir_name = rl_agent.model_folder_name
 
     os.makedirs(dir_name, exist_ok=True)
-    sac_model.save_model(dir_name)
+    rl_agent.save_model(dir_name)
 
     if whether_save_replay_buffer:
-        save_replay_buffer(sac_model, dir_name)
+        save_replay_buffer(rl_agent, dir_name)
 
 
-def save_replay_buffer(sac_model, dir_name):
+def save_replay_buffer(rl_agent, dir_name):
     buffer_path = os.path.join(dir_name, 'buffer.pkl')
     with open(buffer_path, 'wb') as f:
-        pickle.dump(sac_model.replay_buffer.buffer, f)
+        pickle.dump(rl_agent.replay_buffer.buffer, f)
