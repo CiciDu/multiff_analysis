@@ -858,6 +858,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             except Exception as e:
                 print(
                     "Failed to load existing agent. Need to train a new agent. Error: ", e)
+                # Fallback: create a fresh environment and agent before training
+                self.make_env(**self.input_env_kwargs)
+                self.make_agent()
         else:
             print('Making new env based on input_env_kwargs')
             self.make_env(**self.input_env_kwargs)

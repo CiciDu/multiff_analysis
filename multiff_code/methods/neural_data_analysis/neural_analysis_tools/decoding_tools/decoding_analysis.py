@@ -94,9 +94,13 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
     # Optional permutation test
     p_perm = np.nan
     if n_perm > 0:
+        # Use tuned params (if any) and the observed CV AUC from res
+        fixed_params = res.get('best_params', None)
+        observed_auc = res.get('mean_auc', None)
         # permutation_test_auc returns (real_auc, auc_null, pval)
         _, _, p_perm = decoding_utils.permutation_test_auc(
-            X, y, model_name=model_name, k=k, n_perm=n_perm, show_progress=False
+            X, y, model_name=model_name, k=k, n_perm=n_perm,
+            show_progress=False, fixed_params=fixed_params, real_auc=observed_auc
         )
 
     return {
@@ -104,6 +108,7 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
         'mean_auc': res['mean_auc'], 'sd_auc': res['sd_auc'],
         'tstat': tstat, 'p_ttest': p_ttest, 'sig_ttest': sig_ttest,
         'p_perm': p_perm, 'n_units': res['n_units'],
+        'best_params': json.dumps(res.get('best_params', {})),
         'sample_size': int(y.shape[0])
     }
 
@@ -362,6 +367,22 @@ def run_all_decoding_comparisons(
 
             # --- Save results using helper ---
             if save_dir is not None:
+                # Include tuned hyperparameters per window (if present)
+                best_params_by_window = []
+                if 'best_params' in df.columns:
+                    for _, row in df.iterrows():
+                        bp = row['best_params']
+                        try:
+                            bp_obj = json.loads(
+                                bp) if isinstance(bp, str) else bp
+                        except Exception:
+                            bp_obj = bp
+                        best_params_by_window.append({
+                            'window_start': float(row.get('window_start', np.nan)),
+                            'window_end': float(row.get('window_end', np.nan)),
+                            'best_params': bp_obj,
+                        })
+
                 metadata = {
                     'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     'comparison': comp['key'],
@@ -374,6 +395,7 @@ def run_all_decoding_comparisons(
                     'do_testing': do_testing,
                     'windows': windows,
                     'align_by_stop_end': align_by_stop_end,
+                    'best_params_by_window': best_params_by_window,
                 }
 
                 save_decoding_results(

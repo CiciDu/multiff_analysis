@@ -1,3 +1,5 @@
+import torch
+import numpy as np
 import argparse
 import sys
 import os
@@ -12,9 +14,6 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 
 from reinforcement_learning.agents.rppo import rppo_class
 from reinforcement_learning.base_classes import run_logger
-
-import numpy as np
-import torch
 
 os.environ.setdefault("PYTORCH_DISABLE_DYNAMO", "1")
 
@@ -61,11 +60,15 @@ if __name__ == "__main__":
                         action="store_true", help="Load saved replay buffer if available")
     parser.set_defaults(load_replay_buffer=False)
 
+    parser.add_argument("--no-curriculum-training", dest="curriculum_training",
+                        action="store_false", help="Disable curriculum training")
+    parser.set_defaults(curriculum_training=True)
+
     args = parser.parse_args()
 
     # Basic device print for visibility
     device = torch.device(
-        f"cuda:{int(os.getenv('CUDA_DEVICE','0'))}" if torch.cuda.is_available() else (
+        f"cuda:{int(os.getenv('CUDA_DEVICE', '0'))}" if torch.cuda.is_available() else (
             "mps" if torch.backends.mps.is_available() else "cpu")
     )
     print('[env] device:', device)
@@ -99,7 +102,8 @@ if __name__ == "__main__":
         'identity_slot_strategy': args.identity_slot_strategy,
     }
     try:
-        run_logger.log_run_start(overall_folder, agent_type='rppo', sweep_params=sweep_params)
+        run_logger.log_run_start(
+            overall_folder, agent_type='rppo', sweep_params=sweep_params)
     except Exception as e:
         print('[logger] failed to log run start:', e)
 
@@ -111,7 +115,8 @@ if __name__ == "__main__":
 
     # Ensure PPO hyperparams include learning rate prior to agent creation
     try:
-        rl.prepare_agent_params(agent_params_already_set_ok=True, learning_rate=args.lr)
+        rl.prepare_agent_params(
+            agent_params_already_set_ok=True, learning_rate=args.lr)
     except Exception as e:
         print('[rppo] warning: failed to set agent params before training:', e)
 
@@ -123,24 +128,27 @@ if __name__ == "__main__":
         best_model_postcurriculum_exists_ok=True,
         to_train_agent=args.to_train_agent,
         load_replay_buffer=args.load_replay_buffer,
+        use_curriculum_training=args.curriculum_training,
     )
 
     try:
         metrics = {
             'best_avg_reward': getattr(rl, 'best_avg_reward', None)
         }
-        run_logger.log_run_end(overall_folder, agent_type='rppo', sweep_params=sweep_params, status='finished', metrics=metrics)
+        run_logger.log_run_end(overall_folder, agent_type='rppo',
+                               sweep_params=sweep_params, status='finished', metrics=metrics)
     except Exception as e:
         print('[logger] failed to log run end:', e)
 
     # Collect model directories from this run into a per-job folder
     try:
-        run_logger.collect_model_to_job_dir(overall_folder, getattr(rl, 'model_folder_name', overall_folder), preferred_name=os.path.basename(getattr(rl, 'model_folder_name', 'agent_model')))
+        run_logger.collect_model_to_job_dir(overall_folder, getattr(
+            rl, 'model_folder_name', overall_folder), preferred_name=os.path.basename(getattr(rl, 'model_folder_name', 'agent_model')))
         if getattr(rl, 'best_model_in_curriculum_dir', None):
-            run_logger.collect_model_to_job_dir(overall_folder, rl.best_model_in_curriculum_dir, preferred_name=os.path.basename(rl.best_model_in_curriculum_dir))
+            run_logger.collect_model_to_job_dir(
+                overall_folder, rl.best_model_in_curriculum_dir, preferred_name=os.path.basename(rl.best_model_in_curriculum_dir))
         if getattr(rl, 'best_model_postcurriculum_dir', None):
-            run_logger.collect_model_to_job_dir(overall_folder, rl.best_model_postcurriculum_dir, preferred_name=os.path.basename(rl.best_model_postcurriculum_dir))
+            run_logger.collect_model_to_job_dir(
+                overall_folder, rl.best_model_postcurriculum_dir, preferred_name=os.path.basename(rl.best_model_postcurriculum_dir))
     except Exception as e:
         print('[logger] failed to collect models into job dir:', e)
-
-

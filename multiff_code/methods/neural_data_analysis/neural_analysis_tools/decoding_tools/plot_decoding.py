@@ -301,6 +301,8 @@ def _aggregate_for_plot(df_sub, groupby_cols, value_col, sig_col,
     else:
         df_agg['err'] = df_agg['std'] / \
             np.sqrt(df_agg['count']) if err_type == 'sem' else df_agg['std']
+        print(
+            f"[plot_decoding_timecourse] err_col '{err_col}' not found — using std/√N as {err_type}.")
 
     if df_agg['err'].isna().all():
         print(

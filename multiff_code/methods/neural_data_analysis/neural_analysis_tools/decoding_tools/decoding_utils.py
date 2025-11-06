@@ -274,6 +274,58 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
 
 
 # ---------------------------------------------------------------------
+# Helper: CV AUC with fixed (pre-tuned) params
+# ---------------------------------------------------------------------
+def _cv_auc_with_fixed_params(
+        X: np.ndarray,
+        y: np.ndarray,
+        model_name: str = 'logreg',
+        k: int = 5,
+        seed: int = 0,
+        model_kwargs: Optional[Dict[str, Any]] = None,
+        fixed_params: Optional[Dict[str, Any]] = None) -> float:
+    """Compute k-fold CV AUC using a fixed set of pipeline params.
+
+    This mirrors the pipeline structure used in decode_auc_cv(), but skips
+    any hyperparameter search and instead applies the provided params.
+    """
+    n_samples, n_features = X.shape
+    clf, _ = get_decoder(model_name, seed, n_samples, n_features, model_kwargs)
+
+    base_clf = clf.named_steps['clf'] if 'clf' in clf.named_steps else clf
+
+    needs_calibration = not hasattr(base_clf, "predict_proba") and hasattr(
+        base_clf, "decision_function")
+    if needs_calibration:
+        base_clf = CalibratedClassifierCV(base_clf, cv=3)
+
+    steps = [('imputer', SimpleImputer(strategy='mean')), ('clf', base_clf)]
+    pipeline = Pipeline(steps)
+
+    # Apply fixed parameters if provided
+    if fixed_params:
+        try:
+            pipeline.set_params(**fixed_params)
+        except ValueError as e:
+            print(f"[warning] Could not apply fixed_params to pipeline: {e}")
+
+    cv = StratifiedKFold(k, shuffle=True, random_state=seed)
+    aucs = []
+    for tr, te in cv.split(X, y):
+        model = pipeline.fit(X[tr], y[tr])
+        if hasattr(model, "predict_proba"):
+            p = model.predict_proba(X[te])[:, 1]
+        elif hasattr(model, "decision_function"):
+            p = model.decision_function(X[te])
+        else:
+            raise ValueError(
+                f"Model {model_name} lacks predict_proba and decision_function.")
+        aucs.append(roc_auc_score(y[te], p))
+
+    return float(np.mean(aucs))
+
+
+# ---------------------------------------------------------------------
 # 4) MAIN WRAPPER FUNCTION
 # ---------------------------------------------------------------------
 def run_decoding(an, window=(0.0, 0.2), units: Optional[Sequence] = None,
@@ -337,7 +389,8 @@ def run_time_resolved_decoding(an, window_size=0.2, step=0.05, tmin=None, tmax=N
 def permutation_test_auc(
     X, y, model_name='logreg', k=5, n_perm=1000, seed=0,
     tune=False, model_kwargs=None, show_progress=True,
-    plot=False
+    plot=False, fixed_params: Optional[Dict[str, Any]] = None,
+    real_auc: Optional[float] = None
 ):
     """
     Permutation test for decoding significance with optional progress bar.
@@ -373,12 +426,34 @@ def permutation_test_auc(
     rng = np.random.default_rng(seed)
 
     # 1. Compute observed AUC
-    real_auc, _, _ = decode_auc_cv(
-        X, y, model_name=model_name, k=k, seed=seed,
-        tune=tune, model_kwargs=model_kwargs
-    )
+    tuned_params = {}
+    if real_auc is not None:
+        # Caller provided observed AUC already
+        pass
+    elif fixed_params is not None:
+        # Use caller-provided fixed (tuned) params to score observed AUC
+        real_auc = _cv_auc_with_fixed_params(
+            X, y, model_name=model_name, k=k, seed=seed,
+            model_kwargs=model_kwargs, fixed_params=fixed_params
+        )
+    else:
+        # Fall back to internal CV (optionally tuned)
+        real_auc, _, tuned_params = decode_auc_cv(
+            X, y, model_name=model_name, k=k, seed=seed,
+            tune=tune, model_kwargs=model_kwargs
+        )
 
-    # 2. Permutation null distribution
+    # 2. Announce parameter strategy for permutations
+    if fixed_params is not None:
+        print(
+            "[permutation_test_auc] Using pre-computed params from caller for permutations.")
+    elif isinstance(tuned_params, dict) and len(tuned_params) > 0:
+        print("[permutation_test_auc] Using tuned best params from observed-label CV for permutations.")
+    else:
+        print(
+            "[permutation_test_auc] No pre-computed params; using untuned CV per permutation.")
+
+    # 3. Permutation null distribution
     auc_null = np.zeros(n_perm)
     iterator = range(n_perm)
     if show_progress:
@@ -387,17 +462,30 @@ def permutation_test_auc(
     try:
         for i in iterator:
             y_perm = shuffle(y, random_state=rng.integers(1e6))
-            auc_null[i], _, _ = decode_auc_cv(
-                X, y_perm, model_name=model_name, k=k, seed=seed,
-                tune=False, model_kwargs=model_kwargs
-            )
+            # Priority: use provided fixed_params; else reuse tuned_params if available;
+            # else compute non-tuned CV per permutation.
+            if fixed_params is not None:
+                auc_null[i] = _cv_auc_with_fixed_params(
+                    X, y_perm, model_name=model_name, k=k, seed=seed,
+                    model_kwargs=model_kwargs, fixed_params=fixed_params
+                )
+            elif tune and isinstance(tuned_params, dict) and len(tuned_params) > 0:
+                auc_null[i] = _cv_auc_with_fixed_params(
+                    X, y_perm, model_name=model_name, k=k, seed=seed,
+                    model_kwargs=model_kwargs, fixed_params=tuned_params
+                )
+            else:
+                auc_null[i], _, _ = decode_auc_cv(
+                    X, y_perm, model_name=model_name, k=k, seed=seed,
+                    tune=False, model_kwargs=model_kwargs
+                )
     except KeyboardInterrupt:
         print(f'\nStopped early at permutation {i+1}/{n_perm}')
 
-    # 3. Empirical one-tailed p-value
+    # 4. Empirical one-tailed p-value
     pval = (np.sum(auc_null >= real_auc) + 1) / (len(auc_null) + 1)
 
-    # 4. Plot null distribution
+    # 5. Plot null distribution
     if plot:
         plt.figure(figsize=(5, 3))
         plt.hist(auc_null, bins=30, alpha=0.7, label='null')
