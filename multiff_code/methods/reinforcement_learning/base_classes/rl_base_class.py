@@ -36,9 +36,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  overall_folder=None,
                  model_folder_name=None,
                  dt=0.1,
-                 dv_cost_factor=1,
-                 dw_cost_factor=1,
-                 w_cost_factor=1,
+                 dv_cost_factor=0,
+                 dw_cost_factor=0,
+                 w_cost_factor=0,
                  flash_on_interval=0.3,
                  max_in_memory_time=3,
                  add_date_to_model_folder_name=False,
@@ -46,7 +46,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  reward_boundary=25,
                  angular_terminal_vel=0.05,
                  distance2center_cost=0,
-                 stop_vel_cost=1,
+                 stop_vel_cost=0,
+                 zero_invisible_ff_features=True,
                  data_name='data_0',
                  std_anneal_preserve_fraction=1,
                  replay_keep_fraction=0.8,
@@ -71,6 +72,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                           'distance2center_cost': distance2center_cost,
                                           'stop_vel_cost': stop_vel_cost,
                                           'reward_boundary': reward_boundary,
+                                          'reward_per_ff': reward_per_ff,
+                                          'zero_invisible_ff_features': zero_invisible_ff_features
                                           }
 
         self.input_env_kwargs = {
@@ -114,14 +117,45 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     def get_related_folder_names_from_model_folder_name(self, model_folder_name, data_name='data_0'):
         self.model_folder_name = model_folder_name
-        self.processed_data_folder_path = os.path.join(model_folder_name.replace(
-            'all_agents', 'all_collected_data/processed_data'), f'individual_data_sessions/{data_name}')
-        self.planning_data_folder_path = os.path.join(model_folder_name.replace(
-            'all_agents', 'all_collected_data/planning'), f'individual_data_sessions/{data_name}')
-        self.patterns_and_features_folder_path = os.path.join(model_folder_name.replace(
-            'all_agents', 'all_collected_data/patterns_and_features'), f'individual_data_sessions/{data_name}')
-        self.decision_making_folder_path = os.path.join(model_folder_name.replace(
-            'all_agents', 'all_collected_data/decision_making'), f'individual_data_sessions/{data_name}')
+
+        abs_model_path = os.path.abspath(os.path.expanduser(model_folder_name))
+        path_parts = abs_model_path.split(os.sep)
+
+        stored_models_idx = None
+        for idx, part in enumerate(path_parts):
+            if part.endswith('_stored_models'):
+                stored_models_idx = idx
+                break
+
+        if stored_models_idx is not None:
+            stored_models_root = os.sep.join(
+                path_parts[:stored_models_idx + 1])
+            rel_path_from_stored = os.path.relpath(
+                abs_model_path, stored_models_root)
+            first_segment = rel_path_from_stored.split(
+                os.sep)[0] if rel_path_from_stored else ''
+            if first_segment == 'all_agents':
+                segments = rel_path_from_stored.split(os.sep)
+                rel_tail = os.path.join(
+                    *segments[1:]) if len(segments) > 1 else ''
+            else:
+                rel_tail = rel_path_from_stored
+        else:
+            stored_models_root = os.path.dirname(abs_model_path)
+            rel_tail = os.path.basename(abs_model_path)
+
+        def _build_collected(category):
+            base = os.path.join(stored_models_root,
+                                'all_collected_data', category)
+            if rel_tail:
+                return os.path.join(base, rel_tail, 'individual_data_sessions', data_name)
+            return os.path.join(base, 'individual_data_sessions', data_name)
+
+        self.processed_data_folder_path = _build_collected('processed_data')
+        self.planning_data_folder_path = _build_collected('planning')
+        self.patterns_and_features_folder_path = _build_collected(
+            'patterns_and_features')
+        self.decision_making_folder_path = _build_collected('decision_making')
 
         os.makedirs(self.model_folder_name, exist_ok=True)
         os.makedirs(self.processed_data_folder_path, exist_ok=True)
@@ -147,15 +181,15 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.env = self.env_class(**self.current_env_kwargs)
         print(f'Made env with the following kwargs: {env_kwargs}')
 
-    def load_best_model_postcurriculum(self, load_replay_buffer=True):
+    def load_best_model_postcurriculum(self, load_replay_buffer=True, restore_env_from_checkpoint=True):
         # load_agent will recreate env and agent using saved manifest
         self.load_agent(load_replay_buffer=load_replay_buffer,
-                        dir_name=self.best_model_postcurriculum_dir)
+                        dir_name=self.best_model_postcurriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
-    def load_best_model_in_curriculum(self, load_replay_buffer=True):
+    def load_best_model_in_curriculum(self, load_replay_buffer=True, restore_env_from_checkpoint=True):
         # load_agent will recreate env and agent using saved manifest
         self.load_agent(load_replay_buffer=load_replay_buffer,
-                        dir_name=self.best_model_in_curriculum_dir)
+                        dir_name=self.best_model_in_curriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
     def curriculum_training(self, best_model_in_curriculum_exists_ok=True, best_model_postcurriculum_exists_ok=True, load_replay_buffer_of_best_model_postcurriculum=True):
         if self.loaded_agent_name == 'model':
@@ -203,7 +237,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     print(
                         f'Made env based on env params saved in {self.loaded_agent_dir}')
                     self.make_env(**self.curriculum_env_kwargs)
-                    self.load_best_model_in_curriculum(load_replay_buffer=True)
+                    self.load_best_model_in_curriculum(
+                        load_replay_buffer=True, restore_env_from_checkpoint=False)
 
             except Exception:
                 print('Need to train a new best_model_in_curriculum')
@@ -218,76 +253,46 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.streamline_making_animation(currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                                          video_dir=self.best_model_postcurriculum_dir)
 
-    def _make_init_env_for_curriculum_training(self,
-                                               initial_flash_on_interval=1,
-                                               initial_angular_terminal_vel=0.32,
-                                               initial_reward_boundary=50,
-                                               initial_stop_vel_cost=1,
-                                               initial_distance2center_cost=1,
-                                               initial_dv_cost_factor=0,
-                                               initial_dw_cost_factor=0,
-                                               initial_w_cost_factor=0,
-                                               ):
-        self.curriculum_env_kwargs = copy.deepcopy(
-            self.input_env_kwargs)
-        print('Made initial env for curriculum training')
-        # If vectorized (e.g., RPPO), broadcast via env_method on wrapper
-        if hasattr(self, 'env') and hasattr(self.env, 'env_method'):
-            try:
-                self.env.env_method(
-                    'set_curriculum_params', indices=None,
-                    flash_on_interval=initial_flash_on_interval,
-                    angular_terminal_vel=initial_angular_terminal_vel,
-                    reward_boundary=initial_reward_boundary,
-                    distance2center_cost=initial_distance2center_cost,
-                    stop_vel_cost=initial_stop_vel_cost,
-                    dv_cost_factor=initial_dv_cost_factor,
-                    dw_cost_factor=initial_dw_cost_factor,
-                    w_cost_factor=initial_w_cost_factor,
-                )
-            except Exception as e:
-                print(
-                    'Warning: failed to set initial curriculum params via env_method:', e)
-        else:
-            # Determine wrapped vs direct env from agent_type
-            agent_type = getattr(self, 'agent_type', None)
-            if agent_type is None:
-                # backward: infer from presence of .env on env
-                env = self.env.env if hasattr(self.env, 'env') else self.env
-            elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-                env = self.env.env
+    def _make_init_env_for_curriculum_training(
+        self,
+        initial_flash_on_interval=1,
+        initial_angular_terminal_vel=0.32,
+        initial_reward_boundary=50,
+        initial_stop_vel_cost=1,
+        initial_distance2center_cost=1,
+        initial_dv_cost_factor=0,
+        initial_dw_cost_factor=0,
+        initial_w_cost_factor=0,
+    ):
+        """Initialize the environment with baseline parameters for curriculum training."""
+        params = dict(
+            flash_on_interval=initial_flash_on_interval,
+            angular_terminal_vel=initial_angular_terminal_vel,
+            reward_boundary=initial_reward_boundary,
+            stop_vel_cost=initial_stop_vel_cost,
+            distance2center_cost=initial_distance2center_cost,
+            dv_cost_factor=initial_dv_cost_factor,
+            dw_cost_factor=initial_dw_cost_factor,
+            w_cost_factor=initial_w_cost_factor,
+        )
+
+        self.curriculum_env_kwargs = copy.deepcopy(self.input_env_kwargs)
+        self.curriculum_env_kwargs.update(params)
+
+        try:
+            if hasattr(self.env, "env_method"):
+                self.env.env_method("set_curriculum_params",
+                                    indices=None, **params)
             else:
-                env = self.env
+                base_env = getattr(self.env, "unwrapped",
+                                   getattr(self.env, "env", self.env))
+                for k, v in params.items():
+                    setattr(base_env, k, v)
+        except Exception as e:
+            print(f"Warning: failed to set initial curriculum params: {e}")
 
-            env.flash_on_interval = initial_flash_on_interval
-            env.angular_terminal_vel = initial_angular_terminal_vel
-            env.reward_boundary = initial_reward_boundary
-            env.distance2center_cost = initial_distance2center_cost
-            env.stop_vel_cost = initial_stop_vel_cost
-            env.dv_cost_factor = initial_dv_cost_factor
-            env.dw_cost_factor = initial_dw_cost_factor
-            env.w_cost_factor = initial_w_cost_factor
-
-            if agent_type is None:
-                if hasattr(self.env, 'env'):
-                    self.env.env = env
-                else:
-                    self.env = env
-            elif str(agent_type).lower() in ('sb3', 'ff', 'feedforward'):
-                self.env.env = env
-            else:
-                self.env = env
-
-        self.curriculum_env_kwargs['flash_on_interval'] = initial_flash_on_interval
-        self.curriculum_env_kwargs['angular_terminal_vel'] = initial_angular_terminal_vel
-        self.curriculum_env_kwargs['reward_boundary'] = initial_reward_boundary
-        self.curriculum_env_kwargs['distance2center_cost'] = initial_distance2center_cost
-        self.curriculum_env_kwargs['stop_vel_cost'] = initial_stop_vel_cost
-        self.curriculum_env_kwargs['dv_cost_factor'] = initial_dv_cost_factor
-        self.curriculum_env_kwargs['dw_cost_factor'] = initial_dw_cost_factor
-        self.curriculum_env_kwargs['w_cost_factor'] = initial_w_cost_factor
-
-        self.current_env_kwargs = self.curriculum_env_kwargs
+        self.current_env_kwargs = dict(self.curriculum_env_kwargs)
+        print("Initialized curriculum environment parameters.")
 
     def _prune_or_clear_replay_buffer(self, keep_fraction: float = 0.2):
         """
@@ -432,148 +437,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 except Exception:
                     pass
         self.current_env_kwargs = self.curriculum_env_kwargs
-
-    def _choose_next_curriculum_update(self, current: dict, targets: dict):
-        """
-        Choose the next curriculum update.
-
-        If the sign of (current - target) is opposite the intended direction,
-        apply the same step magnitude but in the reverse direction (toward target).
-
-        Returns:
-        - updates: dict of key -> new_value (empty if no change)
-        - do_prune: whether to prune/clear replay buffer after applying updates
-        """
-
-        # -----------------------------
-        # 1. Handle higher-priority single-parameter updates
-        # -----------------------------
-        singles = [
-            ('reward_boundary', lambda c, t: c >
-             t, lambda c, t: max(c - 10, t), True),
-            ('angular_terminal_vel', lambda c, t: c >
-             t, lambda c, t: max(c / 2, t), True),
-            ('flash_on_interval', lambda c, t: c >
-             t, lambda c, t: max(c - 0.3, t), True),
-        ]
-
-        for key, need, step, prune in singles:
-            c_val = current.get(key)
-            t_val = targets.get(key)
-            if c_val is None or t_val is None:
-                continue
-            try:
-                # --- Normal direction update (as originally defined)
-                if need(c_val, t_val):
-                    return {key: step(c_val, t_val)}, prune
-
-                # --- Reverse direction: sign is opposite (e.g., c < t when expecting c > t)
-                elif not need(c_val, t_val) and c_val != t_val:
-                    # Compute how large the *normal* step would be if direction were reversed
-                    step_size = abs(step(t_val, c_val) - t_val)
-
-                    # Apply same magnitude but move c toward t (not past it)
-                    if c_val < t_val:
-                        new_val = min(c_val + step_size, t_val)
-                    else:
-                        new_val = max(c_val - step_size, t_val)
-
-                    return {key: new_val}, prune
-
-            except Exception:
-                continue
-
-        # -----------------------------
-        # 2. Handle grouped parameter updates
-        # -----------------------------
-        grouped_specs = [
-            ('distance2center_cost', lambda c, t: c >
-             t, lambda c, t: max(c - 1, t), True),
-            ('stop_vel_cost', lambda c, t: c > t,
-             lambda c, t: max(c - 1, t), False),
-            ('dv_cost_factor', lambda c, t: c < t,
-             lambda c, t: min(c + 1, t), False),
-            ('dw_cost_factor', lambda c, t: c < t,
-             lambda c, t: min(c + 1, t), False),
-            ('w_cost_factor', lambda c, t: c < t,
-             lambda c, t: min(c + 1, t), False),
-        ]
-
-        updates = {}
-        do_prune = False
-        for key, need, step, prune in grouped_specs:
-            c_val = current.get(key)
-            t_val = targets.get(key)
-            if c_val is None or t_val is None:
-                continue
-            try:
-                # --- Normal direction update
-                if need(c_val, t_val):
-                    updates[key] = step(c_val, t_val)
-                    do_prune = do_prune or prune
-
-                # --- Reverse direction: apply same logic as above
-                elif not need(c_val, t_val) and c_val != t_val:
-                    # Determine how large the "normal" update would have been
-                    step_size = abs(step(t_val, c_val) - t_val)
-
-                    # Move c toward t by the same magnitude, without overshooting
-                    if c_val < t_val:
-                        new_val = min(c_val + step_size, t_val)
-                    else:
-                        new_val = max(c_val - step_size, t_val)
-
-                    updates[key] = new_val
-                    do_prune = do_prune or prune
-
-            except Exception:
-                continue
-
-        # -----------------------------
-        # 3. Return updates if any
-        # -----------------------------
-        if updates:
-            return updates, do_prune
-
-        # No updates needed
-        return {}, False
-
-    def _after_curriculum_env_change(self, updated_key: str):
-        if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'policy_net'):
-            try:
-                current = getattr(self.rl_agent.policy_net, 'anneal_step', 0)
-                setattr(self.rl_agent.policy_net, 'anneal_step', int(
-                    max(0, int(current * self.std_anneal_preserve_fraction))))
-                print('std_anneal step before: ', current)
-                print('std_anneal step after: ', int(
-                    max(0, int(current * self.std_anneal_preserve_fraction))))
-            except Exception as e:
-                print('Warning: failed to reset std-anneal progress:', e)
-        if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'log_alpha'):
-            try:
-                with torch.no_grad():
-                    alpha_reset_beta = getattr(self, 'alpha_reset_beta', 0.6)
-                    current_log_alpha = self.rl_agent.log_alpha
-                    target_log_alpha = torch.zeros_like(current_log_alpha)
-                    alpha_before = getattr(
-                        self.rl_agent, 'alpha', current_log_alpha.exp())
-                    new_log_alpha = alpha_reset_beta * current_log_alpha + \
-                        (1 - alpha_reset_beta) * target_log_alpha
-                    self.rl_agent.log_alpha.copy_(new_log_alpha)
-                    if hasattr(self.rl_agent, 'alpha'):
-                        self.rl_agent.alpha = self.rl_agent.log_alpha.exp()
-                    alpha_after = getattr(
-                        self.rl_agent, 'alpha', self.rl_agent.log_alpha.exp())
-                if getattr(self.rl_agent, 'alpha_optimizer', None) is not None:
-                    try:
-                        self.rl_agent.alpha_optimizer.zero_grad(
-                            set_to_none=True)
-                    except TypeError:
-                        self.rl_agent.alpha_optimizer.zero_grad()
-                if getattr(self.rl_agent.log_alpha, 'grad', None) is not None:
-                    self.rl_agent.log_alpha.grad = None
-            except Exception as e:
-                print('Warning: failed to reset entropy temperature (alpha):', e)
 
     def _update_env_after_meeting_reward_threshold(self):
 
@@ -823,16 +686,17 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                          duration=duration, n_steps=n_steps, file_name=None)
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
-                                    data_exists_ok=False):
+                                    data_exists_ok=False, save_video=True, save_as_gif=False, display_inline=False):
         self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
-                            duration=duration, file_name=file_name, video_dir=video_dir)
+                            duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_as_gif=save_as_gif, display_inline=display_inline)
 
-    def make_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], file_name=None, video_dir=None, max_num_frames=150):
+    def make_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], file_name=None, video_dir=None, max_num_frames=150, save_as_gif=True, save_video=True, display_inline=False):
         self.set_animation_parameters(currentTrial=currentTrial_for_animation, num_trials=num_trials_for_animation,
                                       k=1, duration=duration, max_num_frames=max_num_frames)
-        self.call_animation_function(file_name=file_name, video_dir=video_dir)
+        self.call_animation_function(
+            file_name=file_name, video_dir=video_dir, save_video=save_video, save_as_gif=save_as_gif, display_inline=display_inline)
 
     def streamline_everything(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                               use_curriculum_training=True, load_replay_buffer_of_best_model_postcurriculum=True,
@@ -965,12 +829,15 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             return None
         # Prefer single underlying env when vectorized (e.g., SB3 DummyVecEnv)
         if hasattr(env, 'envs') and isinstance(getattr(env, 'envs', None), (list, tuple)) and len(env.envs) > 0:
-            return env.envs[0]
+            single = env.envs[0]
+            # Return base unwrapped environment when available
+            return getattr(single, 'unwrapped', single)
         # Fallback to .env wrapped gym environment
         if hasattr(env, 'env'):
-            return env.env
+            wrapped = env.env
+            return getattr(wrapped, 'unwrapped', wrapped)
         # Return as-is
-        return env
+        return getattr(env, 'unwrapped', env)
 
     def _compute_reward_threshold(self, n_eval_episodes: int = 2, ff_caught_rate_threshold: float = 0.1) -> float:
         env_for_eval = self._get_active_env()
@@ -1077,6 +944,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             current_params = self._get_curriculum_params()
             targets = self._get_curriculum_targets()
 
+            if finished_curriculum:
+                print(
+                    f'[Stage {stage}] All curriculum conditions met. Curriculum training complete.')
+                break
+
             def _close(a, b):
                 try:
                     if a is None or b is None:
@@ -1084,34 +956,16 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     return bool(np.isclose(float(a), float(b), rtol=1e-6, atol=1e-8))
                 except Exception:
                     return a == b
-            if all([
-                _close(current_params.get('flash_on_interval'),
-                       targets.get('flash_on_interval')),
-                _close(current_params.get('angular_terminal_vel'),
-                       targets.get('angular_terminal_vel')),
-                _close(current_params.get('reward_boundary'),
-                       targets.get('reward_boundary')),
-                _close(current_params.get('distance2center_cost'),
-                       targets.get('distance2center_cost')),
-                _close(current_params.get('stop_vel_cost'),
-                       targets.get('stop_vel_cost')),
-                _close(current_params.get('dv_cost_factor'),
-                       targets.get('dv_cost_factor')),
-                _close(current_params.get('dw_cost_factor'),
-                       targets.get('dw_cost_factor')),
-                _close(current_params.get('w_cost_factor'),
-                       targets.get('w_cost_factor')),
-            ]):
-                print(
-                    f'[Stage {stage}] All curriculum conditions met. Curriculum training complete.')
+
+            if all(_close(current_params.get(k), targets.get(k)) for k in targets.keys()):
                 finished_curriculum = True
-                break
+                print('Reaching the last stage of curriculum training.')
 
         # Final post-curriculum training
         os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
         self.make_env(**self.input_env_kwargs)
         self.load_best_model_in_curriculum(
-            load_replay_buffer=True)
+            load_replay_buffer=True, restore_env_from_checkpoint=False)
 
         final_reward_threshold = self._compute_reward_threshold(
             n_eval_episodes=num_eval_episodes, ff_caught_rate_threshold=0.1)
@@ -1306,7 +1160,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.overall_folder + 'parameters_record.csv')
 
     def call_animation_function(self, margin=100, save_video=True, video_dir=None, file_name=None, plot_eye_position=False, set_xy_limits=True, plot_flash_on_ff=False,
-                                show_speed_through_path_color=True, **animate_kwargs):
+                                show_speed_through_path_color=True, save_as_gif=None, display_inline=False, **animate_kwargs):
         self.obs_ff_indices_in_ff_dataframe_dict = None
         # self.obs_ff_indices_in_ff_dataframe_dict = {index: self.obs_ff_indices_in_ff_dataframe[index].astype(int) for index in range(len(self.obs_ff_indices_in_ff_dataframe))}
 
@@ -1342,7 +1196,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         super().call_animation_function(margin=margin, save_video=save_video, video_dir=video_dir, file_name=file_name, plot_eye_position=plot_eye_position,
                                         set_xy_limits=set_xy_limits, plot_flash_on_ff=plot_flash_on_ff, in_obs_ff_dict=self.obs_ff_indices_in_ff_dataframe_dict,
-                                        fps=int((1/dt)/self.k), show_speed_through_path_color=show_speed_through_path_color, **animate_kwargs)
+                                        fps=int((1/dt)/self.k), show_speed_through_path_color=show_speed_through_path_color, save_as_gif=save_as_gif,
+                                        display_inline=display_inline, **animate_kwargs)
 
     def make_animation_with_annotation(self, margin=100, save_video=True, video_dir=None, file_name=None, plot_eye_position=False, set_xy_limits=True):
         super().make_animation_with_annotation(margin=margin, save_video=save_video, video_dir=video_dir,
@@ -1420,3 +1275,137 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     #                                                 plotting_params=plotting_params,
     #                                                 data_folder_name=self.patterns_and_features_folder_path
     #                                                 )
+
+
+    def _choose_next_curriculum_update(self, current: dict, targets: dict):
+        """
+        Choose the next curriculum update.
+
+        Logic:
+        1. Check high-priority single-parameter updates.
+        2. If none apply, check grouped primary parameters.
+        3. If still none, check grouped secondary parameters.
+        4. Reverse update direction if (current - target) has the wrong sign,
+        keeping the same step magnitude toward target.
+
+        Returns:
+            updates (dict): key → new value (empty if no change)
+            do_prune (bool): whether to clear replay buffer after update
+        """
+
+        def _apply_update_rule(key, c_val, t_val, need_fn, step_fn, prune_flag):
+            """Apply a single update rule, handling both normal and reverse directions."""
+            try:
+                # Normal direction (expected sign)
+                if need_fn(c_val, t_val):
+                    return step_fn(c_val, t_val), prune_flag
+
+                # Reverse direction (wrong sign, move toward target)
+                if c_val != t_val:
+                    step_size = abs(step_fn(t_val, c_val) - t_val)
+                    new_val = min(c_val + step_size, t_val) if c_val < t_val else max(c_val - step_size, t_val)
+                    return new_val, prune_flag
+            except Exception:
+                pass
+            return None, False
+
+        # -----------------------------
+        # 1. High-priority single-parameter updates
+        # -----------------------------
+        singles = [
+            ('reward_boundary', lambda c, t: c > t, lambda c, t: max(c - 10, t), True),
+            ('angular_terminal_vel', lambda c, t: c > t, lambda c, t: max(c / 2, t), True),
+            ('flash_on_interval', lambda c, t: c > t, lambda c, t: max(c - 0.3, t), True),
+        ]
+
+        for key, need, step, prune in singles:
+            c_val, t_val = current.get(key), targets.get(key)
+            if c_val is None or t_val is None:
+                continue
+            new_val, do_prune = _apply_update_rule(key, c_val, t_val, need, step, prune)
+            if new_val is not None:
+                return {key: new_val}, do_prune
+
+        # -----------------------------
+        # 2. Grouped parameter updates
+        # -----------------------------
+        grouped_specs_primary = [
+            ('distance2center_cost', lambda c, t: c > t, lambda c, t: max(c - 1, t), True),
+            ('stop_vel_cost', lambda c, t: c > t, lambda c, t: max(c - 1, t), False),
+        ]
+        grouped_specs_secondary = [
+            ('dv_cost_factor', lambda c, t: c < t, lambda c, t: min(c + 1, t), False),
+            ('dw_cost_factor', lambda c, t: c < t, lambda c, t: min(c + 1, t), False),
+            ('w_cost_factor', lambda c, t: c < t, lambda c, t: min(c + 1, t), False),
+        ]
+
+        # Pass 1: primary group (higher priority)
+        primary_updates, do_prune_primary = {}, False
+        for key, need, step, prune in grouped_specs_primary:
+            c_val, t_val = current.get(key), targets.get(key)
+            if c_val is None or t_val is None:
+                continue
+            new_val, prune_flag = _apply_update_rule(key, c_val, t_val, need, step, prune)
+            if new_val is not None:
+                primary_updates[key] = new_val
+                do_prune_primary |= prune_flag
+        if primary_updates:
+            return primary_updates, do_prune_primary
+
+        # Pass 2: secondary group
+        updates, do_prune = {}, False
+        for key, need, step, prune in grouped_specs_secondary:
+            c_val, t_val = current.get(key), targets.get(key)
+            if c_val is None or t_val is None:
+                continue
+            new_val, prune_flag = _apply_update_rule(key, c_val, t_val, need, step, prune)
+            if new_val is not None:
+                updates[key] = new_val
+                do_prune |= prune_flag
+
+        # -----------------------------
+        # 3. Return updates if any
+        # -----------------------------
+        return (updates, do_prune) if updates else ({}, False)
+
+
+    def _after_curriculum_env_change(self, updated_key: str):
+        """Reset adaptive components (anneal progress, entropy temperature) after env change."""
+        # --- Reset annealing progress ---
+        if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'policy_net'):
+            try:
+                current = getattr(self.rl_agent.policy_net, 'anneal_step', 0)
+                new_value = int(max(0, int(current * self.std_anneal_preserve_fraction)))
+                setattr(self.rl_agent.policy_net, 'anneal_step', new_value)
+                print(f'std_anneal step before: {current}, after: {new_value}')
+            except Exception as e:
+                print('Warning: failed to reset std-anneal progress:', e)
+
+        # --- Reset entropy temperature (alpha) ---
+        if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'log_alpha'):
+            try:
+                with torch.no_grad():
+                    beta = getattr(self, 'alpha_reset_beta', 0.6)
+                    cur_log_alpha = self.rl_agent.log_alpha
+                    tgt_log_alpha = torch.zeros_like(cur_log_alpha)
+
+                    alpha_before = getattr(self.rl_agent, 'alpha', cur_log_alpha.exp())
+                    new_log_alpha = beta * cur_log_alpha + (1 - beta) * tgt_log_alpha
+                    self.rl_agent.log_alpha.copy_(new_log_alpha)
+
+                    if hasattr(self.rl_agent, 'alpha'):
+                        self.rl_agent.alpha = self.rl_agent.log_alpha.exp()
+                    alpha_after = getattr(self.rl_agent, 'alpha', self.rl_agent.log_alpha.exp())
+
+                # Clear optimizer state safely
+                opt = getattr(self.rl_agent, 'alpha_optimizer', None)
+                if opt is not None:
+                    try:
+                        opt.zero_grad(set_to_none=True)
+                    except TypeError:
+                        opt.zero_grad()
+                if getattr(self.rl_agent.log_alpha, 'grad', None) is not None:
+                    self.rl_agent.log_alpha.grad = None
+
+            except Exception as e:
+                print('Warning: failed to reset entropy temperature (alpha):', e)

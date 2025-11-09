@@ -85,13 +85,9 @@ pd.set_option('display.max_columns', 50)
 
 
 def collect_stop_data_func(raw_data_folder_path):
-
-    planning_data_by_point_exists_ok = True
-
     pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
         raw_data_folder_path=raw_data_folder_path)
-    pn.prep_data_to_analyze_planning(
-        planning_data_by_point_exists_ok=planning_data_by_point_exists_ok)
+    pn.retrieve_neural_data()
 
     if not hasattr(pn, 'spikes_df'):
         pn.retrieve_or_make_monkey_data()

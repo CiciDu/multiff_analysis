@@ -158,7 +158,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             'env_params': self.current_env_kwargs,
         })
 
-    def load_agent(self, load_replay_buffer=True, keep_current_agent_params=True, dir_name=None, model_name='best_model'):
+    def load_agent(self, load_replay_buffer=True, keep_current_agent_params=True, dir_name=None, model_name='best_model', restore_env_from_checkpoint=True):
         manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
         model_file = manifest.get('model_file') if isinstance(
             manifest, dict) else None
@@ -167,7 +167,9 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
         if not os.path.exists(path):
             raise FileNotFoundError(f"Model file not found at {path}")
-        self.make_env(**manifest['env_params'])
+
+        if restore_env_from_checkpoint:
+            self.make_env(**manifest['env_params'])
         self.make_agent()
         self.rl_agent = self.rl_agent.load(path, env=self.env)
         print("Loaded existing agent:", path)

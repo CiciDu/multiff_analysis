@@ -82,7 +82,7 @@ class MultiFF(gymnasium.Env):
                  dw_cost_factor=1,
                  w_cost_factor=1,
                  distance2center_cost=0,
-                 stop_vel_cost=1,
+                 stop_vel_cost=0,
                  reward_boundary=25,
                  add_vel_cost_when_catching_ff_only=False,
                  linear_terminal_vel=0.01,
@@ -95,7 +95,7 @@ class MultiFF(gymnasium.Env):
                  noise_mode='linear',
                  slot_fields: Optional[List[str]] = None,
                  obs_visible_only: bool = False,
-                 zero_invisible_ff_features: bool = False,
+                 zero_invisible_ff_features: bool = True,
                  use_prev_obs_for_invisible_pose: bool = False,
                  obs_noise: Optional[Union[ObsNoiseCfg, dict]] = None,
                  identity_slot_strategy: str = 'drop_fill',
@@ -291,7 +291,7 @@ class MultiFF(gymnasium.Env):
         self.dv = (self.prev_v - self.v) / self.dt
         self.dw = (self.prev_w - self.w) / self.dt
 
-        dv_cost = self.dv**2 * self.dt * self.dv_cost_factor / 160000
+        dv_cost = self.dv**2 * self.dt * self.dv_cost_factor / 200000
         dw_cost = self.dw**2 * self.dt * self.dw_cost_factor / 100
         w_cost = self.w**2 * self.dt * self.w_cost_factor
         self.cost_breakdown['dv_cost'] += dv_cost
@@ -700,7 +700,7 @@ class MultiFF(gymnasium.Env):
             valid = np.ones_like(self.visible, dtype=np.float32)
 
             # compute pose_unreliable = 1 - visible
-            if getattr(self, 'use_prev_obs_for_invisible_pose', False) or getattr(self, 'zero_invisible_ff_features', False):
+            if self.use_prev_obs_for_invisible_pose or self.zero_invisible_ff_features:
                 self.pose_unreliable = (self.visible < 0.5).astype(np.float32)
             else:
                 self.pose_unreliable = np.zeros_like(
@@ -730,7 +730,7 @@ class MultiFF(gymnasium.Env):
                 full_stack = np.stack(full_fields, axis=1)  # (K,F)
                 outK = full_stack[:, out_idx].astype(np.float32)  # (K,N)
             # Optionally zero features for invisible fireflies assigned to slots
-            if getattr(self, 'zero_invisible_ff_features', False):
+            if self.zero_invisible_ff_features:
                 invis_rows = self.visible < 0.5
                 if np.any(invis_rows):
                     # preserve 'valid', 't_start_seen', 't_last_seen'
@@ -1055,22 +1055,25 @@ class MultiFF(gymnasium.Env):
         off = n_slots
 
         # print('self.time:', self.time)
-        # print('self.slots_SN:')
         # print('self.agentheading:', self.agentheading * 180/np.pi)
         # print('self.topk_indices: ', self.topk_indices)
+        # print('self.slots_SN:')
         # print(self.slots_SN)
+
+        # print('self.action in obs:', self.action)
+
 
         # print('agentxy:', self.agentxy)
 
         if self.add_action_to_obs:
             obs[off:off + 2] = self.action
             off += 2
-            # print('self.action in obs:', self.action)
-
         # Sanity: keep within [-1,1]
         if np.any(np.abs(obs) > 1.001):
             raise ValueError('Observation exceeded |1| bound.')
 
         self.prev_obs = obs.copy()  # same buffer
+
+        # print('obs:', obs)
 
         return obs

@@ -150,7 +150,7 @@ class LSTMforMultifirefly(rl_base_class._RLforMultifirefly):
             'env_params': self.current_env_kwargs,
         })
 
-    def load_agent(self, load_replay_buffer=True, dir_name=None):
+    def load_agent(self, load_replay_buffer=True, dir_name=None, restore_env_from_checkpoint=True):
         try:
             manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
         except Exception as e:
@@ -164,7 +164,8 @@ class LSTMforMultifirefly(rl_base_class._RLforMultifirefly):
             env_params = getattr(self, 'current_env_kwargs', None)
             if not isinstance(env_params, dict):
                 env_params = self.input_env_kwargs
-        self.make_env(**env_params)
+        if restore_env_from_checkpoint:
+            self.make_env(**env_params)
         self.make_agent()
         self.rl_agent.load_model(dir_name)
 

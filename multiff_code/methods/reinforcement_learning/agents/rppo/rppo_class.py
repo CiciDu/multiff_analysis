@@ -44,6 +44,8 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         self.agent_params = None
         self.rl_agent = None
         self.n_envs = n_envs
+        # Track best average evaluation reward across stages/phases for logging
+        self.best_avg_reward = float('-inf')
 
     def make_env(self,  **env_kwargs):
         super().make_env(**env_kwargs)
@@ -103,7 +105,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             policy=MultiInputLstmPolicy,
             env=self.env,
             verbose=0,
-            tensorboard_log=os.path.join(self.model_folder_name, "tb_logs"),
+            # tensorboard_log=os.path.join(self.model_folder_name, "tb_logs"),
             **{k: v for k, v in self.agent_params.items()
                if k in ['learning_rate', 'gamma', 'n_steps', 'batch_size', 'n_epochs', 'clip_range']}
         )
@@ -142,6 +144,15 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         passed = bool(best_mean_reward >= reward_threshold)
         print(
             f'[RPPO] Stage complete — best_mean={best_mean_reward:.2f}, passed={passed}')
+        # Update global best tracker for run_end logging
+        try:
+            if self.best_avg_reward is None:
+                self.best_avg_reward = best_mean_reward
+            else:
+                self.best_avg_reward = max(
+                    self.best_avg_reward, best_mean_reward)
+        except Exception:
+            pass
         return passed, best_mean_reward
 
     def _post_curriculum_final_train(self, reward_threshold: float, eval_eps_freq: int, num_eval_episodes: int):
@@ -164,7 +175,15 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         except Exception:
             avg_reward = float('nan')
         print(f'[RPPO] Post-curriculum average reward: {avg_reward:.2f}')
-        return avg_reward
+        # Update global best tracker for run_end logging
+        try:
+            if self.best_avg_reward is None:
+                self.best_avg_reward = float(avg_reward)
+            else:
+                self.best_avg_reward = max(
+                    self.best_avg_reward, float(avg_reward))
+        except Exception:
+            pass
 
     # -------------------------------------------------------------------------
     # Saving and loading
@@ -190,7 +209,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             print('[RPPO] Saved model at', model_path)
         self.write_checkpoint_manifest(dir_name)
 
-    def load_agent(self, load_replay_buffer=True, dir_name=None):
+    def load_agent(self, load_replay_buffer=True, dir_name=None, restore_env_from_checkpoint=True):
         """Load PPO model from directory."""
         if dir_name is None:
             dir_name = self.model_folder_name
@@ -201,7 +220,8 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             env_params = getattr(self, 'current_env_kwargs',
                                  None) or self.input_env_kwargs
 
-        self.make_env(**env_params)
+        if restore_env_from_checkpoint:
+            self.make_env(**env_params)
 
         model_file = manifest.get('model_file') if isinstance(
             manifest, dict) else None
@@ -265,17 +285,17 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     # -------------------------------------------------------------------------
     # Explicitly skip replay buffer for RPPO when loading best models
     # -------------------------------------------------------------------------
-    def load_best_model_postcurriculum(self, load_replay_buffer=False):
+    def load_best_model_postcurriculum(self, load_replay_buffer=False, restore_env_from_checkpoint=True):
         """Load best post-curriculum model without replay buffer for RPPO."""
         # Intentionally ignore load_replay_buffer for RPPO
         self.load_agent(load_replay_buffer=False,
-                        dir_name=self.best_model_postcurriculum_dir)
+                        dir_name=self.best_model_postcurriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
-    def load_best_model_in_curriculum(self, load_replay_buffer=False):
+    def load_best_model_in_curriculum(self, load_replay_buffer=False, restore_env_from_checkpoint=True):
         """Load best in-curriculum model without replay buffer for RPPO."""
         # Intentionally ignore load_replay_buffer for RPPO
         self.load_agent(load_replay_buffer=False,
-                        dir_name=self.best_model_in_curriculum_dir)
+                        dir_name=self.best_model_in_curriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
     # -------------------------------------------------------------------------
     # Curriculum initialization

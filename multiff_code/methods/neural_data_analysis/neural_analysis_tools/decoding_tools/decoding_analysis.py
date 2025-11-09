@@ -1,4 +1,5 @@
 import json
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from joblib import Parallel, delayed
@@ -25,6 +26,20 @@ from sklearn.neural_network import MLPClassifier
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools import decoding_utils
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import compare_events
+
+
+def _json_default(o):
+    """Make numpy/scientific types JSON-serializable."""
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    if isinstance(o, (np.floating,)):
+        return float(o)
+    if isinstance(o, (np.ndarray,)):
+        return o.tolist()
+    if isinstance(o, (set,)):
+        return list(o)
+    # Fallback: string representation
+    return str(o)
 
 
 def run_population_decoding(an, window=(0, 0.3), model_name='svm',
@@ -108,12 +123,11 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
         'mean_auc': res['mean_auc'], 'sd_auc': res['sd_auc'],
         'tstat': tstat, 'p_ttest': p_ttest, 'sig_ttest': sig_ttest,
         'p_perm': p_perm, 'n_units': res['n_units'],
-        'best_params': json.dumps(res.get('best_params', {})),
+        'best_params': json.dumps(res.get('best_params', {}), default=_json_default),
         'sample_size': int(y.shape[0])
     }
 
 
-\
 def run_full_decoding_for_comparison(
     comp, datasets, pn, cfg,
     model_name='svm', model_kwargs=None,
@@ -175,6 +189,16 @@ def run_full_decoding_for_comparison(
     )
     an.run_full_analysis(cluster_idx=None)
 
+    # Log model and parameters for this comparison
+    if verbose:
+        try:
+            params_str = json.dumps(model_kwargs or {}, default=_json_default)
+        except Exception:
+            params_str = str(model_kwargs)
+        print(
+            f"[run_full_decoding_for_comparison] model={model_name}, params={params_str}"
+        )
+
     # -----------------------------------------------------------
     # Parallel decoding across windows
     # -----------------------------------------------------------
@@ -230,7 +254,7 @@ def save_decoding_results(df, comp_key, model_name, save_dir, metadata=None, ove
     model_name : str
         Model name, e.g. 'svm' or 'logreg'.
     save_dir : str or Path
-        Base directory to save results (e.g. 'multiff_analysis/results/decoding').
+        Base directory to save results (e.g. '.../retry_decoder/.../decoding').
     metadata : dict or None
         Optional metadata dictionary to save alongside as JSON.
     overwrite : bool
@@ -274,7 +298,98 @@ def save_decoding_results(df, comp_key, model_name, save_dir, metadata=None, ove
             json.dump(metadata, f, indent=2)
         print(f"[save_decoding_results] Saved metadata → {json_path}")
 
+    # Append to central decode index CSV for provenance and easy querying
+    try:
+        # Compute a short, stable hash of model_kwargs
+        params_hash = hashlib.sha1(
+            json.dumps((metadata or {}).get('model_kwargs', {}),
+                       sort_keys=True, default=_json_default).encode('utf-8')
+        ).hexdigest()[:10]
+
+        # Locate project logs directory under multiff_analysis/logs/decode
+        def _decode_logs_index_path() -> Path:
+            p = Path(__file__).resolve()
+            for parent in [p] + list(p.parents):
+                if parent.name == "multiff_analysis":
+                    logs_dir = parent / "logs" / "decode"
+                    logs_dir.mkdir(parents=True, exist_ok=True)
+                    return logs_dir / "index.csv"
+            # Fallback
+            logs_dir = Path.cwd() / "multiff_analysis" / "logs" / "decode"
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            return logs_dir / "index.csv"
+
+        index_path = _decode_logs_index_path()
+
+        row = {
+            'timestamp': (metadata or {}).get('timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            'monkey': (metadata or {}).get('monkey', None),
+            'session': (metadata or {}).get('session', None),
+            'model': model_name,
+            'key': comp_key,
+            'align_by_stop_end': (metadata or {}).get('align_by_stop_end', None),
+            'status': 'done',
+            'csv_path': str(csv_path),
+            'json_path': str(json_path) if metadata is not None else '',
+            'n_perm': (metadata or {}).get('n_perm', None),
+            'tune': (metadata or {}).get('tune', None),
+            'k_folds': (metadata or {}).get('k_folds', None),
+            'params_hash': params_hash,
+        }
+
+        # Append (creating file with columns if needed)
+        if index_path.exists():
+            try:
+                df_idx = pd.read_csv(index_path)
+            except Exception:
+                df_idx = pd.DataFrame()
+        else:
+            df_idx = pd.DataFrame()
+        df_idx = pd.concat([df_idx, pd.DataFrame([row])], ignore_index=True)
+        df_idx.to_csv(index_path, index=False)
+        print(f"[index] Appended → {index_path}")
+    except Exception as e:
+        print(f"[index] Failed to append decode index: {e}")
+
     return csv_path, json_path
+
+
+def _should_skip_existing_results(model_dir, comp_key, align_by_stop_end):
+    """Check if decoding results already exist for this model/key/alignment."""
+    safe_key = comp_key.replace(' ', '_')
+    try:
+        existing_csvs = list(model_dir.glob(f'{safe_key}_*.csv'))
+    except Exception:
+        existing_csvs = []
+
+    if not existing_csvs:
+        return False
+
+    target_align_str = 'true' if align_by_stop_end else 'false'
+    for csv_path in existing_csvs:
+        # Try reading align info from CSV
+        try:
+            df_existing = pd.read_csv(csv_path, usecols=['align_by_stop_end'])
+            if (df_existing['align_by_stop_end'].astype(str)
+                    .str.strip().str.lower() == target_align_str).any():
+                return True
+        except Exception:
+            pass
+
+        # Fallback: read JSON sidecar
+        json_sidecar = csv_path.with_suffix('.json')
+        if json_sidecar.exists():
+            try:
+                with open(json_sidecar, 'r') as f:
+                    meta = json.load(f)
+                meta_align = str(
+                    meta.get('align_by_stop_end', '')).strip().lower()
+                if meta_align == target_align_str:
+                    return True
+            except Exception:
+                pass
+
+    return False
 
 
 def run_all_decoding_comparisons(
@@ -282,7 +397,10 @@ def run_all_decoding_comparisons(
     model_name='svm', model_kwargs=None,
     tune=False, k=3, n_perm=0, alpha=0.05,
     windows=None, do_testing=True, plot=False,
-    save_dir=None, overwrite=False
+    save_dir=None, save_format='csv',
+    overwrite=False, exists_ok=False,
+    session_info=None, verbose=True,
+    n_jobs: int = 1
 ):
     """
     Run decoding for all comparisons (and alignments),
@@ -324,12 +442,25 @@ def run_all_decoding_comparisons(
         'csv' or 'parquet'.
     overwrite : bool
         Overwrite existing files if True.
+    exists_ok : bool
+        If True and outputs already exist for this model and comparison key,
+        skip running that comparison.
+    session_info : dict or None
+        Optional dict with keys like {'monkey': str, 'session': str} to embed
+        provenance in saved metadata and the central index.
+    verbose : bool
+        Print progress messages.
 
     Returns
     -------
     df_all : pd.DataFrame
         Combined DataFrame of all decoding results.
     """
+
+    def _log(msg):
+        if verbose:
+            print(msg)
+
     all_results = []
 
     # ------------------------------------------------------------------
@@ -337,11 +468,12 @@ def run_all_decoding_comparisons(
     # ------------------------------------------------------------------
     if save_dir is not None:
         save_dir = Path(save_dir)
-        (save_dir / model_name).mkdir(parents=True, exist_ok=True)
-        print(
-            f"[run_all_decoding_comparisons] Saving to {save_dir / model_name}")
+        model_dir = save_dir / model_name
+        model_dir.mkdir(parents=True, exist_ok=True)
+        _log(f'[run_all_decoding_comparisons] Saving to {model_dir}')
     else:
-        print("[run_all_decoding_comparisons] Saving disabled (save_dir=None)")
+        model_dir = None
+        _log('[run_all_decoding_comparisons] Saving disabled (save_dir=None)')
 
     # ------------------------------------------------------------------
     # Main decoding loop
@@ -351,8 +483,15 @@ def run_all_decoding_comparisons(
             if comp['key'] not in keys:
                 continue
 
-            print(f"\n>>> {comp['a_label']} vs {comp['b_label']} "
-                  f"({'stop end' if align_by_stop_end else 'stop start'})")
+            _log(f"\n>>> {comp['a_label']} vs {comp['b_label']} "
+                 f"(Aligned by {'stop end' if align_by_stop_end else 'stop start'})")
+
+            # Skip existing results if requested
+            if exists_ok and model_dir is not None:
+                if _should_skip_existing_results(model_dir, comp['key'], align_by_stop_end):
+                    _log(f"[run_all_decoding_comparisons] Skip existing → "
+                         f"model={model_name}, key={comp['key']}, align_by_stop_end={align_by_stop_end}")
+                    continue
 
             # --- Run decoding for this comparison ---
             df = run_full_decoding_for_comparison(
@@ -360,31 +499,28 @@ def run_all_decoding_comparisons(
                 model_name=model_name, model_kwargs=model_kwargs,
                 tune=tune, k=k, n_perm=n_perm, alpha=alpha,
                 windows=windows, align_by_stop_end=align_by_stop_end,
-                do_testing=do_testing
+                do_testing=do_testing, n_jobs=n_jobs
             )
 
             all_results.append(df)
 
             # --- Save results using helper ---
-            if save_dir is not None:
-                # Include tuned hyperparameters per window (if present)
-                best_params_by_window = []
-                if 'best_params' in df.columns:
-                    for _, row in df.iterrows():
-                        bp = row['best_params']
-                        try:
-                            bp_obj = json.loads(
-                                bp) if isinstance(bp, str) else bp
-                        except Exception:
-                            bp_obj = bp
-                        best_params_by_window.append({
-                            'window_start': float(row.get('window_start', np.nan)),
-                            'window_end': float(row.get('window_end', np.nan)),
-                            'best_params': bp_obj,
-                        })
+            if model_dir is not None:
+                best_params_by_window = [
+                    {
+                        'window_start': float(row.get('window_start', np.nan)),
+                        'window_end': float(row.get('window_end', np.nan)),
+                        'best_params': (
+                            json.loads(row['best_params'])
+                            if isinstance(row.get('best_params'), str)
+                            else row.get('best_params')
+                        ),
+                    }
+                    for _, row in df.iterrows() if 'best_params' in df.columns
+                ]
 
                 metadata = {
-                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'comparison': comp['key'],
                     'model_name': model_name,
                     'model_kwargs': model_kwargs,
@@ -396,7 +532,14 @@ def run_all_decoding_comparisons(
                     'windows': windows,
                     'align_by_stop_end': align_by_stop_end,
                     'best_params_by_window': best_params_by_window,
+                    'save_format': save_format,
                 }
+
+                if isinstance(session_info, dict):
+                    metadata.update({
+                        k_: v for k_, v in session_info.items()
+                        if k_ in ('monkey', 'session')
+                    })
 
                 save_decoding_results(
                     df=df,
@@ -413,19 +556,24 @@ def run_all_decoding_comparisons(
         if plot and all_results:
             try:
                 from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
-            except Exception as e:
-                print(f"[plot] Skipping plots due to missing dependency: {e}")
-            else:
-                df_align = pd.concat(all_results, ignore_index=True)
+                df_align = pd.concat(
+                    all_results, ignore_index=True, copy=False)
                 title = 'Align by stop end' if align_by_stop_end else 'Align by stop start'
                 plot_decoding.plot_decoding_auc_heatmap(
                     df_align, threshold=0.55, cmap='magma', title=title
                 )
                 plt.show()
+            except Exception as e:
+                _log(f'[plot] Skipping plots due to missing dependency: {e}')
 
     # ------------------------------------------------------------------
     # Combine and return all results
     # ------------------------------------------------------------------
-    df_all = pd.concat(all_results, ignore_index=True)
-    print("\n[run_all_decoding_comparisons] All comparisons complete.")
+    if not all_results:
+        _log('\n[run_all_decoding_comparisons] No results to combine '
+             '(all comparisons may have been skipped or produced no output). Returning empty DataFrame.')
+        return pd.DataFrame()
+
+    df_all = pd.concat(all_results, ignore_index=True, copy=False)
+    _log('\n[run_all_decoding_comparisons] All comparisons complete.')
     return df_all

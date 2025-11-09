@@ -1,22 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Flexible neural decoding with optional hyperparameter tuning and user-defined model parameters.
-
-Supports:
-    - Logistic Regression (linear)
-    - Elastic Net Logistic Regression (sparse)
-    - SVM (RBF)
-    - Random Forest
-    - MLP (neural net)
-
-Also includes:
-    - Sliding-window (time-resolved) decoding
-
-Usage:
-    from decoding import run_decoding, run_time_resolved_decoding
-"""
-
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold
+from typing import Any, Dict, Optional
 from tqdm import tqdm  # make sure to install with: pip install tqdm
 import matplotlib.pyplot as plt
 from statsmodels.stats.multitest import multipletests
@@ -127,9 +111,10 @@ def get_decoder(name: str,
             solver='saga', penalty='elasticnet',
             l1_ratios=choose([0.1, 0.5, 0.9], [0.1, 0.5, 0.9], [
                              0.0, 0.1, 0.5, 0.9]),
-            scoring='roc_auc', max_iter=1000,
+            scoring='roc_auc', max_iter=5000, n_jobs=1,
             class_weight='balanced',
-            random_state=seed, **model_kwargs
+            random_state=seed, **model_kwargs,
+            tol=1e-3
         )
         clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
         param_grid = {}  # CV internal
@@ -194,7 +179,6 @@ def get_decoder(name: str,
 # 3) CROSS-VALIDATION DECODING
 # ---------------------------------------------------------------------
 
-
 def decode_auc_cv(X: np.ndarray, y: np.ndarray,
                   model_name: str = 'logreg',
                   k: int = 5, seed: int = 0, tune: bool = True,
@@ -209,20 +193,8 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
     clf, param_grid = get_decoder(
         model_name, seed, n_samples, n_features, model_kwargs)
 
-    # Base classifier
-    base_clf = clf.named_steps['clf'] if 'clf' in clf.named_steps else clf
-
-    # Imputation only; scaling handled in get_decoder(). Build pipeline after
-    # potential calibration so it always contains the correct classifier.
-
-    # Handle models without predict_proba (e.g., LinearSVC)
-    needs_calibration = not hasattr(base_clf, "predict_proba") and hasattr(
-        base_clf, "decision_function")
-    if needs_calibration:
-        base_clf = CalibratedClassifierCV(base_clf, cv=3)
-
-    steps = [('imputer', SimpleImputer(strategy='mean')), ('clf', base_clf)]
-    pipeline = Pipeline(steps)
+    # Build fully prepared pipeline (imputer + calibration if needed)
+    pipeline = make_calibrated_pipeline(clf)
 
     # Use response_method for compatibility across sklearn versions
     scorer = make_scorer(roc_auc_score, response_method='predict_proba')
@@ -233,19 +205,54 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
         model = pipeline.fit(X, y)
         p = model.predict_proba(X)[:, 1]
         auc = roc_auc_score(y, p)
-        return float(auc), 0.0, model.get_params()['clf'].get_params()
+        # Extract single best hyperparameters from LogisticRegressionCV
+        try:
+            lr_cv = model.named_steps['clf']
+        except Exception:
+            # Fallback: access via get_params (should not normally happen)
+            lr_cv = model.get_params().get('clf', None)
+        best_params = {}
+        if lr_cv is not None:
+            # Best C can be per-class; pick the first (one-vs-rest) selection
+            try:
+                c_attr = getattr(lr_cv, 'C_', None)
+                if c_attr is not None:
+                    c_vals = np.ravel(c_attr)
+                    best_C = float(c_vals[0])
+                else:
+                    best_C = 1.0
+            except Exception:
+                best_C = 1.0
+            # l1_ratio_ may be scalar or array depending on sklearn version
+            try:
+                lr_attr = getattr(lr_cv, 'l1_ratio_', None)
+                if lr_attr is None:
+                    # Fall back to default if attribute missing
+                    best_l1 = 0.5
+                else:
+                    best_l1 = float(np.ravel(lr_attr)[0])
+            except Exception:
+                best_l1 = 0.5
+            # Return a clean, frozen configuration for plain LogisticRegression
+            best_params = {
+                'C': best_C,
+                'l1_ratio': best_l1,
+                'penalty': 'elasticnet',
+                'solver': 'saga',
+                'class_weight': getattr(lr_cv, 'class_weight', 'balanced'),
+                'max_iter': getattr(lr_cv, 'max_iter', 5000),
+                'random_state': getattr(lr_cv, 'random_state', 0),
+            }
+        return float(auc), 0.0, best_params
 
     # Hyperparameter tuning
     if tune:
         if search == 'grid':
             searcher = GridSearchCV(
-                pipeline, param_grid, scoring=scorer, cv=cv, n_jobs=-1
-            )
+                pipeline, param_grid, scoring=scorer, cv=cv, n_jobs=1)
         elif search == 'random':
-            searcher = RandomizedSearchCV(
-                pipeline, param_grid, scoring=scorer, cv=cv,
-                n_jobs=-1, n_iter=n_iter, random_state=seed
-            )
+            searcher = RandomizedSearchCV(pipeline, param_grid, scoring=scorer,
+                                          cv=cv, n_jobs=1, n_iter=n_iter, random_state=seed)
         else:
             raise ValueError("search must be 'grid' or 'random'")
 
@@ -262,7 +269,6 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
         if hasattr(model, "predict_proba"):
             p = model.predict_proba(X[te])[:, 1]
         elif hasattr(model, "decision_function"):
-            # decision_function may output signed scores
             p = model.decision_function(X[te])
         else:
             raise ValueError(
@@ -272,62 +278,92 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
     aucs = np.asarray(aucs)
     return float(np.mean(aucs)), float(np.std(aucs)), model.get_params()['clf'].get_params()
 
-
 # ---------------------------------------------------------------------
 # Helper: CV AUC with fixed (pre-tuned) params
 # ---------------------------------------------------------------------
-def _cv_auc_with_fixed_params(
-        X: np.ndarray,
-        y: np.ndarray,
-        model_name: str = 'logreg',
-        k: int = 5,
-        seed: int = 0,
-        model_kwargs: Optional[Dict[str, Any]] = None,
-        fixed_params: Optional[Dict[str, Any]] = None) -> float:
-    """Compute k-fold CV AUC using a fixed set of pipeline params.
 
-    This mirrors the pipeline structure used in decode_auc_cv(), but skips
-    any hyperparameter search and instead applies the provided params.
+
+def _cv_auc_with_fixed_params(
+    X: np.ndarray,
+    y: np.ndarray,
+    model_name: str = "logreg",
+    k: int = 5,
+    seed: int = 0,
+    model_kwargs: Optional[Dict[str, Any]] = None,
+    fixed_params: Optional[Dict[str, Any]] = None,
+) -> float:
+    """
+    Compute k-fold CV AUC using a fixed set of pipeline params.
+    Uses make_calibrated_pipeline() for consistent preprocessing/calibration.
     """
     n_samples, n_features = X.shape
     clf, _ = get_decoder(model_name, seed, n_samples, n_features, model_kwargs)
 
-    base_clf = clf.named_steps['clf'] if 'clf' in clf.named_steps else clf
-
-    needs_calibration = not hasattr(base_clf, "predict_proba") and hasattr(
-        base_clf, "decision_function")
-    if needs_calibration:
-        base_clf = CalibratedClassifierCV(base_clf, cv=3)
-
-    steps = [('imputer', SimpleImputer(strategy='mean')), ('clf', base_clf)]
-    pipeline = Pipeline(steps)
+    # Unified pipeline creation
+    pipeline = make_calibrated_pipeline(clf)
 
     # Apply fixed parameters if provided
     if fixed_params:
-        try:
-            pipeline.set_params(**fixed_params)
-        except ValueError as e:
-            print(f"[warning] Could not apply fixed_params to pipeline: {e}")
+        # Special-case: freeze LogisticRegression (not CV) for elastic-net permutations
+        if (model_name == 'logreg_elasticnet'
+                and 'C' in fixed_params and 'l1_ratio' in fixed_params):
+            try:
+                frozen_lr = LogisticRegression(
+                    penalty=str(fixed_params.get('penalty', 'elasticnet')),
+                    solver=str(fixed_params.get('solver', 'saga')),
+                    C=float(fixed_params['C']),
+                    l1_ratio=float(fixed_params['l1_ratio']),
+                    class_weight=fixed_params.get('class_weight', 'balanced'),
+                    max_iter=int(fixed_params.get('max_iter', 5000)),
+                    random_state=int(fixed_params.get('random_state', 0)),
+                )
+                if isinstance(pipeline.named_steps.get("clf"), CalibratedClassifierCV):
+                    pipeline.named_steps["clf"].base_estimator = frozen_lr
+                else:
+                    pipeline.set_params(clf=frozen_lr)
+                # Do not also try to set_params with CV grids
+                fixed_params = {}
+            except Exception as e:
+                print(
+                    f"[warning] Could not freeze LogisticRegression with fixed params: {e}")
 
-    cv = StratifiedKFold(k, shuffle=True, random_state=seed)
+        def _prefix_params(params: Dict[str, Any], step: str) -> Dict[str, Any]:
+            """Prefix bare params with <step>__ for sklearn pipeline compatibility."""
+            return {key if "__" in key else f"{step}__{key}": val for key, val in params.items()}
+
+        clf_step = "clf__base_estimator" if isinstance(
+            pipeline.named_steps["clf"], CalibratedClassifierCV) else "clf"
+
+        if fixed_params:
+            params_to_apply = _prefix_params(fixed_params, clf_step)
+            try:
+                #print(f"[info] Applying fixed_params: {params_to_apply}")
+                pipeline.set_params(**params_to_apply)
+            except ValueError as e:
+                #print(f"[warning] Could not apply fixed_params: {e}")
+                pass
+    # Cross-validation loop
+    cv = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
     aucs = []
-    for tr, te in cv.split(X, y):
-        model = pipeline.fit(X[tr], y[tr])
+
+    for train_idx, test_idx in cv.split(X, y):
+        model = pipeline.fit(X[train_idx], y[train_idx])
         if hasattr(model, "predict_proba"):
-            p = model.predict_proba(X[te])[:, 1]
+            y_pred = model.predict_proba(X[test_idx])[:, 1]
         elif hasattr(model, "decision_function"):
-            p = model.decision_function(X[te])
+            y_pred = model.decision_function(X[test_idx])
         else:
             raise ValueError(
-                f"Model {model_name} lacks predict_proba and decision_function.")
-        aucs.append(roc_auc_score(y[te], p))
+                f"Model {model_name} lacks a probability-like output.")
+        aucs.append(roc_auc_score(y[test_idx], y_pred))
 
     return float(np.mean(aucs))
-
 
 # ---------------------------------------------------------------------
 # 4) MAIN WRAPPER FUNCTION
 # ---------------------------------------------------------------------
+
+
 def run_decoding(an, window=(0.0, 0.2), units: Optional[Sequence] = None,
                  model_name='logreg', k=5, seed=0, tune=True, search='grid',
                  n_iter=10, model_kwargs: Optional[Dict[str, Any]] = None
@@ -348,37 +384,6 @@ def run_decoding(an, window=(0.0, 0.2), units: Optional[Sequence] = None,
         'sd_auc': sd_auc,
         'best_params': best_params
     }
-
-
-# ---------------------------------------------------------------------
-# 5) SLIDING-WINDOW DECODING
-# ---------------------------------------------------------------------
-def run_time_resolved_decoding(an, window_size=0.2, step=0.05, tmin=None, tmax=None,
-                               model_name='logreg', k=5, seed=0, tune=False,
-                               model_kwargs=None) -> pd.DataFrame:
-    """
-    Perform sliding-window decoding to estimate AUC over time.
-    Returns a DataFrame with columns ['t_center', 'mean_auc', 'sd_auc'].
-    """
-    time = an.psth_data['psth']['time_axis']
-    if tmin is None:
-        tmin = time[0]
-    if tmax is None:
-        tmax = time[-1]
-
-    # Define overlapping windows
-    starts = np.arange(tmin, tmax - window_size, step)
-    results = []
-    for t0 in starts:
-        window = (t0, t0 + window_size)
-        res = run_decoding(an, window=window, model_name=model_name,
-                           k=k, seed=seed, tune=tune,
-                           model_kwargs=model_kwargs)
-        res['t_center'] = np.mean(window)
-        results.append(res)
-
-    df = pd.DataFrame(results)
-    return df[['t_center', 'mean_auc', 'sd_auc']]
 
 
 # ---------------------------------------------------------------------
@@ -446,7 +451,7 @@ def permutation_test_auc(
     # 2. Announce parameter strategy for permutations
     if fixed_params is not None:
         print(
-            "[permutation_test_auc] Using pre-computed params from caller for permutations.")
+            f"[permutation_test_auc] Using pre-determined params from caller for permutations: {fixed_params}")
     elif isinstance(tuned_params, dict) and len(tuned_params) > 0:
         print("[permutation_test_auc] Using tuned best params from observed-label CV for permutations.")
     else:
@@ -509,9 +514,9 @@ def ttest_auc_folds(X, y, model_name='logreg', k=5, seed=0,
     """
     n_samples, n_features = X.shape
     clf, _ = get_decoder(model_name, seed, n_samples, n_features, model_kwargs)
-    base_clf = clf.named_steps['clf'] if 'clf' in clf.named_steps else clf
-    steps = [('imputer', SimpleImputer(strategy='mean')), ('clf', base_clf)]
-    pipeline = Pipeline(steps)
+    # Preserve scaler from get_decoder by prepending imputer
+    pipeline = Pipeline([('imputer', SimpleImputer(strategy='mean'))] +
+                        (clf.steps if isinstance(clf, Pipeline) else [('clf', clf)]))
     cv = StratifiedKFold(k, shuffle=True, random_state=seed)
     aucs = []
     for tr, te in cv.split(X, y):
@@ -542,30 +547,6 @@ def population_decoding_test(auc_per_neuron: np.ndarray, method='t', alpha=0.05)
     return {'mean_auc': np.mean(auc_per_neuron), 't': t, 'p': p, 'sig': sig}
 
 
-def time_resolved_significance(df_time, alpha=0.05, method='t', fdr=True):
-    """
-    Given a DataFrame from run_time_resolved_decoding (with fold AUCs per bin),
-    compute per-bin p-values and FDR correction.
-    """
-    pvals = []
-    for aucs in df_time['fold_aucs']:
-        if method == 't':
-            _, p = stats.ttest_1samp(aucs, 0.5, alternative='greater')
-        elif method == 'wilcoxon':
-            p = stats.wilcoxon(np.array(aucs) - 0.5,
-                               alternative='greater').pvalue
-        else:
-            raise ValueError
-        pvals.append(p)
-    df_time['pval'] = pvals
-    if fdr:
-        df_time['sig_FDR'] = multipletests(
-            df_time['pval'], alpha=alpha, method='fdr_bh')[0]
-    else:
-        df_time['sig_FDR'] = df_time['pval'] < alpha
-    return df_time
-
-
 def get_auc_per_neuron(an, window=(0, 0.2),
                        model_name='logreg', k=5, seed=0, tune=False,
                        model_kwargs=None):
@@ -589,3 +570,48 @@ def get_auc_per_neuron(an, window=(0, 0.2),
         print(f'Neuron {i+1}/{n_units} (ID={unit_ids[i]}): AUC={auc_mean:.3f}')
 
     return aucs, unit_ids
+
+
+def make_calibrated_pipeline(clf: Pipeline) -> Pipeline:
+    """
+    Wrap a classifier (or pipeline) with calibration and imputation if needed.
+
+    - Preserves any scaler or preprocessing in the given pipeline.
+    - Adds mean imputation at the start.
+    - Wraps the final estimator in CalibratedClassifierCV if it lacks predict_proba.
+
+    Returns
+    -------
+    pipeline : sklearn.Pipeline
+        A fully prepared and calibrated pipeline.
+    """
+    # Extract base estimator
+    if isinstance(clf, Pipeline):
+        base_clf = clf.named_steps.get('clf', clf)
+    else:
+        base_clf = clf
+
+    # Avoid double calibration
+    if isinstance(base_clf, CalibratedClassifierCV):
+        needs_calibration = False
+    else:
+        needs_calibration = not hasattr(base_clf, 'predict_proba') and hasattr(
+            base_clf, 'decision_function')
+
+    # Wrap with calibration if necessary
+    if needs_calibration:
+        if isinstance(clf, Pipeline) and 'clf' in clf.named_steps:
+            new_steps = []
+            for name, step in clf.steps:
+                if name == 'clf':
+                    step = CalibratedClassifierCV(step, cv=3)
+                new_steps.append((name, step))
+            clf = Pipeline(new_steps)
+        else:
+            base_clf = CalibratedClassifierCV(base_clf, cv=3)
+            clf = Pipeline([('clf', base_clf)])
+
+    # Always prepend imputer
+    pipeline = Pipeline([('imputer', SimpleImputer(strategy='mean'))] +
+                        (clf.steps if isinstance(clf, Pipeline) else [('clf', clf)]))
+    return pipeline

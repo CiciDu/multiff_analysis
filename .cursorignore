@@ -60,8 +60,8 @@ venv.bak/
 
 # Logs
 *.log
-logs/
-log/
+**logs/decode/
+**logs/rppo/run_stdout/
 
 # Large / raw data
 all_monkey_data/
@@ -78,8 +78,8 @@ data_backup/
 backups/
 
 # Logs
-logs/
-**/logs/
+**/logs/decode
+**/logs/rppo/run_stdout/
 
 # Temporary files
 *.tmp

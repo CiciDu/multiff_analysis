@@ -5,14 +5,14 @@
 Compare decoding outputs across models.
 
 Loads CSVs written by the decode job under:
-  multiff_analysis/results/decoding/<model>/*.csv
+  .../retry_decoder/.../decoding/runs/<model>/*.csv
 
 Then concatenates them, prints a compact summary (peak AUC by model
 and comparison), and renders timecourse plots with lines per model.
 
 Example:
-  python scripts/cmp_decode.py \
-      --base multiff_analysis/results/decoding \
+  python jobs/scripts/cmp_decode.py \
+      --base path/to/.../retry_decoder/.../decoding/runs \
       --models svm logreg rf mlp
 """
 
@@ -50,8 +50,8 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument(
         "--base",
         type=str,
-        default=str(Path("multiff_analysis") / "results" / "decoding"),
-        help="Base directory containing per-model result subfolders",
+        default=str(Path("runs")),
+        help="Base directory containing per-model result subfolders (e.g., .../retry_decoder/.../decoding/runs)",
     )
     ap.add_argument(
         "--models",
@@ -93,7 +93,7 @@ def _load_all_results(base_dir: Path, models: Optional[List[str]]) -> pd.DataFra
     Parameters
     ----------
     base_dir : Path
-        `results/decoding` directory that contains subdirs per model.
+        `runs` directory that contains subdirs per model.
     models : list[str] or None
         If provided, only include these model subdirectories.
     """

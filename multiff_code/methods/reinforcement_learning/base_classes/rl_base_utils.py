@@ -21,7 +21,7 @@ def extract_cost_params_from_folder_name(folder):
 
 
 def retrieve_or_make_family_of_agents_log(overall_folder):
-    filepath = overall_folder + 'family_of_agents_log.csv'
+    filepath = os.path.join(overall_folder, 'family_of_agents_log.csv')
     if not exists(filepath):
         family_of_agents_log = pd.DataFrame(columns=['dv_cost_factor', 'dw_cost_factor', 'w_cost_factor',
                                             'v_noise_std', 'w_noise_std', 'ffr_noise_scale', 'num_obs_ff', 'max_in_memory_time',

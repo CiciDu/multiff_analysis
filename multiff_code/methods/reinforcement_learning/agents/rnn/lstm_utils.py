@@ -816,39 +816,7 @@ class LSTM_SAC_Trainer():
                   f"|g| p={grad_norm_policy_value:.2f} q1={grad_norm_q1_value:.2f} q2={grad_norm_q2_value:.2f} "
                   f"r(mu±sd)={rew_mean:.2f}±{rew_std:.2f} done%={done_frac*100:.1f}"
                   )
-            # Also persist to CSV under logs
-            try:
-                run_logger.log_training_metrics(
-                    overall_folder=self.overall_folder,
-                    agent_type=self.agent_type,
-                    sweep_params=self.sweep_params,
-                    step=self._update_step,
-                    metrics={
-                        'policy_loss': float(self.metrics['policy_loss'][-1]),
-                        'q1_loss': float(self.metrics['q1_loss'][-1]),
-                        'q2_loss': float(self.metrics['q2_loss'][-1]),
-                        'q_pi_mean': q_pi_mean,
-                        'q_pi_median': q_pi_median,
-                        'q_pi_max': q_pi_max,
-                        'target_q_mean': tgt_q_mean,
-                        'target_q_median': tgt_q_median,
-                        'td1_std': td1_std,
-                        'td2_std': td2_std,
-                        'alpha': alpha_val,
-                        'entropy': entropy,
-                        'log_prob_mean': log_prob_mean,
-                        'action_mean': act_mean,
-                        'action_std': a_std_mean,
-                        'grad_norm_policy': grad_norm_policy_value,
-                        'grad_norm_q1': grad_norm_q1_value,
-                        'grad_norm_q2': grad_norm_q2_value,
-                        'reward_mean': rew_mean,
-                        'reward_std': rew_std,
-                        'done_frac': done_frac,
-                    }
-                )
-            except Exception:
-                pass
+
 
         return predicted_new_q_value.mean()
 

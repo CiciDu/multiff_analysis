@@ -33,7 +33,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
 
-    def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left=False, max_num_frames=150, 
+    def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left=False, max_num_frames=150,
                                  max_duration=30, min_duration=1, rotated=True, figsize=(14, 9), dpi=None):
         # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
         currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
@@ -69,8 +69,8 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
     def call_animation_function(self, with_annotation=False,
                                 margin=100, dt=0.0165, plot_time_index=False, fps=None,
-                                save_video=True, video_dir=None, file_name=None, dpi=None,
-                                **animate_kwargs):
+                                save_video=True, video_dir=None, file_name=None, dpi=None, save_as_gif=None,
+                                display_inline=True, **animate_kwargs):
         # dt is to be used to determine the fps(frame per second) of the animation
 
         # if the key "margin" is in animate_kwargs, then put it into animate_kwargs
@@ -91,12 +91,20 @@ class AnimationClass(further_processing_class.FurtherProcessing):
             self.fig, animate_func, frames=self.num_frames, interval=dt*1000*self.k, repeat=True)
 
         if save_video:
-            self._save_animation(fps, video_dir, file_name, dpi)
-            try:
-                print('Rendering animation ......')
-                Video(self.video_path_name, embed=True)
-            except Exception as e:
-                print('Error rendering animation:', e)
+            self._save_animation(fps, video_dir, file_name,
+                                 dpi, save_as_gif=save_as_gif)
+            if display_inline:
+                try:
+                    print('Rendering animation ......')
+                    Video(self.video_path_name, embed=True)
+                except Exception as e:
+                    print('Error rendering animation:', e)
+        else:
+            if not display_inline:
+                try:
+                    plt.close(self.fig)
+                except Exception:
+                    pass
 
     def _call_prepare_for_animation_func(self, currentTrial=None, num_trials=None, duration=None, k=1, max_num_frames=None,
                                          max_duration=30, min_duration=1, rotated=True):
@@ -147,7 +155,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         return self.fig, self.ax
 
-    def _save_animation(self, fps, video_dir, file_name, dpi=None):
+    def _save_animation(self, fps, video_dir, file_name, dpi=None, save_as_gif=False):
         if fps is None:
             if self.player == 'agent':
                 fps = int(4/self.k)  # the real life speed
@@ -165,21 +173,42 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                 file_name = self.agent_id + \
                     f'__{self.duration[0]}s_to_{self.duration[1]}s.mp4'
 
+        # If explicit format requested, adjust extension accordingly
+        base_name, current_ext = os.path.splitext(file_name)
+        if save_as_gif is True and current_ext.lower() != ".gif":
+            file_name = base_name + ".gif"
+        elif save_as_gif is False and current_ext.lower() not in [".mp4", ".m4v", ".mov", ".avi"]:
+            file_name = base_name + ".mp4"
+
         os.makedirs(video_dir, exist_ok=True)
         self.video_path_name = f"{video_dir}/{file_name}"
 
         print("Saving animation as:", self.video_path_name)
-        writervideo = animation.FFMpegWriter(fps=fps)
-        if dpi is not None:
-            try:
-                self.anim.save(self.video_path_name,
-                               writer=writervideo, dpi=dpi)
-            except TypeError:
-                # Fallback if writer doesn't accept dpi in this backend
-                self.fig.set_dpi(dpi)
-                self.anim.save(self.video_path_name, writer=writervideo)
+        ext = os.path.splitext(self.video_path_name)[1].lower()
+        use_gif = save_as_gif if save_as_gif is not None else (ext == ".gif")
+        if use_gif:
+            writer = animation.PillowWriter(fps=fps)
+            if dpi is not None:
+                try:
+                    self.anim.save(self.video_path_name,
+                                   writer=writer, dpi=dpi)
+                except TypeError:
+                    self.fig.set_dpi(dpi)
+                    self.anim.save(self.video_path_name, writer=writer)
+            else:
+                self.anim.save(self.video_path_name, writer=writer)
         else:
-            self.anim.save(self.video_path_name, writer=writervideo)
+            writervideo = animation.FFMpegWriter(fps=fps)
+            if dpi is not None:
+                try:
+                    self.anim.save(self.video_path_name,
+                                   writer=writervideo, dpi=dpi)
+                except TypeError:
+                    # Fallback if writer doesn't accept dpi in this backend
+                    self.fig.set_dpi(dpi)
+                    self.anim.save(self.video_path_name, writer=writervideo)
+            else:
+                self.anim.save(self.video_path_name, writer=writervideo)
         print("Animation is saved at:", self.video_path_name)
 
         # save animation as gif
@@ -190,7 +219,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                        save_video=False, video_dir=None, file_name=None,
                        dt=0.0165, k=3, with_annotation=False, plot_time_index=False,
                        static_plot_on_the_left=True, margin=100, max_num_frames=150, max_duration=30, min_duration=1,
-                       fps=None, rotated=True, figsize=None, dpi=None, **animate_kwargs):
+                       fps=None, rotated=True, figsize=None, dpi=None, save_as_gif=None, display_inline=True, **animate_kwargs):
         if file_name is None:
             if currentTrial is not None:
                 file_name = f"{self.data_name}_{currentTrial-num_trials+1}-{currentTrial}.mp4"
@@ -207,7 +236,8 @@ class AnimationClass(further_processing_class.FurtherProcessing):
         self.set_animation_parameters(currentTrial=currentTrial, num_trials=num_trials, duration=duration, animation_plot_kwargs=animation_plot_kwargs, k=k, rotated=rotated,
                                       static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, max_duration=max_duration, min_duration=min_duration, figsize=figsize, dpi=dpi)
         self.call_animation_function(save_video=save_video, video_dir=video_dir, plot_time_index=plot_time_index,
-                                     file_name=file_name, dt=dt, with_annotation=with_annotation, fps=fps, dpi=dpi, **animate_kwargs)
+                                     file_name=file_name, dt=dt, with_annotation=with_annotation, fps=fps, dpi=dpi, save_as_gif=save_as_gif,
+                                     display_inline=display_inline, **animate_kwargs)
 
     def make_animation_from_a_category(self, category_name, max_trial_to_plot, sampling_frame_ratio=3, max_duration=30, min_duration=1,
                                        num_trials=3, save_video=True, video_dir=None, additional_kwargs=None, animation_exists_ok=True,

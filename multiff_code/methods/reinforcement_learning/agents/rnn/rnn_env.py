@@ -12,7 +12,7 @@ class EnvForRNN(base_env.MultiFF):
     def __init__(self, episode_len=512,
                  max_in_memory_time=2,
                  use_prev_obs_for_invisible_pose=False,
-                 zero_invisible_ff_features = True,
+                 zero_invisible_ff_features=True,
                  obs_noise = {'perc_r': 0,
                     'perc_th': 0,
                     'mem_r': 0,

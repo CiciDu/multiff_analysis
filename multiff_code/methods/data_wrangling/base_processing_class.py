@@ -62,9 +62,9 @@ class BaseProcessing:
         self.player = 'monkey'
 
         if 'monkey_' not in self.monkey_name:
-            raise Exception("The monkey name should start with 'monkey_")
+            raise Exception("The monkey name should start with 'monkey_', but got: ", self.monkey_name)
         if 'data_' not in self.data_name:
-            raise Exception("The data name should start with 'data_'")
+            raise Exception("The data name should start with 'data_', but got: ", self.data_name)
 
     def get_related_folder_names_from_raw_data_folder_path(self, raw_data_folder_path):
         # replace raw_monkey_data with other folder names
@@ -89,6 +89,8 @@ class BaseProcessing:
             'raw_monkey_data', 'time_calibration')
         self.target_decoder_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'target_decoder')
+        self.retry_decoder_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'retry_decoder')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)

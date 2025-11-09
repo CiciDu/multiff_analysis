@@ -7,11 +7,11 @@ import pandas as pd
 
 def _slurm_context():
     return {
-        'slurm_job_id': os.getenv('SLURM_JOB_ID'),
-        'slurm_array_job_id': os.getenv('SLURM_ARRAY_JOB_ID'),
-        'slurm_array_task_id': os.getenv('SLURM_ARRAY_TASK_ID'),
-        'slurm_job_name': os.getenv('SLURM_JOB_NAME'),
-        'slurm_submit_dir': os.getenv('SLURM_SUBMIT_DIR'),
+        'job_id': os.getenv('SLURM_JOB_ID'),
+        'array_job_id': os.getenv('SLURM_ARRAY_JOB_ID'),
+        'array_task_id': os.getenv('SLURM_ARRAY_TASK_ID'),
+        'job_name': os.getenv('SLURM_JOB_NAME'),
+        'submit_dir': os.getenv('SLURM_SUBMIT_DIR'),
     }
 
 
@@ -22,7 +22,7 @@ def _ensure_csv(path: str, columns):
 
 
 def _logs_root_from_overall(overall_folder: str) -> str:
-    # Walk up until we find multiff_analysis, then use its logs/ subdir
+    # Walk up until we find multiff_analysis, then use its logs subdir
     p = os.path.abspath(os.path.expanduser(overall_folder))
     cur = p
     while True:
@@ -35,22 +35,26 @@ def _logs_root_from_overall(overall_folder: str) -> str:
         cur = parent
 
 
-def _runs_log_path(overall_folder: str) -> str:
-    logs_root = _logs_root_from_overall(overall_folder)
+def _run_summary_path(overall_folder: str) -> str:
+    logs_root = os.path.join(_logs_root_from_overall(
+        overall_folder), 'rppo', 'run_summary')
+    # Nest under job id if available
+    job_id = os.getenv('SLURM_ARRAY_JOB_ID') or os.getenv('SLURM_JOB_ID')
+    if job_id:
+        logs_root = os.path.join(logs_root, str(job_id))
     suffix = _run_suffix()
-    return os.path.join(logs_root, f'runs_log_{suffix}.csv')
+    return os.path.join(logs_root, f'run_summary_{suffix}.csv')
 
 
 def _curriculum_log_path(overall_folder: str) -> str:
-    logs_root = _logs_root_from_overall(overall_folder)
+    logs_root = os.path.join(_logs_root_from_overall(
+        overall_folder), 'rppo', 'run_curriculum')
+    # Nest under job id if available
+    job_id = os.getenv('SLURM_ARRAY_JOB_ID') or os.getenv('SLURM_JOB_ID')
+    if job_id:
+        logs_root = os.path.join(logs_root, str(job_id))
     suffix = _run_suffix()
-    return os.path.join(logs_root, f'curriculum_stages_{suffix}.csv')
-
-
-def _training_log_path(overall_folder: str) -> str:
-    logs_root = _logs_root_from_overall(overall_folder)
-    suffix = _run_suffix()
-    return os.path.join(logs_root, f'training_metrics_{suffix}.csv')
+    return os.path.join(logs_root, f'run_curriculum_{suffix}.csv')
 
 
 def _run_suffix() -> str:
@@ -89,7 +93,7 @@ def log_run_start(overall_folder: str, agent_type: str, sweep_params: dict, retr
     if isinstance(retries_info, dict):
         record.update(_flatten_dict('extra_', retries_info))
 
-    path = _runs_log_path(overall_folder)
+    path = _run_summary_path(overall_folder)
     _ensure_csv(path, columns=list(record.keys()))
     # Union columns if schema evolves
     try:
@@ -112,7 +116,7 @@ def log_run_end(overall_folder: str, agent_type: str, sweep_params: dict, status
         **_flatten_dict('metric_', metrics or {}),
         **_flatten_dict('slurm_', _slurm_context()),
     }
-    path = _runs_log_path(overall_folder)
+    path = _run_summary_path(overall_folder)
     _ensure_csv(path, columns=list(record.keys()))
     try:
         df = pd.read_csv(path)
@@ -143,34 +147,6 @@ def log_curriculum_stage(overall_folder: str, agent_type: str, sweep_params: dic
     df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
     df.to_csv(path, index=False)
     print('curriculum_stage logged to:', path)
-
-
-def log_training_metrics(overall_folder: str, agent_type: str, sweep_params: dict, step: int, metrics: dict):
-    """
-    Append a single training metrics row to logs/training_metrics_<suffix>.csv for this run.
-    Includes flattened sweep params and slurm context, and a monotonically increasing step.
-    """
-    if overall_folder is None:
-        return
-    now = time_package.strftime('%Y-%m-%d %H:%M:%S', time_package.localtime())
-    record = {
-        'timestamp': now,
-        'event': 'training_metrics',
-        'agent_type': agent_type,
-        'overall_folder': os.path.expanduser(overall_folder),
-        'step': int(step),
-        **_flatten_dict('param_', sweep_params or {}),
-        **_flatten_dict('metric_', metrics or {}),
-        **_flatten_dict('slurm_', _slurm_context()),
-    }
-    path = _training_log_path(overall_folder)
-    _ensure_csv(path, columns=list(record.keys()))
-    try:
-        df = pd.read_csv(path)
-    except Exception:
-        df = pd.DataFrame()
-    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
-    df.to_csv(path, index=False)
 
 
 def collect_model_to_job_dir(overall_folder: str, source_dir: str, preferred_name: str = None, force_copy: bool = False):
