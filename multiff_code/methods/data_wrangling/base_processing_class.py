@@ -120,6 +120,8 @@ class BaseProcessing:
             'raw_monkey_data', 'target_decoder')
         self.retry_decoder_folder_path = raw_data_folder_path.replace(
             'raw_monkey_data', 'retry_decoder')
+        self.retry_decoder_cumulative_folder_path = raw_data_folder_path.replace(
+            'raw_monkey_data', 'retry_decoder_cumulative')
 
         # make sure all the folders above exist
         os.makedirs(self.processed_data_folder_path, exist_ok=True)

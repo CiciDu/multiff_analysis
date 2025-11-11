@@ -44,7 +44,7 @@ def _json_default(o):
 
 
 def run_population_decoding(an, window=(0, 0.3), model_name='svm',
-                            k=3, tune=False, model_kwargs=None,
+                            k=5, tune=False, model_kwargs=None,
                             alpha=0.05, do_testing=True):
     """Compute per-neuron AUCs and (optionally) perform population-level test."""
     auc_per_neuron, unit_ids = decoding_utils.get_auc_per_neuron(
@@ -65,12 +65,11 @@ def run_population_decoding(an, window=(0, 0.3), model_name='svm',
     return pop_res, auc_per_neuron, unit_ids
 
 
-def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
+def run_window_decoding(an, window, model_name='svm', k=5, tune=False,
                         model_kwargs=None, alpha=0.05, n_perm=0,
                         do_testing=True,
-                        perm_search: Optional[str] = None,
-                        perm_param_grid: Optional[Dict[str, Any]] = None,
-                        perm_n_iter: int = 10):
+                        perm_search: Optional[str] = 'grid',
+                        perm_param_grid: Optional[Dict[str, Any]] = None):
     """
     Decode neural data for a single time window with optional significance testing.
 
@@ -101,10 +100,19 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
     cv = StratifiedKFold(k, shuffle=True, random_state=0)
     aucs = []
     for tr, te in cv.split(X, y):
-        model = decoding_utils.get_decoder(
+        # Use calibrated+imputed pipeline for robust probability outputs
+        base_pipeline = decoding_utils.get_decoder(
             model_name, model_kwargs=model_kwargs)[0]
+        model = decoding_utils.make_calibrated_pipeline(base_pipeline)
         model.fit(X[tr], y[tr])
-        aucs.append(roc_auc_score(y[te], model.predict_proba(X[te])[:, 1]))
+        if hasattr(model, "predict_proba"):
+            scores = model.predict_proba(X[te])[:, 1]
+        elif hasattr(model, "decision_function"):
+            scores = model.decision_function(X[te])
+        else:
+            raise ValueError(
+                f"Model {model_name} lacks probability-like output.")
+        aucs.append(roc_auc_score(y[te], scores))
 
     aucs = np.asarray(aucs)
     tstat, p_ttest = stats.ttest_1samp(aucs, 0.5, alternative='greater')
@@ -121,7 +129,7 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
         _, _, p_perm = decoding_utils.permutation_test_auc(
             X, y, model_name=model_name, k=k, n_perm=n_perm,
             show_progress=False, fixed_params=fixed_params, real_auc=observed_auc,
-            param_grid=perm_param_grid, perm_search=perm_search, perm_n_iter=perm_n_iter
+            param_grid=perm_param_grid, perm_search=perm_search
         )
 
     return {
@@ -134,15 +142,14 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
     }
 
 
-def run_full_decoding_for_comparison(
+def run_one_decoding_comparison(
     comp, datasets, pn, cfg,
     model_name='svm', model_kwargs=None,
-    tune=False, k=3, n_perm=0, alpha=0.05,
+    tune=False, k=5, n_perm=0, alpha=0.05,
     windows=None, align_by_stop_end=False,
     do_testing=True, n_jobs=1, verbose=True,
     perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None,
-    perm_n_iter: int = 10
+    perm_param_grid: Optional[Dict[str, Any]] = None
 ):
     """
     Run decoding across all time windows for a single comparison.
@@ -188,7 +195,7 @@ def run_full_decoding_for_comparison(
     # Build analyzer once per comparison
     # -----------------------------------------------------------
     if verbose:
-        print(f"[run_full_decoding_for_comparison] Building analyzer for "
+        print(f"[run_one_decoding_comparison] Building analyzer for "
               f"{comp['a_label']} vs {comp['b_label']} "
               f"({'stop end' if align_by_stop_end else 'stop start'})")
 
@@ -205,14 +212,14 @@ def run_full_decoding_for_comparison(
         except Exception:
             params_str = str(model_kwargs)
         print(
-            f"[run_full_decoding_for_comparison] model={model_name}, params={params_str}"
+            f"[run_one_decoding_comparison] model={model_name}, params={params_str}"
         )
 
     # -----------------------------------------------------------
     # Parallel decoding across windows
     # -----------------------------------------------------------
     if verbose:
-        print(f"[run_full_decoding_for_comparison] Running {len(windows)} windows "
+        print(f"[run_one_decoding_comparison] Running {len(windows)} windows "
               f"using {n_jobs} parallel workers...")
 
     results = Parallel(n_jobs=n_jobs, verbose=10 if verbose else 0)(
@@ -221,7 +228,7 @@ def run_full_decoding_for_comparison(
             model_name=model_name, k=k, tune=tune,
             model_kwargs=model_kwargs, alpha=alpha,
             n_perm=n_perm, do_testing=do_testing,
-            perm_search=perm_search, perm_param_grid=perm_param_grid, perm_n_iter=perm_n_iter
+            perm_search=perm_search, perm_param_grid=perm_param_grid
         )
         for window in windows
     )
@@ -245,7 +252,7 @@ def run_full_decoding_for_comparison(
     df['model_name'] = model_name
 
     if verbose:
-        print(f"[run_full_decoding_for_comparison] Done: "
+        print(f"[run_one_decoding_comparison] Done: "
               f"{comp['a_label']} vs {comp['b_label']} ({len(windows)} windows)")
 
     return df
@@ -373,16 +380,16 @@ def _should_skip_existing_results(model_dir, comp_key, align_by_stop_end):
         existing_csvs = []
 
     if not existing_csvs:
-        return False
+        return None, False
 
     target_align_str = 'true' if align_by_stop_end else 'false'
     for csv_path in existing_csvs:
         # Try reading align info from CSV
         try:
-            df_existing = pd.read_csv(csv_path, usecols=['align_by_stop_end'])
+            df_existing = pd.read_csv(csv_path)
             if (df_existing['align_by_stop_end'].astype(str)
                     .str.strip().str.lower() == target_align_str).any():
-                return True
+                return df_existing, True
         except Exception:
             pass
 
@@ -395,144 +402,125 @@ def _should_skip_existing_results(model_dir, comp_key, align_by_stop_end):
                 meta_align = str(
                     meta.get('align_by_stop_end', '')).strip().lower()
                 if meta_align == target_align_str:
-                    return True
+                    return None, True
             except Exception:
                 pass
 
-    return False
+    return None, False
 
 
-def run_all_decoding_comparisons(
-    comparisons, keys, datasets, pn, cfg,
-    model_name='svm', model_kwargs=None,
-    tune=False, k=3, n_perm=0, alpha=0.05,
-    windows=None, do_testing=True, plot=False,
-    save_dir=None, save_format='csv',
-    overwrite=False, exists_ok=False,
-    session_info=None, verbose=True,
-    n_jobs: int = 1,
-    perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None,
-    perm_n_iter: int = 10
+def _prepare_save_dir(save_dir, model_name, log_fn):
+    """Create and return model_dir under save_dir if saving is enabled."""
+    if save_dir is not None:
+        save_dir = Path(save_dir)
+        model_dir = save_dir / model_name
+        model_dir.mkdir(parents=True, exist_ok=True)
+        log_fn(f'[decoding_core] Saving to {model_dir}')
+    else:
+        model_dir = None
+        log_fn('[decoding_core] Saving disabled (save_dir=None)')
+    return save_dir, model_dir
+
+
+def _collect_best_params_by_window_from_df(df: pd.DataFrame):
+    """Extract best params list from a per-comparison results DataFrame."""
+    return [
+        {
+            'window_start': float(row.get('window_start', np.nan)),
+            'window_end': float(row.get('window_end', np.nan)),
+            'best_params': (
+                json.loads(row['best_params'])
+                if isinstance(row.get('best_params'), str)
+                else row.get('best_params')
+            ),
+        }
+        for _, row in df.iterrows() if 'best_params' in df.columns
+    ]
+
+
+def _run_all_decoding_core(
+    *,
+    comparisons,
+    keys,
+    datasets,
+    pn,
+    cfg,
+    model_name,
+    model_kwargs,
+    tune,
+    k,
+    n_perm,
+    alpha,
+    windows,
+    do_testing,
+    plot,
+    save_dir,
+    save_format,
+    overwrite,
+    exists_ok,
+    session_info,
+    verbose,
+    n_jobs,
+    perm_search,
+    perm_param_grid,
+    per_comp_runner,
+    cumulative_features=False,
+    title_suffix=''
 ):
-    """
-    Run decoding for all comparisons (and alignments),
-    using save_decoding_results() to write per-comparison CSV + JSON.
-
-    Parameters
-    ----------
-    comparisons : list[dict]
-        Comparison dictionaries (a_label, b_label, key, etc.).
-    keys : list[str]
-        Subset of comparison keys to run.
-    datasets : dict
-        Dataset dictionary.
-    pn : object
-        Monkey data object.
-    cfg : PSTHConfig
-        Configuration for decoding windows and binning.
-    model_name : str
-        Decoder name (svm, logreg, etc.).
-    model_kwargs : dict
-        Decoder model hyperparameters.
-    tune : bool
-        Whether to tune hyperparameters.
-    k : int
-        Number of CV folds.
-    n_perm : int
-        Number of permutations.
-    alpha : float
-        Significance level for tests.
-    windows : list[tuple]
-        Time windows for decoding.
-    do_testing : bool
-        Whether to run t-tests / permutation tests.
-    plot : bool
-        Whether to plot timecourse or heatmaps.
-    save_dir : str or Path or None
-        Base directory for saving results (disabled if None).
-    save_format : str
-        'csv' or 'parquet'.
-    overwrite : bool
-        Overwrite existing files if True.
-    exists_ok : bool
-        If True and outputs already exist for this model and comparison key,
-        skip running that comparison.
-    session_info : dict or None
-        Optional dict with keys like {'monkey': str, 'session': str} to embed
-        provenance in saved metadata and the central index.
-    verbose : bool
-        Print progress messages.
-
-    Returns
-    -------
-    df_all : pd.DataFrame
-        Combined DataFrame of all decoding results.
-    """
-
+    """Shared orchestration for running over alignments and comparisons."""
     def _log(msg):
         if verbose:
             print(msg)
 
     all_results = []
+    save_dir, model_dir = _prepare_save_dir(save_dir, model_name, _log)
 
-    # ------------------------------------------------------------------
-    # Prepare save directory
-    # ------------------------------------------------------------------
-    if save_dir is not None:
-        save_dir = Path(save_dir)
-        model_dir = save_dir / model_name
-        model_dir.mkdir(parents=True, exist_ok=True)
-        _log(f'[run_all_decoding_comparisons] Saving to {model_dir}')
-    else:
-        model_dir = None
-        _log('[run_all_decoding_comparisons] Saving disabled (save_dir=None)')
-
-    # ------------------------------------------------------------------
-    # Main decoding loop
-    # ------------------------------------------------------------------
     for align_by_stop_end in [True, False]:
         for comp in comparisons:
             if comp['key'] not in keys:
                 continue
 
             _log(f"\n>>> {comp['a_label']} vs {comp['b_label']} "
-                 f"(Aligned by {'stop end' if align_by_stop_end else 'stop start'})")
+                 f"(Aligned by {'stop end' if align_by_stop_end else 'stop start'})"
+                 f"{' [cumulative]' if cumulative_features else ''}")
 
-            # Skip existing results if requested
+            # Optional skip if existing (based on align + key)
             if exists_ok and model_dir is not None:
-                if _should_skip_existing_results(model_dir, comp['key'], align_by_stop_end):
-                    _log(f"[run_all_decoding_comparisons] Skip existing → "
+                df_existing, skip = _should_skip_existing_results(
+                    model_dir, comp['key'], align_by_stop_end)
+                if skip:
+                    _log(f"[decoding_core] Skip existing → "
                          f"model={model_name}, key={comp['key']}, align_by_stop_end={align_by_stop_end}")
+                    if df_existing is not None:
+                        all_results.append(df_existing)
                     continue
 
-            # --- Run decoding for this comparison ---
-            df = run_full_decoding_for_comparison(
-                comp, datasets, pn, cfg,
-                model_name=model_name, model_kwargs=model_kwargs,
-                tune=tune, k=k, n_perm=n_perm, alpha=alpha,
-                windows=windows, align_by_stop_end=align_by_stop_end,
-                do_testing=do_testing, n_jobs=n_jobs,
-                perm_search=perm_search, perm_param_grid=perm_param_grid, perm_n_iter=perm_n_iter
+            # Run per-comparison decoding via provided runner
+            df = per_comp_runner(
+                comp=comp,
+                datasets=datasets,
+                pn=pn,
+                cfg=cfg,
+                model_name=model_name,
+                model_kwargs=model_kwargs,
+                tune=tune,
+                k=k,
+                n_perm=n_perm,
+                alpha=alpha,
+                windows=windows,
+                align_by_stop_end=align_by_stop_end,
+                do_testing=do_testing,
+                n_jobs=n_jobs,
+                verbose=verbose,
+                perm_search=perm_search,
+                perm_param_grid=perm_param_grid
             )
-
             all_results.append(df)
 
-            # --- Save results using helper ---
+            # Save results
             if model_dir is not None:
-                best_params_by_window = [
-                    {
-                        'window_start': float(row.get('window_start', np.nan)),
-                        'window_end': float(row.get('window_end', np.nan)),
-                        'best_params': (
-                            json.loads(row['best_params'])
-                            if isinstance(row.get('best_params'), str)
-                            else row.get('best_params')
-                        ),
-                    }
-                    for _, row in df.iterrows() if 'best_params' in df.columns
-                ]
-
+                best_params_by_window = _collect_best_params_by_window_from_df(
+                    df)
                 metadata = {
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'comparison': comp['key'],
@@ -547,14 +535,13 @@ def run_all_decoding_comparisons(
                     'align_by_stop_end': align_by_stop_end,
                     'best_params_by_window': best_params_by_window,
                     'save_format': save_format,
+                    'cumulative_features': cumulative_features,
                 }
-
                 if isinstance(session_info, dict):
                     metadata.update({
                         k_: v for k_, v in session_info.items()
                         if k_ in ('monkey', 'session')
                     })
-
                 save_decoding_results(
                     df=df,
                     comp_key=comp['key'],
@@ -564,14 +551,14 @@ def run_all_decoding_comparisons(
                     overwrite=overwrite
                 )
 
-        # ------------------------------------------------------------------
-        # Optional plotting after each alignment
-        # ------------------------------------------------------------------
+        # Plot per-alignment if requested
         if plot and all_results:
             try:
                 df_align = pd.concat(
                     all_results, ignore_index=True, copy=False)
-                title = 'Align by stop end' if align_by_stop_end else 'Align by stop start'
+                title = (
+                    'Align by stop end' if align_by_stop_end else 'Align by stop start')
+                title = title + (f' {title_suffix}' if title_suffix else '')
                 plot_decoding.plot_decoding_auc_heatmap(
                     df_align, threshold=0.55, cmap='magma', title=title
                 )
@@ -579,14 +566,270 @@ def run_all_decoding_comparisons(
             except Exception as e:
                 _log(f'[plot] Skipping plots due to missing dependency: {e}')
 
-    # ------------------------------------------------------------------
-    # Combine and return all results
-    # ------------------------------------------------------------------
     if not all_results:
-        _log('\n[run_all_decoding_comparisons] No results to combine '
-             '(all comparisons may have been skipped or produced no output). Returning empty DataFrame.')
+        _log('\n[decoding_core] No results to combine (possibly all skipped). Returning empty DataFrame.')
         return pd.DataFrame()
 
     df_all = pd.concat(all_results, ignore_index=True, copy=False)
-    _log('\n[run_all_decoding_comparisons] All comparisons complete.')
+    _log('\n[decoding_core] All comparisons complete.')
     return df_all
+
+
+def run_cumulative_window_decoding(
+    an,
+    windows_prefix,
+    model_name='svm',
+    k=5,
+    tune=False,
+    model_kwargs=None,
+    alpha=0.05,
+    n_perm=0,
+    do_testing=True,
+    perm_search: Optional[str] = None,
+    perm_param_grid: Optional[Dict[str, Any]] = None
+):
+    """
+    Decode using features concatenated from all windows up to the current one.
+    windows_prefix is a list of windows [w0, w1, ..., wi]; we concatenate X for each.
+    """
+    # Build X,y per window, then concatenate across feature dimension
+    X_parts = []
+    y_ref = None
+    for w in windows_prefix:
+        Xw, yw, _ = decoding_utils.build_Xy(an, w)
+        if y_ref is None:
+            y_ref = yw
+        else:
+            if yw.shape[0] != y_ref.shape[0] or np.any(yw != y_ref):
+                raise ValueError("Labels y are inconsistent across windows.")
+        X_parts.append(Xw)
+    X = np.concatenate(X_parts, axis=1)
+    y = y_ref
+
+    # Obtain mean AUC and (optionally) tuned params on cumulative X
+    mean_auc, sd_auc, best_params = decoding_utils.decode_auc_cv(
+        X, y, model_name=model_name, k=k, seed=0, tune=tune, model_kwargs=model_kwargs
+    )
+
+    # Skip significance if not requested
+    if not do_testing:
+        return {
+            'window_start': windows_prefix[-1][0],
+            'window_end': windows_prefix[-1][1],
+            'mean_auc': mean_auc,
+            'sd_auc': sd_auc,
+            'tstat': np.nan,
+            'p_ttest': np.nan,
+            'sig_ttest': np.nan,
+            'p_perm': np.nan,
+            'n_units': int(X.shape[1]),
+            'best_params': json.dumps(best_params or {}, default=_json_default),
+            'sample_size': int(y.shape[0]),
+        }
+
+    # CV fold AUCs for t-test
+    cv = StratifiedKFold(k, shuffle=True, random_state=0)
+    aucs = []
+    for tr, te in cv.split(X, y):
+        model = decoding_utils.get_decoder(
+            model_name, model_kwargs=model_kwargs)[0]
+        model.fit(X[tr], y[tr])
+        if hasattr(model, "predict_proba"):
+            scores = model.predict_proba(X[te])[:, 1]
+        elif hasattr(model, "decision_function"):
+            scores = model.decision_function(X[te])
+        else:
+            raise ValueError(
+                f"Model {model_name} lacks probability-like output.")
+        aucs.append(roc_auc_score(y[te], scores))
+    aucs = np.asarray(aucs)
+    tstat, p_ttest = stats.ttest_1samp(aucs, 0.5, alternative='greater')
+    sig_ttest = p_ttest < alpha
+
+    # Optional permutation test on cumulative X
+    p_perm = np.nan
+    if n_perm > 0:
+        fixed_params = None if perm_search in (
+            'grid', 'random') else best_params
+        decoding_utils.permutation_test_auc  # just to satisfy linters if unused
+        _, _, p_perm = decoding_utils.permutation_test_auc(
+            X, y,
+            model_name=model_name, k=k, n_perm=n_perm, seed=0,
+            tune=tune, model_kwargs=model_kwargs, show_progress=False,
+            fixed_params=fixed_params, real_auc=mean_auc,
+            param_grid=perm_param_grid, perm_search=perm_search
+        )
+
+    return {
+        'window_start': windows_prefix[-1][0],
+        'window_end': windows_prefix[-1][1],
+        'mean_auc': mean_auc,
+        'sd_auc': sd_auc,
+        'tstat': tstat,
+        'p_ttest': p_ttest,
+        'sig_ttest': sig_ttest,
+        'p_perm': p_perm,
+        'n_units': int(X.shape[1]),
+        'best_params': json.dumps(best_params or {}, default=_json_default),
+        'sample_size': int(y.shape[0]),
+    }
+
+
+def run_one_decoding_comparison_cumulative(
+    comp, datasets, pn, cfg,
+    model_name='svm', model_kwargs=None,
+    tune=False, k=5, n_perm=0, alpha=0.05,
+    windows=None, align_by_stop_end=False,
+    do_testing=True, n_jobs=1, verbose=True,
+    perm_search: Optional[str] = None,
+    perm_param_grid: Optional[Dict[str, Any]] = None
+):
+    """
+    Run cumulative-window decoding across all time windows for a single comparison.
+    For window i, features are concatenated from windows [0..i].
+    """
+    if verbose:
+        print(f"[run_one_decoding_comparison_cumulative] Building analyzer for "
+              f"{comp['a_label']} vs {comp['b_label']} "
+              f"({'stop end' if align_by_stop_end else 'stop start'})")
+
+    an, _ = compare_events.build_analyzer(
+        comp, datasets, pn.spikes_df, pn.monkey_information,
+        cfg, verbose=False, align_by_stop_end=align_by_stop_end
+    )
+    an.run_full_analysis(cluster_idx=None)
+
+    if verbose:
+        try:
+            params_str = json.dumps(model_kwargs or {}, default=_json_default)
+        except Exception:
+            params_str = str(model_kwargs)
+        print(
+            f"[run_one_decoding_comparison_cumulative] model={model_name}, params={params_str}")
+        print(f"[run_one_decoding_comparison_cumulative] Running {len(windows)} cumulative windows "
+              f"using {n_jobs} parallel workers...")
+
+    # Parallel over window indices, each using prefix windows[:i+1]
+    results = Parallel(n_jobs=n_jobs, verbose=10 if verbose else 0)(
+        delayed(run_cumulative_window_decoding)(
+            an,
+            windows[:i + 1],
+            model_name=model_name,
+            k=k,
+            tune=tune,
+            model_kwargs=model_kwargs,
+            alpha=alpha,
+            n_perm=n_perm,
+            do_testing=do_testing,
+            perm_search=perm_search,
+            perm_param_grid=perm_param_grid
+        )
+        for i in range(len(windows))
+    )
+
+    df = pd.DataFrame(results)
+    if 'sample_size' not in df.columns:
+        # All cumulative windows share the same sample size as labels come from trials
+        X_tmp, y_tmp, _ = decoding_utils.build_Xy(an, windows[0])
+        df['sample_size'] = int(y_tmp.shape[0])
+    df['a_label'] = comp['a_label']
+    df['b_label'] = comp['b_label']
+    df['key'] = comp['key']
+    df['align_by_stop_end'] = align_by_stop_end
+    df['n_perm'] = n_perm
+    df['model_name'] = model_name
+
+    if verbose:
+        print(f"[run_one_decoding_comparison_cumulative] Done: "
+              f"{comp['a_label']} vs {comp['b_label']} ({len(windows)} cumulative windows)")
+    return df
+
+# ------------------------------------------------------------------
+# Refactored thin wrappers (override previous definitions)
+# ------------------------------------------------------------------
+
+
+def run_all_decoding_comparisons(  # type: ignore[override]
+    comparisons, keys, datasets, pn, cfg,
+    model_name='logreg_elasticnet', model_kwargs=None,
+    tune=False, k=5, n_perm=0, alpha=0.05,
+    windows=None, do_testing=True, plot=False,
+    save_dir=None, save_format='csv',
+    overwrite=False, exists_ok=False,
+    session_info=None, verbose=True,
+    n_jobs: int = 1,
+    perm_search: Optional[str] = None,
+    perm_param_grid: Optional[Dict[str, Any]] = None
+):
+    return _run_all_decoding_core(
+        comparisons=comparisons,
+        keys=keys,
+        datasets=datasets,
+        pn=pn,
+        cfg=cfg,
+        model_name=model_name,
+        model_kwargs=model_kwargs,
+        tune=tune,
+        k=k,
+        n_perm=n_perm,
+        alpha=alpha,
+        windows=windows,
+        do_testing=do_testing,
+        plot=plot,
+        save_dir=save_dir,
+        save_format=save_format,
+        overwrite=overwrite,
+        exists_ok=exists_ok,
+        session_info=session_info,
+        verbose=verbose,
+        n_jobs=n_jobs,
+        perm_search=perm_search,
+        perm_param_grid=perm_param_grid,
+        per_comp_runner=lambda **kwargs: run_one_decoding_comparison(
+            **kwargs),
+        cumulative_features=False,
+        title_suffix=''
+    )
+
+
+def run_all_decoding_comparisons_cumulative(
+    comparisons, keys, datasets, pn, cfg,
+    model_name='svm', model_kwargs=None,
+    tune=False, k=5, n_perm=0, alpha=0.05,
+    windows=None, do_testing=True, plot=False,
+    save_dir=None, save_format='csv',
+    overwrite=False, exists_ok=False,
+    session_info=None, verbose=True,
+    n_jobs: int = 1,
+    perm_search: Optional[str] = None,
+    perm_param_grid: Optional[Dict[str, Any]] = None
+):
+    return _run_all_decoding_core(
+        comparisons=comparisons,
+        keys=keys,
+        datasets=datasets,
+        pn=pn,
+        cfg=cfg,
+        model_name=model_name,
+        model_kwargs=model_kwargs,
+        tune=tune,
+        k=k,
+        n_perm=n_perm,
+        alpha=alpha,
+        windows=windows,
+        do_testing=do_testing,
+        plot=plot,
+        save_dir=save_dir,
+        save_format=save_format,
+        overwrite=overwrite,
+        exists_ok=exists_ok,
+        session_info=session_info,
+        verbose=verbose,
+        n_jobs=n_jobs,
+        perm_search=perm_search,
+        perm_param_grid=perm_param_grid,
+        per_comp_runner=lambda **kwargs: run_one_decoding_comparison_cumulative(
+            **kwargs),
+        cumulative_features=True,
+        title_suffix='[cumulative]'
+    )

@@ -266,7 +266,7 @@ def _plot_summary_bars(summary: pd.DataFrame, title_prefix: str = "Peak AUC by m
     plt.show()
 
 
-def summarize_and_plot_decoding(raw_data_folder_path):
+def summarize_and_plot_decoding(raw_data_folder_path, cumulative=False):
     """Load decoding results, summarize AUC, and save timecourse plots for each alignment."""
     # Initialize analysis object
     pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
@@ -274,8 +274,9 @@ def summarize_and_plot_decoding(raw_data_folder_path):
     )
 
     # Define result directories
-    job_result_dir = Path(pn.retry_decoder_folder_path) / 'runs'
-    summary_csv = Path(pn.retry_decoder_folder_path) / 'cross_model' / 'sum.csv'
+    retry_decoder_dir = pn.retry_decoder_folder_path if not cumulative else pn.retry_decoder_cumulative_folder_path
+    job_result_dir = Path(retry_decoder_dir) / 'runs'
+    summary_csv = Path(retry_decoder_dir) / 'cross_model' / 'sum.csv'
 
     # Ensure decoding methods are accessible
     _ensure_methods_on_path()
@@ -284,6 +285,8 @@ def summarize_and_plot_decoding(raw_data_folder_path):
     df_all = _load_all_results(job_result_dir, None)
     if df_all.empty:
         raise RuntimeError('No rows matched the provided filters.')
+    
+    df_all = df_all[df_all['align_by_stop_end'] == True].copy()
 
     # Summarize decoding results
     summary = _summarize(df_all)
@@ -305,7 +308,7 @@ def summarize_and_plot_decoding(raw_data_folder_path):
     date_str = date_part.replace('data_', '')  # '0301'
 
     # --- Loop over alignments and save a plot for each ---
-    plot_dir = Path('all_monkey_data/retry_decoder/plots')
+    plot_dir = Path('all_monkey_data/retry_decoder/plots') if not cumulative else Path('all_monkey_data/retry_decoder_cumulative/plots')
     plot_dir.mkdir(parents=True, exist_ok=True)
 
     align_col = 'align_by_stop_end'

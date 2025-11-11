@@ -78,9 +78,11 @@ class MultiFF(gymnasium.Env):
                  invisible_distance=500,
                  make_ff_always_flash_on=False,
                  reward_per_ff=100,
-                 dv_cost_factor=1,
-                 dw_cost_factor=1,
-                 w_cost_factor=1,
+                 cost_per_stop=10,
+                 dv_cost_factor=0.5,
+                 dw_cost_factor=0,
+                 w_cost_factor=0,
+                 jerk_cost_factor=0.5,
                  distance2center_cost=0,
                  stop_vel_cost=0,
                  reward_boundary=25,
@@ -131,6 +133,8 @@ class MultiFF(gymnasium.Env):
         self.dv_cost_factor = dv_cost_factor
         self.dw_cost_factor = dw_cost_factor
         self.w_cost_factor = w_cost_factor
+        self.jerk_cost_factor = jerk_cost_factor
+        self.cost_per_stop = cost_per_stop
         self.distance2center_cost = distance2center_cost
         self.stop_vel_cost = stop_vel_cost
         self.dt = dt
@@ -213,14 +217,19 @@ class MultiFF(gymnasium.Env):
         print('current distance2center_cost: ', self.distance2center_cost)
         print('current angular_terminal_vel: ', self.angular_terminal_vel)
         print('current flash_on_interval: ', self.flash_on_interval)
-        print('current stop_vel_cost: ', self.stop_vel_cost)
-
-        print('current dv_cost_factor: ', self.dv_cost_factor)
-        print('current dw_cost_factor: ', self.dw_cost_factor)
-        print('current w_cost_factor: ', self.w_cost_factor)
-
+        
         print('current num_obs_ff: ', self.num_obs_ff)
         print('current max_in_memory_time: ', self.max_in_memory_time)
+        
+        print('======================COST Parameters=========================')
+        print('current stop_vel_cost: ', self.stop_vel_cost)
+        print('current dv_cost_factor: ', self.dv_cost_factor)
+        print('current jerk_cost_factor: ', self.jerk_cost_factor)
+        print('current cost_per_stop: ', self.cost_per_stop)
+
+        # print('current dw_cost_factor: ', self.dw_cost_factor)
+        # print('current w_cost_factor: ', self.w_cost_factor)
+
 
         # randomly generate the information of the fireflies
         if use_random_ff is True:
@@ -244,6 +253,8 @@ class MultiFF(gymnasium.Env):
         self.w = 0.0  # initialize with no angular velocity
         self.prev_w = self.w
         self.prev_v = self.v
+        self.dv = 0.0
+        self.prev_dv = 0.0
         self.is_stop = False
 
         # validity buffer for tails
@@ -270,7 +281,7 @@ class MultiFF(gymnasium.Env):
         self.time = 0
         self.num_targets = 0
         self.episode_reward = 0
-        self.cost_breakdown = {'dv_cost': 0, 'dw_cost': 0, 'w_cost': 0}
+        self.cost_breakdown = {'dv_cost': 0, 'dw_cost': 0, 'w_cost': 0, 'jerk_cost': 0, 'stop_cost': 0}
         self.reward_for_each_ff = []
         self.end_episode = False
         self.action = np.array([0.0, 0.0], dtype=np.float32)
@@ -294,16 +305,26 @@ class MultiFF(gymnasium.Env):
         dv_cost = self.dv**2 * self.dt * self.dv_cost_factor / 200000
         dw_cost = self.dw**2 * self.dt * self.dw_cost_factor / 100
         w_cost = self.w**2 * self.dt * self.w_cost_factor
+        
+        self.ddv = (self.dv - self.prev_dv) / self.dt
+        jerk_cost = (self.ddv**2) * self.dt * self.jerk_cost_factor / 200000000
+        
+        
         self.cost_breakdown['dv_cost'] += dv_cost
         self.cost_breakdown['dw_cost'] += dw_cost
         self.cost_breakdown['w_cost'] += w_cost
+        self.cost_breakdown['jerk_cost'] += jerk_cost
 
-        self.vel_cost = dv_cost + dw_cost + w_cost
+        self.vel_cost = dv_cost + dw_cost + w_cost + jerk_cost
 
         if self.add_vel_cost_when_catching_ff_only:
             reward = 0
         else:
             reward = - self.vel_cost
+            
+        if self.is_stop:
+            self.cost_breakdown['stop_cost'] += self.cost_per_stop
+            reward -= self.cost_per_stop
 
         if self.num_targets > 0:
             self.catching_ff_reward = self._get_catching_ff_reward()
@@ -400,7 +421,8 @@ class MultiFF(gymnasium.Env):
         '''
         self.prev_w = self.w
         self.prev_v = self.v
-
+        self.prev_dv = self.dv
+        
         self.w = self.action[0] * self.wgain
         self.v = (self.action[1] * 0.5 + 0.5) * self.vgain
 

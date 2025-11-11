@@ -106,17 +106,37 @@ def get_decoder(name: str,
         param_grid = {'clf__C': Cs}
 
     elif name == 'logreg_elasticnet':
-        base = LogisticRegressionCV(
-            Cs=np.logspace(-3, 0, num=4),
-            solver='saga', penalty='elasticnet',
-            l1_ratios=[0.01, 0.1, 0.5, 0.9],
-            scoring='roc_auc', max_iter=5000, n_jobs=1,
+        # base = LogisticRegressionCV(
+        #     Cs=np.logspace(-3, 0, num=4),
+        #     solver='saga', penalty='elasticnet',
+        #     l1_ratios=[0.01, 0.1, 0.5, 0.9],
+        #     scoring='roc_auc', max_iter=5000, n_jobs=1,
+        #     class_weight='balanced',
+        #     random_state=seed, **model_kwargs,
+        #     tol=1e-3
+        # )
+        # clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
+        # param_grid = {}  # CV internal
+
+        base = LogisticRegression(
+            solver='saga',
+            penalty='elasticnet',
+            C=0.1,                  # fixed choice
+            l1_ratio=0.5,             # fixed choice
+            max_iter=5000,
+            n_jobs=1,
             class_weight='balanced',
-            random_state=seed, **model_kwargs,
-            tol=1e-3
+            random_state=seed,
+            tol=1e-3,
+            **model_kwargs
         )
-        clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
-        param_grid = {}  # CV internal
+
+        clf = Pipeline([
+            ('scaler', StandardScaler()),
+            ('clf', base)
+        ])
+
+        param_grid = {}
 
     elif name == 'svm_linear':
         # Linear SVM is great when p is not tiny and N is small
@@ -181,7 +201,7 @@ def get_decoder(name: str,
 def decode_auc_cv(X: np.ndarray, y: np.ndarray,
                   model_name: str = 'logreg',
                   k: int = 5, seed: int = 0, tune: bool = True,
-                  search: str = 'grid', n_iter: int = 10,
+                  search: str = 'grid',
                   model_kwargs: Optional[Dict[str, Any]] = None,
                   param_grid_override: Optional[Dict[str, Any]] = None
                   ) -> Tuple[float, float, Dict[str, Any]]:
@@ -225,63 +245,88 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
 
     param_grid = _normalize_grid_keys(param_grid)
 
-    # Use response_method for compatibility across sklearn versions
-    scorer = make_scorer(roc_auc_score, response_method='predict_proba')
     cv = StratifiedKFold(k, shuffle=True, random_state=seed)
 
-    # Elastic-net logreg handles its own CV internally
+    # Elastic-net logreg: if using LogisticRegressionCV, extract tuned params;
+    # if using plain LogisticRegression, propagate provided params instead of placeholders.
     if model_name == 'logreg_elasticnet':
-        model = pipeline.fit(X, y)
-        p = model.predict_proba(X)[:, 1]
-        auc = roc_auc_score(y, p)
-        # Extract single best hyperparameters from LogisticRegressionCV
+        # 1) Fit once on full data to extract parameters
+        model_full = pipeline.fit(X, y)
+        # 2) Compute out-of-sample AUC via k-fold CV
+        aucs = []
+        for tr, te in cv.split(X, y):
+            model_cv = pipeline.fit(X[tr], y[tr])
+            if hasattr(model_cv, "predict_proba"):
+                p = model_cv.predict_proba(X[te])[:, 1]
+            elif hasattr(model_cv, "decision_function"):
+                p = model_cv.decision_function(X[te])
+            else:
+                raise ValueError(
+                    "Model logreg_elasticnet lacks predict_proba and decision_function.")
+            aucs.append(roc_auc_score(y[te], p))
+        aucs = np.asarray(aucs)
+        # Extract underlying classifier (unwrap calibration if present) from full-data fit
         try:
-            lr_cv = model.named_steps['clf']
+            clf_step = model_full.named_steps['clf']
         except Exception:
-            # Fallback: access via get_params (should not normally happen)
-            lr_cv = model.get_params().get('clf', None)
+            clf_step = model_full.get_params().get('clf', None)
+        if isinstance(clf_step, CalibratedClassifierCV):
+            base_estimator = clf_step.base_estimator
+        else:
+            base_estimator = clf_step
         best_params = {}
-        if lr_cv is not None:
-            # Best C can be per-class; pick the first (one-vs-rest) selection
-            try:
-                c_attr = getattr(lr_cv, 'C_', None)
-                if c_attr is not None:
-                    c_vals = np.ravel(c_attr)
+        if base_estimator is not None:
+            # Case 1: LogisticRegressionCV (has C_ and l1_ratio_)
+            c_attr = getattr(base_estimator, 'C_', None)
+            l1_attr = getattr(base_estimator, 'l1_ratio_', None)
+            if c_attr is not None or l1_attr is not None:
+                try:
+                    c_vals = np.ravel(
+                        c_attr) if c_attr is not None else np.array([1.0])
                     best_C = float(c_vals[0])
-                else:
+                except Exception:
                     best_C = 1.0
-            except Exception:
-                best_C = 1.0
-            # l1_ratio_ may be scalar or array depending on sklearn version
-            try:
-                lr_attr = getattr(lr_cv, 'l1_ratio_', None)
-                if lr_attr is None:
-                    # Fall back to default if attribute missing
+                try:
+                    if l1_attr is None:
+                        best_l1 = 0.5
+                    else:
+                        best_l1 = float(np.ravel(l1_attr)[0])
+                except Exception:
                     best_l1 = 0.5
-                else:
-                    best_l1 = float(np.ravel(lr_attr)[0])
-            except Exception:
-                best_l1 = 0.5
-            # Return a clean, frozen configuration for plain LogisticRegression
-            best_params = {
-                'C': best_C,
-                'l1_ratio': best_l1,
-                'penalty': 'elasticnet',
-                'solver': 'saga',
-                'class_weight': getattr(lr_cv, 'class_weight', 'balanced'),
-                'max_iter': getattr(lr_cv, 'max_iter', 5000),
-                'random_state': getattr(lr_cv, 'random_state', 0),
-            }
-        return float(auc), 0.0, best_params
+                best_params = {
+                    'C': best_C,
+                    'l1_ratio': best_l1,
+                    'penalty': 'elasticnet',
+                    'solver': getattr(base_estimator, 'solver', 'saga'),
+                    'class_weight': getattr(base_estimator, 'class_weight', 'balanced'),
+                    'max_iter': getattr(base_estimator, 'max_iter', 5000),
+                    'random_state': getattr(base_estimator, 'random_state', 0),
+                }
+            else:
+                # Case 2: Plain LogisticRegression -> propagate its own configured params
+                try:
+                    params = base_estimator.get_params()
+                except Exception:
+                    params = {}
+                best_params = {
+                    'C': float(params.get('C', 1.0)),
+                    'l1_ratio': float(params.get('l1_ratio', 0.5)),
+                    'penalty': params.get('penalty', 'elasticnet'),
+                    'solver': params.get('solver', 'saga'),
+                    'class_weight': params.get('class_weight', 'balanced'),
+                    'max_iter': int(params.get('max_iter', 5000)),
+                    'random_state': int(params.get('random_state', 0)),
+                }
+        return float(np.mean(aucs)), float(np.std(aucs)), best_params
 
     # Hyperparameter tuning
     if tune:
         if search == 'grid':
             searcher = GridSearchCV(
-                pipeline, param_grid, scoring=scorer, cv=cv, n_jobs=1)
+                pipeline, param_grid, scoring='roc_auc', cv=cv, n_jobs=1)
         elif search == 'random':
-            searcher = RandomizedSearchCV(pipeline, param_grid, scoring=scorer,
-                                          cv=cv, n_jobs=1, n_iter=n_iter, random_state=seed)
+            searcher = RandomizedSearchCV(pipeline, param_grid, scoring='roc_auc',
+                                          cv=cv, n_jobs=1, n_iter=10, random_state=seed)
         else:
             raise ValueError("search must be 'grid' or 'random'")
 
@@ -395,13 +440,13 @@ def _cv_auc_with_fixed_params(
 
 def run_decoding(an, window=(0.0, 0.2), units: Optional[Sequence] = None,
                  model_name='logreg', k=5, seed=0, tune=True, search='grid',
-                 n_iter=10, model_kwargs: Optional[Dict[str, Any]] = None
+                 model_kwargs: Optional[Dict[str, Any]] = None
                  ) -> Dict[str, Any]:
     """Run full decoding pipeline for one window."""
     X, y, unit_ids = build_Xy(an, window, units=units)
     mean_auc, sd_auc, best_params = decode_auc_cv(
         X, y, model_name=model_name, k=k, seed=seed,
-        tune=tune, search=search, n_iter=n_iter,
+        tune=tune, search=search,
         model_kwargs=model_kwargs
     )
     return {
@@ -427,7 +472,6 @@ def permutation_test_auc(
     real_auc: Optional[float] = None,
     param_grid: Optional[Dict[str, Any]] = None,
     perm_search: Optional[str] = None,
-    perm_n_iter: int = 10
 ):
     """
     Permutation test for decoding significance with optional progress bar.
@@ -461,8 +505,6 @@ def permutation_test_auc(
         If 'grid' or 'random', perform hyperparameter search on each permutation
         using param_grid (or the model's default grid if None). If None, fall back to
         fixed_params -> tuned_params -> untuned per original behavior.
-    perm_n_iter : int
-        Number of iterations when perm_search='random'.
 
     Returns
     -------
@@ -523,7 +565,7 @@ def permutation_test_auc(
             if perm_search in ('grid', 'random'):
                 auc_null[i], _, _ = decode_auc_cv(
                     X, y_perm, model_name=model_name, k=k, seed=seed,
-                    tune=True, search=perm_search, n_iter=perm_n_iter,
+                    tune=True, search=perm_search,
                     model_kwargs=model_kwargs, param_grid_override=param_grid
                 )
             elif fixed_params is not None:
