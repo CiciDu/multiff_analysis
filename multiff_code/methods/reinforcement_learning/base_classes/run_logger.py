@@ -99,8 +99,13 @@ def log_run_start(overall_folder: str, agent_type: str, sweep_params: dict, retr
     try:
         df = pd.read_csv(path)
     except Exception:
-        df = pd.DataFrame()
-    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
+        df = pd.DataFrame(columns=list(record.keys()))
+    # Ensure all keys exist as columns
+    for k in record.keys():
+        if k not in df.columns:
+            df[k] = pd.NA
+    # Append without concat to avoid pandas deprecation warnings
+    df.loc[len(df)] = {c: record.get(c, pd.NA) for c in df.columns}
     df.to_csv(path, index=False)
 
 
@@ -121,8 +126,11 @@ def log_run_end(overall_folder: str, agent_type: str, sweep_params: dict, status
     try:
         df = pd.read_csv(path)
     except Exception:
-        df = pd.DataFrame()
-    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
+        df = pd.DataFrame(columns=list(record.keys()))
+    for k in record.keys():
+        if k not in df.columns:
+            df[k] = pd.NA
+    df.loc[len(df)] = {c: record.get(c, pd.NA) for c in df.columns}
     df.to_csv(path, index=False)
     print('run_end logged to:', path)
 
@@ -143,8 +151,11 @@ def log_curriculum_stage(overall_folder: str, agent_type: str, sweep_params: dic
     try:
         df = pd.read_csv(path)
     except Exception:
-        df = pd.DataFrame()
-    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
+        df = pd.DataFrame(columns=list(record.keys()))
+    for k in record.keys():
+        if k not in df.columns:
+            df[k] = pd.NA
+    df.loc[len(df)] = {c: record.get(c, pd.NA) for c in df.columns}
     df.to_csv(path, index=False)
     print('curriculum_stage logged to:', path)
 

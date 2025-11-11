@@ -159,9 +159,8 @@ def collect_stop_data_func(raw_data_folder_path):
     # Combine the “first several” from both, keep only columns you care about, then sort by index
     retry_after_miss = (
         pd.concat(
-            [
-                GUAT_nonfinal[shared_columns],
-                TAFT_nonfinal[shared_columns],
+            [GUAT_nonfinal[shared_columns],
+             TAFT_nonfinal[shared_columns],
             ],
             ignore_index=True
         )

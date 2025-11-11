@@ -16,7 +16,7 @@ import pandas as pd
 from os.path import exists
 from functools import partial
 from matplotlib import animation
-from IPython.display import Video
+from IPython.display import Video, HTML
 
 
 plt.rcParams["animation.html"] = "html5"
@@ -35,6 +35,11 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
     def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left=False, max_num_frames=150,
                                  max_duration=30, min_duration=1, rotated=True, figsize=(14, 9), dpi=None):
+        '''
+        Set the parameters for the animation.
+
+        k: Select every k-th frame to animate.
+        '''
         # Among currentTrial, num_trials, duration, either currentTrial and num_trials must be specified, or duration must be specified
         currentTrial, num_trials, duration = specific_utils.find_currentTrial_or_num_trials_or_duration(
             self.ff_caught_T_new, currentTrial, num_trials, duration)
@@ -68,10 +73,9 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                                               max_duration=max_duration, min_duration=min_duration, rotated=rotated)
 
     def call_animation_function(self, with_annotation=False,
-                                margin=100, dt=0.0165, plot_time_index=False, fps=None,
-                                save_video=True, video_dir=None, file_name=None, dpi=None, save_as_gif=None,
+                                margin=100, plot_time_index=False, fps=None,
+                                save_video=True, video_dir=None, file_name=None, dpi=None, save_format='html',
                                 display_inline=True, **animate_kwargs):
-        # dt is to be used to determine the fps(frame per second) of the animation
 
         # if the key "margin" is in animate_kwargs, then put it into animate_kwargs
         # if not, then put the default value (500) into animate_kwargs
@@ -88,15 +92,21 @@ class AnimationClass(further_processing_class.FurtherProcessing):
             animate_func = partial(animation_func.animate, ax=self.ax, anim_monkey_info=self.anim_monkey_info, ff_dataframe_anim=self.ff_dataframe_anim,
                                    flash_on_ff_dict=self.flash_on_ff_dict, alive_ff_dict=self.alive_ff_dict, believed_ff_dict=self.believed_ff_dict, plot_time_index=plot_time_index, **animate_kwargs)
         self.anim = animation.FuncAnimation(
-            self.fig, animate_func, frames=self.num_frames, interval=dt*1000*self.k, repeat=True)
+            self.fig, animate_func, frames=self.num_frames, interval=self.dt*1000*self.k, repeat=True)
 
         if save_video:
             self._save_animation(fps, video_dir, file_name,
-                                 dpi, save_as_gif=save_as_gif)
+                                 dpi, save_format=save_format)
             if display_inline:
                 try:
                     print('Rendering animation ......')
-                    Video(self.video_path_name, embed=True)
+                    ext = os.path.splitext(self.video_path_name)[1].lower()
+                    if ext == ".html":
+                        # Display saved HTML inline
+                        HTML(open(self.video_path_name,
+                             "r", encoding="utf-8").read())
+                    else:
+                        Video(self.video_path_name, embed=True)
                 except Exception as e:
                     print('Error rendering animation:', e)
         else:
@@ -155,10 +165,10 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         return self.fig, self.ax
 
-    def _save_animation(self, fps, video_dir, file_name, dpi=None, save_as_gif=False):
+    def _save_animation(self, fps, video_dir, file_name, dpi=None, save_format='html'):
         if fps is None:
             if self.player == 'agent':
-                fps = int(4/self.k)  # the real life speed
+                fps = int(10/self.k)  # the real life speed
             else:
                 fps = int(62/self.k)
 
@@ -175,18 +185,33 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         # If explicit format requested, adjust extension accordingly
         base_name, current_ext = os.path.splitext(file_name)
-        if save_as_gif is True and current_ext.lower() != ".gif":
-            file_name = base_name + ".gif"
-        elif save_as_gif is False and current_ext.lower() not in [".mp4", ".m4v", ".mov", ".avi"]:
-            file_name = base_name + ".mp4"
+        # Normalize save_format
+        if save_format is not None:
+            save_format = str(save_format).lower()
+            if save_format not in {"gif", "mp4", "html"}:
+                print(
+                    f"Unrecognized save_format '{save_format}', defaulting to mp4.")
+                save_format = "mp4"
+        # Decide final extension
+        if save_format is None:
+            # Infer from current extension; default to mp4 if unknown
+            if current_ext.lower() in [".gif"]:
+                save_format = "gif"
+            elif current_ext.lower() in [".html", ".htm"]:
+                save_format = "html"
+            else:
+                save_format = "mp4"
+        # Ensure filename has the correct extension
+        desired_ext = ".gif" if save_format == "gif" else (
+            ".html" if save_format == "html" else ".mp4")
+        if current_ext.lower() != desired_ext:
+            file_name = base_name + desired_ext
 
         os.makedirs(video_dir, exist_ok=True)
         self.video_path_name = f"{video_dir}/{file_name}"
 
         print("Saving animation as:", self.video_path_name)
-        ext = os.path.splitext(self.video_path_name)[1].lower()
-        use_gif = save_as_gif if save_as_gif is not None else (ext == ".gif")
-        if use_gif:
+        if save_format == "gif":
             writer = animation.PillowWriter(fps=fps)
             if dpi is not None:
                 try:
@@ -197,7 +222,8 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                     self.anim.save(self.video_path_name, writer=writer)
             else:
                 self.anim.save(self.video_path_name, writer=writer)
-        else:
+            print("Animation is saved at:", self.video_path_name, "as GIF file.")
+        elif save_format == "mp4":
             writervideo = animation.FFMpegWriter(fps=fps)
             if dpi is not None:
                 try:
@@ -209,7 +235,13 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                     self.anim.save(self.video_path_name, writer=writervideo)
             else:
                 self.anim.save(self.video_path_name, writer=writervideo)
-        print("Animation is saved at:", self.video_path_name)
+            print("Animation is saved at:", self.video_path_name, "as MP4 file.")
+        else:
+            # Save as standalone HTML via JSHTML string
+            html_str = self.anim.to_jshtml()
+            with open(self.video_path_name, 'w', encoding='utf-8') as f:
+                f.write(html_str)
+            print("Animation is saved at:", self.video_path_name, "as HTML file.")
 
         # save animation as gif
         # self.anim.save(f"{self.processed_data_folder_path}/agent_animation.gif", writer='imagemagick', fps=int(62/self.k)) #SB3
@@ -217,9 +249,9 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
     def make_animation(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None,
                        save_video=False, video_dir=None, file_name=None,
-                       dt=0.0165, k=3, with_annotation=False, plot_time_index=False,
+                       k=3, with_annotation=False, plot_time_index=False,
                        static_plot_on_the_left=True, margin=100, max_num_frames=150, max_duration=30, min_duration=1,
-                       fps=None, rotated=True, figsize=None, dpi=None, save_as_gif=None, display_inline=True, **animate_kwargs):
+                       fps=None, rotated=True, figsize=None, dpi=None, save_format=None, display_inline=True, **animate_kwargs):
         if file_name is None:
             if currentTrial is not None:
                 file_name = f"{self.data_name}_{currentTrial-num_trials+1}-{currentTrial}.mp4"
@@ -236,12 +268,12 @@ class AnimationClass(further_processing_class.FurtherProcessing):
         self.set_animation_parameters(currentTrial=currentTrial, num_trials=num_trials, duration=duration, animation_plot_kwargs=animation_plot_kwargs, k=k, rotated=rotated,
                                       static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, max_duration=max_duration, min_duration=min_duration, figsize=figsize, dpi=dpi)
         self.call_animation_function(save_video=save_video, video_dir=video_dir, plot_time_index=plot_time_index,
-                                     file_name=file_name, dt=dt, with_annotation=with_annotation, fps=fps, dpi=dpi, save_as_gif=save_as_gif,
+                                     file_name=file_name, with_annotation=with_annotation, fps=fps, dpi=dpi, save_format=save_format,
                                      display_inline=display_inline, **animate_kwargs)
 
     def make_animation_from_a_category(self, category_name, max_trial_to_plot, sampling_frame_ratio=3, max_duration=30, min_duration=1,
                                        num_trials=3, save_video=True, video_dir=None, additional_kwargs=None, animation_exists_ok=True,
-                                       with_annotation=False, dt=0.0165, static_plot_on_the_left=True, max_num_frames=None, **animate_kwargs):
+                                       with_annotation=False, static_plot_on_the_left=True, max_num_frames=None, save_format='html', **animate_kwargs):
         '''
         Create animations for a given category of trials.
         '''
@@ -267,7 +299,10 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         with general_utils.initiate_plot(10, 10, 100):
             for currentTrial in category[:max_trial_to_plot]:
-                file_name = f"{self.data_name}_{currentTrial-num_trials+1}-{currentTrial}.mp4"
+                # Choose extension based on save_format
+                ext = ".gif" if str(save_format).lower() == "gif" else (
+                    ".html" if str(save_format).lower() == "html" else ".mp4")
+                file_name = f"{self.data_name}_{currentTrial-num_trials+1}-{currentTrial}{ext}"
                 video_path_name = os.path.join(self.video_dir, file_name)
 
                 if animation_exists_ok and exists(video_path_name):
@@ -284,15 +319,15 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                     video_dir=video_dir,
                     file_name=file_name,
                     with_annotation=with_annotation,
-                    dt=dt,
                     max_num_frames=max_num_frames,
                     max_duration=max_duration,
                     min_duration=min_duration,
+                    save_format=save_format,
                     **animate_kwargs
                 )
 
     def make_animation_of_chunks(self, df_with_chunks, monkey_information, chunk_numbers=range(10), sampling_frame_ratio=3, additional_kwargs=None, exists_ok=True,
-                                 max_duration=30, min_duration=1, dt=0.016, save_video=True, static_plot_on_the_left=True, max_num_frames=None, **animate_kwargs):
+                                 max_duration=30, min_duration=1, save_video=True, static_plot_on_the_left=True, max_num_frames=None, save_format='html', **animate_kwargs):
         k = sampling_frame_ratio
         self.video_dir = os.path.join(
             'chunks', self.monkey_name, self.data_name)
@@ -310,11 +345,13 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                 duration = [monkey_information['time'][duration_points[0]],
                             monkey_information['time'][duration_points[0]]+10]
 
-                file_name = f"chunk{chunk}_{round(duration[0], 1)}s-{round(duration[1], 1)}s.mp4"
+                ext = ".gif" if str(save_format).lower() == "gif" else (
+                    ".html" if str(save_format).lower() == "html" else ".mp4")
+                file_name = f"chunk{chunk}_{round(duration[0], 1)}s-{round(duration[1], 1)}s{ext}"
                 video_path_name = os.path.join(self.video_dir, file_name)
                 if exists_ok & exists(os.path.join(self.video_dir, file_name)):
                     print("Animation for the current chunk already exists at",
                           video_path_name, "Moving on to the next trial.")
                     continue
-                self.make_animation(duration=duration, animation_plot_kwargs=animation_plot_kwargs, save_video=save_video, file_name=file_name, dt=dt, max_duration=max_duration, min_duration=min_duration,
-                                    video_dir=self.video_dir, static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, **animate_kwargs)
+                self.make_animation(duration=duration, animation_plot_kwargs=animation_plot_kwargs, save_video=save_video, file_name=file_name, max_duration=max_duration, min_duration=min_duration,
+                                    video_dir=self.video_dir, static_plot_on_the_left=static_plot_on_the_left, max_num_frames=max_num_frames, save_format=save_format, **animate_kwargs)

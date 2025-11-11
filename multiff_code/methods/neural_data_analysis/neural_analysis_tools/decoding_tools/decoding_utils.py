@@ -107,10 +107,9 @@ def get_decoder(name: str,
 
     elif name == 'logreg_elasticnet':
         base = LogisticRegressionCV(
-            Cs=np.logspace(-3, 3, 7),
+            Cs=np.logspace(-3, 0, num=4),
             solver='saga', penalty='elasticnet',
-            l1_ratios=choose([0.1, 0.5, 0.9], [0.1, 0.5, 0.9], [
-                             0.0, 0.1, 0.5, 0.9]),
+            l1_ratios=[0.01, 0.1, 0.5, 0.9],
             scoring='roc_auc', max_iter=5000, n_jobs=1,
             class_weight='balanced',
             random_state=seed, **model_kwargs,
@@ -183,7 +182,8 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
                   model_name: str = 'logreg',
                   k: int = 5, seed: int = 0, tune: bool = True,
                   search: str = 'grid', n_iter: int = 10,
-                  model_kwargs: Optional[Dict[str, Any]] = None
+                  model_kwargs: Optional[Dict[str, Any]] = None,
+                  param_grid_override: Optional[Dict[str, Any]] = None
                   ) -> Tuple[float, float, Dict[str, Any]]:
     """
     Cross-validated decoding with ROC-AUC scoring and optional hyperparameter tuning.
@@ -195,6 +195,35 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
 
     # Build fully prepared pipeline (imputer + calibration if needed)
     pipeline = make_calibrated_pipeline(clf)
+
+    # If caller provides a param grid, use it instead of the default
+    if param_grid_override is not None:
+        param_grid = dict(param_grid_override)  # shallow copy
+
+    # Normalize/retarget grid param keys to match pipeline structure
+    def _normalize_grid_keys(grid: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(grid, dict) or len(grid) == 0:
+            return grid
+        try:
+            clf_step = pipeline.named_steps.get('clf', None)
+            calibrated = isinstance(clf_step, CalibratedClassifierCV)
+        except Exception:
+            calibrated = False
+        norm_grid: Dict[str, Any] = {}
+        for key, vals in grid.items():
+            # If user already provided a nested path, keep as is, but fix common case
+            if '__' in key:
+                if calibrated and key.startswith('clf__') and not key.startswith('clf__base_estimator__'):
+                    # Redirect to base_estimator inside CalibratedClassifierCV
+                    key = 'clf__base_estimator__' + key[len('clf__'):]
+                norm_grid[key] = vals
+            else:
+                # Bare param name -> prefix with appropriate step
+                prefix = 'clf__base_estimator__' if calibrated else 'clf__'
+                norm_grid[prefix + key] = vals
+        return norm_grid
+
+    param_grid = _normalize_grid_keys(param_grid)
 
     # Use response_method for compatibility across sklearn versions
     scorer = make_scorer(roc_auc_score, response_method='predict_proba')
@@ -337,10 +366,10 @@ def _cv_auc_with_fixed_params(
         if fixed_params:
             params_to_apply = _prefix_params(fixed_params, clf_step)
             try:
-                #print(f"[info] Applying fixed_params: {params_to_apply}")
+                # print(f"[info] Applying fixed_params: {params_to_apply}")
                 pipeline.set_params(**params_to_apply)
             except ValueError as e:
-                #print(f"[warning] Could not apply fixed_params: {e}")
+                # print(f"[warning] Could not apply fixed_params: {e}")
                 pass
     # Cross-validation loop
     cv = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
@@ -395,7 +424,10 @@ def permutation_test_auc(
     X, y, model_name='logreg', k=5, n_perm=1000, seed=0,
     tune=False, model_kwargs=None, show_progress=True,
     plot=False, fixed_params: Optional[Dict[str, Any]] = None,
-    real_auc: Optional[float] = None
+    real_auc: Optional[float] = None,
+    param_grid: Optional[Dict[str, Any]] = None,
+    perm_search: Optional[str] = None,
+    perm_n_iter: int = 10
 ):
     """
     Permutation test for decoding significance with optional progress bar.
@@ -418,6 +450,19 @@ def permutation_test_auc(
         Model parameters.
     show_progress : bool
         If True, display tqdm progress bar.
+    fixed_params : dict or None
+        If provided, use these frozen parameters for all permutations (fast).
+    real_auc : float or None
+        Observed AUC to reuse (skip recompute).
+    param_grid : dict or None
+        Optional hyperparameter grid to use during permutations (if perm_search is set).
+        Keys may be bare (e.g., 'C') or pipeline-style; they will be normalized.
+    perm_search : {'grid','random',None}
+        If 'grid' or 'random', perform hyperparameter search on each permutation
+        using param_grid (or the model's default grid if None). If None, fall back to
+        fixed_params -> tuned_params -> untuned per original behavior.
+    perm_n_iter : int
+        Number of iterations when perm_search='random'.
 
     Returns
     -------
@@ -445,11 +490,17 @@ def permutation_test_auc(
         # Fall back to internal CV (optionally tuned)
         real_auc, _, tuned_params = decode_auc_cv(
             X, y, model_name=model_name, k=k, seed=seed,
-            tune=tune, model_kwargs=model_kwargs
+            tune=tune, model_kwargs=model_kwargs,
+            param_grid_override=param_grid
         )
 
     # 2. Announce parameter strategy for permutations
-    if fixed_params is not None:
+    if perm_search in ('grid', 'random'):
+        print(
+            f"[permutation_test_auc] Using per-permutation hyperparameter search "
+            f"({perm_search}) with provided/default grid."
+        )
+    elif fixed_params is not None:
         print(
             f"[permutation_test_auc] Using pre-determined params from caller for permutations: {fixed_params}")
     elif isinstance(tuned_params, dict) and len(tuned_params) > 0:
@@ -469,7 +520,13 @@ def permutation_test_auc(
             y_perm = shuffle(y, random_state=rng.integers(1e6))
             # Priority: use provided fixed_params; else reuse tuned_params if available;
             # else compute non-tuned CV per permutation.
-            if fixed_params is not None:
+            if perm_search in ('grid', 'random'):
+                auc_null[i], _, _ = decode_auc_cv(
+                    X, y_perm, model_name=model_name, k=k, seed=seed,
+                    tune=True, search=perm_search, n_iter=perm_n_iter,
+                    model_kwargs=model_kwargs, param_grid_override=param_grid
+                )
+            elif fixed_params is not None:
                 auc_null[i] = _cv_auc_with_fixed_params(
                     X, y_perm, model_name=model_name, k=k, seed=seed,
                     model_kwargs=model_kwargs, fixed_params=fixed_params

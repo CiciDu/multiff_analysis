@@ -36,6 +36,7 @@ class BaseProcessing:
         # self.monkey_information = None
         # self.ff_dataframe = None
         self.curv_of_traj_params = {}
+        
 
     def load_raw_data(self, raw_data_folder_path=None, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         if raw_data_folder_path is None:
@@ -57,14 +58,42 @@ class BaseProcessing:
 
         self.get_related_folder_names_from_raw_data_folder_path(
             raw_data_folder_path)
-        self.monkey_name = raw_data_folder_path.split('/')[2]
-        self.data_name = raw_data_folder_path.split('/')[3]
+        # robustly parse monkey and data folder names regardless of absolute path prefix
+        path_norm = os.path.normpath(raw_data_folder_path)
+        print('Normalized monkey raw data folder path: ', path_norm)
+        parts = path_norm.split(os.sep)
+
+        monkey_name, data_name = None, None
+        # Prefer contiguous 'monkey_*' followed by 'data_*'
+        for i in range(len(parts) - 1):
+            if parts[i].startswith('monkey_') and parts[i + 1].startswith('data_'):
+                monkey_name = parts[i]
+                data_name = parts[i + 1]
+                break
+        # Fallback: anchor by 'raw_monkey_data'
+        if (monkey_name is None or data_name is None) and ('raw_monkey_data' in parts):
+            idx = parts.index('raw_monkey_data')
+            if idx + 2 < len(parts):
+                cand_monkey, cand_data = parts[idx + 1], parts[idx + 2]
+                if cand_monkey.startswith('monkey_') and cand_data.startswith('data_'):
+                    monkey_name, data_name = cand_monkey, cand_data
+
+        if (monkey_name is None) or (data_name is None):
+            raise Exception(
+                "Could not parse monkey/data names from path. Expected .../raw_monkey_data/monkey_*/data_* but got: ",
+                raw_data_folder_path,
+            )
+
+        self.monkey_name = monkey_name
+        self.data_name = data_name
         self.player = 'monkey'
 
         if 'monkey_' not in self.monkey_name:
-            raise Exception("The monkey name should start with 'monkey_', but got: ", self.monkey_name)
+            raise Exception(
+                "The monkey name should start with 'monkey_', but got: ", self.monkey_name)
         if 'data_' not in self.data_name:
-            raise Exception("The data name should start with 'data_', but got: ", self.data_name)
+            raise Exception(
+                "The data name should start with 'data_', but got: ", self.data_name)
 
     def get_related_folder_names_from_raw_data_folder_path(self, raw_data_folder_path):
         # replace raw_monkey_data with other folder names

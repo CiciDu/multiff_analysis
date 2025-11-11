@@ -11,7 +11,7 @@ Then concatenates them, prints a compact summary (peak AUC by model
 and comparison), and renders timecourse plots with lines per model.
 
 Example:
-  python jobs/scripts/cmp_decode.py \
+  python jobs/scripts/py \
       --base path/to/.../retry_decoder/.../decoding/runs \
       --models svm logreg rf mlp
 """
@@ -27,6 +27,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 
 def _ensure_methods_on_path() -> None:
     """Make sure `multiff_code/methods` is importable.
@@ -264,50 +266,126 @@ def _plot_summary_bars(summary: pd.DataFrame, title_prefix: str = "Peak AUC by m
     plt.show()
 
 
-def main() -> None:
-    args = _parse_args()
+def summarize_and_plot_decoding(raw_data_folder_path):
+    """Load decoding results, summarize AUC, and save timecourse plots for each alignment."""
+    # Initialize analysis object
+    pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
+        raw_data_folder_path=raw_data_folder_path
+    )
 
-    base_dir = Path(args.base)
+    # Define result directories
+    job_result_dir = Path(pn.retry_decoder_folder_path) / 'runs'
+    summary_csv = Path(pn.retry_decoder_folder_path) / 'cross_model' / 'sum.csv'
 
+    # Ensure decoding methods are accessible
     _ensure_methods_on_path()
-    try:
-        from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
-    except Exception as e:
-        raise RuntimeError(
-            f"Could not import plotting utilities. Ensure methods path is set. ({e})"
-        )
 
-    df_all = _load_all_results(base_dir, args.models)
-    df_all = _apply_filters(df_all, key=args.key, align=args.align)
-
+    # Load all decoding results
+    df_all = _load_all_results(job_result_dir, None)
     if df_all.empty:
-        raise RuntimeError("No rows matched the provided filters.")
+        raise RuntimeError('No rows matched the provided filters.')
 
+    # Summarize decoding results
     summary = _summarize(df_all)
-    print("\n=== Peak AUC by model and comparison ===")
-    print(summary.to_string(index=False))
+    # print('\n=== Peak AUC by model and comparison ===')
+    # print(summary.to_string(index=False))
 
-    if args.summary_csv:
-        out_path = Path(args.summary_csv)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        summary.to_csv(out_path, index=False)
-        print(f"[write] Summary CSV → {out_path}")
+    # Save summary CSV
+    out_path = Path(summary_csv)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(out_path, index=False)
+    # print(f'[write] Summary CSV → {out_path}')
 
-    if not args.no_plot:
-        # Bar charts of peak AUC by model, split per comparison/alignment
-        _plot_summary_bars(summary, title_prefix="Peak AUC by model")
-        # Overlay timecourses with a line per model, subplots per comparison
-        plot_decoding.plot_decoding_timecourse(
-            df_all,
-            groupby_cols=("model_name",),
-            split_by=("a_label", "b_label"),
-            align_col="align_by_stop_end",
-            value_col="mean_auc",
-            sig_col="sig_ttest" if "sig_ttest" in df_all.columns else "sig_FDR",
-            err_col="sd_auc" if "sd_auc" in df_all.columns else None,
-            title_prefix="Decoding timecourse by model",
+    # --- Extract monkey name and session date from path ---
+    # Example path: all_monkey_data/raw_monkey_data/monkey_Bruno/data_0301
+    raw_path = Path(raw_data_folder_path)
+    monkey_part = raw_path.parts[-2]  # 'monkey_Bruno'
+    monkey = monkey_part.replace('monkey_', '')  # 'Bruno'
+    date_part = raw_path.parts[-1]  # 'data_0301'
+    date_str = date_part.replace('data_', '')  # '0301'
+
+    # --- Loop over alignments and save a plot for each ---
+    plot_dir = Path('all_monkey_data/retry_decoder/plots')
+    plot_dir.mkdir(parents=True, exist_ok=True)
+
+    align_col = 'align_by_stop_end'
+    if align_col not in df_all.columns:
+        print(f"[warn] '{align_col}' not in dataframe; assuming all align_by_stop_end=False")
+        df_all[align_col] = False
+
+    for align_val in df_all[align_col].unique():
+        suffix = 'end' if align_val else 'start'
+        png_path = plot_dir / f'{monkey}_{date_str}_{suffix}.png'
+        
+        fig = plot_decoding.plot_decoding_timecourse(
+            df_all[df_all[align_col] == align_val],
+            groupby_cols=('model_name',),
+            split_by=('a_label', 'b_label'),
+            align_col=align_col,
+            value_col='mean_auc',
+            sig_col='sig_ttest' if 'sig_ttest' in df_all.columns else 'sig_FDR',
+            err_col='sd_auc' if 'sd_auc' in df_all.columns else None,
+            title_prefix=f'{monkey} {date_str}',
+            save_path=png_path,  # uses the new save_path parameter
         )
+        plt.show()
 
 
-if __name__ == "__main__":
-    main()
+    print(f'\n[done] Summary and plots generated for {monkey} {date_str}\n')
+    return
+
+
+import ast
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def plot_best_params(df_all):
+    df = df_all[df_all['model_name'] == 'logreg_elasticnet'].copy()
+
+    # ---- Safe parser ----
+    def safe_parse(x):
+        if isinstance(x, dict):
+            return x
+        if not isinstance(x, str):
+            return {}
+        try:
+            return ast.literal_eval(x)
+        except Exception:
+            try:
+                # try JSON-style cleaning if keys aren't quoted
+                x_clean = (
+                    x.replace("'", '"')
+                     .replace('None', 'null')
+                     .replace('nan', 'null')
+                )
+                return pd.io.json.loads(x_clean)
+            except Exception:
+                return {}
+
+    df['best_params'] = df['best_params'].apply(safe_parse)
+
+    # ---- Extract C and l1_ratio ----
+    df['C'] = df['best_params'].apply(lambda d: d.get('C', None))
+    df['l1_ratio'] = df['best_params'].apply(lambda d: d.get('l1_ratio', None))
+
+    # drop invalid rows
+    df = df.dropna(subset=['C', 'l1_ratio'])
+
+    # ---- Count frequencies ----
+    count_df = (
+        df.groupby(['C', 'l1_ratio'])
+        .size()
+        .reset_index(name='count')
+    )
+
+    # ---- Plot ----
+    pivot = count_df.pivot(index='l1_ratio', columns='C', values='count').fillna(0)
+    plt.figure(figsize=(8, 5))
+    sns.heatmap(pivot, annot=True, fmt='.0f', cmap='viridis')
+    plt.title('Frequency of Best Params (C vs l1_ratio)')
+    plt.xlabel('C')
+    plt.ylabel('l1_ratio')
+    plt.tight_layout()
+    plt.show()
+
+    return count_df.sort_values('count', ascending=False)

@@ -26,6 +26,7 @@ from sklearn.neural_network import MLPClassifier
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools import decoding_utils
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import compare_events
+from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
 
 
 def _json_default(o):
@@ -66,7 +67,10 @@ def run_population_decoding(an, window=(0, 0.3), model_name='svm',
 
 def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
                         model_kwargs=None, alpha=0.05, n_perm=0,
-                        do_testing=True):
+                        do_testing=True,
+                        perm_search: Optional[str] = None,
+                        perm_param_grid: Optional[Dict[str, Any]] = None,
+                        perm_n_iter: int = 10):
     """
     Decode neural data for a single time window with optional significance testing.
 
@@ -109,13 +113,15 @@ def run_window_decoding(an, window, model_name='svm', k=3, tune=False,
     # Optional permutation test
     p_perm = np.nan
     if n_perm > 0:
-        # Use tuned params (if any) and the observed CV AUC from res
-        fixed_params = res.get('best_params', None)
+        # Strategy: if perm_search provided, do NOT use fixed_params; otherwise reuse tuned params
+        fixed_params = None if perm_search in (
+            'grid', 'random') else res.get('best_params', None)
         observed_auc = res.get('mean_auc', None)
         # permutation_test_auc returns (real_auc, auc_null, pval)
         _, _, p_perm = decoding_utils.permutation_test_auc(
             X, y, model_name=model_name, k=k, n_perm=n_perm,
-            show_progress=False, fixed_params=fixed_params, real_auc=observed_auc
+            show_progress=False, fixed_params=fixed_params, real_auc=observed_auc,
+            param_grid=perm_param_grid, perm_search=perm_search, perm_n_iter=perm_n_iter
         )
 
     return {
@@ -133,7 +139,10 @@ def run_full_decoding_for_comparison(
     model_name='svm', model_kwargs=None,
     tune=False, k=3, n_perm=0, alpha=0.05,
     windows=None, align_by_stop_end=False,
-    do_testing=True, n_jobs=1, verbose=True
+    do_testing=True, n_jobs=1, verbose=True,
+    perm_search: Optional[str] = None,
+    perm_param_grid: Optional[Dict[str, Any]] = None,
+    perm_n_iter: int = 10
 ):
     """
     Run decoding across all time windows for a single comparison.
@@ -211,7 +220,8 @@ def run_full_decoding_for_comparison(
             an, window,
             model_name=model_name, k=k, tune=tune,
             model_kwargs=model_kwargs, alpha=alpha,
-            n_perm=n_perm, do_testing=do_testing
+            n_perm=n_perm, do_testing=do_testing,
+            perm_search=perm_search, perm_param_grid=perm_param_grid, perm_n_iter=perm_n_iter
         )
         for window in windows
     )
@@ -400,7 +410,10 @@ def run_all_decoding_comparisons(
     save_dir=None, save_format='csv',
     overwrite=False, exists_ok=False,
     session_info=None, verbose=True,
-    n_jobs: int = 1
+    n_jobs: int = 1,
+    perm_search: Optional[str] = None,
+    perm_param_grid: Optional[Dict[str, Any]] = None,
+    perm_n_iter: int = 10
 ):
     """
     Run decoding for all comparisons (and alignments),
@@ -499,7 +512,8 @@ def run_all_decoding_comparisons(
                 model_name=model_name, model_kwargs=model_kwargs,
                 tune=tune, k=k, n_perm=n_perm, alpha=alpha,
                 windows=windows, align_by_stop_end=align_by_stop_end,
-                do_testing=do_testing, n_jobs=n_jobs
+                do_testing=do_testing, n_jobs=n_jobs,
+                perm_search=perm_search, perm_param_grid=perm_param_grid, perm_n_iter=perm_n_iter
             )
 
             all_results.append(df)
@@ -555,7 +569,6 @@ def run_all_decoding_comparisons(
         # ------------------------------------------------------------------
         if plot and all_results:
             try:
-                from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
                 df_align = pd.concat(
                     all_results, ignore_index=True, copy=False)
                 title = 'Align by stop end' if align_by_stop_end else 'Align by stop start'

@@ -58,6 +58,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             print("Warning: raw_data_folder_path is None")
 
         self.max_visibility_window = 10
+        self.dt = 0.0165
 
     def make_df_related_to_patterns_and_features(self, exists_ok=True):
 

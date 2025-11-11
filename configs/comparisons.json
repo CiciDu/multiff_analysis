@@ -20,6 +20,26 @@
     "title": "GUAT Middle vs TAFT Middle"
   },
   {
+    "key": "guat_last_vs_taft_last",
+    "a": "GUAT_last",
+    "b": "TAFT_last",
+    "a_label": "GUAT last",
+    "b_label": "TAFT last",
+    "slug_capfirst": "GUAT_last_vs_TAFT_last",
+    "slug_pascal": "GUATLast_vs_TAFTLast",
+    "title": "GUAT Last vs TAFT Last"
+  },
+  {
+    "key": "guat_middle_vs_guat_last",
+    "a": "GUAT_middle",
+    "b": "GUAT_last",
+    "a_label": "GUAT middle",
+    "b_label": "GUAT last",
+    "slug_capfirst": "GUAT_middle_vs_GUAT_last",
+    "slug_pascal": "GUATMiddle_vs_GUATLast",
+    "title": "GUAT Middle vs GUAT Last"
+  },
+  {
     "key": "switch_vs_retry_after_miss",
     "a": "switch_after_miss",
     "b": "retry_after_miss",
@@ -48,5 +68,105 @@
     "slug_capfirst": "One_stop_miss_vs_Both_first_miss",
     "slug_pascal": "OneStopMiss_vs_BothFirstMiss",
     "title": "First-Attempt Give-up vs First-Attempt Persist"
+  },
+  {
+    "key": "captures_vs_no_capture",
+    "a": "captures",
+    "b": "no_capture",
+    "a_label": "Captures",
+    "b_label": "No capture",
+    "slug_capfirst": "Captures_vs_No_capture",
+    "slug_pascal": "Captures_vs_NoCapture",
+    "title": "Capture vs No Capture"
+  },
+  {
+    "key": "captures_vs_all_misses",
+    "a": "captures",
+    "b": "all_misses",
+    "a_label": "Captures",
+    "b_label": "All misses",
+    "slug_capfirst": "Captures_vs_All_misses",
+    "slug_pascal": "Captures_vs_AllMisses",
+    "title": "Capture vs Miss"
+  },
+  {
+    "key": "first_vs_eventual_capture",
+    "a": "captures_minus_TAFT_last",
+    "b": "TAFT_last",
+    "a_label": "Captures minus TAFT last",
+    "b_label": "TAFT last",
+    "slug_capfirst": "Captures_minus_TAFT_last_vs_TAFT_last",
+    "slug_pascal": "CapturesMinusTAFTLast_vs_TAFTLast",
+    "title": "First-Shot Capture vs Eventual Capture"
+  },
+  {
+    "key": "first_giveup_vs_retry_then_giveup",
+    "a": "one_stop_miss",
+    "b": "GUAT_last",
+    "a_label": "one stop miss",
+    "b_label": "GUAT last",
+    "slug_capfirst": "One_stop_miss_vs_GUAT_last",
+    "slug_pascal": "OneStopMiss_vs_GUATLast",
+    "title": "First-Attempt Give-up vs Retry then Give-up"
+  },
+  {
+    "key": "first_giveup_vs_first_GUAT",
+    "a": "one_stop_miss",
+    "b": "GUAT_first",
+    "a_label": "one stop miss",
+    "b_label": "GUAT first",
+    "slug_capfirst": "One_stop_miss_vs_GUAT_first",
+    "slug_pascal": "OneStopMiss_vs_GUATFirst",
+    "title": "First-Attempt Give-up vs First-Attempt GUAT"
+  },
+  {
+    "key": "guat_persist_vs_taft_persist",
+    "a": "GUAT_nonfinal",
+    "b": "TAFT_nonfinal",
+    "a_label": "GUAT nonfinal",
+    "b_label": "TAFT nonfinal",
+    "slug_capfirst": "GUAT_nonfinal_vs_TAFT_nonfinal",
+    "slug_pascal": "GUATNonfinal_vs_TAFTNonfinal",
+    "title": "GUAT Early Persists vs TAFT Early Persists"
+  },
+  {
+    "key": "non_attempts_vs_all_misses",
+    "a": "all_misses",
+    "b": "non_captures_minus_all_misses",
+    "a_label": "All misses",
+    "b_label": "non Captures minus All misses",
+    "slug_capfirst": "All_misses_vs_Non_captures_minus_all_misses",
+    "slug_pascal": "AllMisses_vs_NonCapturesMinusAllMisses",
+    "title": "Miss vs Non-Attempt"
+  },
+  {
+    "key": "non_attempts_vs_single_miss",
+    "a": "non_captures_minus_all_misses",
+    "b": "one_stop_miss",
+    "a_label": "non Captures minus All misses",
+    "b_label": "one stop miss",
+    "slug_capfirst": "Non_captures_minus_all_misses_vs_One_stop_miss",
+    "slug_pascal": "NonCapturesMinusAllMisses_vs_OneStopMiss",
+    "title": "Non-Attempt vs Single-Attempt Miss"
+  },
+  {
+    "key": "non_attempts_vs_first_miss",
+    "a": "non_captures_minus_all_misses",
+    "b": "all_first_misses",
+    "a_label": "non Captures minus All misses",
+    "b_label": "All first misses",
+    "slug_capfirst": "Non_captures_minus_all_misses_vs_All_first_misses",
+    "slug_pascal": "NonCapturesMinusAllMisses_vs_AllFirstMisses",
+    "title": "Non-Attempt vs First-Attempt Miss"
+  },
+  {
+    "key": "non_attempts_vs_last_misses",
+    "a": "non_captures_minus_all_misses",
+    "b": "all_last_misses",
+    "a_label": "non Captures minus All misses",
+    "b_label": "All last misses",
+    "slug_capfirst": "Non_captures_minus_all_misses_vs_All_last_misses",
+    "slug_pascal": "NonCapturesMinusAllMisses_vs_AllLastMisses",
+    "title": "Non-Attempt vs Last-Attempt Miss"
   }
 ]

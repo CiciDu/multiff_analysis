@@ -42,9 +42,6 @@ class PlanFactorsAcrossAgents():
             self.pooled_perc_info_across_agents = pd.DataFrame()
             for folder in folders_with_params:
                 print('folder:', folder)
-                if 'best_model_postcurriculum' in folder:
-                    print('Ignoring best_model_postcurriculum')
-                    continue
                 manifest = rl_base_utils.read_checkpoint_manifest(folder)
                 if isinstance(manifest, dict) and ('env_params' in manifest):
                     params = manifest['env_params']

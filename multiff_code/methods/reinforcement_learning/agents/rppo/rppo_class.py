@@ -1,11 +1,14 @@
 import os
 import copy
+import json
 from reinforcement_learning.base_classes import rl_base_class, rl_base_utils, env_utils, base_env
 from reinforcement_learning.agents.rppo import rppo_env
 from reinforcement_learning.agents.feedforward import sb3_utils
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.vec_env import VecMonitor
-
+from sb3_contrib import RecurrentPPO
+from sb3_contrib.ppo_recurrent import MultiInputLstmPolicy
+from sb3_contrib import RecurrentPPO
 
 class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     """
@@ -88,18 +91,20 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
 
         self.agent_params = {**defaults, **existing, **kwargs}
         print('[RPPO] Prepared agent params:', self.agent_params)
+        # Persist agent params into meta for standardized layout
+        try:
+            meta_dir = getattr(self, 'meta_dir', None) or os.path.join(
+                self.model_folder_name, 'meta')
+            os.makedirs(meta_dir, exist_ok=True)
+            with open(os.path.join(meta_dir, 'agent_params.json'), 'w') as f:
+                json.dump(self.agent_params, f, indent=2, default=str)
+        except Exception:
+            pass
 
     def make_agent(self, agent_params_already_set_ok=True, **kwargs):
         """Initialize RPPO agent; placeholder until full integration."""
         self.prepare_agent_params(agent_params_already_set_ok, **kwargs)
 
-        # Import lazily to avoid circular imports
-        try:
-            from sb3_contrib import RecurrentPPO
-            from sb3_contrib.ppo_recurrent import MultiInputLstmPolicy
-        except ImportError as e:
-            raise ImportError(
-                'Stable-Baselines3 and sb3-contrib must be installed for RPPO: ' + str(e))
 
         self.rl_agent = RecurrentPPO(
             policy=MultiInputLstmPolicy,
@@ -144,6 +149,23 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         passed = bool(best_mean_reward >= reward_threshold)
         print(
             f'[RPPO] Stage complete — best_mean={best_mean_reward:.2f}, passed={passed}')
+        # Update ln/best_curr symlink
+        try:
+            ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
+                self.model_folder_name, 'ln')
+            os.makedirs(ln_dir, exist_ok=True)
+            link_path = os.path.join(ln_dir, 'best_curr')
+            target = self.best_model_in_curriculum_dir
+            if os.path.islink(link_path) or os.path.exists(link_path):
+                try:
+                    os.remove(link_path)
+                except IsADirectoryError:
+                    os.rmdir(link_path)
+                except Exception:
+                    pass
+            os.symlink(target, link_path)
+        except Exception:
+            pass
         # Update global best tracker for run_end logging
         try:
             if self.best_avg_reward is None:
@@ -208,6 +230,24 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             self.rl_agent.save(model_path)
             print('[RPPO] Saved model at', model_path)
         self.write_checkpoint_manifest(dir_name)
+        # Refresh meta manifest links if saving into standardized best dirs
+        try:
+            ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
+                self.model_folder_name, 'ln')
+            os.makedirs(ln_dir, exist_ok=True)
+            if os.path.abspath(dir_name) == os.path.abspath(getattr(self, 'best_model_postcurriculum_dir', '')):
+                link_path = os.path.join(ln_dir, 'best_post')
+                target = dir_name
+                if os.path.islink(link_path) or os.path.exists(link_path):
+                    try:
+                        os.remove(link_path)
+                    except IsADirectoryError:
+                        os.rmdir(link_path)
+                    except Exception:
+                        pass
+                os.symlink(target, link_path)
+        except Exception:
+            pass
 
     def load_agent(self, load_replay_buffer=True, dir_name=None, restore_env_from_checkpoint=True):
         """Load PPO model from directory."""
@@ -228,7 +268,6 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         model_path = os.path.join(dir_name, model_file) if model_file else os.path.join(
             dir_name, 'best_model.zip')
         try:
-            from sb3_contrib import RecurrentPPO
             self.rl_agent = RecurrentPPO.load(model_path, env=self.env)
             print('[RPPO] Loaded model from', model_path)
         except Exception as e:
@@ -277,10 +316,28 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         try:
             best_path = os.path.join(best_model_save_path, 'best_model.zip')
             if os.path.exists(best_path):
-                from sb3_contrib import RecurrentPPO
                 self.rl_agent = RecurrentPPO.load(best_path, env=self.env)
         except Exception as e:
             print('[RPPO] Warning: failed to load best model after training:', e)
+
+        # Update ln symlink if we trained into standardized post/best
+        try:
+            ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
+                self.model_folder_name, 'ln')
+            os.makedirs(ln_dir, exist_ok=True)
+            if os.path.abspath(best_model_save_path) == os.path.abspath(getattr(self, 'best_model_postcurriculum_dir', '')):
+                link_path = os.path.join(ln_dir, 'best_post')
+                target = best_model_save_path
+                if os.path.islink(link_path) or os.path.exists(link_path):
+                    try:
+                        os.remove(link_path)
+                    except IsADirectoryError:
+                        os.rmdir(link_path)
+                    except Exception:
+                        pass
+                os.symlink(target, link_path)
+        except Exception:
+            pass
 
     # -------------------------------------------------------------------------
     # Explicitly skip replay buffer for RPPO when loading best models

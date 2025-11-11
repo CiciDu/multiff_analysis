@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
 
 
 def plot_decoding_auc_heatmap(
@@ -365,7 +366,33 @@ def plot_decoding_timecourse(
     chance_level=0.5,
     title_prefix='Decoding timecourse',
     split_by=('a_label', 'b_label'),
+    save_path=None,          # ← new argument
+    dpi=300                  # ← optional, for high-res saving
 ):
+    """Plot decoding AUC timecourses, optionally saving to file.
+
+    Args:
+        df_results: DataFrame containing decoding results.
+        groupby_cols: Columns to group lines (models) within each subplot.
+        align_col: Column specifying alignment condition (e.g. by stop start/end).
+        value_col: Column with mean AUC or metric to plot.
+        sig_col: Column marking significant time bins.
+        err_col: Column with error values (sd or sem).
+        err_type: Error type label (for plotting, default 'sem').
+        alpha: Significance threshold or proxy if no sig_col present.
+        figsize: Tuple defining base subplot size.
+        palette: Matplotlib/seaborn color palette for lines.
+        show_sig: Whether to mark significant bins visually.
+        sig_color: Color used to mark significant bins.
+        chance_level: Baseline AUC level for reference.
+        title_prefix: Title text prefix.
+        split_by: Columns to define subplot grouping.
+        save_path: Optional path to save the figure (PNG/PDF/etc.).
+        dpi: Resolution for saved figure.
+
+    Returns:
+        fig: The Matplotlib Figure object.
+    """
     groupby_cols = _normalize_cols(groupby_cols)
     split_by = _normalize_cols(split_by)
 
@@ -380,7 +407,7 @@ def plot_decoding_timecourse(
             f"[plot_decoding_timecourse] '{align_col}' not found — treating as single alignment.")
         df[align_col] = False
 
-    # Compute window_center once up front
+    # Compute window_center (average of start and end if available)
     if 'window_end' in df.columns:
         df['window_center'] = df['window_start']
         mask_end = df['window_end'].notna()
@@ -392,6 +419,7 @@ def plot_decoding_timecourse(
             "[plot_decoding_timecourse] 'window_end' not found — using window_start as center.")
         df['window_center'] = df['window_start']
 
+    # Fallback for missing significance column
     if sig_col not in df.columns or df[sig_col].isna().all():
         print(
             f"[plot_decoding_timecourse] No '{sig_col}' found — using AUC > {chance_level + alpha:.2f} as proxy.")
@@ -407,12 +435,15 @@ def plot_decoding_timecourse(
         n_plots = len(subplot_groups)
         if n_plots == 0:
             print("[plot_decoding_timecourse] No subplot groups found — skipping.")
-            return
+            return None
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
 
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(
-            n_cols * 5, n_rows * 4), sharey=True)
+        fig, axes = plt.subplots(
+            n_rows, n_cols,
+            figsize=(n_cols * 5, n_rows * 4),
+            sharey=True
+        )
         axes = np.array(axes).reshape(-1)
 
         for i, (group_keys, df_sub) in enumerate(subplot_groups):
@@ -421,17 +452,40 @@ def plot_decoding_timecourse(
                 group_keys = (group_keys,)
             label_prefix = ' | '.join(
                 [f"{k}={v}" for k, v in zip(split_by, group_keys)])
+            # Append sample size to each subplot title if available
+            if 'sample_size' in df_sub.columns:
+                non_null_sizes = df_sub['sample_size'].dropna().to_numpy()
+                if non_null_sizes.size > 0:
+                    # Prefer a single unique value; otherwise show max as a conservative summary
+                    unique_sizes = np.unique(non_null_sizes)
+                    try:
+                        sample_n = int(unique_sizes[0]) if unique_sizes.size == 1 else int(
+                            np.nanmax(non_null_sizes))
+                        label_prefix = f"{label_prefix} (n={sample_n})"
+                    except Exception:
+                        pass
 
             df_agg = _aggregate_for_plot(
                 df_sub, groupby_cols, value_col, sig_col,
                 err_col=err_col, err_type=err_type
             )
-            _plot_subplot(ax, df_agg, groupby_cols, palette,
-                          show_sig, sig_color, chance_level, label_prefix)
+            _plot_subplot(
+                ax, df_agg, groupby_cols, palette,
+                show_sig, sig_color, chance_level, label_prefix
+            )
 
         for j in range(i + 1, len(axes)):
             axes[j].set_visible(False)
 
         fig.suptitle(f"{title_prefix} ({title_align})", fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.97])
-        plt.show()
+
+        # --- Save or display
+        if save_path:
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_path, dpi=dpi, bbox_inches='tight')
+            print(f'[write] Plot saved → {save_path}')
+        else:
+            plt.show()
+
+        return fig

@@ -51,6 +51,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  data_name='data_0',
                  std_anneal_preserve_fraction=1,
                  replay_keep_fraction=0.8,
+                 agent_id=None,
                  **additional_env_kwargs):
 
         self.player = "agent"
@@ -84,17 +85,29 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.loaded_agent_name = ''
 
+        self.dt = dt
+
         # self.agent_id = "dv" + str(dv_cost_factor) + \
         #                 "_dw" + str(dw_cost_factor) + "_w" + str(w_cost_factor) + \
         #                 "_memT" + \
         #     str(self.input_env_kwargs['max_in_memory_time'])
-        self.agent_id = 'agent_1'
+        self.agent_id = agent_id
 
         if len(overall_folder) > 0:
             os.makedirs(self.overall_folder, exist_ok=True)
 
-        self.model_folder_name = model_folder_name if model_folder_name is not None else os.path.join(
-            self.overall_folder, self.agent_id)
+        if model_folder_name is not None:
+            self.model_folder_name = model_folder_name
+        elif agent_id is not None:
+            self.model_folder_name = os.path.join(
+                self.overall_folder, self.agent_id)
+        else:
+            self.model_folder_name = self.overall_folder
+
+        if self.agent_id is None:
+            # use the last part of the overall_folder path as the agent_id
+            self.agent_id = os.path.basename(os.path.normpath(overall_folder))
+
         print('model_folder_name:', self.model_folder_name)
 
         self.std_anneal_preserve_fraction = std_anneal_preserve_fraction
@@ -108,12 +121,80 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.get_related_folder_names_from_model_folder_name(
             self.model_folder_name, data_name=data_name)
 
-        # Per-agent best-after-curriculum directory under the agent folder
+        # Initialize training status flag for robust downstream logging/logic
+        self.successful_training = False
+
+        # ---- Standardized artifact layout ----
+        # Roots
+        self.curr_dir = os.path.join(self.model_folder_name, 'curr')
+        self.post_dir = os.path.join(self.model_folder_name, 'post')
+        self.ft_dir = os.path.join(self.model_folder_name, 'ft')
+        self.ln_dir = os.path.join(self.model_folder_name, 'ln')
+        self.meta_dir = os.path.join(self.model_folder_name, 'meta')
+        # Best subdirs (curr/post)
+        self.best_model_in_curriculum_dir = os.path.join(self.curr_dir, 'best')
         self.best_model_postcurriculum_dir = os.path.join(
-            self.model_folder_name, 'best_model_postcurriculum')
-        # Per-agent best-during-curriculum directory
-        self.best_model_in_curriculum_dir = os.path.join(
-            self.model_folder_name, 'best_model_in_curriculum')
+            self.post_dir, 'best')
+
+        # Ensure directories exist
+        for d in [self.curr_dir, self.post_dir, self.ft_dir, self.ln_dir, self.meta_dir,
+                  self.best_model_in_curriculum_dir, self.best_model_postcurriculum_dir]:
+            try:
+                os.makedirs(d, exist_ok=True)
+            except Exception:
+                pass
+
+        # Short, robust symlink helpers
+        def _safe_symlink(target, link_path):
+            try:
+                if os.path.islink(link_path) or os.path.exists(link_path):
+                    try:
+                        os.remove(link_path)
+                    except IsADirectoryError:
+                        # Remove existing directory link
+                        os.rmdir(link_path)
+                    except Exception:
+                        pass
+                os.symlink(target, link_path)
+            except Exception:
+                # Symlinks may fail on some filesystems; ignore
+                pass
+
+        # Initialize ln symlinks (best_curr, best_post)
+        try:
+            _safe_symlink(self.best_model_in_curriculum_dir,
+                          os.path.join(self.ln_dir, 'best_curr'))
+            _safe_symlink(self.best_model_postcurriculum_dir,
+                          os.path.join(self.ln_dir, 'best_post'))
+        except Exception:
+            pass
+
+        # Minimal meta files
+        try:
+            env_params_path = os.path.join(self.meta_dir, 'env_params.json')
+            with open(env_params_path, 'w') as f:
+                json.dump(self.input_env_kwargs, f, indent=2, default=str)
+            manifest_path = os.path.join(self.meta_dir, 'manifest.json')
+            manifest = {
+                'algo': getattr(self, 'agent_type', None),
+                'version': '1',
+                'role': 'root',
+                'parent': None,
+                'env_params': 'meta/env_params.json',
+                'agent_params': 'meta/agent_params.json',
+                'artifacts': {
+                    'best_curr': 'ln/best_curr',
+                    'best_post': 'ln/best_post'
+                }
+            }
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest, f, indent=2, default=str)
+            # agent_params may be None at init; write an empty dict now
+            with open(os.path.join(self.meta_dir, 'agent_params.json'), 'w') as f:
+                json.dump(self.agent_params if isinstance(
+                    self.agent_params, dict) else {}, f, indent=2, default=str)
+        except Exception:
+            pass
 
     def get_related_folder_names_from_model_folder_name(self, model_folder_name, data_name='data_0'):
         self.model_folder_name = model_folder_name
@@ -192,33 +273,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                         dir_name=self.best_model_in_curriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
     def curriculum_training(self, best_model_in_curriculum_exists_ok=True, best_model_postcurriculum_exists_ok=True, load_replay_buffer_of_best_model_postcurriculum=True):
-        if self.loaded_agent_name == 'model':
-            self.regular_training()
-            self.successful_training = True
-            return
-        elif self.loaded_agent_name == 'best_model_in_curriculum':
-            self._progress_in_curriculum(best_model_in_curriculum_exists_ok)
-            self.regular_training()
-            self.successful_training = True
-            return
-        elif self.loaded_agent_name == 'best_model_postcurriculum':
-            self.regular_training()
+        if (self.loaded_agent_name == 'model') or (self.loaded_agent_name == 'post/best'):
             self.successful_training = True
             return
         else:
-            if best_model_postcurriculum_exists_ok:
-                try:
-                    self.load_best_model_postcurriculum(
-                        load_replay_buffer=load_replay_buffer_of_best_model_postcurriculum)
-                    print('Loaded best_model_postcurriculum')
-                except Exception:
-                    print('Need to train a new best_model_postcurriculum')
-                    self._progress_in_curriculum(
-                        best_model_in_curriculum_exists_ok)
-            else:
-                self._progress_in_curriculum(
-                    best_model_in_curriculum_exists_ok)
-            self.regular_training()
+            self._progress_in_curriculum(best_model_in_curriculum_exists_ok)
             self.successful_training = True
             return
 
@@ -230,10 +289,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         print('Starting curriculum training')
         if best_model_in_curriculum_exists_ok:
             try:
-                if self.loaded_agent_name != 'best_model_in_curriculum':
+                if self.loaded_agent_name != 'curr/best':
                     self.curriculum_env_kwargs = rl_base_utils.read_checkpoint_manifest(
                         self.loaded_agent_dir)['env_params']
-                    print('Loaded best_model_in_curriculum')
+                    print('Loaded curr/best')
                     print(
                         f'Made env based on env params saved in {self.loaded_agent_dir}')
                     self.make_env(**self.curriculum_env_kwargs)
@@ -241,7 +300,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                         load_replay_buffer=True, restore_env_from_checkpoint=False)
 
             except Exception:
-                print('Need to train a new best_model_in_curriculum')
+                print('Need to train a new curr/best')
                 self.make_init_env_for_curriculum_training()
                 self._make_agent_for_curriculum_training()
         else:
@@ -459,7 +518,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         print('Stage summary:', stage_summary)
 
     def collect_data(self, n_steps=8000, exists_ok=False, save_data=True):
-
         if exists_ok:
             try:
                 self.retrieve_monkey_data()
@@ -485,6 +543,21 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         if not hasattr(self, 'current_env_kwargs'):
             self.current_env_kwargs = copy.deepcopy(self.input_env_kwargs)
 
+        # Ensure an agent/model exists before collecting data
+        if not hasattr(self, 'rl_agent') or getattr(self, 'rl_agent') is None:
+            try:
+                # Prefer loading an existing agent if available
+                self.load_latest_agent(load_replay_buffer=True)
+            except Exception:
+                # Fall back to creating a fresh env and agent
+                print('No agent found. Creating a fresh env and agent...')
+                try:
+                    self.env
+                except AttributeError:
+                    self.make_env(**self.input_env_kwargs)
+                self.make_agent()
+
+
         env_data_collection_kwargs = copy.deepcopy(self.current_env_kwargs)
         env_data_collection_kwargs.update({'episode_len': n_steps+100})
 
@@ -499,19 +572,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 **env_data_collection_kwargs)
             LSTM = False
 
-        # Ensure an agent/model exists before collecting data
-        if not hasattr(self, 'rl_agent') or getattr(self, 'rl_agent') is None:
-            try:
-                # Prefer loading an existing agent if available
-                self.load_latest_agent(load_replay_buffer=True)
-            except Exception:
-                # Fall back to creating a fresh env and agent
-                print('No agent found. Creating a fresh env and agent...')
-                try:
-                    self.env
-                except AttributeError:
-                    self.make_env(**self.input_env_kwargs)
-                self.make_agent()
 
         self._run_agent_to_collect_data(
             n_steps=n_steps, save_data=save_data, LSTM=LSTM)
@@ -631,19 +691,24 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # Try current directory first; if it's a curriculum subdir, fall back to agent root
         candidates = [dir_name]
         candidate_names = ['model']
-        for best_model_dir in ['best_model_postcurriculum', 'best_model_in_curriculum']:
-            best_model_path = os.path.join(dir_name, best_model_dir)
-            candidates.append(best_model_path)
-            candidate_names.append(best_model_dir)
+        # Prefer symlinks in ln/ first (stable interface), then fall back to canonical dirs
+        candidates.extend([
+            os.path.join(dir_name, 'ln', 'best_post'),
+            os.path.join(dir_name, 'ln', 'best_curr'),
+            os.path.join(dir_name, 'post', 'best'),
+            os.path.join(dir_name, 'curr', 'best'),
+        ])
+        candidate_names.extend(
+            ['ln/best_post', 'ln/best_curr', 'post/best', 'curr/best'])
 
         last_error = None
         self.loaded_agent_dir = None
         for d, name in zip(candidates, candidate_names):
             try:
                 self.load_agent(
-                    load_replay_buffer=load_replay_buffer, dir_name=d)
+                    load_replay_buffer=load_replay_buffer, dir_name=d, restore_env_from_checkpoint=True)
                 self.loaded_agent_name = name
-                if name == 'best_model_in_curriculum':
+                if name in ('curr/best', 'ln/best_curr'):
                     self.curriculum_env_kwargs = self.current_env_kwargs.copy()
                 return
             except Exception as e:
@@ -686,17 +751,17 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                          duration=duration, n_steps=n_steps, file_name=None)
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
-                                    data_exists_ok=False, save_video=True, save_as_gif=False, display_inline=False):
+                                    data_exists_ok=False, save_video=True, save_format='html', display_inline=False):
         self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
-                            duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_as_gif=save_as_gif, display_inline=display_inline)
+                            duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline)
 
-    def make_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], file_name=None, video_dir=None, max_num_frames=150, save_as_gif=True, save_video=True, display_inline=False):
+    def make_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], file_name=None, video_dir=None, max_num_frames=150, save_format=None, save_video=True, display_inline=False):
         self.set_animation_parameters(currentTrial=currentTrial_for_animation, num_trials=num_trials_for_animation,
                                       k=1, duration=duration, max_num_frames=max_num_frames)
         self.call_animation_function(
-            file_name=file_name, video_dir=video_dir, save_video=save_video, save_as_gif=save_as_gif, display_inline=display_inline)
+            file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline)
 
     def streamline_everything(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                               use_curriculum_training=True, load_replay_buffer_of_best_model_postcurriculum=True,
@@ -761,6 +826,22 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     best_model_postcurriculum_exists_ok=True,
                     load_replay_buffer_of_best_model_postcurriculum=True, timesteps=1000000):
 
+        # Ensure family_of_agents_log exists when training is invoked directly
+        family_log = getattr(self, 'family_of_agents_log', None)
+        if family_log is None or not isinstance(family_log, pd.DataFrame):
+            try:
+                self.family_of_agents_log = rl_base_utils.retrieve_or_make_family_of_agents_log(
+                    self.overall_folder)
+            except Exception:
+                # Fallback: keep an in-memory empty frame with expected columns
+                self.family_of_agents_log = pd.DataFrame(columns=[
+                    'dv_cost_factor', 'dw_cost_factor', 'w_cost_factor',
+                    'v_noise_std', 'w_noise_std', 'ffr_noise_scale',
+                    'num_obs_ff', 'max_in_memory_time',
+                    'finished_training', 'year', 'month', 'date',
+                    'training_time', 'successful_training'
+                ])
+
         # Emit run_start once per training invocation
         try:
             # Prefer externally provided sweep params
@@ -798,6 +879,17 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # self.rl_agent.save_replay_buffer(os.path.join(self.model_folder_name, 'buffer')) # I added this
         self.current_info_condition = self.get_current_info_condition(
             self.family_of_agents_log)
+        # Ensure 'successful_training' column exists and is numeric for safe aggregation
+        try:
+            if 'successful_training' not in self.family_of_agents_log.columns:
+                self.family_of_agents_log['successful_training'] = 0
+            self.family_of_agents_log['successful_training'] = self.family_of_agents_log['successful_training'].fillna(
+                0)
+        except Exception:
+            pass
+        # Default to True if subclasses didn't explicitly set flag but training completed
+        if not hasattr(self, 'successful_training'):
+            self.successful_training = True
         self.family_of_agents_log.loc[self.current_info_condition,
                                       'finished_training'] = True
         self.family_of_agents_log.loc[self.current_info_condition,
@@ -845,8 +937,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             env_for_eval, n_eval_episodes=n_eval_episodes, ff_caught_rate_threshold=ff_caught_rate_threshold)
 
     def _ensure_curriculum_log(self) -> str:
-        log_path = os.path.join(
-            self.best_model_in_curriculum_dir, 'curriculum_log.csv')
+        # Log curriculum progression at curr/log.csv
+        log_path = os.path.join(self.curr_dir, 'log.csv')
         columns = [
             'stage', 'reward_threshold', 'best_avg_reward',
             'flash_on_interval', 'angular_terminal_vel', 'reward_boundary',
@@ -1096,18 +1188,27 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.minimal_current_info = self.get_minimum_current_info()
         retrieved_current_info = self.family_of_agents_log.loc[self.current_info_condition]
 
-        # Detect existence of a best model for both SB3 (.zip) and RNN (manifest) schemes
+        # Detect existence of a best model for both legacy and new standardized layouts
         candidate_paths = [
             os.path.join(self.model_folder_name, 'best_model.zip'),
             os.path.join(self.model_folder_name, 'checkpoint_manifest.json'),
+            os.path.join(self.model_folder_name, 'post',
+                         'best', 'checkpoint_manifest.json'),
+            os.path.join(self.model_folder_name, 'curr',
+                         'best', 'checkpoint_manifest.json'),
         ]
         exist_best_model = any(exists(p) for p in candidate_paths)
         finished_training = np.any(retrieved_current_info['finished_training'])
         print('exist_best_model', exist_best_model)
         print('finished_training', finished_training)
 
-        self.successful_training = np.any(
-            retrieved_current_info['successful_training'])
+        # Treat missing values as 0 for robust boolean evaluation
+        try:
+            self.successful_training = bool(np.any(
+                retrieved_current_info['successful_training'].fillna(0)))
+        except Exception:
+            self.successful_training = bool(np.any(
+                retrieved_current_info.get('successful_training', 0)))
 
         if finished_training & (not self.successful_training):
             # That's the indication that the set of parameters cannot be used to train a good agent
@@ -1127,7 +1228,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                        'year': time_package.localtime().tm_year,
                                        'month': time_package.localtime().tm_mon,
                                        'date': time_package.localtime().tm_mday,
-                                       'training_time': 0}
+                                       'training_time': 0,
+                                       'successful_training': 0}
             current_info = {**self.minimal_current_info,
                             **additional_current_info}
 
@@ -1160,7 +1262,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.overall_folder + 'parameters_record.csv')
 
     def call_animation_function(self, margin=100, save_video=True, video_dir=None, file_name=None, plot_eye_position=False, set_xy_limits=True, plot_flash_on_ff=False,
-                                show_speed_through_path_color=True, save_as_gif=None, display_inline=False, **animate_kwargs):
+                                show_speed_through_path_color=True, save_format=None, display_inline=False, **animate_kwargs):
         self.obs_ff_indices_in_ff_dataframe_dict = None
         # self.obs_ff_indices_in_ff_dataframe_dict = {index: self.obs_ff_indices_in_ff_dataframe[index].astype(int) for index in range(len(self.obs_ff_indices_in_ff_dataframe))}
 
@@ -1196,7 +1298,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         super().call_animation_function(margin=margin, save_video=save_video, video_dir=video_dir, file_name=file_name, plot_eye_position=plot_eye_position,
                                         set_xy_limits=set_xy_limits, plot_flash_on_ff=plot_flash_on_ff, in_obs_ff_dict=self.obs_ff_indices_in_ff_dataframe_dict,
-                                        fps=int((1/dt)/self.k), show_speed_through_path_color=show_speed_through_path_color, save_as_gif=save_as_gif,
+                                        fps=int((1/dt)/self.k), show_speed_through_path_color=show_speed_through_path_color, save_format=save_format,
                                         display_inline=display_inline, **animate_kwargs)
 
     def make_animation_with_annotation(self, margin=100, save_video=True, video_dir=None, file_name=None, plot_eye_position=False, set_xy_limits=True):
@@ -1276,7 +1378,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     #                                                 data_folder_name=self.patterns_and_features_folder_path
     #                                                 )
 
-
     def _choose_next_curriculum_update(self, current: dict, targets: dict):
         """
         Choose the next curriculum update.
@@ -1303,7 +1404,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 # Reverse direction (wrong sign, move toward target)
                 if c_val != t_val:
                     step_size = abs(step_fn(t_val, c_val) - t_val)
-                    new_val = min(c_val + step_size, t_val) if c_val < t_val else max(c_val - step_size, t_val)
+                    new_val = min(
+                        c_val + step_size, t_val) if c_val < t_val else max(c_val - step_size, t_val)
                     return new_val, prune_flag
             except Exception:
                 pass
@@ -1313,16 +1415,20 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # 1. High-priority single-parameter updates
         # -----------------------------
         singles = [
-            ('reward_boundary', lambda c, t: c > t, lambda c, t: max(c - 10, t), True),
-            ('angular_terminal_vel', lambda c, t: c > t, lambda c, t: max(c / 2, t), True),
-            ('flash_on_interval', lambda c, t: c > t, lambda c, t: max(c - 0.3, t), True),
+            ('reward_boundary', lambda c, t: c >
+             t, lambda c, t: max(c - 10, t), True),
+            ('angular_terminal_vel', lambda c, t: c >
+             t, lambda c, t: max(c / 2, t), True),
+            ('flash_on_interval', lambda c, t: c >
+             t, lambda c, t: max(c - 0.3, t), True),
         ]
 
         for key, need, step, prune in singles:
             c_val, t_val = current.get(key), targets.get(key)
             if c_val is None or t_val is None:
                 continue
-            new_val, do_prune = _apply_update_rule(key, c_val, t_val, need, step, prune)
+            new_val, do_prune = _apply_update_rule(
+                key, c_val, t_val, need, step, prune)
             if new_val is not None:
                 return {key: new_val}, do_prune
 
@@ -1330,13 +1436,18 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # 2. Grouped parameter updates
         # -----------------------------
         grouped_specs_primary = [
-            ('distance2center_cost', lambda c, t: c > t, lambda c, t: max(c - 1, t), True),
-            ('stop_vel_cost', lambda c, t: c > t, lambda c, t: max(c - 1, t), False),
+            ('distance2center_cost', lambda c, t: c >
+             t, lambda c, t: max(c - 1, t), True),
+            ('stop_vel_cost', lambda c, t: c > t,
+             lambda c, t: max(c - 1, t), False),
         ]
         grouped_specs_secondary = [
-            ('dv_cost_factor', lambda c, t: c < t, lambda c, t: min(c + 1, t), False),
-            ('dw_cost_factor', lambda c, t: c < t, lambda c, t: min(c + 1, t), False),
-            ('w_cost_factor', lambda c, t: c < t, lambda c, t: min(c + 1, t), False),
+            ('dv_cost_factor', lambda c, t: c < t,
+             lambda c, t: min(c + 1, t), False),
+            ('dw_cost_factor', lambda c, t: c < t,
+             lambda c, t: min(c + 1, t), False),
+            ('w_cost_factor', lambda c, t: c < t,
+             lambda c, t: min(c + 1, t), False),
         ]
 
         # Pass 1: primary group (higher priority)
@@ -1345,7 +1456,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             c_val, t_val = current.get(key), targets.get(key)
             if c_val is None or t_val is None:
                 continue
-            new_val, prune_flag = _apply_update_rule(key, c_val, t_val, need, step, prune)
+            new_val, prune_flag = _apply_update_rule(
+                key, c_val, t_val, need, step, prune)
             if new_val is not None:
                 primary_updates[key] = new_val
                 do_prune_primary |= prune_flag
@@ -1358,7 +1470,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             c_val, t_val = current.get(key), targets.get(key)
             if c_val is None or t_val is None:
                 continue
-            new_val, prune_flag = _apply_update_rule(key, c_val, t_val, need, step, prune)
+            new_val, prune_flag = _apply_update_rule(
+                key, c_val, t_val, need, step, prune)
             if new_val is not None:
                 updates[key] = new_val
                 do_prune |= prune_flag
@@ -1368,14 +1481,14 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # -----------------------------
         return (updates, do_prune) if updates else ({}, False)
 
-
     def _after_curriculum_env_change(self, updated_key: str):
         """Reset adaptive components (anneal progress, entropy temperature) after env change."""
         # --- Reset annealing progress ---
         if hasattr(self, 'rl_agent') and hasattr(self.rl_agent, 'policy_net'):
             try:
                 current = getattr(self.rl_agent.policy_net, 'anneal_step', 0)
-                new_value = int(max(0, int(current * self.std_anneal_preserve_fraction)))
+                new_value = int(
+                    max(0, int(current * self.std_anneal_preserve_fraction)))
                 setattr(self.rl_agent.policy_net, 'anneal_step', new_value)
                 print(f'std_anneal step before: {current}, after: {new_value}')
             except Exception as e:
@@ -1389,13 +1502,16 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     cur_log_alpha = self.rl_agent.log_alpha
                     tgt_log_alpha = torch.zeros_like(cur_log_alpha)
 
-                    alpha_before = getattr(self.rl_agent, 'alpha', cur_log_alpha.exp())
-                    new_log_alpha = beta * cur_log_alpha + (1 - beta) * tgt_log_alpha
+                    alpha_before = getattr(
+                        self.rl_agent, 'alpha', cur_log_alpha.exp())
+                    new_log_alpha = beta * cur_log_alpha + \
+                        (1 - beta) * tgt_log_alpha
                     self.rl_agent.log_alpha.copy_(new_log_alpha)
 
                     if hasattr(self.rl_agent, 'alpha'):
                         self.rl_agent.alpha = self.rl_agent.log_alpha.exp()
-                    alpha_after = getattr(self.rl_agent, 'alpha', self.rl_agent.log_alpha.exp())
+                    alpha_after = getattr(
+                        self.rl_agent, 'alpha', self.rl_agent.log_alpha.exp())
 
                 # Clear optimizer state safely
                 opt = getattr(self.rl_agent, 'alpha_optimizer', None)
