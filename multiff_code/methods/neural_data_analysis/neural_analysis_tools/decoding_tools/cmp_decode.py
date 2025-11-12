@@ -17,6 +17,8 @@ Example:
 """
 
 from __future__ import annotations
+import seaborn as sns
+import ast
 
 import argparse
 import sys
@@ -29,6 +31,7 @@ import matplotlib.pyplot as plt
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
+
 
 def _ensure_methods_on_path() -> None:
     """Make sure `multiff_code/methods` is importable.
@@ -285,7 +288,7 @@ def summarize_and_plot_decoding(raw_data_folder_path, cumulative=False):
     df_all = _load_all_results(job_result_dir, None)
     if df_all.empty:
         raise RuntimeError('No rows matched the provided filters.')
-    
+
     df_all = df_all[df_all['align_by_stop_end'] == True].copy()
 
     # Summarize decoding results
@@ -308,18 +311,20 @@ def summarize_and_plot_decoding(raw_data_folder_path, cumulative=False):
     date_str = date_part.replace('data_', '')  # '0301'
 
     # --- Loop over alignments and save a plot for each ---
-    plot_dir = Path('all_monkey_data/retry_decoder/plots') if not cumulative else Path('all_monkey_data/retry_decoder_cumulative/plots')
+    plot_dir = Path('all_monkey_data/retry_decoder/plots') if not cumulative else Path(
+        'all_monkey_data/retry_decoder_cumulative/plots')
     plot_dir.mkdir(parents=True, exist_ok=True)
 
     align_col = 'align_by_stop_end'
     if align_col not in df_all.columns:
-        print(f"[warn] '{align_col}' not in dataframe; assuming all align_by_stop_end=False")
+        print(
+            f"[warn] '{align_col}' not in dataframe; assuming all align_by_stop_end=False")
         df_all[align_col] = False
 
     for align_val in df_all[align_col].unique():
         suffix = 'end' if align_val else 'start'
         png_path = plot_dir / f'{monkey}_{date_str}_{suffix}.png'
-        
+
         fig = plot_decoding.plot_decoding_timecourse(
             df_all[df_all[align_col] == align_val],
             groupby_cols=('model_name',),
@@ -333,17 +338,33 @@ def summarize_and_plot_decoding(raw_data_folder_path, cumulative=False):
         )
         plt.show()
 
-
     print(f'\n[done] Summary and plots generated for {monkey} {date_str}\n')
-    return
+    return df_all
 
 
 import ast
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def plot_best_params(df_all):
-    df = df_all[df_all['model_name'] == 'logreg_elasticnet'].copy()
+import ast
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def safe_sorted_categories(series):
+    vals = series.dropna().unique()
+    str_vals = sorted([v for v in vals if isinstance(v, str)])
+    num_vals = sorted([v for v in vals if not isinstance(v, str)])
+    return list(num_vals) + str_vals
+
+
+def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=None):
+    """Visualize 1–3 hyperparameters for a given model (handles clf__ prefixes, clean ticks)."""
+    df = df_all[df_all['model_name'] == model_name].copy()
+    if df.empty:
+        print(f'No entries for model {model_name}')
+        return None
 
     # ---- Safe parser ----
     def safe_parse(x):
@@ -355,7 +376,6 @@ def plot_best_params(df_all):
             return ast.literal_eval(x)
         except Exception:
             try:
-                # try JSON-style cleaning if keys aren't quoted
                 x_clean = (
                     x.replace("'", '"')
                      .replace('None', 'null')
@@ -367,28 +387,86 @@ def plot_best_params(df_all):
 
     df['best_params'] = df['best_params'].apply(safe_parse)
 
-    # ---- Extract C and l1_ratio ----
-    df['C'] = df['best_params'].apply(lambda d: d.get('C', None))
-    df['l1_ratio'] = df['best_params'].apply(lambda d: d.get('l1_ratio', None))
+    # ---- Normalize keys (strip 'clf__' etc.) ----
+    def strip_prefixes(d):
+        return {k.split('__')[-1]: v for k, v in d.items()} if isinstance(d, dict) else {}
+    df['best_params'] = df['best_params'].apply(strip_prefixes)
 
-    # drop invalid rows
-    df = df.dropna(subset=['C', 'l1_ratio'])
+    # ---- Extract requested params ----
+    params = [p for p in [param_x, param_y, param_z] if p is not None]
+    for p in params:
+        df[p] = df['best_params'].apply(lambda d: d.get(p, None))
 
-    # ---- Count frequencies ----
-    count_df = (
-        df.groupby(['C', 'l1_ratio'])
-        .size()
-        .reset_index(name='count')
-    )
+    df = df.dropna(subset=params)
+    if df.empty:
+        print(f'No valid entries for {model_name} with params {params}')
+        return None
 
-    # ---- Plot ----
-    pivot = count_df.pivot(index='l1_ratio', columns='C', values='count').fillna(0)
-    plt.figure(figsize=(8, 5))
-    sns.heatmap(pivot, annot=True, fmt='.0f', cmap='viridis')
-    plt.title('Frequency of Best Params (C vs l1_ratio)')
-    plt.xlabel('C')
-    plt.ylabel('l1_ratio')
-    plt.tight_layout()
-    plt.show()
+    # ---- 1️⃣ One param → bar plot ----
+    if len(params) == 1:
+        p = params[0]
+        count_df = df[p].value_counts().reset_index()
+        count_df.columns = [p, 'count']
+        sns.barplot(x=p, y='count', data=count_df, palette='viridis')
+        plt.title(f'{model_name}: Frequency of Best {p}')
+        plt.tight_layout()
+        plt.show()
+        return count_df
 
-    return count_df.sort_values('count', ascending=False)
+    # ---- 2️⃣ Two params → single heatmap ----
+    elif len(params) == 2:
+        x, y = params
+        count_df = df.groupby([x, y]).size().reset_index(name='count')
+
+
+        count_df[x] = pd.Categorical(count_df[x], categories=safe_sorted_categories(count_df[x]), ordered=True)
+        count_df[y] = pd.Categorical(count_df[y], categories=safe_sorted_categories(count_df[y]), ordered=True)
+
+        pivot = count_df.pivot(index=y, columns=x, values='count').fillna(0)
+        sns.heatmap(pivot, annot=True, fmt='.0f', cmap='viridis')
+        plt.title(f'{model_name}: Frequency of Best Params ({x} vs {y})')
+        plt.xlabel(x)
+        plt.ylabel(y)
+        plt.tight_layout()
+        plt.show()
+        return count_df.sort_values('count', ascending=False)
+
+    # ---- 3️⃣ Three params → multiple heatmaps ----
+    elif len(params) == 3:
+        x, y, z = params
+        count_df = df.groupby([x, y, z]).size().reset_index(name='count')
+
+        # Ensure discrete numeric order across all slices
+        x_order = safe_sorted_categories(count_df[x])
+        y_order = safe_sorted_categories(count_df[y])
+        z_order = safe_sorted_categories(count_df[z])
+
+        n = len(z_order)
+        ncols = min(n, 4)
+        nrows = (n - 1) // ncols + 1
+        fig, axes = plt.subplots(nrows, ncols, figsize=(6*ncols, 5*nrows), sharey=True)
+        axes = axes.flatten() if n > 1 else [axes]
+
+        for ax, z_val in zip(axes, z_order):
+            subset = count_df[count_df[z] == z_val].copy()
+
+            # Force discrete ordering for consistent ticks
+            subset[x] = pd.Categorical(subset[x], categories=x_order, ordered=True)
+            subset[y] = pd.Categorical(subset[y], categories=y_order, ordered=True)
+
+            pivot = subset.pivot(index=y, columns=x, values='count').fillna(0)
+            sns.heatmap(pivot, annot=True, fmt='.0f', cmap='viridis', ax=ax)
+
+            ax.set_title(f'{z} = {z_val}')
+            ax.set_xlabel(x)
+            ax.set_ylabel(y)
+
+        # Hide unused subplots if any
+        for ax in axes[len(z_order):]:
+            ax.axis('off')
+
+        plt.suptitle(f'{model_name}: Frequency of Best Params ({x}, {y}, {z})')
+        plt.tight_layout()
+        plt.show()
+
+        return count_df.sort_values('count', ascending=False)

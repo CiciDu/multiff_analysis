@@ -68,8 +68,7 @@ def run_population_decoding(an, window=(0, 0.3), model_name='svm',
 def run_window_decoding(an, window, model_name='svm', k=5, tune=False,
                         model_kwargs=None, alpha=0.05, n_perm=0,
                         do_testing=True,
-                        perm_search: Optional[str] = 'grid',
-                        perm_param_grid: Optional[Dict[str, Any]] = None):
+                        perm_search: Optional[str] = 'grid'):
     """
     Decode neural data for a single time window with optional significance testing.
 
@@ -77,26 +76,54 @@ def run_window_decoding(an, window, model_name='svm', k=5, tune=False,
     -------
     dict : mean_auc, sd_auc, tstat, p_ttest, sig_ttest, p_perm, n_units
     """
-    res = decoding_utils.run_decoding(
-        an, window=window, model_name=model_name,
-        tune=tune, k=k, model_kwargs=model_kwargs
+    # Build data once
+    X, y, _ = decoding_utils.build_Xy(an, window)
+
+    # If tuning is requested, ensure baseline and permutations use the SAME grid
+    # Strategy: derive default grid from get_decoder() for this data shape
+    shared_param_grid: Optional[Dict[str, Any]] = None
+    if tune:
+        # Derive the default grid for the given data size so both paths match
+        n_samples, n_features = X.shape
+        _, derived_grid = decoding_utils.get_decoder(
+            model_name, seed=0, n_samples=n_samples, n_features=n_features, model_kwargs=model_kwargs
+        )
+        shared_param_grid = derived_grid
+    else:
+        perm_search = None
+
+    # Run baseline decoding (use shared grid if tuning)
+    mean_auc, sd_auc, best_params = decoding_utils.decode_auc_cv(
+        X, y,
+        model_name=model_name,
+        k=k,
+        seed=0,
+        tune=bool(tune),
+        search='grid',
+        model_kwargs=model_kwargs,
+        param_grid_override=shared_param_grid if tune else None,
     )
+
+    res = {
+        'model': model_name,
+        'tuned': tune,
+        'window': window,
+        'n_units': int(X.shape[1]),
+        'mean_auc': mean_auc,
+        'sd_auc': sd_auc,
+        'best_params': best_params,
+    }
 
     # Skip significance if not requested
     if not do_testing:
-        # Compute sample size for this window
-        X_tmp, y_tmp, _ = decoding_utils.build_Xy(an, window)
-        sample_size = int(y_tmp.shape[0])
         return {
             'window_start': window[0], 'window_end': window[1],
             'mean_auc': res['mean_auc'], 'sd_auc': res['sd_auc'],
             'tstat': np.nan, 'p_ttest': np.nan, 'sig_ttest': np.nan,
             'p_perm': np.nan, 'n_units': res['n_units'],
-            'sample_size': sample_size
+            'sample_size': int(y.shape[0])
         }
 
-    # Build data
-    X, y, _ = decoding_utils.build_Xy(an, window)
     cv = StratifiedKFold(k, shuffle=True, random_state=0)
     aucs = []
     for tr, te in cv.split(X, y):
@@ -129,7 +156,9 @@ def run_window_decoding(an, window, model_name='svm', k=5, tune=False,
         _, _, p_perm = decoding_utils.permutation_test_auc(
             X, y, model_name=model_name, k=k, n_perm=n_perm,
             show_progress=False, fixed_params=fixed_params, real_auc=observed_auc,
-            param_grid=perm_param_grid, perm_search=perm_search
+            # Critical: pass the SAME grid used by baseline when tuning
+            param_grid=(shared_param_grid if tune else None),
+            perm_search=perm_search
         )
 
     return {
@@ -148,8 +177,7 @@ def run_one_decoding_comparison(
     tune=False, k=5, n_perm=0, alpha=0.05,
     windows=None, align_by_stop_end=False,
     do_testing=True, n_jobs=1, verbose=True,
-    perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None
+    perm_search: Optional[str] = 'grid'
 ):
     """
     Run decoding across all time windows for a single comparison.
@@ -228,7 +256,7 @@ def run_one_decoding_comparison(
             model_name=model_name, k=k, tune=tune,
             model_kwargs=model_kwargs, alpha=alpha,
             n_perm=n_perm, do_testing=do_testing,
-            perm_search=perm_search, perm_param_grid=perm_param_grid
+            perm_search=perm_search
         )
         for window in windows
     )
@@ -462,7 +490,6 @@ def _run_all_decoding_core(
     verbose,
     n_jobs,
     perm_search,
-    perm_param_grid,
     per_comp_runner,
     cumulative_features=False,
     title_suffix=''
@@ -512,8 +539,7 @@ def _run_all_decoding_core(
                 do_testing=do_testing,
                 n_jobs=n_jobs,
                 verbose=verbose,
-                perm_search=perm_search,
-                perm_param_grid=perm_param_grid
+                perm_search=perm_search
             )
             all_results.append(df)
 
@@ -585,8 +611,7 @@ def run_cumulative_window_decoding(
     alpha=0.05,
     n_perm=0,
     do_testing=True,
-    perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None
+    perm_search: Optional[str] = 'grid'
 ):
     """
     Decode using features concatenated from all windows up to the current one.
@@ -606,9 +631,22 @@ def run_cumulative_window_decoding(
     X = np.concatenate(X_parts, axis=1)
     y = y_ref
 
-    # Obtain mean AUC and (optionally) tuned params on cumulative X
+    # If tuning is requested, ensure baseline and permutations use the SAME grid
+    # Strategy: derive default grid from get_decoder() for this data shape
+    shared_param_grid: Optional[Dict[str, Any]] = None
+    if tune:
+        n_samples, n_features = X.shape
+        _, derived_grid = decoding_utils.get_decoder(
+            model_name, seed=0, n_samples=n_samples, n_features=n_features, model_kwargs=model_kwargs
+        )
+        shared_param_grid = derived_grid
+    else:
+        perm_search = None
+
+    # Obtain mean AUC and (optionally) tuned params on cumulative X using shared grid if tuning
     mean_auc, sd_auc, best_params = decoding_utils.decode_auc_cv(
-        X, y, model_name=model_name, k=k, seed=0, tune=tune, model_kwargs=model_kwargs
+        X, y, model_name=model_name, k=k, seed=0, tune=tune,
+        model_kwargs=model_kwargs, param_grid_override=shared_param_grid if tune else None
     )
 
     # Skip significance if not requested
@@ -657,7 +695,8 @@ def run_cumulative_window_decoding(
             model_name=model_name, k=k, n_perm=n_perm, seed=0,
             tune=tune, model_kwargs=model_kwargs, show_progress=False,
             fixed_params=fixed_params, real_auc=mean_auc,
-            param_grid=perm_param_grid, perm_search=perm_search
+            # Critical: pass the SAME grid used by baseline when tuning
+            param_grid=(shared_param_grid if tune else None), perm_search=perm_search
         )
 
     return {
@@ -681,8 +720,7 @@ def run_one_decoding_comparison_cumulative(
     tune=False, k=5, n_perm=0, alpha=0.05,
     windows=None, align_by_stop_end=False,
     do_testing=True, n_jobs=1, verbose=True,
-    perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None
+    perm_search: Optional[str] = 'grid'
 ):
     """
     Run cumulative-window decoding across all time windows for a single comparison.
@@ -721,8 +759,7 @@ def run_one_decoding_comparison_cumulative(
             alpha=alpha,
             n_perm=n_perm,
             do_testing=do_testing,
-            perm_search=perm_search,
-            perm_param_grid=perm_param_grid
+            perm_search=perm_search
         )
         for i in range(len(windows))
     )
@@ -758,8 +795,7 @@ def run_all_decoding_comparisons(  # type: ignore[override]
     overwrite=False, exists_ok=False,
     session_info=None, verbose=True,
     n_jobs: int = 1,
-    perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None
+    perm_search: Optional[str] = 'grid'
 ):
     return _run_all_decoding_core(
         comparisons=comparisons,
@@ -784,7 +820,6 @@ def run_all_decoding_comparisons(  # type: ignore[override]
         verbose=verbose,
         n_jobs=n_jobs,
         perm_search=perm_search,
-        perm_param_grid=perm_param_grid,
         per_comp_runner=lambda **kwargs: run_one_decoding_comparison(
             **kwargs),
         cumulative_features=False,
@@ -801,8 +836,7 @@ def run_all_decoding_comparisons_cumulative(
     overwrite=False, exists_ok=False,
     session_info=None, verbose=True,
     n_jobs: int = 1,
-    perm_search: Optional[str] = None,
-    perm_param_grid: Optional[Dict[str, Any]] = None
+    perm_search: Optional[str] = 'grid'
 ):
     return _run_all_decoding_core(
         comparisons=comparisons,
@@ -827,7 +861,6 @@ def run_all_decoding_comparisons_cumulative(
         verbose=verbose,
         n_jobs=n_jobs,
         perm_search=perm_search,
-        perm_param_grid=perm_param_grid,
         per_comp_runner=lambda **kwargs: run_one_decoding_comparison_cumulative(
             **kwargs),
         cumulative_features=True,

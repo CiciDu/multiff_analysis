@@ -101,7 +101,8 @@ def get_decoder(name: str,
             class_weight='balanced', **model_kwargs
         )
         # Keep C modest at small N
-        Cs = choose([0.01, 0.1, 1], [0.03, 0.3, 1, 3], [0.03, 0.3, 1, 3, 10])
+        #Cs = choose([0.01, 0.1, 1], [0.03, 0.3, 1, 3], [0.03, 0.3, 1, 3, 10])
+        Cs = [0.03]
         clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
         param_grid = {'clf__C': Cs}
 
@@ -152,24 +153,30 @@ def get_decoder(name: str,
         base = SVC(probability=True, kernel='rbf',
                    random_state=seed, class_weight='balanced', **model_kwargs)
         # Keep gamma mostly 'scale'; only add a tiny perturbation at larger N
-        gamma_grid = choose(['scale'], ['scale', 0.01],
-                            ['scale', 0.03, 0.01])
-        C_grid = choose([0.1, 1], [0.1, 1, 3], [0.1, 1, 3, 10])
+        # gamma_grid = choose(['scale'], ['scale', 0.01],
+        #                     ['scale', 0.03, 0.01])
+        # C_grid = choose([0.1, 1], [0.1, 1, 3], [0.1, 1, 3, 10])
+        gamma_grid = ['scale']
+        C_grid = [0.1, 1]
         clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
         param_grid = {'clf__C': C_grid, 'clf__gamma': gamma_grid}
 
     elif name == 'rf':
         base = RandomForestClassifier(random_state=seed, **model_kwargs)
         # Shallow trees for small N; grow a bit with more data
-        n_estimators = choose([100], [100, 200], [200, 400])
-        max_depth = choose([3, 5], [5, 10], [None, 10])
-        min_split = choose([5, 10], [5, 10], [2, 5, 10])
+        #n_estimators = choose([100], [100, 200], [200, 400])
+        #max_depth = choose([3, 5], [5, 10], [None, 10])
+        # min_split = choose([5, 10], [5, 10], [2, 5, 10])
+        n_estimators = [200, 400]
+        max_depth = [None, 10]
+        min_samples_leaf: [2, 5, 10]
         param_grid = {
             'clf__n_estimators': n_estimators,
             'clf__max_depth': max_depth,
-            'clf__min_samples_split': min_split
+            'clf__min_samples_leaf': min_samples_leaf
         }
         clf = Pipeline([('clf', base)])  # no scaling needed
+
 
     elif name == 'mlp':
         base = MLPClassifier(
@@ -471,7 +478,7 @@ def permutation_test_auc(
     plot=False, fixed_params: Optional[Dict[str, Any]] = None,
     real_auc: Optional[float] = None,
     param_grid: Optional[Dict[str, Any]] = None,
-    perm_search: Optional[str] = None,
+    perm_search: Optional[str] = 'grid',
 ):
     """
     Permutation test for decoding significance with optional progress bar.
@@ -536,20 +543,20 @@ def permutation_test_auc(
             param_grid_override=param_grid
         )
 
-    # 2. Announce parameter strategy for permutations
-    if perm_search in ('grid', 'random'):
-        print(
-            f"[permutation_test_auc] Using per-permutation hyperparameter search "
-            f"({perm_search}) with provided/default grid."
-        )
-    elif fixed_params is not None:
-        print(
-            f"[permutation_test_auc] Using pre-determined params from caller for permutations: {fixed_params}")
-    elif isinstance(tuned_params, dict) and len(tuned_params) > 0:
-        print("[permutation_test_auc] Using tuned best params from observed-label CV for permutations.")
-    else:
-        print(
-            "[permutation_test_auc] No pre-computed params; using untuned CV per permutation.")
+    # # 2. Announce parameter strategy for permutations
+    # if perm_search in ('grid', 'random'):
+    #     print(
+    #         f"[permutation_test_auc] Using per-permutation hyperparameter search "
+    #         f"({perm_search}) with provided/default grid."
+    #     )
+    # elif fixed_params is not None:
+    #     print(
+    #         f"[permutation_test_auc] Using pre-determined params from caller for permutations: {fixed_params}")
+    # elif isinstance(tuned_params, dict) and len(tuned_params) > 0:
+    #     print("[permutation_test_auc] Using tuned best params from observed-label CV for permutations.")
+    # else:
+    #     print(
+    #         "[permutation_test_auc] No pre-computed params; using untuned CV per permutation.")
 
     # 3. Permutation null distribution
     auc_null = np.zeros(n_perm)

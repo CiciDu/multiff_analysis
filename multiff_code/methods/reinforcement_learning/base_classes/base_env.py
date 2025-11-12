@@ -87,7 +87,7 @@ class MultiFF(gymnasium.Env):
                  stop_vel_cost=0,
                  reward_boundary=25,
                  add_vel_cost_when_catching_ff_only=False,
-                 linear_terminal_vel=0.01,
+                 linear_terminal_vel=0.05,
                  angular_terminal_vel=0.05,
                  dt=0.1,
                  episode_len=512,
