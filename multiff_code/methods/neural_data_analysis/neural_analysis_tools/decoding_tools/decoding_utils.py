@@ -24,6 +24,8 @@ from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.base import clone
+import itertools
 
 
 # ---------------------------------------------------------------------
@@ -101,7 +103,7 @@ def get_decoder(name: str,
             class_weight='balanced', **model_kwargs
         )
         # Keep C modest at small N
-        #Cs = choose([0.01, 0.1, 1], [0.03, 0.3, 1, 3], [0.03, 0.3, 1, 3, 10])
+        # Cs = choose([0.01, 0.1, 1], [0.03, 0.3, 1, 3], [0.03, 0.3, 1, 3, 10])
         Cs = [0.03]
         clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
         param_grid = {'clf__C': Cs}
@@ -164,8 +166,8 @@ def get_decoder(name: str,
     elif name == 'rf':
         base = RandomForestClassifier(random_state=seed, **model_kwargs)
         # Shallow trees for small N; grow a bit with more data
-        #n_estimators = choose([100], [100, 200], [200, 400])
-        #max_depth = choose([3, 5], [5, 10], [None, 10])
+        # n_estimators = choose([100], [100, 200], [200, 400])
+        # max_depth = choose([3, 5], [5, 10], [None, 10])
         # min_split = choose([5, 10], [5, 10], [2, 5, 10])
         n_estimators = [200, 400]
         max_depth = [None, 10]
@@ -176,7 +178,6 @@ def get_decoder(name: str,
             'clf__min_samples_leaf': min_samples_leaf
         }
         clf = Pipeline([('clf', base)])  # no scaling needed
-
 
     elif name == 'mlp':
         base = MLPClassifier(
@@ -543,20 +544,146 @@ def permutation_test_auc(
             param_grid_override=param_grid
         )
 
-    # # 2. Announce parameter strategy for permutations
-    # if perm_search in ('grid', 'random'):
-    #     print(
-    #         f"[permutation_test_auc] Using per-permutation hyperparameter search "
-    #         f"({perm_search}) with provided/default grid."
-    #     )
-    # elif fixed_params is not None:
-    #     print(
-    #         f"[permutation_test_auc] Using pre-determined params from caller for permutations: {fixed_params}")
-    # elif isinstance(tuned_params, dict) and len(tuned_params) > 0:
-    #     print("[permutation_test_auc] Using tuned best params from observed-label CV for permutations.")
-    # else:
-    #     print(
-    #         "[permutation_test_auc] No pre-computed params; using untuned CV per permutation.")
+    # 2. Prepare reusable pipeline template and CV splits to avoid rebuilds per permutation
+    n_samples, n_features = X.shape
+    base_clf, default_grid = get_decoder(
+        model_name, seed, n_samples, n_features, model_kwargs
+    )
+    pipeline_template = make_calibrated_pipeline(base_clf)
+
+    # Precompute CV splits once and reuse across permutations
+    cv = StratifiedKFold(k, shuffle=True, random_state=seed)
+    splits = list(cv.split(X, y))
+
+    # Identify preprocessing steps (everything before final 'clf') and cache transformed folds
+    preproc_steps = []
+    for name, step in pipeline_template.steps:
+        if name == 'clf':
+            break
+        preproc_steps.append((name, step))
+    preproc_pipeline = Pipeline(preproc_steps) if preproc_steps else None
+
+    Xtr_list = []
+    Xte_list = []
+    for tr, te in splits:
+        if preproc_pipeline is None:
+            Xtr_list.append(X[tr])
+            Xte_list.append(X[te])
+        else:
+            pp = clone(preproc_pipeline)
+            Xtr_list.append(pp.fit_transform(X[tr]))
+            Xte_list.append(pp.transform(X[te]))
+
+    # Helpers to normalize grid keys and to apply fixed params on a cloned estimator/classifier
+    def _normalize_grid_keys_for_pipeline(pipeline, grid: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(grid, dict) or len(grid) == 0:
+            return grid
+        try:
+            clf_step = pipeline.named_steps.get('clf', None)
+            calibrated = isinstance(clf_step, CalibratedClassifierCV)
+        except Exception:
+            calibrated = False
+        norm_grid: Dict[str, Any] = {}
+        for key, vals in grid.items():
+            if '__' in key:
+                if calibrated and key.startswith('clf__') and not key.startswith('clf__base_estimator__'):
+                    key = 'clf__base_estimator__' + key[len('clf__'):]
+                norm_grid[key] = vals
+            else:
+                prefix = 'clf__base_estimator__' if calibrated else 'clf__'
+                norm_grid[prefix + key] = vals
+        return norm_grid
+
+    def _to_estimator_param_grid(grid: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert pipeline-style keys to bare estimator keys for the clf step."""
+        if not isinstance(grid, dict) or len(grid) == 0:
+            return grid
+        est_grid: Dict[str, Any] = {}
+        for key, vals in grid.items():
+            if '__' in key:
+                if key.startswith('clf__base_estimator__'):
+                    est_key = key[len('clf__base_estimator__'):]
+                elif key.startswith('clf__'):
+                    est_key = key[len('clf__'):]
+                else:
+                    est_key = key.split('__')[-1]
+            else:
+                est_key = key
+            est_grid[est_key] = vals
+        return est_grid
+
+    def _classifier_with_params(params: Optional[Dict[str, Any]]):
+        """Clone only the classifier step from the template and set params on it."""
+        est = clone(pipeline_template.named_steps['clf'])
+        if not params:
+            return est
+
+        # Special handling: freeze LogisticRegression for elasticnet if requested
+        params_local = dict(params)
+        try:
+            if (model_name == 'logreg_elasticnet'
+                    and 'C' in params_local and 'l1_ratio' in params_local):
+                frozen_lr = LogisticRegression(
+                    penalty=str(params_local.get('penalty', 'elasticnet')),
+                    solver=str(params_local.get('solver', 'saga')),
+                    C=float(params_local['C']),
+                    l1_ratio=float(params_local['l1_ratio']),
+                    class_weight=params_local.get('class_weight', 'balanced'),
+                    max_iter=int(params_local.get('max_iter', 5000)),
+                    random_state=int(params_local.get('random_state', 0)),
+                )
+                if isinstance(est, CalibratedClassifierCV):
+                    est.base_estimator = frozen_lr
+                else:
+                    est = frozen_lr
+                # Remove keys consumed by the frozen estimator construction
+                for kk in ('C', 'l1_ratio', 'penalty', 'solver', 'class_weight', 'max_iter', 'random_state'):
+                    params_local.pop(kk, None)
+        except Exception:
+            # If anything goes wrong, fall back to generic param setting below
+            pass
+
+        if params_local:
+            # Strip pipeline prefixes if present and apply to appropriate object
+            bare_params = _to_estimator_param_grid(params_local)
+            try:
+                if isinstance(est, CalibratedClassifierCV):
+                    est.base_estimator.set_params(**bare_params)
+                else:
+                    est.set_params(**bare_params)
+            except ValueError:
+                # Silently ignore params that do not match
+                pass
+        return est
+
+    def _cv_mean_auc_pretransformed(y_labels: np.ndarray, params: Optional[Dict[str, Any]] = None) -> float:
+        aucs = []
+        for (tr, te), Xtr, Xte in zip(splits, Xtr_list, Xte_list):
+            clf = _classifier_with_params(params)
+            clf.fit(Xtr, y_labels[tr])
+            if hasattr(clf, "predict_proba"):
+                p = clf.predict_proba(Xte)[:, 1]
+            elif hasattr(clf, "decision_function"):
+                p = clf.decision_function(Xte)
+            else:
+                raise ValueError(
+                    f"Model {model_name} lacks probability-like output.")
+            aucs.append(roc_auc_score(y_labels[te], p))
+        return float(np.mean(aucs))
+
+    def _iter_param_combinations(est_grid: Dict[str, Any], n_random: Optional[int] = None, rng_seed: int = 0):
+        keys = list(est_grid.keys())
+        values = [list(v) if isinstance(v, (list, tuple, np.ndarray)) else [
+            v] for v in est_grid.values()]
+        rng_local = np.random.default_rng(rng_seed)
+        if n_random is None:
+            for combo in itertools.product(*values):
+                yield dict(zip(keys, combo))
+        else:
+            # Randomly sample with replacement
+            for _ in range(int(n_random)):
+                combo = [rng_local.choice(vals) for vals in values]
+                yield dict(zip(keys, combo))
 
     # 3. Permutation null distribution
     auc_null = np.zeros(n_perm)
@@ -565,31 +692,29 @@ def permutation_test_auc(
         iterator = tqdm(iterator, desc=f'Permuting ({n_perm}x)', ncols=80)
 
     try:
+        grid = param_grid if param_grid is not None else default_grid
+        norm_grid = _normalize_grid_keys_for_pipeline(
+            pipeline_template, grid)
+        est_grid = _to_estimator_param_grid(norm_grid)
         for i in iterator:
             y_perm = shuffle(y, random_state=rng.integers(1e6))
             # Priority: use provided fixed_params; else reuse tuned_params if available;
             # else compute non-tuned CV per permutation.
             if perm_search in ('grid', 'random'):
-                auc_null[i], _, _ = decode_auc_cv(
-                    X, y_perm, model_name=model_name, k=k, seed=seed,
-                    tune=True, search=perm_search,
-                    model_kwargs=model_kwargs, param_grid_override=param_grid
-                )
+                n_iter = None if perm_search == 'grid' else 10
+                best_score = -np.inf
+                for params_candidate in _iter_param_combinations(est_grid, n_random=n_iter, rng_seed=seed):
+                    score = _cv_mean_auc_pretransformed(
+                        y_perm, params_candidate)
+                    if score > best_score:
+                        best_score = score
+                auc_null[i] = float(best_score)
             elif fixed_params is not None:
-                auc_null[i] = _cv_auc_with_fixed_params(
-                    X, y_perm, model_name=model_name, k=k, seed=seed,
-                    model_kwargs=model_kwargs, fixed_params=fixed_params
-                )
+                auc_null[i] = _cv_mean_auc_pretransformed(y_perm, fixed_params)
             elif tune and isinstance(tuned_params, dict) and len(tuned_params) > 0:
-                auc_null[i] = _cv_auc_with_fixed_params(
-                    X, y_perm, model_name=model_name, k=k, seed=seed,
-                    model_kwargs=model_kwargs, fixed_params=tuned_params
-                )
+                auc_null[i] = _cv_mean_auc_pretransformed(y_perm, tuned_params)
             else:
-                auc_null[i], _, _ = decode_auc_cv(
-                    X, y_perm, model_name=model_name, k=k, seed=seed,
-                    tune=False, model_kwargs=model_kwargs
-                )
+                auc_null[i] = _cv_mean_auc_pretransformed(y_perm, None)
     except KeyboardInterrupt:
         print(f'\nStopped early at permutation {i+1}/{n_perm}')
 

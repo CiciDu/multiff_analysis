@@ -70,7 +70,7 @@ class LSTMforMultifirefly(rl_base_class._RLforMultifirefly):
             existing_agent_params = {}
 
         self.agent_params = {
-            "gamma": 0.995,
+            "gamma": 0.998,
             "state_space": self.env.observation_space,
             "action_space": self.env.action_space,
             "action_dim": self.env.action_space.shape[0],

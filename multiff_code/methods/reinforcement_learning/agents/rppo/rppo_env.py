@@ -91,7 +91,8 @@ class WrapperForRecurrentPPO(gym.Wrapper):
         allowed = {
             'flash_on_interval', 'angular_terminal_vel', 'distance2center_cost',
             'stop_vel_cost', 'reward_boundary', 'dv_cost_factor',
-            'dw_cost_factor', 'w_cost_factor'
+            'dw_cost_factor', 'w_cost_factor', 'jerk_cost_factor', 
+            'cost_per_stop'
         }
         for key, value in kwargs.items():
             if key in allowed and value is not None:

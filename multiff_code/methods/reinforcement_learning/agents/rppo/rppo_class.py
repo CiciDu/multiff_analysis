@@ -81,7 +81,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
 
         # Default PPO parameters — extend later with SB3 RecurrentPPO params
         defaults = {
-            'gamma': kwargs.get('gamma', 0.99),
+            'gamma': kwargs.get('gamma', 0.998),
             'learning_rate': kwargs.get('learning_rate', 3e-4),
             'n_steps': kwargs.get('n_steps', 512),
             'batch_size': kwargs.get('batch_size', 256),

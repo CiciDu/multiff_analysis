@@ -335,7 +335,7 @@ def _plot_subplot(ax, df_agg, groupby_cols, palette, show_sig, sig_color,
         if show_sig and dfg['sig'].any():
             sig_points = dfg.loc[dfg['sig'], 'window_center']
             ax.scatter(sig_points, dfg.loc[dfg['sig'], 'mean'],
-                       color=sig_color, s=40, edgecolors='k', zorder=5, marker='o')
+                       color=color, s=40, edgecolors='k', zorder=5, marker='o')
 
     ax.axhline(chance_level, color='gray', lw=1, ls='--', label='Chance')
     ax.axvline(0, color='black', lw=1, ls='-')
@@ -350,9 +350,75 @@ def _plot_subplot(ax, df_agg, groupby_cols, palette, show_sig, sig_color,
     ax.set_xticklabels([f"{x:.2f}" for x in all_x])
 
 
+# -------------------------
+# Shared helper functions
+# -------------------------
+def _prepare_timecourse_df(df, value_col, sig_col, chance_level, alpha, align_col):
+    df = df.copy()
+    if 'window_end' in df.columns:
+        df['window_center'] = df['window_start']
+        mask_end = df['window_end'].notna()
+        df.loc[mask_end, 'window_center'] = (
+            df.loc[mask_end, 'window_start'] + df.loc[mask_end, 'window_end']
+        ) / 2.0
+    else:
+        print("[timecourse] 'window_end' not found — using window_start as center.")
+        df['window_center'] = df['window_start']
+
+    if sig_col not in df.columns or df[sig_col].isna().all():
+        print(
+            f"[timecourse] No '{sig_col}' found — using AUC > {chance_level + alpha:.2f} as proxy.")
+        df[sig_col] = df[value_col] > (chance_level + alpha)
+
+    if align_col not in df.columns:
+        print(
+            f"[timecourse] '{align_col}' not found — treating as single alignment.")
+        df[align_col] = False
+    return df
+
+
+def _title_for_alignment(align_val):
+    return 'Align by stop end' if align_val else 'Align by stop start'
+
+
+def _make_subplots_grid(n_plots, base_width, base_height, sharey=True):
+    n_cols = int(np.ceil(np.sqrt(n_plots)))
+    n_rows = int(np.ceil(n_plots / n_cols))
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(n_cols * base_width, n_rows * base_height),
+        sharey=sharey
+    )
+    axes = np.array(axes).reshape(-1)
+    return fig, axes, n_rows, n_cols
+
+
+def _append_sample_size_to_label(df_sub, label_prefix):
+    if 'sample_size' in df_sub.columns:
+        non_null_sizes = df_sub['sample_size'].dropna().to_numpy()
+        if non_null_sizes.size > 0:
+            unique_sizes = np.unique(non_null_sizes)
+            try:
+                sample_n = int(unique_sizes[0]) if unique_sizes.size == 1 else int(
+                    np.nanmax(non_null_sizes))
+                return f"{label_prefix} (n={sample_n})"
+            except Exception:
+                return label_prefix
+    return label_prefix
+
+
+def _save_or_show(fig, save_path, dpi):
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=dpi, bbox_inches='tight')
+        print(f'[write] Plot saved → {save_path}')
+    else:
+        plt.show()
+
+
 def plot_decoding_timecourse(
     df_results,
-    groupby_cols=('a_label', 'b_label'),
+    groupby_cols='key',
     align_col='align_by_stop_end',
     value_col='mean_auc',
     sig_col='sig_FDR',
@@ -365,7 +431,7 @@ def plot_decoding_timecourse(
     sig_color='limegreen',
     chance_level=0.5,
     title_prefix='Decoding timecourse',
-    split_by=('a_label', 'b_label'),
+    split_by='key',
     save_path=None,          # ← new argument
     dpi=300                  # ← optional, for high-res saving
 ):
@@ -402,49 +468,22 @@ def plot_decoding_timecourse(
         raise ValueError("df_results must include 'window_start'.")
     if value_col not in df.columns:
         raise ValueError(f"'{value_col}' not found in df_results.")
-    if align_col not in df.columns:
-        print(
-            f"[plot_decoding_timecourse] '{align_col}' not found — treating as single alignment.")
-        df[align_col] = False
-
-    # Compute window_center (average of start and end if available)
-    if 'window_end' in df.columns:
-        df['window_center'] = df['window_start']
-        mask_end = df['window_end'].notna()
-        df.loc[mask_end, 'window_center'] = (
-            df.loc[mask_end, 'window_start'] + df.loc[mask_end, 'window_end']
-        ) / 2.0
-    else:
-        print(
-            "[plot_decoding_timecourse] 'window_end' not found — using window_start as center.")
-        df['window_center'] = df['window_start']
-
-    # Fallback for missing significance column
-    if sig_col not in df.columns or df[sig_col].isna().all():
-        print(
-            f"[plot_decoding_timecourse] No '{sig_col}' found — using AUC > {chance_level + alpha:.2f} as proxy.")
-        df[sig_col] = df[value_col] > (chance_level + alpha)
+    df = _prepare_timecourse_df(
+        df, value_col, sig_col, chance_level, alpha, align_col)
 
     sns.set(style='whitegrid')
 
     for align_val in df[align_col].unique():
         dfa = df[df[align_col] == align_val].copy()
-        title_align = 'Align by stop end' if align_val else 'Align by stop start'
+        title_align = _title_for_alignment(align_val)
 
         subplot_groups = dfa.groupby(split_by)
         n_plots = len(subplot_groups)
         if n_plots == 0:
             print("[plot_decoding_timecourse] No subplot groups found — skipping.")
             return None
-        n_cols = int(np.ceil(np.sqrt(n_plots)))
-        n_rows = int(np.ceil(n_plots / n_cols))
-
-        fig, axes = plt.subplots(
-            n_rows, n_cols,
-            figsize=(n_cols * 5, n_rows * 4),
-            sharey=True
-        )
-        axes = np.array(axes).reshape(-1)
+        fig, axes, _, _ = _make_subplots_grid(
+            n_plots, base_width=5, base_height=4, sharey=True)
 
         for i, (group_keys, df_sub) in enumerate(subplot_groups):
             ax = axes[i]
@@ -452,18 +491,7 @@ def plot_decoding_timecourse(
                 group_keys = (group_keys,)
             label_prefix = ' | '.join(
                 [f"{k}={v}" for k, v in zip(split_by, group_keys)])
-            # Append sample size to each subplot title if available
-            if 'sample_size' in df_sub.columns:
-                non_null_sizes = df_sub['sample_size'].dropna().to_numpy()
-                if non_null_sizes.size > 0:
-                    # Prefer a single unique value; otherwise show max as a conservative summary
-                    unique_sizes = np.unique(non_null_sizes)
-                    try:
-                        sample_n = int(unique_sizes[0]) if unique_sizes.size == 1 else int(
-                            np.nanmax(non_null_sizes))
-                        label_prefix = f"{label_prefix} (n={sample_n})"
-                    except Exception:
-                        pass
+            label_prefix = _append_sample_size_to_label(df_sub, label_prefix)
 
             df_agg = _aggregate_for_plot(
                 df_sub, groupby_cols, value_col, sig_col,
@@ -480,12 +508,180 @@ def plot_decoding_timecourse(
         fig.suptitle(f"{title_prefix} ({title_align})", fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.97])
 
-        # --- Save or display
-        if save_path:
-            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(save_path, dpi=dpi, bbox_inches='tight')
-            print(f'[write] Plot saved → {save_path}')
-        else:
-            plt.show()
+        _save_or_show(fig, save_path, dpi)
 
         return fig
+
+
+def plot_decoding_timecourse_by_session(
+    df_results,
+    key_value=None,
+    key_col='key',
+    session_col='session',
+    align_col='align_by_stop_end',
+    value_col='mean_auc',
+    sig_col='sig_FDR',
+    err_col='sd_auc',
+    err_type='sem',
+    alpha=0.05,
+    sessions_per_subplot=6,
+    palette='tab20',
+    figsize=(5, 4),
+    show_sig=True,
+    sig_color='limegreen',
+    chance_level=0.5,
+    title_prefix='Decoding timecourse by session',
+    save_path=None,
+    dpi=300
+):
+    """Plot decoding timecourses for one or all keys across multiple sessions.
+
+    Sessions are grouped into chunks, with a few sessions plotted per subplot.
+
+    Args:
+        df_results: DataFrame containing decoding results.
+        key_value: If provided, plot only this key. If None, iterate over all
+                   existing keys in df_results[key_col].
+        key_col: Column name for the decoding 'key'.
+        session_col: Column name for session identifier.
+        align_col: Column specifying alignment condition.
+        value_col: Column with mean AUC or metric to plot.
+        sig_col: Column marking significant time bins.
+        err_col: Column with error values (sd or sem).
+        err_type: Error type label ('sem' or 'std').
+        alpha: Used to threshold significance proxy if sig_col missing.
+        sessions_per_subplot: Number of session lines per subplot.
+        palette: Color palette for session lines (should support many colors).
+        figsize: Per-subplot figure size (width, height).
+        show_sig: Whether to mark significant bins visually.
+        sig_color: Color used to mark significant bins.
+        chance_level: Baseline AUC level for reference.
+        title_prefix: Title text prefix.
+        save_path: Optional path to save the figure (PNG/PDF/etc.).
+        dpi: Resolution for saved figure.
+
+    Returns:
+        If a single figure is produced, returns that Figure.
+        If multiple figures are produced (multiple keys and/or alignments),
+        returns a list of Figure objects.
+    """
+    required_cols = set(
+        ['window_start', key_col, session_col, value_col, align_col])
+    for c in required_cols:
+        if c not in df_results.columns:
+            raise ValueError(f"df_results must include '{c}'.")
+
+    df = df_results.copy()
+
+    # Determine keys to plot
+    if key_value is not None:
+        keys_to_plot = [key_value]
+    else:
+        keys_to_plot = list(pd.unique(df[key_col].dropna()))
+        keys_to_plot.sort(key=lambda x: str(x))
+        if len(keys_to_plot) == 0:
+            raise ValueError(f"No valid '{key_col}' values found to plot.")
+
+    # Shared preprocessing
+    df = _prepare_timecourse_df(
+        df, value_col, sig_col, chance_level, alpha, align_col)
+
+    sns.set(style='whitegrid')
+
+    produced_figs = []
+
+    # Plot per key and alignment mode
+    for one_key in keys_to_plot:
+        df_key = df[df[key_col] == one_key].copy()
+        if df_key.empty:
+            continue
+
+        for align_val in df_key[align_col].unique():
+            dfa = df_key[df_key[align_col] == align_val].copy()
+            if dfa.empty:
+                continue
+
+            # Determine sessions and chunk them
+            sessions = list(pd.unique(dfa[session_col]))
+            sessions = [s for s in sessions if pd.notna(s)]
+            sessions.sort(key=lambda x: str(x))
+            if len(sessions) == 0:
+                print("[plot_decoding_timecourse_by_session] No sessions found.")
+                continue
+
+            session_chunks = [sessions[i:i + sessions_per_subplot]
+                              for i in range(0, len(sessions), sessions_per_subplot)]
+            n_plots = len(session_chunks)
+
+            fig, axes, _, _ = _make_subplots_grid(
+                n_plots, base_width=figsize[0], base_height=figsize[1], sharey=True
+            )
+
+            title_align = _title_for_alignment(align_val)
+
+            for i, chunk in enumerate(session_chunks):
+                ax = axes[i]
+                df_sub = dfa[dfa[session_col].isin(chunk)].copy()
+
+                # Build informative label: key and session list
+                if len(chunk) <= 6:
+                    session_label = ", ".join([str(s) for s in chunk])
+                else:
+                    session_label = f"{len(chunk)} sessions"
+                label_prefix = f"{key_col}={one_key} | {session_col}s: {session_label}"
+
+                label_prefix = _append_sample_size_to_label(
+                    df_sub, label_prefix)
+
+                df_agg = _aggregate_for_plot(
+                    df_sub,
+                    groupby_cols=[session_col],
+                    value_col=value_col,
+                    sig_col=sig_col,
+                    err_col=err_col,
+                    err_type=err_type
+                )
+
+                _plot_subplot(
+                    ax,
+                    df_agg=df_agg,
+                    groupby_cols=[session_col],
+                    palette=palette,
+                    show_sig=show_sig,
+                    sig_color=sig_color,
+                    chance_level=chance_level,
+                    label_prefix=label_prefix
+                )
+
+            # Hide any extra axes
+            last_i = i if n_plots > 0 else -1
+            for j in range(last_i + 1, len(axes)):
+                axes[j].set_visible(False)
+
+            fig.suptitle(f"{title_prefix} ({title_align})", fontsize=14)
+            plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+            # Save or display
+            if save_path:
+                out_path = Path(save_path)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                # Avoid overwrite by suffixing key and alignment when iterating
+                if key_value is None or len(keys_to_plot) > 1:
+                    stem, suffix = out_path.stem, out_path.suffix
+                    safe_key = str(one_key).replace(
+                        '/', '_').replace('\\', '_').replace(' ', '_')
+                    align_suffix = 'end' if align_val else 'start'
+                    out_path = out_path.parent / \
+                        f"{stem}_{safe_key}_{align_suffix}{suffix}"
+                fig.savefig(out_path, dpi=dpi, bbox_inches='tight')
+                print(f'[write] Plot saved → {out_path}')
+            else:
+                plt.show()
+
+            produced_figs.append(fig)
+
+    if len(produced_figs) == 0:
+        return None
+    if len(produced_figs) == 1:
+        return produced_figs[0]
+    return produced_figs
