@@ -237,11 +237,11 @@ def animate_annotated(frame, ax, anim_monkey_info, margin, ff_dataframe_anim,
     if annotation_info['ignore_sudden_flash_point_dummy'][index] > 0:
         annotation = annotation + "Ignored sudden flash\n"
     # If the monkey uses a few tries to capture a firefly
-    if annotation_info['try_a_few_times_point_dummy'][index] > 0:
-        annotation = annotation + "Try a few times to catch ff\n"
+    if annotation_info['retry_capture_point_dummy'][index] > 0:
+        annotation = annotation + "Retry capture to catch ff\n"
     # If during the trial, the monkey fails to capture a firefly with a few tries and moves on to capture another one
-    if annotation_info['give_up_after_trying_point_dummy'][index] > 0:
-        annotation = annotation + "Give up after trying\n"
+    if annotation_info['retry_switch_point_dummy'][index] > 0:
+        annotation = annotation + "Retry switch\n"
     ax.text(0.5, 1.04, annotation, horizontalalignment='left', verticalalignment='top', transform=ax.transAxes,
             fontsize=12, color="black", bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     return ax

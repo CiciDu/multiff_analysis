@@ -10,9 +10,10 @@ from sb3_contrib import RecurrentPPO
 from sb3_contrib.ppo_recurrent import MultiInputLstmPolicy
 from sb3_contrib import RecurrentPPO
 
+
 class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     """
-    RL controller for Multi-Firefly task using Recurrent PPO (RPPO).
+    RL controller for Multi-Firefly task using Recurrent PPO (rppo).
 
     This class manages:
       - Environment creation and wrapping for recurrent PPO.
@@ -21,7 +22,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     """
 
     def __init__(self,
-                 overall_folder='multiff_analysis/RL_models/RPPO_stored_models/all_agents/env1/',
+                 overall_folder='multiff_analysis/RL_models/rppo_stored_models/all_agents/env1/',
                  add_date_to_model_folder_name=False,
                  dict_obs=True,
                  n_envs=1,
@@ -90,7 +91,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         }
 
         self.agent_params = {**defaults, **existing, **kwargs}
-        print('[RPPO] Prepared agent params:', self.agent_params)
+        print('[rppo] Prepared agent params:', self.agent_params)
         # Persist agent params into meta for standardized layout
         try:
             meta_dir = getattr(self, 'meta_dir', None) or os.path.join(
@@ -102,9 +103,8 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             pass
 
     def make_agent(self, agent_params_already_set_ok=True, **kwargs):
-        """Initialize RPPO agent; placeholder until full integration."""
+        """Initialize rppo agent; placeholder until full integration."""
         self.prepare_agent_params(agent_params_already_set_ok, **kwargs)
-
 
         self.rl_agent = RecurrentPPO(
             policy=MultiInputLstmPolicy,
@@ -114,7 +114,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             **{k: v for k, v in self.agent_params.items()
                if k in ['learning_rate', 'gamma', 'n_steps', 'batch_size', 'n_epochs', 'clip_range']}
         )
-        print('[RPPO] Created RecurrentPPO model')
+        print('[rppo] Created RecurrentPPO model')
 
     # -------------------------------------------------------------------------
     # Curriculum / training
@@ -128,7 +128,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             raise RuntimeError('RecurrentPPO model not initialized.')
 
         print(
-            f'[RPPO] Starting curriculum stage: reward_threshold={reward_threshold:.2f}')
+            f'[rppo] Starting curriculum stage: reward_threshold={reward_threshold:.2f}')
 
         stop_train_callback = StopTrainingOnRewardThreshold(
             reward_threshold=reward_threshold)
@@ -148,7 +148,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             getattr(callback, 'best_mean_reward', float('-inf')))
         passed = bool(best_mean_reward >= reward_threshold)
         print(
-            f'[RPPO] Stage complete — best_mean={best_mean_reward:.2f}, passed={passed}')
+            f'[rppo] Stage complete — best_mean={best_mean_reward:.2f}, passed={passed}')
         # Update ln/best_curr symlink
         try:
             ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
@@ -196,7 +196,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
                 self.rl_agent, self.env, num_eval_episodes=num_eval_episodes)
         except Exception:
             avg_reward = float('nan')
-        print(f'[RPPO] Post-curriculum average reward: {avg_reward:.2f}')
+        print(f'[rppo] Post-curriculum average reward: {avg_reward:.2f}')
         # Update global best tracker for run_end logging
         try:
             if self.best_avg_reward is None:
@@ -228,7 +228,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         if self.rl_agent is not None:
             model_path = os.path.join(dir_name, 'best_model.zip')
             self.rl_agent.save(model_path)
-            print('[RPPO] Saved model at', model_path)
+            print('[rppo] Saved model at', model_path)
         self.write_checkpoint_manifest(dir_name)
         # Refresh meta manifest links if saving into standardized best dirs
         try:
@@ -269,9 +269,9 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             dir_name, 'best_model.zip')
         try:
             self.rl_agent = RecurrentPPO.load(model_path, env=self.env)
-            print('[RPPO] Loaded model from', model_path)
+            print('[rppo] Loaded model from', model_path)
         except Exception as e:
-            print('[RPPO] Warning: failed to load model:', e)
+            print('[rppo] Warning: failed to load model:', e)
             self.make_agent()
         self.loaded_agent_dir = dir_name
 
@@ -318,7 +318,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             if os.path.exists(best_path):
                 self.rl_agent = RecurrentPPO.load(best_path, env=self.env)
         except Exception as e:
-            print('[RPPO] Warning: failed to load best model after training:', e)
+            print('[rppo] Warning: failed to load best model after training:', e)
 
         # Update ln symlink if we trained into standardized post/best
         try:
@@ -340,17 +340,17 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             pass
 
     # -------------------------------------------------------------------------
-    # Explicitly skip replay buffer for RPPO when loading best models
+    # Explicitly skip replay buffer for rppo when loading best models
     # -------------------------------------------------------------------------
     def load_best_model_postcurriculum(self, load_replay_buffer=False, restore_env_from_checkpoint=True):
-        """Load best post-curriculum model without replay buffer for RPPO."""
-        # Intentionally ignore load_replay_buffer for RPPO
+        """Load best post-curriculum model without replay buffer for rppo."""
+        # Intentionally ignore load_replay_buffer for rppo
         self.load_agent(load_replay_buffer=False,
                         dir_name=self.best_model_postcurriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
     def load_best_model_in_curriculum(self, load_replay_buffer=False, restore_env_from_checkpoint=True):
-        """Load best in-curriculum model without replay buffer for RPPO."""
-        # Intentionally ignore load_replay_buffer for RPPO
+        """Load best in-curriculum model without replay buffer for rppo."""
+        # Intentionally ignore load_replay_buffer for rppo
         self.load_agent(load_replay_buffer=False,
                         dir_name=self.best_model_in_curriculum_dir, restore_env_from_checkpoint=restore_env_from_checkpoint)
 
@@ -362,4 +362,4 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         """Initialize environment for first stage of curriculum."""
         self.make_env(**self.input_env_kwargs)
         self._make_init_env_for_curriculum_training(**kwargs)
-        print('[RPPO] Initialized env for curriculum training')
+        print('[rppo] Initialized env for curriculum training')

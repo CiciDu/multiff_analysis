@@ -91,7 +91,7 @@ class WrapperForRecurrentPPO(gym.Wrapper):
         allowed = {
             'flash_on_interval', 'angular_terminal_vel', 'distance2center_cost',
             'stop_vel_cost', 'reward_boundary', 'dv_cost_factor',
-            'dw_cost_factor', 'w_cost_factor', 'jerk_cost_factor', 
+            'dw_cost_factor', 'w_cost_factor', 'jerk_cost_factor',
             'cost_per_stop'
         }
         for key, value in kwargs.items():
@@ -134,5 +134,5 @@ def make_vec_env_for_rppo(env_class, env_kwargs=None, dict_obs=True, n_envs=8, u
         vec_env = DummyVecEnv(env_fns)
 
     print(
-        f'[RPPO] Created {n_envs} parallel envs ({"SubprocVecEnv" if use_subproc else "DummyVecEnv"})')
+        f'[rppo] Created {n_envs} parallel envs ({"SubprocVecEnv" if use_subproc else "DummyVecEnv"})')
     return vec_env

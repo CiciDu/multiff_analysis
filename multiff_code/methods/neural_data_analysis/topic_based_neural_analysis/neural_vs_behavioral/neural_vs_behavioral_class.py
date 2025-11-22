@@ -123,7 +123,7 @@ class NeuralVsBehavioralClass(base_neural_class.NeuralBaseClass):
 
     def _add_pattern_info_based_on_points_and_trials(self):
         self.binned_features = prep_monkey_data.add_pattern_info_base_on_points(self.binned_features, self.monkey_info_in_bins, self.monkey_information,
-                                                                                self.try_a_few_times_indices_for_anim, self.GUAT_point_indices_for_anim,
+                                                                                self.retry_capture_indices_for_anim, self.rsw_point_indices_for_anim,
                                                                                 self.ignore_sudden_flash_indices_for_anim)
         self.binned_features = prep_monkey_data.add_pattern_info_based_on_trials(
             self.binned_features, self.ff_caught_T_new, self.all_trial_patterns, self.time_bins)

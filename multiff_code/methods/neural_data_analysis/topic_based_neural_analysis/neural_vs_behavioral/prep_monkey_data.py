@@ -192,18 +192,18 @@ def initialize_binned_features(monkey_information, bin_width):
 
 
 def add_pattern_info_base_on_points(binned_features, monkey_info_in_bins, monkey_information,
-                                    try_a_few_times_indices_for_anim, GUAT_point_indices_for_anim,
+                                    retry_capture_indices_for_anim, rsw_point_indices_for_anim,
                                     ignore_sudden_flash_indices_for_anim):
 
     pattern_df = monkey_information[['point_index']].copy()
     pattern_df.index = pattern_df['point_index'].values
 
-    pattern_df['try_a_few_times_indice_dummy'] = 0
-    pattern_df.loc[try_a_few_times_indices_for_anim,
-                   'try_a_few_times_indice_dummy'] = 1
-    pattern_df['give_up_after_trying_indice_dummy'] = 0
-    pattern_df.loc[GUAT_point_indices_for_anim,
-                   'give_up_after_trying_indice_dummy'] = 1
+    pattern_df['retry_capture_indice_dummy'] = 0
+    pattern_df.loc[retry_capture_indices_for_anim,
+                   'retry_capture_indice_dummy'] = 1
+    pattern_df['retry_switch_indice_dummy'] = 0
+    pattern_df.loc[rsw_point_indices_for_anim,
+                   'retry_switch_indice_dummy'] = 1
     pattern_df['ignore_sudden_flash_indice_dummy'] = 0
     pattern_df.loc[ignore_sudden_flash_indices_for_anim,
                    'ignore_sudden_flash_indice_dummy'] = 1
@@ -212,7 +212,7 @@ def add_pattern_info_base_on_points(binned_features, monkey_info_in_bins, monkey
     pattern_df = pattern_df.merge(
         monkey_info_in_bins[['bin', 'point_index']], on='point_index', how='right')
 
-    pattern_df_condensed = pattern_df[['bin', 'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
+    pattern_df_condensed = pattern_df[['bin', 'retry_capture_indice_dummy', 'retry_switch_indice_dummy',
                                        'ignore_sudden_flash_indice_dummy']].copy()
     pattern_df_condensed = pattern_df_condensed.groupby(
         'bin').max().reset_index(drop=False)
@@ -229,8 +229,8 @@ def add_pattern_info_based_on_trials(binned_features, ff_caught_T_new, all_trial
         time_bins, ff_caught_T_new, all_trial_patterns)
 
     binned_features = binned_features.merge(bin_midlines[['bin', 'two_in_a_row', 'visible_before_last_one',
-                                                          'disappear_latest', 'ignore_sudden_flash', 'try_a_few_times',
-                                                          'give_up_after_trying', 'cluster_around_target',
+                                                          'disappear_latest', 'ignore_sudden_flash', 'retry_capture',
+                                                          'retry_switch', 'cluster_around_target',
                                                           'waste_cluster_around_target']], on='bin', how='left')
 
     binned_features = binned_features.ffill().reset_index(drop=True)

@@ -1,4 +1,4 @@
-from decision_making_analysis.decision_making import plot_decision_making
+from decision_making_analysis.ff_data_acquisition import plot_decision_making
 from visualization.plotly_polar_tools import plotly_for_trajectory_polar, plotly_for_ff_polar
 
 import os

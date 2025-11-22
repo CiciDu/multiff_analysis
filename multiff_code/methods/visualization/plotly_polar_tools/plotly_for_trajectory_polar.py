@@ -17,16 +17,6 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def prepare_trajectory_data_for_plotting(current_traj_points, current_stops, all_traj_feature_names, current_more_traj_points=None, current_more_traj_stops=None, trajectory_features=['monkey_distance', 'monkey_angle_to_origin']):
-    current_traj_df = make_current_traj_df(
-        current_traj_points, current_stops, trajectory_features=trajectory_features)
-    current_traj_df['time'] = [item.split(
-        '_')[-1] for item in all_traj_feature_names['traj_stops']]
-    current_more_traj_df = make_current_traj_df(
-        current_more_traj_points, current_more_traj_stops, trajectory_features=trajectory_features)
-    current_more_traj_df['time'] = [item.split(
-        '_')[-1] for item in all_traj_feature_names['more_traj_stops']]
-    return current_traj_df, current_more_traj_df
 
 
 def plot_trajectory_data(fig, traj_df_to_use, color_discrete_sequence=['red', 'blue'], additional_update_kwargs={},
@@ -166,12 +156,11 @@ def find_monkey_info_when_ff_last_seen(current_ff_df, last_seen_ff_numbers):
 def find_monkey_info_when_ff_next_seen(current_ff_df, next_seen_ff_numbers):
     current_ff_df = current_ff_df[current_ff_df['ff_number'].isin(
         next_seen_ff_numbers)].copy()
-    monkey_info_when_ff_next_seen = current_ff_df[['point_index', 'group', 'ff_number', 'next_seen_monkey_x', 'next_seen_monkey_y', 'time_till_next_visible',
+    monkey_info_when_ff_next_seen = current_ff_df[['point_index', 'group', 'ff_number', 'next_seen_monkey_x', 'next_seen_monkey_y',
                                                    'distance_from_monkey_now_to_monkey_when_ff_next_seen', 'angle_from_monkey_now_to_monkey_when_ff_next_seen',
                                                    'distance_from_monkey_now_to_ff_when_ff_next_seen', 'angle_from_monkey_now_to_ff_when_ff_next_seen']].copy()
     monkey_info_when_ff_next_seen.rename(columns={'next_seen_monkey_x': 'monkey_x',
                                                   'next_seen_monkey_y': 'monkey_y',
-                                                  'time_till_next_visible': 'time_from_now',
                                                   'next_seen_ff_distance': 'distance_from_monkey_then_to_ff_then',
                                                   'next_seen_ff_angle': 'angle_from_monkey_then_to_ff_then',
                                                   'next_seen_curv_diff': 'curv_diff_from_monkey_then_to_ff_then',

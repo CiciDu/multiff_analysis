@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from os.path import exists
 from eye_position_analysis import eye_positions
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

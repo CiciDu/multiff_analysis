@@ -1,13 +1,13 @@
 from data_wrangling import base_processing_class, general_utils
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from visualization.matplotlib_tools import plot_behaviors_utils
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
-from decision_making_analysis.GUAT import GUAT_utils
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
+from decision_making_analysis.event_detection import get_miss_to_switch_data
 from pattern_discovery import pattern_by_points
 from null_behaviors import find_best_arc, curvature_utils, curv_of_traj_utils, opt_arc_utils
-from decision_making_analysis.decision_making import decision_making_utils
+from decision_making_analysis.ff_data_acquisition import ff_data_utils
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
-from decision_making_analysis import assign_attempts
+from decision_making_analysis.event_detection import assign_attempts
 
 import math
 import numpy as np
@@ -99,15 +99,15 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.ff_dataframe, self.max_point_index, max_ff_distance_from_monkey=50)
         self.ignore_sudden_flash_time = self.monkey_information[
             'time'][self.ignore_sudden_flash_indices]
-        self.get_give_up_after_trying_info()
-        self.get_try_a_few_times_info()
+        self.get_retry_switch_info()
+        self.get_retry_capture_info()
 
         self.all_categories = {'visible_before_last_one': self.visible_before_last_one_trials,
                                'disappear_latest': self.disappear_latest_trials,
                                'two_in_a_row': self.two_in_a_row,
                                'waste_cluster_around_target': self.waste_cluster_around_target_trials,
-                               'try_a_few_times': self.try_a_few_times_trials,
-                               'give_up_after_trying': self.give_up_after_trying_trials,
+                               'retry_capture': self.retry_capture_trials,
+                               'retry_switch': self.retry_switch_trials,
                                'ignore_sudden_flash': self.ignore_sudden_flash_trials,
 
                                # additional categories:
@@ -129,19 +129,19 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.visible_before_last_one_trials, self.vblo_target_cluster_df, self.selected_base_trials = pattern_by_trials.visible_before_last_one_func(
             self.target_clust_df_short, self.ff_caught_T_new)
 
-    def get_try_a_few_times_info(self):
+    def get_retry_capture_info(self):
         if not hasattr(self, 'stop_category_df'):
             self.make_or_retrieve_stop_category_df()
-        self.TAFT_trials_df = find_GUAT_or_TAFT_trials.make_TAFT_trials_df(
+        self.rcap_events_df = detect_rsw_and_rcap.make_rcap_events_df(
             self.stop_category_df)
-        self.try_a_few_times_trials = self.TAFT_trials_df['trial'].values
+        self.retry_capture_trials = self.rcap_events_df['trial'].values
 
-    def get_give_up_after_trying_info(self):
+    def get_retry_switch_info(self):
         if not hasattr(self, 'stop_category_df'):
             self.make_or_retrieve_stop_category_df()
-        self.GUAT_trials_df, self.GUAT_w_ff_df = find_GUAT_or_TAFT_trials.make_GUAT_trials_df(
+        self.rsw_events_df, self.rsw_w_ff_df = detect_rsw_and_rcap.make_rsw_events_df(
             self.stop_category_df, self.ff_real_position_sorted, self.monkey_information)
-        self.give_up_after_trying_trials = self.GUAT_w_ff_df['trial'].values
+        self.retry_switch_trials = self.rsw_w_ff_df['trial'].values
 
     def make_or_retrieve_all_trial_patterns(self, exists_ok=True):
         self.all_trial_patterns = self.try_retrieving_df(
@@ -159,16 +159,16 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         self.make_one_stop_w_ff_df()
         # Count one-stop misses (stops near but not at fireflies) for pattern frequency analysis
         self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
-        if getattr(self, 'GUAT_w_ff_df', None) is None:
-            self.get_give_up_after_trying_info()
+        if getattr(self, 'rsw_w_ff_df', None) is None:
+            self.get_retry_switch_info()
         # Count give-up-after-trying events (multiple stops with firefly proximity) for pattern frequency analysis
-        self.GUAT_w_ff_frequency = len(self.GUAT_w_ff_df)
+        self.rsw_w_ff_frequency = len(self.rsw_w_ff_df)
 
         if self.pattern_frequencies is None:
             if getattr(self, 'monkey_information', None) is None:
                 self.retrieve_or_make_monkey_data(already_made_ok=True)
             self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_new, self.monkey_information,
-                                                                                               self.GUAT_w_ff_frequency, self.one_stop_w_ff_frequency,
+                                                                                               self.rsw_w_ff_frequency, self.one_stop_w_ff_frequency,
                                                                                                data_folder_name=self.patterns_and_features_folder_path)
             print("made pattern_frequencies")
 
@@ -267,13 +267,13 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if len(self.ignore_sudden_flash_trials) > 0:
             ignore_sudden_flash2[self.ignore_sudden_flash_trials] = 1
 
-        try_a_few_times2 = zero_array.copy()
-        if len(self.try_a_few_times_trials) > 0:
-            try_a_few_times2[self.try_a_few_times_trials] = 1
+        retry_capture2 = zero_array.copy()
+        if len(self.retry_capture_trials) > 0:
+            retry_capture2[self.retry_capture_trials] = 1
 
-        give_up_after_trying2 = zero_array.copy()
-        if len(self.give_up_after_trying_trials) > 0:
-            give_up_after_trying2[self.give_up_after_trying_trials] = 1
+        retry_switch2 = zero_array.copy()
+        if len(self.retry_switch_trials) > 0:
+            retry_switch2[self.retry_switch_trials] = 1
 
         cluster_around_target2 = zero_array.copy()
         if len(self.cluster_around_target_trials) > 0:
@@ -299,8 +299,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             'disappear_latest': disappear_latest2,
             'sudden_flash': sudden_flash_trials2,
             'ignore_sudden_flash': ignore_sudden_flash2,
-            'try_a_few_times': try_a_few_times2,
-            'give_up_after_trying': give_up_after_trying2,
+            'retry_capture': retry_capture2,
+            'retry_switch': retry_switch2,
             'cluster_around_target': cluster_around_target2,
             'use_cluster': use_cluster2,
             'waste_cluster_around_target': waste_cluster_around_target2
@@ -322,7 +322,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if not hasattr(self, 'stop_category_df'):
             self.make_or_retrieve_stop_category_df()
 
-        self.one_stop_w_ff_df = GUAT_utils.make_one_stop_w_ff_df(
+        self.one_stop_w_ff_df = get_miss_to_switch_data.make_one_stop_w_ff_df(
             self.stop_category_df)
 
     def make_distance_and_num_stops_df(self):
@@ -453,12 +453,6 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                                                                                                                                                      whether_ff_behind=whether_ff_behind, opt_arc_stop_first_vis_bdry=opt_arc_stop_first_vis_bdry,
                                                                                                                                                      ignore_error=ignore_error)
 
-    def make_auto_annot(self):
-        if getattr(self, 'best_arc_df', None) is None:
-            self.make_best_arc_df()
-        self.auto_annot, self.auto_annot_long = decision_making_utils.make_auto_annot(
-            self.best_arc_df, self.monkey_information, self.ff_caught_T_new)
-
     def make_or_retrieve_target_cluster_df(self, exists_ok=True, fill_na=False):
         target_cluster_df_filepath = os.path.join(
             self.patterns_and_features_folder_path, 'target_cluster_df.csv')
@@ -505,19 +499,16 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         if exists(stop_category_df_filepath) & exists_ok:
             self.stop_category_df = pd.read_csv(stop_category_df_filepath)
             print("Retrieved stop_category_df")
-            if 'stop_id_duration' not in self.stop_category_df.columns:
-                self.stop_category_df['stop_id_duration'] = self.stop_category_df['stop_id_end_time'] - \
-                    self.stop_category_df['stop_id_start_time']
         else:
             monkey_information = self.monkey_information.copy()
-            monkey_information = find_GUAT_or_TAFT_trials.add_temp_stop_cluster_id(
+            monkey_information = detect_rsw_and_rcap.add_temp_stop_cluster_id(
                 monkey_information, self.ff_caught_T_new, col_exists_ok=False)
 
-            temp_TAFT_trials_df = find_GUAT_or_TAFT_trials.make_temp_TAFT_trials_df(
+            temp_rcap_events_df = detect_rsw_and_rcap.make_temp_rcap_events_df(
                 monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted)
 
             self.stop_category_df = assign_attempts.make_stop_category_df(monkey_information, self.ff_caught_T_new,
-                                                                          self.closest_stop_to_capture_df, temp_TAFT_trials_df, self.ff_dataframe,
+                                                                          self.closest_stop_to_capture_df, temp_rcap_events_df, self.ff_dataframe,
                                                                           self.ff_real_position_sorted)
             self.stop_category_df.to_csv(
                 stop_category_df_filepath, index=False)
@@ -530,4 +521,3 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             columns=cols_to_add, inplace=True, errors='ignore')
         self.monkey_information = self.monkey_information.merge(
             self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')
-

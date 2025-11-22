@@ -94,12 +94,12 @@ def get_opt_arc_end_points_closest_to_stop(null_arc_info, stop_and_ref_point_inf
     arc_df = arc_df.merge(stop_and_ref_point_info[[
                           'cur_ff_index', 'point_index', 'stop_x', 'stop_y']].drop_duplicates(), on=['cur_ff_index', 'point_index'], how='left')
     # Calculate distance to stop
-    arc_df['distance_to_stop'] = np.sqrt(
+    arc_df['distance_to_ref_point'] = np.sqrt(
         (arc_df['x'] - arc_df['stop_x'])**2 + (arc_df['y'] - arc_df['stop_y'])**2)
 
     # Find the arc points closest to each stop
     index_of_arc_rows_closest_to_stop = arc_df.groupby(
-        ['cur_ff_index', 'point_index'])['distance_to_stop'].idxmin()
+        ['cur_ff_index', 'point_index'])['distance_to_ref_point'].idxmin()
     arc_rows_closest_to_stop = arc_df.loc[index_of_arc_rows_closest_to_stop].reset_index(
         drop=True)
 
@@ -351,7 +351,7 @@ def make_heading_info_df(cur_and_nxt_ff_from_ref_df, stops_near_ff_df, monkey_in
                                                                                                  mx=heading_info_df['cur_ff_x'].values, my=heading_info_df['cur_ff_y'], m_angle=heading_info_df['monkey_angle_before_stop'])
     heading_info_df['angle_from_cur_ff_to_nxt_ff'] = specific_utils.calculate_angles_to_ff_centers(ff_x=heading_info_df['nxt_ff_x'].values, ff_y=heading_info_df['nxt_ff_y'],
                                                                                                    mx=heading_info_df['cur_ff_x'].values, my=heading_info_df['cur_ff_y'], m_angle=heading_info_df['monkey_angle_before_stop'])
-    
+
     heading_info_df = build_factor_comp.process_heading_info_df(
         heading_info_df)
     return heading_info_df

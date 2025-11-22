@@ -82,8 +82,20 @@ def get_decoder(name: str,
                 model_kwargs: Optional[Dict[str, Any]] = None
                 ) -> Tuple[Pipeline, Dict[str, Any]]:
     """Return classifier pipeline and parameter grid tailored to data size."""
-    model_kwargs = model_kwargs or {}
+
     name = name.lower()
+
+    default_model_kwargs = {
+        "svm": {"C": 0.5, "gamma": 'scale'},
+        "svm_linear": {"C": 0.03},
+        "logreg": {"C": 0.03},
+        "logreg_elasticnet": {"C": 0.1, "l1_ratio": 0.5},
+        "rf": {"n_estimators": 200, "max_depth": None, "min_samples_leaf": 2},
+        "mlp": {"hidden_layer_sizes": (32,), "alpha": 1e-3},
+    }
+
+    model_kwargs_to_use = default_model_kwargs.get(name, {})
+    model_kwargs_to_use.update(model_kwargs or {})
 
     small = n_samples <= 200
     medium = 200 < n_samples <= 500
@@ -100,7 +112,7 @@ def get_decoder(name: str,
     if name == 'logreg':
         base = LogisticRegression(
             max_iter=1000, solver='lbfgs', random_state=seed,
-            class_weight='balanced', **model_kwargs
+            class_weight='balanced', **model_kwargs_to_use
         )
         # Keep C modest at small N
         # Cs = choose([0.01, 0.1, 1], [0.03, 0.3, 1, 3], [0.03, 0.3, 1, 3, 10])
@@ -115,7 +127,7 @@ def get_decoder(name: str,
         #     l1_ratios=[0.01, 0.1, 0.5, 0.9],
         #     scoring='roc_auc', max_iter=5000, n_jobs=1,
         #     class_weight='balanced',
-        #     random_state=seed, **model_kwargs,
+        #     random_state=seed, **model_kwargs_to_use,
         #     tol=1e-3
         # )
         # clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
@@ -131,7 +143,7 @@ def get_decoder(name: str,
             class_weight='balanced',
             random_state=seed,
             tol=1e-3,
-            **model_kwargs
+            **model_kwargs_to_use
         )
 
         clf = Pipeline([
@@ -144,7 +156,7 @@ def get_decoder(name: str,
     elif name == 'svm_linear':
         # Linear SVM is great when p is not tiny and N is small
         base = LinearSVC(
-            random_state=seed, class_weight='balanced', **model_kwargs
+            random_state=seed, class_weight='balanced', **model_kwargs_to_use
         )
         Cs = choose([0.01, 0.1, 1], [0.03, 0.3, 1, 3], [0.03, 0.3, 1, 3, 10])
         clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
@@ -153,7 +165,7 @@ def get_decoder(name: str,
 
     elif name == 'svm':  # RBF SVM
         base = SVC(probability=True, kernel='rbf',
-                   random_state=seed, class_weight='balanced', **model_kwargs)
+                   random_state=seed, class_weight='balanced', **model_kwargs_to_use)
         # Keep gamma mostly 'scale'; only add a tiny perturbation at larger N
         # gamma_grid = choose(['scale'], ['scale', 0.01],
         #                     ['scale', 0.03, 0.01])
@@ -164,14 +176,14 @@ def get_decoder(name: str,
         param_grid = {'clf__C': C_grid, 'clf__gamma': gamma_grid}
 
     elif name == 'rf':
-        base = RandomForestClassifier(random_state=seed, **model_kwargs)
+        base = RandomForestClassifier(random_state=seed, **model_kwargs_to_use)
         # Shallow trees for small N; grow a bit with more data
         # n_estimators = choose([100], [100, 200], [200, 400])
         # max_depth = choose([3, 5], [5, 10], [None, 10])
         # min_split = choose([5, 10], [5, 10], [2, 5, 10])
         n_estimators = [200, 400]
         max_depth = [None, 10]
-        min_samples_leaf: [2, 5, 10]
+        min_samples_leaf = [2, 5, 10]
         param_grid = {
             'clf__n_estimators': n_estimators,
             'clf__max_depth': max_depth,
@@ -182,7 +194,7 @@ def get_decoder(name: str,
     elif name == 'mlp':
         base = MLPClassifier(
             max_iter=1000, random_state=seed,
-            early_stopping=True, n_iter_no_change=10, **model_kwargs
+            early_stopping=True, n_iter_no_change=10, **model_kwargs_to_use
         )
         # Keep networks tiny; increase slightly with data
         hls = choose([(16,), (32,)],
@@ -358,7 +370,22 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
         aucs.append(roc_auc_score(y[te], p))
 
     aucs = np.asarray(aucs)
-    return float(np.mean(aucs)), float(np.std(aucs)), model.get_params()['clf'].get_params()
+    # Extract params from final classifier; unwrap calibration if present
+    try:
+        clf_step = model.named_steps['clf']
+    except Exception:
+        clf_step = model.get_params().get('clf', None)
+    if isinstance(clf_step, CalibratedClassifierCV):
+        base_estimator = clf_step.base_estimator
+    else:
+        base_estimator = clf_step
+    best_params = {}
+    if base_estimator is not None:
+        try:
+            best_params = base_estimator.get_params()
+        except Exception:
+            best_params = {}
+    return float(np.mean(aucs)), float(np.std(aucs)), best_params
 
 # ---------------------------------------------------------------------
 # Helper: CV AUC with fixed (pre-tuned) params
@@ -745,14 +772,19 @@ def ttest_auc_folds(X, y, model_name='logreg', k=5, seed=0,
     """
     n_samples, n_features = X.shape
     clf, _ = get_decoder(model_name, seed, n_samples, n_features, model_kwargs)
-    # Preserve scaler from get_decoder by prepending imputer
-    pipeline = Pipeline([('imputer', SimpleImputer(strategy='mean'))] +
-                        (clf.steps if isinstance(clf, Pipeline) else [('clf', clf)]))
+    # Use unified calibrated pipeline to ensure probability-like output
+    pipeline = make_calibrated_pipeline(clf)
     cv = StratifiedKFold(k, shuffle=True, random_state=seed)
     aucs = []
     for tr, te in cv.split(X, y):
         model = pipeline.fit(X[tr], y[tr])
-        p = model.predict_proba(X[te])[:, 1]
+        if hasattr(model, "predict_proba"):
+            p = model.predict_proba(X[te])[:, 1]
+        elif hasattr(model, "decision_function"):
+            p = model.decision_function(X[te])
+        else:
+            raise ValueError(
+                f"Model {model_name} lacks a probability-like output.")
         aucs.append(roc_auc_score(y[te], p))
     aucs = np.array(aucs)
     tstat, pval = stats.ttest_1samp(aucs, 0.5, alternative='greater')

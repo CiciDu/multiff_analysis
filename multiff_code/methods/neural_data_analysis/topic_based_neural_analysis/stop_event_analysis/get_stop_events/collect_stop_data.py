@@ -37,7 +37,7 @@ import math
 import sys
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import get_stops_utils, collect_stop_data
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats, compare_events, dpca_utils, prep_stop_psth_data
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 from neural_data_analysis.neural_analysis_tools.align_trials import align_trial_utils
 from neural_data_analysis.neural_analysis_tools.gpfa_methods import elephant_utils, fit_gpfa_utils, plot_gpfa_utils, gpfa_helper_class
 from planning_analysis.show_planning import nxt_ff_utils, show_planning_utils
@@ -108,98 +108,98 @@ def collect_stop_data_func(raw_data_folder_path):
 
     pn.make_one_stop_w_ff_df()
     one_stop_miss = pn.one_stop_w_ff_df[[
-        'first_stop_point_index', 'first_stop_time', 'latest_visible_ff']].copy()
+        'first_stop_point_index', 'first_stop_time', 'candidate_target']].copy()
     one_stop_miss.rename(columns={
         'first_stop_point_index': 'stop_point_index', 'first_stop_time': 'stop_time'}, inplace=True)
     one_stop_miss[columns_to_add] = pn.monkey_information.loc[one_stop_miss['stop_point_index'],
                                                               columns_to_add].values
 
     pn.make_or_retrieve_stop_category_df()
-    pn.get_try_a_few_times_info()
-    pn.get_give_up_after_trying_info()
+    pn.get_retry_capture_info()
+    pn.get_retry_switch_info()
 
     columns_to_add = ["stop_id", "stop_id_duration",
                       "stop_id_start_time", "stop_id_end_time"]
     shared_columns = ["stop_point_index", "stop_time"] + columns_to_add
 
-    # --- Build expanded + ordered tables for GUAT / TAFT ---
-    GUAT_expanded = get_stops_utils._expand_trials(
-        pn.GUAT_trials_df, pn.monkey_information)
-    TAFT_expanded = get_stops_utils._expand_trials(
-        pn.TAFT_trials_df, pn.monkey_information)
+    # --- Build expanded + ordered tables for rsw / rcap ---
+    rsw_expanded = get_stops_utils._expand_trials(
+        pn.rsw_events_df, pn.monkey_information)
+    rcap_expanded = get_stops_utils._expand_trials(
+        pn.rcap_events_df, pn.monkey_information)
 
-    # add stop_id to GUAT_trials_df and TAFT_trials_df
-    GUAT_expanded[columns_to_add] = pn.monkey_information.loc[GUAT_expanded['stop_point_index'],
-                                                              columns_to_add].values
-    TAFT_expanded[columns_to_add] = pn.monkey_information.loc[TAFT_expanded['stop_point_index'],
+    # add stop_id to rsw_events_df and rcap_events_df
+    rsw_expanded[columns_to_add] = pn.monkey_information.loc[rsw_expanded['stop_point_index'],
+                                                             columns_to_add].values
+    rcap_expanded[columns_to_add] = pn.monkey_information.loc[rcap_expanded['stop_point_index'],
                                                               columns_to_add].values
 
-    GUAT = get_stops_utils._add_cluster_ordering(GUAT_expanded)
-    TAFT = get_stops_utils._add_cluster_ordering(TAFT_expanded)
+    rsw = get_stops_utils._add_cluster_ordering(rsw_expanded)
+    rcap = get_stops_utils._add_cluster_ordering(rcap_expanded)
 
     # --- Per-cluster slices (consistent, vectorized) ---
     # First stop in each cluster
-    GUAT_first = GUAT[GUAT["is_first"]].reset_index(drop=True)
-    TAFT_first = TAFT[TAFT["is_first"]].reset_index(drop=True)
+    rsw_first = rsw[rsw["is_first"]].reset_index(drop=True)
+    rcap_first = rcap[rcap["is_first"]].reset_index(drop=True)
 
     # Last stop in each cluster
-    GUAT_last = GUAT[GUAT["is_last"]].reset_index(drop=True)
-    TAFT_last = TAFT[TAFT["is_last"]].reset_index(drop=True)
+    rsw_last = rsw[rsw["is_last"]].reset_index(drop=True)
+    rcap_last = rcap[rcap["is_last"]].reset_index(drop=True)
 
     # Middle stops (exclude first and last)
-    GUAT_middle = GUAT[GUAT["is_middle"]].reset_index(drop=True)
-    TAFT_middle = TAFT[TAFT["is_middle"]].reset_index(drop=True)
+    rsw_middle = rsw[rsw["is_middle"]].reset_index(drop=True)
+    rcap_middle = rcap[rcap["is_middle"]].reset_index(drop=True)
 
     # “First several” = all but the last stop in each cluster
-    GUAT_nonfinal = GUAT[GUAT["order_in_cluster"] <
-                         GUAT["cluster_size"] - 1].reset_index(drop=True)
-    TAFT_nonfinal = TAFT[TAFT["order_in_cluster"] <
-                         TAFT["cluster_size"] - 1].reset_index(drop=True)
+    rsw_nonfinal = rsw[rsw["order_in_cluster"] <
+                       rsw["cluster_size"] - 1].reset_index(drop=True)
+    rcap_nonfinal = rcap[rcap["order_in_cluster"] <
+                         rcap["cluster_size"] - 1].reset_index(drop=True)
 
     # Combine the “first several” from both, keep only columns you care about, then sort by index
     retry_after_miss = (
         pd.concat(
-            [GUAT_nonfinal[shared_columns],
-             TAFT_nonfinal[shared_columns],
-            ],
+            [rsw_nonfinal[shared_columns],
+             rcap_nonfinal[shared_columns],
+             ],
             ignore_index=True
         )
         .sort_values("stop_point_index")
         .reset_index(drop=True)
     )
 
-    both_first_miss = pd.concat([GUAT_first[shared_columns],
-                                 TAFT_first[shared_columns]])
+    both_first_miss = pd.concat([rsw_first[shared_columns],
+                                 rcap_first[shared_columns]])
 
-    both_middle = pd.concat([GUAT_middle[shared_columns],
-                            TAFT_middle[shared_columns]])
+    both_middle = pd.concat([rsw_middle[shared_columns],
+                            rcap_middle[shared_columns]])
 
     # Optional: if you also want “last several” (all but the first), it’s symmetrical:
-    # GUAT_last_several = GUAT[GUAT["order_in_cluster"] > 0].reset_index(drop=True)
-    # TAFT_last_several = TAFT[TAFT["order_in_cluster"] > 0].reset_index(drop=True)
+    # rsw_last_several = rsw[rsw["order_in_cluster"] > 0].reset_index(drop=True)
+    # rcap_last_several =  rcap[ rcap["order_in_cluster"] > 0].reset_index(drop=True)
 
-    switch_after_miss = pd.concat([GUAT_last[shared_columns],
+    switch_after_miss = pd.concat([rsw_last[shared_columns],
                                    one_stop_miss[shared_columns]])
 
     all_misses = pd.concat([one_stop_miss[shared_columns],
-                            GUAT_expanded[shared_columns],
-                            TAFT_nonfinal[shared_columns]
+                            rsw_expanded[shared_columns],
+                            rcap_nonfinal[shared_columns]
                             ])
 
     all_first_misses = pd.concat(
         [one_stop_miss[shared_columns],
-            GUAT_first[shared_columns], TAFT_first[shared_columns]],
+            rsw_first[shared_columns], rcap_first[shared_columns]],
         ignore_index=True
     )
 
     all_last_misses = pd.concat(
-        [one_stop_miss[shared_columns], GUAT_last[shared_columns]],
+        [one_stop_miss[shared_columns], rsw_last[shared_columns]],
         ignore_index=True
     )
 
-    # captures not in TAFT last (assuming TAFT_last is a subset of captures)
-    captures_minus_TAFT_last = compare_events.diff_by(
-        valid_captures_df, TAFT_last, key='stop_id')
+    # captures not in rcap last (assuming rcap_last is a subset of captures)
+    captures_minus_rcap_last = compare_events.diff_by(
+        valid_captures_df, rcap_last, key='stop_id')
 
     # non-captures excluding those flagged as 'all_misses'
     non_captures_minus_all_misses = compare_events.diff_by(
@@ -210,18 +210,18 @@ def collect_stop_data_func(raw_data_folder_path):
         'no_capture': filtered_no_capture_stops_df.copy(),
         'retry_after_miss': retry_after_miss.copy(),
         'both_middle': both_middle.copy(),
-        'TAFT_first': TAFT_first.copy(),
-        'GUAT_first': GUAT_first.copy(),
-        'GUAT_middle': GUAT_middle.copy(),
-        'TAFT_middle': TAFT_middle.copy(),
-        'GUAT_last': GUAT_last.copy(),
-        'TAFT_last': TAFT_last.copy(),
-        'GUAT_nonfinal': GUAT_nonfinal.copy(),
-        'TAFT_nonfinal': TAFT_nonfinal.copy(),
+        'rcap_first': rcap_first.copy(),
+        'rsw_first': rsw_first.copy(),
+        'rsw_middle': rsw_middle.copy(),
+        'rcap_middle': rcap_middle.copy(),
+        'rsw_last': rsw_last.copy(),
+        'rcap_last': rcap_last.copy(),
+        'rsw_nonfinal': rsw_nonfinal.copy(),
+        'rcap_nonfinal': rcap_nonfinal.copy(),
         'one_stop_miss': one_stop_miss.copy(),
         'both_first_miss': both_first_miss.copy(),
         'switch_after_miss': switch_after_miss.copy(),
-        'captures_minus_TAFT_last': captures_minus_TAFT_last.copy(),
+        'captures_minus_rcap_last': captures_minus_rcap_last.copy(),
         'all_misses': all_misses.copy(),
         'non_captures_minus_all_misses': non_captures_minus_all_misses.copy(),
         'all_first_misses': all_first_misses.copy(),
@@ -230,21 +230,21 @@ def collect_stop_data_func(raw_data_folder_path):
 
     comparisons = compare_events.build_comparisons([
 
-        {'a': 'GUAT_first', 'b': 'TAFT_first',
-         'key': 'guat_first_vs_taft_first',
-         'title': 'GUAT First vs TAFT First'},
+        {'a': 'rsw_first', 'b': 'rcap_first',
+         'key': 'rsw_first_vs_rcap_first',
+         'title': 'rsw First vs rcap First'},
 
-        {'a': 'GUAT_middle', 'b': 'TAFT_middle',
-         'key': 'guat_middle_vs_taft_middle',
-         'title': 'GUAT Middle vs TAFT Middle'},
+        {'a': 'rsw_middle', 'b': 'rcap_middle',
+         'key': 'rsw_middle_vs_rcap_middle',
+         'title': 'rsw Middle vs rcap Middle'},
 
-        {'a': 'GUAT_last', 'b': 'TAFT_last',
-         'key': 'guat_last_vs_taft_last',
-         'title': 'GUAT Last vs TAFT Last'},
+        {'a': 'rsw_last', 'b': 'rcap_last',
+         'key': 'rsw_last_vs_rcap_last',
+         'title': 'rsw Last vs rcap Last'},
 
-        {'a': 'GUAT_middle', 'b': 'GUAT_last',
-         'key': 'guat_middle_vs_guat_last',
-         'title': 'GUAT Middle vs GUAT Last'},
+        {'a': 'rsw_middle', 'b': 'rsw_last',
+         'key': 'rsw_middle_vs_rsw_last',
+         'title': 'rsw Middle vs rsw Last'},
 
         # ========= Maybe less interpretable because of the confounds in stops & captures surrounding the current stop =========
 
@@ -252,50 +252,47 @@ def collect_stop_data_func(raw_data_folder_path):
          'key': 'switch_vs_retry_after_miss',
          'title': 'Switch vs Retry After Miss'},
 
-        {'a': 'GUAT_last', 'b': 'both_middle',
+        {'a': 'rsw_last', 'b': 'both_middle',
          'key': 'switch_vs_retry_after_retry',
          'title': 'Switch vs Retry After Retry'},
 
-         # ==================
+        # ==================
 
 
         {'a': 'one_stop_miss', 'b': 'both_first_miss',
-         'key': 'first_giveup_vs_first_persist',
+         'key': 'one_stop_vs_both_first_miss',
          'title': 'First-Attempt Give-up vs First-Attempt Persist'},
 
-
-
-        {'a': 'captures', 'b': 'no_capture', 'key': 'captures_vs_no_capture',
-            'title': 'Capture vs No Capture'},
-
-            
-        {'a': 'captures', 'b': 'all_misses',
-            'key': 'captures_vs_all_misses', 'title': 'Capture vs Miss'},
-
-        {'a': 'captures_minus_TAFT_last', 'b': 'TAFT_last',
-         'key': 'first_vs_eventual_capture',
-         'title': 'First-Shot Capture vs Eventual Capture'},
-
-        {'a': 'one_stop_miss', 'b': 'GUAT_last',
-         'key': 'first_giveup_vs_retry_then_giveup',
+        {'a': 'one_stop_miss', 'b': 'rsw_last',
+         'key': 'one_stop_vs_rsw_last',
          'title': 'First-Attempt Give-up vs Retry then Give-up'},
 
+        {'a': 'one_stop_miss', 'b': 'rsw_first',
+         'key': 'one_stop_vs_rsw_first',
+         'title': 'First-Attempt Give-up vs First-Attempt rsw'},
 
-        {'a': 'one_stop_miss', 'b': 'GUAT_first',
-         'key': 'first_giveup_vs_first_GUAT',
-         'title': 'First-Attempt Give-up vs First-Attempt GUAT'},
+        {'a': 'rsw_nonfinal', 'b': 'rcap_nonfinal',
+         'key': 'rsw_nonfinal_vs_rcap_nonfinal',
+         'title': 'rsw Early Persists vs rcap Early Persists'},
 
+        {'a': 'captures', 'b': 'no_capture',
+         'key': 'captures_vs_no_capture',
+         'title': 'Capture vs No Capture'},
 
-        {'a': 'GUAT_nonfinal', 'b': 'TAFT_nonfinal',
-         'key': 'guat_persist_vs_taft_persist',
-         'title': 'GUAT Early Persists vs TAFT Early Persists'},
+        {'a': 'captures', 'b': 'all_misses',
+         'key': 'captures_vs_all_misses',
+         'title': 'Capture vs Miss'},
+
+        {'a': 'captures_minus_rcap_last', 'b': 'rcap_last',
+         'key': 'captures_minus_rcap_last_vs_rcap_last',
+         'title': 'First-Shot Capture vs Eventual Capture'},
 
         {'a': 'all_misses', 'b': 'non_captures_minus_all_misses',
-         'key': 'non_attempts_vs_all_misses',
+         'key': 'miss_vs_non_attemtp',
          'title': 'Miss vs Non-Attempt'},
 
         {'a': 'non_captures_minus_all_misses', 'b': 'one_stop_miss',
-         'key': 'non_attempts_vs_single_miss',
+         'key': 'non_attempt_vs_one_stop_miss',
          'title': 'Non-Attempt vs Single-Attempt Miss'},
 
         {'a': 'non_captures_minus_all_misses', 'b': 'all_first_misses',
@@ -303,11 +300,11 @@ def collect_stop_data_func(raw_data_folder_path):
          'title': 'Non-Attempt vs First-Attempt Miss'},
 
         {'a': 'non_captures_minus_all_misses', 'b': 'all_last_misses',
-         'key': 'non_attempts_vs_last_misses',
+         'key': 'non_attempt_vs_last_miss',
          'title': 'Non-Attempt vs Last-Attempt Miss'},
     ])
 
-
-    datasets = {k: compare_events.dedupe_within(compare_events.ensure_event_schema(v)) for k, v in datasets_raw.items()}
+    datasets = {k: compare_events.dedupe_within(
+        compare_events.ensure_event_schema(v)) for k, v in datasets_raw.items()}
 
     return pn, datasets, comparisons

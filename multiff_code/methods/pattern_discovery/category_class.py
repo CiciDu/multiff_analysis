@@ -1,5 +1,5 @@
-from decision_making_analysis.decision_making import decision_making_utils, plot_decision_making
-from decision_making_analysis import free_selection
+from decision_making_analysis.ff_data_acquisition import ff_data_utils
+from decision_making_analysis. ff_data_acquisition import free_selection
 from data_wrangling import specific_utils
 from visualization.matplotlib_tools import plot_trials, plot_behaviors_utils
 from pattern_discovery import pattern_by_points
@@ -111,7 +111,7 @@ class ProcessCategoryData:
     def clean_out_cross_boundary_trials(self, min_time_no_crossing_boundary=2.5):
 
         # Eliminate the cases where during the min_time_no_crossing_boundary up to catching the target, the monkey has crossed boundary
-        crossing_boundary_trials = decision_making_utils.find_crossing_boundary_trials(
+        crossing_boundary_trials = ff_data_utils.find_crossing_boundary_trials(
             self.sort_1_trials, self.sort_1_trials_ending_time, self.monkey_information, min_time_no_crossing_boundary)
         print("There are", str(len(crossing_boundary_trials)), "trials in", self.sort_1_name, "out of", str(
             len(self.sort_1_trials)), "that the monkey crossed the boundary before catching the firefly.")
@@ -128,7 +128,7 @@ class ProcessCategoryData:
         self.sort_1_time_for_predicting_ff = self.sort_1_time_for_predicting_ff[new_indices]
 
         # for those that are not in visible_before_last_one trials, similarly eliminate crossing-boundary cases
-        crossing_boundary_trials_2 = decision_making_utils.find_crossing_boundary_trials(
+        crossing_boundary_trials_2 = ff_data_utils.find_crossing_boundary_trials(
             self.sort_2_trials, self.sort_2_trials_ending_time, self.monkey_information, min_time_no_crossing_boundary)
         print("There are", str(len(crossing_boundary_trials_2)), "trials in", self.sort_2_name, "out of", str(
             len(self.sort_2_trials)), "that the monkey crossed the boundary before catching the firefly.")
@@ -189,11 +189,10 @@ class ProcessCategoryData:
         # sample from it so the size is the same as target_cluster_info
         ax.scatter(self.sort_2_df_sample['last_vis_ang'], self.sort_2_df_sample['last_vis_dist'],
                    c="red", alpha=0.4, zorder=2, s=15, marker='o')  # originally it was s=15
-        
-        
+
         ax.set_thetamin(-45)
         ax.set_thetamax(45)
-        
+
         plt.title("Firefly Last Seen Positions", fontsize=20)
         plt.legend(labels=[self.sort_1_name, self.sort_2_name],
                    fontsize=13, loc="upper right")
@@ -209,9 +208,11 @@ class ProcessCategoryData:
                          alpha=0.4, color="green", binwidth=0.1, stat="probability")
             sns.histplot(data=self.sort_2_df[variable_of_interest], kde=False,
                          alpha=0.4, color="blue", binwidth=0.1, stat="probability")
-            axes.set_title("Time from Last Firefly Visibility to Closest Stop", fontsize=19, pad=12)
+            axes.set_title(
+                "Time from Last Firefly Visibility to Closest Stop", fontsize=19, pad=12)
             # axes.set_title("Time Since Firefly Last Visible at Time of Closest Stop", fontsize=19)
-            max_time = max(self.sort_1_df[variable_of_interest].max(), self.sort_2_df[variable_of_interest].max())
+            max_time = max(self.sort_1_df[variable_of_interest].max(
+            ), self.sort_2_df[variable_of_interest].max())
             axes.set_xlim([0, max_time])
             axes.set_xlabel('Time (s)', fontsize=13)
             # change ylabel font size
@@ -223,15 +224,15 @@ class ProcessCategoryData:
         variable_of_interest = "abs_last_vis_ang"
         if (variable_of_interest in self.sort_1_df.columns) & (variable_of_interest in self.sort_2_df.columns):
             fig, axes = plt.subplots(figsize=(8, 5))
-            
+
             sort_1_angles = self.sort_1_df[variable_of_interest] * 180 / np.pi
             sort_2_angles = self.sort_2_df[variable_of_interest] * 180 / np.pi
-            
+
             sns.histplot(data=sort_1_angles, kde=False, binwidth=5,
                          alpha=0.3, color="green", stat="probability", edgecolor='grey')
             sns.histplot(data=sort_2_angles, kde=False,
                          binwidth=5, alpha=0.3, color="blue", stat="probability", edgecolor='grey')
-            
+
             max_angle = max(sort_1_angles.max(), sort_2_angles.max())
             axes.set_title("Abs Angle of Firefly Last Visible", fontsize=19)
             axes.set_xlabel('')
@@ -324,14 +325,14 @@ class ProcessCategoryData:
 
         prev_target_caught_T = self.ff_caught_T_new[self.sort_1_trials -
                                                     1][self.sort_1_sample_indices]
-        target_distances, target_angles = decision_making_utils.get_distance_and_angle_from_previous_target(
+        target_distances, target_angles = ff_data_utils.get_distance_and_angle_from_previous_target(
             self.sort_1_ff_positions[self.sort_1_sample_indices], prev_target_caught_T, self.monkey_information)
         ax.scatter(target_angles, target_distances, c="green", alpha=0.7,
                    zorder=2, s=5, marker='o')  # originally it was s=15
 
         prev_target_caught_T = self.ff_caught_T_new[self.sort_2_trials -
                                                     1][self.sort_2_sample_indices]
-        target_distances, target_angles = decision_making_utils.get_distance_and_angle_from_previous_target(
+        target_distances, target_angles = ff_data_utils.get_distance_and_angle_from_previous_target(
             self.sort_2_ff_positions[self.sort_2_sample_indices], prev_target_caught_T, self.monkey_information)
         ax.scatter(target_angles, target_distances, c="red", alpha=0.7,
                    zorder=2, s=5, marker='o')  # originally it was s=15
@@ -406,44 +407,6 @@ class ProcessCategoryData:
         plt.legend(title=None, labels=[
                    self.sort_1_name, self.sort_2_name], fontsize=13, loc="upper right")
         plt.show()
-
-    def make_and_visualize_free_selection_predictions_using_trained_model(self, trained_model, use_sort_1=True, use_sort_2=False, max_plot_to_make=2,
-                                                                          sort_1_select_trials=None, sort_2_select_trials=None):
-        # Note: select_sort_1_trials or select_sort_2_trials will override max_plot_to_make
-
-        if use_sort_1:
-            print(
-                "Predictions on free selection trials using the trained model: ", self.sort_1_name)
-            self.sort_1_inputs, self.sort_1_labels, self.sort_1_y_pred = free_selection.make_free_selection_predictions_using_trained_model(trained_model, self.sort_1_ff_indices, self.sort_1_trials, self.ff_dataframe,
-                                                                                                                                            self.ff_real_position_sorted, self.ff_caught_T_new, self.monkey_information, time_of_evaluation=self.sort_1_time_for_predicting_ff)
-
-            if sort_1_select_trials is not None:
-                # find corresponding indices of select_trials in trials
-                selected_cases = np.where(
-                    np.isin(self.sort_1_trials, sort_1_select_trials))[0]
-
-            plot_decision_making.make_polar_plots_for_decision_making(ff_inputs=self.sort_1_inputs,
-                                                                      labels=self.sort_1_labels,
-                                                                      y_pred=self.sort_1_y_pred,
-                                                                      trials=self.sort_1_trials,  # this is only for naming the title
-                                                                      max_plot_to_make=max_plot_to_make,
-                                                                      selected_cases=selected_cases)
-
-        if use_sort_2:
-            print(
-                "Predictions on free selection trials using the trained model: ", self.sort_2_name)
-            self.sort_2_inputs, self.sort_2_labels, self.sort_2_y_pred = free_selection.make_free_selection_predictions_using_trained_model(trained_model, self.sort_2_ff_indices, self.sort_2_trials, self.ff_dataframe, self.ff_real_position_sorted,
-                                                                                                                                            self.ff_caught_T_new, self.monkey_information, time_of_evaluation=self.sort_2_time_for_predicting_ff)
-
-            if sort_2_select_trials is not None:
-                selected_cases = np.where(
-                    np.isin(self.sort_2_trials, sort_2_select_trials))[0]
-            plot_decision_making.make_polar_plots_for_decision_making(ff_inputs=self.sort_2_inputs,
-                                                                      labels=self.sort_2_labels,
-                                                                      y_pred=self.sort_2_y_pred,
-                                                                      trials=self.sort_2_trials,  # this is only for naming the title
-                                                                      max_plot_to_make=max_plot_to_make,
-                                                                      selected_cases=selected_cases)
 
     def inspect_special_cases(self, weird_trials):
         try:

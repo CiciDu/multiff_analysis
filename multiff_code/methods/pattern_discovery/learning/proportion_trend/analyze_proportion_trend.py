@@ -1,4 +1,5 @@
 
+from typing import Literal, Optional, Dict, Tuple
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -182,9 +183,6 @@ def tertile_phase(df, session_col='session'):
     return g
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-
 def add_pval_to_plot(
     ax,
     pval: float,
@@ -205,7 +203,7 @@ def add_pval_to_plot(
     fontsize : int
         Font size for text.
     label_prefix : str, optional
-        Optional string prefix (e.g. 'GUAT').
+        Optional string prefix (e.g. 'rsw').
     loc : {'upper left','upper right','lower left','lower right'}
         Where to place the annotation.
     show_box : bool
@@ -246,7 +244,8 @@ def add_pval_to_plot(
         raise ValueError(f'loc must be one of {list(loc_map.keys())}')
     x, y, ha, va = loc_map[loc]
 
-    bbox = dict(boxstyle='round', facecolor='white', alpha=0.8) if show_box else None
+    bbox = dict(boxstyle='round', facecolor='white',
+                alpha=0.8) if show_box else None
 
     ax.text(
         x, y, p_text,
@@ -255,7 +254,6 @@ def add_pval_to_plot(
         fontsize=fontsize,
         bbox=bbox
     )
-
 
 
 def summarize_glm(model, label):
@@ -420,12 +418,6 @@ def show_event_proportion(df_monkey, event, title=None, ylabel=None):
                               denom_count_col=denom_count_col, title=title, ylabel=ylabel)
 
 
-from typing import Literal, Optional, Dict, Tuple
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 def plot_poisson_proportion_fit(
     df_sessions_counts: pd.DataFrame,
     glm_pois,  # single fitted model OR dict {monkey_name: fitted_model}
@@ -450,14 +442,16 @@ def plot_poisson_proportion_fit(
     def _observed_df(d: pd.DataFrame) -> pd.DataFrame:
         # Add Wilson CI per session (expects columns named 'success' and 'stops')
         plot_df = add_wilson_to_session_counts(
-            d.rename(columns={event_count_col: 'success', denom_count_col: 'stops'}),
+            d.rename(columns={event_count_col: 'success',
+                     denom_count_col: 'stops'}),
             event_count_col='success', denom_col='stops'
         ).sort_values(session_col)
         return plot_df
 
     def _pred_df(model, d: pd.DataFrame) -> pd.DataFrame:
         # Predict expected successes per session using its own offset; divide by stops to get rate
-        grid = d[[session_col, denom_count_col]].drop_duplicates().sort_values(session_col)
+        grid = d[[session_col, denom_count_col]
+                 ].drop_duplicates().sort_values(session_col)
         preds = []
         for s, n in zip(grid[session_col], grid[denom_count_col]):
             n_safe = max(1.0, float(n))
@@ -469,7 +463,8 @@ def plot_poisson_proportion_fit(
             lo = sf['mean_ci_lower'].iloc[0] / n_safe
             hi = sf['mean_ci_upper'].iloc[0] / n_safe
             preds.append((s, rate, lo, hi))
-        pred_df = pd.DataFrame(preds, columns=[session_col, 'fit_rate', 'fit_lo', 'fit_hi'])
+        pred_df = pd.DataFrame(
+            preds, columns=[session_col, 'fit_rate', 'fit_lo', 'fit_hi'])
         return pred_df
 
     def _get_pval(model, fallback: float = 1.0) -> float:
@@ -483,22 +478,26 @@ def plot_poisson_proportion_fit(
     def _plot_on_ax(ax, obs: pd.DataFrame, pred: pd.DataFrame, panel_title: str,
                     p_value: float, *, markersize: int, font_axis: int,
                     font_tick: int, font_title: int, font_legend: int):
-        yerr = np.vstack([obs['p_hat'] - obs['p_lo'], obs['p_hi'] - obs['p_hat']])
+        yerr = np.vstack([obs['p_hat'] - obs['p_lo'],
+                         obs['p_hi'] - obs['p_hat']])
         ax.errorbar(
             obs[session_col], obs['p_hat'],
             yerr=yerr, fmt='o', capsize=3, alpha=0.85,
             markersize=markersize,
             label='Observed (Wilson 95% CI)'
         )
-        ax.plot(pred[session_col], pred['fit_rate'], lw=2, label='Poisson offset fit')
-        ax.fill_between(pred[session_col], pred['fit_lo'], pred['fit_hi'], alpha=0.2, label='95% CI')
+        ax.plot(pred[session_col], pred['fit_rate'],
+                lw=2, label='Poisson offset fit')
+        ax.fill_between(pred[session_col], pred['fit_lo'],
+                        pred['fit_hi'], alpha=0.2, label='95% CI')
 
         ax.set_xlabel('Session', fontsize=font_axis)
         ax.set_title(panel_title, fontsize=font_title, y=1.02)
         ax.tick_params(axis='both', labelsize=font_tick)
 
         # Percent formatter
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
+        ax.yaxis.set_major_formatter(
+            plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
 
         # p-value box (uses your existing helper)
         add_pval_to_plot(ax, p_value)
@@ -529,7 +528,8 @@ def plot_poisson_proportion_fit(
         return
 
     # --- Side-by-side mode ------------------------------------------------------
-    df2 = df_sessions_counts[df_sessions_counts[monkey_col].isin(monkeys)].copy()
+    df2 = df_sessions_counts[df_sessions_counts[monkey_col].isin(
+        monkeys)].copy()
     panels = []
     for m in monkeys:
         d_m = df2[df2[monkey_col] == m]
@@ -544,7 +544,8 @@ def plot_poisson_proportion_fit(
         raise ValueError('No matching monkeys/models found to plot.')
 
     n = len(panels)
-    fig, axes = plt.subplots(1, n, figsize=(5.6 * n, 4.4), dpi=300, sharey=True)
+    fig, axes = plt.subplots(1, n, figsize=(
+        5.6 * n, 4.4), dpi=300, sharey=True)
     if n == 1:
         axes = [axes]
 
@@ -559,8 +560,10 @@ def plot_poisson_proportion_fit(
     global_min = np.inf
     global_max = -np.inf
     for _, obs_m, pred_m, _ in panels:
-        global_min = min(global_min, obs_m['p_lo'].min(), pred_m['fit_lo'].min())
-        global_max = max(global_max, obs_m['p_hi'].max(), pred_m['fit_hi'].max())
+        global_min = min(
+            global_min, obs_m['p_lo'].min(), pred_m['fit_lo'].min())
+        global_max = max(
+            global_max, obs_m['p_hi'].max(), pred_m['fit_hi'].max())
 
     for i, (ax, (m, obs_m, pred_m, p_m)) in enumerate(zip(axes, panels)):
         panel_title = f'{m}: {title}'
@@ -580,7 +583,6 @@ def plot_poisson_proportion_fit(
 
         # Apply shared y-lims
         ax.set_ylim(global_min * 0.9, global_max * 1.2)
-
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0.15)

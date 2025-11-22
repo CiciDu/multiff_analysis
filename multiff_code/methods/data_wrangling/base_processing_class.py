@@ -5,7 +5,7 @@ from planning_analysis.test_params_for_planning import params_utils
 from planning_analysis.show_planning import nxt_ff_utils
 from pattern_discovery import cluster_analysis
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 
 import os
 import os
@@ -36,7 +36,6 @@ class BaseProcessing:
         # self.monkey_information = None
         # self.ff_dataframe = None
         self.curv_of_traj_params = {}
-        
 
     def load_raw_data(self, raw_data_folder_path=None, monkey_data_exists_ok=True, window_for_curv_of_traj=[-25, 0], curv_of_traj_mode='distance', truncate_curv_of_traj_by_time_of_capture=False):
         if raw_data_folder_path is None:

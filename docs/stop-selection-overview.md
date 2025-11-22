@@ -1,4 +1,4 @@
-# Selection Criteria — `one_stop_df` vs `GUAT` vs `TAFT`
+# Selection Criteria — `one_stop_df` vs `rsw` vs `rcap`
 ---
 
 # Old method (but some parts are used in the new method)
@@ -10,7 +10,7 @@
 
 ---
 
-## `TAFT` (Try A Few Times)
+## `rcap` (Try A Few Times)
 - **Multiple stops per trial**
   - Require **≥ 2** stops in a cluster  
 - **Target proximity**
@@ -20,11 +20,11 @@
 
 ---
 
-## `GUAT` (Give Up After Trying)
+## `rsw` (Give Up After Trying)
 - **Base DataFrames**
-  - `GUAT_trials_df`: base trials without firefly context  
-  - `GUAT_expanded_trials_df`: base trials + firefly proximity annotations  
-  - `GUAT_w_ff_df`: only trials where there is at least one firefly near the stop  
+  - `rsw_trials_df`: base trials without firefly context  
+  - `rsw_expanded_trials_df`: base trials + firefly proximity annotations  
+  - `rsw_w_ff_df`: only trials where there is at least one firefly near the stop  
     - If two stop clusters map to the same firefly around the same time, keep the cluster whose stop is closest to the trajectory point nearest the stop (measured in number of `point_indices`).  
     - *This rule is implemented in `deal_with_duplicated_stop_point_index`, and may change. Such cases are very rare.*  
 - **Multiple stops per trial**
@@ -58,23 +58,23 @@
 
 ## Initial assignment (precedence order)
 
-1. **Tag TAFT and captures first**  
-   Use the TAFT/capture methods to label stops that clearly belong to those categories.
+1. **Tag rcap and captures first**  
+   Use the rcap/capture methods to label stops that clearly belong to those categories.
 
 2. **Fallback-to-own-target (≤ 50 cm)**  
-   For any remaining stop, if it is within **50 cm** of its trial’s intended target, set `associated_ff = target_index`.  
-   *This pulls the stop into the same `associated_ff` as a nearby TAFT or capture when appropriate.*
+   For any remaining stop, if it is within **50 cm** of its trial’s intended target, set `candidate_target = target_index`.  
+   *This pulls the stop into the same `candidate_target` as a nearby rcap or capture when appropriate.*
 
-3. **GUAT from leftovers**  
-   From the remaining unlabeled stops, select **GUAT** using the GUAT method.
+3. **rsw from leftovers**  
+   From the remaining unlabeled stops, select **rsw** using the rsw method.
 
 4. **One-stop miss from the rest**  
    From what’s still left, select **one-stop misses**.
 
-> After steps 1–4, every labeled stop has an **`associated_ff`** (TAFT/capture assignments take precedence over GUAT/miss).
+> After steps 1–4, every labeled stop has an **`candidate_target`** (rcap/capture assignments take precedence over rsw/miss).
 
-5. **Merge consecutive runs by `associated_ff`**  
-   Build **consecutive clusters** (ordered by time): each time `associated_ff` changes (including to/from NaN), start a new cluster.
+5. **Merge consecutive runs by `candidate_target`**  
+   Build **consecutive clusters** (ordered by time): each time `candidate_target` changes (including to/from NaN), start a new cluster.
 
 6. **Reassign labels per cluster** (rules below)
 
@@ -82,23 +82,23 @@
 
 ## Rules for cluster-level re-assignment
 
-Within each **consecutive `associated_ff` cluster**:
+Within each **consecutive `candidate_target` cluster**:
 
-1. **If any stop = TAFT → entire cluster = TAFT.**  
+1. **If any stop = rcap → entire cluster = rcap.**  
 2. **Else, if any stop = capture**:  
-   - Cluster size **> 1** → **TAFT** (captures embedded in persistence are treated as TAFT)  
+   - Cluster size **> 1** → **rcap** (captures embedded in persistence are treated as rcap)  
    - Cluster size **= 1** → **capture**  
-3. **Else (no TAFT, no capture)**:  
-   - Cluster size **> 1** → **GUAT**  
+3. **Else (no rcap, no capture)**:  
+   - Cluster size **> 1** → **rsw**  
    - Cluster size **= 1** → **miss** (one-stop)
 
-Stops with **no associated firefly** (`associated_ff` is NaN) are labeled **`unclassified`**.
+Stops with **no associated firefly** (`candidate_target` is NaN) are labeled **`unclassified`**.
 
 ---
 
 ## Output
-- `attempt_type ∈ {capture, TAFT, GUAT, miss, unclassified}`  
-- All stops within the same consecutive `associated_ff` cluster share the **same** final label.  
+- `attempt_type ∈ {capture, rcap, rsw, miss, unclassified}`  
+- All stops within the same consecutive `candidate_target` cluster share the **same** final label.  
 
 ---
 
@@ -106,9 +106,9 @@ Stops with **no associated firefly** (`associated_ff` is NaN) are labeled **`unc
 
 | Cluster condition                     | Final label     |
 |--------------------------------------|-----------------|
-| Any stop = TAFT                      | **TAFT**        |
-| Contains capture, size > 1           | **TAFT**        |
+| Any stop = rcap                      | **rcap**        |
+| Contains capture, size > 1           | **rcap**        |
 | Contains capture, size = 1           | **capture**     |
-| No TAFT/capture, size > 1            | **GUAT**        |
-| No TAFT/capture, size = 1            | **miss**        |
-| `associated_ff` is NaN               | **unclassified** |
+| No rcap/capture, size > 1            | **rsw**        |
+| No rcap/capture, size = 1            | **miss**        |
+| `candidate_target` is NaN               | **unclassified** |

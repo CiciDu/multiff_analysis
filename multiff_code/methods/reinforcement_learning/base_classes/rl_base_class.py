@@ -8,7 +8,7 @@ from reinforcement_learning.collect_data import collect_agent_data, process_agen
 from reinforcement_learning.agents.feedforward import interpret_neural_network, sb3_utils
 from reinforcement_learning.base_classes import rl_base_utils
 from reinforcement_learning.base_classes import run_logger
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 from reinforcement_learning.base_classes import base_env
 from reinforcement_learning.base_classes import env_utils
 
@@ -561,7 +561,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     self.make_env(**self.input_env_kwargs)
                 self.make_agent()
 
-
         env_data_collection_kwargs = copy.deepcopy(self.current_env_kwargs)
         env_data_collection_kwargs.update({'episode_len': n_steps+100})
 
@@ -575,7 +574,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.env_for_data_collection = sb3_env.CollectInformation(
                 **env_data_collection_kwargs)
             LSTM = False
-
 
         self._run_agent_to_collect_data(
             n_steps=n_steps, save_data=save_data, LSTM=LSTM)
@@ -755,17 +753,20 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                          duration=duration, n_steps=n_steps, file_name=None)
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
-                                    data_exists_ok=False, save_video=True, save_format='html', display_inline=False):
+                                    data_exists_ok=False, save_video=True, save_format='html', display_inline=False, **animate_kwargs):
         self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
-                            duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline)
+                            duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline,
+                            **animate_kwargs)
 
-    def make_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], file_name=None, video_dir=None, max_num_frames=150, save_format=None, save_video=True, display_inline=False):
+    def make_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], file_name=None, video_dir=None, max_num_frames=150, save_format=None,
+                       save_video=True, display_inline=False, **animate_kwargs):
         self.set_animation_parameters(currentTrial=currentTrial_for_animation, num_trials=num_trials_for_animation,
-                                      k=1, duration=duration, max_num_frames=max_num_frames)
+                                      k=1, duration=duration, max_num_frames=max_num_frames, reduce_k_if_too_many_frames=False)
         self.call_animation_function(
-            file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline)
+            file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline,
+            **animate_kwargs)
 
     def streamline_everything(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000,
                               use_curriculum_training=True, load_replay_buffer_of_best_model_postcurriculum=True,
@@ -924,8 +925,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         if env is None:
             return None
         # Prefer single underlying env when vectorized (e.g., SB3 DummyVecEnv)
-        if hasattr(env, 'envs') and isinstance(getattr(env, 'envs', None), (list, tuple)) and len(env.envs) > 0:
-            single = env.envs[0]
+        if hasattr(env, 'envs') and isinstance(getattr(env, 'envs', None), (list, tuple)) and len(env.unwrapped.envs) > 0:
+            single = env.unwrapped.envs[0]
             # Return base unwrapped environment when available
             return getattr(single, 'unwrapped', single)
         # Fallback to .env wrapped gym environment
@@ -1125,9 +1126,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             num_trials_for_animation = min(len(self.ff_caught_T_new)-1, 5)
 
         self.annotation_info = animation_utils.make_annotation_info(self.caught_ff_num+1, self.max_point_index, self.n_ff_in_a_row, self.visible_before_last_one_trials, self.disappear_latest_trials,
-                                                                    self.ignore_sudden_flash_indices, self.GUAT_indices_df['point_index'].values, self.try_a_few_times_indices)
+                                                                    self.ignore_sudden_flash_indices, self.rsw_indices_df['point_index'].values, self.retry_capture_indices)
         self.set_animation_parameters(currentTrial=currentTrial_for_animation,
-                                      num_trials=num_trials_for_animation, k=1, duration=duration)
+                                      num_trials=num_trials_for_animation, k=1, duration=duration, reduce_k_if_too_many_frames=False)
         self.call_animation_function(
             save_video=True, fps=None, video_dir=self.overall_folder + 'all_videos', plot_flash_on_ff=True)
         # self.combine_6_plots_for_neural_network()

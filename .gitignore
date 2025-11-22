@@ -31,6 +31,9 @@ __pycache__/
 **/.ipynb_checkpoints/
 
 
-**/RL_models/
-**/jobs/
+**/RL_models/ 
 **/results/
+
+**/jobs/rppo/logs/
+**/jobs/decode/logs/
+**/jobs/sb3/logs/

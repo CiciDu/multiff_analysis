@@ -29,7 +29,7 @@ class PatternsAndFeatures():
 
     pattern_order = ['ff_capture_rate', 'stop_success_rate',
                      'two_in_a_row', 'waste_cluster_around_target', 'visible_before_last_one', 'disappear_latest',
-                     'give_up_after_trying', 'try_a_few_times', 'ignore_sudden_flash']
+                     'retry_switch', 'retry_capture', 'ignore_sudden_flash']
 
     feature_order = ['t', 't_last_vis', 'd_last_vis', 'abs_angle_last_vis',
                      'num_stops', 'num_stops_since_last_vis']
@@ -76,7 +76,8 @@ class PatternsAndFeatures():
                 raw_data_folder_path=raw_data_folder_path)
             self.data_item.make_df_related_to_patterns_and_features(
                 exists_ok=exists_ok)
-            print(f'Successfully made df related to patterns and features for {data_name}')
+            print(
+                f'Successfully made df related to patterns and features for {data_name}')
 
             self.data_item.pattern_frequencies['data_name'] = data_name
             self.data_item.feature_statistics['data_name'] = data_name

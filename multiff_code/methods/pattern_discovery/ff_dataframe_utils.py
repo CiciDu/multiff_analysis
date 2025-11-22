@@ -185,23 +185,6 @@ def find_time_since_last_vis(visible_pos_indices, monkey_t_array):
     return time_since_last_vis
 
 
-def find_time_till_next_visible(visible_pos_indices, monkey_t_array):
-    invisible_pos_indices = np.setdiff1d(
-        np.arange(len(monkey_t_array)), visible_pos_indices)
-    monkey_t_array_copy = monkey_t_array.copy()
-    monkey_t_array_copy[invisible_pos_indices] = np.nan
-    # use forward fill to fill in the nan values
-    monkey_t_array_copy = pd.Series(
-        monkey_t_array_copy).fillna(method='bfill').values
-    # and fill the rest of NA to be the the first value of monkey_t_array
-    monkey_t_array_copy = pd.Series(
-        monkey_t_array_copy).fillna(monkey_t_array[-1]).values
-
-    time_till_next_visible = monkey_t_array_copy - monkey_t_array
-
-    return time_till_next_visible
-
-
 def add_caught_time_and_whether_caught_to_ff_dataframe(ff_dataframe, ff_caught_T_new, ff_life_sorted, dt=0.016):
     env_end_time = ff_life_sorted[-1, -1] + 100
     num_ff_to_be_added = len(ff_life_sorted) - len(ff_caught_T_new)

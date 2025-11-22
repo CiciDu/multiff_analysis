@@ -21,6 +21,8 @@ from scipy import stats
 import matplotlib.pyplot as plt
 
 # ----------------------------- Small helpers ---------------------------------
+
+
 def quick_report(an, window="late_rebound(0.3–0.8)"):
     fig = an.plot_comparison()
     plt.show()
@@ -30,7 +32,8 @@ def quick_report(an, window="late_rebound(0.3–0.8)"):
         if "error" in v:
             print(f"Cluster {k}: {v['error']}")
         else:
-            print(f"Cluster {k}: p={v['p_value']:.3g}  AUC={v['AUC']:.3f}  δ={v['cliffs_delta']:.3f}  g={v['hedges_g']:.2f}")
+            print(
+                f"Cluster {k}: p={v['p_value']:.3g}  AUC={v['AUC']:.3f}  δ={v['cliffs_delta']:.3f}  g={v['hedges_g']:.2f}")
 
 # def _hedges_g(x: np.ndarray, y: np.ndarray) -> float:
 #     n1, n2 = len(x), len(y)
@@ -40,20 +43,24 @@ def quick_report(an, window="late_rebound(0.3–0.8)"):
 #     J = 1 - (3 / (4*(n1+n2) - 9))  # small-sample correction
 #     return float(J * d)
 
+
 def _hedges_g(x, y, eps=1e-3, trim=0.0):
     import numpy as np
-    x = np.asarray(x, float); y = np.asarray(y, float)
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
     if trim > 0:
-        qx = np.quantile(x, [trim/2, 1-trim/2]); x = np.clip(x, *qx)
-        qy = np.quantile(y, [trim/2, 1-trim/2]); y = np.clip(y, *qy)
+        qx = np.quantile(x, [trim/2, 1-trim/2])
+        x = np.clip(x, *qx)
+        qy = np.quantile(y, [trim/2, 1-trim/2])
+        y = np.clip(y, *qy)
     n1, n2 = len(x), len(y)
     if n1 < 2 or n2 < 2:
         return 0.0
     s1, s2 = np.var(x, ddof=1), np.var(y, ddof=1)
     sp = np.sqrt(((n1-1)*s1 + (n2-1)*s2) / max(n1+n2-2, 1))
     sp = max(sp, eps)  # variance floor to stop blow-ups
-    d  = (np.mean(x) - np.mean(y)) / sp
-    J  = 1 - 3/(4*(n1+n2)-9) if (n1+n2) > 2 else 1.0  # small-sample correction
+    d = (np.mean(x) - np.mean(y)) / sp
+    J = 1 - 3/(4*(n1+n2)-9) if (n1+n2) > 2 else 1.0  # small-sample correction
     return float(J * d)
 
 
@@ -66,6 +73,7 @@ def _cliffs_delta_mwu(x: np.ndarray, y: np.ndarray) -> float:
     U, _ = stats.mannwhitneyu(x, y, alternative="two-sided")
     auc = U / (len(x) * len(y))
     return float(2*auc - 1)
+
 
 def _fdr_bh(p: np.ndarray, alpha: float = 0.05) -> Tuple[np.ndarray, np.ndarray]:
     """Benjamini–Hochberg FDR. Returns (reject_mask, p_adjusted)."""
@@ -85,9 +93,11 @@ def _fdr_bh(p: np.ndarray, alpha: float = 0.05) -> Tuple[np.ndarray, np.ndarray]
 
 # ------------------------- Data collectors from analyzer ---------------------
 
+
 def _ensure_ready(analyzer) -> None:
     if not getattr(analyzer, "psth_data", None):
         analyzer.run_full_analysis(None)
+
 
 def _collect_window_absolute(analyzer, t0: float, t1: float) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray]]:
     """Return per-trial mean rates (Hz) within [t0,t1] for each cluster and condition."""
@@ -106,34 +116,43 @@ def _collect_window_absolute(analyzer, t0: float, t1: float) -> Tuple[Dict[int, 
     a_by_c, b_by_c = {}, {}
     for ci in range(analyzer.n_clusters):
         def take(name):
-            arr = segments.get(name, np.zeros((0, len(time_axis), analyzer.n_clusters), np.float32))
+            arr = segments.get(name, np.zeros(
+                (0, len(time_axis), analyzer.n_clusters), np.float32))
             if arr.shape[0] == 0:
                 return np.array([], float)
             return (arr[:, i0:i1+1, ci].mean(axis=1) / bw).astype(float)
-        cid = int(analyzer.clusters[ci]) if str(analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
+        cid = int(analyzer.clusters[ci]) if str(
+            analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
         a_by_c[cid] = take("event_a")
         b_by_c[cid] = take("event_b")
     return a_by_c, b_by_c
+
 
 def _collect_window_percent(analyzer, window_name: str) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray]]:
     """Use analyzer.window_summary to resolve percent windows per event."""
     _ensure_ready(analyzer)
     if not getattr(analyzer.config, "windows_pct", None) or window_name not in analyzer.config.windows_pct:
-        raise ValueError(f"Percent window '{window_name}' not defined in config.windows_pct")
-    tables = analyzer.window_summary(segments=analyzer.psth_data["segments"], use_abs=False, use_pct=True)
+        raise ValueError(
+            f"Percent window '{window_name}' not defined in config.windows_pct")
+    tables = analyzer.window_summary(
+        segments=analyzer.psth_data["segments"], use_abs=False, use_pct=True)
     a_by_c, b_by_c = {}, {}
     for ci in range(analyzer.n_clusters):
-        cid = int(analyzer.clusters[ci]) if str(analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
+        cid = int(analyzer.clusters[ci]) if str(
+            analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
+
         def pick(df, cond):
             if df.empty:
                 return np.array([], float)
-            sub = df[(df["cluster"] == cid) & (df["window"] == window_name) & (df["event_type"] == cond)]
+            sub = df[(df["cluster"] == cid) & (df["window"] ==
+                                               window_name) & (df["event_type"] == cond)]
             return sub["rate_hz"].to_numpy(dtype=float)
         a_by_c[cid] = pick(tables["event_a"], "event_a")
         b_by_c[cid] = pick(tables["event_b"], "event_b")
     return a_by_c, b_by_c
 
 # ------------------------------ Main stats API -------------------------------
+
 
 def statistical_comparison_window(
     analyzer,
@@ -158,7 +177,8 @@ def statistical_comparison_window(
             a_by_c, b_by_c = _collect_window_percent(analyzer, window_name)
             wlabel, wtype = window_name, "percent"
         else:
-            raise ValueError(f"window_name '{window_name}' not found in absolute or percent windows.")
+            raise ValueError(
+                f"window_name '{window_name}' not found in absolute or percent windows.")
     else:
         if time_window is None:
             time_window = (0.0, 0.5)
@@ -170,7 +190,8 @@ def statistical_comparison_window(
     pvals, keys = [], []
 
     for ci in range(analyzer.n_clusters):
-        cid = int(analyzer.clusters[ci]) if str(analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
+        cid = int(analyzer.clusters[ci]) if str(
+            analyzer.clusters[ci]).isdigit() else analyzer.clusters[ci]
         a = np.asarray(a_by_c[cid])
         b = np.asarray(b_by_c[cid])
         if len(a) >= analyzer.config.min_trials and len(b) >= analyzer.config.min_trials:
@@ -196,7 +217,8 @@ def statistical_comparison_window(
                 "window_type": wtype,
             }
         else:
-            res = {"error": "Insufficient data", "window": wlabel, "window_type": wtype}
+            res = {"error": "Insufficient data",
+                   "window": wlabel, "window_type": wtype}
         results[str(cid)] = res
         if "p_value" in res:
             pvals.append(res["p_value"])
@@ -209,6 +231,7 @@ def statistical_comparison_window(
             results[cid]["reject_fdr"] = bool(rej[i])
 
     return results
+
 
 def statistical_comparison_by_windows(
     analyzer,
@@ -223,14 +246,17 @@ def statistical_comparison_by_windows(
     names: List[str] = []
     if include_absolute and getattr(analyzer.config, "windows_abs", None):
         abs_names = list(analyzer.config.windows_abs.keys())
-        names.extend(abs_names if windows is None else [w for w in windows if w in abs_names])
+        names.extend(abs_names if windows is None else [
+                     w for w in windows if w in abs_names])
     if include_percent and getattr(analyzer.config, "windows_pct", None):
         pct_names = list(analyzer.config.windows_pct.keys())
-        names.extend(pct_names if windows is None else [w for w in windows if w in pct_names])
+        names.extend(pct_names if windows is None else [
+                     w for w in windows if w in pct_names])
 
     rows = []
     for w in names:
-        res = statistical_comparison_window(analyzer, window_name=w, fdr_across_clusters=False)
+        res = statistical_comparison_window(
+            analyzer, window_name=w, fdr_across_clusters=False)
         for cid, d in res.items():
             d2 = d.copy()
             d2["cluster"] = int(cid) if cid.isdigit() else cid
@@ -241,10 +267,12 @@ def statistical_comparison_by_windows(
     if out.empty or "p_value" not in out.columns:
         return out
     if fdr_across_all:
-        rej, padj = _fdr_bh(out["p_value"].to_numpy(float), alpha=analyzer.config.alpha)
+        rej, padj = _fdr_bh(out["p_value"].to_numpy(
+            float), alpha=analyzer.config.alpha)
         out["p_value_adj_fdr_all"] = padj
         out["reject_fdr_all"] = rej
     return out.sort_values(["window_type", "window_name", "cluster"]).reset_index(drop=True)
+
 
 def sliding_window_stats(
     analyzer,
@@ -260,7 +288,8 @@ def sliding_window_stats(
     rows = []
     for t0 in starts:
         t1 = t0 + width_s
-        res = statistical_comparison_window(analyzer, time_window=(t0, t1), fdr_across_clusters=False)
+        res = statistical_comparison_window(
+            analyzer, time_window=(t0, t1), fdr_across_clusters=False)
         for cid, d in res.items():
             d2 = d.copy()
             d2["cluster"] = int(cid) if cid.isdigit() else cid
@@ -270,10 +299,12 @@ def sliding_window_stats(
     if out.empty or "p_value" not in out.columns:
         return out
     if fdr:
-        rej, padj = _fdr_bh(out["p_value"].to_numpy(float), alpha=analyzer.config.alpha)
+        rej, padj = _fdr_bh(out["p_value"].to_numpy(
+            float), alpha=analyzer.config.alpha)
         out["p_value_adj_fdr"] = padj
         out["reject_fdr"] = rej
     return out.sort_values(["cluster", "t0"]).reset_index(drop=True)
+
 
 def permutation_time_cluster_test(
     analyzer,
@@ -293,7 +324,8 @@ def permutation_time_cluster_test(
     bw = analyzer.config.bin_width
 
     def take(name):
-        arr = segments.get(name, np.zeros((0, len(time_axis), analyzer.n_clusters), np.float32))
+        arr = segments.get(name, np.zeros(
+            (0, len(time_axis), analyzer.n_clusters), np.float32))
         return (arr[:, :, cluster_idx] / bw).astype(float)
 
     X = take("event_a")  # trials×time
@@ -346,14 +378,16 @@ def permutation_time_cluster_test(
         Yp = Z[idx[nX:]]
         mxp, myp = Xp.mean(0), Yp.mean(0)
         vxp, vyp = Xp.var(0, ddof=1), Yp.var(0, ddof=1)
-        pooled_p = np.sqrt(((nX-1)*vxp + (Yp.shape[0]-1)*vyp) / (nX+Yp.shape[0]-2))
+        pooled_p = np.sqrt(
+            ((nX-1)*vxp + (Yp.shape[0]-1)*vyp) / (nX+Yp.shape[0]-2))
         pooled_p[pooled_p == 0] = 1.0
         t_like_p = (mxp - myp) / pooled_p
         _, masses_p = clusters_from_stat(t_like_p, threshold, tail)
         max_masses[p] = 0.0 if masses_p.size == 0 else np.max(np.abs(masses_p))
 
     crit = np.quantile(max_masses, 1 - analyzer.config.alpha)
-    pvals = np.array([(np.sum(max_masses >= abs(m)) + 1) / (n_perm + 1) for m in obs_masses], float)
+    pvals = np.array([(np.sum(max_masses >= abs(m)) + 1) /
+                      (n_perm + 1) for m in obs_masses], float)
 
     return {
         "time_axis": time_axis,
@@ -364,3 +398,9 @@ def permutation_time_cluster_test(
         "crit_val": float(crit),
         "alpha": analyzer.config.alpha,
     }
+
+
+def split_half_reliability(*args, **kwargs) -> pd.DataFrame:
+    """Wrapper: moved to templates.py"""
+    from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import templates as _tmpl
+    return _tmpl.split_half_reliability(*args, **kwargs)

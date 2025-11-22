@@ -81,9 +81,10 @@ def export_psth_to_df(
         out_frames.append(_block("event_b", label_b))
 
     return pd.concat(out_frames, ignore_index=True) if out_frames else pd.DataFrame(
-        columns=(["time", "cluster", "condition", "mean"] +
+        columns=(['time', 'cluster', 'condition', 'mean'] +
                  (["sem", "lower", "upper"] if include_ci else []))
     )
+
 
 
 def _bh_fdr(pvals, alpha=0.05):
@@ -400,7 +401,8 @@ def plot_sig_heatmap(summary: pd.DataFrame,
 
     cbar = plt.colorbar(im, ax=ax, fraction=0.045, pad=0.02)
 
-    cbar.set_label('Standardized\nmean difference', rotation=0, labelpad=40, fontsize=12)
+    cbar.set_label('Standardized\nmean difference',
+                   rotation=0, labelpad=40, fontsize=12)
     # cbar.set_label("Cohen's d (event_a − event_b)")
 
     # reserve space for the two-line suptitle

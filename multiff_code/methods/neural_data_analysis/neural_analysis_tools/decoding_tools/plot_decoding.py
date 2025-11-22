@@ -517,6 +517,8 @@ def plot_decoding_timecourse_by_session(
     df_results,
     key_value=None,
     key_col='key',
+    model_name_col='model_name',
+    model_name_value=None,
     session_col='session',
     align_col='align_by_stop_end',
     value_col='mean_auc',
@@ -540,9 +542,10 @@ def plot_decoding_timecourse_by_session(
 
     Args:
         df_results: DataFrame containing decoding results.
-        key_value: If provided, plot only this key. If None, iterate over all
-                   existing keys in df_results[key_col].
-        key_col: Column name for the decoding 'key'.
+        key_value: If provided, plot only this key.
+        key_col: Column name for the decoding 'key' (default 'key').
+        model_name_col: Column for model identifier (default 'model_name').
+        model_name_value: If provided, plot only this model.
         session_col: Column name for session identifier.
         align_col: Column specifying alignment condition.
         value_col: Column with mean AUC or metric to plot.
@@ -566,21 +569,26 @@ def plot_decoding_timecourse_by_session(
         returns a list of Figure objects.
     """
     required_cols = set(
-        ['window_start', key_col, session_col, value_col, align_col])
+        ['window_start', key_col, model_name_col, session_col, value_col, align_col])
     for c in required_cols:
         if c not in df_results.columns:
             raise ValueError(f"df_results must include '{c}'.")
 
     df = df_results.copy()
 
-    # Determine keys to plot
+    # ---- Determine (key, model_name) combos to plot ----
+    combos_df = df[[key_col, model_name_col]].dropna().drop_duplicates()
     if key_value is not None:
-        keys_to_plot = [key_value]
-    else:
-        keys_to_plot = list(pd.unique(df[key_col].dropna()))
-        keys_to_plot.sort(key=lambda x: str(x))
-        if len(keys_to_plot) == 0:
-            raise ValueError(f"No valid '{key_col}' values found to plot.")
+        combos_df = combos_df[combos_df[key_col] == key_value]
+    if model_name_value is not None:
+        combos_df = combos_df[combos_df[model_name_col] == model_name_value]
+    if len(combos_df) == 0:
+        raise ValueError(
+            f"No valid ({key_col}, {model_name_col}) combinations found to plot "
+            f"after filtering with key_value={key_value}, model_name_value={model_name_value}."
+        )
+    combos_to_plot = [tuple(row) for row in combos_df[[
+        key_col, model_name_col]].to_numpy()]
 
     # Shared preprocessing
     df = _prepare_timecourse_df(
@@ -590,14 +598,31 @@ def plot_decoding_timecourse_by_session(
 
     produced_figs = []
 
-    # Plot per key and alignment mode
-    for one_key in keys_to_plot:
-        df_key = df[df[key_col] == one_key].copy()
-        if df_key.empty:
+    # Plot per (key, model_name) and alignment mode
+    for selected_key, selected_model in combos_to_plot:
+        df_combo = df[(df[key_col] == selected_key) & (
+            df[model_name_col] == selected_model)].copy()
+        if df_combo.empty:
             continue
 
-        for align_val in df_key[align_col].unique():
-            dfa = df_key[df_key[align_col] == align_val].copy()
+        # ---- Duplicate-row validation per (key, model_name, session, window_start) ----
+        dup_subset = [key_col, model_name_col, session_col, 'window_start']
+        dup_mask = df_combo.duplicated(subset=dup_subset, keep=False)
+        if dup_mask.any():
+            dup_rows = (
+                df_combo.loc[dup_mask, dup_subset]
+                .sort_values(dup_subset)
+                .drop_duplicates()
+            )
+            raise ValueError(
+                "[plot_decoding_timecourse_by_session] Found duplicate rows for the same "
+                f"({key_col}, {model_name_col}, {session_col}, window_start) combination. "
+                "Resolve duplicates before plotting.\n"
+                f"{dup_rows.to_string(index=False)}"
+            )
+
+        for align_val in df_combo[align_col].unique():
+            dfa = df_combo[df_combo[align_col] == align_val].copy()
             if dfa.empty:
                 continue
 
@@ -628,7 +653,7 @@ def plot_decoding_timecourse_by_session(
                     session_label = ", ".join([str(s) for s in chunk])
                 else:
                     session_label = f"{len(chunk)} sessions"
-                label_prefix = f"{key_col}={one_key} | {session_col}s: {session_label}"
+                label_prefix = f"{key_col}={selected_key} | {session_col}s: {session_label}"
 
                 label_prefix = _append_sample_size_to_label(
                     df_sub, label_prefix)
@@ -658,21 +683,24 @@ def plot_decoding_timecourse_by_session(
             for j in range(last_i + 1, len(axes)):
                 axes[j].set_visible(False)
 
-            fig.suptitle(f"{title_prefix} ({title_align})", fontsize=14)
+            combo_str = f"{key_col}={selected_key} | {model_name_col}={selected_model}"
+            fig.suptitle(
+                f"{title_prefix} ({combo_str}) — {title_align}", fontsize=14)
             plt.tight_layout(rect=[0, 0, 1, 0.97])
 
             # Save or display
             if save_path:
                 out_path = Path(save_path)
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                # Avoid overwrite by suffixing key and alignment when iterating
-                if key_value is None or len(keys_to_plot) > 1:
-                    stem, suffix = out_path.stem, out_path.suffix
-                    safe_key = str(one_key).replace(
-                        '/', '_').replace('\\', '_').replace(' ', '_')
-                    align_suffix = 'end' if align_val else 'start'
-                    out_path = out_path.parent / \
-                        f"{stem}_{safe_key}_{align_suffix}{suffix}"
+                # Avoid overwrite by suffixing key, model, and alignment
+                stem, suffix = out_path.stem, out_path.suffix
+                safe_key = str(selected_key).replace(
+                    '/', '_').replace('\\', '_').replace(' ', '_')
+                safe_model = str(selected_model).replace(
+                    '/', '_').replace('\\', '_').replace(' ', '_')
+                align_suffix = 'end' if align_val else 'start'
+                out_path = out_path.parent / \
+                    f"{stem}_{safe_key}_{safe_model}_{align_suffix}{suffix}"
                 fig.savefig(out_path, dpi=dpi, bbox_inches='tight')
                 print(f'[write] Plot saved → {out_path}')
             else:

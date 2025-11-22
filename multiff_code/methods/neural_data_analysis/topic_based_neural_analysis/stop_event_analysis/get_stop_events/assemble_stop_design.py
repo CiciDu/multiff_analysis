@@ -1,4 +1,5 @@
 # --- Standard library
+from typing import Tuple
 import os
 import sys
 from pathlib import Path
@@ -28,7 +29,6 @@ os.environ['PYDEVD_DISABLE_FILE_VALIDATION'] = '1'
 # =========================
 # Stop Design Builder
 # =========================
-from typing import Tuple
 
 
 def build_stop_design(
@@ -86,7 +86,8 @@ def build_stop_design(
             vals, dt_arr, bin_idx_arr, how='mean'
         )
         if not (np.allclose(exp_chk, exposure) and np.array_equal(used_bins_chk, used_bins)):
-            raise ValueError('Exposure/used_bins mismatch while aggregating features.')
+            raise ValueError(
+                'Exposure/used_bins mismatch while aggregating features.')
         return out
 
     # 3c) Aggregate kinematics
@@ -146,10 +147,12 @@ def build_stop_design(
         'cluster_rel_time_s_z',
     ]
 
-    cols_to_add_from_event_design = [c for c in X_event_df.columns if c not in binned_feats.columns]
+    cols_to_add_from_event_design = [
+        c for c in X_event_df.columns if c not in binned_feats.columns]
     binned_feats.loc[:, cols_to_add_from_event_design] = X_event_df[cols_to_add_from_event_design].to_numpy()
 
-    cols_to_add_from_cluster_design = [c for c in cluster_feats if c not in binned_feats.columns]
+    cols_to_add_from_cluster_design = [
+        c for c in cluster_feats if c not in binned_feats.columns]
     binned_feats.loc[:, cols_to_add_from_cluster_design] = cluster_df[cols_to_add_from_cluster_design].to_numpy()
 
     # Offset term
@@ -167,7 +170,7 @@ def build_stop_design(
         binned_feats, meta_used = add_retries_info_to_binned_feats(
             binned_feats, new_seg_info, datasets, meta_used
         )
-        
+
     binned_spikes = binned_spikes.reset_index(drop=True)
     binned_feats.reset_index(drop=True, inplace=True)
     meta_used.reset_index(drop=True, inplace=True)
@@ -177,42 +180,47 @@ def build_stop_design(
 
 def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_used):
     assert datasets is not None, 'datasets is required to add retries info'
-    
+
     retries_info = [
-        ('GUAT_first', datasets['GUAT_first']),
-        ('TAFT_first', datasets['TAFT_first']),
-        ('GUAT_middle', datasets['GUAT_middle']),
-        ('TAFT_middle', datasets['TAFT_middle']),
-        ('GUAT_last', datasets['GUAT_last']),
-        ('TAFT_last', datasets['TAFT_last']),
+        ('rsw_first', datasets['rsw_first']),
+        ('rcap_first', datasets['rcap_first']),
+        ('rsw_middle', datasets['rsw_middle']),
+        ('rcap_middle', datasets['rcap_middle']),
+        ('rsw_last', datasets['rsw_last']),
+        ('rcap_last', datasets['rcap_last']),
         ('one_stop_miss', datasets['one_stop_miss'])
     ]
-    
+
     retries_columns = [col for col, _ in retries_info]
     for col, df in retries_info:
         new_seg_info[col] = 0
         category_stop_ids = df['stop_id'].unique()
-        new_seg_info.loc[new_seg_info['stop_id'].isin(category_stop_ids), col] = 1
+        new_seg_info.loc[new_seg_info['stop_id'].isin(
+            category_stop_ids), col] = 1
 
-    event_tbl = stop_design.build_per_event_table(new_seg_info, extras=retries_columns)
-    meta_used = stop_design.join_event_tbl_avoid_collisions(meta_used, event_tbl)
+    event_tbl = stop_design.build_per_event_table(
+        new_seg_info, extras=retries_columns)
+    meta_used = stop_design.join_event_tbl_avoid_collisions(
+        meta_used, event_tbl)
 
     # enforce alignment safety
     meta_used = meta_used.sort_values('bin').reset_index(drop=True)
     binned_feats = binned_feats.reset_index(drop=True)
-    assert len(meta_used) == len(binned_feats), 'meta_used and binned_feats misaligned'
+    assert len(meta_used) == len(
+        binned_feats), 'meta_used and binned_feats misaligned'
 
     # add base retry columns
     for col in retries_columns:
         binned_feats[col] = meta_used[col].to_numpy()
 
     # derived columns
-    retry_cols = ['GUAT_first', 'TAFT_first', 'GUAT_middle', 'TAFT_middle']
-    miss_cols = retry_cols + ['GUAT_last', 'one_stop_miss']
+    retry_cols = ['rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle']
+    miss_cols = retry_cols + ['rsw_last', 'one_stop_miss']
 
-    binned_feats['whether_retry'] = binned_feats[retry_cols].any(axis=1).astype('int8')
+    binned_feats['whether_retry'] = binned_feats[retry_cols].any(
+        axis=1).astype('int8')
     binned_feats['miss'] = binned_feats[miss_cols].any(axis=1).astype('int8')
-    
+
     # also drop the column 'is_clustered' to avoid perfect collinearity
     binned_feats = binned_feats.drop(columns=['is_clustered'])
 
@@ -220,7 +228,8 @@ def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_
 
 
 def add_ff_visible_and_in_memory_info(binned_feats, bins_2d, ff_dataframe, used_bins, max_in_memory_time_since_seen=2):
-    ff_df_sub = ff_dataframe[ff_dataframe['time_since_last_vis'] < max_in_memory_time_since_seen].copy()
+    ff_df_sub = ff_dataframe[ff_dataframe['time_since_last_vis']
+                             < max_in_memory_time_since_seen].copy()
     ff_df_sub['in_memory'] = 1
 
     for state in ['visible', 'in_memory']:
@@ -231,6 +240,7 @@ def add_ff_visible_and_in_memory_info(binned_feats, bins_2d, ff_dataframe, used_
         binned_feats[f'any_ff_{state}'] = any_ff_visible[used_bins]
         binned_feats[f'k_ff_{state}'] = k_ff_visible[used_bins]
     return binned_feats
+
 
 def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_used, mask):
     return (

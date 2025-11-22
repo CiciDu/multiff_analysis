@@ -3,7 +3,7 @@ from scipy import stats
 from planning_analysis.factors_vs_indicators import make_variations_utils, process_variations_utils
 from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
 from data_wrangling import specific_utils, process_monkey_information, base_processing_class, combine_info_utils, further_processing_class
-from decision_making_analysis.compare_GUAT_and_TAFT import GUAT_vs_TAFT_class
+from decision_making_analysis.data_compilation import miss_events_class
 
 import numpy as np
 import pandas as pd
@@ -29,23 +29,23 @@ def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monk
             raw_data_dir_name, row['monkey_name'], data_name)
         print(raw_data_folder_path)
 
-        cgt = GUAT_vs_TAFT_class.GUATvsTAFTclass(
+        cgt = miss_events_class.MissEventsClass(
             raw_data_folder_path=raw_data_folder_path,)
-        cgt.get_monkey_data(already_retrieved_ok=True, include_ff_dataframe=False, include_GUAT_data=True,
-                            include_TAFT_data=True)
+        cgt.get_monkey_data(already_retrieved_ok=True, include_ff_dataframe=False, include_rsw_data=True,
+                            include_rcap_data=True)
 
-        cgt.GUAT_trials_df['old_miss_index'] = np.arange(
-            len(cgt.GUAT_trials_df))
+        cgt.rsw_events_df['old_miss_index'] = np.arange(
+            len(cgt.rsw_events_df))
         new_trials_df, cap_old_to_new, miss_old_to_new = reindex_trials_with_misses(
-            cgt.ff_caught_T_new, cgt.GUAT_trials_df['last_stop_time'].values)
+            cgt.ff_caught_T_new, cgt.rsw_events_df['last_stop_time'].values)
 
-        cgt.GUAT_trials_df['new_trial_index'] = cgt.GUAT_trials_df['old_miss_index'].map(
+        cgt.rsw_events_df['new_trial_index'] = cgt.rsw_events_df['old_miss_index'].map(
             miss_old_to_new)
-        cgt.TAFT_trials_df['new_trial_index'] = cgt.TAFT_trials_df['trial'].map(
+        cgt.rcap_events_df['new_trial_index'] = cgt.rcap_events_df['trial'].map(
             cap_old_to_new)
 
         retries_df = build_retries_df_from_new_trials(
-            new_trials_df, cgt.GUAT_trials_df, cgt.TAFT_trials_df, max_duration=max_duration)
+            new_trials_df, cgt.rsw_events_df, cgt.rcap_events_df, max_duration=max_duration)
 
         retries_df['data_name'] = data_name
         all_retries_df = pd.concat(
@@ -64,42 +64,42 @@ def summarize_retry_data(retries_df):
 
     rows = []
 
-    # TAFT
-    n_taft = retries_df.loc[retries_df['type'] == 'TAFT', 'capture'].sum()
-    d_taft = float(
-        retries_df.loc[retries_df['type'] == 'TAFT', 'new_duration'].sum())
-    sw_taft = float(
-        retries_df.loc[retries_df['type'] == 'TAFT', 'stop_window'].sum())
+    #  rcap
+    n_rcap = retries_df.loc[retries_df['type'] == 'rcap', 'capture'].sum()
+    d_rcap = float(
+        retries_df.loc[retries_df['type'] == 'rcap', 'new_duration'].sum())
+    sw_rcap = float(
+        retries_df.loc[retries_df['type'] == 'rcap', 'stop_window'].sum())
     rows.append({
-        'group': 'TAFT',
-        'num_captures': n_taft,
-        'total_new_duration': d_taft,
-        'total_stop_window': sw_taft,
-        'capture_over_duration': _rate_per_min(n_taft, d_taft),
-        'retry_window_captures': _rate_per_min(n_taft, sw_taft),
+        'group': 'rcap',
+        'num_captures': n_rcap,
+        'total_new_duration': d_rcap,
+        'total_stop_window': sw_rcap,
+        'capture_over_duration': _rate_per_min(n_rcap, d_rcap),
+        'retry_window_captures': _rate_per_min(n_rcap, sw_rcap),
     })
 
-    # GUAT (rates intentionally 0)
-    n_guat = 0
-    d_guat = float(
-        retries_df.loc[retries_df['type'] == 'GUAT', 'new_duration'].sum())
-    sw_guat = float(
-        retries_df.loc[retries_df['type'] == 'GUAT', 'stop_window'].sum())
+    # rsw (rates intentionally 0)
+    n_rsw = 0
+    d_rsw = float(
+        retries_df.loc[retries_df['type'] == 'rsw', 'new_duration'].sum())
+    sw_rsw = float(
+        retries_df.loc[retries_df['type'] == 'rsw', 'stop_window'].sum())
     rows.append({
-        'group': 'GUAT',
-        'num_captures': n_guat,
-        'total_new_duration': d_guat,
-        'total_stop_window': sw_guat,
-        'capture_over_duration': _rate_per_min(n_guat, d_guat),
-        'retry_window_captures': _rate_per_min(n_guat, sw_guat),
+        'group': 'rsw',
+        'num_captures': n_rsw,
+        'total_new_duration': d_rsw,
+        'total_stop_window': sw_rsw,
+        'capture_over_duration': _rate_per_min(n_rsw, d_rsw),
+        'retry_window_captures': _rate_per_min(n_rsw, sw_rsw),
     })
 
-    # both = TAFT count only; duration/stop_window = TAFT+GUAT
-    n_both = n_taft
+    # both = rcap count only; duration/stop_window =  rcap+rsw
+    n_both = n_rcap
     d_both = float(retries_df.loc[retries_df['type'].isin(
-        ['TAFT', 'GUAT']), 'new_duration'].sum())
+        ['rcap', 'rsw']), 'new_duration'].sum())
     sw_both = float(retries_df.loc[retries_df['type'].isin(
-        ['TAFT', 'GUAT']), 'stop_window'].sum())
+        ['rcap', 'rsw']), 'stop_window'].sum())
     rows.append({
         'group': 'both',
         'num_captures': n_both,
@@ -122,7 +122,7 @@ def summarize_retry_data(retries_df):
         'retry_window_captures': np.nan,
     })
 
-    # all = base intervals; stop_window only from TAFT+GUAT
+    # all = base intervals; stop_window only from  rcap+rsw
     n_all = retries_df['capture'].sum()
     d_all = float(retries_df['new_duration'].sum())
     sw_all = sw_both
@@ -233,7 +233,7 @@ def reindex_trials_with_misses(capture_times, fail_times):
     return new_trials_df, cap_old_to_new, miss_old_to_new
 
 
-def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_df, max_duration=30.0):
+def build_retries_df_from_new_trials(new_trials_df, rsw_events_df, rcap_events_df, max_duration=30.0):
     """
     Build retries_df from merged event timeline (event→event durations, 0-based indices).
 
@@ -242,10 +242,10 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
       - old_trial_index : original capture index (0-based; NaN for misses)
       - old_miss_index  : original miss index (0-based; NaN for captures)
       - duration        : event→event seconds (first event dropped)
-      - stop_window     : TAFT/GUAT first→last stop span; 0 for rest
-      - type            : {'TAFT','GUAT','rest'}
-      - type_combined   : 'both' if TAFT or GUAT else 'rest'
-      - capture         : 1 for TAFT/rest, 0 for GUAT
+      - stop_window     :  rcap/rsw first→last stop span; 0 for rest
+      - type            : {'rcap','rsw','rest'}
+      - type_combined   : 'both' if rcap or rsw else 'rest'
+      - capture         : 1 for  rcap/rest, 0 for rsw
     """
     # ---- 0) Event→event duration; filter at the EVENT level (keep 0 durations) ----
     nt = new_trials_df.sort_values('new_trial_index').copy()
@@ -266,25 +266,25 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
                 df['stop_window'] = np.nan
         return df
 
-    TAFT_df = _ensure_stop_window(TAFT_trials_df)
-    GUAT_df = _ensure_stop_window(GUAT_trials_df)
+    rcap_df = _ensure_stop_window(rcap_events_df)
+    rsw_df = _ensure_stop_window(rsw_events_df)
 
-    # ---- 2) TAFT rows: capture events that are TAFT-labeled (inner join) ----
-    taft_rows = nt.merge(
-        TAFT_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
-    taft_rows['type'] = 'TAFT'
+    # ---- 2) rcap rows: capture events that are  rcap-labeled (inner join) ----
+    rcap_rows = nt.merge(
+        rcap_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
+    rcap_rows['type'] = 'rcap'
 
-    # ---- 3) GUAT rows: miss events that are GUAT-labeled (inner join) ----
-    guat_rows = nt.merge(
-        GUAT_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
-    guat_rows['type'] = 'GUAT'
+    # ---- 3) rsw rows: miss events that are rsw-labeled (inner join) ----
+    rsw_rows = nt.merge(
+        rsw_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
+    rsw_rows['type'] = 'rsw'
 
-    # ---- 4) REST rows: capture events NOT TAFT ----
-    taft_newidx = set(taft_rows['new_trial_index'].astype(
-        int)) if len(taft_rows) else set()
-    guat_newidx = set(guat_rows['new_trial_index'].astype(
-        int)) if len(guat_rows) else set()
-    blocked = taft_newidx | guat_newidx
+    # ---- 4) REST rows: capture events NOT rcap ----
+    rcap_newidx = set(rcap_rows['new_trial_index'].astype(
+        int)) if len(rcap_rows) else set()
+    rsw_newidx = set(rsw_rows['new_trial_index'].astype(
+        int)) if len(rsw_rows) else set()
+    blocked = rcap_newidx | rsw_newidx
 
     rest_rows = nt[(nt['event'] == 'capture') & ~
                    nt['new_trial_index'].isin(blocked)].copy()
@@ -294,19 +294,19 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
     # ---- 5) Assemble; preserve IDs and every qualifying new_trial_index ----
     keep = ['new_trial_index', 'new_duration', 'stop_window',
             'type', 'old_trial_index', 'old_miss_index']
-    retries_df = (pd.concat([taft_rows[keep], guat_rows[keep], rest_rows[keep]], ignore_index=True)
+    retries_df = (pd.concat([rcap_rows[keep], rsw_rows[keep], rest_rows[keep]], ignore_index=True)
                     .sort_values(['new_trial_index', 'type'])
                     .reset_index(drop=True))
 
     retries_df['type_combined'] = np.where(
-        retries_df['type'].isin(['TAFT', 'GUAT']), 'both', 'rest')
-    retries_df['capture'] = (retries_df['type'] != 'GUAT').astype(int)
+        retries_df['type'].isin(['rcap', 'rsw']), 'both', 'rest')
+    retries_df['capture'] = (retries_df['type'] != 'rsw').astype(int)
 
     retries_df['old_trial_index'] = retries_df['old_trial_index'].astype(
         'Int64')
     retries_df['old_miss_index'] = retries_df['old_miss_index'].astype('Int64')
 
-    # Sanity: events should be disjoint across TAFT/GUAT/REST
+    # Sanity: events should be disjoint across  rcap/rsw/REST
     assert not retries_df['new_trial_index'].duplicated(
         keep=False).any(), 'duplicated new_trial_index found'
 
@@ -316,7 +316,7 @@ def build_retries_df_from_new_trials(new_trials_df, GUAT_trials_df, TAFT_trials_
 def get_retry_window_captures(all_retries_df):
     # retries_summary = summarize_retry_data(all_retries_df)
     retry_window_captures = all_retries_df[all_retries_df['type'].isin(
-        ['GUAT', 'TAFT'])].copy()
+        ['rsw', 'rcap'])].copy()
     retry_window_captures = retry_window_captures[[
         'session', 'capture', 'stop_window']].groupby('session').sum().reset_index(drop=False)
     retry_window_captures.rename(

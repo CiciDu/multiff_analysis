@@ -1,4 +1,4 @@
-from decision_making_analysis.GUAT import add_features_GUAT_and_TAFT
+from decision_making_analysis.ff_data_acquisition import get_missed_ff_data
 from data_wrangling import specific_utils
 
 import os
@@ -18,10 +18,10 @@ def make_sessions_df_for_one_monkey(raw_data_dir_name, monkey_name):
 
 def collect_info_from_all_sessions(sessions_df_for_one_monkey,
                                    data_category='decision_making',
-                                   data_folder_name='GUAT_info',
-                                   df_names=['miss_abort_nxt_ff_info', 'miss_abort_cur_ff_info',
-                                             'traj_data_df', 'more_traj_data_df', 'more_ff_df'],
-                                   point_index_column_name='point_index'):
+                                   data_folder_name='miss_events_info',
+                                   df_names=['miss_event_alt_ff', 'miss_event_cur_ff',
+                                             'traj_data_df'],
+                                   new_point_index_col='new_point_index'):
 
     all_important_info = dict()
     all_point_index_to_new_number = pd.DataFrame()
@@ -42,18 +42,18 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
             important_info[df] = pd.read_csv(os.path.join(folder, df+'.csv'))
 
         print('folder:', folder)
-        important_info, point_index_to_new_number_df = add_features_GUAT_and_TAFT.update_point_index_of_important_df_in_important_info_func(
-            important_info, new_point_index_start, point_index_column_name=point_index_column_name)
-        new_point_index_start = point_index_to_new_number_df['new_number'].max(
+        important_info, point_index_map = get_missed_ff_data.assign_new_point_index_to_combine_across_sessions(
+            important_info, new_point_index_start, new_point_index_col=new_point_index_col)
+        new_point_index_start = point_index_map['new_number'].max(
         )+1
         all_important_info[row['data_name']] = important_info
 
-        point_index_to_new_number_df['data_name'] = row['data_name']
+        point_index_map['data_name'] = row['data_name']
         if len(all_point_index_to_new_number) == 0:
-            all_point_index_to_new_number = point_index_to_new_number_df.copy()
+            all_point_index_to_new_number = point_index_map.copy()
         else:
             all_point_index_to_new_number = pd.concat(
-                [all_point_index_to_new_number, point_index_to_new_number_df], axis=0)
+                [all_point_index_to_new_number, point_index_map], axis=0)
 
         gc.collect()
 
@@ -62,8 +62,8 @@ def collect_info_from_all_sessions(sessions_df_for_one_monkey,
 
 def check_which_df_exists_for_each_session(sessions_df_for_one_monkey,
                                            data_category='decision_making',
-                                           data_folder_name='GUAT_info',
-                                           df_names=['miss_abort_nxt_ff_info', 'miss_abort_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df']):
+                                           data_folder_name='miss_events_info',
+                                           df_names=['miss_event_alt_ff', 'miss_event_cur_ff', 'traj_data_df']):
     # first assess which df need to be remade
     for name in df_names:
         sessions_df_for_one_monkey[name] = False
@@ -101,7 +101,7 @@ def turn_all_important_info_into_combined_info(all_important_info, folder_name, 
     return combined_info
 
 
-def try_to_retrieve_combined_info(folder_name, df_names=['miss_abort_nxt_ff_info', 'miss_abort_cur_ff_info', 'traj_data_df', 'more_traj_data_df', 'more_ff_df']):
+def try_to_retrieve_combined_info(folder_name, df_names=['miss_events_df', 'miss_event_alt_ff', 'miss_event_cur_ff', 'traj_data_df']):
     combined_info = dict()
     # retrieve all the csv in raw_data_dir_name and put into combined_info
     collect_info_flag = False

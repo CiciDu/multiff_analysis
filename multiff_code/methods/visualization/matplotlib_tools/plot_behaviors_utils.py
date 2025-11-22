@@ -234,8 +234,8 @@ def customize_kwargs_by_category(classic_plot_kwargs, images_dir=None):
     disappear_latest_kwargs = classic_plot_kwargs.copy()
     two_in_a_row_kwargs = classic_plot_kwargs.copy()
     waste_cluster_around_target_kwargs = classic_plot_kwargs.copy()
-    try_a_few_times_kwargs = classic_plot_kwargs.copy()
-    give_up_after_trying_kwargs = classic_plot_kwargs.copy()
+    retry_capture_kwargs = classic_plot_kwargs.copy()
+    retry_switch_kwargs = classic_plot_kwargs.copy()
     ignore_sudden_flash_kwargs = classic_plot_kwargs.copy()
 
     visible_before_last_one_kwargs['show_connect_path_ff_except_targets'] = True
@@ -245,16 +245,16 @@ def customize_kwargs_by_category(classic_plot_kwargs, images_dir=None):
     two_in_a_row_kwargs['show_path_when_target_visible'] = True
     waste_cluster_around_target_kwargs['show_connect_path_ff'] = True
     waste_cluster_around_target_kwargs['trial_to_show_cluster_around_target'] = 'previous'
-    try_a_few_times_kwargs['show_connect_path_ff'] = True
-    give_up_after_trying_kwargs['show_connect_path_ff'] = True
+    retry_capture_kwargs['show_connect_path_ff'] = True
+    retry_switch_kwargs['show_connect_path_ff'] = True
     ignore_sudden_flash_kwargs['show_connect_path_ff'] = True
 
     all_category_kwargs = {'visible_before_last_one': visible_before_last_one_kwargs,
                            'disappear_latest': disappear_latest_kwargs,
                            'two_in_a_row': two_in_a_row_kwargs,
                            'waste_cluster_around_target': waste_cluster_around_target_kwargs,
-                           'try_a_few_times': try_a_few_times_kwargs,
-                           'give_up_after_trying': give_up_after_trying_kwargs,
+                           'retry_capture': retry_capture_kwargs,
+                           'retry_switch': retry_switch_kwargs,
                            'ignore_sudden_flash': ignore_sudden_flash_kwargs}
     return all_category_kwargs
 
@@ -615,13 +615,15 @@ def plot_visible_segments_on_trajectory(
 
     for i, ff_index in enumerate(unique_ff_indices):
         color = np.append(varying_colors[i % 9], 0.5)
-        temp_df = ff_info[ff_info['ff_index'] == ff_index].copy().sort_values(by=['point_index'])
+        temp_df = ff_info[ff_info['ff_index'] == ff_index].copy().sort_values(by=[
+            'point_index'])
         if len(temp_df) == 0:
             continue
 
         # firefly position
         ff_position_rotated = np.matmul(
-            rotation_matrix, temp_df[['ff_x', 'ff_y']].drop_duplicates().values.T
+            rotation_matrix, temp_df[['ff_x', 'ff_y']
+                                     ].drop_duplicates().values.T
         )
         if how_to_show_ff == 'square':
             axes.scatter(ff_position_rotated[0]-x0, ff_position_rotated[1]-y0,
@@ -631,19 +633,18 @@ def plot_visible_segments_on_trajectory(
                                 25, facecolor=color, edgecolor=None, alpha=0.75, zorder=1)
             axes.add_patch(circle)
 
-
             # if legend_markers is not None:
             #     proxy = mlines.Line2D(
             #         [], [], color=color, marker='o', linestyle='None',
             #         markersize=10, alpha=0.75
             #     )
             #     legend_markers.append(proxy)
-            #     legend_names.append('FF position') 
-                
-    
+            #     legend_names.append('FF position')
+
         # segment breaks
         all_point_index = temp_df.point_index.values
-        breaks = np.where(np.diff(all_point_index) >= point_index_gap_threshold_to_sep_vis_intervals)[0] + 1
+        breaks = np.where(np.diff(all_point_index) >=
+                          point_index_gap_threshold_to_sep_vis_intervals)[0] + 1
         bounds = np.r_[0, breaks, len(all_point_index)]
 
         for j in range(len(bounds)-1):
@@ -663,24 +664,23 @@ def plot_visible_segments_on_trajectory(
             # if (j == 0) and (legend_markers is not None):
             #     legend_markers.append(marker1)          # <-- use append, and the handle itself
             #     legend_names.append('FF visible segments')
-    
+
     # when creating the legend:
     axes.legend(
         legend_markers, legend_names,
         handler_map={tuple: HandlerTuple(ndivide=None)}  # <-- key bit
     )
 
-
-    proxy = mlines.Line2D([], [], color='tab:blue', marker='o', linestyle='None', markersize=10)
+    proxy = mlines.Line2D([], [], color='tab:blue',
+                          marker='o', linestyle='None', markersize=10)
     legend_markers.append(proxy)
     legend_names.append('Firefly locations (various colors)')
 
-
-    proxy_line = mlines.Line2D([], [], color='tab:blue', linewidth=4, solid_capstyle='round')
+    proxy_line = mlines.Line2D(
+        [], [], color='tab:blue', linewidth=4, solid_capstyle='round')
     legend_markers.append(proxy_line)
     legend_names.append('Visible segments (colored by firefly)')
 
-                
     return axes, legend_markers, legend_names, show_visible_segments_of_ff_dict
 
 

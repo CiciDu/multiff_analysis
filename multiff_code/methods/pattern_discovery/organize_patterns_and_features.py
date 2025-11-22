@@ -1,7 +1,7 @@
 # --- tidy imports (remove duplicate) ---
 from data_wrangling import specific_utils, general_utils
 from pattern_discovery import pattern_by_trials, cluster_analysis
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 from planning_analysis.show_planning import nxt_ff_utils
 
 import os
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_information,
-                             GUAT_w_ff_frequency, one_stop_w_ff_frequency,
+                             rsw_w_ff_frequency, one_stop_w_ff_frequency,
                              data_folder_name=None):
     # Ensure boolean/0-1 patterns behave as counts
     # (only coerces bool -> int; leaves numeric alone)
@@ -61,18 +61,18 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             pattern_frequencies['item'] == "ignore_sudden_flash", 'denom_count'
         ] = atp_num["sudden_flash"].sum()
 
-    try_a_few = int(atp_num["try_a_few_times"].sum()
-                    ) if "try_a_few_times" in has else 0
-    n_total_guat_block = GUAT_w_ff_frequency + one_stop_w_ff_frequency + try_a_few
+    try_a_few = int(atp_num["retry_capture"].sum()
+                    ) if "retry_capture" in has else 0
+    n_total_rsw_block = rsw_w_ff_frequency + one_stop_w_ff_frequency + try_a_few
 
     pattern_frequencies.loc[
-        pattern_frequencies['item'] == "give_up_after_trying", 'frequency'
-    ] = GUAT_w_ff_frequency
+        pattern_frequencies['item'] == "retry_switch", 'frequency'
+    ] = rsw_w_ff_frequency
     pattern_frequencies.loc[
         pattern_frequencies['item'].isin(
-            ["give_up_after_trying", "try_a_few_times"]),
+            ["retry_switch", "retry_capture"]),
         'denom_count'
-    ] = n_total_guat_block
+    ] = n_total_rsw_block
 
     # assign group = 1 for the patterns above
     pattern_frequencies['group'] = 1
@@ -81,19 +81,19 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
     rows = []
 
     rows.extend([
-        {'item': "GUAT_over_TAFT", 'frequency': GUAT_w_ff_frequency,
+        {'item': "rsw_over_rcap", 'frequency': rsw_w_ff_frequency,
             'denom_count': try_a_few, 'group': 2},
-        {'item': "GUAT_over_both", 'frequency': GUAT_w_ff_frequency,
-            'denom_count': GUAT_w_ff_frequency + try_a_few, 'group': 2},
-        {'item': "TAFT_over_both", 'frequency': try_a_few,
-            'denom_count': GUAT_w_ff_frequency + try_a_few, 'group': 2},
+        {'item': "rsw_over_both", 'frequency': rsw_w_ff_frequency,
+            'denom_count': rsw_w_ff_frequency + try_a_few, 'group': 2},
+        {'item': "rcap_over_both", 'frequency': try_a_few,
+            'denom_count': rsw_w_ff_frequency + try_a_few, 'group': 2},
     ])
 
-    retry = GUAT_w_ff_frequency + try_a_few
+    retry = rsw_w_ff_frequency + try_a_few
     first_miss = retry + one_stop_w_ff_frequency
     capture_not_in_try_a_few = capture_counted - try_a_few
     # in terms of attempts as denominator, capture_counted include try_a_few
-    first_attempt = capture_counted + GUAT_w_ff_frequency + one_stop_w_ff_frequency
+    first_attempt = capture_counted + rsw_w_ff_frequency + one_stop_w_ff_frequency
 
     # Choice after miss
     rows.extend([
@@ -101,7 +101,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             'denom_count': first_miss, 'group': 2},
         {'item': "no_retry_over_miss", 'frequency': (
             first_miss - retry), 'denom_count': first_miss, 'group': 2},
-        {'item': "retry_fail_over_miss", 'frequency': GUAT_w_ff_frequency,
+        {'item': "retry_fail_over_miss", 'frequency': rsw_w_ff_frequency,
             'denom_count': first_miss, 'group': 2},
         {'item': "retry_capture_over_miss", 'frequency': try_a_few,
             'denom_count': first_miss, 'group': 2},
@@ -113,7 +113,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             'denom_count': first_attempt, 'group': 2},
         {'item': "no_retry_over_attempt", 'frequency': (
             first_miss - retry), 'denom_count': first_attempt, 'group': 2},
-        {'item': "retry_fail_over_attempt", 'frequency': GUAT_w_ff_frequency,
+        {'item': "retry_fail_over_attempt", 'frequency': rsw_w_ff_frequency,
             'denom_count': first_attempt, 'group': 2},
         {'item': "retry_capture_over_attempt", 'frequency': try_a_few,
             'denom_count': first_attempt, 'group': 2},
@@ -137,7 +137,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             'denom_count': first_attempt, 'group': 2},
         {'item': "eventual_capture_over_attempt", 'frequency': capture_counted,
             'denom_count': first_attempt, 'group': 2},
-        {'item': "eventual_miss_over_attempt", 'frequency': GUAT_w_ff_frequency + one_stop_w_ff_frequency,
+        {'item': "eventual_miss_over_attempt", 'frequency': rsw_w_ff_frequency + one_stop_w_ff_frequency,
             'denom_count': first_attempt, 'group': 2},
     ])
 
@@ -185,8 +185,8 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'waste_cluster_around_target': 'Waste cluster around target',
         'ignore_sudden_flash': 'Ignore sudden flash',
         'sudden_flash': 'Sudden flash',
-        'give_up_after_trying': 'Give up after trying',
-        'try_a_few_times': 'Try a few times',
+        'retry_switch': 'Retry switch',
+        'retry_capture': 'Retry capture',
         'ff_capture_rate': 'Firefly capture rate (per s)',
         'stop_success_rate': 'Stop success rate',
         'three_in_a_row': 'Three in a row',
@@ -195,16 +195,16 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'multiple_in_a_row': 'Multiple in a row',
         'multiple_in_a_row_all': 'Multiple in a row incl. 1st',
         'cluster_around_target': 'Cluster exists around target',
-        'GUAT_over_TAFT': 'GUAT over TAFT',
-        'GUAT_over_both': 'GUAT over both',
-        'TAFT_over_both': 'TAFT over both',
-        'retry_fail_over_miss': 'GUAT over all miss',
-        'retry_capture_over_miss': 'TAFT over all miss',
-        'retry_over_miss': 'GUAT+TAFT over all miss',
+        'rsw_over_rcap': 'rsw over rcap',
+        'rsw_over_both': 'rsw over both',
+        'rcap_over_both': 'rcap over both',
+        'retry_fail_over_miss': 'rsw over all miss',
+        'retry_capture_over_miss': 'rcap over all miss',
+        'retry_over_miss': 'rsw+rcap over all miss',
         'no_retry_over_miss': 'No retry over all miss',
-        'retry_fail_over_attempt': 'GUAT over all attempt',
-        'retry_capture_over_attempt': 'TAFT over all attempt',
-        'retry_over_attempt': 'GUAT+TAFT over all attempt',
+        'retry_fail_over_attempt': 'rsw over all attempt',
+        'retry_capture_over_attempt': 'rcap over all attempt',
+        'retry_over_attempt': 'rsw+rcap over all attempt',
         'no_retry_over_attempt': 'No retry over all attempt',
         'miss_over_attempt': 'Miss over attempt',
         'first_shot_capture_over_attempt': 'First shot capture over attempt',

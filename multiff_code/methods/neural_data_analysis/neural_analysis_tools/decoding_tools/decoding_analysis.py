@@ -295,7 +295,7 @@ def save_decoding_results(df, comp_key, model_name, save_dir, metadata=None, ove
     df : pd.DataFrame
         The decoding results to save.
     comp_key : str
-        Comparison key, e.g. 'guat_first_vs_taft_first'.
+        Comparison key, e.g. 'rsw_first_vs_rcap_first'.
     model_name : str
         Model name, e.g. 'svm' or 'logreg'.
     save_dir : str or Path

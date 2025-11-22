@@ -27,17 +27,17 @@ def _logs_root_from_overall(overall_folder: str) -> str:
     cur = p
     while True:
         if os.path.basename(cur) == 'multiff_analysis':
-            return os.path.join(cur, 'logs')
+            return os.path.join(cur, 'jobs')
         parent = os.path.dirname(cur)
         if parent == cur:
             # Fallback: sibling logs next to overall_folder
-            return os.path.join(os.path.dirname(p), 'logs')
+            return os.path.join(os.path.dirname(p), 'jobs')
         cur = parent
 
 
 def _run_summary_path(overall_folder: str) -> str:
     logs_root = os.path.join(_logs_root_from_overall(
-        overall_folder), 'rppo', 'run_summary')
+        overall_folder), 'rppo/logs/run_summary')
     # Nest under job id if available
     job_id = os.getenv('SLURM_ARRAY_JOB_ID') or os.getenv('SLURM_JOB_ID')
     if job_id:
@@ -48,7 +48,7 @@ def _run_summary_path(overall_folder: str) -> str:
 
 def _curriculum_log_path(overall_folder: str) -> str:
     logs_root = os.path.join(_logs_root_from_overall(
-        overall_folder), 'rppo', 'run_curriculum')
+        overall_folder), 'rppo/logs/run_curriculum')
     # Nest under job id if available
     job_id = os.getenv('SLURM_ARRAY_JOB_ID') or os.getenv('SLURM_JOB_ID')
     if job_id:

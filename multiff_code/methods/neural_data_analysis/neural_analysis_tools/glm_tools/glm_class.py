@@ -20,10 +20,10 @@ class GLMclass():
     #                  'min_target_has_disappeared_for_last_time_dummy',
     #                  'min_target_cluster_has_disappeared_for_last_time_dummy',
     #                  'max_target_visible_dummy', 'max_target_cluster_visible_dummy',
-    #                  'try_a_few_times_indice_dummy', 'give_up_after_trying_indice_dummy',
+    #                  'retry_capture_indice_dummy', 'retry_switch_indice_dummy',
     #                  'ignore_sudden_flash_indice_dummy', 'two_in_a_row', 'waste_cluster_around_target',
     #                  'visible_before_last_one', 'disappear_latest', 'ignore_sudden_flash',
-    #                  'try_a_few_times', 'give_up_after_trying', 'cluster_around_target',
+    #                  'retry_capture', 'retry_switch', 'cluster_around_target',
     #                  ]
 
     def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):

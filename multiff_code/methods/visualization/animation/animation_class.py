@@ -33,7 +33,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
     def __init__(self, raw_data_folder_path=None):
         super().__init__(raw_data_folder_path=raw_data_folder_path)
 
-    def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, static_plot_on_the_left=False, max_num_frames=150,
+    def set_animation_parameters(self, currentTrial=None, num_trials=None, duration=None, animation_plot_kwargs=None, k=3, reduce_k_if_too_many_frames=True, static_plot_on_the_left=False, max_num_frames=150,
                                  max_duration=30, min_duration=1, rotated=True, figsize=(14, 9), dpi=None):
         '''
         Set the parameters for the animation.
@@ -70,7 +70,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
         self.k = k
 
         self._call_prepare_for_animation_func(currentTrial=currentTrial, num_trials=num_trials, duration=duration, k=k, max_num_frames=max_num_frames,
-                                              max_duration=max_duration, min_duration=min_duration, rotated=rotated)
+                                              max_duration=max_duration, min_duration=min_duration, rotated=rotated, reduce_k_if_too_many_frames=reduce_k_if_too_many_frames)
 
     def call_animation_function(self, with_annotation=False,
                                 margin=100, plot_time_index=False, fps=None,
@@ -84,7 +84,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
 
         if with_annotation:
             self.annotation_info = animation_utils.make_annotation_info(self.caught_ff_num+1, self.max_point_index, self.n_ff_in_a_row, self.visible_before_last_one_trials, self.disappear_latest_trials,
-                                                                        self.ignore_sudden_flash_indices, self.GUAT_indices_df['point_index'].values, self.try_a_few_times_indices)
+                                                                        self.ignore_sudden_flash_indices, self.rsw_indices_df['point_index'].values, self.retry_capture_indices)
             animate_func = partial(animation_func.animate_annotated, ax=self.ax, anim_monkey_info=self.anim_monkey_info, ff_dataframe_anim=self.ff_dataframe_anim,
                                    flash_on_ff_dict=self.flash_on_ff_dict, alive_ff_dict=self.alive_ff_dict, believed_ff_dict=self.believed_ff_dict, ff_caught_T_new=self.ff_caught_T_new, annotation_info=self.annotation_info,
                                    plot_time_index=plot_time_index, **animate_kwargs)
@@ -117,7 +117,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
                     pass
 
     def _call_prepare_for_animation_func(self, currentTrial=None, num_trials=None, duration=None, k=1, max_num_frames=None,
-                                         max_duration=30, min_duration=1, rotated=True):
+                                         max_duration=30, min_duration=1, rotated=True, reduce_k_if_too_many_frames=True):
         self.num_frames, self.anim_monkey_info, self.flash_on_ff_dict, self.alive_ff_dict, self.believed_ff_dict, self.new_num_trials, self.ff_dataframe_anim \
             = animation_utils.prepare_for_animation(
                 self.ff_dataframe, self.ff_caught_T_new, self.ff_life_sorted, self.ff_believed_position_sorted,
@@ -126,7 +126,7 @@ class AnimationClass(further_processing_class.FurtherProcessing):
         print("Number of frames is:", self.num_frames)
 
         # if the number of frames is too large, then reduce k so that the number of frames is reduced
-        if max_num_frames is not None:
+        if (max_num_frames is not None) & (reduce_k_if_too_many_frames):
             while self.num_frames > 150:
                 self.k = self.k + 1
                 self.num_frames, self.anim_monkey_info, self.flash_on_ff_dict, self.alive_ff_dict, self.believed_ff_dict, self.new_num_trials, self.ff_dataframe_anim \
@@ -241,7 +241,8 @@ class AnimationClass(further_processing_class.FurtherProcessing):
             html_str = self.anim.to_jshtml()
             with open(self.video_path_name, 'w', encoding='utf-8') as f:
                 f.write(html_str)
-            print("Animation is saved at:", self.video_path_name, "as HTML file.")
+            print("Animation is saved at:",
+                  self.video_path_name, "as HTML file.")
 
         # save animation as gif
         # self.anim.save(f"{self.processed_data_folder_path}/agent_animation.gif", writer='imagemagick', fps=int(62/self.k)) #SB3

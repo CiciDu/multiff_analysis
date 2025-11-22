@@ -12,7 +12,7 @@ from reinforcement_learning.collect_data.process_agent_data import (
     unpack_ff_information_of_agent,
     reverse_value_and_position,
 )
-from decision_making_analysis.compare_GUAT_and_TAFT import find_GUAT_or_TAFT_trials
+from decision_making_analysis.event_detection import detect_rsw_and_rcap
 
 import os
 import shutil
@@ -287,8 +287,6 @@ def pack_monkey_information(time, monkey_x, monkey_y, speed, ang_speed, is_stop,
     return monkey_information
 
 
-
-
 def _collect_monkey_and_ff_data(
     env, rl_agent, n_steps, hidden_dim, deterministic,
     state_or_obs, last_action, hidden_out, agent_type=None
@@ -298,13 +296,18 @@ def _collect_monkey_and_ff_data(
     # -------------------------------------------------------
     # --- Initialization ---
     # -------------------------------------------------------
-    monkey_x, monkey_y, speed, ang_speed, monkey_angle, is_stop, time = ([] for _ in range(7))
-    indexes_in_ff_flash, corresponding_time, ff_x_noisy, ff_y_noisy = ([] for _ in range(4))
-    pose_unreliable, visible, time_since_last_vis_list, all_steps = ([] for _ in range(4))
+    monkey_x, monkey_y, speed, ang_speed, monkey_angle, is_stop, time = (
+        [] for _ in range(7))
+    indexes_in_ff_flash, corresponding_time, ff_x_noisy, ff_y_noisy = (
+        [] for _ in range(4))
+    pose_unreliable, visible, time_since_last_vis_list, all_steps = (
+        [] for _ in range(4))
 
-    derived_agent_type = str(agent_type).lower() if agent_type is not None else 'sb3'
+    derived_agent_type = str(agent_type).lower(
+    ) if agent_type is not None else 'sb3'
     is_rnn = derived_agent_type in ('lstm', 'gru')
-    is_attn_ff = derived_agent_type in ('attn', 'attention', 'attn_ff', 'attention_ff')
+    is_attn_ff = derived_agent_type in (
+        'attn', 'attention', 'attn_ff', 'attention_ff')
     is_attn_rnn = derived_agent_type in ('attn_rnn', 'attention_rnn')
 
     attn_limits = _get_attention_action_limits(env, is_attn_ff, is_attn_rnn)
@@ -423,8 +426,10 @@ def _step_default_agent(env, rl_agent, state_or_obs, deterministic):
     obs_input = state_or_obs
     try:
         if hasattr(rl_agent, 'observation_space') and isinstance(rl_agent.observation_space, spaces.Dict):
-            n_slots = int(env.num_obs_ff) * int(getattr(env, 'num_elem_per_ff', 0))
-            slots = state_or_obs[:n_slots].reshape(int(env.num_obs_ff), int(getattr(env, 'num_elem_per_ff', 0)))
+            n_slots = int(env.num_obs_ff) * \
+                int(getattr(env, 'num_elem_per_ff', 0))
+            slots = state_or_obs[:n_slots].reshape(
+                int(env.num_obs_ff), int(getattr(env, 'num_elem_per_ff', 0)))
             obs_input = {'slots': slots}
             if getattr(env, 'add_action_to_obs', False):
                 ego = state_or_obs[n_slots:n_slots + 2]
@@ -444,7 +449,7 @@ def _collect_monkey_data(env, monkey_x, monkey_y, speed, ang_speed,
     monkey_y.append(env.agentxy[1] + env.arena_center_global[1])
     speed.append(float(env.v))
     ang_speed.append(float(env.w))
-    monkey_angle.append(env.agentheading[0])
+    monkey_angle.append(env.agentheading)
     is_stop.append(env.is_stop)
     time.append(env.time)
 
@@ -452,18 +457,22 @@ def _collect_monkey_data(env, monkey_x, monkey_y, speed, ang_speed,
 def _collect_firefly_data(env, step, idxs, times, ff_x_noisy, ff_y_noisy,
                           pose_unreliable, visible, time_since_last_vis, all_steps):
     """Append current firefly sensory data."""
-    topk_indices = env.topk_indices.tolist()
-    idxs.extend(topk_indices)
-    times.extend([env.time] * len(topk_indices))
-    all_steps.extend([step] * len(topk_indices))
+    sel_ff_indices = env.sel_ff_indices.tolist()
+    idxs.extend(sel_ff_indices)
+    times.extend([env.time] * len(sel_ff_indices))
+    all_steps.extend([step] * len(sel_ff_indices))
 
-    if len(topk_indices) > 0:
-        time_since_last_vis.extend(env.ff_t_since_last_seen[topk_indices].tolist())
+    if len(sel_ff_indices) > 0:
+        time_since_last_vis.extend(
+            env.ff_t_since_last_seen[sel_ff_indices].tolist())
 
     if len(env.ffxy_slot_noisy) > 0:
-        if env.ffxy_slot_noisy.shape[0] != len(topk_indices):
-            raise ValueError('Number of fireflies in observation does not match the environment.')
-        ff_x_noisy.extend((env.ffxy_slot_noisy[:, 0] + env.arena_center_global[0]).tolist())
-        ff_y_noisy.extend((env.ffxy_slot_noisy[:, 1] + env.arena_center_global[1]).tolist())
+        if env.ffxy_slot_noisy.shape[0] != len(sel_ff_indices):
+            raise ValueError(
+                'Number of fireflies in observation does not match the environment.')
+        ff_x_noisy.extend(
+            (env.ffxy_slot_noisy[:, 0] + env.arena_center_global[0]).tolist())
+        ff_y_noisy.extend(
+            (env.ffxy_slot_noisy[:, 1] + env.arena_center_global[1]).tolist())
         pose_unreliable.extend(env.pose_unreliable.tolist())
         visible.extend(env.visible.tolist())

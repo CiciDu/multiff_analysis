@@ -240,9 +240,9 @@ def plot_merged_df_by_category(merged_df, category_column_name, category_order=N
 def plot_pattern_frequencies(pattern_frequencies, compare_monkey_and_agent=False, data_folder_name=None, file_name=None, monkey_name='',
                              ax=None, return_ax=False, hue=None):
     subset = pattern_frequencies[pattern_frequencies['item'].isin(['two_in_a_row', 'visible_before_last_one', 'disappear_latest', 'waste_cluster_around_target',
-                                                                   'ignore_sudden_flash', 'give_up_after_trying', 'try_a_few_times', 'ff_capture_rate', 'stop_success_rate'])]
+                                                                   'ignore_sudden_flash', 'retry_switch', 'retry_capture', 'ff_capture_rate', 'stop_success_rate'])]
     label_order = ['Visible before last capture', 'Target disappears latest', 'Two in a row', 'Waste cluster around target',
-                   'Try a few times', 'Give up after trying', 'Ignore sudden flash', 'Firefly capture rate (per s)', 'Stop success rate']
+                   'Retry capture', 'Retry switch', 'Ignore sudden flash', 'Firefly capture rate (per s)', 'Stop success rate']
     if compare_monkey_and_agent:
         hue = "Player"
     ax = plot_merged_df(subset, x='label', y='rate',

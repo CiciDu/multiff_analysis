@@ -1,4 +1,4 @@
-from decision_making_analysis.decision_making import decision_making_utils
+from decision_making_analysis.ff_data_acquisition import ff_data_utils
 from data_wrangling import specific_utils, general_utils
 from planning_analysis.show_planning import nxt_ff_utils
 from null_behaviors import show_null_trajectory
@@ -219,7 +219,7 @@ def find_captured_ff_info_for_making_stops_near_ff_df(
 
     n_seconds_before_crossing_boundary = 0.2
     n_seconds_after_crossing_boundary = stop_period_duration + 0.2
-    CB_indices, non_CB_indices, _ = decision_making_utils.find_time_points_that_are_within_n_seconds_after_crossing_boundary(
+    CB_indices, non_CB_indices, _ = ff_data_utils.find_time_points_that_are_within_n_seconds_after_crossing_boundary(
         time_of_stops,
         crossing_boundary_time,
         n_seconds_before_crossing_boundary=n_seconds_before_crossing_boundary,

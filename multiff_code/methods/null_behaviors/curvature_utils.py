@@ -1,6 +1,6 @@
 import math
 import pandas as pd
-from decision_making_analysis import trajectory_info
+from decision_making_analysis.data_enrichment import trajectory_utils
 from null_behaviors import opt_arc_utils
 from scipy.stats import rankdata
 
@@ -45,7 +45,7 @@ def make_curvature_df(ff_dataframe_sub, curv_of_traj_df, ff_radius_for_opt_arc=1
     if opt_arc_stop_first_vis_bdry & (len(ff_dataframe_sub) > 100000):
         print('Warning: The number of ff is larger than 100000, and opt_arc_stop_first_vis_bdry is set to True. This might take a long time to calculate the optimal arc.')
 
-    curv_of_traj = trajectory_info.find_trajectory_arc_info(
+    curv_of_traj = trajectory_utils.find_trajectory_arc_info(
         ff_dataframe_sub['point_index'].values, curv_of_traj_df, monkey_information=monkey_information, ff_caught_T_new=ff_caught_T_new)
 
     curvature_df = _make_curvature_df(ff_dataframe_sub, curv_of_traj, ff_radius_for_opt_arc=ff_radius_for_opt_arc, clean=clean, invalid_curvature_ok=invalid_curvature_ok,
@@ -383,7 +383,7 @@ def _find_polar_arc_starting_and_ending_angles(arc_radius, arc_measure, arc_end_
 
 def clean_curvature_info(curvature_df, include_opt_arc_curv=True):
     # seems like this is no longer needed because all the columns here will be cleaned in the process of being made
-    
+
     cols_to_winsorize = ['curv_of_traj']
     curvature_df['curv_of_traj'] = opt_arc_utils.winsorize_curv(
         curvature_df['curv_of_traj'])
@@ -413,7 +413,7 @@ def fill_up_NAs_for_placeholders_in_columns_related_to_curvature(df, monkey_info
 
     if 'curv_of_traj' in df.columns:
         if len(point_index_array) > 0:
-            curv_of_traj = trajectory_info.find_trajectory_arc_info(
+            curv_of_traj = trajectory_utils.find_trajectory_arc_info(
                 point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
             df.loc[df.curv_of_traj.isna(), 'curv_of_traj'] = curv_of_traj
     return df
@@ -432,7 +432,7 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
                     "Please provide ff_caught_T_new and curv_of_traj_df, since it's needed to calculate curv_of_traj.")
             point_index_array = df.loc[curv_traj_na_index,
                                        'point_index'].values
-            curv_of_traj = trajectory_info.find_trajectory_arc_info(
+            curv_of_traj = trajectory_utils.find_trajectory_arc_info(
                 point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
             # we fill up the NAs for curv_of_traj
             df.loc[curv_traj_na_index, 'curv_of_traj'] = curv_of_traj
@@ -445,7 +445,7 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
             raise ValueError(
                 "Please provide ff_caught_T_new and curv_of_traj_df, since it's needed to calculate curv_of_traj.")
         point_index_array = df.point_index.values
-        curv_of_traj = trajectory_info.find_trajectory_arc_info(
+        curv_of_traj = trajectory_utils.find_trajectory_arc_info(
             point_index_array, curv_of_traj_df, ff_caught_T_new=ff_caught_T_new, monkey_information=monkey_information)
         df['curv_of_traj'] = curv_of_traj
         df['curv_of_traj'] = opt_arc_utils.winsorize_curv(
@@ -490,7 +490,8 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
         ff_left_na_index = (df['ff_angle_boundary'] >
                             0) & df['curvature_lower_bound'].isna()
         df.loc[ff_left_na_index, ['curvature_lower_bound',
-                                  'curvature_upper_bound']] = np.array([0, 200])  # note: positive number is to the left
+                                  # note: positive number is to the left
+                                  'curvature_upper_bound']] = np.array([0, 200])
         ff_right_na_index = (df['ff_angle_boundary'] <
                              0) & df['curvature_lower_bound'].isna()
         df.loc[ff_right_na_index, ['curvature_lower_bound',
@@ -503,10 +504,12 @@ def fill_up_NAs_in_columns_related_to_curvature(df, monkey_information=None, ff_
     if 'opt_arc_curv' in df.columns:
         ff_left_na_index = (df['ff_angle_boundary'] >
                             0) & df['opt_arc_curv'].isna()
-        df.loc[ff_left_na_index, 'opt_arc_curv'] = opt_arc_utils.CURV_OR_TRAJ_UPPER_BOUND
+        df.loc[ff_left_na_index,
+               'opt_arc_curv'] = opt_arc_utils.CURV_OR_TRAJ_UPPER_BOUND
         ff_right_na_index = (df['ff_angle_boundary'] <
                              0) & df['opt_arc_curv'].isna()
-        df.loc[ff_right_na_index, 'opt_arc_curv'] = opt_arc_utils.CURV_OR_TRAJ_LOWER_BOUND
+        df.loc[ff_right_na_index,
+               'opt_arc_curv'] = opt_arc_utils.CURV_OR_TRAJ_LOWER_BOUND
         middle_ff_na_index = (df['ff_angle_boundary']
                               == 0) & df['opt_arc_curv'].isna()
         df.loc[middle_ff_na_index, 'opt_arc_curv'] = 0

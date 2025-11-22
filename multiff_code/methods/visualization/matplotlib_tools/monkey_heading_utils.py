@@ -1,6 +1,6 @@
 
 from visualization.animation import animation_utils
-from decision_making_analysis import trajectory_info
+from decision_making_analysis.data_enrichment import trajectory_utils
 
 import numpy as np
 import math
@@ -241,13 +241,13 @@ def turn_mheading_into_triangle_df(mheading, R, point_index=None):
 
 def find_all_mheading_components_in_polar(monkey_information, time_all, time_range_of_trajectory, num_time_points_for_trajectory, return_packed_info=False):
     # Get info to plot triangles to show monkey directions
-    traj_time_2d, trajectory_data_dict = trajectory_info.find_trajectory_data(
+    traj_time_2d, trajectory_data_dict = trajectory_utils.find_trajectory_data(
         time_all, monkey_information, time_range_of_trajectory=time_range_of_trajectory, num_time_points_for_trajectory=num_time_points_for_trajectory)
     traj_x_2d = trajectory_data_dict['monkey_x']
     traj_y_2d = trajectory_data_dict['monkey_y']
     monkey_angle_2d = trajectory_data_dict['monkey_angle']
     monkey_indices = np.searchsorted(monkey_information['time'], time_all)
-    traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north = trajectory_info.find_monkey_info_on_trajectory_relative_to_origin(
+    traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north = trajectory_utils.find_monkey_info_on_trajectory_relative_to_origin(
         monkey_indices, monkey_information, traj_x_2d, traj_y_2d, monkey_angle_2d, num_time_points_for_trajectory=num_time_points_for_trajectory)
     left_end_r, left_end_theta, right_end_r, right_end_theta = find_coordinates_of_triangles_for_monkey_heading_in_polar(
         traj_distances, traj_angles, monkey_angle_on_trajectory_relative_to_the_current_north)

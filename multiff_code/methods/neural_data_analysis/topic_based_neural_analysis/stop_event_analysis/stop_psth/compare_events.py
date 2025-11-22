@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
+import warnings
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
 
@@ -128,6 +129,7 @@ def match_features_func(results, key, A1, B1, match_features, match_strategy, ma
         A2, B2 = A1, B1
     return A2, B2, results
 
+
 def ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
     """Standardize minimal schema: stop_time, stop_point_index; sort by stop_time."""
     out = df.copy()
@@ -143,10 +145,12 @@ def ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
     # Ensure stop_point_index
     if 'stop_point_index' not in out.columns:
         if 'point_index' in out.columns:
-            warnings.warn("Renaming 'point_index' column to 'stop_point_index'", UserWarning)
+            warnings.warn(
+                "Renaming 'point_index' column to 'stop_point_index'", UserWarning)
             out = out.rename(columns={'point_index': 'stop_point_index'})
         else:
-            warnings.warn("'stop_point_index' not found; filling with NaN", UserWarning)
+            warnings.warn(
+                "'stop_point_index' not found; filling with NaN", UserWarning)
             out['stop_point_index'] = np.nan
 
     return out.sort_values('stop_time', kind='stable').reset_index(drop=True)
@@ -175,10 +179,10 @@ def dedupe_within(df: pd.DataFrame,
     duplicated_mask = key.duplicated(keep=False)
     n_dupes = duplicated_mask.sum()
     if n_dupes > 0:
-        warnings.warn(f'{n_dupes} duplicate rows found based on keys {keys}', UserWarning)
+        warnings.warn(
+            f'{n_dupes} duplicate rows found based on keys {keys}', UserWarning)
 
     return df.loc[~duplicated_mask].copy()
-
 
 
 def diff_by(a: pd.DataFrame, b: pd.DataFrame, key: str = 'stop_id') -> pd.DataFrame:
@@ -191,7 +195,7 @@ def diff_by(a: pd.DataFrame, b: pd.DataFrame, key: str = 'stop_id') -> pd.DataFr
 def titleize(name: str) -> str:
     """Pretty label from a snake key."""
     repl = {
-        'guat': 'GUAT', 'taft': 'TAFT',
+        'rsw': 'rsw', 'rcap': 'rcap',
         'no_capture': 'No-capture',
         'nonfinal': 'Non-final', 'middle': 'Middle',
         'giveup': 'Give-up', 'captures': 'Captures',
@@ -205,7 +209,7 @@ def titleize(name: str) -> str:
     return ' '.join(pretty)
 
 
-ACRONYMS = {'GUAT', 'TAFT'}
+ACRONYMS = {'rsw', 'rcap'}
 
 
 def _cap_first_segment(name: str) -> str:
@@ -242,7 +246,7 @@ def _pretty_word(w: str) -> str:
 
 
 def _titleize_side(name: str) -> str:
-    # turn 'GUAT_last' -> 'Give-up GUAT last'
+    # turn 'rsw_last' -> 'Give-up rsw last'
     parts = name.split('_')
     pretty = [_pretty_word(parts[0])]
     for p in parts[1:]:
@@ -322,7 +326,7 @@ def validate(datasets: dict[str, pd.DataFrame], comparisons: list[dict]) -> None
 
 
 def build_analyzer(comp, datasets, spikes_df, monkey_information, config,
-                   align_by_stop_end=False,
+                   align_by_stop_end=True,
                    dedupe_keys: list[str] | None = None,
                    time_round: int = 3,
                    warn_on_overlap: bool = True,

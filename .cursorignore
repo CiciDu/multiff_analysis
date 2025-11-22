@@ -73,13 +73,11 @@ RL_models/
 **/RL_models/
 
 # Manual and backup folders
-for_manual_annotation/
 data_backup/
 backups/
 
 # Logs
-**/logs/decode
-**/logs/rppo/run_stdout/
+**/logs/
 
 # Temporary files
 *.tmp
