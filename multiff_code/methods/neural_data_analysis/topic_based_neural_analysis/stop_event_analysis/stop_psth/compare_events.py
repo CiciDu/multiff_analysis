@@ -384,7 +384,6 @@ def build_analyzer(comp, datasets, spikes_df, monkey_information, config,
     # build analyzer
     an = core_stops_psth.PSTHAnalyzer(
         spikes_df=spikes_df,
-        monkey_information=monkey_information,
         config=config,
         event_a_df=A2,
         event_b_df=B2,

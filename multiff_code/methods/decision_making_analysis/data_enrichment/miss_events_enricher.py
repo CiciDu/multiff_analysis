@@ -25,8 +25,8 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-gc_kwargs = {'time_with_respect_to_first_stop': None,
-             'time_with_respect_to_second_stop': None,
+gc_kwargs = {'time_with_respect_to_stop_1': None,
+             'time_with_respect_to_stop_2': None,
              'time_with_respect_to_last_stop': 0,
              'n_seconds_before_crossing_boundary': 2.5,
              'n_seconds_after_crossing_boundary': 2.5,
@@ -62,7 +62,7 @@ class MissEventsDataEnricher():
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
     def streamline_getting_rsw_or_rcap_x_df(self, rsw_or_rcap='rsw',
                                             save_data=True,
                                             exists_ok=True,
@@ -421,11 +421,11 @@ class MissEventsDataEnricher():
         self.cur_ff_df_final = _merge_and_compute_heading(self.cur_ff_df_final)
 
     def _get_rcap_df2_based_on_ref_point(self):
-        self.rcap_df2 = rsw_vs_rcap_utils.further_make_trials_df(
+        self.rcap_df2 = rsw_vs_rcap_utils.further_make_events_df(
             self.rcap_df, self.monkey_information, self.ff_real_position_sorted, self.stop_period_duration, self.ref_point_mode, self.ref_point_value)
 
     def _get_rsw_df2_based_on_ref_point(self):
-        self.rsw_df2 = rsw_vs_rcap_utils.further_make_trials_df(
+        self.rsw_df2 = rsw_vs_rcap_utils.further_make_events_df(
             self.rsw_df, self.monkey_information, self.ff_real_position_sorted, self.stop_period_duration, self.ref_point_mode, self.ref_point_value)
 
     def _get_rsw_or_rcap_x_df(self, save_data=True):
@@ -433,9 +433,9 @@ class MissEventsDataEnricher():
             self.x_features_df, self.only_cur_ff_df, self.plan_features_df)
 
         # add num_stops
-        trials_df = self.rcap_events_df if self.rsw_or_rcap == 'rcap' else self.rsw_w_ff_df
+        events_df = self.rcap_events_df if self.rsw_or_rcap == 'rcap' else self.rsw_w_ff_df
         self.rsw_or_rcap_x_df = self.rsw_or_rcap_x_df.merge(
-            trials_df[['stop_point_index', 'num_stops']], on='stop_point_index', how='left')
+            events_df[['stop_point_index', 'num_stops']], on='stop_point_index', how='left')
 
         # also clean out unnecesary columns especially in clusters
         new_df_columns = features_to_keep_utils.get_minimal_features_to_keep(

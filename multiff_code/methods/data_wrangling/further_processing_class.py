@@ -45,6 +45,9 @@ np.set_printoptions(suppress=True)
 
 
 class FurtherProcessing(base_processing_class.BaseProcessing):
+    
+    max_visibility_window = 10
+    
     def __init__(self, raw_data_folder_path=None):
         super().__init__()
 
@@ -57,7 +60,6 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
         else:
             print("Warning: raw_data_folder_path is None")
 
-        self.max_visibility_window = 10
         self.dt = 0.0165
 
     def make_df_related_to_patterns_and_features(self, exists_ok=True):
@@ -80,6 +82,8 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.find_patterns()
 
     def find_patterns(self):
+        self.caught_ff_num = len(self.ff_caught_T_new)
+        self.max_point_index = self.monkey_information['point_index'].max()
         self.get_n_ff_in_a_row_info()
         self.on_before_last_one_trials = pattern_by_trials.on_before_last_one_func(
             self.ff_flash_end_sorted, self.ff_caught_T_new, self.caught_ff_num)
@@ -219,6 +223,7 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                                "cluster_around_target_indices": self.cluster_around_target_indices}
 
     def make_all_trial_patterns(self):
+        self.caught_ff_num = len(self.ff_caught_T_new)
         zero_array = np.zeros(self.caught_ff_num + 1, dtype=int)
 
         multiple_in_a_row = np.where(self.n_ff_in_a_row >= 2)[0]

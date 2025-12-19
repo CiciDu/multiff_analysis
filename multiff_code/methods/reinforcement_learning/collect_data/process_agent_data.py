@@ -179,11 +179,11 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
     Remove all contents inside folders in all_collected_data that are derived
     from the given processed_data_folder_path, but keep the folders themselves.
     """
-    if 'processed_data/' not in processed_data_folder_path:
-        raise ValueError("'processed_data/' not found in the provided path.")
+    if 'processed_data' not in processed_data_folder_path:
+        raise ValueError(f"'processed_data/' not found in the provided path: {processed_data_folder_path}")
 
     after_processed_data = processed_data_folder_path.split(
-        'processed_data/', 1)[1]
+        'processed_data', 1)[1]
     search_root = 'multiff_analysis/RL_models/SB3_stored_models/all_collected_data'
 
     matching_dirs = []

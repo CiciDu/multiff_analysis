@@ -39,8 +39,13 @@ MONKEY_DIR="${MONKEY_DIR:-/user_data/cicid/Multifirefly-Project/all_monkey_data/
 # Enable cumulative mode by setting CUMULATIVE=1 in environment before sbatch
 CUMULATIVE="${CUMULATIVE:-0}"
 # Models to run for each selected session
-# MODELS=("svm" "logreg" "logreg_elasticnet" "rf")
-MODELS=("svm" "logreg")
+# Allow MODELS to be provided by caller as space- or comma-delimited string
+if [ -n "${MODELS:-}" ]; then
+    MODELS_SANITIZED="$(echo "$MODELS" | tr ',' ' ' | xargs)"
+    read -r -a MODELS <<< "$MODELS_SANITIZED"
+else
+    MODELS=("svm" "logreg" "rf" "logreg_elasticnet")
+fi
 if [ ! -d "$MONKEY_DIR" ]; then
     echo "[SLURM] Monkey directory not found: $MONKEY_DIR" >&2
     exit 1
@@ -84,9 +89,10 @@ keys_csv = os.environ.get('KEYS_CSV', '').strip()
 models = [m.strip() for m in os.environ.get('MODELS_CSV', '').split(',') if m.strip()]
 
 cumulative = os.environ.get('CUMULATIVE', '0') == '1'
-replace_target = '/retry_decoder_cumulative/' if cumulative else '/retry_decoder/'
-retry_monkey_dir = Path(str(monkey_dir).replace('/raw_monkey_data/', replace_target))
-retry_monkey_dir.mkdir(parents=True, exist_ok=True)
+base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs')
+subdir = 'retry_decoder_cumulative' if cumulative else 'retry_decoder'
+progress_dir = base_logs / subdir
+progress_dir.mkdir(parents=True, exist_ok=True)
 
 if keys_csv:
     keys_sorted = ','.join(sorted([k.strip() for k in keys_csv.split(',') if k.strip()]))
@@ -94,7 +100,7 @@ if keys_csv:
     progress_filename = f"_decoding_progress_all_k{keys_hash}.json"
 else:
     progress_filename = f"_decoding_progress_all.json"
-progress_path = retry_monkey_dir / progress_filename
+progress_path = progress_dir / progress_filename
 
 all_sessions = []
 if monkey_dir.exists():
@@ -131,16 +137,18 @@ session = os.environ.get('SESSION_NAME', '')
 keys_csv = os.environ.get('KEYS_CSV', '').strip()
 models = [m.strip() for m in os.environ.get('MODELS_CSV', '').split(',') if m.strip()]
 cumulative = os.environ.get('CUMULATIVE', '0') == '1'
-replace_target = '/retry_decoder_cumulative/' if cumulative else '/retry_decoder/'
-retry_monkey_dir = Path(str(monkey_dir).replace('/raw_monkey_data/', replace_target))
-retry_monkey_dir.mkdir(parents=True, exist_ok=True)
+base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs')
+subdir = 'retry_decoder_cumulative' if cumulative else 'retry_decoder'
+progress_dir = base_logs / subdir
+progress_dir.mkdir(parents=True, exist_ok=True)
 if keys_csv:
     keys_sorted = ','.join(sorted([k.strip() for k in keys_csv.split(',') if k.strip()]))
     keys_hash = hashlib.md5(keys_sorted.encode('utf-8')).hexdigest()[:8]
     progress_filename = f"_decoding_progress_all_k{keys_hash}.json"
 else:
     progress_filename = f"_decoding_progress_all.json"
-progress_path = retry_monkey_dir / progress_filename
+progress_path = progress_dir / progress_filename
+print(f"Progress path: {progress_path}")
 
 done_all = False
 if progress_path.exists():
@@ -203,16 +211,17 @@ keys_csv = os.environ.get('KEYS_CSV', '').strip()
 models = [m.strip() for m in os.environ.get('MODELS_CSV', '').split(',') if m.strip()]
 
 cumulative = os.environ.get('CUMULATIVE', '0') == '1'
-replace_target = '/retry_decoder_cumulative/' if cumulative else '/retry_decoder/'
-retry_monkey_dir = Path(str(monkey_dir).replace('/raw_monkey_data/', replace_target))
-retry_monkey_dir.mkdir(parents=True, exist_ok=True)
+base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs')
+subdir = 'retry_decoder_cumulative' if cumulative else 'retry_decoder'
+progress_dir = base_logs / subdir
+progress_dir.mkdir(parents=True, exist_ok=True)
 if keys_csv:
     keys_sorted = ','.join(sorted([k.strip() for k in keys_csv.split(',') if k.strip()]))
     keys_hash = hashlib.md5(keys_sorted.encode('utf-8')).hexdigest()[:8]
     progress_filename = f"_decoding_progress_all_k{keys_hash}.json"
 else:
     progress_filename = f"_decoding_progress_all.json"
-progress_path = retry_monkey_dir / progress_filename
+progress_path = progress_dir / progress_filename
 
 all_sessions = list_sessions(monkey_dir) if monkey_dir.exists() else []
 progress = {

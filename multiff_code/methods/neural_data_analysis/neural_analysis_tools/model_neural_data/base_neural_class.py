@@ -44,7 +44,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                 self.get_basic_data()
 
             self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
-                                                                   sampling_rate=self.sampling_rate)
+                                                                   self.monkey_information, sampling_rate=self.sampling_rate)
 
             self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
                 self.spikes_df, bin_width=self.bin_width)

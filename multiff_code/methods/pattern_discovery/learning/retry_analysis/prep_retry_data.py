@@ -17,12 +17,12 @@ import pandas as pd
 
 
 def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monkey_data', monkey_name='monkey_Bruno',
-                                     max_duration=30.0):
+                                     max_duration_of_retry_series=30.0):
 
     sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
         raw_data_dir_name, monkey_name)
 
-    all_retries_df = pd.DataFrame()
+    all_capture_and_last_retry_df = pd.DataFrame()
     for index, row in sessions_df_for_one_monkey.iterrows():
         data_name = row['data_name']
         raw_data_folder_path = os.path.join(
@@ -36,7 +36,7 @@ def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monk
 
         cgt.rsw_events_df['old_miss_index'] = np.arange(
             len(cgt.rsw_events_df))
-        new_trials_df, cap_old_to_new, miss_old_to_new = reindex_trials_with_misses(
+        new_events_df, cap_old_to_new, miss_old_to_new = reindex_trials_with_misses(
             cgt.ff_caught_T_new, cgt.rsw_events_df['last_stop_time'].values)
 
         cgt.rsw_events_df['new_trial_index'] = cgt.rsw_events_df['old_miss_index'].map(
@@ -44,20 +44,20 @@ def get_retries_data_across_sessions(raw_data_dir_name='all_monkey_data/raw_monk
         cgt.rcap_events_df['new_trial_index'] = cgt.rcap_events_df['trial'].map(
             cap_old_to_new)
 
-        retries_df = build_retries_df_from_new_trials(
-            new_trials_df, cgt.rsw_events_df, cgt.rcap_events_df, max_duration=max_duration)
+        capture_and_last_retry_df = build_capture_and_last_retry_df_from_new_trials(
+            new_events_df, cgt.rsw_events_df, cgt.rcap_events_df, max_duration_of_retry_series=max_duration_of_retry_series)
 
-        retries_df['data_name'] = data_name
-        all_retries_df = pd.concat(
-            [all_retries_df, retries_df], ignore_index=True)
+        capture_and_last_retry_df['data_name'] = data_name
+        all_capture_and_last_retry_df = pd.concat(
+            [all_capture_and_last_retry_df, capture_and_last_retry_df], ignore_index=True)
 
-    all_retries_df = make_variations_utils.assign_session_id(
-        all_retries_df, 'session')
+    all_capture_and_last_retry_df = make_variations_utils.assign_session_id(
+        all_capture_and_last_retry_df, 'session')
 
-    return all_retries_df
+    return all_capture_and_last_retry_df
 
 
-def summarize_retry_data(retries_df):
+def summarize_retry_data(capture_and_last_retry_df):
     def _rate_per_min(n, denom):
         # leave NaN when denom == 0
         return (n / denom) * 60 if denom > 0 else np.nan
@@ -65,11 +65,12 @@ def summarize_retry_data(retries_df):
     rows = []
 
     #  rcap
-    n_rcap = retries_df.loc[retries_df['type'] == 'rcap', 'capture'].sum()
+    n_rcap = capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rcap', 'capture'].sum(
+    )
     d_rcap = float(
-        retries_df.loc[retries_df['type'] == 'rcap', 'new_duration'].sum())
+        capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rcap', 'new_duration'].sum())
     sw_rcap = float(
-        retries_df.loc[retries_df['type'] == 'rcap', 'stop_window'].sum())
+        capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rcap', 'stop_window'].sum())
     rows.append({
         'group': 'rcap',
         'num_captures': n_rcap,
@@ -82,9 +83,9 @@ def summarize_retry_data(retries_df):
     # rsw (rates intentionally 0)
     n_rsw = 0
     d_rsw = float(
-        retries_df.loc[retries_df['type'] == 'rsw', 'new_duration'].sum())
+        capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rsw', 'new_duration'].sum())
     sw_rsw = float(
-        retries_df.loc[retries_df['type'] == 'rsw', 'stop_window'].sum())
+        capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rsw', 'stop_window'].sum())
     rows.append({
         'group': 'rsw',
         'num_captures': n_rsw,
@@ -96,9 +97,9 @@ def summarize_retry_data(retries_df):
 
     # both = rcap count only; duration/stop_window =  rcap+rsw
     n_both = n_rcap
-    d_both = float(retries_df.loc[retries_df['type'].isin(
+    d_both = float(capture_and_last_retry_df.loc[capture_and_last_retry_df['type'].isin(
         ['rcap', 'rsw']), 'new_duration'].sum())
-    sw_both = float(retries_df.loc[retries_df['type'].isin(
+    sw_both = float(capture_and_last_retry_df.loc[capture_and_last_retry_df['type'].isin(
         ['rcap', 'rsw']), 'stop_window'].sum())
     rows.append({
         'group': 'both',
@@ -110,9 +111,10 @@ def summarize_retry_data(retries_df):
     })
 
     # rest
-    n_rest = retries_df.loc[retries_df['type'] == 'rest', 'capture'].sum()
+    n_rest = capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rest', 'capture'].sum(
+    )
     d_rest = float(
-        retries_df.loc[retries_df['type'] == 'rest', 'new_duration'].sum())
+        capture_and_last_retry_df.loc[capture_and_last_retry_df['type'] == 'rest', 'new_duration'].sum())
     rows.append({
         'group': 'rest',
         'num_captures': n_rest,
@@ -123,8 +125,8 @@ def summarize_retry_data(retries_df):
     })
 
     # all = base intervals; stop_window only from  rcap+rsw
-    n_all = retries_df['capture'].sum()
-    d_all = float(retries_df['new_duration'].sum())
+    n_all = capture_and_last_retry_df['capture'].sum()
+    d_all = float(capture_and_last_retry_df['new_duration'].sum())
     sw_all = sw_both
     rows.append({
         'group': 'all',
@@ -149,9 +151,9 @@ def add_stop_window(df, label):
         df['trial_index'] = df['trial']
     if df is None or df.empty:
         return pd.DataFrame(columns=['trial_index', 'stop_window', 'type'])
-    sub = df[['trial_index', 'first_stop_time', 'last_stop_time']].copy()
+    sub = df[['trial_index', 'stop_1_time', 'last_stop_time']].copy()
     sub['stop_window'] = (sub['last_stop_time'] -
-                          sub['first_stop_time']).astype(float)
+                          sub['stop_1_time']).astype(float)
     sub = sub[['trial_index', 'stop_window']].copy()
     sub['type'] = label
     return sub
@@ -164,7 +166,7 @@ def reindex_trials_with_misses(capture_times, fail_times):
 
     Returns
     -------
-    new_trials_df : pd.DataFrame
+    new_events_df : pd.DataFrame - basically a merged timeline of captures and fails
         Columns: ['new_trial_index','time','event','old_miss_index','old_trial_index']
         - 'old_trial_index' = original capture index (0-based) for captures; NaN for fails
         - 'old_miss_index' = original fail index (0-based) for fails; NaN for captures
@@ -221,21 +223,21 @@ def reindex_trials_with_misses(capture_times, fail_times):
                        .set_index('old_miss_index')['new_trial_index']
                        .to_dict())
 
-    new_trials_df = trials.drop(columns=['_seq'])[
+    new_events_df = trials.drop(columns=['_seq'])[
         ['new_trial_index', 'time', 'event', 'old_miss_index', 'old_trial_index']
     ]
     # keep both as nullable Int64 for clean joins
-    new_trials_df['old_trial_index'] = new_trials_df['old_trial_index'].astype(
+    new_events_df['old_trial_index'] = new_events_df['old_trial_index'].astype(
         'Int64')
-    new_trials_df['old_miss_index'] = new_trials_df['old_miss_index'].astype(
+    new_events_df['old_miss_index'] = new_events_df['old_miss_index'].astype(
         'Int64')
 
-    return new_trials_df, cap_old_to_new, miss_old_to_new
+    return new_events_df, cap_old_to_new, miss_old_to_new
 
 
-def build_retries_df_from_new_trials(new_trials_df, rsw_events_df, rcap_events_df, max_duration=30.0):
+def build_capture_and_last_retry_df_from_new_trials(new_events_df, rsw_events_df, rcap_events_df, max_duration_of_retry_series=30.0):
     """
-    Build retries_df from merged event timeline (event→event durations, 0-based indices).
+    Basically categorize each attempt (miss or fail) into rcap, rsw, or rest.
 
     Output columns:
       - new_trial_index : merged event index (0-based)
@@ -248,19 +250,19 @@ def build_retries_df_from_new_trials(new_trials_df, rsw_events_df, rcap_events_d
       - capture         : 1 for  rcap/rest, 0 for rsw
     """
     # ---- 0) Event→event duration; filter at the EVENT level (keep 0 durations) ----
-    nt = new_trials_df.sort_values('new_trial_index').copy()
+    nt = new_events_df.sort_values('new_trial_index').copy()
     nt['new_duration'] = nt['time'].diff()  # first event has NaN
     nt = nt.iloc[1:].copy()                 # drop first (no predecessor)
-    nt = nt.loc[nt['new_duration'] <= max_duration].copy()
+    nt = nt.loc[nt['new_duration'] <= max_duration_of_retry_series].copy()
 
     def _ensure_stop_window(df):
         if df is None or len(df) == 0:
             return df
         if 'stop_window' not in df.columns:
-            if {'first_stop_time', 'last_stop_time'}.issubset(df.columns):
+            if {'stop_1_time', 'last_stop_time'}.issubset(df.columns):
                 df = df.copy()
                 df['stop_window'] = (
-                    df['last_stop_time'] - df['first_stop_time']).astype(float)
+                    df['last_stop_time'] - df['stop_1_time']).astype(float)
             else:
                 df = df.copy()
                 df['stop_window'] = np.nan
@@ -279,7 +281,7 @@ def build_retries_df_from_new_trials(new_trials_df, rsw_events_df, rcap_events_d
         rsw_df[['new_trial_index', 'stop_window']], on='new_trial_index', how='inner')
     rsw_rows['type'] = 'rsw'
 
-    # ---- 4) REST rows: capture events NOT rcap ----
+    # ---- 4) capture rows: capture events NOT rcap ----
     rcap_newidx = set(rcap_rows['new_trial_index'].astype(
         int)) if len(rcap_rows) else set()
     rsw_newidx = set(rsw_rows['new_trial_index'].astype(
@@ -291,31 +293,39 @@ def build_retries_df_from_new_trials(new_trials_df, rsw_events_df, rcap_events_d
     rest_rows['stop_window'] = 0.0
     rest_rows['type'] = 'rest'
 
+    # ---- 5) miss rows: miss events NOT rsw ----
+    miss_rows = nt[(nt['event'] == 'miss') & ~
+                   nt['new_trial_index'].isin(blocked)].copy()
+    miss_rows['stop_window'] = 0.0
+    miss_rows['type'] = 'miss'
+
     # ---- 5) Assemble; preserve IDs and every qualifying new_trial_index ----
     keep = ['new_trial_index', 'new_duration', 'stop_window',
             'type', 'old_trial_index', 'old_miss_index']
-    retries_df = (pd.concat([rcap_rows[keep], rsw_rows[keep], rest_rows[keep]], ignore_index=True)
-                    .sort_values(['new_trial_index', 'type'])
-                    .reset_index(drop=True))
+    capture_and_last_retry_df = (pd.concat([rcap_rows[keep], rsw_rows[keep], rest_rows[keep], miss_rows[keep]], ignore_index=True)
+                                 .sort_values(['new_trial_index', 'type'])
+                                 .reset_index(drop=True))
 
-    retries_df['type_combined'] = np.where(
-        retries_df['type'].isin(['rcap', 'rsw']), 'both', 'rest')
-    retries_df['capture'] = (retries_df['type'] != 'rsw').astype(int)
+    capture_and_last_retry_df['type_combined'] = np.where(
+        capture_and_last_retry_df['type'].isin(['rcap', 'rsw']), 'both', 'rest')
+    capture_and_last_retry_df['capture'] = (
+        capture_and_last_retry_df['type'] != 'rsw').astype(int)
 
-    retries_df['old_trial_index'] = retries_df['old_trial_index'].astype(
+    capture_and_last_retry_df['old_trial_index'] = capture_and_last_retry_df['old_trial_index'].astype(
         'Int64')
-    retries_df['old_miss_index'] = retries_df['old_miss_index'].astype('Int64')
+    capture_and_last_retry_df['old_miss_index'] = capture_and_last_retry_df['old_miss_index'].astype(
+        'Int64')
 
     # Sanity: events should be disjoint across  rcap/rsw/REST
-    assert not retries_df['new_trial_index'].duplicated(
+    assert not capture_and_last_retry_df['new_trial_index'].duplicated(
         keep=False).any(), 'duplicated new_trial_index found'
 
-    return retries_df
+    return capture_and_last_retry_df
 
 
-def get_retry_window_captures(all_retries_df):
-    # retries_summary = summarize_retry_data(all_retries_df)
-    retry_window_captures = all_retries_df[all_retries_df['type'].isin(
+def get_retry_window_captures(all_capture_and_last_retry_df):
+    # retries_summary = summarize_retry_data(all_capture_and_last_retry_df)
+    retry_window_captures = all_capture_and_last_retry_df[all_capture_and_last_retry_df['type'].isin(
         ['rsw', 'rcap'])].copy()
     retry_window_captures = retry_window_captures[[
         'session', 'capture', 'stop_window']].groupby('session').sum().reset_index(drop=False)

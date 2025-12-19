@@ -165,7 +165,7 @@ def _take_out_rsw_from_leftover_stops(stop_category_df, monkey_information, ff_d
 
     temp_rsw_sub = stop_sub[stop_sub['stop_cluster_size'] > 1].copy()
 
-    temp_rsw_events_df = detect_rsw_and_rcap._make_trials_df(
+    temp_rsw_events_df = detect_rsw_and_rcap._make_events_df(
         temp_rsw_sub, stop_cluster_id_col='temp_stop_cluster_id')
 
     rsw_indices_df = detect_rsw_and_rcap.find_rsw_or_rcap_info(

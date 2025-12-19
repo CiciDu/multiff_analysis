@@ -33,10 +33,10 @@ def create_firing_rate_plot_for_one_duration_in_plotly(
         min_time=rel_start_time, max_time=rel_end_time
     )
     time_array = (time_bins[:-1] + time_bins[1:]) / 2
-    fr_df = _prepare_fr_data(binned_df, bin_width,
-                             bins_per_aggregate, time_array=time_array,
-                             smoothing_window=smoothing_window,
-                             smoothing_method=smoothing_method)
+    fr_df = prepare_fr_data(binned_df, bin_width,
+                            bins_per_aggregate, time_array=time_array,
+                            smoothing_window=smoothing_window,
+                            smoothing_method=smoothing_method)
 
     selected_cluster_cols = [f"cluster_{c}" for c in selected_clusters]
     if 'time' not in fr_df.columns or not set(selected_cluster_cols).intersection(fr_df.columns):
@@ -257,8 +257,8 @@ def _add_vertical_line(fig, x_val, y_min, y_max, color, width=2, dash=None, name
     ))
 
 
-def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None,
-                     smoothing_window=None, smoothing_method='gaussian'):
+def prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None,
+                    smoothing_window=None, smoothing_method='gaussian'):
     """
     Aggregate binned spike counts into firing rates averaged over bins_per_aggregate bins.
 
@@ -361,7 +361,8 @@ def _apply_smoothing(df, cluster_cols, window_size, method='gaussian', pad_mode=
         return df_smoothed
 
     else:
-        raise ValueError("method must be 'gaussian', 'uniform', or 'exponential'")
+        raise ValueError(
+            "method must be 'gaussian', 'uniform', or 'exponential'")
 
     # Apply centered (acausal) convolution for gaussian/uniform
     half = kernel.size // 2

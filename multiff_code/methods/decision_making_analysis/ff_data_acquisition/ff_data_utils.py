@@ -377,7 +377,10 @@ def find_crossing_boundary_trials(original_trials, trial_ending_time, monkey_inf
 def find_time_points_that_are_within_n_seconds_after_crossing_boundary(input_time, crossing_boundary_time, n_seconds_after_crossing_boundary=2, n_seconds_before_crossing_boundary=0):
 
     if len(crossing_boundary_time) == 0:
-        crossing_boundary_time = np.array([-999])
+        CB_indices = np.array([])
+        non_CB_indices = np.arange(len(input_time))
+        remaining_input_time = input_time
+        return CB_indices, non_CB_indices, remaining_input_time
 
     # make sure n_seconds_after_crossing_boundary is positive
     n_seconds_before_crossing_boundary = abs(

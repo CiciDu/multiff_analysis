@@ -59,9 +59,7 @@ venv.bak/
 *.pickle
 
 # Logs
-*.log
-**logs/decode/
-**logs/rppo/run_stdout/
+**logs/
 
 # Large / raw data
 all_monkey_data/

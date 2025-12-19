@@ -35,7 +35,13 @@ echo "[SLURM] Job $SLURM_JOB_ID | Array index $SLURM_ARRAY_TASK_ID"
 echo "[SLURM] Using $SLURM_CPUS_PER_TASK CPU cores"
 
 # --- Model configs ---
-MODELS=("svm" "logreg")
+# Allow MODELS to be provided by caller as space- or comma-delimited string
+if [ -n "${MODELS:-}" ]; then
+    MODELS_SANITIZED="$(echo "$MODELS" | tr ',' ' ' | xargs)"
+    read -r -a MODELS <<< "$MODELS_SANITIZED"
+else
+    MODELS=("svm" "logreg")
+fi
 # Enable cumulative mode by setting CUMULATIVE=1 in environment before sbatch
 CUMULATIVE="${CUMULATIVE:-0}"
 

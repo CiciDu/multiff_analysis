@@ -1,15 +1,17 @@
 from decision_making_analysis.data_enrichment import rsw_vs_rcap_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
 from data_wrangling import general_utils
-from decision_making_analysis.ff_data_acquisition import get_missed_ff_data
+from decision_making_analysis.ff_data_acquisition import get_missed_ff_data, free_selection
 from decision_making_analysis.event_detection import get_miss_to_switch_data
 from pattern_discovery import cluster_analysis
 from visualization.matplotlib_tools import plot_trials
 from decision_making_analysis.data_enrichment import miss_events_enricher
 from data_wrangling import base_processing_class, further_processing_class
-from decision_making_analysis.data_enrichment import trajectory_class
-from decision_making_analysis.ff_data_acquisition import missed_ff_data_class
-from decision_making_analysis.ff_data_acquisition import ff_data_utils
+from decision_making_analysis.data_enrichment import trajectory_class, trajectory_utils
+from decision_making_analysis.ff_data_acquisition import missed_ff_data_class, cluster_replacement_utils, ff_data_utils
+from machine_learning.ml_methods import classification_utils, regression_utils
+from null_behaviors import show_null_trajectory, curvature_utils
+from visualization.matplotlib_tools import monkey_heading_utils
 
 # ------------------------------
 # Scientific & Data Libraries
@@ -44,56 +46,6 @@ class MLForDecisionMakingClass():
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-    def prepare_data_for_machine_learning(self, kind="free selection", furnish_with_trajectory_data=True, trajectory_data_kind="position", add_traj_stops=True):
-        # kind can also be "replacement"
-        # trajectory_data_kind can also be "velocity"
-        '''
-        X_all: array, containing the input features for machine learning
-        y_all: array, containing the labels for machine learning
-        indices: array, containing the indices of the rows in X_all and y_all
-        input_features: array, containing the names of the input features
-        X_all_to_plot: array, containing the input features for machine learning, for plotting
-        time_all: array, containing the time for each row in X_all_to_plot
-        point_index_all: array, containing the point_index for each row in X_all_to_plot
-        '''
-
-        self.data_kind = kind
-        self.furnish_with_trajectory_data = furnish_with_trajectory_data
-        self.add_traj_stops = add_traj_stops
-        self.trajectory_data_kind = trajectory_data_kind
-
-        if kind == "free selection":
-            self.X_all_df = self.free_selection_x_df.drop(
-                columns=['point_index'], errors='ignore')
-            self.X_all = self.X_all_df.values
-            self.X_all_to_plot = self.free_selection_x_df_for_plotting.copy().values
-            self.y_all = self.free_selection_labels.copy()
-            self.indices = np.arange(len(self.free_selection_x_df))
-            self.time_all = self.free_selection_time
-            self.point_index_all = self.free_selection_point_index
-            self.input_features = self.free_selection_x_df.columns
-
-        elif kind == "replacement":
-            self.replacement_x_df = self.changing_pursued_ff_data_diff.drop(
-                ['whether_changed'], axis=1)
-            self.X_all_df = self.replacement_x_df.copy()
-            self.X_all = self.replacement_x_df.values
-            self.X_all_to_plot = self.replacement_inputs_for_plotting
-            self.y_all = self.replacement_labels
-            self.indices = np.arange(len(self.changing_pursued_ff_data_diff))
-            self.time_all = self.replacement_time
-            self.point_index_all = self.replacement_point_index
-            self.input_features = self.replacement_x_df.columns
-        elif kind is None:
-            pass
-        else:
-            raise ValueError(
-                "kind can only be 'free selection', 'replacement', or None")
-
-        if furnish_with_trajectory_data:
-            self.X_all_df, self.X_all = self.furnish_machine_learning_data_with_trajectory_data(
-                trajectory_data_kind=trajectory_data_kind, add_traj_stops=add_traj_stops)
 
     def split_data_to_train_and_test(self, scaling_data=True, keep_whole_chunks=False, test_size=0.2):
         ''' 
@@ -169,12 +121,12 @@ class MLForDecisionMakingClass():
         # trajectory_feature_names: list, containing the names of the features in traj_stops
         '''
 
-        self.X_all, self.traj_points, self.traj_stops, self.trajectory_feature_names = trajectory_info.furnish_machine_learning_data_with_trajectory_data_func(self.X_all, self.time_all, self.monkey_information,
-                                                                                                                                                               trajectory_data_kind=trajectory_data_kind, time_range_of_trajectory=self.time_range_of_trajectory, num_time_points_for_trajectory=self.gc_kwargs['num_time_points_for_trajectory'], add_traj_stops=add_traj_stops)
+        self.X_all_df, self.traj_points, self.traj_stops, self.trajectory_feature_names = trajectory_utils.furnish_machine_learning_data_with_trajectory_data_func(self.X_all_df, self.time_all, self.monkey_information,
+                                                                                                                                                                trajectory_data_kind=trajectory_data_kind, time_range_of_trajectory=self.time_range_of_trajectory, num_time_points_for_trajectory=self.gc_kwargs['num_time_points_for_trajectory'], add_traj_stops=add_traj_stops)
+        # we already have updated
         self.input_features = np.concatenate(
             [self.input_features, self.trajectory_feature_names], axis=0)
-        self.X_all_df = pd.concat([self.X_all_df, pd.DataFrame(
-            self.traj_points, columns=self.trajectory_feature_names)], axis=1)
+        self.X_all = self.X_all_df.values
         return self.X_all_df, self.X_all
 
     def use_machine_learning_model_for_classification(self, model=None):
@@ -250,4 +202,207 @@ class MLForDecisionMakingClass():
 
     def get_input_data(self, num_ff_per_row=5, select_every_nth_row=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'], curvature_df=None, curv_of_traj_df=None, **kwargs):
         self.get_free_selection_x(num_ff_per_row=num_ff_per_row, select_every_nth_row=select_every_nth_row,
-                                     add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, **kwargs)
+                                  add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, **kwargs)
+
+    # ===============================================================
+    # Process and align current vs alternative firefly info
+    # ===============================================================
+    def process_current_and_alternative_ff_info(self):
+
+        for df in [self.miss_event_cur_ff, self.miss_event_alt_ff]:
+            df[['whether_changed', 'whether_intended_target']] = False
+
+        self.num_old_ff_per_row = self.gc_kwargs['num_old_ff_per_row']
+        self.num_new_ff_per_row = self.gc_kwargs['num_new_ff_per_row']
+
+        self.miss_event_cur_ff, self.miss_event_alt_ff = (
+            cluster_replacement_utils.further_process_df_related_to_cluster_replacement(
+                self.miss_event_cur_ff,
+                self.miss_event_alt_ff,
+                num_old_ff_per_row=self.num_old_ff_per_row,
+                num_new_ff_per_row=self.num_new_ff_per_row,
+                selection_criterion_if_too_many_ff=self.gc_kwargs['selection_criterion_if_too_many_ff']
+            )
+        )
+
+        self.miss_event_alt_ff['order'] += self.num_old_ff_per_row
+
+        # Fill curvature placeholders
+        self.miss_event_cur_ff = curvature_utils.fill_up_NAs_for_placeholders_in_columns_related_to_curvature(
+            self.miss_event_cur_ff, self.relevant_curv_of_traj_df, curv_of_traj_df=self.relevant_curv_of_traj_df
+        )
+        self.miss_event_alt_ff = curvature_utils.fill_up_NAs_for_placeholders_in_columns_related_to_curvature(
+            self.miss_event_alt_ff, self.relevant_curv_of_traj_df, curv_of_traj_df=self.relevant_curv_of_traj_df
+        )
+
+        # also fill in eventual_outcome and event_type
+        self.miss_event_cur_ff = get_missed_ff_data.fill_in_eventual_outcome_and_event_type(
+            self.miss_event_cur_ff)
+        self.miss_event_alt_ff = get_missed_ff_data.fill_in_eventual_outcome_and_event_type(
+            self.miss_event_alt_ff)
+
+    # ===============================================================
+    # Construct ML-ready input/output
+    # ===============================================================
+
+    def prepare_data_to_predict_num_stops(
+        self,
+        add_arc_info=False,
+        add_current_curv_of_traj=False,
+        ff_attributes=['ff_distance', 'ff_angle',
+                       'time_since_last_vis'],
+        add_num_ff_in_cluster=False,
+        arc_info_to_add=['curv_diff', 'abs_curv_diff']
+    ):
+
+        # Merge current & next firefly info
+        self.miss_event_cur_ff['group'] = 'Original'
+        self.miss_event_alt_ff['group'] = 'Alternative'
+        self.miss_to_switch_joined_ff_info = pd.concat(
+            [self.miss_event_cur_ff[self.miss_event_cur_ff['eventual_outcome'] == 'switch'],
+                self.miss_event_alt_ff[self.miss_event_alt_ff['eventual_outcome'] == 'switch']], axis=0
+        )
+
+        self._prepare_data_using_current_and_alternative_ff_info(
+            add_arc_info=add_arc_info,
+            add_current_curv_of_traj=add_current_curv_of_traj,
+            ff_attributes=ff_attributes,
+            add_num_ff_in_cluster=add_num_ff_in_cluster,
+            arc_info_to_add=arc_info_to_add
+        )
+
+        self.num_stops = self.num_stops_df.set_index('point_index').loc[
+            self.point_index_array, 'num_stops'
+        ].values
+        self.y_value = self.num_stops
+
+        self.y_var_df = pd.DataFrame(
+            self.num_stops.astype(int), columns=['num_stops'])
+        self.y_var_df.loc[self.y_var_df['num_stops'] > 2, 'num_stops'] = 2
+        # to avoid problem during classification
+        self.y_var_df['num_stops'] = self.y_var_df['num_stops'] - 1
+
+    def prepare_data_to_predict_rsw_vs_rcap(self,
+                                            add_arc_info=False,
+                                            add_current_curv_of_traj=False,
+                                            ff_attributes=['ff_distance', 'ff_angle',
+                                                           'time_since_last_vis'],
+                                            add_num_ff_in_cluster=False,
+                                            arc_info_to_add=['curv_diff', 'abs_curv_diff'],
+                                            use_alt_ff_only=False):
+        # Merge current & next firefly info
+        self.miss_event_cur_ff['group'] = 'Original'
+        self.miss_event_alt_ff['group'] = 'Alternative'        
+        
+        if use_alt_ff_only:
+            self.miss_to_switch_joined_ff_info = self.miss_event_alt_ff.copy()
+            self.miss_to_switch_joined_ff_info['order'] = self.miss_to_switch_joined_ff_info['order'] - self.num_old_ff_per_row
+            self.num_ff_per_row = self.num_new_ff_per_row
+        else:
+            self.miss_to_switch_joined_ff_info = pd.concat(
+                [self.miss_event_cur_ff[self.miss_event_cur_ff['event_type'].isin(['rcap', 'rsw'])],
+                    self.miss_event_alt_ff[self.miss_event_alt_ff['event_type'].isin(['rcap', 'rsw'])]], axis=0
+            )
+            self.num_ff_per_row = self.num_old_ff_per_row + self.num_new_ff_per_row
+
+        self._prepare_data_using_current_and_alternative_ff_info(
+            add_arc_info=add_arc_info,
+            add_current_curv_of_traj=add_current_curv_of_traj,
+            ff_attributes=ff_attributes,
+            add_num_ff_in_cluster=add_num_ff_in_cluster,
+            arc_info_to_add=arc_info_to_add
+        )
+
+        self.y_var_df = rsw_vs_rcap_utils.extract_binary_event_label(
+                df=self.miss_event_cur_ff,
+                point_index_array=self.point_index_array
+            )
+        self.y_value = self.y_var_df['whether_rcap'].values
+
+    def _prepare_data_using_current_and_alternative_ff_info(self,
+                                                            add_arc_info=False,
+                                                            add_current_curv_of_traj=False,
+                                                            ff_attributes=['ff_distance', 'ff_angle',
+                                                                           'time_since_last_vis'],
+                                                            add_num_ff_in_cluster=False,
+                                                            arc_info_to_add=['curv_diff', 'abs_curv_diff']):
+
+        if add_current_curv_of_traj:
+            existing_curv_feats = [
+                n for n in self.all_traj_feature_names['traj_points'] if 'curv_of_traj' in n]
+            if existing_curv_feats:
+                add_current_curv_of_traj = False
+                print(
+                    "Warning: 'curv_of_traj' already present in trajectory features. Ignoring add_current_curv_of_traj.")
+                
+        if not hasattr(self, 'num_ff_per_row'):
+            self.num_ff_per_row = self.num_old_ff_per_row + self.num_new_ff_per_row
+
+        self.ff_attributes = ff_attributes.copy()
+        self.attributes_for_plotting = [a for a in [
+            'ff_distance', 'ff_angle', 'time_since_last_vis'] if a in self.ff_attributes]
+
+        if add_arc_info:
+            ff_attributes = list(set(ff_attributes) | set(arc_info_to_add))
+
+        # Build ML design matrix
+        (self.free_selection_x_df, self.free_selection_x_df_for_plotting,
+         self.sequence_of_obs_ff_indices, self.point_index_array, self.pred_var) = free_selection.find_free_selection_x_from_info_of_n_ff_per_point(
+            self.miss_to_switch_joined_ff_info,
+            ff_attributes=ff_attributes,
+            attributes_for_plotting=self.attributes_for_plotting,
+            num_ff_per_row=self.num_ff_per_row
+        )
+
+        if add_current_curv_of_traj:
+            curv_of_traj = self.relevant_curv_of_traj_df.set_index('point_index').loc[
+                self.point_index_array, 'curv_of_traj'
+            ].values
+            self.free_selection_x_df['curv_of_traj'] = curv_of_traj
+
+        if add_num_ff_in_cluster:
+            self.free_selection_x_df['num_current_ff_in_cluster'] = (
+                self.miss_event_cur_ff.groupby('point_index').first()[
+                    'num_ff_in_cluster'].values
+            )
+            self.free_selection_x_df['num_nxt_ff_in_cluster'] = (
+                self.miss_event_alt_ff.groupby('point_index').first()[
+                    'num_ff_in_cluster'].values
+            )
+
+        # Extract labels and times
+        self.free_selection_time = self.miss_to_switch_joined_ff_info.set_index('point_index').loc[
+            self.point_index_array, 'time'
+        ].values
+
+    # ===============================================================
+    # Prepare for ML pipeline
+    # ===============================================================
+    def prepare_data_for_machine_learning(self, furnish_with_trajectory_data=False,
+                                          add_traj_stops=False,
+                                          trajectory_data_kind='position'):
+        """
+        Prepares all rsw-derived inputs and labels for ML models.
+        Optionally augments with trajectory points and stops.
+        """
+
+
+        self.time_range_of_trajectory = self.gc_kwargs['time_range_of_trajectory']
+        self.num_time_points_for_trajectory = self.gc_kwargs['num_time_points_for_trajectory']
+
+        self.furnish_with_trajectory_data = furnish_with_trajectory_data
+        self.add_traj_stops = add_traj_stops
+        self.trajectory_data_kind = trajectory_data_kind
+
+        self.X_all_df = self.free_selection_x_df.drop(
+            columns=['point_index'], errors='ignore')
+        self.X_all = self.X_all_df.values
+        self.X_all_to_plot = self.free_selection_x_df_for_plotting.copy().values
+        self.indices = np.arange(len(self.free_selection_x_df))
+        self.y_all = self.y_value.copy()
+        self.time_all = self.free_selection_time
+        self.input_features = self.free_selection_x_df.columns
+
+        if furnish_with_trajectory_data:
+            self.X_all_df, self.X_all = self.furnish_machine_learning_data_with_trajectory_data(
+                trajectory_data_kind=trajectory_data_kind, add_traj_stops=add_traj_stops)

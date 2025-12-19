@@ -5,6 +5,15 @@ PROJECT_ROOT="/user_data/cicid/Multifirefly-Project"
 DEFAULT_MONKEY_DIR="$PROJECT_ROOT/all_monkey_data/raw_monkey_data/monkey_Bruno"
 MONKEY_DIR="${MONKEY_DIR:-$DEFAULT_MONKEY_DIR}"
 
+mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs/run_stdout
+
+# Optional: accept models from CLI flag or env. Example: --models "svm logreg rf" or --models "svm,logreg,rf"
+MODELS="${MODELS:-}"
+if [ "${1:-}" = "--models" ] && [ -n "${2:-}" ]; then
+  MODELS="$2"
+  shift 2
+fi
+
 if [ ! -d "$MONKEY_DIR" ]; then
   echo "[submit] Monkey dir not found: $MONKEY_DIR" >&2
   exit 1
@@ -23,7 +32,7 @@ ARRAY_SPEC="0-$((NUM_SESS-1))"
 echo "[submit] Array spec: $ARRAY_SPEC"
 
 echo "[submit] Submitting decode_sess.slurm with CUMULATIVE=1 and array=$ARRAY_SPEC"
-sbatch --array="$ARRAY_SPEC" --export=ALL,MONKEY_DIR="$MONKEY_DIR",SESSIONS_FILE="$SESS_FILE",CUMULATIVE=1,KEYS_CSV="${KEYS_CSV:-}",MODELS_CSV="${MODELS_CSV:-}" "$PROJECT_ROOT/multiff_analysis/jobs/decode/slurm/decode_sess.slurm"
+sbatch --array="$ARRAY_SPEC" --export=ALL,MONKEY_DIR="$MONKEY_DIR",SESSIONS_FILE="$SESS_FILE",CUMULATIVE=1,KEYS_CSV="${KEYS_CSV:-}",MODELS="${MODELS:-}" "$PROJECT_ROOT/multiff_analysis/jobs/decode/slurm/decode_sess.slurm"
 
 echo "[submit] Done."
 

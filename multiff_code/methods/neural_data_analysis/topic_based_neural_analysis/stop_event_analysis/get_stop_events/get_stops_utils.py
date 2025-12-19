@@ -4,7 +4,7 @@ from typing import Tuple, Callable, Optional
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import stats 
+from scipy import stats
 from scipy.ndimage import gaussian_filter1d
 
 
@@ -14,10 +14,10 @@ def prepare_no_capture_and_captures(
     ff_caught_T_new: np.ndarray | pd.Series,
     *,
     min_stop_duration: float = 0.0,
-    max_stop_duration = None,
+    max_stop_duration=None,
     capture_match_window: float = 0.3,
     stop_debounce: float = 0.1,
-    distance_thresh: float = 40.0, # allow for some recording error
+    distance_thresh: float = 40.0,  # allow for some recording error
     distance_col: str = "distance_from_ff_to_stop",
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -46,7 +46,7 @@ def prepare_no_capture_and_captures(
 
     captures_df = closest_stop_to_capture_df[["cur_ff_index", "stop_id", "time",
                                               "point_index", "stop_time", 'distance_from_ff_to_stop']].copy()
-    
+
     captures_df = (
         captures_df
         .sort_values(by=['stop_time', 'distance_from_ff_to_stop'])
@@ -80,15 +80,16 @@ def prepare_no_capture_and_captures(
     ].copy()
     valid_captures_df['stop_point_index'] = valid_captures_df['point_index']
     valid_captures_df['stop_time'] = valid_captures_df['time']
-    
+
     valid_captures_df = valid_captures_df.reset_index(drop=True)
-    valid_captures_df[['stop_id_duration', 'stop_id_start_time', 'stop_id_end_time']] = monkey_information.loc[valid_captures_df['point_index'], ['stop_id_duration', 'stop_id_start_time', 'stop_id_end_time']].values
+    valid_captures_df[['stop_id_duration', 'stop_id_start_time', 'stop_id_end_time']] = monkey_information.loc[valid_captures_df['point_index'], [
+        'stop_id_duration', 'stop_id_start_time', 'stop_id_end_time']].values
 
     # 5) Temporal filtering against capture times (optional)
     filtered_no_capture_stops_df = filter_no_capture_stops_vectorized(
         no_capture_stops_df, ff_caught_T_new, capture_match_window
     )
-    
+
     filtered_no_capture_stops_df['stop_point_index'] = filtered_no_capture_stops_df['point_index']
     filtered_no_capture_stops_df['stop_time'] = filtered_no_capture_stops_df['time']
     filtered_no_capture_stops_df = filter_stops_df_by_debounce(
@@ -206,14 +207,12 @@ def extract_unique_stops(monkey_information: pd.DataFrame) -> pd.DataFrame:
     #     .first()
     #     .reset_index(drop=True)
     # )
-    
-    unique_stops_df = monkey_information[['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration', 
-        'stop_cluster_id', 'stop_cluster_size']].groupby(('stop_id')).first().reset_index(drop=False)
-    
+
+    unique_stops_df = monkey_information[['stop_id', 'point_index', 'time', 'stop_id_start_time', 'stop_id_end_time', 'stop_id_duration',
+                                          'stop_cluster_id', 'stop_cluster_size']].groupby(('stop_id')).first().reset_index(drop=False)
 
     return unique_stops_df
 
-    
 
 def add_stop_id_to_closest_stop_to_capture_df(
     closest_stop_to_capture_df: pd.DataFrame,
@@ -247,9 +246,6 @@ def add_stop_id_to_closest_stop_to_capture_df(
     return closest_stop_to_capture_df
 
 
-from scipy import stats 
-from scipy.ndimage import gaussian_filter1d
-
 def plot_inter_stop_intervals(onsets,
                               suggest_window: tuple = (0.1, 0.6),
                               linear_max: float = 2.0,
@@ -275,7 +271,8 @@ def plot_inter_stop_intervals(onsets,
 
     # Smooth to find a stable valley
     if smooth_sigma_bins > 0:
-        lin_hist_sm = gaussian_filter1d(lin_hist.astype(float), sigma=smooth_sigma_bins, mode="nearest")
+        lin_hist_sm = gaussian_filter1d(lin_hist.astype(
+            float), sigma=smooth_sigma_bins, mode="nearest")
     else:
         lin_hist_sm = lin_hist.astype(float)
 
@@ -299,10 +296,12 @@ def plot_inter_stop_intervals(onsets,
     ax1, ax2 = axes
 
     # Linear
-    ax1.bar(lin_centers, lin_hist, width=np.diff(lin_edges), align="center", alpha=0.6, edgecolor="none")
+    ax1.bar(lin_centers, lin_hist, width=np.diff(lin_edges),
+            align="center", alpha=0.6, edgecolor="none")
     ax1.plot(lin_centers, lin_hist_sm, linewidth=2)
     if suggested is not None:
-        ax1.axvline(suggested, linestyle="--", color="k", alpha=0.8, label=f"Suggested debounce ≈ {suggested:.3f}s")
+        ax1.axvline(suggested, linestyle="--", color="k", alpha=0.8,
+                    label=f"Suggested debounce ≈ {suggested:.3f}s")
         ax1.legend()
     ax1.set_title("Inter-stop intervals (linear scale)")
     ax1.set_xlabel("ISI (s)")
@@ -332,23 +331,19 @@ def plot_inter_stop_intervals(onsets,
     }
 
 
-
-import pandas as pd
-import numpy as np
-
-def _expand_trials(trials_df: pd.DataFrame,
+def _expand_trials(events_df: pd.DataFrame,
                    monkey_information: pd.DataFrame,
                    stop_indices_col: str = "stop_indices",
                    out_index_col: str = "stop_point_index") -> pd.DataFrame:
     """
-    Explode `trials_df[stop_indices_col]` so each stop index is its own row,
+    Explode `events_df[stop_indices_col]` so each stop index is its own row,
     and add `stop_time` (and `stop_cluster_id` if not already present) by
     mapping from `monkey_information` via positional indexing.
 
     Assumes `stop_indices` are integer point indices into `monkey_information`.
     """
     df = (
-        trials_df
+        events_df
         .explode(stop_indices_col, ignore_index=True)
         .rename(columns={stop_indices_col: out_index_col})
         .copy()
@@ -378,13 +373,21 @@ def _add_cluster_ordering(df: pd.DataFrame,
       - order_in_cluster (0-based)
       - is_first / is_last / is_middle
     """
-    out = df.sort_values([cluster_col, order_col], ascending=[True, True]).reset_index(drop=True)
+    out = df.sort_values([cluster_col, order_col], ascending=[
+                         True, True]).reset_index(drop=True)
 
     out["cluster_size"] = out.groupby(cluster_col)[order_col].transform("size")
     out["order_in_cluster"] = out.groupby(cluster_col).cumcount()
 
     out["is_first"] = out["order_in_cluster"].eq(0)
-    out["is_last"]  = out["order_in_cluster"].eq(out["cluster_size"] - 1)
+    out["is_last"] = out["order_in_cluster"].eq(out["cluster_size"] - 1)
     out["is_middle"] = (~out["is_first"]) & (~out["is_last"])
     return out
 
+
+def extract_comparison_info(comparisons, datasets, key):
+    comp = next(d for d in comparisons if d['key'] == key)
+    a_name, b_name = comp['a'], comp['b']
+    a_label, b_label = comp['a_label'], comp['b_label']
+    A1, B1 = datasets[a_name], datasets[b_name]
+    return comp, A1, B1, a_label, b_label

@@ -27,9 +27,10 @@ class _CompareYValues:
 
     def make_or_retrieve_all_ref_pooled_median_info(self,
                                                     process_info_for_plotting=True,
+                                                    use_stored_data_only=False,
                                                     **kwargs):
         self.all_ref_pooled_median_info = self._make_or_retrieve_all_ref_median_info(
-            per_sess=False, **kwargs)
+            per_sess=False, use_stored_data_only=use_stored_data_only, **kwargs)
         if process_info_for_plotting:
             self.process_all_ref_pooled_median_info_to_plot_heading_and_curv()
         return self.all_ref_pooled_median_info
@@ -55,6 +56,7 @@ class _CompareYValues:
                                               combd_heading_df_x_sessions_exists_ok=True,
                                               stops_near_ff_df_exists_ok=True,
                                               heading_info_df_exists_ok=True,
+                                              use_stored_data_only=False,
                                               ):
 
         df_path = self.all_ref_pooled_median_info_path if not per_sess else self.all_ref_per_sess_median_info_folder_path
@@ -83,6 +85,7 @@ class _CompareYValues:
                                                                                                                           'heading_info_df_exists_ok': heading_info_df_exists_ok,
                                                                                                                           },
                                                                                                    path_to_save=None,
+                                                                                                   use_stored_data_only=use_stored_data_only,
                                                                                                    )
                 ref_median_info['curv_traj_window_before_stop'] = str(
                     curv_traj_window_before_stop)
@@ -134,6 +137,7 @@ class _CompareYValues:
     def make_or_retrieve_pooled_perc_info(self, exists_ok=True, stops_near_ff_df_exists_ok=True, heading_info_df_exists_ok=True,
                                           ref_point_mode='distance', ref_point_value=-50, verbose=False, save_data=True,
                                           filter_heading_info_df_across_refs=False,
+                                          use_stored_data_only=False,
                                           ):
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
@@ -144,7 +148,7 @@ class _CompareYValues:
         else:
             self.get_test_and_ctrl_heading_info_df_across_sessions2(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                     heading_info_df_exists_ok=heading_info_df_exists_ok, stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                    filter_heading_info_df_across_refs=filter_heading_info_df_across_refs)
+                                                                    filter_heading_info_df_across_refs=filter_heading_info_df_across_refs, use_stored_data_only=use_stored_data_only)
             self.pooled_perc_info = make_variations_utils.make_pooled_perc_info_from_test_and_ctrl_heading_info_df(self.test_heading_info_df,
                                                                                                                    self.ctrl_heading_info_df, verbose=verbose)
 
@@ -183,6 +187,7 @@ class _CompareYValues:
                           verbose: bool = False,
                           save_data: bool = True,
                           filter_heading_info_df_across_refs=False,
+                          use_stored_data_only=False,
                           **kwargs):
         """
         Unified builder for median-info DataFrames.
@@ -237,6 +242,7 @@ class _CompareYValues:
             save_data=save_data,
             combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
             filter_heading_info_df_across_refs=filter_heading_info_df_across_refs,
+            use_stored_data_only=use_stored_data_only,
         )
 
         df = cfg["make_fn"](self.test_heading_info_df,
@@ -263,6 +269,7 @@ class _CompareYValues:
                                                            stops_near_ff_df_exists_ok=True,
                                                            save_data=True,
                                                            filter_heading_info_df_across_refs=False,
+                                                           use_stored_data_only=False,
                                                            **kwargs
                                                            ):
         if filter_heading_info_df_across_refs:
@@ -290,6 +297,7 @@ class _CompareYValues:
                 stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
                 save_data=save_data,
                 combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
+                use_stored_data_only=use_stored_data_only,
             )
     # --- Thin wrappers for backward compatibility ---
 
@@ -302,6 +310,7 @@ class _CompareYValues:
                                 stops_near_ff_df_exists_ok=True,
                                 heading_info_df_exists_ok=True,
                                 verbose=False, save_data=True,
+                                use_stored_data_only=False,
                                 **kwargs
                                 ):
         return self._make_median_info(
@@ -315,6 +324,7 @@ class _CompareYValues:
             heading_info_df_exists_ok=heading_info_df_exists_ok,
             verbose=verbose,
             save_data=save_data,
+            use_stored_data_only=use_stored_data_only,
         )
 
     def make_per_sess_median_info(self,

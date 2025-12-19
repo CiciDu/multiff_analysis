@@ -203,53 +203,44 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     def get_related_folder_names_from_model_folder_name(self, model_folder_name, data_name='data_0'):
         self.model_folder_name = model_folder_name
 
-        abs_model_path = os.path.abspath(os.path.expanduser(model_folder_name))
-        path_parts = abs_model_path.split(os.sep)
+        if '/all_agents/' not in model_folder_name:
+            raise ValueError('model_folder_name must contain /all_agents/')
 
-        stored_models_idx = None
-        for idx, part in enumerate(path_parts):
-            if part.endswith('_stored_models'):
-                stored_models_idx = idx
-                break
+        # Split path into:
+        #   before_all_agents / all_agents / after_all_agents
+        before, after = model_folder_name.split('/all_agents/', 1)
 
-        if stored_models_idx is not None:
-            stored_models_root = os.sep.join(
-                path_parts[:stored_models_idx + 1])
-            rel_path_from_stored = os.path.relpath(
-                abs_model_path, stored_models_root)
-            first_segment = rel_path_from_stored.split(
-                os.sep)[0] if rel_path_from_stored else ''
-            if first_segment == 'all_agents':
-                segments = rel_path_from_stored.split(os.sep)
-                rel_tail = os.path.join(
-                    *segments[1:]) if len(segments) > 1 else ''
-            else:
-                rel_tail = rel_path_from_stored
-        else:
-            stored_models_root = os.path.dirname(abs_model_path)
-            rel_tail = os.path.basename(abs_model_path)
+        # "after" may have 1, 2, 3, or more path levels — keep them all
+        sublevels = after.strip('/').split('/')
 
-        def _build_collected(category):
-            base = os.path.join(stored_models_root,
-                                'all_collected_data', category)
-            if rel_tail:
-                return os.path.join(base, rel_tail, 'individual_data_sessions', data_name)
-            return os.path.join(base, 'individual_data_sessions', data_name)
+        # Base target directory:
+        collected_base = os.path.join(before, 'all_collected_data')
 
-        self.processed_data_folder_path = _build_collected('processed_data')
-        self.planning_data_folder_path = _build_collected('planning')
-        self.patterns_and_features_folder_path = _build_collected(
-            'patterns_and_features')
-        self.decision_making_folder_path = _build_collected('decision_making')
+        # Helper to build each category path
+        def build_path(category):
+            return os.path.join(collected_base, category, *sublevels, data_name)
 
-        os.makedirs(self.model_folder_name, exist_ok=True)
-        os.makedirs(self.processed_data_folder_path, exist_ok=True)
-        os.makedirs(self.planning_data_folder_path, exist_ok=True)
-        os.makedirs(self.patterns_and_features_folder_path, exist_ok=True)
-        os.makedirs(self.decision_making_folder_path, exist_ok=True)
+        self.processed_data_folder_path = build_path('processed_data')
+        self.planning_data_folder_path = build_path('planning')
+        self.patterns_and_features_folder_path = build_path('patterns_and_features')
+        self.decision_making_folder_path = build_path('decision_making')
 
-    # removed resolve_best_model_postcurriculum_dir; callers should use
-    # self.best_model_postcurriculum_dir and create dirs as needed
+        # Make the directories
+        for folder in [
+            self.processed_data_folder_path,
+            self.planning_data_folder_path,
+            self.patterns_and_features_folder_path,
+            self.decision_making_folder_path
+        ]:
+            os.makedirs(folder, exist_ok=True)
+
+        return {
+            'processed_data': self.processed_data_folder_path,
+            'planning': self.planning_data_folder_path,
+            'patterns_and_features': self.patterns_and_features_folder_path,
+            'decision_making': self.decision_making_folder_path,
+        }
+
 
     def get_current_info_condition(self, df):
         minimal_current_info = self.get_minimum_current_info()
@@ -619,14 +610,15 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         return
 
-    def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1):
+    def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1, retrieve_ff_flash_sorted=False):
         self.npz_file_pathway = os.path.join(
             self.processed_data_folder_path, 'ff_basic_info.npz')
         self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
             self.ff_flash_end_sorted = retrieve_raw_data._retrieve_ff_info_in_npz_from_txt_data(
                 self.processed_data_folder_path)
-        self.ff_flash_sorted = retrieve_raw_data._retrieve_ff_flash_sorted_in_npz_from_txt_data(
-            self.processed_data_folder_path)
+        if retrieve_ff_flash_sorted:
+            self.ff_flash_sorted = retrieve_raw_data._retrieve_ff_flash_sorted_in_npz(
+                self.processed_data_folder_path)
 
         self.monkey_information_path = os.path.join(
             self.processed_data_folder_path, 'monkey_information.csv')
@@ -774,7 +766,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                               best_model_postcurriculum_exists_ok=True,
                               to_load_latest_agent=True,
                               load_replay_buffer=True,
-                              to_train_agent=True):
+                              to_train_agent=True,
+                              make_animation=False):
 
         self.family_of_agents_log = rl_base_utils.retrieve_or_make_family_of_agents_log(
             self.overall_folder)
@@ -810,8 +803,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     Skip to the next set of parameters")
                 return
 
-            self.streamline_loading_and_making_animation(currentTrial_for_animation=currentTrial_for_animation, duration=duration,
-                                                         num_trials_for_animation=num_trials_for_animation, n_steps=n_steps)
+            if make_animation:
+                self.streamline_loading_and_making_animation(currentTrial_for_animation=currentTrial_for_animation, duration=duration,
+                                                            num_trials_for_animation=num_trials_for_animation, n_steps=n_steps)
 
         # to_update_record, to_make_plots = self.whether_to_update_record_and_make_plots()
         # if to_make_plots or to_update_record:

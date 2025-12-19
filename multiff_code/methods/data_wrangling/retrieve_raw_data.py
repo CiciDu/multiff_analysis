@@ -165,7 +165,7 @@ def make_or_retrieve_ff_flash_sorted_from_txt_data(raw_data_folder_path, exists_
     os.makedirs(processed_data_folder_path, exist_ok=True)
     if exists_ok:
         try:
-            ff_flash_sorted = _retrieve_ff_flash_sorted_in_npz_from_txt_data(
+            ff_flash_sorted = _retrieve_ff_flash_sorted_in_npz(
                 processed_data_folder_path)
         except FileNotFoundError as e:
             print(
@@ -252,7 +252,7 @@ def _retrieve_ff_info_in_npz_from_txt_data(processed_data_folder_path):
     return ff_caught_T_sorted, ff_index_sorted, ff_real_position_sorted, ff_believed_position_sorted, ff_life_sorted, ff_flash_end_sorted
 
 
-def _retrieve_ff_flash_sorted_in_npz_from_txt_data(processed_data_folder_path):
+def _retrieve_ff_flash_sorted_in_npz(processed_data_folder_path):
     npz_file_for_flash = os.path.join(os.path.join(
         processed_data_folder_path, 'ff_flash_sorted.npz'))
     loaded_ff_flash_sorted = np.load(npz_file_for_flash, allow_pickle=True)
@@ -261,6 +261,7 @@ def _retrieve_ff_flash_sorted_in_npz_from_txt_data(processed_data_folder_path):
     #     ff_flash_sorted.append(values)
     for file in loaded_ff_flash_sorted.files:
         ff_flash_sorted.append(loaded_ff_flash_sorted[file])
+    print(f"Loaded ff_flash_sorted from {npz_file_for_flash}")
     return ff_flash_sorted
 
 

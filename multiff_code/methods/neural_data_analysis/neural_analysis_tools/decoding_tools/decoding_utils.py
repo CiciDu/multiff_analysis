@@ -79,7 +79,8 @@ def get_decoder(name: str,
                 seed: int = 0,
                 n_samples: int = 300,
                 n_features: int = 50,
-                model_kwargs: Optional[Dict[str, Any]] = None
+                model_kwargs: Optional[Dict[str, Any]] = None,
+                tune: Optional[bool] = None
                 ) -> Tuple[Pipeline, Dict[str, Any]]:
     """Return classifier pipeline and parameter grid tailored to data size."""
 
@@ -89,8 +90,8 @@ def get_decoder(name: str,
         "svm": {"C": 0.5, "gamma": 'scale'},
         "svm_linear": {"C": 0.03},
         "logreg": {"C": 0.03},
-        "logreg_elasticnet": {"C": 0.1, "l1_ratio": 0.5},
-        "rf": {"n_estimators": 200, "max_depth": None, "min_samples_leaf": 2},
+        "logreg_elasticnet": {"C": 0.1, "l1_ratio": 0.2},
+        "rf": {"n_estimators": 200, "max_depth": None, "min_samples_leaf": 8},
         "mlp": {"hidden_layer_sizes": (32,), "alpha": 1e-3},
     }
 
@@ -121,37 +122,54 @@ def get_decoder(name: str,
         param_grid = {'clf__C': Cs}
 
     elif name == 'logreg_elasticnet':
-        # base = LogisticRegressionCV(
-        #     Cs=np.logspace(-3, 0, num=4),
-        #     solver='saga', penalty='elasticnet',
-        #     l1_ratios=[0.01, 0.1, 0.5, 0.9],
-        #     scoring='roc_auc', max_iter=5000, n_jobs=1,
-        #     class_weight='balanced',
-        #     random_state=seed, **model_kwargs_to_use,
-        #     tol=1e-3
-        # )
-        # clf = Pipeline([('scaler', StandardScaler()), ('clf', base)])
-        # param_grid = {}  # CV internal
-
-        base = LogisticRegression(
-            solver='saga',
-            penalty='elasticnet',
-            C=0.1,                  # fixed choice
-            l1_ratio=0.5,             # fixed choice
-            max_iter=5000,
-            n_jobs=1,
-            class_weight='balanced',
-            random_state=seed,
-            tol=1e-3,
-            **model_kwargs_to_use
-        )
-
-        clf = Pipeline([
-            ('scaler', StandardScaler()),
-            ('clf', base)
-        ])
-
-        param_grid = {}
+        # If tune=True: use LogisticRegressionCV (internal CV for C and l1_ratio)
+        # If tune=False/None: use plain LogisticRegression with provided C and l1_ratio
+        if bool(tune):
+            # Avoid passing scalar C/l1_ratio into LogisticRegressionCV
+            model_kwargs_cv = dict(model_kwargs_to_use)
+            model_kwargs_cv.pop('C', None)
+            model_kwargs_cv.pop('l1_ratio', None)
+            if 'Cs' not in model_kwargs_cv:
+                model_kwargs_cv['Cs'] = [0.01, 0.1]
+            if 'l1_ratios' not in model_kwargs_cv:
+                model_kwargs_cv['l1_ratios'] = [0.2, 0.5, 0.8]
+            base = LogisticRegressionCV(
+                solver='saga',
+                penalty='elasticnet',
+                scoring='roc_auc',
+                max_iter=5000,
+                n_jobs=1,
+                class_weight='balanced',
+                random_state=seed,
+                tol=1e-3,
+                **model_kwargs_cv
+            )
+            clf = Pipeline([
+                ('scaler', StandardScaler()),
+                ('clf', base)
+            ])
+            param_grid = {}  # internal CV handles tuning
+        else:
+            # Ensure sensible defaults if not provided via model_kwargs
+            if 'C' not in model_kwargs_to_use:
+                model_kwargs_to_use['C'] = 0.1
+            if 'l1_ratio' not in model_kwargs_to_use:
+                model_kwargs_to_use['l1_ratio'] = 0.5
+            base = LogisticRegression(
+                solver='saga',
+                penalty='elasticnet',
+                max_iter=5000,
+                n_jobs=1,
+                class_weight='balanced',
+                random_state=seed,
+                tol=1e-3,
+                **model_kwargs_to_use
+            )
+            clf = Pipeline([
+                ('scaler', StandardScaler()),
+                ('clf', base)
+            ])
+            param_grid = {}
 
     elif name == 'svm_linear':
         # Linear SVM is great when p is not tiny and N is small
@@ -181,9 +199,9 @@ def get_decoder(name: str,
         # n_estimators = choose([100], [100, 200], [200, 400])
         # max_depth = choose([3, 5], [5, 10], [None, 10])
         # min_split = choose([5, 10], [5, 10], [2, 5, 10])
-        n_estimators = [200, 400]
-        max_depth = [None, 10]
-        min_samples_leaf = [2, 5, 10]
+        n_estimators = [200, 300]
+        max_depth = [None]
+        min_samples_leaf = [5, 8]
         param_grid = {
             'clf__n_estimators': n_estimators,
             'clf__max_depth': max_depth,
@@ -231,7 +249,7 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
     """
     n_samples, n_features = X.shape
     clf, param_grid = get_decoder(
-        model_name, seed, n_samples, n_features, model_kwargs)
+        model_name, seed, n_samples, n_features, model_kwargs, tune=tune)
 
     # Build fully prepared pipeline (imputer + calibration if needed)
     pipeline = make_calibrated_pipeline(clf)
@@ -267,77 +285,11 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
 
     cv = StratifiedKFold(k, shuffle=True, random_state=seed)
 
-    # Elastic-net logreg: if using LogisticRegressionCV, extract tuned params;
-    # if using plain LogisticRegression, propagate provided params instead of placeholders.
+    # Elastic-net logistic regression: support toggling between LR and LRCV
     if model_name == 'logreg_elasticnet':
-        # 1) Fit once on full data to extract parameters
-        model_full = pipeline.fit(X, y)
-        # 2) Compute out-of-sample AUC via k-fold CV
-        aucs = []
-        for tr, te in cv.split(X, y):
-            model_cv = pipeline.fit(X[tr], y[tr])
-            if hasattr(model_cv, "predict_proba"):
-                p = model_cv.predict_proba(X[te])[:, 1]
-            elif hasattr(model_cv, "decision_function"):
-                p = model_cv.decision_function(X[te])
-            else:
-                raise ValueError(
-                    "Model logreg_elasticnet lacks predict_proba and decision_function.")
-            aucs.append(roc_auc_score(y[te], p))
-        aucs = np.asarray(aucs)
-        # Extract underlying classifier (unwrap calibration if present) from full-data fit
-        try:
-            clf_step = model_full.named_steps['clf']
-        except Exception:
-            clf_step = model_full.get_params().get('clf', None)
-        if isinstance(clf_step, CalibratedClassifierCV):
-            base_estimator = clf_step.base_estimator
-        else:
-            base_estimator = clf_step
-        best_params = {}
-        if base_estimator is not None:
-            # Case 1: LogisticRegressionCV (has C_ and l1_ratio_)
-            c_attr = getattr(base_estimator, 'C_', None)
-            l1_attr = getattr(base_estimator, 'l1_ratio_', None)
-            if c_attr is not None or l1_attr is not None:
-                try:
-                    c_vals = np.ravel(
-                        c_attr) if c_attr is not None else np.array([1.0])
-                    best_C = float(c_vals[0])
-                except Exception:
-                    best_C = 1.0
-                try:
-                    if l1_attr is None:
-                        best_l1 = 0.5
-                    else:
-                        best_l1 = float(np.ravel(l1_attr)[0])
-                except Exception:
-                    best_l1 = 0.5
-                best_params = {
-                    'C': best_C,
-                    'l1_ratio': best_l1,
-                    'penalty': 'elasticnet',
-                    'solver': getattr(base_estimator, 'solver', 'saga'),
-                    'class_weight': getattr(base_estimator, 'class_weight', 'balanced'),
-                    'max_iter': getattr(base_estimator, 'max_iter', 5000),
-                    'random_state': getattr(base_estimator, 'random_state', 0),
-                }
-            else:
-                # Case 2: Plain LogisticRegression -> propagate its own configured params
-                try:
-                    params = base_estimator.get_params()
-                except Exception:
-                    params = {}
-                best_params = {
-                    'C': float(params.get('C', 1.0)),
-                    'l1_ratio': float(params.get('l1_ratio', 0.5)),
-                    'penalty': params.get('penalty', 'elasticnet'),
-                    'solver': params.get('solver', 'saga'),
-                    'class_weight': params.get('class_weight', 'balanced'),
-                    'max_iter': int(params.get('max_iter', 5000)),
-                    'random_state': int(params.get('random_state', 0)),
-                }
-        return float(np.mean(aucs)), float(np.std(aucs)), best_params
+        mean_auc, sd_auc, best_params = _evaluate_elasticnet_auc_and_params(
+            pipeline, X, y, cv)
+        return mean_auc, sd_auc, best_params
 
     # Hyperparameter tuning
     if tune:
@@ -385,6 +337,90 @@ def decode_auc_cv(X: np.ndarray, y: np.ndarray,
             best_params = base_estimator.get_params()
         except Exception:
             best_params = {}
+    return float(np.mean(aucs)), float(np.std(aucs)), best_params
+
+# ---------------------------------------------------------------------
+# Helper: CV AUC and param extraction for elastic-net logistic regression
+# ---------------------------------------------------------------------
+
+
+def _evaluate_elasticnet_auc_and_params(
+    pipeline: Pipeline,
+    X: np.ndarray,
+    y: np.ndarray,
+    cv: StratifiedKFold,
+) -> Tuple[float, float, Dict[str, Any]]:
+    """
+    Compute k-fold CV AUC and extract best params for elastic-net logistic regression.
+    Works for both LogisticRegression and LogisticRegressionCV, and unwraps calibration.
+    """
+    # Fit once on full data to extract parameters
+    model_full = pipeline.fit(X, y)
+    # Compute out-of-sample AUC via k-fold CV
+    aucs = []
+    for tr, te in cv.split(X, y):
+        model_cv = pipeline.fit(X[tr], y[tr])
+        if hasattr(model_cv, "predict_proba"):
+            p = model_cv.predict_proba(X[te])[:, 1]
+        elif hasattr(model_cv, "decision_function"):
+            p = model_cv.decision_function(X[te])
+        else:
+            raise ValueError(
+                "Model logreg_elasticnet lacks predict_proba and decision_function.")
+        aucs.append(roc_auc_score(y[te], p))
+    aucs = np.asarray(aucs)
+    # Extract underlying classifier (unwrap calibration if present) from full-data fit
+    try:
+        clf_step = model_full.named_steps['clf']
+    except Exception:
+        clf_step = model_full.get_params().get('clf', None)
+    if isinstance(clf_step, CalibratedClassifierCV):
+        base_estimator = clf_step.base_estimator
+    else:
+        base_estimator = clf_step
+    best_params: Dict[str, Any] = {}
+    if base_estimator is not None:
+        # Case 1: LogisticRegressionCV (has C_ and l1_ratio_)
+        c_attr = getattr(base_estimator, 'C_', None)
+        l1_attr = getattr(base_estimator, 'l1_ratio_', None)
+        if c_attr is not None or l1_attr is not None:
+            try:
+                c_vals = np.ravel(
+                    c_attr) if c_attr is not None else np.array([1.0])
+                best_C = float(c_vals[0])
+            except Exception:
+                best_C = 1.0
+            try:
+                if l1_attr is None:
+                    best_l1 = 0.5
+                else:
+                    best_l1 = float(np.ravel(l1_attr)[0])
+            except Exception:
+                best_l1 = 0.5
+            best_params = {
+                'C': best_C,
+                'l1_ratio': best_l1,
+                'penalty': getattr(base_estimator, 'penalty', 'elasticnet'),
+                'solver': getattr(base_estimator, 'solver', 'saga'),
+                'class_weight': getattr(base_estimator, 'class_weight', 'balanced'),
+                'max_iter': getattr(base_estimator, 'max_iter', 5000),
+                'random_state': getattr(base_estimator, 'random_state', 0),
+            }
+        else:
+            # Case 2: Plain LogisticRegression -> propagate its own configured params
+            try:
+                params = base_estimator.get_params()
+            except Exception:
+                params = {}
+            best_params = {
+                'C': float(params.get('C', 1.0)),
+                'l1_ratio': float(params.get('l1_ratio', 0.5)),
+                'penalty': params.get('penalty', 'elasticnet'),
+                'solver': params.get('solver', 'saga'),
+                'class_weight': params.get('class_weight', 'balanced'),
+                'max_iter': int(params.get('max_iter', 5000)),
+                'random_state': int(params.get('random_state', 0)),
+            }
     return float(np.mean(aucs)), float(np.std(aucs)), best_params
 
 # ---------------------------------------------------------------------

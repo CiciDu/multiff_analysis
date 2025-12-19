@@ -79,8 +79,6 @@ def find_current_and_alternative_ff_info(
     # Identify alternative (switch) firefly candidates
     nxt_ff_info = find_miss_event_alt_ff(
         cur_ff_info,
-        ff_dataframe,
-        monkey_information,
         ff_real_position_sorted,
         max_time_since_last_vis=max_time_since_last_vis,
         max_distance_to_ref_point=max_distance_to_ref_point,
@@ -201,7 +199,7 @@ def find_miss_event_cur_ff(miss_events_df, ff_real_position_sorted, ff_dataframe
     - Duplicates by (point_index, ff_index) are removed, keeping the first occurrence.
     - Visibility filtering always applies 'time_since_last_vis' <= max_time_since_last_vis.
     - Distances are computed between firefly position ('ff_real_position_sorted[ff_index]')
-      and monkey position at 'first_stop_point_index'.
+      and monkey position at 'stop_1_point_index'.
     - This function does not modify inputs in-place.
     """
 
@@ -209,7 +207,7 @@ def find_miss_event_cur_ff(miss_events_df, ff_real_position_sorted, ff_dataframe
 
     temp_miss_events_df = (
         miss_events_df[['ff_index', 'point_index', 'target_index',
-                        'time', 'num_stops', 'first_stop_point_index', 'total_stop_time',
+                        'time', 'num_stops', 'stop_1_point_index', 'total_stop_time',
                         'eventual_outcome', 'event_type']]
         .assign(ff_index=lambda df: df['ff_index'].astype(int),
                 point_index=lambda df: df['point_index'].astype(int),
@@ -237,9 +235,9 @@ def find_miss_event_cur_ff(miss_events_df, ff_real_position_sorted, ff_dataframe
 
     # get distance_to_ref_point
     miss_event_cur_ff = miss_event_cur_ff.merge(
-        temp_miss_events_df[['point_index', 'first_stop_point_index']], on='point_index', how='left')
+        temp_miss_events_df[['point_index', 'stop_1_point_index']], on='point_index', how='left')
     ff_x, ff_y = ff_real_position_sorted[miss_event_cur_ff['ff_index'].values].T
-    monkey_x, monkey_y = monkey_information.loc[miss_event_cur_ff['first_stop_point_index'].values, [
+    monkey_x, monkey_y = monkey_information.loc[miss_event_cur_ff['stop_1_point_index'].values, [
         'monkey_x', 'monkey_y']].values.T
     miss_event_cur_ff['distance_to_ref_point'] = np.sqrt(
         (ff_x - monkey_x)**2 + (ff_y - monkey_y)**2)
@@ -253,7 +251,6 @@ def find_miss_event_cur_ff(miss_events_df, ff_real_position_sorted, ff_dataframe
 
 
 def find_miss_event_alt_ff(miss_event_cur_ff, ff_dataframe,
-                           monkey_information, ff_real_position_sorted,
                            max_time_since_last_vis=3,
                            max_distance_to_ref_point=400,
                            ):
@@ -460,7 +457,6 @@ def assign_new_point_index_to_combine_across_sessions(
     return important_info, point_index_map
 
 
-
 def find_possible_objects_of_pursuit(all_relevant_indices, ff_dataframe, max_distance_from_ref_point_to_missed_target=50,
                                      max_allowed_time_since_last_vis=3):
     # find corresponding info in ff_dataframe at time (in-memory ff and visible ff)
@@ -499,20 +495,20 @@ def add_arc_info_to_ff_info(df, curvature_df, monkey_information, ff_caught_T_ne
     return df
 
 
-def set_point_of_eval(miss_events_df, monkey_information, time_with_respect_to_first_stop=None, time_with_respect_to_second_stop=None, time_with_respect_to_last_stop=None):
+def set_point_of_eval(miss_events_df, monkey_information, time_with_respect_to_stop_1=None, time_with_respect_to_stop_2=None, time_with_respect_to_last_stop=None):
 
     miss_events_df = miss_events_df.copy()
 
     # Exactly one of the three offsets must be provided
     options = [
-        ('first_stop_time', time_with_respect_to_first_stop),
-        ('second_stop_time', time_with_respect_to_second_stop),
+        ('stop_1_time', time_with_respect_to_stop_1),
+        ('stop_2_time', time_with_respect_to_stop_2),
         ('last_stop_time', time_with_respect_to_last_stop),
     ]
     provided = [(col, offset) for col, offset in options if offset is not None]
     if len(provided) != 1:
         raise ValueError(
-            'Provide exactly one of time_with_respect_to_first_stop, time_with_respect_to_second_stop, or time_with_respect_to_last_stop.')
+            'Provide exactly one of time_with_respect_to_stop_1, time_with_respect_to_stop_2, or time_with_respect_to_last_stop.')
 
     base_col, offset = provided[0]
 

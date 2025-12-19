@@ -21,9 +21,10 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-class _VariationsBase(predict_y_values_class._PredictYValues,
+class _VariationsBase(plot_variations_class._PlotVariations,
+                      predict_y_values_class._PredictYValues,
                       compare_y_values_class._CompareYValues,
-                      plot_variations_class._PlotVariations):
+                      ):
 
     # class _VariationsBase:
 
@@ -89,9 +90,10 @@ class _VariationsBase(predict_y_values_class._PredictYValues,
                     'curv_Q3',
                     'curv_max']
 
-    def __init__(self, opt_arc_type='opt_arc_stop_closest'):
+    def __init__(self, opt_arc_type='opt_arc_stop_closest', backend='matplotlib'):
         self.opt_arc_type = opt_arc_type
-
+        super().__init__(backend=backend)
+        
         # # Bind methods from _PredictYValues
         # for name, method in predict_y_values_class._PredictYValues.__dict__.items():
         #     if callable(method):

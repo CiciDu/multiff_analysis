@@ -12,7 +12,7 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-def find_rsw_or_rcap_info(trials_df, monkey_information, max_point_index=None):
+def find_rsw_or_rcap_info(events_df, monkey_information, max_point_index=None):
 
     # Initialize lists to store indices
     point_indices = []
@@ -20,19 +20,19 @@ def find_rsw_or_rcap_info(trials_df, monkey_information, max_point_index=None):
     indices_corr_clusters = []
     point_indices_for_anim = []
 
-    # Iterate over the rows of trials_df
-    for _, row in trials_df.iterrows():
-        first_stop_point_index = row['first_stop_point_index']
+    # Iterate over the rows of events_df
+    for _, row in events_df.iterrows():
+        stop_1_point_index = row['stop_1_point_index']
         last_stop_point_index = row['last_stop_point_index']
         indices_to_add = list(
-            range(first_stop_point_index, last_stop_point_index))
+            range(stop_1_point_index, last_stop_point_index))
 
         point_indices.extend(indices_to_add)
         indices_corr_trials.extend([row['trial']] * len(indices_to_add))
         indices_corr_clusters.extend(
             [row['temp_stop_cluster_id']] * len(indices_to_add))
         point_indices_for_anim.extend(
-            range(first_stop_point_index - 20, last_stop_point_index + 21))
+            range(stop_1_point_index - 20, last_stop_point_index + 21))
 
     if max_point_index is None:
         max_point_index = monkey_information['point_index'].max()
@@ -54,13 +54,13 @@ def find_rsw_or_rcap_info(trials_df, monkey_information, max_point_index=None):
     return indices_df
 
 
-def only_get_point_indices_for_anim(trials_df, monkey_information, max_point_index=None):
+def only_get_point_indices_for_anim(events_df, monkey_information, max_point_index=None):
     point_indices_for_anim = []
-    for _, row in trials_df.iterrows():
-        first_stop_point_index = row['first_stop_point_index']
+    for _, row in events_df.iterrows():
+        stop_1_point_index = row['stop_1_point_index']
         last_stop_point_index = row['last_stop_point_index']
         point_indices_for_anim.extend(
-            range(first_stop_point_index - 20, last_stop_point_index + 21))
+            range(stop_1_point_index - 20, last_stop_point_index + 21))
 
     if max_point_index is None:
         max_point_index = monkey_information['point_index'].max()
@@ -75,7 +75,7 @@ def make_rcap_events_df(stop_category_df):
         'point_index', 'stop_id_duration', 'stop_cluster_id', 'stop_cluster_size', 'trial', 'time', 'candidate_target']].copy()
     new_rcap_df = new_rcap_df.rename(columns={'candidate_target': 'ff_index'})
 
-    rcap_events_df = _make_trials_df(new_rcap_df)
+    rcap_events_df = _make_events_df(new_rcap_df)
     rcap_events_df.reset_index(drop=True, inplace=True)
 
     rcap_events_df['event_type'] = 'rcap'
@@ -89,7 +89,7 @@ def make_rsw_events_df(stop_category_df, ff_real_position_sorted, monkey_informa
         'point_index', 'stop_id_duration', 'stop_cluster_id', 'stop_cluster_size', 'trial', 'time', 'candidate_target']].copy()
     new_rsw_df['ff_index'] = new_rsw_df['candidate_target']
 
-    rsw_events_df = _make_trials_df(new_rsw_df)
+    rsw_events_df = _make_events_df(new_rsw_df)
     rsw_events_df.reset_index(drop=True, inplace=True)
 
     # also get rsw_w_ff_df
@@ -123,7 +123,7 @@ def make_temp_rcap_events_df(monkey_information, ff_caught_T_new, ff_real_positi
     monkey_sub = _take_out_monkey_subset_for_rcap(
         monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance)
 
-    rcap_events_df = _make_trials_df(monkey_sub, stop_cluster_id_col='temp_stop_cluster_id',
+    rcap_events_df = _make_events_df(monkey_sub, stop_cluster_id_col='temp_stop_cluster_id',
                                      stop_cluster_size_col='temp_stop_cluster_size')
 
     rcap_events_df.reset_index(drop=True, inplace=True)
@@ -254,7 +254,7 @@ def add_temp_stop_cluster_id(
     return df
 
 
-def _make_trials_df(monkey_sub: pd.DataFrame, stop_cluster_id_col='stop_cluster_id',
+def _make_events_df(monkey_sub: pd.DataFrame, stop_cluster_id_col='stop_cluster_id',
                     stop_cluster_size_col='stop_cluster_size') -> pd.DataFrame:
     # Work on a sorted copy so first/second/last are well-defined
     ms = monkey_sub.sort_values(
@@ -267,25 +267,75 @@ def _make_trials_df(monkey_sub: pd.DataFrame, stop_cluster_id_col='stop_cluster_
         raise ValueError(
             f'{stop_cluster_size_col} varies within a cluster; cannot keep a single value.')
 
-    agg_spec = {
-        'num_stops': ('point_index', 'size'),
-        'stop_indices': ('point_index', list),
-        'first_stop_point_index': ('point_index', 'first'),
-        'second_stop_point_index': ('point_index', lambda s: s.iloc[1] if len(s) > 1 else pd.NA),
-        'last_stop_point_index': ('point_index', 'last'),
-        'first_stop_time': ('time', 'first'),
-        'second_stop_time': ('time', lambda s: s.iloc[1] if len(s) > 1 else pd.NA),
-        'last_stop_time': ('time', 'last'),
-        'stop_cluster_size': (stop_cluster_size_col, 'max'),  # keep it
-        'stop_id_duration': ('stop_id_duration', 'max'),  # keep it
-    }
+    # Aggregate lists so we can expand to as many stops as needed later
+    base = g.agg(
+        num_stops=('point_index', 'size'),
+        stop_indices=('point_index', list),
+        stop_times=('time', list),
+        stop_id_durations=('stop_id_duration', list),
+        stop_cluster_size=(stop_cluster_size_col, 'max'),
+    ).reset_index()
 
-    trials_df = g.agg(**agg_spec).reset_index()
-    trials_df = trials_df[trials_df['num_stops'] > 1].reset_index(drop=True)
-    for col in ['first_stop_point_index', 'second_stop_point_index', 'last_stop_point_index']:
-        trials_df[col] = trials_df[col].astype('Int64')
+    # Keep clusters with more than one stop
+    base = base[base['num_stops'] > 1].reset_index(drop=True)
 
-    return trials_df
+    # Round time and duration lists to at most 5 decimals
+    def _round_list(values):
+        if not isinstance(values, (list, tuple)):
+            return values
+        out = []
+        for x in values:
+            if x is pd.NA:
+                out.append(x)
+            else:
+                try:
+                    out.append(round(float(x), 5))
+                except Exception:
+                    out.append(x)
+        return out
+
+    base['stop_times'] = base['stop_times'].apply(_round_list)
+    base['stop_id_durations'] = base['stop_id_durations'].apply(_round_list)
+
+    # Last stop fields
+    base['last_stop_point_index'] = base['stop_indices'].apply(
+        lambda lst: lst[-1] if len(lst) > 0 else pd.NA
+    )
+    base['last_stop_time'] = base['stop_times'].apply(
+        lambda lst: lst[-1] if len(lst) > 0 else pd.NA
+    )
+    base['last_stop_id_duration'] = base['stop_id_durations'].apply(
+        lambda lst: lst[-1] if len(lst) > 0 else pd.NA
+    )
+
+    # Expand per-stop fields up to the maximum number of stops
+    max_stops = int(base['num_stops'].max()) if len(base) else 0
+    for i in range(1, max_stops + 1):
+        idx = i - 1
+        base[f'stop_{i}_point_index'] = base['stop_indices'].apply(
+            lambda lst: lst[idx] if len(lst) > idx else pd.NA
+        )
+        base[f'stop_{i}_time'] = base['stop_times'].apply(
+            lambda lst: lst[idx] if len(lst) > idx else pd.NA
+        )
+        base[f'stop_{i}_id_duration'] = base['stop_id_durations'].apply(
+            lambda lst: lst[idx] if len(lst) > idx else pd.NA
+        )
+
+    # Align naming used elsewhere: overall stop_id_duration equals the last stop's duration
+    base['stop_id_duration'] = base['last_stop_id_duration']
+
+    # Cast index-like columns to nullable Int64
+    point_index_cols = [
+        c for c in base.columns if c.endswith('_point_index')
+    ]
+    for col in point_index_cols:
+        try:
+            base[col] = base[col].astype('Int64')
+        except Exception:
+            pass
+
+    return base
 
 
 def _take_out_monkey_subset_for_rcap(monkey_information, ff_caught_T_new, ff_real_position_sorted, max_cluster_distance=50):
@@ -452,14 +502,14 @@ def _add_target_distances(
 def combine_rsw_and_one_stop_to_make_miss_to_switch_df(rsw_w_ff_df, one_stop_w_ff_df):
 
     common_idx = np.intersect1d(
-        rsw_w_ff_df['first_stop_point_index'].values,
-        one_stop_w_ff_df['first_stop_point_index'].values,
+        rsw_w_ff_df['stop_1_point_index'].values,
+        one_stop_w_ff_df['stop_1_point_index'].values,
     )
     if len(common_idx) > 0:
         print(f'{len(common_idx)} of {len(one_stop_w_ff_df)} one-stop rows overlap with rsw; removing duplicates.')
 
     one_stop_w_ff_df = one_stop_w_ff_df[
-        ~one_stop_w_ff_df['first_stop_point_index'].isin(common_idx)
+        ~one_stop_w_ff_df['stop_1_point_index'].isin(common_idx)
     ].copy()
 
     cols_to_keep = [
@@ -483,10 +533,10 @@ def combine_rsw_and_one_stop_to_make_miss_to_switch_df(rsw_w_ff_df, one_stop_w_f
 
     na_idx = miss_to_switch_df['last_stop_point_index'].isna()
     miss_to_switch_df.loc[na_idx, 'last_stop_point_index'] = miss_to_switch_df.loc[
-        na_idx, 'first_stop_point_index'
+        na_idx, 'stop_1_point_index'
     ]
     miss_to_switch_df.loc[na_idx, 'last_stop_time'] = miss_to_switch_df.loc[
-        na_idx, 'first_stop_time'
+        na_idx, 'stop_1_time'
     ]
 
     return miss_to_switch_df

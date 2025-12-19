@@ -124,7 +124,7 @@ def ml_model_for_regression(X_train, y_train, X_test, y_test,
     model_name = model_names[np.argmin(mse_list)]
     # compile into chosen_model_info
     chosen_model_info = _choose_best_model(
-        model, model_name, X_train, X_test, y_test)
+        model, model_name, X_train, y_train, X_test, y_test)
 
     return model_comparison_df, chosen_model_info
 
@@ -170,7 +170,7 @@ def _get_model_comparison_df(X_train, y_train, X_test, y_test, model_names, mode
     return model_comparison_df, model_list, mse_list
 
 
-def _choose_best_model(model, model_name, X_train, X_test, y_test):
+def _choose_best_model(model, model_name, X_train, y_train, X_test, y_test):
 
     print("\n")
     print("The model with the lowest mean squared error is:", model, '.')
@@ -179,6 +179,12 @@ def _choose_best_model(model, model_name, X_train, X_test, y_test):
     # evaluate
     mse = mean_squared_error(y_test, y_pred)
     print("chosen model mse:", mse)
+    print("chosen model r_squared_test:", r2_score(y_test, y_pred))
+    
+    # also get r2 score on train set
+    y_pred_train = model.predict(X_train)
+    r2_train = r2_score(y_train, y_pred_train)
+    print("chosen model r_squared_train:", r2_train)
 
     chosen_model_info = {'model': model,
                          'y_pred': y_pred,
@@ -188,7 +194,7 @@ def _choose_best_model(model, model_name, X_train, X_test, y_test):
 
     if model_name == 'rf':
         chosen_model_info['sorted_features_and_importances'] = _get_rf_feature_importances(
-            model, X_train, feature_names=X_train.columns)
+            model, feature_names=X_train.columns)
 
     return chosen_model_info
 

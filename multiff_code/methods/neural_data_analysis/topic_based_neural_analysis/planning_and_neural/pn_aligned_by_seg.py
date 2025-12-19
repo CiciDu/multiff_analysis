@@ -63,7 +63,7 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
         if not hasattr(self, 'spikes_df'):
             self.retrieve_or_make_monkey_data()
             self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
-                                                                   sampling_rate=self.sampling_rate)
+                                                                   self.monkey_information, sampling_rate=self.sampling_rate)
 
         self.rebinned_x_var = pn_utils.rebin_spike_data(
             self.spikes_df, self.new_seg_info, bin_width=self.bin_width)

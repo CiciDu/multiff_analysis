@@ -27,8 +27,8 @@ def make_one_stop_w_ff_df(stop_category_df):
     one_stop_w_ff_df['ff_index'] = one_stop_sub['candidate_target']
     one_stop_w_ff_df['num_stops'] = 1
     one_stop_w_ff_df['stop_time'] = one_stop_sub['time']
-    one_stop_w_ff_df['first_stop_time'] = one_stop_sub['time']
-    one_stop_w_ff_df['first_stop_point_index'] = one_stop_sub['point_index']
+    one_stop_w_ff_df['stop_1_time'] = one_stop_sub['time']
+    one_stop_w_ff_df['stop_1_point_index'] = one_stop_sub['point_index']
 
     one_stop_w_ff_df['event_type'] = 'dsw'
     one_stop_w_ff_df['eventual_outcome'] = 'switch'
@@ -106,12 +106,12 @@ def make_temp_one_stop_w_ff_df(one_stop_df: pd.DataFrame) -> pd.DataFrame:
 
     # add column names
     out['stop_time'] = out['time']
-    out['first_stop_time'] = out['time']
-    out['first_stop_point_index'] = out['point_index']
+    out['stop_1_time'] = out['time']
+    out['stop_1_point_index'] = out['point_index']
 
     # per your previous pattern
-    out["stop_indices"] = out["first_stop_point_index"].apply(lambda x: [
-                                                              int(x)])
+    out["stop_indices"] = out["stop_1_point_index"].apply(lambda x: [
+        int(x)])
 
     return out
 
@@ -305,11 +305,11 @@ def get_ff_info_for_rsw(rsw_indices_df,
 
     Output DataFrames:
     - rsw_ff_info: Filtered subset of trials that have fireflies near stops
-    - rsw_expanded_trials_df: All trials with firefly context added (unfiltered)
+    - rsw_expanded_events_df: All trials with firefly context added (unfiltered)
 
     Key Differences:
     - rsw_events_df: Base trials without firefly context
-    - rsw_expanded_trials_df: Base trials + firefly proximity annotations
+    - rsw_expanded_events_df: Base trials + firefly proximity annotations
     - rsw_ff_info: Only trials where whether_w_ff_near_stops == 1
     """
 
@@ -347,20 +347,20 @@ def get_ff_info_for_rsw(rsw_indices_df,
     rsw_ff_info2['latest_visible_ff'] = rsw_ff_info.groupby('temp_stop_cluster_id')[
         'ff_index'].first().values
 
-    # Step 7: Create rsw_expanded_trials_df - merge base trials with firefly context
+    # Step 7: Create rsw_expanded_events_df - merge base trials with firefly context
     # This adds firefly proximity information to all trials (unfiltered)
-    rsw_expanded_trials_df = rsw_events_df.merge(
+    rsw_expanded_events_df = rsw_events_df.merge(
         rsw_ff_info2, on='temp_stop_cluster_id', how='left')
-    rsw_expanded_trials_df.sort_values(by='temp_stop_cluster_id', inplace=True)
+    rsw_expanded_events_df.sort_values(by='temp_stop_cluster_id', inplace=True)
 
     # Step 8: Add flag indicating whether fireflies are near stops
     # Mark whether_w_ff_near_stops as 1 if nearby_alive_ff_indices is not NA
-    rsw_expanded_trials_df['whether_w_ff_near_stops'] = (
-        ~rsw_expanded_trials_df['nearby_alive_ff_indices'].isna()).values.astype(int)
+    rsw_expanded_events_df['whether_w_ff_near_stops'] = (
+        ~rsw_expanded_events_df['nearby_alive_ff_indices'].isna()).values.astype(int)
 
     # Step 9: Create rsw_ff_info - filter to keep only trials with nearby fireflies
     # This is the filtered subset where whether_w_ff_near_stops == 1
-    rsw_ff_info = rsw_expanded_trials_df[rsw_expanded_trials_df['whether_w_ff_near_stops'] == 1].reset_index(
+    rsw_ff_info = rsw_expanded_events_df[rsw_expanded_events_df['whether_w_ff_near_stops'] == 1].reset_index(
         drop=True)
     # Step 10: Final processing of rsw_ff_info
     rsw_ff_info['target_index'] = rsw_ff_info['trial']
@@ -368,7 +368,7 @@ def get_ff_info_for_rsw(rsw_indices_df,
         'int64')
     rsw_ff_info['ff_index'] = rsw_ff_info['candidate_target']
 
-    rsw_ff_info.sort_values(by=['trial', 'first_stop_time'], inplace=True)
+    rsw_ff_info.sort_values(by=['trial', 'stop_1_time'], inplace=True)
 
     # Add stop point indices and handle duplicates
     rsw_ff_info = rsw_vs_rcap_utils.add_stop_point_index(

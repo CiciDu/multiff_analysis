@@ -3,23 +3,19 @@
 │   ├── env1_relu
 │   │   └── ff3
 │           ├── dv0_dw0_w0_mem3
-│           │   └── individual_data_sessions
-│           │       └── data_0
+│           │   └── data_0
 │           ├── dv10_dw10_w10_mem3
-│           │   └── individual_data_sessions
-│           │       └── data_0
+│           │   └── data_0
 │           ├── dv10_dw20_w10_mem3
-│           │   └── individual_data_sessions
-│           │       └── data_0
+│           │   └── data_0
 │   └── env1_test_params
 │       └── ...
 ├── patterns_and_features
 │   ├── env1_relu
 │   │   └── ff3
 │   │       └── dv10_dw10_w10_mem3
-│   │           └── individual_data_sessions
-│   │               ├── data_0
-│   │               └── data_1
+│   │           ├── data_0
+│   │           ├── data_1
 │   └── env1_test_params
 ├── planning
 │   ├── env1_relu
@@ -46,42 +42,40 @@
 │   │           │       └── ml_results
 │   │           │           └── lr_variations
 │   │           │               └── norm_opt_arc
-│   │           └── individual_data_sessions
-│   │               ├── data_0
-│   │               │   ├── diff_in_curv_df
-│   │               │   │   └── norm_opt_arc
-│   │               │   │       ├── control
-│   │               │   │       │   ├── dist_100_window_-50cm_0cm
-│   │               │   │       │   ├── dist_150_window_-50cm_0cm
-│   │               │   │       └── test
-│   │               │   │           ├── dist_100_window_-50cm_0cm
-│   │               │   │           ├── dist_150_window_-50cm_0cm
-│   │               │   ├── heading_info_df
-│   │               │   │   └── norm_opt_arc
-│   │               │   │       ├── control
-│   │               │   │       │   ├── agent_dist_100
-│   │               │   │       │   ├── agent_dist_150
-│   │               │   │       └── test
-│   │               │   │           ├── agent_dist_100
-│   │               │   │           ├── agent_dist_150
-│   │               │   └── shared_stops_near_ff_df.csv
-│   │               └── data_1
+│   │           ├── data_0
+│   │           │   ├── diff_in_curv_df
+│   │           │   │   └── norm_opt_arc
+│   │           │   │       ├── control
+│   │           │   │       │   ├── dist_100_window_-50cm_0cm
+│   │           │   │       │   ├── dist_150_window_-50cm_0cm
+│   │           │   │       └── test
+│   │           │   │           ├── dist_100_window_-50cm_0cm
+│   │           │   │           ├── dist_150_window_-50cm_0cm
+│   │           │   ├── heading_info_df
+│   │           │   │   └── norm_opt_arc
+│   │           │   │       ├── control
+│   │           │   │       │   ├── agent_dist_100
+│   │           │   │       │   ├── agent_dist_150
+│   │           │   │       └── test
+│   │           │   │           ├── agent_dist_100
+│   │           │   │           ├── agent_dist_150
+│   │           │   └── shared_stops_near_ff_df.csv
+│   │           └── data_1
 │   └── env1_test_params
 │       └── ...
 └── processed_data
     ├── env1_relu
     │   └── ff3
     │       └── dv10_dw10_w10_mem3
-    │           └── individual_data_sessions
-    │               ├── data_0
-    │               │   ├── closest_stop_to_capture_df.csv
-    │               │   ├── ff_basic_info.npz
-    │               │   ├── ff_dataframe.csv
-    │               │   ├── ff_flash_sorted.npz
-    │               │   └── monkey_information.csv
-    │               └── data_1
-    │                   ├── ff_basic_info.npz
-    │                   ├── ff_dataframe.csv
-    │                   ├── ff_flash_sorted.npz
-    │                   └── monkey_information.csv
+    │           ├── data_0
+    │           │   ├── closest_stop_to_capture_df.csv
+    │           │   ├── ff_basic_info.npz
+    │           │   ├── ff_dataframe.csv
+    │           │   ├── ff_flash_sorted.npz
+    │           │   └── monkey_information.csv
+    │           └── data_1
+    │               ├── ff_basic_info.npz
+    │               ├── ff_dataframe.csv
+    │               ├── ff_flash_sorted.npz
+    │               └── monkey_information.csv
     └── env1_test_params

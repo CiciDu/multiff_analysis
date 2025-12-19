@@ -107,20 +107,24 @@ class PatternsAndFeatures():
             columns=['data_name', 'data', 'date']), data_folder_name=None)
 
         if save_data:
-            os.makedirs(
-                self.combd_patterns_and_features_folder_path, exist_ok=True)
-            self.combd_pattern_frequencies.to_csv(os.path.join(
-                self.combd_patterns_and_features_folder_path, 'combd_pattern_frequencies.csv'))
-            self.combd_feature_statistics.to_csv(os.path.join(
-                self.combd_patterns_and_features_folder_path, 'combd_feature_statistics.csv'))
-            self.combd_all_trial_features.to_csv(os.path.join(
-                self.combd_patterns_and_features_folder_path, 'combd_all_trial_features.csv'))
-            self.agg_pattern_frequencies.to_csv(os.path.join(
-                self.combd_patterns_and_features_folder_path, 'agg_pattern_frequencies.csv'))
-            self.agg_feature_statistics.to_csv(os.path.join(
-                self.combd_patterns_and_features_folder_path, 'agg_feature_statistics.csv'))
-            self.combd_scatter_around_target_df.to_csv(os.path.join(
-                self.combd_patterns_and_features_folder_path, 'combd_scatter_around_target_df.csv'))
+            self._save_processed_data()
+
+
+    def _save_processed_data(self):
+        os.makedirs(
+            self.combd_patterns_and_features_folder_path, exist_ok=True)
+        self.combd_pattern_frequencies.to_csv(os.path.join(
+            self.combd_patterns_and_features_folder_path, 'combd_pattern_frequencies.csv'))
+        self.combd_feature_statistics.to_csv(os.path.join(
+            self.combd_patterns_and_features_folder_path, 'combd_feature_statistics.csv'))
+        self.combd_all_trial_features.to_csv(os.path.join(
+            self.combd_patterns_and_features_folder_path, 'combd_all_trial_features.csv'))
+        self.agg_pattern_frequencies.to_csv(os.path.join(
+            self.combd_patterns_and_features_folder_path, 'agg_pattern_frequencies.csv'))
+        self.agg_feature_statistics.to_csv(os.path.join(
+            self.combd_patterns_and_features_folder_path, 'agg_feature_statistics.csv'))
+        self.combd_scatter_around_target_df.to_csv(os.path.join(
+            self.combd_patterns_and_features_folder_path, 'combd_scatter_around_target_df.csv'))
 
     # If only wanting to make combd_scatter_around_target_df
     def make_combd_scatter_around_target_df(self, exists_ok=True, save_data=True):

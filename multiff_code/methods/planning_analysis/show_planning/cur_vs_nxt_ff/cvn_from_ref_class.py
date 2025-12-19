@@ -118,6 +118,9 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         self.make_stops_near_ff_and_ff_comparison_dfs(
             test_or_control=test_or_control, exists_ok=stops_near_ff_df_exists_ok, save_data=True)
+        
+        if len(self.stops_near_ff_df) == 0:
+            raise Exception('No stops near ff found for {test_or_control} data. Will not be able to make heading info df.')
 
         self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
             ref_point_value, ref_point_mode)

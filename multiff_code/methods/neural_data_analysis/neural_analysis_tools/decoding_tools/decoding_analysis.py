@@ -351,16 +351,15 @@ def save_decoding_results(df, comp_key, model_name, save_dir, metadata=None, ove
                        sort_keys=True, default=_json_default).encode('utf-8')
         ).hexdigest()[:10]
 
-        # Locate project logs directory under multiff_analysis/logs/decode
         def _decode_logs_index_path() -> Path:
             p = Path(__file__).resolve()
             for parent in [p] + list(p.parents):
                 if parent.name == "multiff_analysis":
-                    logs_dir = parent / "logs" / "decode"
+                    logs_dir = parent / "jobs" / "decode" / "logs"
                     logs_dir.mkdir(parents=True, exist_ok=True)
                     return logs_dir / "index.csv"
             # Fallback
-            logs_dir = Path.cwd() / "multiff_analysis" / "logs" / "decode"
+            logs_dir = Path.cwd() / "multiff_analysis" / "jobs" / "decode" / "logs"
             logs_dir.mkdir(parents=True, exist_ok=True)
             return logs_dir / "index.csv"
 

@@ -133,6 +133,8 @@ def _load_all_results(base_dir: Path, models: Optional[List[str]]) -> pd.DataFra
     for col in ("window_start", "window_end", "mean_auc", "sd_auc"):
         if col in df_all.columns:
             df_all[col] = pd.to_numeric(df_all[col], errors="coerce")
+            
+    df_all = df_all.sort_values(by=['key', 'model_name', 'window_start'], ascending=True)
     return df_all
 
 
@@ -366,24 +368,6 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
         print(f'No entries for model {model_name}')
         return None
 
-    # ---- Safe parser ----
-    def safe_parse(x):
-        if isinstance(x, dict):
-            return x
-        if not isinstance(x, str):
-            return {}
-        try:
-            return ast.literal_eval(x)
-        except Exception:
-            try:
-                x_clean = (
-                    x.replace("'", '"')
-                     .replace('None', 'null')
-                     .replace('nan', 'null')
-                )
-                return pd.io.json.loads(x_clean)
-            except Exception:
-                return {}
 
     df['best_params'] = df['best_params'].apply(safe_parse)
 
@@ -397,7 +381,9 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
     for p in params:
         df[p] = df['best_params'].apply(lambda d: d.get(p, None))
 
-    df = df.dropna(subset=params)
+    for p in params:
+        df[p] = df[p].apply(lambda v: 'None' if pd.isna(v) else v)
+    
     if df.empty:
         print(f'No valid entries for {model_name} with params {params}')
         return None
@@ -470,3 +456,29 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
         plt.show()
 
         return count_df.sort_values('count', ascending=False)
+
+
+import json
+import ast
+
+def safe_parse(x):
+    """Parse either Python-literal dicts or JSON dicts safely."""
+    if isinstance(x, dict):
+        return x
+    if not isinstance(x, str):
+        return {}
+
+    # Try Python literal syntax first
+    try:
+        return ast.literal_eval(x)
+    except Exception:
+        pass
+
+    # Try JSON syntax second
+    try:
+        return json.loads(x)
+    except Exception:
+        pass
+
+    # Fallback
+    return {}

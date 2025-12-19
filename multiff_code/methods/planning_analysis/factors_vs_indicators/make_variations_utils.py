@@ -817,6 +817,7 @@ def make_variations_df_across_ref_point_values(variation_func,
                                                                                'distance': [-150, -100, -50]},
                                                monkey_name=None,
                                                path_to_save=None,
+                                               use_stored_data_only=False,
                                                ):
 
     all_variations_df = pd.DataFrame()
@@ -827,6 +828,7 @@ def make_variations_df_across_ref_point_values(variation_func,
         print(row)
         df = variation_func(ref_point_mode=row['ref_point_mode'],
                             ref_point_value=row['ref_point_value'],
+                            use_stored_data_only=use_stored_data_only,
                             **variation_func_kwargs)
         all_variations_df = pd.concat([all_variations_df, df], axis=0)
         all_variations_df.reset_index(drop=True, inplace=True)

@@ -38,9 +38,10 @@ class PlanAcrossSessions(variations_base_class._VariationsBase):
                  monkey_name='monkey_Bruno',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
+                 backend='matplotlib',
                  ):
 
-        super().__init__(opt_arc_type=opt_arc_type)
+        super().__init__(opt_arc_type=opt_arc_type, backend=backend)
         self.monkey_name = monkey_name
         self.sessions_df = None
         self.sessions_df_for_one_monkey = None

@@ -19,7 +19,7 @@ class GPFAHelperClass():
         self.align_at_beginning = align_at_beginning
 
         spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
-                                                          sampling_rate=self.sampling_rate)
+                                                          self.monkey_information, sampling_rate=self.sampling_rate)
 
         self.spike_segs_df = fit_gpfa_utils.make_spike_segs_df(
             spikes_df, new_seg_info)

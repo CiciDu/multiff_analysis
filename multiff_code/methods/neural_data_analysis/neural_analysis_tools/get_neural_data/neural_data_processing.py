@@ -20,7 +20,7 @@ np.set_printoptions(suppress=True)
 
 
 def make_spikes_df(raw_data_folder_path, ff_caught_T_sorted,
-                   sampling_rate=20000):
+                   monkey_information, sampling_rate=20000):
 
     neural_data_path = raw_data_folder_path.replace(
         'raw_monkey_data', 'neural_data')
@@ -47,6 +47,8 @@ def make_spikes_df(raw_data_folder_path, ff_caught_T_sorted,
 
     spikes_df = pd.DataFrame(
         {'time': spike_times_in_s, 'cluster': spike_clusters})
+
+    spikes_df = spikes_df[spikes_df['time'] <= monkey_information['time'].max()].copy()
 
     return spikes_df
 

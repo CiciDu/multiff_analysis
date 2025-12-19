@@ -129,9 +129,13 @@ def streamline_making_plotly_plot_to_compare_two_sets_of_data(original_df,
                     row_number += 1
                 # hide x axis title
                 fig.update_xaxes(title_text='', row=row_number, col=col_number)
-
+            else:
+                fig.show()
+        
     if use_subplots_based_on_changeable_variables:
         fig.update_layout(height=500 * first_dim, width=700 * second_dim)
+        
+    fig._combinations = combinations
 
     return fig
 

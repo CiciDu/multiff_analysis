@@ -1,7 +1,9 @@
 from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
-from planning_analysis.factors_vs_indicators import plot_variations_utils, process_variations_utils
+from planning_analysis.factors_vs_indicators import process_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
 from reinforcement_learning.base_classes import rl_base_utils
+from pathlib import Path
 
 import pandas as pd
 import os
@@ -17,30 +19,33 @@ class PlanFactorsAcrossAgents():
         self.overall_folder_name = overall_folder_name
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
-    def make_all_ref_pooled_median_info_across_agents_AND_pooled_perc_info_across_agents(self, exists_ok=True, intermediate_products_exist_ok=True, agent_data_exists_ok=True):
+    def make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(self, exists_ok=True, intermediate_products_exist_ok=True, agent_data_exists_ok=True,
+                                                                     num_steps_per_dataset=9000,
+                                                                     num_datasets_to_collect=2,
+                                                                     use_stored_data_only=False):
 
         self.combd_planning_info_x_agents_path = self.overall_folder_name.replace(
             'all_agents', 'all_collected_data/planning') + '/combined_data_x_agents'
         os.makedirs(self.combd_planning_info_x_agents_path, exist_ok=True)
-        all_ref_pooled_median_info_across_agents_path = os.path.join(
+        all_ref_pooled_median_x_agents_path = os.path.join(
             self.combd_planning_info_x_agents_path, 'all_ref_pooled_median_info_x_agents.csv')
-        pooled_perc_info_across_agents_path = os.path.join(
+        pooled_perc_x_agents_path = os.path.join(
             self.combd_planning_info_x_agents_path, 'pooled_perc_info_x_agents.csv')
 
-        if exists_ok & os.path.exists(all_ref_pooled_median_info_across_agents_path) & os.path.exists(pooled_perc_info_across_agents_path):
-            self.all_ref_pooled_median_info_across_agents = pd.read_csv(
-                all_ref_pooled_median_info_across_agents_path)
-            self.pooled_perc_info_across_agents = pd.read_csv(
-                pooled_perc_info_across_agents_path)
+        if exists_ok & os.path.exists(all_ref_pooled_median_x_agents_path) & os.path.exists(pooled_perc_x_agents_path):
+            self.all_ref_pooled_median_x_agents = pd.read_csv(
+                all_ref_pooled_median_x_agents_path)
+            self.pooled_perc_x_agents = pd.read_csv(
+                pooled_perc_x_agents_path)
         else:
-            folders_with_params = rl_base_utils.get_folders_with_params(
+            agent_folders = rl_base_utils.get_agent_folders(
                 path=self.overall_folder_name)
-            if len(folders_with_params) == 0:
+            if len(agent_folders) == 0:
                 raise Exception('No folders with params found.')
 
-            self.all_ref_pooled_median_info_across_agents = pd.DataFrame()
-            self.pooled_perc_info_across_agents = pd.DataFrame()
-            for folder in folders_with_params:
+            self.all_ref_pooled_median_x_agents = pd.DataFrame()
+            self.pooled_perc_x_agents = pd.DataFrame()
+            for folder in agent_folders:
                 print('folder:', folder)
                 manifest = rl_base_utils.read_checkpoint_manifest(folder)
                 if isinstance(manifest, dict) and ('env_params' in manifest):
@@ -50,33 +55,50 @@ class PlanFactorsAcrossAgents():
 
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
                     model_folder_name=folder)
-                self.pfas.streamline_getting_y_values(
-                    model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok, **params)
+                
+                try:
+                    self.pfas.streamline_getting_y_values(
+                        model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok,
+                        num_datasets_to_collect=num_datasets_to_collect, num_steps_per_dataset=num_steps_per_dataset, use_stored_data_only=use_stored_data_only,
+                        **params)
+                except Exception as e:
+                    print(f'Error making overall all median info for agent {folder}: {e}. Will continue to the next agent.')
+                    continue
+
+                # Extract model name after all_agents
+                model_dir = Path(folder).name
+                # Remove job ID suffix
+                if '_job' in model_dir:
+                    agent_id = model_dir.split('_job')[0]
+                else:
+                    agent_id = model_dir
 
                 agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.all_ref_pooled_median_info, params)
-                self.all_ref_pooled_median_info_across_agents = pd.concat(
-                    [self.all_ref_pooled_median_info_across_agents, agent_all_ref_pooled_median_info], axis=0)
+                agent_all_ref_pooled_median_info['id'] = agent_id
+                self.all_ref_pooled_median_x_agents = pd.concat(
+                    [self.all_ref_pooled_median_x_agents, agent_all_ref_pooled_median_info], axis=0)
 
                 agent_all_perc_df = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.pooled_perc_info, params)
-                self.pooled_perc_info_across_agents = pd.concat(
-                    [self.pooled_perc_info_across_agents, agent_all_perc_df], axis=0)
+                agent_all_perc_df['id'] = agent_id
+                self.pooled_perc_x_agents = pd.concat(
+                    [self.pooled_perc_x_agents, agent_all_perc_df], axis=0)
 
                 # self.pfas.plot_monkey_and_agent_median_df()
                 # self.pfas.plot_monkey_and_agent_perc_df()
 
-            self.all_ref_pooled_median_info_across_agents.reset_index(
+            self.all_ref_pooled_median_x_agents.reset_index(
                 drop=True, inplace=True)
-            self.pooled_perc_info_across_agents.reset_index(
+            self.pooled_perc_x_agents.reset_index(
                 drop=True, inplace=True)
 
-            self.all_ref_pooled_median_info_across_agents.to_csv(
-                all_ref_pooled_median_info_across_agents_path)
-            self.pooled_perc_info_across_agents.to_csv(
-                pooled_perc_info_across_agents_path)
+            self.all_ref_pooled_median_x_agents.to_csv(
+                all_ref_pooled_median_x_agents_path, index=False)
+            self.pooled_perc_x_agents.to_csv(
+                pooled_perc_x_agents_path, index=False)
 
-        return self.all_ref_pooled_median_info_across_agents, self.pooled_perc_info_across_agents
+        return self.all_ref_pooled_median_x_agents, self.pooled_perc_x_agents
 
     def get_monkey_median_df(self):
         ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(
@@ -92,7 +114,7 @@ class PlanFactorsAcrossAgents():
 
     def plot_monkey_and_agent_median_df(self):
         both_players_df = compare_monkey_and_agent_utils.make_both_players_df(
-            self.monkey_median_df, self.all_ref_pooled_median_info_across_agents)
+            self.monkey_median_df, self.all_ref_pooled_median_x_agents)
         median_new_df = process_variations_utils.make_new_df_for_plotly_comparison(both_players_df,
                                                                                    match_rows_based_on_ref_columns_only=False)
         x_var_column_list = ['ref_point_value']
@@ -115,7 +137,7 @@ class PlanFactorsAcrossAgents():
 
     def plot_monkey_and_agent_perc_df(self):
         both_players_df = compare_monkey_and_agent_utils.make_both_players_df(
-            self.monkey_perc_df, self.pooled_perc_info_across_agents)
+            self.monkey_perc_df, self.pooled_perc_x_agents)
         perc_new_df = process_variations_utils.make_new_df_for_plotly_comparison(both_players_df,
                                                                                  match_rows_based_on_ref_columns_only=False)
         x_var_column_list = ['key_for_split']

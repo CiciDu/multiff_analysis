@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH -J sb3_sweep
-#SBATCH --partition=cpu,xaqq,gpu
+#SBATCH --partition=gpu,xaqq
 #SBATCH -c 2
+#SBATCH --gres=gpu:1
 #SBATCH --mem=5G
 #SBATCH -t 24:00:00
-#SBATCH --array=1-50
+#SBATCH --array=1-40
 #SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.out
 #SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.err
 
@@ -15,29 +16,13 @@ cd /user_data/cicid/Multifirefly-Project
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate multiff_clean
 
-# Ensure sb3 dependencies are available
-python - <<'PY'
-import importlib, sys, subprocess
-missing = []
-for m in ('stable_baselines3', 'sb3_contrib'):
-    try:
-        importlib.import_module(m)
-    except ImportError:
-        missing.append(m)
-if missing:
-    print('[setup] Installing sb3 deps:', ', '.join(missing))
-    # Avoid yanked 2.3.0 and extras that pull AutoROM; use stable 2.4.0
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'stable-baselines3==2.4.0', 'sb3-contrib==2.4.0'])
-else:
-    print('[setup] sb3 deps already present')
-PY
 
 # ---------------------
 # Define hyperparameter lists
 # ---------------------
 declare -a LRS=(3e-4)
 declare -a NUM_OBS_FF_LIST=(1 2 3 4 5)
-declare -a MAX_IN_MEMORY_TIME_LIST=(2)
+declare -a MAX_IN_MEMORY_TIME_LIST=(2 3)
 declare -a IDENTITY_SLOT_STRATEGY_LIST=(rank_keep_visible_only rank_keep_visible_and_memory drop_fill_visible_only drop_fill_visible_and_memory)
 N_ENVS=1
 
@@ -58,7 +43,7 @@ IDENTITY_SLOT_STRATEGY=${IDENTITY_SLOT_STRATEGY_LIST[$STRAT_IDX]}
 # ---------------------
 BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents"
 SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
-RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}_job${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
 OVERALL_FOLDER="${BASE_DIR}/${RUN_NAME}"
 
 mkdir -p "$OVERALL_FOLDER"
@@ -78,7 +63,9 @@ srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --lr "$LR" \
   --num-obs-ff "$NUM_OBS_FF" \
   --n-envs "$N_ENVS" \
+  --no-curriculum-training \
   --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" 2> >(tee -a "$ERR_FILE" >&2)
+  
 
 echo "[jobinfo] Finished sb3 training for LR=${LR}, NUM_OBS_FF=${NUM_OBS_FF}, MAX_IN_MEMORY_TIME=${MAX_IN_MEMORY_TIME}, STRAT=${IDENTITY_SLOT_STRATEGY}, N_ENVS=${N_ENVS}"
 

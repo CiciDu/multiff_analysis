@@ -127,8 +127,8 @@ class MissEventsClass(further_processing_class.FurtherProcessing, trajectory_cla
         self.furnish_rcap_events_df()
 
     def furnish_rcap_events_df(self):
-        self.rcap_events_df['first_stop_time'] = self.monkey_information.loc[
-            self.rcap_events_df['first_stop_point_index'], 'time'].values
+        self.rcap_events_df['stop_1_time'] = self.monkey_information.loc[
+            self.rcap_events_df['stop_1_point_index'], 'time'].values
         self.rcap_events_df['ff_index'] = self.rcap_events_df['trial']
         # because we need to have nxt_ff, we will limit the max number of ff_index to len(self.ff_caught_T_new - 2)
 
@@ -172,8 +172,8 @@ class MissEventsClass(further_processing_class.FurtherProcessing, trajectory_cla
         self.rsw_cluster_df.rename(
             columns={'cluster_identifier': 'stop_cluster_id'}, inplace=True)
 
-        self.rsw_cluster_df = self.rsw_cluster_df.merge(self.rsw_w_ff_df[['stop_cluster_id', 'first_stop_time', 'second_stop_time', 'last_stop_time', 'first_stop_point_index',
-                                                                          'second_stop_point_index', 'last_stop_point_index', 'target_index', 'num_stops']],
+        self.rsw_cluster_df = self.rsw_cluster_df.merge(self.rsw_w_ff_df[['stop_cluster_id', 'stop_1_time', 'stop_2_time', 'last_stop_time', 'stop_1_point_index',
+                                                                          'stop_2_point_index', 'last_stop_point_index', 'target_index', 'num_stops']],
                                                         on='stop_cluster_id', how='left')
 
         # to prepare for free selection
@@ -184,7 +184,7 @@ class MissEventsClass(further_processing_class.FurtherProcessing, trajectory_cla
         self.rsw_cluster_df.sort_values(by='last_stop_time', inplace=True)
 
     def _get_rcap_df(self):
-        self.rcap_df = rsw_vs_rcap_utils.process_trials_df(
+        self.rcap_df = rsw_vs_rcap_utils.process_events_df(
             self.rcap_events_df, self.monkey_information, self.ff_dataframe, self.ff_real_position_sorted, self.stop_period_duration)
         self.rcap_df['cur_ff_capture_time'] = self.ff_caught_T_new[self.rcap_df['ff_index'].values]
         if self.rcap_df['ff_index'].max() == len(self.ff_caught_T_new) - 1:
@@ -193,7 +193,7 @@ class MissEventsClass(further_processing_class.FurtherProcessing, trajectory_cla
                 self.ff_caught_T_new) - 1].reset_index(drop=True)
 
     def _get_rsw_df(self):
-        self.rsw_df = rsw_vs_rcap_utils.process_trials_df(
+        self.rsw_df = rsw_vs_rcap_utils.process_events_df(
             self.rsw_w_ff_df, self.monkey_information, self.ff_dataframe, self.ff_real_position_sorted, self.stop_period_duration)
         if self.rsw_df['ff_index'].max() == len(self.ff_caught_T_new) - 1:
             # remove the last row since later we need nxt_ff

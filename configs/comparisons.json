@@ -5,8 +5,8 @@
     "b": "rcap_first",
     "a_label": "rsw first",
     "b_label": "rcap first",
-    "slug_capfirst": "rsw_first_vs_rcap_first",
-    "slug_pascal": "rswFirst_vs_rcapFirst",
+    "slug_capfirst": "Rsw_first_vs_Rcap_first",
+    "slug_pascal": "RswFirst_vs_RcapFirst",
     "title": "rsw First vs rcap First"
   },
   {
@@ -15,29 +15,9 @@
     "b": "rcap_middle",
     "a_label": "rsw middle",
     "b_label": "rcap middle",
-    "slug_capfirst": "rsw_middle_vs_rcap_middle",
-    "slug_pascal": "rswMiddle_vs_rcapMiddle",
+    "slug_capfirst": "Rsw_middle_vs_Rcap_middle",
+    "slug_pascal": "RswMiddle_vs_RcapMiddle",
     "title": "rsw Middle vs rcap Middle"
-  },
-  {
-    "key": "rsw_last_vs_rcap_last",
-    "a": "rsw_last",
-    "b": "rcap_last",
-    "a_label": "rsw last",
-    "b_label": "rcap last",
-    "slug_capfirst": "rsw_last_vs_rcap_last",
-    "slug_pascal": "rswLast_vs_rcapLast",
-    "title": "rsw Last vs rcap Last"
-  },
-  {
-    "key": "rsw_middle_vs_rsw_last",
-    "a": "rsw_middle",
-    "b": "rsw_last",
-    "a_label": "rsw middle",
-    "b_label": "rsw last",
-    "slug_capfirst": "rsw_middle_vs_rsw_last",
-    "slug_pascal": "rswMiddle_vs_rswLast",
-    "title": "rsw Middle vs rsw Last"
   },
   {
     "key": "switch_vs_retry_after_miss",
@@ -55,8 +35,8 @@
     "b": "both_middle",
     "a_label": "rsw last",
     "b_label": "both middle",
-    "slug_capfirst": "rsw_last_vs_Both_middle",
-    "slug_pascal": "rswLast_vs_BothMiddle",
+    "slug_capfirst": "Rsw_last_vs_Both_middle",
+    "slug_pascal": "RswLast_vs_BothMiddle",
     "title": "Switch vs Retry After Retry"
   },
   {
@@ -68,105 +48,5 @@
     "slug_capfirst": "One_stop_miss_vs_Both_first_miss",
     "slug_pascal": "OneStopMiss_vs_BothFirstMiss",
     "title": "First-Attempt Give-up vs First-Attempt Persist"
-  },
-  {
-    "key": "captures_vs_no_capture",
-    "a": "captures",
-    "b": "no_capture",
-    "a_label": "Captures",
-    "b_label": "No capture",
-    "slug_capfirst": "Captures_vs_No_capture",
-    "slug_pascal": "Captures_vs_NoCapture",
-    "title": "Capture vs No Capture"
-  },
-  {
-    "key": "captures_vs_all_misses",
-    "a": "captures",
-    "b": "all_misses",
-    "a_label": "Captures",
-    "b_label": "All misses",
-    "slug_capfirst": "Captures_vs_All_misses",
-    "slug_pascal": "Captures_vs_AllMisses",
-    "title": "Capture vs Miss"
-  },
-  {
-    "key": "captures_minus_rcap_last_vs_rcap_last",
-    "a": "captures_minus_rcap_last",
-    "b": "rcap_last",
-    "a_label": "Captures minus rcap last",
-    "b_label": "rcap last",
-    "slug_capfirst": "Captures_minus_rcap_last_vs_rcap_last",
-    "slug_pascal": "CapturesMinusrcapLast_vs_rcapLast",
-    "title": "First-Shot Capture vs Eventual Capture"
-  },
-  {
-    "key": "one_stop_vs_rsw_last",
-    "a": "one_stop_miss",
-    "b": "rsw_last",
-    "a_label": "one stop miss",
-    "b_label": "rsw last",
-    "slug_capfirst": "One_stop_miss_vs_rsw_last",
-    "slug_pascal": "OneStopMiss_vs_rswLast",
-    "title": "First-Attempt Give-up vs Retry then Give-up"
-  },
-  {
-    "key": "one_stop_vs_rsw_first",
-    "a": "one_stop_miss",
-    "b": "rsw_first",
-    "a_label": "one stop miss",
-    "b_label": "rsw first",
-    "slug_capfirst": "One_stop_miss_vs_rsw_first",
-    "slug_pascal": "OneStopMiss_vs_rswFirst",
-    "title": "First-Attempt Give-up vs First-Attempt rsw"
-  },
-  {
-    "key": "rsw_nonfinal_vs_rcap_nonfinal",
-    "a": "rsw_nonfinal",
-    "b": "rcap_nonfinal",
-    "a_label": "rsw nonfinal",
-    "b_label": "rcap nonfinal",
-    "slug_capfirst": "rsw_nonfinal_vs_rcap_nonfinal",
-    "slug_pascal": "rswNonfinal_vs_rcapNonfinal",
-    "title": "rsw Early Persists vs rcap Early Persists"
-  },
-  {
-    "key": "miss_vs_non_attemtp",
-    "a": "all_misses",
-    "b": "non_captures_minus_all_misses",
-    "a_label": "All misses",
-    "b_label": "non Captures minus All misses",
-    "slug_capfirst": "miss_vs_non_attemtp",
-    "slug_pascal": "AllMisses_vs_NonCapturesMinusAllMisses",
-    "title": "Miss vs Non-Attempt"
-  },
-  {
-    "key": "non_attempt_vs_one_stop_miss",
-    "a": "non_captures_minus_all_misses",
-    "b": "one_stop_miss",
-    "a_label": "non Captures minus All misses",
-    "b_label": "one stop miss",
-    "slug_capfirst": "non_attempt_vs_one_stop_miss",
-    "slug_pascal": "NonCapturesMinusAllMisses_vs_OneStopMiss",
-    "title": "Non-Attempt vs Single-Attempt Miss"
-  },
-  {
-    "key": "non_attempts_vs_first_miss",
-    "a": "non_captures_minus_all_misses",
-    "b": "all_first_misses",
-    "a_label": "non Captures minus All misses",
-    "b_label": "All first misses",
-    "slug_capfirst": "Non_captures_minus_all_misses_vs_All_first_misses",
-    "slug_pascal": "NonCapturesMinusAllMisses_vs_AllFirstMisses",
-    "title": "Non-Attempt vs First-Attempt Miss"
-  },
-  {
-    "key": "non_attempt_vs_last_miss",
-    "a": "non_captures_minus_all_misses",
-    "b": "all_last_misses",
-    "a_label": "non Captures minus All misses",
-    "b_label": "All last misses",
-    "slug_capfirst": "Non_captures_minus_all_misses_vs_All_last_misses",
-    "slug_pascal": "NonCapturesMinusAllMisses_vs_AllLastMisses",
-    "title": "Non-Attempt vs Last-Attempt Miss"
   }
 ]

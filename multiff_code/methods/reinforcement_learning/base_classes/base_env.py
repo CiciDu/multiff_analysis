@@ -24,18 +24,15 @@ TMAX_DEFAULT = 5.0     # seconds cap for t_seen normalization
 class ObsNoiseCfg:
     # perception (visible): instantaneous noise
     perc_r: float = 0.02     # Weber radial (std_r = perc_r * r)
-    perc_th: float = 0.005   # angular base (std_th ≈ perc_th / r)
+    perc_th: float = 0.01   # angular base (std_th = perc_th)
 
     # memory (invisible): per-step diffusion
-    mem_r: float = 0.005      # Weber radial step
-    mem_th: float = 0.001    # angular step base (~1/r)
+    mem_r: float = 0.02      # Weber radial step
+    mem_th: float = 0.01    # angular step base (std_th = mem_th)
 
     # lognormal obs (if you use it)
     lognorm_k: float = 0.10  # dimensionless log-std multiplier (0..0.5)
 
-    # shared knobs
-    theta_floor: float = 1e-4
-    r_min_for_theta: float = 10.0
     seed: Optional[int] = None
     preset: str = 'weber_perc_ego_mem'  # doc label only
 
@@ -43,8 +40,6 @@ class ObsNoiseCfg:
         assert self.perc_r >= 0 and self.perc_th >= 0
         assert self.mem_r >= 0 and self.mem_th >= 0
         assert 0.0 <= self.lognorm_k <= 0.5
-        assert self.theta_floor >= 0
-        assert self.r_min_for_theta > 0
         return self
 
     @staticmethod
@@ -71,10 +66,9 @@ class MultiFF(gymnasium.Env):
     def __init__(self,
                  v_noise_std=0,
                  w_noise_std=0,
-                 num_alive_ff=1800,
                  flash_on_interval=0.3,
                  num_obs_ff=5,
-                 max_in_memory_time=3,
+                 max_in_memory_time=2,
                  invisible_distance=500,
                  make_ff_always_flash_on=False,
                  make_ff_always_visible=False,
@@ -126,7 +120,6 @@ class MultiFF(gymnasium.Env):
 
         self.linear_terminal_vel = linear_terminal_vel
         self.angular_terminal_vel = angular_terminal_vel
-        self.num_alive_ff = num_alive_ff
         self.flash_on_interval = flash_on_interval
         self.invisible_distance = invisible_distance
         self.make_ff_always_flash_on = make_ff_always_flash_on
@@ -181,8 +174,9 @@ class MultiFF(gymnasium.Env):
             low=-1., high=1., shape=(2,), dtype=np.float32)
         self.vgain = 200
         self.wgain = pi / 2
-        self.arena_radius = 3000
-        self.recentering_trigger_radius = 2000
+        self.arena_radius = 2000
+        self.num_alive_ff = 800
+        self.recentering_trigger_radius = self.arena_radius - (self.invisible_distance + 100)
         self.ff_radius = 10
         self.invisible_angle = 2 * pi / 9
         self.epi_num = 0
@@ -271,10 +265,10 @@ class MultiFF(gymnasium.Env):
         self._prev_slot_ids = None
         self._prev_vis = np.array([], dtype=np.int32)
 
-        self.ff_t_since_start_seen = np.zeros(
-            self.num_alive_ff, dtype=np.float32)
-        self.ff_t_since_last_seen = np.full(
+        self.ff_t_since_start_seen = np.full(
             self.num_alive_ff, 0, dtype=np.float32)
+        self.ff_t_since_last_seen = np.full(
+            self.num_alive_ff, 9999, dtype=np.float32)
 
         self.ff_visible = np.zeros(self.num_alive_ff, dtype=np.int32)
         self.visible_ff_indices = np.array([], dtype=np.int32)
@@ -312,7 +306,7 @@ class MultiFF(gymnasium.Env):
             'rank_keep') else 'drop_fill'
         if 'visible_only' in strat:
             self.new_ff_scope = 'visible_only'
-        elif 'visible_and_memory' in strat or strat in ('drop_fill', 'rank_keep'):
+        elif 'visible_and_memory' in strat:
             self.new_ff_scope = 'visible_and_memory'
         else:
             # default if unrecognized suffix
@@ -532,13 +526,13 @@ class MultiFF(gymnasium.Env):
         # advance timers; mark visibles; reset t_seen for visibles
 
         self.ff_t_since_start_seen += self.dt
-        self.ff_t_since_last_seen = self.ff_t_since_last_seen + self.dt
+        self.ff_t_since_last_seen += self.dt
 
         if len(self.visible_ff_indices) > 0:
             self.ff_t_since_last_seen[self.visible_ff_indices] = 0.0
 
         if len(self.ff_not_visible_indices) > 0:
-            self.ff_t_since_start_seen[self.ff_not_visible_indices] = 0
+            self.ff_t_since_start_seen[self.ff_not_visible_indices] = 0.0
 
         self.ff_t_since_start_seen[self.newly_visible_ff] = self.dt
 
@@ -597,7 +591,7 @@ class MultiFF(gymnasium.Env):
                 self.total_deviated_target_distance = np.sum(
                     self.ff_distance_all[self.captured_ff_index])
                 self.ff_t_since_start_seen[self.captured_ff_index] = 0
-                self.ff_t_since_last_seen[self.captured_ff_index] = 0
+                self.ff_t_since_last_seen[self.captured_ff_index] = 9999
                 # Defer unbinding and respawn until after current step's obs is produced
                 self._deferred_captured_ff = np.array(
                     self.captured_ff_index, dtype=np.int32)
@@ -913,13 +907,13 @@ class MultiFF(gymnasium.Env):
 
         # Visible → perception noise
         if vis.size:
-            if self.obs_noise.perc_r > 0 and self.obs_noise.perc_th > 0:
+            if self.obs_noise.perc_r > 0 or self.obs_noise.perc_th > 0:
                 self._apply_perception_noise_visible()
             else:
                 self.ffxy_noisy[vis] = self.ffxy[vis]
 
         # Memory noise
-        if self.obs_noise.mem_r > 0 and self.obs_noise.mem_th > 0:
+        if self.obs_noise.mem_r > 0 or self.obs_noise.mem_th > 0:
             if newly_invisible.size:
                 self._apply_memory_noise_ego_weber_subset(
                     newly_invisible, step_scale=alpha_first_mem)
@@ -936,8 +930,8 @@ class MultiFF(gymnasium.Env):
         Applies cumulative egocentric memory noise to a subset of feature positions.
 
         Models gradual memory drift in egocentric polar coordinates (r, θ), where 
-        radial noise scales linearly with distance (σ_r ∝ r) and angular noise 
-        scales inversely with distance (σ_θ ∝ 1/r), following a Weber-like law. 
+        radial noise scales linearly with distance (σ_r ∝ r) and angular noise is modeled as a constant 
+        diffusion term (σθ = k_th). 
         The noise magnitude is scaled by `step_scale`, making it cumulative across 
         simulation steps to reflect progressive memory degradation. 
 
@@ -953,15 +947,12 @@ class MultiFF(gymnasium.Env):
         th = np.arctan2(dy, dx).astype(np.float32) - self.agentheading
         th = self._wrap_pi(th)
 
-        r_min = self.obs_noise.r_min_for_theta
-        th_floor = self.obs_noise.theta_floor
         k_r = self.obs_noise.mem_r
         k_th = self.obs_noise.mem_th
 
         r_i = r
         std_r = step_scale * (k_r * np.maximum(r_i, 0.0))
-        std_th = step_scale * \
-            np.maximum(th_floor, k_th / np.clip(r_i, r_min, None))
+        std_th = np.full_like(r_i, step_scale * k_th)
 
         dr = self.rng.normal(0.0, std_r)
         dth = self.rng.normal(0.0, std_th)
@@ -978,8 +969,8 @@ class MultiFF(gymnasium.Env):
         Applies instantaneous egocentric perceptual noise to currently visible features.
 
         Just like memory noise, models sensory uncertainty in egocentric polar coordinates (r, θ), where 
-        radial noise scales linearly with distance (σ_r ∝ r) and angular noise 
-        scales inversely with distance (σ_θ ∝ 1/r), following a Weber-like law. 
+        radial noise scales linearly with distance (σ_r ∝ r) and angular noise is modeled as a constant 
+        diffusion term (σθ = k_th). 
 
         But unlike memory noise, perception noise is applied once per observation and 
         does not accumulate over time.
@@ -995,11 +986,7 @@ class MultiFF(gymnasium.Env):
         th_true = self._wrap_pi(th_true)
 
         std_r = self.obs_noise.perc_r * r_v
-        std_th = np.maximum(
-            self.obs_noise.theta_floor,
-            self.obs_noise.perc_th /
-            np.clip(r_v, self.obs_noise.r_min_for_theta, None)
-        )
+        std_th = np.full_like(r_v, self.obs_noise.perc_th)
 
         dr = self.rng.normal(0.0, std_r)
         dth = self.rng.normal(0.0, std_th)
@@ -1046,6 +1033,7 @@ class MultiFF(gymnasium.Env):
 
         self._slot_valid_mask = (self.slot_ids >= 0).astype(np.int32)
 
+
     def _eligibility_mask(self):
         """
         Returns boolean mask of FFs eligible for slot binding.
@@ -1056,26 +1044,34 @@ class MultiFF(gymnasium.Env):
                 (b) already bound and still within memory.
         - 'visible_and_memory': any FF within memory window.
         """
-        mem_ok = self.ff_t_since_last_seen <= self.max_in_memory_time
+        in_memory = self.ff_t_since_last_seen < self.max_in_memory_time
 
-        # Base: time-in-memory constraint
-        mask = mem_ok.copy()
+        # Visibility mask
+        vis = self.ff_visible.astype(bool)
 
-        # Additional scope logic
         scope = getattr(self, 'new_ff_scope', 'visible_only')
+
         if scope == 'visible_only':
-            vis = self.ff_visible.astype(bool)
+
+            # If slots exist, mark bound FF
             if getattr(self, 'slot_ids', None) is not None:
-                # currently bound FFs (keep even if invisible)
-                bound = np.zeros_like(mask, dtype=bool)
-                bound[self.slot_ids[self.slot_ids >= 0]] = True
-                # eligible if visible OR bound (and in memory)
-                mask = mem_ok & (vis | bound)
+                bound = np.zeros(self.num_alive_ff, dtype=bool)
+                bound_ids = self.slot_ids[self.slot_ids >= 0]
+                bound[bound_ids] = True
+
+                # eligible = visible OR (bound AND in_memory)
+                mask = vis | (bound & in_memory)
+
             else:
-                mask = mem_ok & vis
-        # else 'visible_and_memory': no extra filter
+                # eligible = visible
+                mask = vis
+
+        else:
+            # visible_and_memory
+            mask = in_memory
 
         return mask
+
 
     def _assign_slots_rank_keep(self, K):
         """
@@ -1194,7 +1190,6 @@ class MultiFF(gymnasium.Env):
         # print(self.slots_SN)
 
         # print('agentxy:', self.agentxy)
-
 
         if self.add_action_to_obs:
             obs[off:off + 2] = self.action

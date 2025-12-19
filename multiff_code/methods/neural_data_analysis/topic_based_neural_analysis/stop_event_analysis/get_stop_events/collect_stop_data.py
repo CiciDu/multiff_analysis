@@ -92,7 +92,7 @@ def collect_stop_data_func(raw_data_folder_path):
     if not hasattr(pn, 'spikes_df'):
         pn.retrieve_or_make_monkey_data()
         pn.spikes_df = neural_data_processing.make_spikes_df(pn.raw_data_folder_path, pn.ff_caught_T_sorted,
-                                                             sampling_rate=pn.sampling_rate)
+                                                             pn.monkey_information, sampling_rate=pn.sampling_rate)
 
     pn.make_or_retrieve_stop_category_df()
 
@@ -108,9 +108,9 @@ def collect_stop_data_func(raw_data_folder_path):
 
     pn.make_one_stop_w_ff_df()
     one_stop_miss = pn.one_stop_w_ff_df[[
-        'first_stop_point_index', 'first_stop_time', 'candidate_target']].copy()
+        'stop_1_point_index', 'stop_1_time', 'candidate_target']].copy()
     one_stop_miss.rename(columns={
-        'first_stop_point_index': 'stop_point_index', 'first_stop_time': 'stop_time'}, inplace=True)
+        'stop_1_point_index': 'stop_point_index', 'stop_1_time': 'stop_time'}, inplace=True)
     one_stop_miss[columns_to_add] = pn.monkey_information.loc[one_stop_miss['stop_point_index'],
                                                               columns_to_add].values
 
@@ -208,7 +208,7 @@ def collect_stop_data_func(raw_data_folder_path):
     datasets_raw = {
         'captures': valid_captures_df.copy(),
         'no_capture': filtered_no_capture_stops_df.copy(),
-        'retry_after_miss': retry_after_miss.copy(),
+        'retry_after_miss': retry_after_miss.copy(), # note: retry_after_miss excludes rcap_last
         'both_middle': both_middle.copy(),
         'rcap_first': rcap_first.copy(),
         'rsw_first': rsw_first.copy(),
@@ -248,7 +248,7 @@ def collect_stop_data_func(raw_data_folder_path):
 
         # ========= Maybe less interpretable because of the confounds in stops & captures surrounding the current stop =========
 
-        {'a': 'switch_after_miss', 'b': 'retry_after_miss',
+        {'a': 'switch_after_miss', 'b': 'retry_after_miss', # retry_after_miss excludes rcap_last
          'key': 'switch_vs_retry_after_miss',
          'title': 'Switch vs Retry After Miss'},
 

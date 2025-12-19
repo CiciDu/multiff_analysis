@@ -164,7 +164,7 @@ class PlotlyPlotter(base_plot_class.BasePlotter):
                 plot_counter_i=i)
 
             if show_fig is True:
-                self.plt.show()
+                self.fig.show()
 
     def plot_cvn_in_plotly_func(self,
                                 monkey_plot_params={},

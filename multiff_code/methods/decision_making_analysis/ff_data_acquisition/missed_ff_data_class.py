@@ -29,8 +29,8 @@ class MissedFfDataClass():
 
     def streamline_making_current_and_alternative_ff_info(self,
                                                           add_one_stop_info=False,
-                                                          time_with_respect_to_first_stop=None,
-                                                          time_with_respect_to_second_stop=None,
+                                                          time_with_respect_to_stop_1=None,
+                                                          time_with_respect_to_stop_2=None,
                                                           time_with_respect_to_last_stop=None,
                                                           n_seconds_before_crossing_boundary=2,
                                                           n_seconds_after_crossing_boundary=None,
@@ -58,8 +58,8 @@ class MissedFfDataClass():
 
         # --- Align times ---
         self.set_point_of_eval(
-            time_with_respect_to_first_stop=time_with_respect_to_first_stop,
-            time_with_respect_to_second_stop=time_with_respect_to_second_stop,
+            time_with_respect_to_stop_1=time_with_respect_to_stop_1,
+            time_with_respect_to_stop_2=time_with_respect_to_stop_2,
             time_with_respect_to_last_stop=time_with_respect_to_last_stop,
         )
         self.time_of_eval = self.miss_events_df['time_of_eval']
@@ -176,6 +176,10 @@ class MissedFfDataClass():
                 self.gc_kwargs['num_time_points_for_trajectory_to_plot'],
                 traj_point_features=self.gc_kwargs['trajectory_features'],
             )
+            self.relevant_curv_of_traj_df = self.traj_data_df[self.all_traj_feature_names['relevant_curv_of_traj']].copy(
+            )
+            self.relevant_curv_of_traj_df['point_index'] = self.traj_data_df['point_index']
+
         except AttributeError:
             pass
 
@@ -355,16 +359,16 @@ class MissedFfDataClass():
             print(
                 f'[INFO] Generated and saved new curv_of_traj_df at {filepath}')
 
-    def set_point_of_eval(self, time_with_respect_to_first_stop=None,
-                          time_with_respect_to_second_stop=None,
+    def set_point_of_eval(self, time_with_respect_to_stop_1=None,
+                          time_with_respect_to_stop_2=None,
                           time_with_respect_to_last_stop=None,
                           ):
 
         self.miss_events_df = get_missed_ff_data.set_point_of_eval(
             self.miss_events_df,
             self.monkey_information,
-            time_with_respect_to_first_stop=time_with_respect_to_first_stop,
-            time_with_respect_to_second_stop=time_with_respect_to_second_stop,
+            time_with_respect_to_stop_1=time_with_respect_to_stop_1,
+            time_with_respect_to_stop_2=time_with_respect_to_stop_2,
             time_with_respect_to_last_stop=time_with_respect_to_last_stop,
         )
 
@@ -374,7 +378,7 @@ class MissedFfDataClass():
             self.furnish_rcap_events_df()
 
         self.rcap_events_df['total_stop_time'] = self.rcap_events_df['last_stop_time'] - \
-            self.rcap_events_df['first_stop_time']
+            self.rcap_events_df['stop_1_time']
         self.rcap_events_df['candidate_target'] = self.rcap_events_df['cur_ff_index'].fillna(
             0)
         self.rcap_events_df['target_index'] = self.rcap_events_df['trial'].astype(
@@ -399,7 +403,7 @@ class MissedFfDataClass():
             self.miss_to_switch_df = self.rsw_w_ff_df.copy()
 
         self.miss_to_switch_df['total_stop_time'] = self.miss_to_switch_df['last_stop_time'] - \
-            self.miss_to_switch_df['first_stop_time']
+            self.miss_to_switch_df['stop_1_time']
 
     def get_free_selection_x(self, num_ff_per_row=5, select_every_nth_row=1, add_arc_info=False, arc_info_to_add=['opt_arc_curv', 'curv_diff'],
                              curvature_df=None, curv_of_traj_df=None, **kwargs):
@@ -418,8 +422,8 @@ class MissedFfDataClass():
         else:
             self.free_selection_df_sample = self.free_selection_df.copy()
 
-        self.free_selection_x_df, self.free_selection_labels, self.cases_for_inspection, self.chosen_rows_of_df, self.sequence_of_obs_ff_indices, self.free_selection_x_df_for_plotting = free_selection.organize_free_selection_x(self.free_selection_df_sample, self.ff_dataframe, self.ff_real_position_sorted, self.monkey_information, ff_caught_T_new=self.ff_caught_T_new,
-                                                                                                                                                                                                                                   only_select_n_ff_case=None, num_ff_per_row=num_ff_per_row, add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, **kwargs)
+        self.free_selection_x_df, self.y_value, self.cases_for_inspection, self.chosen_rows_of_df, self.sequence_of_obs_ff_indices, self.free_selection_x_df_for_plotting = free_selection.organize_free_selection_x(self.free_selection_df_sample, self.ff_dataframe, self.ff_real_position_sorted, self.monkey_information, ff_caught_T_new=self.ff_caught_T_new,
+                                                                                                                                                                                                                     only_select_n_ff_case=None, num_ff_per_row=num_ff_per_row, add_arc_info=add_arc_info, arc_info_to_add=arc_info_to_add, curvature_df=curvature_df, curv_of_traj_df=curv_of_traj_df, **kwargs)
         self.free_selection_x_df_for_plotting = self.free_selection_x_df_for_plotting.drop(
             columns=['ff_angle_boundary'], errors='ignore')
         self.free_selection_time = self.chosen_rows_of_df.time.values

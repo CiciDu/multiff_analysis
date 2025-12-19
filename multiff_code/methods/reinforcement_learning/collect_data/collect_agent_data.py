@@ -276,11 +276,7 @@ def pack_monkey_information(time, monkey_x, monkey_y, speed, ang_speed, is_stop,
         'monkey_angle': monkey_angle,
     }
 
-    delta_x = np.diff(monkey_information['monkey_x'])
-    delta_y = np.diff(monkey_information['monkey_y'])
-    delta_position = np.sqrt(np.square(delta_x)+np.square(delta_y))
-    crossing_boundary = np.append(0, (delta_position > 100).astype('int'))
-    monkey_information['crossing_boundary'] = crossing_boundary
+    monkey_information['crossing_boundary'] = 0
 
     monkey_information = pd.DataFrame(monkey_information)
 

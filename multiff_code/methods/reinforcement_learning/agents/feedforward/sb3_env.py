@@ -11,11 +11,9 @@ class EnvForSB3(base_env.MultiFF):
 
     def __init__(self,
                  obs_visible_only=False,
-                 identity_slot_strategy='rank_keep',
                  **kwargs):
 
         super().__init__(obs_visible_only=obs_visible_only,
-                         identity_slot_strategy=identity_slot_strategy,
                          **kwargs)
 
 

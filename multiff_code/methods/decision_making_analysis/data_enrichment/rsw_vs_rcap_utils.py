@@ -19,14 +19,14 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def add_closest_point_on_trajectory_to_cur_ff(trials_df, monkey_information, ff_real_position_sorted):
-    if 'cur_ff_index' not in trials_df.columns:
-        trials_df['cur_ff_index'] = trials_df['ff_index']
-    trials_df[['cur_ff_x', 'cur_ff_y']
-              ] = ff_real_position_sorted[trials_df['cur_ff_index'].values]
+def add_closest_point_on_trajectory_to_cur_ff(events_df, monkey_information, ff_real_position_sorted):
+    if 'cur_ff_index' not in events_df.columns:
+        events_df['cur_ff_index'] = events_df['ff_index']
+    events_df[['cur_ff_x', 'cur_ff_y']
+              ] = ff_real_position_sorted[events_df['cur_ff_index'].values]
     list_of_closest_points = []
-    for index, row in trials_df.iterrows():
-        start_time = row['first_stop_time'] - 1
+    for index, row in events_df.iterrows():
+        start_time = row['stop_1_time'] - 1
         end_time = row['last_stop_time'] + 1
         monkey_sub = monkey_information[(monkey_information['time'] >= start_time) & (
             monkey_information['time'] <= end_time)].copy()
@@ -35,16 +35,16 @@ def add_closest_point_on_trajectory_to_cur_ff(trials_df, monkey_information, ff_
         closest_point_index = monkey_sub.loc[monkey_sub['distance_to_ff'].idxmin(
         ), 'point_index']
         list_of_closest_points.append(closest_point_index)
-    trials_df['closest_point_index_to_cur_ff'] = list_of_closest_points
+    events_df['closest_point_index_to_cur_ff'] = list_of_closest_points
 
 
-def add_stop_point_index(trials_df, monkey_information, ff_real_position_sorted):
+def add_stop_point_index(events_df, monkey_information, ff_real_position_sorted):
     # Note: stop_point_index here is not necessarily a real stop!!! But only the point on the trajectory that is closest to the current ff.
     add_closest_point_on_trajectory_to_cur_ff(
-        trials_df, monkey_information, ff_real_position_sorted)
-    trials_df['stop_point_index'] = trials_df['closest_point_index_to_cur_ff']
-    trials_df['stop_time'] = monkey_information.loc[trials_df['stop_point_index'], 'time'].values
-    return trials_df
+        events_df, monkey_information, ff_real_position_sorted)
+    events_df['stop_point_index'] = events_df['closest_point_index_to_cur_ff']
+    events_df['stop_time'] = monkey_information.loc[events_df['stop_point_index'], 'time'].values
+    return events_df
 
 
 def add_cur_ff_info(rsw_w_ff_df, ff_real_position_sorted):
@@ -59,7 +59,7 @@ def add_cur_ff_info(rsw_w_ff_df, ff_real_position_sorted):
 def deal_with_duplicated_stop_point_index(
     rsw_w_ff_df: pd.DataFrame,
     stop_col: str = "stop_point_index",
-    first_col: str = "first_stop_point_index",
+    first_col: str = "stop_1_point_index",
     last_col: str = "last_stop_point_index",
     warn: bool = True,
 ) -> pd.DataFrame:
@@ -137,11 +137,11 @@ def deal_with_duplicated_stop_point_index(
     return out
 
 
-def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_position_sorted, stop_period_duration):
+def process_events_df(events_df, monkey_information, ff_dataframe, ff_real_position_sorted, stop_period_duration):
 
     ff_dataframe_visible = ff_dataframe[ff_dataframe['visible'] == 1].copy()
 
-    processed_df = trials_df[['stop_point_index',
+    processed_df = events_df[['stop_point_index',
                               'ff_index', 'stop_id_duration']].copy()
     processed_df[['stop_time', 'stop_cum_distance']
                  ] = monkey_information.loc[processed_df.stop_point_index, ['time', 'cum_distance']].values
@@ -193,7 +193,7 @@ def process_trials_df(trials_df, monkey_information, ff_dataframe, ff_real_posit
     return processed_df
 
 
-def further_make_trials_df(processed_df, monkey_information, ff_real_position_sorted, stop_period_duration, ref_point_mode, ref_point_value):
+def further_make_events_df(processed_df, monkey_information, ff_real_position_sorted, stop_period_duration, ref_point_mode, ref_point_value):
     processed_df2 = find_cvn_utils.find_ff_info_based_on_ref_point(processed_df, monkey_information, ff_real_position_sorted,
                                                                    ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
 
@@ -329,9 +329,8 @@ non_cluster_columns_to_keep_from_plan_features_df = ['d_from_cur_ff_to_nxt_ff',
                                                      'dir_from_cur_ff_same_side']
 
 
-
 def extract_binary_event_label(df, point_index_array, event_col='event_type',
-                                point_col='point_index', positive_event='rcap'):
+                               point_col='point_index', positive_event='rcap'):
 
     # Subset relevant columns
     df_sub = df[[point_col, event_col]].copy()
@@ -350,7 +349,8 @@ def extract_binary_event_label(df, point_index_array, event_col='event_type',
 
     # Deduplicate safely
     df_unique = df_sub.drop_duplicates(subset=point_col, keep='first').copy()
-    df_unique['whether_rcap'] = (df_unique[event_col] == positive_event).astype(int)
+    df_unique['whether_rcap'] = (
+        df_unique[event_col] == positive_event).astype(int)
     df_unique.set_index(point_col, inplace=True)
 
     # Align to desired order

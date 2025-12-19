@@ -1,9 +1,10 @@
 from planning_analysis.plan_factors import plan_factors_class
 from reinforcement_learning.agents.feedforward import sb3_class
 from reinforcement_learning.base_classes import rl_base_class
+from data_wrangling import further_processing_class, retrieve_raw_data, time_calib_utils
 
 
-class PlanFactorsOfAgent():
+class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
 
     def __init__(self,
                  # overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu',
@@ -26,17 +27,17 @@ class PlanFactorsOfAgent():
         episode_len = int(n_steps * 1.2)
         env_kwargs['episode_len'] = episode_len
 
-        self.rl_ff = sb3_class.SB3forMultifirefly(model_folder_name=self.model_folder_name,
+        self.agent = sb3_class.SB3forMultifirefly(model_folder_name=self.model_folder_name,
                                                   data_name=self.data_name,
                                                   overall_folder='',
                                                   **env_kwargs)
-        self.rl_ff.streamline_getting_data_from_agent(
+        self.agent.streamline_getting_data_from_agent(
             n_steps=n_steps, exists_ok=exists_ok, save_data=save_data)
 
     def make_animation(self, currentTrial=None, num_trials=None, duration=[10, 20], video_dir=None):
-        self.rl_ff.set_animation_parameters(
+        self.agent.set_animation_parameters(
             currentTrial=currentTrial, num_trials=num_trials, k=1, duration=duration)
-        self.rl_ff.call_animation_function(video_dir=video_dir)
+        self.agent.call_animation_function(video_dir=video_dir)
 
     def _copy_df_from_pn_to_self(self):
 
@@ -62,7 +63,10 @@ class PlanFactorsOfAgent():
                      'ff_flash_sorted',
                      'closest_stop_to_capture_df'
                      ]:
-            setattr(self.pf, attr, getattr(self.rl_ff, attr))
+            if hasattr(self.agent, attr):
+                setattr(self.pf, attr, getattr(self.agent, attr))
+            else:
+                print(f'Attribute {attr} not found in agent. Will not be able to load onto pf.')
 
     def _initialize_pf(self, **kwargs):
 
@@ -124,6 +128,7 @@ class PlanFactorsOfAgent():
                                                           curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                                           n_steps=8000,
                                                           merge_diff_in_curv_df_to_heading_info=True,
+                                                          use_stored_data_only=False,
                                                           **env_kwargs):
 
         self._initialize_pf(curv_of_traj_mode=curv_of_traj_mode,
@@ -138,6 +143,9 @@ class PlanFactorsOfAgent():
                 setattr(self, f'{test_or_ctrl}_heading_info_df',
                         heading_info_df)
         except Exception as e:
+            if use_stored_data_only:
+                raise Exception(
+                    'Data missing. Will not be able to make heading info df.')
             print('Data missing. Will get agent data first. Error message: ', e)
             self.get_agent_data(
                 n_steps=n_steps, exists_ok=monkey_data_exists_ok, save_data=save_data, **env_kwargs)

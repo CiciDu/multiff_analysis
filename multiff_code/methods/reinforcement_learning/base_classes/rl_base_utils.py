@@ -147,27 +147,40 @@ def retrieve_params(model_folder_name):
     return params
 
 
-def get_folders_with_params(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
+def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
+    agent_folders = []
 
-    dirs = [f for f in os.listdir(
-        path) if os.path.isdir(os.path.join(path, f))]
+    # Walk through all directories and subdirectories
+    for root, dirs, files in os.walk(path):
+        # Check if this folder contains checkpoint_manifest.json
+        if 'checkpoint_manifest.json' in files:
+            agent_folders.append(root)
 
-    # get all subfolders and sub-sub folders in path
-    all_folders = []
-    for dir in dirs:
-        folders = os.listdir(f'{path}/{dir}')
-        for folder in folders:
-            all_folders.append(f'{path}/{dir}/{folder}')
+    return agent_folders
 
-    # take out folders in all_folders if it contains env_params.csv
-    folders_with_params = []
-    for folder in all_folders:
-        # if folder is a directory
-        if os.path.isdir(folder):
-            if 'env_params.txt' in os.listdir(folder):
-                folders_with_params.append(folder)
 
-    return folders_with_params
+# def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
+
+#     dirs = [f for f in os.listdir(
+#         path) if os.path.isdir(os.path.join(path, f))]
+
+#     # get all subfolders and sub-sub folders in path
+#     all_folders = []
+#     for dir in dirs:
+#         folders = os.listdir(f'{path}/{dir}')
+#         for folder in folders:
+#             all_folders.append(f'{path}/{dir}/{folder}')
+
+#     # take out folders in all_folders if it contains checkpoint_manifest.json
+#     agent_folders = []
+#     for folder in all_folders:
+#         # if folder is a directory
+#         if os.path.isdir(folder):
+#             print(folder)
+#             if 'checkpoint_manifest.json' in os.listdir(folder):
+#                 agent_folders.append(folder)
+
+#     return agent_folders
 
 
 def add_essential_agent_params_info(df, params):

@@ -175,8 +175,8 @@ def plot_fr_over_time(
     binned_spikes_df, bin_width, max_time=None,
     bins_per_aggregate=1, num_clusters_per_plot=5, plot_mean=True
 ):
-    fr_df = _prepare_fr_data(
-        binned_spikes_df, bin_width, bins_per_aggregate, max_time)
+    fr_df = prepare_fr_data(
+        binned_spikes_df, bin_width, bins_per_aggregate, max_time=max_time)
     cluster_cols = [col for col in fr_df.columns if col.startswith('cluster_')]
     _plot_fr_curves(
         fr_df, cluster_cols, num_clusters_per_plot, plot_mean)
@@ -188,7 +188,7 @@ def plot_fr_over_time(
     print(f'Total change: {round(total_change, 4)}')
 
 
-def _prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None):
+def prepare_fr_data(binned_df, bin_width, bins_per_aggregate, time_array=None, max_time=None):
     df = binned_df.copy()
     if time_array is None:
         df['time'] = df['bin'] * bin_width

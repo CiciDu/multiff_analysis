@@ -21,13 +21,13 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                  model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
-                 num_steps_per_dataset=40000,  # note, currently we use 10000s / dt = 40000 steps
+                 # note, currently we use 900s / dt = 9000 steps (15 mins)
+                 backend='matplotlib',
                  ):
 
-        super().__init__(opt_arc_type=opt_arc_type)
+        super().__init__(opt_arc_type=opt_arc_type, backend=backend)
         self.model_folder_name = model_folder_name
         self.opt_arc_type = opt_arc_type
-        self.num_steps_per_dataset = num_steps_per_dataset
         rl_base_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name)
         self.monkey_name = None
@@ -36,13 +36,13 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             'all_agents', 'all_collected_data/planning'), 'combined_data')
         self.combd_cur_and_nxt_folder_path = os.path.join(
             self.combd_planning_info_folder_path, 'cur_and_nxt')
-        # note that we used dir_name for the above because those data folder path includes "individual_data_sessions/data_0" and so on at the end.
         self.make_key_paths()
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
     def streamline_getting_y_values(self,
-                                    num_datasets_to_collect=5,
+                                    num_datasets_to_collect=2,
+                                    num_steps_per_dataset=9000,
                                     ref_point_mode='time after cur ff visible',
                                     ref_point_value=0.1,
                                     save_data=True,
@@ -50,55 +50,70 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                     intermediate_products_exist_ok=True,
                                     agent_data_exists_ok=True,
                                     model_folder_name=None,
+                                    ref_point_params_based_on_mode=None,
+                                    use_stored_data_only=False,
                                     **env_kwargs
                                     ):
+        
+        self.num_steps_per_dataset = num_steps_per_dataset
+        
+        if ref_point_params_based_on_mode is None:
+            ref_point_params_based_on_mode = self.default_ref_point_params_based_on_mode
+   
 
         if model_folder_name is None:
             model_folder_name = self.model_folder_name
 
-        # make sure there's enough data from agent
-        for i in range(num_datasets_to_collect):
-            data_name = f'data_{i}'
+        if not use_stored_data_only:
+            # make sure there's enough data from agent
+            for i in range(num_datasets_to_collect):
+                data_name = f'data_{i}'
+                print(' ')
+                print('model_folder_name:', model_folder_name)
+                print('data_name:', data_name)
+                # make a new instance of PlanFactorsOfAgent for each dataset for convenience
+                self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=model_folder_name,
+                                                                    data_name=data_name,
+                                                                    opt_arc_type=self.opt_arc_type,
+                                                                    )
+
+                # check to see if data exists:
+                if agent_data_exists_ok & exists(os.path.join(self.pfa.processed_data_folder_path, 'monkey_information.csv')):
+                    print('Data exists for this agent.')
+                    continue
+                print('Getting agent data ......')
+                env_kwargs['print_ff_capture_incidents'] = False
+                self.pfa.get_agent_data(**env_kwargs, exists_ok=agent_data_exists_ok,
+                                        save_data=save_data, n_steps=self.num_steps_per_dataset)
+            
+        try: 
             print(' ')
-            print('model_folder_name:', model_folder_name)
-            print('data_name:', data_name)
-            self.pfa = agent_plan_factors_class.PlanFactorsOfAgent(model_folder_name=model_folder_name,
-                                                                   data_name=data_name,
-                                                                   opt_arc_type=self.opt_arc_type,
-                                                                   )
+            print('Making overall all median info ......')
+            self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode=ref_point_params_based_on_mode,
+                                                            list_of_curv_traj_window_before_stop=[
+                [-25, 0]],
+                save_data=save_data,
+                exists_ok=final_products_exist_ok,
+                pooled_median_info_exists_ok=intermediate_products_exist_ok,
+                combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
+                stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                heading_info_df_exists_ok=intermediate_products_exist_ok,
+                use_stored_data_only=use_stored_data_only)
 
-            # check to see if data exists:
-            if agent_data_exists_ok & exists(os.path.join(self.pfa.processed_data_folder_path, 'monkey_information.csv')):
-                print('Data exists for this agent.')
-                continue
-            print('Getting agent data ......')
-            env_kwargs['print_ff_capture_incidents'] = False
-            self.pfa.get_agent_data(**env_kwargs, exists_ok=agent_data_exists_ok,
-                                    save_data=save_data, n_steps=self.num_steps_per_dataset)
-
-        print(' ')
-        print('Making overall all median info ......')
-        self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode={'time after cur ff visible': [0.1, 0],
-                                                                                         'distance': [-150, -100, -50]},
-                                                         list_of_curv_traj_window_before_stop=[
-            [-25, 0]],
-            save_data=save_data,
-            exists_ok=final_products_exist_ok,
-            pooled_median_info_exists_ok=intermediate_products_exist_ok,
-            combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
-            stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-            heading_info_df_exists_ok=intermediate_products_exist_ok)
-
-        self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
-        print(' ')
-        print('Making all perc info ......')
-        self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                               verbose=True,
-                                               exists_ok=final_products_exist_ok,
-                                               stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                                               heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                               save_data=save_data)
-        self.agent_all_perc_df = self.pooled_perc_info.copy()
+            self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
+            print(' ')
+            print('Making all perc info ......')
+            self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                verbose=True,
+                                                exists_ok=final_products_exist_ok,
+                                                stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                                                heading_info_df_exists_ok=intermediate_products_exist_ok,
+                                                save_data=save_data,
+                                                use_stored_data_only=use_stored_data_only)
+            self.agent_all_perc_df = self.pooled_perc_info.copy()
+        except Exception as e:
+            print(f'Error making overall all median info: {e}')
+            raise Exception(f'Error making either overall all median info or perc info: {e}')
 
     def get_plan_features_df_across_sessions(self,
                                              num_datasets_to_collect=1,
@@ -194,6 +209,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                          curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                          use_curv_to_ff_center=False,
                                          save_data=True,
+                                         use_stored_data_only=False,
                                          **env_kwargs
                                          ):
         self.test_heading_info_df = pd.DataFrame()
@@ -219,6 +235,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                                        use_curv_to_ff_center=use_curv_to_ff_center,
                                                                        save_data=save_data,
                                                                        n_steps=self.num_steps_per_dataset,
+                                                                       use_stored_data_only=use_stored_data_only,
                                                                        **env_kwargs)
 
             self._add_heading_info_to_combd_heading_info(data_name)
@@ -248,6 +265,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                           curv_of_traj_mode='distance', window_for_curv_of_traj=[-25, 0],
                                                           use_curv_to_ff_center=False,
                                                           save_data=True,
+                                                          use_stored_data_only=False,
                                                           **env_kwargs
                                                           ):
 
@@ -258,7 +276,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
                     raise Exception('Empty combd_heading_df_x_sessions.')
             else:
-                raise Exception()
+                raise Exception('combd_heading_df_x_sessions_exists_ok is False.')
 
         except Exception as e:
             print(
@@ -271,6 +289,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                   curv_of_traj_mode=curv_of_traj_mode, window_for_curv_of_traj=window_for_curv_of_traj,
                                                   use_curv_to_ff_center=use_curv_to_ff_center,
                                                   save_data=save_data,
+                                                  use_stored_data_only=use_stored_data_only,
                                                   **env_kwargs)
 
     def _add_plan_features_to_combd_plan_features(self, data_name):
@@ -297,7 +316,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.all_ref_pooled_median_info['monkey_name'] = 'agent'
         return self.all_ref_pooled_median_info
 
-    def make_or_retrieve_pooled_perc_info(self, **kwargs):
-        self.pooled_perc_info = super().make_or_retrieve_pooled_perc_info(**kwargs)
+    def make_or_retrieve_pooled_perc_info(self, use_stored_data_only=False, **kwargs):
+        self.pooled_perc_info = super().make_or_retrieve_pooled_perc_info(use_stored_data_only=use_stored_data_only, **kwargs)
         self.pooled_perc_info['monkey_name'] = 'agent'
         return self.pooled_perc_info

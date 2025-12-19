@@ -1,271 +1,160 @@
+"""
+Legacy class wrapper around the new function-based API in
+plot_variations_functions.py.
 
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
-from planning_analysis.factors_vs_indicators import process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import parent_assembler
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+This preserves backward compatibility for any code that still uses
+    pv = _PlotVariations()
+    pv.plot_median_heading(...)
+while internally routing all work to the unified function-based API.
+"""
+
 import numpy as np
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
+    plot_variations_functions as pvf
+)
 
 
 class _PlotVariations:
+    """
+    Thin, backward-compatible wrapper that delegates to the modern,
+    function-based API in plot_variations_functions.py.
+    """
 
-    def __init__(self):
-        pass
+    def __init__(self, backend='plotly'):
+        """
+        backend: 'plotly' or 'matplotlib'
+        """
+        self.backend = backend
+        self.fig = None
+        self.main_fig = None
+        self.diff_fig = None
 
-    def plot_median_heading(self,
-                            all_ref_median_info=None,
-                            x_var_column_list=[
-                                'ref_point_value'],
-                            fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-                                                          'key_for_split': 'ff_seen'},
-                            changeable_variables=[
-                                'whether_even_out_dist'],
-                            columns_to_find_unique_combinations_for_color=[],
-                            columns_to_find_unique_combinations_for_line=[],
-                            add_ci_bounds=True,
-                            use_subplots_based_on_changeable_variables=False,
-                            is_difference=False,
-                            ):
+    # ---------------------------------------------------------------
+    # Simple 1-panel APIs
+    # ---------------------------------------------------------------
 
+    def plot_median_heading(
+        self,
+        all_ref_median_info=None,
+        x_var_column_list=['ref_point_value'],
+        fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
+                                      'key_for_split': 'ff_seen'},
+        changeable_variables=['whether_even_out_dist'],
+        columns_to_find_unique_combinations_for_color=None,
+        columns_to_find_unique_combinations_for_line=None,
+        add_ci_bounds=True,
+        use_subplots_based_on_changeable_variables=False,
+        is_difference=False,
+    ):
         if all_ref_median_info is None:
             all_ref_median_info = self.all_ref_pooled_median_info_heading
-
-        all_ref_median_info['diff_in_abs_angle_to_nxt_ff_median'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_median'] * 180/np.pi
-
-        if add_ci_bounds:
-            all_ref_median_info['ci_lower'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_ci_low_95'] * 180/np.pi
-            all_ref_median_info['ci_upper'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_ci_high_95'] * 180/np.pi
-
-        if is_difference:
-            all_ref_median_info = all_ref_median_info[all_ref_median_info['test_or_control'] == 'difference']
-        else:
-            all_ref_median_info = all_ref_median_info[all_ref_median_info['test_or_control'] != 'difference']
-
-        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
-                                                                                                   fixed_variable_values_to_use,
-                                                                                                   changeable_variables,
-                                                                                                   x_var_column_list,
-                                                                                                   y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-                                                                                                   # var_to_determine_x_offset_direction=None,
-                                                                                                   var_to_determine_x_offset_direction='test_or_control',
-                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                                   columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-                                                                                                   use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
-
-        if (len(x_var_column_list) == 1) and ('ref_point_value' in x_var_column_list):
-            if is_difference:
-                self.fig.update_layout(
-                    title="Test vs Control Difference in Absolute Angle to Next FF (Median ± 95% BCa CI)",
-                    xaxis_title="Reference Distance (cm)",
-                    yaxis_title="Difference in Median Angle(°)"
-                )
-            else:
-                self.fig.update_layout(
-                    title="Absolute Angle to Next FF (Median ± 95% BCa CI)",
-                    xaxis_title="Reference Distance (cm)",
-                    yaxis_title="Angle (°)"
-                )
-
-    def plot_median_curv(self,
-                         all_ref_median_info=None,
-                         x_var_column_list=['ref_point_value'],
-                         fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-                                                       'key_for_split': 'ff_seen'},
-                         changeable_variables=[
-                             'whether_even_out_dist'],
-                         columns_to_find_unique_combinations_for_color=[
-                             'curv_traj_window_before_stop'],
-                         columns_to_find_unique_combinations_for_line=[],
-                         add_ci_bounds=True,
-                         use_subplots_based_on_changeable_variables=False,
-                         is_difference=False):
-
-        # note: d_curv has already been converted to degrees/m in furnish_diff_in_curv_df function
-
-        if all_ref_median_info is None:
-            all_ref_median_info = self.all_ref_pooled_median_info_curv
-
-        if add_ci_bounds:
-            all_ref_median_info['ci_lower'] = all_ref_median_info['diff_in_abs_d_curv_ci_low_95']
-            all_ref_median_info['ci_upper'] = all_ref_median_info['diff_in_abs_d_curv_ci_high_95']
-
-        if is_difference:
-            all_ref_median_info = all_ref_median_info[all_ref_median_info['test_or_control'] == 'difference']
-        else:
-            all_ref_median_info = all_ref_median_info[all_ref_median_info['test_or_control'] != 'difference']
-
-        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(all_ref_median_info,
-                                                                                                   fixed_variable_values_to_use,
-                                                                                                   changeable_variables,
-                                                                                                   x_var_column_list,
-                                                                                                   y_var_column='diff_in_abs_d_curv_median',
-                                                                                                   # var_to_determine_x_offset_direction=None,
-                                                                                                   var_to_determine_x_offset_direction='test_or_control',
-                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                                   columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-                                                                                                   use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables)
-
-        if (len(x_var_column_list) == 1) and ('ref_point_value' in x_var_column_list):
-            if is_difference:
-                self.fig.update_layout(
-                    title="Test vs Control Difference in Curvature (Median ± 95% BCa CI)",
-                    xaxis_title="Reference Distance (cm)",
-                    yaxis_title="Difference in Median Curvature (°/m)"
-                )
-            else:
-                self.fig.update_layout(
-                    title="Difference in Curvature Across Two Arc Pairs (Median ± 95% BCa CI)",
-                    xaxis_title="Reference Distance (cm)",
-                    yaxis_title="Curvature (°/m)"
-                )
-
-    def plot_same_side_percentage(self,
-                                  perc_info=None,
-                                  x_var_column_list=['monkey_name'],
-                                  fixed_variable_values_to_use={
-                                      'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
-                                  changeable_variables=[
-                                      'monkey_name'],
-                                  columns_to_find_unique_combinations_for_color=[],
-                                  add_ci_bounds=True,
-                                  use_subplots_based_on_changeable_variables=False,
-                                  show_fig=True,
-                                  is_difference=False,
-                                  y_min=None,
-                                  y_max=None,
-                                  ):
-
-        if perc_info is None:
-            perc_info = self.pooled_perc_info
-
-        perc_info['perc'] = perc_info['perc'] * 100
-
-        if add_ci_bounds:
-            perc_info['ci_lower'] = perc_info['perc_ci_low_95'] * 100
-            perc_info['ci_upper'] = perc_info['perc_ci_high_95'] * 100
-
-        if is_difference:
-            perc_info = perc_info[perc_info['test_or_control'] == 'difference']
-        else:
-            perc_info = perc_info[perc_info['test_or_control'] != 'difference']
-
-        perc_info = process_variations_utils.make_new_df_for_plotly_comparison(
-            perc_info, match_rows_based_on_ref_columns_only=False)
-
-        self.fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(perc_info,
-                                                                                                   fixed_variable_values_to_use,
-                                                                                                   changeable_variables,
-                                                                                                   x_var_column_list,
-                                                                                                   y_var_column='perc',
-                                                                                                   var_to_determine_x_offset_direction='test_or_control',
-                                                                                                   columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                                                                                   use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
-                                                                                                   )
-
-        # Calculate y-axis limits based on ci_lower and ci_upper
-        if y_min is None:
-            y_min = perc_info['ci_lower'].min(
-            ) if add_ci_bounds else perc_info['perc'].min()
-            y_min = max(0, y_min - 20)
-        if y_max is None:
-            y_max = perc_info['ci_upper'].max(
-            ) if add_ci_bounds else perc_info['perc'].max()
-            y_max = min(100, y_max + 5)
-
-        self.fig.update_layout(
-            title="Same-Side Stop Rate",
-            xaxis_title=None,
-            yaxis_title="Same-Side Stop Rate",
-        )
-        # Apply y-axis range to all subplots
-        self.fig.update_yaxes(range=[y_min, y_max])
-        if show_fig:
-            self.fig.show()
-
-    def plot_same_side_percentage_across_monkeys(self,
-                                                 perc_info=None,
-                                                 x_var_column_list=[
-                                                     'monkey_name'],
-                                                 fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
-                                                                               'key_for_split': 'ff_seen',
-                                                                               'whether_even_out_dist': False,
-                                                                               },
-                                                 changeable_variables=[],  # 'key_for_split'
-                                                 columns_to_find_unique_combinations_for_color=[],
-                                                 add_ci_bounds=True,
-                                                 ):
-
-        self.plot_same_side_percentage(perc_info=perc_info,
-                                       x_var_column_list=x_var_column_list,
-                                       fixed_variable_values_to_use=fixed_variable_values_to_use,
-                                       changeable_variables=changeable_variables,
-                                       columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-                                       add_ci_bounds=add_ci_bounds,
-                                       use_subplots_based_on_changeable_variables=True,
-                                       y_min=45,  # Set fixed y_min
-                                       y_max=65)  # Set fixed y_max
-
-    # shared engine
-
-    def _plot_median_with_difference(self, *,
-                                     all_ref_median_info,
-                                     x_var_column_list,
-                                     fixed_variable_values_to_use,
-                                     changeable_variables,
-                                     columns_to_find_unique_combinations_for_color,
-                                     columns_to_find_unique_combinations_for_line,
-                                     use_subplots_based_on_changeable_variables,
-                                     y_var_column,
-                                     main_y_title,
-                                     diff_y_title,
-                                     overall_title,
-                                     constant_marker_size=None,
-                                     x_title='Reference Distance from Stop at Current Target (cm)',
-                                     ):
-        # split
-        main_data = all_ref_median_info[all_ref_median_info['test_or_control'] != 'difference'].copy(
-        )
-        difference_data = all_ref_median_info[all_ref_median_info['test_or_control'] == 'difference'].copy(
-        )
-
-        # common kwargs
-        common = dict(
+        
+        
+        self.fig = pvf.plot_median_heading(
+            all_ref_median_info=all_ref_median_info,
+            x_var_column_list=x_var_column_list,
             fixed_variable_values_to_use=fixed_variable_values_to_use,
             changeable_variables=changeable_variables,
-            x_var_column_list=x_var_column_list,
-            y_var_column=y_var_column,
-            var_to_determine_x_offset_direction='test_or_control',
             columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
             columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
+            add_ci_bounds=add_ci_bounds,
             use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables,
+            is_difference=is_difference,
+            backend=self.backend,
         )
-
-        # children
-        self.main_fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(
-            main_data, **common, is_difference=False, constant_marker_size=constant_marker_size)
-        self.diff_fig = plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(
-            difference_data, **common, is_difference=True, constant_marker_size=constant_marker_size)
-
-        if not hasattr(self, 'parent_assembler'):
-            self.parent_assembler = parent_assembler.ParentFigureAssembler(
-                x_title="Optimal Arc Type")
-
-        # parent
-        self.fig = self.parent_assembler.assemble(
-            self.main_fig, self.diff_fig,
-            main_y_title=main_y_title,
-            diff_y_title=diff_y_title,
-            overall_title=overall_title,
-            x_title=x_title,
-        )
-        # Retain x and y axis lines across all subplots
-        self.fig.update_xaxes(
-            showline=True, linecolor='black', linewidth=1, mirror=False)
-        self.fig.update_yaxes(
-            showline=True, linecolor='black', linewidth=1, mirror=False)
         return self.fig
 
-    # public wrappers (unchanged names)
+    def plot_median_curv(
+        self,
+        all_ref_median_info=None,
+        x_var_column_list=['ref_point_value'],
+        fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
+                                      'key_for_split': 'ff_seen'},
+        changeable_variables=['whether_even_out_dist'],
+        columns_to_find_unique_combinations_for_color=None,
+        columns_to_find_unique_combinations_for_line=None,
+        add_ci_bounds=True,
+        use_subplots_based_on_changeable_variables=False,
+        is_difference=False,
+    ):
+        
+        if all_ref_median_info is None:
+            all_ref_median_info = self.all_ref_pooled_median_info_curv
+        
+        self.fig = pvf.plot_median_curv(
+            all_ref_median_info=all_ref_median_info,
+            x_var_column_list=x_var_column_list,
+            fixed_variable_values_to_use=fixed_variable_values_to_use,
+            changeable_variables=changeable_variables,
+            columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+            columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
+            add_ci_bounds=add_ci_bounds,
+            use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables,
+            is_difference=is_difference,
+            backend=self.backend,
+        )
+        return self.fig
+
+    def plot_same_side_percentage(
+        self,
+        perc_info=None,
+        x_var_column_list=['monkey_name'],
+        fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible'},
+        changeable_variables=['monkey_name'],
+        columns_to_find_unique_combinations_for_color=None,
+        add_ci_bounds=True,
+        use_subplots_based_on_changeable_variables=False,
+        show_fig=True,
+        is_difference=False,
+        y_min=None,
+        y_max=None,
+    ):
+        if perc_info is None:
+            perc_info = self.pooled_perc_info
+        
+        
+        self.fig = pvf.plot_same_side_percentage(
+            perc_info=perc_info,
+            x_var_column_list=x_var_column_list,
+            fixed_variable_values_to_use=fixed_variable_values_to_use,
+            changeable_variables=changeable_variables,
+            columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+            add_ci_bounds=add_ci_bounds,
+            use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables,
+            show_fig=show_fig,
+            is_difference=is_difference,
+            y_min=y_min,
+            y_max=y_max,
+            backend=self.backend,
+        )
+        return self.fig
+
+    def plot_same_side_percentage_across_monkeys(
+        self,
+        perc_info=None,
+        x_var_column_list=['monkey_name'],
+        fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
+                                      'key_for_split': 'ff_seen',
+                                      'whether_even_out_dist': False},
+        changeable_variables=None,
+        columns_to_find_unique_combinations_for_color=None,
+        add_ci_bounds=True,
+    ):
+        self.fig = pvf.plot_same_side_percentage_across_monkeys(
+            perc_info=perc_info,
+            x_var_column_list=x_var_column_list,
+            fixed_variable_values_to_use=fixed_variable_values_to_use,
+            changeable_variables=changeable_variables,
+            columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
+            add_ci_bounds=add_ci_bounds,
+            backend=self.backend,
+        )
+        return self.fig
+
+    # ---------------------------------------------------------------
+    # Complex 2-panel “main vs diff” APIs
+    # ---------------------------------------------------------------
+
     def plot_median_curv_across_monkeys_and_arc_types_with_difference(
         self,
         all_ref_median_info=None,
@@ -273,32 +162,25 @@ class _PlotVariations:
         fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                       'key_for_split': 'ff_seen',
                                       'whether_even_out_dist': False,
-                                      'curv_traj_window_before_stop': '[-25, 0]'
-                                      },
+                                      'curv_traj_window_before_stop': '[-25, 0]'},
         changeable_variables=['opt_arc_type', 'monkey_name'],
-        columns_to_find_unique_combinations_for_color=[],
-        columns_to_find_unique_combinations_for_line=[],
+        columns_to_find_unique_combinations_for_color=None,
+        columns_to_find_unique_combinations_for_line=None,
         add_ci_bounds=True,
         use_subplots_based_on_changeable_variables=True,
     ):
-        if all_ref_median_info is None:
-            all_ref_median_info = self.all_ref_pooled_median_info_curv
-        if add_ci_bounds:
-            all_ref_median_info['ci_lower'] = all_ref_median_info['diff_in_abs_d_curv_ci_low_95']
-            all_ref_median_info['ci_upper'] = all_ref_median_info['diff_in_abs_d_curv_ci_high_95']
-        return self._plot_median_with_difference(
+        self.fig = pvf.plot_median_curv_across_monkeys_and_arc_types_with_difference(
             all_ref_median_info=all_ref_median_info,
             x_var_column_list=x_var_column_list,
             fixed_variable_values_to_use=fixed_variable_values_to_use,
             changeable_variables=changeable_variables,
             columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
             columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
+            add_ci_bounds=add_ci_bounds,
             use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables,
-            y_var_column='diff_in_abs_d_curv_median',
-            main_y_title="Median Curvature (°/m)",
-            diff_y_title="Difference in Median Curvature (°/m)",
-            overall_title="Difference in Curvature Across Two Arc Pairs: Test vs Control",
+            backend=self.backend,
         )
+        return self.fig
 
     def plot_median_heading_across_monkeys_and_arc_types_with_difference(
         self,
@@ -307,59 +189,24 @@ class _PlotVariations:
         fixed_variable_values_to_use={'if_test_nxt_ff_group_appear_after_stop': 'flexible',
                                       'key_for_split': 'ff_seen',
                                       'whether_even_out_dist': False,
-                                      'curv_traj_window_before_stop': '[-25, 0]'
-                                      },
+                                      'curv_traj_window_before_stop': '[-25, 0]'},
         changeable_variables=['opt_arc_type', 'monkey_name'],
-        columns_to_find_unique_combinations_for_color=[],
-        columns_to_find_unique_combinations_for_line=[],
+        columns_to_find_unique_combinations_for_color=None,
+        columns_to_find_unique_combinations_for_line=None,
         add_ci_bounds=True,
         use_subplots_based_on_changeable_variables=True,
         constant_marker_size=12,
     ):
-
-        if all_ref_median_info is None:
-            all_ref_median_info = self.all_ref_pooled_median_info_heading
-
-        all_ref_median_info['diff_in_abs_angle_to_nxt_ff_median'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_median'] * 180/np.pi
-
-        if add_ci_bounds:
-            all_ref_median_info['ci_lower'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_ci_low_95'] * 180/np.pi
-            all_ref_median_info['ci_upper'] = all_ref_median_info['diff_in_abs_angle_to_nxt_ff_ci_high_95'] * 180/np.pi
-        return self._plot_median_with_difference(
+        self.fig = pvf.plot_median_heading_across_monkeys_and_arc_types_with_difference(
             all_ref_median_info=all_ref_median_info,
             x_var_column_list=x_var_column_list,
             fixed_variable_values_to_use=fixed_variable_values_to_use,
             changeable_variables=changeable_variables,
             columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
             columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
+            add_ci_bounds=add_ci_bounds,
             use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables,
-            y_var_column='diff_in_abs_angle_to_nxt_ff_median',
-            main_y_title="Median Angle (°)",
-            diff_y_title="Difference in Median Angle (°)",
-            overall_title="Absolute Angle to Next FF: Test vs Control",
             constant_marker_size=constant_marker_size,
+            backend=self.backend,
         )
-
-    def build_child_fig(self, data, *,
-                        fixed_variable_values_to_use,
-                        changeable_variables,
-                        x_var_column_list,
-                        y_var_column,
-                        var_to_determine_x_offset_direction='test_or_control',
-                        columns_to_find_unique_combinations_for_color=None,
-                        columns_to_find_unique_combinations_for_line=None,
-                        use_subplots_based_on_changeable_variables=False):
-        columns_to_find_unique_combinations_for_color = columns_to_find_unique_combinations_for_color or []
-        columns_to_find_unique_combinations_for_line = columns_to_find_unique_combinations_for_line or []
-
-        return plot_variations_utils.streamline_making_plotly_plot_to_compare_two_sets_of_data(
-            data,
-            fixed_variable_values_to_use,
-            changeable_variables,
-            x_var_column_list,
-            y_var_column=y_var_column,
-            var_to_determine_x_offset_direction=var_to_determine_x_offset_direction,
-            columns_to_find_unique_combinations_for_color=columns_to_find_unique_combinations_for_color,
-            columns_to_find_unique_combinations_for_line=columns_to_find_unique_combinations_for_line,
-            use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables
-        )
+        return self.fig

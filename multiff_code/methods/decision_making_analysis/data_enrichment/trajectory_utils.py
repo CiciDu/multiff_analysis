@@ -144,7 +144,7 @@ def generate_feature_names_given_relative_time_points(relative_time_points, num_
 # ============================================================
 
 def furnish_machine_learning_data_with_trajectory_data_func(
-        X_all, time_all, monkey_information, trajectory_data_kind='position',
+        X_all_df, time_all, monkey_information, trajectory_data_kind='position',
         time_range_of_trajectory=[-0.5, 0.5], num_time_points_for_trajectory=10, add_traj_stops=True):
     """
     Augment machine learning features with trajectory and stopping information.
@@ -153,13 +153,13 @@ def furnish_machine_learning_data_with_trajectory_data_func(
         traj_points, trajectory_feature_names = generate_trajectory_position_data(
             time_all, monkey_information, time_range_of_trajectory, num_time_points_for_trajectory
         )
-        X_all = np.concatenate([X_all, traj_points], axis=1)
+        X_all_df = pd.concat([X_all_df, pd.DataFrame(traj_points, columns=trajectory_feature_names)], axis=1)
 
     elif trajectory_data_kind == 'velocity':
         traj_points, trajectory_feature_names = generate_trajectory_velocity_data(
             time_all, monkey_information, time_range_of_trajectory, num_time_points_for_trajectory
         )
-        X_all = np.concatenate([X_all, traj_points], axis=1)
+        X_all_df = pd.concat([X_all_df, pd.DataFrame(traj_points, columns=trajectory_feature_names)], axis=1)
 
     else:
         raise ValueError(
@@ -170,10 +170,10 @@ def furnish_machine_learning_data_with_trajectory_data_func(
         traj_stops, stop_feature_names = generate_stops_info(
             time_all, monkey_information, time_range_of_trajectory, num_time_points_for_trajectory
         )
-        X_all = np.concatenate([X_all, traj_stops], axis=1)
+        X_all_df = pd.concat([X_all_df, pd.DataFrame(traj_stops, columns=stop_feature_names)], axis=1)
         trajectory_feature_names.extend(stop_feature_names)
 
-    return X_all, traj_points, traj_stops, trajectory_feature_names
+    return X_all_df, traj_points, traj_stops, trajectory_feature_names
 
 
 # ============================================================
@@ -218,7 +218,7 @@ def generate_stops_info(time_all, monkey_information,
     return traj_stops, feature_names
 
 
-def add_stops_info_to_one_row_of_trajectory_info(traj_time_1d, monkey_information):
+def add_stops_info_to_one_row_of_trajectory_utils(traj_time_1d, monkey_information):
     """
     Generate binary stop info (1 = stop) for a single trajectory row, based on monkey_speeddummy.
     """

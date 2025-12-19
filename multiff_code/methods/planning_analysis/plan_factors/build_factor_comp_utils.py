@@ -137,9 +137,10 @@ def _get_monkey_speed_stat_df(data_of_segments):
     monkey_speed_stat_df = build_factor_comp_utils._find_summary_stats_of_each_segment(data_of_segments,
                                                                                        groupby_column='stop_point_index',
                                                                                        stat_columns=['speed', 'ang_speed'])
-    columns_to_preserve = [column for column in monkey_speed_stat_df if ('iqr' in column) | (
+    extra_columns_to_preserve = [column for column in monkey_speed_stat_df if ('iqr' in column) | (
         'range' in column) | ('std' in column) | (column == 'stop_point_index')]
-    monkey_speed_stat_df = monkey_speed_stat_df[columns_to_preserve].copy()
+    monkey_speed_stat_df = monkey_speed_stat_df[extra_columns_to_preserve].copy(
+    )
     return monkey_speed_stat_df
 
 
@@ -164,9 +165,9 @@ def _get_eye_stats(data_of_segments, ff_to_include=['cur_ff', 'nxt_ff']):
     eye_stat_df = build_factor_comp_utils._find_summary_stats_of_each_segment(data_of_segments,
                                                                               groupby_column='stop_point_index',
                                                                               stat_columns=['LDy', 'LDz', 'RDy', 'RDz'])
-    columns_to_preserve = [column for column in eye_stat_df if ('iqr' in column) | (
+    extra_columns_to_preserve = [column for column in eye_stat_df if ('iqr' in column) | (
         'range' in column) | ('std' in column) | (column == 'stop_point_index')]
-    eye_stat_df = eye_stat_df[columns_to_preserve].copy()
+    eye_stat_df = eye_stat_df[extra_columns_to_preserve].copy()
     eye_toward_ff_time_perc_df = build_factor_comp.get_eye_toward_ff_time_perc_df(
         data_of_segments, ff_to_include=ff_to_include)
     return eye_stat_df, eye_toward_ff_time_perc_df

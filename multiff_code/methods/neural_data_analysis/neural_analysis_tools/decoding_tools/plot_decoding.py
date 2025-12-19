@@ -430,7 +430,7 @@ def plot_decoding_timecourse(
     show_sig=True,
     sig_color='limegreen',
     chance_level=0.5,
-    title_prefix='Decoding timecourse',
+    title_prefix='',
     split_by='key',
     save_path=None,          # ← new argument
     dpi=300                  # ← optional, for high-res saving
@@ -532,7 +532,7 @@ def plot_decoding_timecourse_by_session(
     show_sig=True,
     sig_color='limegreen',
     chance_level=0.5,
-    title_prefix='Decoding timecourse by session',
+    title_prefix='',
     save_path=None,
     dpi=300
 ):
@@ -648,15 +648,16 @@ def plot_decoding_timecourse_by_session(
                 ax = axes[i]
                 df_sub = dfa[dfa[session_col].isin(chunk)].copy()
 
-                # Build informative label: key and session list
-                if len(chunk) <= 6:
-                    session_label = ", ".join([str(s) for s in chunk])
-                else:
-                    session_label = f"{len(chunk)} sessions"
-                label_prefix = f"{key_col}={selected_key} | {session_col}s: {session_label}"
+                # # Build informative label: key and session list
+                # if len(chunk) <= 6:
+                #     session_label = ", ".join([str(s) for s in chunk])
+                # else:
+                #     session_label = f"{len(chunk)} sessions"
+                # label_prefix = f"{key_col}={selected_key} | {session_col}s: {session_label}"
 
-                label_prefix = _append_sample_size_to_label(
-                    df_sub, label_prefix)
+                # label_prefix = _append_sample_size_to_label(
+                #     df_sub, label_prefix)
+                label_prefix = ""
 
                 df_agg = _aggregate_for_plot(
                     df_sub,
@@ -683,9 +684,11 @@ def plot_decoding_timecourse_by_session(
             for j in range(last_i + 1, len(axes)):
                 axes[j].set_visible(False)
 
-            combo_str = f"{key_col}={selected_key} | {model_name_col}={selected_model}"
+            # combo_str = f"{selected_key} | {selected_model}"
+            combo_str = f"{selected_key.replace('_', ' ')} ({selected_model.replace('_', ' ')})"
+
             fig.suptitle(
-                f"{title_prefix} ({combo_str}) — {title_align}", fontsize=14)
+                f"{title_prefix} {combo_str} — {title_align}", fontsize=14)
             plt.tight_layout(rect=[0, 0, 1, 0.97])
 
             # Save or display

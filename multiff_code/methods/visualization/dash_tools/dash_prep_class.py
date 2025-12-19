@@ -77,7 +77,7 @@ class DashCartesianPreparation(cvn_from_ref_class.CurVsNxtFfFromRefClass):
     def _make_spikes_df(self):
         self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
         self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
-                                                               sampling_rate=self.sampling_rate)
+                                                               self.monkey_information, sampling_rate=self.sampling_rate)
 
     def _show_angle_to_nxt_ff_in_time_series(self):
         self.add_diff_in_abs_angle_to_nxt_ff_to_curv_of_traj_in_duration()
