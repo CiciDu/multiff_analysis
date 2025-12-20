@@ -14,19 +14,19 @@ def run_lfads_on_continuous_session(
     spikes_df: pd.DataFrame,
     bin_width_ms: float = 10.0,
     window_len_s: float = 1.0,
-    step_s: float = 0.5,
-    factors_dim: int = 20,
-    enc_dim: int = 64,
-    gen_dim: int = 64,
-    z_dim: int = 20,
+    step_s: float = 1.0,
+    factors_dim: int = 5,
+    enc_dim: int = 24,
+    gen_dim: int = 24,
+    z_dim: int = 10,
     batch_size: int = 64,
-    n_epochs: int = 50,
+    n_epochs: int = 200,
     lr: float = 1e-3,
     kl_weight: float = 1.0,
     device_str: str = 'cuda',
     val_frac: float = 0.1,
     verbose: bool = True,
-    use_controller=True,
+    use_controller=False,
     out_path: Optional[str] = None,
     load_if_exists: bool = True,
     overwrite: bool = False,
@@ -52,6 +52,10 @@ def run_lfads_on_continuous_session(
       - After computation, results are saved to out_path if provided.
         Use overwrite=True to overwrite an existing file.
     """
+
+    # ---------------------------------------------
+    # Early stopping setup
+    # ---------------------------------------------
 
     device = torch.device(device_str if torch.cuda.is_available() else 'cpu')
 
@@ -134,8 +138,19 @@ def run_lfads_on_continuous_session(
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+
+    use_early_stopping = has_val
+    patience = 15
+    min_delta = 1e-4
+    min_epochs = 20
+
+    best_val_loss = np.inf
+    best_epoch = 0
+    epochs_no_improve = 0
+    best_model_state = None
+
     # ---------------------------------------------
-    # 4. Training loop
+    # 4. Training loop (with early stopping)
     # ---------------------------------------------
     for epoch in range(1, n_epochs + 1):
         train_stats = lfads_train_epoch(
@@ -145,6 +160,7 @@ def run_lfads_on_continuous_session(
             device=device,
             kl_weight=kl_weight,
         )
+
         if has_val:
             val_stats = lfads_eval_epoch(
                 model=model,
@@ -152,8 +168,10 @@ def run_lfads_on_continuous_session(
                 device=device,
                 kl_weight=kl_weight,
             )
+            val_loss = val_stats['loss']
         else:
             val_stats = None
+            val_loss = None
 
         if verbose:
             if val_stats is not None:
@@ -162,7 +180,7 @@ def run_lfads_on_continuous_session(
                     f'train loss={train_stats["loss"]:.3f}, '
                     f'recon={train_stats["recon"]:.3f}, '
                     f'kld={train_stats["kld"]:.3f}, '
-                    f'val loss={val_stats["loss"]:.3f}'
+                    f'val loss={val_loss:.3f}'
                 )
             else:
                 print(
@@ -172,6 +190,36 @@ def run_lfads_on_continuous_session(
                     f'kld={train_stats["kld"]:.3f}'
                 )
 
+        # -------------------------
+        # Early stopping logic
+        # -------------------------
+        if use_early_stopping and epoch >= min_epochs:
+            if val_loss < best_val_loss - min_delta:
+                best_val_loss = val_loss
+                best_epoch = epoch
+                epochs_no_improve = 0
+                best_model_state = {
+                    k: v.detach().cpu().clone()
+                    for k, v in model.state_dict().items()
+                }
+            else:
+                epochs_no_improve += 1
+
+            if epochs_no_improve >= patience:
+                if verbose:
+                    print(
+                        f'Early stopping at epoch {epoch} '
+                        f'(best epoch {best_epoch}, '
+                        f'best val loss {best_val_loss:.3f})'
+                    )
+                break
+
+
+    if use_early_stopping and best_model_state is not None:
+        if verbose:
+            print(f'LFADS: restoring best model from epoch {best_epoch}')
+        model.load_state_dict(best_model_state)
+        
     # ---------------------------------------------
     # 5. Predict LFADS rates (and factors) for all trials
     # ---------------------------------------------
@@ -226,6 +274,16 @@ def run_lfads_on_continuous_session(
             'lfads_rates_trials': lfads_rates,       # optional, trial-wise
             'lfads_factors_trials': lfads_factors,   # optional, trial-wise
         },
+        'train_stats': train_stats,
+        'val_stats': val_stats,
+        'best_epoch': best_epoch,
+        'best_val_loss': best_val_loss,
+        'epochs_no_improve': epochs_no_improve,
+        'best_model_state': best_model_state,
+        'use_early_stopping': use_early_stopping,
+        'patience': patience,
+        'min_delta': min_delta,
+        'min_epochs': min_epochs,
     }
 
 
