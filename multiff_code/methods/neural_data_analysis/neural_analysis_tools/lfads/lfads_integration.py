@@ -16,13 +16,13 @@ def run_lfads_on_continuous_session(
     window_len_s: float = 1.0,
     step_s: float = 1.0,
     factors_dim: int = 5,
-    enc_dim: int = 24,
-    gen_dim: int = 24,
+    enc_dim: int = 36,
+    gen_dim: int = 36,
     z_dim: int = 10,
     batch_size: int = 64,
     n_epochs: int = 200,
     lr: float = 1e-3,
-    kl_weight: float = 1.0,
+    kl_weight: float = 0.5,
     device_str: str = 'cuda',
     val_frac: float = 0.1,
     verbose: bool = True,
@@ -30,6 +30,7 @@ def run_lfads_on_continuous_session(
     out_path: Optional[str] = None,
     load_if_exists: bool = True,
     overwrite: bool = False,
+    kl_warmup_frac = 0.15,
 ) -> Dict:
     """
     High-level LFADS pipeline for continuous data:
@@ -139,34 +140,51 @@ def run_lfads_on_continuous_session(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 
+    # ---------------------------------------------
+    # KL warm-up & early stopping setup
+    # ---------------------------------------------
     use_early_stopping = has_val
     patience = 15
     min_delta = 1e-4
-    min_epochs = 20
+
+    # Implicit KL warm-up (15% of total epochs)
+    kl_warmup_epochs = int(round(kl_warmup_frac * n_epochs))
+
+    # Minimum epochs: warm-up + settling margin
+    settle_margin = 15 if use_controller else 10
+    min_epochs = kl_warmup_epochs + settle_margin
 
     best_val_loss = np.inf
     best_epoch = 0
     epochs_no_improve = 0
     best_model_state = None
 
+
     # ---------------------------------------------
     # 4. Training loop (with early stopping)
     # ---------------------------------------------
     for epoch in range(1, n_epochs + 1):
+        # Linear KL warm-up
+        if epoch <= kl_warmup_epochs:
+            kl_weight_epoch = kl_weight * (epoch / kl_warmup_epochs)
+        else:
+            kl_weight_epoch = kl_weight
+
         train_stats = lfads_train_epoch(
             model=model,
             dataloader=train_loader,
             optimizer=optimizer,
             device=device,
-            kl_weight=kl_weight,
+            kl_weight=kl_weight_epoch,
         )
+
 
         if has_val:
             val_stats = lfads_eval_epoch(
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                kl_weight=kl_weight,
+                kl_weight=kl_weight_epoch,
             )
             val_loss = val_stats['loss']
         else:
@@ -177,11 +195,13 @@ def run_lfads_on_continuous_session(
             if val_stats is not None:
                 print(
                     f'Epoch {epoch:03d} | '
+                    f'kl_wt={kl_weight_epoch:.3f} | '
                     f'train loss={train_stats["loss"]:.3f}, '
                     f'recon={train_stats["recon"]:.3f}, '
                     f'kld={train_stats["kld"]:.3f}, '
                     f'val loss={val_loss:.3f}'
                 )
+
             else:
                 print(
                     f'Epoch {epoch:03d} | '
