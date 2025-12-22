@@ -132,7 +132,7 @@ def check_design(binned_feats_sc):
 
     # 6) VIF
     vif_report = compute_vif(binned_feats_sc)
-    print(vif_report.head(10))
+    print(vif_report.head(20))
 
     # 7) Suggested columns to drop
     to_drop = suggest_columns_to_drop(binned_feats_sc, corr_thresh=0.98, vif_thresh=30.0)
@@ -140,4 +140,120 @@ def check_design(binned_feats_sc):
 
     # Optional: apply the drop list
     X_pruned = binned_feats_sc.drop(columns=to_drop, errors='ignore')
-    return X_pruned
+    return X_pruned, vif_report
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+def analyze_column_correlations(
+    df,
+    high_corr_thresh=0.9,
+    plot=True,
+):
+    """
+    Analyze column correlations in a DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe (numeric columns only are used)
+    high_corr_thresh : float
+        Absolute correlation threshold for 'highly correlated'
+    plot : bool
+        Whether to plot a heatmap of high-correlation columns
+
+    Returns
+    -------
+    perfect_corr_df : pd.DataFrame
+        Column pairs with perfect correlation (±1)
+    high_corr_df : pd.DataFrame
+        Column pairs with |corr| >= high_corr_thresh
+    high_corr_cols : list
+        Columns that have at least one high-correlation partner
+    """
+
+    # ------------------------------------------------------------------
+    # Keep numeric & non-constant columns
+    # ------------------------------------------------------------------
+    df_num = df.select_dtypes(include=[np.number])
+    df_num = df_num.loc[:, df_num.std() > 0]
+
+    # ------------------------------------------------------------------
+    # Correlation matrix
+    # ------------------------------------------------------------------
+    corr = df_num.corr()
+
+    # Mask diagonal & lower triangle (unique pairs only)
+    upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+
+    # ------------------------------------------------------------------
+    # Perfect correlations (±1)
+    # ------------------------------------------------------------------
+    perfect_corr = (
+        upper
+        .stack()
+        .loc[lambda x: np.isclose(np.abs(x), 1.0)]
+    )
+
+    perfect_corr_df = (
+        perfect_corr
+        .reset_index()
+        .rename(columns={
+            'level_0': 'col_1',
+            'level_1': 'col_2',
+            0: 'correlation',
+        })
+        .sort_values('correlation', ascending=False)
+    )
+
+    # ------------------------------------------------------------------
+    # High correlations (|r| >= threshold)
+    # ------------------------------------------------------------------
+    high_corr = (
+        upper
+        .stack()
+        .loc[lambda x: np.abs(x) >= high_corr_thresh]
+    )
+
+    high_corr_df = (
+        high_corr
+        .reset_index()
+        .rename(columns={
+            'level_0': 'col_1',
+            'level_1': 'col_2',
+            0: 'correlation',
+        })
+        .sort_values('correlation', ascending=False)
+    )
+
+    # Columns involved in at least one high-corr pair
+    high_corr_cols = sorted(
+        set(high_corr_df['col_1']).union(high_corr_df['col_2'])
+    )
+
+    # ------------------------------------------------------------------
+    # Heatmap of high-correlation columns
+    # ------------------------------------------------------------------
+    if plot and len(high_corr_cols) > 1:
+        plt.figure(figsize=(0.6 * len(high_corr_cols), 0.6 * len(high_corr_cols)))
+
+        sns.heatmap(
+            corr.loc[high_corr_cols, high_corr_cols],
+            cmap='coolwarm',
+            center=0,
+            vmin=-1,
+            vmax=1,
+            square=True,
+            cbar_kws={'label': 'Correlation'},
+        )
+
+        plt.title(f'High-correlation columns (|r| ≥ {high_corr_thresh})')
+        plt.tight_layout()
+        plt.show()
+
+    return perfect_corr_df, high_corr_df, high_corr_cols

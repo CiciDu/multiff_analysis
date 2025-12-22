@@ -253,11 +253,11 @@ def plot_observed_vs_predicted_event(
         exp_s = exp_s[good]
 
     # --- predictions: expected COUNTS per bin
-    pred_counts = model_res.predict(X_stop_full, offset=off_stop)
+    pred_counts = model_res.predict(np.asarray(X_stop_full, dtype=float), offset=off_stop)
 
     # --- convert to Hz using per-bin exposure
     obs_rate_hz = y_counts.to_numpy() / exp_s
-    pred_rate_hz = pred_counts.to_numpy() / exp_s
+    pred_rate_hz = np.asarray(pred_counts, dtype=float) / exp_s
 
     # --- time axis (apply same "good" filter, then optional sort)
     t = meta_used.loc[mask, time_col].to_numpy()

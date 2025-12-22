@@ -217,7 +217,7 @@ def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_
     retry_cols = ['rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle']
     miss_cols = retry_cols + ['rsw_last', 'one_stop_miss']
 
-    binned_feats['whether_retry'] = binned_feats[retry_cols].any(
+    binned_feats['whether_in_retry_series'] = binned_feats[retry_cols].any(
         axis=1).astype('int8')
     binned_feats['miss'] = binned_feats[miss_cols].any(axis=1).astype('int8')
 
