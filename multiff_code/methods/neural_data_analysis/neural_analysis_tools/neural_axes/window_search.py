@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple, Optional
 
-from .axis_utils import cross_validate_axis
+from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import cross_validate_axis
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +12,7 @@ from .axis_visualization import (
     plot_event_projection_hist,
     plot_event_projection_scatter,
 )
-from .axis_utils import extract_event_windows
+from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import extract_event_windows
 from .axis_visualization import plot_window_heatmap
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from .axis_utils import (
+from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
     build_continuous_fr,
     events_to_bins,
     extract_event_windows,
@@ -65,7 +65,7 @@ class ContinuousBehaviorAxisAnalyzer:
                 self.clusters = external_clusters
         else:
             # original path: build continuous FR from spikes
-            from .axis_utils import build_continuous_fr
+            from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import build_continuous_fr
             self.fr_mat, self.start_time = build_continuous_fr(
                 spike_times, spike_codes, len(clusters),
                 bin_width_ms, smoothing_sigma_ms
@@ -84,10 +84,9 @@ class ContinuousBehaviorAxisAnalyzer:
         sd = fr.std(axis=0, keepdims=True) + 1e-6
         return (fr - mu) / sd
 
-
     # -----------------------------
+
     def build_event_vectors(self, window_a_ms, window_b_ms):
-        
 
         a_bins = self._events_to_bins(self.event_a_times)
         b_bins = self._events_to_bins(self.event_b_times)

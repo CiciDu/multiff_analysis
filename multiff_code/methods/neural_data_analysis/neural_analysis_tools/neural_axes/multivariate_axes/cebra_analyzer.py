@@ -3,7 +3,7 @@ import pandas as pd
 
 from cebra import CEBRA
 
-from .axis_utils import (
+from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
     build_continuous_fr,
     events_to_bins,
     extract_event_windows,
@@ -219,7 +219,8 @@ class CEBRAAnalyzer:
         Extract peri-event embedding segments.
         """
         if not hasattr(self, 'embedding_'):
-            raise RuntimeError('Call fit_cebra() before extracting embeddings.')
+            raise RuntimeError(
+                'Call fit_cebra() before extracting embeddings.')
 
         event_bins = self._events_to_bins(self.event_times)
 
@@ -305,6 +306,7 @@ class CEBRAAnalyzer:
             start_time=self.start_time,
         )
     # -----------------------------
+
     def load_embedding(self, path):
         """
         Load a previously saved CEBRA embedding.

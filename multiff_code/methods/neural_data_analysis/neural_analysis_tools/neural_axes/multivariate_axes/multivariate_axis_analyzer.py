@@ -1,7 +1,7 @@
 # multivariate_axis_analyzer.py
 import numpy as np
 
-from .axis_utils import (
+from neural_data_analysis.neural_analysis_tools.neural_axes.axis_utils import (
     build_continuous_fr,
     events_to_bins,
     extract_event_windows,
@@ -15,11 +15,14 @@ from .multivariate_axis_utils import (
     reduced_rank_regression,
 )
 
+from .conditioned_timecourse import ConditionedTimecourseMixin
+from .peri_event_trajectory import PeriEventTrajectoryMixin
+
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
 
-class MultivariateAxisAnalyzer:
+class MultivariateAxisAnalyzer(ConditionedTimecourseMixin, PeriEventTrajectoryMixin):
     def __init__(
         self,
         spikes_df,
@@ -32,7 +35,8 @@ class MultivariateAxisAnalyzer:
         external_start_time=None,
         external_clusters=None,
     ):
-        self.behavior_cols = list(behavior_cols) if behavior_cols is not None else None
+        self.behavior_cols = list(
+            behavior_cols) if behavior_cols is not None else None
         self.event_times = behavior_df[event_col].to_numpy()
         self.behavior_df = behavior_df.reset_index(drop=True)
 
@@ -41,7 +45,8 @@ class MultivariateAxisAnalyzer:
         self.clusters = clusters
         self.cluster_to_idx = {c: i for i, c in enumerate(clusters)}
 
-        spike_codes = np.array([self.cluster_to_idx[c] for c in spikes_df['cluster']])
+        spike_codes = np.array([self.cluster_to_idx[c]
+                               for c in spikes_df['cluster']])
         spike_times = spikes_df['time'].to_numpy(float)
 
         self.bin_width_ms = float(bin_width_ms)
@@ -49,7 +54,8 @@ class MultivariateAxisAnalyzer:
 
         if external_fr_mat is not None:
             self.fr_mat = external_fr_mat
-            self.start_time = float(external_start_time) if external_start_time is not None else float(spike_times.min())
+            self.start_time = float(
+                external_start_time) if external_start_time is not None else float(spike_times.min())
             if external_clusters is not None:
                 self.clusters = external_clusters
         else:
@@ -110,7 +116,8 @@ class MultivariateAxisAnalyzer:
         if interaction_pairs is not None and len(interaction_pairs) > 0:
             Y = build_interaction_terms(Y, interaction_pairs)
             for i, j in interaction_pairs:
-                target_names.append(f'{self.behavior_cols[i]}*{self.behavior_cols[j]}')
+                target_names.append(
+                    f'{self.behavior_cols[i]}*{self.behavior_cols[j]}')
 
         if fit_backend == 'linear':
             if rank is None:
@@ -133,7 +140,8 @@ class MultivariateAxisAnalyzer:
                     'rank': None,
                 }
 
-            W_rank, model = reduced_rank_regression(X, Y, rank=rank, alpha=alpha)
+            W_rank, model = reduced_rank_regression(
+                X, Y, rank=rank, alpha=alpha)
             projection = self.fr_mat @ W_rank  # (T, rank)
             return {
                 'fit_kind': 'linear_axes',

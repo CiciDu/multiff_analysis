@@ -6,7 +6,7 @@ import os
 
 import numpy as np
 
-from neural_data_analysis.neural_analysis_tools.neural_axes import cebra_analyzer
+from neural_data_analysis.neural_analysis_tools.neural_axes.multivariate_axes import cebra_analyzer
 from neural_data_analysis.loaders import load_processed_neural_data  # adjust if needed
 
 
