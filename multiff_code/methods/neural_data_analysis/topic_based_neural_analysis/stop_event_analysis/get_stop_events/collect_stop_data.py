@@ -226,6 +226,8 @@ def collect_stop_data_func(raw_data_folder_path):
         'non_captures_minus_all_misses': non_captures_minus_all_misses.copy(),
         'all_first_misses': all_first_misses.copy(),
         'all_last_misses': all_last_misses.copy(),
+        'rsw': rsw.copy(),
+        'rcap': rcap.copy(),
     }
 
     comparisons = compare_events.build_comparisons([

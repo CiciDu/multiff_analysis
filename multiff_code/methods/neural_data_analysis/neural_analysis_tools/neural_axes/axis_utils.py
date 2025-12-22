@@ -5,7 +5,13 @@ from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.metrics import roc_auc_score, roc_curve
-
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import Pipeline
+from sklearn.utils.class_weight import compute_sample_weight
 
 # -----------------------------------------------------------
 # Continuous FR construction
@@ -73,22 +79,83 @@ def extract_event_windows(fr_mat, event_bins, window_ms, bin_width_ms, require_f
 # -----------------------------------------------------------
 # Fit behavior axis
 # -----------------------------------------------------------
-def fit_behavior_axis(X, y, model="logreg"):
-    if model == "logreg":
+def fit_behavior_axis(X, y, model='logreg', **kwargs):
+    """
+    Returns:
+        readout : fitted model
+        axis_vec : np.ndarray or None
+    """
+
+    if model == 'lda':
+        clf = LinearDiscriminantAnalysis(priors=None)
+        clf.fit(X, y)
+        axis = clf.coef_.ravel()
+        axis /= np.linalg.norm(axis)
+        return clf, axis
+
+    elif model == 'logreg':
         clf = LogisticRegression(
-            max_iter=2000, class_weight="balanced").fit(X, y)
+            penalty='l2',
+            solver='liblinear',
+            max_iter=2000,
+            class_weight="balanced"
+        )
+        clf.fit(X, y)
         axis = clf.coef_.ravel()
+        axis /= np.linalg.norm(axis)
+        return clf, axis
 
-    elif model == "lda":
-        clf = LinearDiscriminantAnalysis().fit(X, y)
+    elif model == 'poly_logreg':
+        degree = kwargs.get('degree', 2)
+        clf = Pipeline([
+            ('poly', PolynomialFeatures(degree=degree, include_bias=False)),
+            ('logreg', LogisticRegression(
+                penalty='l2',
+                solver='liblinear',
+                max_iter=2000,
+                class_weight="balanced"
+            ))
+        ])
+        clf.fit(X, y)
+        return clf, None
+
+    elif model == 'rbf_svm':
+        clf = SVC(
+            kernel='rbf',
+            C=kwargs.get('C', 1.0),
+            gamma=kwargs.get('gamma', 'scale'),
+            probability=False,
+            class_weight="balanced"
+        )
+        clf.fit(X, y)
+        return clf, None
+
+    elif model == 'mlp':
+        sample_weight = compute_sample_weight(
+            class_weight='balanced',
+            y=y
+        )
+        clf = MLPClassifier(
+            hidden_layer_sizes=kwargs.get('hidden', (32,)),
+            activation='relu',
+            alpha=kwargs.get('alpha', 1e-3),
+            early_stopping=True,
+            max_iter=500
+        )
+
+        clf.fit(X, y, sample_weight=sample_weight)
+
+        return clf, None
+
+    elif model == 'ridge_regression':
+        clf = Ridge(alpha=kwargs.get('alpha', 1.0))
+        clf.fit(X, y)
         axis = clf.coef_.ravel()
+        axis /= np.linalg.norm(axis)
+        return clf, axis
 
-    elif model == "ridge":
-        clf = Ridge(alpha=1.0).fit(X, y)
-        axis = clf.coef_.ravel()
-
-    axis /= np.linalg.norm(axis)
-    return axis, clf
+    else:
+        raise ValueError(f'Unknown model: {model}')
 
 
 # -----------------------------------------------------------
@@ -122,27 +189,43 @@ def find_best_accuracy_threshold(prob, y_true):
 # -----------------------------------------------------------
 
 
-def cross_validate_axis(X, y, model='logreg', n_splits=5):
+from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.metrics import accuracy_score, roc_auc_score
+import numpy as np
+
+from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.metrics import accuracy_score, roc_auc_score
+import numpy as np
+
+def _fit_preprocess_fr(X):
+    mu = X.mean(axis=0, keepdims=True)
+    sd = X.std(axis=0, keepdims=True) + 1e-6
+    return mu, sd
+
+
+def _apply_preprocess_fr(X, mu, sd):
+    return (X - mu) / sd
+
+
+def cross_validate_axis(X, y, model='logreg', n_splits=5, **kwargs):
     """
-    Cross-validate: fit behavior axis on training fold,
-    choose optimal threshold (max accuracy) on training prob,
-    apply to test fold.
+    Cross-validate behavioral readout.
+    Fully CV-safe: preprocessing is fit on training folds only.
     """
+
     y_int = y.astype(int)
     unique_classes = np.unique(y_int)
 
-    # If only one class exists, no evaluation is possible
     if len(unique_classes) < 2:
         return {
-            'mean_accuracy': float('nan'),
-            'mean_auc': float('nan'),
-            'axis_cosine_similarity': float('nan'),
+            'mean_accuracy': np.nan,
+            'mean_auc': np.nan,
+            'axis_cosine_similarity': np.nan,
             'all_axes': [],
             'all_accuracies': [],
             'all_aucs': []
         }
 
-    # Prefer StratifiedKFold when possible
     class_counts = np.bincount(y_int)
     if class_counts.min() >= n_splits:
         splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
@@ -156,55 +239,83 @@ def cross_validate_axis(X, y, model='logreg', n_splits=5):
     aucs = []
 
     for tr, te in split_iter:
-        Xtr, Xte = X[tr], X[te]
+        Xtr_raw, Xte_raw = X[tr], X[te]
         ytr, yte = y_int[tr], y_int[te]
 
-        # Fit the behavioral axis
-        axis, clf = fit_behavior_axis(Xtr, ytr, model=model)
+        # ---- FIT PREPROCESSING ON TRAIN ONLY ----
+        mu, sd = _fit_preprocess_fr(Xtr_raw)
+        Xtr = _apply_preprocess_fr(Xtr_raw, mu, sd)
+        Xte = _apply_preprocess_fr(Xte_raw, mu, sd)
 
-        # Training probabilities
-        if hasattr(clf, 'predict_proba'):
-            prob_tr = clf.predict_proba(Xtr)[:, 1]
-            prob_te = clf.predict_proba(Xte)[:, 1]
+        # ---- Fit model ----
+        readout, axis = fit_behavior_axis(Xtr, ytr, model=model, **kwargs)
+
+        # ---- Compute scores ----
+        if axis is not None:
+            # Linear model
+            if hasattr(readout, 'decision_function'):
+                score_te = readout.decision_function(Xte)
+                score_tr = readout.decision_function(Xtr)
+            else:
+                score_te = Xte @ axis
+                score_tr = Xtr @ axis
         else:
-            # Manual sigmoid on projection
-            proj_tr = Xtr @ axis
-            prob_tr = 1 / (1 + np.exp(-proj_tr))
-            proj_te = Xte @ axis
-            prob_te = 1 / (1 + np.exp(-proj_te))
+            # Nonlinear model
+            if hasattr(readout, 'decision_function'):
+                score_tr = readout.decision_function(Xtr)
+                score_te = readout.decision_function(Xte)
+            elif hasattr(readout, 'predict_proba'):
+                score_tr = readout.predict_proba(Xtr)[:, 1]
+                score_te = readout.predict_proba(Xte)[:, 1]
+            else:
+                score_tr = readout.predict(Xtr)
+                score_te = readout.predict(Xte)
 
-        # === Train-fold threshold selection: maximize raw accuracy ===
-        t_star, _ = find_best_accuracy_threshold(prob_tr, ytr)
+        # ---- Threshold selection (score space) ----
+        t_star, _ = find_best_accuracy_threshold(score_tr, ytr)
 
-        # === Apply threshold to test fold ===
-        y_pred_te = (prob_te >= t_star).astype(int)
-        acc_te = accuracy_score(yte, y_pred_te)
-        accs.append(acc_te)
+        y_pred_te = (score_te >= t_star).astype(int)
+        accs.append(accuracy_score(yte, y_pred_te))
 
-        # === Test fold AUC (threshold-free) ===
         try:
-            aucs.append(roc_auc_score(yte, prob_te))
-        except:
+            aucs.append(roc_auc_score(yte, score_te))
+        except Exception:
             aucs.append(np.nan)
 
         axes.append(axis)
 
-    # === Cosine similarity across axes ===
-    cosines = []
-    for i in range(len(axes)):
-        for j in range(i+1, len(axes)):
-            denom = (np.linalg.norm(axes[i]) * np.linalg.norm(axes[j]) + 1e-12)
-            cosines.append(np.dot(axes[i], axes[j]) / denom)
+    # ---- Axis cosine similarity (linear models only) ----
+    valid_axes = [a for a in axes if a is not None]
+
+    if len(valid_axes) >= 2:
+        ref = valid_axes[0]
+        aligned_axes = []
+        for a in valid_axes:
+            if np.dot(a, ref) < 0:
+                a = -a
+            aligned_axes.append(a)
+
+        cosines = []
+        for i in range(len(aligned_axes)):
+            for j in range(i + 1, len(aligned_axes)):
+                cosines.append(
+                    np.dot(aligned_axes[i], aligned_axes[j]) /
+                    (np.linalg.norm(aligned_axes[i]) *
+                     np.linalg.norm(aligned_axes[j]) + 1e-12)
+                )
+
+        axis_cosine_similarity = float(np.nanmean(cosines))
+    else:
+        axis_cosine_similarity = np.nan
 
     return {
         'mean_accuracy': float(np.nanmean(accs)),
         'mean_auc': float(np.nanmean(aucs)),
-        'axis_cosine_similarity': float(np.nanmean(cosines)),
+        'axis_cosine_similarity': axis_cosine_similarity,
         'all_axes': axes,
         'all_accuracies': accs,
         'all_aucs': aucs
     }
-
 
 
 # -----------------------------------------------------------

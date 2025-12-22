@@ -75,8 +75,20 @@ class ContinuousBehaviorAxisAnalyzer:
     def _events_to_bins(self, times):
         return events_to_bins(times, self.start_time, self.bin_width_s)
 
+    def _preprocess_fr(self, fr):
+        # variance-stabilize
+        fr = np.sqrt(np.maximum(fr, 0))
+
+        # z-score per neuron
+        mu = fr.mean(axis=0, keepdims=True)
+        sd = fr.std(axis=0, keepdims=True) + 1e-6
+        return (fr - mu) / sd
+
+
     # -----------------------------
     def build_event_vectors(self, window_a_ms, window_b_ms):
+        
+
         a_bins = self._events_to_bins(self.event_a_times)
         b_bins = self._events_to_bins(self.event_b_times)
 
@@ -93,22 +105,36 @@ class ContinuousBehaviorAxisAnalyzer:
         return X, y
 
     # -----------------------------
-    def compute_event_axis(self, window_a_ms, window_b_ms, model="logreg"):
+    def compute_event_axis(self, window_a_ms, window_b_ms, model='logreg', **kwargs):
         X, y = self.build_event_vectors(window_a_ms, window_b_ms)
-        axis, clf = fit_behavior_axis(X, y, model=model)
-        projection = self.fr_mat @ axis
+
+        readout, axis = fit_behavior_axis(X, y, model=model, **kwargs)
+
+        # Compute continuous projection
+        if axis is not None:
+            projection = self.fr_mat @ axis
+        else:
+            if hasattr(readout, 'decision_function'):
+                projection = readout.decision_function(self.fr_mat)
+            elif hasattr(readout, 'predict_proba'):
+                projection = readout.predict_proba(self.fr_mat)[:, 1]
+            else:
+                projection = readout.predict(self.fr_mat)
+
         return {
-            "axis_vec": axis,
-            "projection": projection,
-            "X_train": X,
-            "y_train": y,
-            "clusters": self.clusters,
+            'axis_vec': axis,
+            'projection': projection,
+            'readout': readout,
+            'readout_type': model,
+            'X_train': X,
+            'y_train': y,
+            'clusters': self.clusters,
         }
 
     # -----------------------------
-    def cross_validate_axis(self, window_a_ms, window_b_ms, model="logreg", n_splits=5):
+    def cross_validate_axis(self, window_a_ms, window_b_ms, model="logreg", n_splits=5, **kwargs):
         X, y = self.build_event_vectors(window_a_ms, window_b_ms)
-        return cross_validate_axis(X, y, model=model, n_splits=n_splits)
+        return cross_validate_axis(X, y, model=model, n_splits=n_splits, **kwargs)
 
     # -----------------------------
     # Visualization wrappers (optional)
