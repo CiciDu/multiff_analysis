@@ -20,17 +20,17 @@
     "title": "rsw Middle vs rcap Middle"
   },
   {
-    "key": "switch_vs_retry_after_miss",
-    "a": "switch_after_miss",
-    "b": "retry_after_miss",
+    "key": "will_switch_vs_retry_after_miss",
+    "a": "will_switch_after_miss",
+    "b": "will_retry_after_miss",
     "a_label": "switch after miss",
     "b_label": "retry after miss",
-    "slug_capfirst": "Switch_after_miss_vs_Retry_after_miss",
+    "slug_capfirst": "will_switch_after_miss_vs_Retry_after_miss",
     "slug_pascal": "SwitchAfterMiss_vs_RetryAfterMiss",
     "title": "Switch vs Retry After Miss"
   },
   {
-    "key": "switch_vs_retry_after_retry",
+    "key": "will_switch_vs_retry_after_retry_miss",
     "a": "rsw_last",
     "b": "both_middle",
     "a_label": "rsw last",

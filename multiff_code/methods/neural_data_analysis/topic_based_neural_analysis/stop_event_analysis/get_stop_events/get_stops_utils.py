@@ -387,6 +387,7 @@ def _add_cluster_ordering(df: pd.DataFrame,
         out["cluster_size"] - 2)
     out["is_last"] = out["order_in_cluster"].eq(out["cluster_size"] - 1)
     out["is_middle"] = (~out["is_first"]) & (~out["is_last"])
+    out['after_first'] = out["order_in_cluster"] > 0
     out['before_second_to_last'] = out["order_in_cluster"] < out["cluster_size"] - 2
     return out
 

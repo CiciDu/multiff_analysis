@@ -157,7 +157,7 @@ def collect_stop_data_func(raw_data_folder_path):
                          rcap["cluster_size"] - 1].reset_index(drop=True)
 
     # Combine the “first several” from both, keep only columns you care about, then sort by index
-    retry_after_miss = (
+    will_retry_after_miss = (
         pd.concat(
             [rsw_nonfinal[shared_columns],
              rcap_nonfinal[shared_columns],
@@ -178,7 +178,7 @@ def collect_stop_data_func(raw_data_folder_path):
     # rsw_last_several = rsw[rsw["order_in_cluster"] > 0].reset_index(drop=True)
     # rcap_last_several =  rcap[ rcap["order_in_cluster"] > 0].reset_index(drop=True)
 
-    switch_after_miss = pd.concat([rsw_last[shared_columns],
+    will_switch_after_miss = pd.concat([rsw_last[shared_columns],
                                    one_stop_miss[shared_columns]])
 
     all_misses = pd.concat([one_stop_miss[shared_columns],
@@ -208,7 +208,7 @@ def collect_stop_data_func(raw_data_folder_path):
     datasets_raw = {
         'captures': valid_captures_df.copy(),
         'no_capture': filtered_no_capture_stops_df.copy(),
-        'retry_after_miss': retry_after_miss.copy(), # note: retry_after_miss excludes rcap_last
+        'will_retry_after_miss': will_retry_after_miss.copy(), # note: will_retry_after_miss excludes rcap_last
         'both_middle': both_middle.copy(),
         'rcap_first': rcap_first.copy(),
         'rsw_first': rsw_first.copy(),
@@ -220,7 +220,7 @@ def collect_stop_data_func(raw_data_folder_path):
         'rcap_nonfinal': rcap_nonfinal.copy(),
         'one_stop_miss': one_stop_miss.copy(),
         'both_first_miss': both_first_miss.copy(),
-        'switch_after_miss': switch_after_miss.copy(),
+        'will_switch_after_miss': will_switch_after_miss.copy(),
         'captures_minus_rcap_last': captures_minus_rcap_last.copy(),
         'all_misses': all_misses.copy(),
         'non_captures_minus_all_misses': non_captures_minus_all_misses.copy(),
@@ -250,12 +250,12 @@ def collect_stop_data_func(raw_data_folder_path):
 
         # ========= Maybe less interpretable because of the confounds in stops & captures surrounding the current stop =========
 
-        {'a': 'switch_after_miss', 'b': 'retry_after_miss', # retry_after_miss excludes rcap_last
-         'key': 'switch_vs_retry_after_miss',
+        {'a': 'will_switch_after_miss', 'b': 'will_retry_after_miss', # will_retry_after_miss excludes rcap_last
+         'key': 'will_switch_vs_retry_after_miss',
          'title': 'Switch vs Retry After Miss'},
 
         {'a': 'rsw_last', 'b': 'both_middle',
-         'key': 'switch_vs_retry_after_retry',
+         'key': 'will_switch_vs_retry_after_retry_miss',
          'title': 'Switch vs Retry After Retry'},
 
         # ==================

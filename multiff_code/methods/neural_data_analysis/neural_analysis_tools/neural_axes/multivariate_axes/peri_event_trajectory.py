@@ -9,108 +9,139 @@ class PeriEventTrajectoryMixin:
     Mixin for peri-event population trajectory analysis in low-D spaces.
     Assumes aligned_proj has shape (n_trials, n_time, n_dims).
     """
-class PeriEventTrajectoryMixin:
-    ...
-    # =====================================================
-    # High-level conditioned peri-event axis timecourse API
-    # =====================================================
 
-    def conditioned_peri_event_axes_panel(
+    def plot_peri_event_trajectory(
         self,
         projection,
         event_times,
         condition_mask,
         window_ms,
-        axis_indices=None,
-        axis_names=None,
-        label_true='Condition = 1',
-        label_false='Condition = 0',
-        title=None,
-        n_perm=2000,
+        dims_3d=(0, 1, 2),
+        dims_2d=(0, 1),
+        single_trial_label_name=None,
+        single_trial_labels=None,
+        n_show=30,
+        label_true=None,
+        label_false=None,
+        mean_title='Peri-event population trajectories',
+        distance_title='Population separation with 95% CI',
+        state_title='Population states with covariance ellipses',
+        t_query=0.1,
+        n_boot=1000,
         random_state=0,
-        fdr_alpha=0.05,
-        fdr_scope='within_axis',
-        show_sem=True,
-        show_significance=True,
-        sig_field='reject_fdr',
-        sig_marker_y='top',
-        return_stats=True,
     ):
         """
-        End-to-end conditioned peri-event axis analysis:
-        alignment → permutation test → plotting.
+        End-to-end conditioned population geometry analysis.
+
+        This function:
+          1) plots condition-mean 3D trajectories
+          2) plots single-trial 3D trajectories (optional)
+          3) plots population separation over time with bootstrap CI
+          4) plots state-space scatter with covariance ellipses at a selected time
 
         Parameters
         ----------
-        projection : (T, n_axes) array
-            Continuous axis projection.
-        event_times : (n_events,) array
-            Event times in seconds.
-        condition_mask : (n_events,) bool
-            Trial-wise condition labels.
-        window_ms : (start_ms, end_ms)
-        axis_indices : list[int] or None
-        axis_names : list[str] or None
+        aligned_proj : (n_trials, n_time, n_dims)
+        time : (n_time,)
+        condition_mask : (n_trials,) bool
+            Primary condition used for averaging and distance.
+        dims_3d : tuple[int]
+            Dimensions used for 3D trajectory plots.
+        dims_2d : tuple[int]
+            Dimensions used for state scatter plot.
+        single_trial_labels : (n_trials,) bool or None
+            If provided, used for coloring single-trial trajectories.
+            Defaults to condition_mask.
+        n_show : int
+            Number of single-trial trajectories to plot per condition.
         label_true, label_false : str
-            Legend labels.
-        title : str or None
-        n_perm : int
+        t_query : float
+            Time (s) at which to plot state-space geometry.
+        n_boot : int
+            Number of bootstrap samples for population distance.
         random_state : int
-        fdr_alpha : float
-        fdr_scope : {'within_axis', 'global'}
-        show_sem : bool
-        show_significance : bool
-        sig_field : str
-        sig_marker_y : {'top', 'zero'}
-        return_stats : bool
-
-        Returns
-        -------
-        stats_df : pd.DataFrame or None
         """
-        # -----------------------
-        # 1) Align to events
-        # -----------------------
+
+        if label_true is None:
+            if single_trial_label_name is not None:
+                label_true = single_trial_label_name.replace('_', ' ').title()
+            else:
+                label_true = 'Condition = 1'
+
+        if label_false is None:
+            if single_trial_label_name is not None:
+                label_false = f'Not {single_trial_label_name.replace("_", " ").title()}'
+            else:
+                label_false = 'Condition = 0'
+
         self.aligned_proj, self.time = self.align_continuous_to_events(
             projection=projection,
             event_times=event_times,
             window_ms=window_ms,
         )
 
-        # -----------------------
-        # 2) Permutation stats
-        # -----------------------
-        stats_df = self.permutation_test_conditioned_timecourses(
-            aligned_proj=self.aligned_proj,
-            time=self.time,
-            condition_mask=condition_mask,
-            axis_indices=axis_indices,
-            axis_names=axis_names,
-            n_perm=n_perm,
+        y = np.asarray(condition_mask, dtype=bool)
+
+        if single_trial_labels is None:
+            single_trial_labels = y
+
+        # ----------------------------------
+        # 1) Mean condition trajectories
+        # ----------------------------------
+        mean_true, mean_false = self.compute_condition_means(
+            self.aligned_proj,
+            condition_mask=y,
+            dims=dims_3d,
+        )
+
+        self.plot_mean_trajectory_3d(
+            mean_true,
+            mean_false,
+            labels=(label_true, label_false),
+            title=mean_title,
+        )
+
+        # ----------------------------------
+        # 2) Single-trial trajectories
+        # ----------------------------------
+        self.plot_peri_event_trajectories_3d(
+            self.aligned_proj,
+            labels=single_trial_labels,
+            dims=dims_3d,
+            n_show=n_show,
+            labels_text=(label_false, label_true),
+        )
+
+        # ----------------------------------
+        # 3) Population separation over time
+        # ----------------------------------
+        dist, ci_low, ci_high = self.population_distance_over_time(
+            self.aligned_proj,
+            condition_mask=y,
+            dims=dims_3d,
+            n_boot=n_boot,
             random_state=random_state,
-            fdr_alpha=fdr_alpha,
-            fdr_scope=fdr_scope,
         )
 
-        # -----------------------
-        # 3) Plot
-        # -----------------------
-        self.plot_conditioned_axes_panel(
-            stats_df,
-            label_true=label_true,
-            label_false=label_false,
-            title=title,
-            show_sem=show_sem,
-            show_significance=show_significance,
-            sig_field=sig_field,
-            sig_marker_y=sig_marker_y,
+        self.plot_population_distance(
+            self.time,
+            dist,
+            ci_low,
+            ci_high,
+            title=distance_title,
         )
 
-        if return_stats:
-            return stats_df
-        return None
-
-        
+        # ----------------------------------
+        # 4) State geometry at a timepoint
+        # ----------------------------------
+        self.plot_state_scatter_with_covariance(
+            self.aligned_proj,
+            condition_mask=y,
+            time=self.time,
+            t_query=t_query,
+            dims=dims_2d,
+            title=state_title,
+        )
 
     @staticmethod
     def compute_condition_means(
@@ -199,7 +230,8 @@ class PeriEventTrajectoryMixin:
             if len(idx) == 0:
                 continue
 
-            idx = np.random.choice(idx, size=min(n_show, len(idx)), replace=False)
+            idx = np.random.choice(idx, size=min(
+                n_show, len(idx)), replace=False)
             for i in idx:
                 ax.plot(Z[i, :, 0], Z[i, :, 1], Z[i, :, 2],
                         color=color, alpha=alpha)
@@ -254,7 +286,8 @@ class PeriEventTrajectoryMixin:
 
         for b in range(n_boot):
             samp_true = rng.choice(idx_true, size=len(idx_true), replace=True)
-            samp_false = rng.choice(idx_false, size=len(idx_false), replace=True)
+            samp_false = rng.choice(
+                idx_false, size=len(idx_false), replace=True)
 
             mt = Z[samp_true].mean(axis=0)
             mf = Z[samp_false].mean(axis=0)
@@ -356,4 +389,3 @@ class PeriEventTrajectoryMixin:
 
         plt.tight_layout()
         plt.show()
-
