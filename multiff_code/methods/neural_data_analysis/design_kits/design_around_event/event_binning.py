@@ -89,18 +89,35 @@ def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False
 
     Convention (left-hold):
       value[i] applies on [t[i], t[i+1]) for i = 0..n-2.
-    """
-    import numpy as np
 
+    Parameters
+    ----------
+    time : (n,) strictly increasing float array
+    bins : (m, 2) float array of [left, right] per bin
+           Must be sorted by left edge ascending. Non-overlapping recommended.
+    assume_sorted : bool
+        If False, we sort bins by left edge first.
+    check_nonoverlap : bool
+        If True, assert that bins do not overlap.
+
+    Returns
+    -------
+    sample_idx : (L,) int    # interval index i contributing
+    bin_idx_array    : (L,) int    # bin index j receiving contribution
+    dt_array   : (L,) float  # overlap duration for that (i, j)
+    m          : int         # number of bins
+    """
     t = np.asarray(time, float)
     n = t.size
     assert n >= 2, 'need ≥2 time points'
     bins = np.asarray(bins, float)
     assert bins.ndim == 2 and bins.shape[1] == 2, 'bins must be (m,2)'
 
+    # intervals (left-hold): [t[i], t[i+1]) for i=0..n-2
     seg_lo = t[:-1]
     seg_hi = t[1:]
 
+    # sort bins if needed
     if not assume_sorted:
         order = np.argsort(bins[:, 0], kind='mergesort')
         bins = bins[order]
@@ -113,41 +130,113 @@ def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False
     bin_hi = bins[:, 1]
     m = bins.shape[0]
 
-    # 🔑 accumulate unique (i, j) pairs
-    overlap_map = {}  # (i, j) -> total dt
+    sample_idx = []
+    bin_idx_array = []
+    dt_array = []
 
-    i = 0
-    j = 0
+    i = 0  # interval pointer (0..n-2)
+    j = 0  # bin pointer (0..m-1)
 
     while i < n - 1 and j < m:
         lo = max(seg_lo[i], bin_lo[j])
         hi = min(seg_hi[i], bin_hi[j])
 
         if hi > lo:
-            key = (i, j)
-            overlap_map[key] = overlap_map.get(key, 0.0) + (hi - lo)
+            sample_idx.append(i)
+            bin_idx_array.append(j)
+            dt_array.append(hi - lo)
 
+        # advance whichever segment ends first
         if seg_hi[i] <= bin_hi[j]:
             i += 1
         else:
             j += 1
 
-        while j < m and i < n - 1 and bin_hi[j] <= seg_lo[i]:
+        # skip bins entirely before next interval
+        while j < m and bin_hi[j] <= seg_lo[i] if i < n - 1 else False:
             j += 1
 
-        while i < n - 1 and j < m and seg_hi[i] <= bin_lo[j]:
+        # skip intervals entirely before next bin
+        while i < n - 1 and seg_hi[i] <= bin_lo[j] if j < m else False:
             i += 1
 
-    if overlap_map:
-        sample_idx = np.fromiter((k[0] for k in overlap_map.keys()), dtype=int)
-        bin_idx_array = np.fromiter((k[1] for k in overlap_map.keys()), dtype=int)
-        dt_array = np.fromiter(overlap_map.values(), dtype=float)
+    if sample_idx:
+        sample_idx = np.asarray(sample_idx, dtype=int)
+        bin_idx_array = np.asarray(bin_idx_array,    dtype=int)
+        dt_array = np.asarray(dt_array,   dtype=float)
     else:
         sample_idx = np.zeros(0, dtype=int)
         bin_idx_array = np.zeros(0, dtype=int)
         dt_array = np.zeros(0, dtype=float)
 
     return sample_idx, bin_idx_array, dt_array, m
+
+
+# def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False):
+#     """
+#     O(n + m) interval–bin overlap for sorted, non-overlapping bins.
+
+#     Convention (left-hold):
+#       value[i] applies on [t[i], t[i+1]) for i = 0..n-2.
+#     """
+#     import numpy as np
+
+#     t = np.asarray(time, float)
+#     n = t.size
+#     assert n >= 2, 'need ≥2 time points'
+#     bins = np.asarray(bins, float)
+#     assert bins.ndim == 2 and bins.shape[1] == 2, 'bins must be (m,2)'
+
+#     seg_lo = t[:-1]
+#     seg_hi = t[1:]
+
+#     if not assume_sorted:
+#         order = np.argsort(bins[:, 0], kind='mergesort')
+#         bins = bins[order]
+
+#     if check_nonoverlap:
+#         if np.any(bins[1:, 0] < bins[:-1, 1]):
+#             raise ValueError('bins overlap; two-pointer assumes non-overlap')
+
+#     bin_lo = bins[:, 0]
+#     bin_hi = bins[:, 1]
+#     m = bins.shape[0]
+
+#     # 🔑 accumulate unique (i, j) pairs
+#     overlap_map = {}  # (i, j) -> total dt
+
+#     i = 0
+#     j = 0
+
+#     while i < n - 1 and j < m:
+#         lo = max(seg_lo[i], bin_lo[j])
+#         hi = min(seg_hi[i], bin_hi[j])
+
+#         if hi > lo:
+#             key = (i, j)
+#             overlap_map[key] = overlap_map.get(key, 0.0) + (hi - lo)
+
+#         if seg_hi[i] <= bin_hi[j]:
+#             i += 1
+#         else:
+#             j += 1
+
+#         while j < m and i < n - 1 and bin_hi[j] <= seg_lo[i]:
+#             j += 1
+
+#         while i < n - 1 and j < m and seg_hi[i] <= bin_lo[j]:
+#             i += 1
+
+#     if overlap_map:
+#         sample_idx = np.fromiter((k[0] for k in overlap_map.keys()), dtype=int)
+#         bin_idx_array = np.fromiter((k[1] for k in overlap_map.keys()), dtype=int)
+#         dt_array = np.fromiter(overlap_map.values(), dtype=float)
+#     else:
+#         sample_idx = np.zeros(0, dtype=int)
+#         bin_idx_array = np.zeros(0, dtype=int)
+#         dt_array = np.zeros(0, dtype=float)
+
+#     return sample_idx, bin_idx_array, dt_array, m
 
 
 def pick_event_window(df, event_time_col='stop_time',
