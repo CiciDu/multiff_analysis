@@ -242,7 +242,8 @@ def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False
 def pick_event_window(df, event_time_col='stop_time',
                       prev_event_col='prev_time',
                       next_event_col='next_time',
-                      pre_s=0.6, post_s=1.0, min_pre_bins=10, min_post_bins=20, bin_dt=0.04):
+                      pre_s=0.6, post_s=1.0,
+                      min_pre_bins=10, min_post_bins=20, bin_dt=0.04):
     out = df.copy()
     event_t = out[event_time_col].astype(float)
 
@@ -252,15 +253,35 @@ def pick_event_window(df, event_time_col='stop_time',
     t0 = t0_nom.copy()
     t1 = t1_nom.copy()
 
-    # clip to midpoints with neighbors (only where defined)
+    # ---- overlap-based clipping with previous event ----
     if prev_event_col in out.columns:
         prev_t = out[prev_event_col].astype(float)
         mask = prev_t.notna()
-        t0[mask] = np.maximum(t0[mask], 0.5 * (prev_t[mask] + event_t[mask]))
+
+        prev_end = prev_t + float(post_s)
+        overlap = prev_end > t0_nom
+
+        clip_mask = mask & overlap
+        overlap_mid = 0.5 * (prev_end + t0_nom)
+
+        t0[clip_mask] = np.maximum(t0[clip_mask], overlap_mid[clip_mask])
+
+    # ---- overlap-based clipping with next event ----
     if next_event_col in out.columns:
         next_t = out[next_event_col].astype(float)
         mask = next_t.notna()
-        t1[mask] = np.minimum(t1[mask], 0.5 * (next_t[mask] + event_t[mask]))
+
+        next_start = next_t - float(pre_s)
+        overlap = t1_nom > next_start
+
+        clip_mask = mask & overlap
+        overlap_mid = 0.5 * (t1_nom + next_start)
+
+        t1[clip_mask] = np.minimum(t1[clip_mask], overlap_mid[clip_mask])
+
+    t0 = np.minimum(t0, event_t)
+    t1 = np.maximum(t1, event_t)
+
 
     out['new_seg_start_time'] = t0
     out['new_seg_end_time'] = t1
@@ -277,16 +298,19 @@ def pick_event_window(df, event_time_col='stop_time',
     out['n_post_bins'] = np.floor(
         (out['new_seg_end_time'] - event_t) / dt).astype(int)
 
+    # snap to bin grid
     out['new_seg_start_time'] = event_t - out['n_pre_bins'] * dt
     out['new_seg_end_time'] = event_t + out['n_post_bins'] * dt
-    out['new_seg_duration'] = out['new_seg_end_time'] - out['new_seg_start_time']
+    out['new_seg_duration'] = (
+        out['new_seg_end_time'] - out['new_seg_start_time'])
 
     # quality flag
-    out['ok_window'] = (out['n_pre_bins'] >= int(min_pre_bins)) & (
-        out['n_post_bins'] >= int(min_post_bins))
+    out['ok_window'] = (
+        (out['n_pre_bins'] >= int(min_pre_bins)) &
+        (out['n_post_bins'] >= int(min_post_bins))
+    )
 
-    new_seg_info = out
-    return new_seg_info
+    return out
 
 
 def event_windows_to_bins2d(picked_windows,
@@ -302,6 +326,8 @@ def event_windows_to_bins2d(picked_windows,
                             tol=1e-9):
     """
     Turn event-centered windows into per-event fixed-width bins.
+    
+    Note: the bins are not guaranteed to be continuous in time. Instead, the function creates piecewise-continuous blocks of bins per event
 
     Produces:
       - bins_2d: (N_bins, 2) array of [left, right] for each bin across all events

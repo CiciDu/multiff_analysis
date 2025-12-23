@@ -8,14 +8,17 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 from data_wrangling import general_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
 
+
 def init_decoding_data(raw_data_folder_path):
     planning_data_by_point_exists_ok = True
 
-    pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(raw_data_folder_path=raw_data_folder_path)
-    pn.prep_data_to_analyze_planning(planning_data_by_point_exists_ok=planning_data_by_point_exists_ok)
+    pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
+        raw_data_folder_path=raw_data_folder_path)
+    pn.prep_data_to_analyze_planning(
+        planning_data_by_point_exists_ok=planning_data_by_point_exists_ok)
 
     pn.rebin_data_in_new_segments(cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                                    pre_event_window=0, post_event_window=1.5, rebinned_max_x_lag_number=2)
+                                  pre_event_window=0, post_event_window=1.5, rebinned_max_x_lag_number=2)
 
     for col in ['cur_vis', 'nxt_vis', 'cur_in_memory', 'nxt_in_memory']:
         pn.rebinned_y_var[col] = (pn.rebinned_y_var[col] > 0).astype(int)
@@ -25,9 +28,10 @@ def init_decoding_data(raw_data_folder_path):
 def get_data_for_decoding_vis(rebinned_x_var, rebinned_y_var, dt):
     data = rebinned_y_var.copy()
     trial_ids = data['new_segment']
-    design_df, meta0, meta = create_design_df.get_initial_design_df(data, dt, trial_ids)
+    design_df, meta0, meta = create_design_df.get_initial_design_df(
+        data, dt, trial_ids)
 
-    # design_df, meta = create_design_df.add_spike_history(
+    # design_df, meta = temporal_feats.add_spike_history(
     #     design_df, y, meta0['trial_ids'], dt,
     #     n_basis=4, t_max=0.20, edge='zero',
     #     prefix='spk_hist', style='bjk',
@@ -35,16 +39,17 @@ def get_data_for_decoding_vis(rebinned_x_var, rebinned_y_var, dt):
     # )
 
     df_X = design_df[['speed_z', 'time_since_last_capture',
-        'ang_accel_mag_spline:s0', 'ang_accel_mag_spline:s1',
-        'ang_accel_mag_spline:s2', 'ang_accel_mag_spline:s3', 'cur_vis', 'nxt_vis']].copy()
+                      'ang_accel_mag_spline:s0', 'ang_accel_mag_spline:s1',
+                      'ang_accel_mag_spline:s2', 'ang_accel_mag_spline:s3', 'cur_vis', 'nxt_vis']].copy()
 
     df_X['random_0_or_1'] = np.random.randint(0, 2, len(df_X))
 
-    cluster_cols = [col for col in rebinned_x_var.columns if col.startswith('cluster_')]
+    cluster_cols = [
+        col for col in rebinned_x_var.columns if col.startswith('cluster_')]
     df_Y = rebinned_x_var[cluster_cols]
     df_Y.columns = df_Y.columns.str.replace('cluster_', '').astype(int)
     return df_X, df_Y
-        
+
 
 def glm_decoding_from_fit(cols_to_decode, df_X, df_Y, offset_log, report):
 
@@ -52,18 +57,22 @@ def glm_decoding_from_fit(cols_to_decode, df_X, df_Y, offset_log, report):
         y_vars = df_X[decoding_col].to_numpy()
 
         # 1) Build params from the report and align to your spike matrix:
-        params_df = glm_decoding_llr.params_df_from_coefs_df(report['coefs_df'])     # long → wide
+        params_df = glm_decoding_llr.params_df_from_coefs_df(
+            report['coefs_df'])     # long → wide
         params_df = params_df.reindex(columns=df_X.columns, fill_value=0.0)
-        params_df = glm_decoding_llr.align_params_to_Y(params_df, df_Y)              # row order = df_Y columns
+        params_df = glm_decoding_llr.align_params_to_Y(
+            params_df, df_Y)              # row order = df_Y columns
 
         # 2) Decode on all rows (no CV)
         #    vis_col must match the column name you used for visibility in df_X/params_df.
         llr, p_vis = glm_decoding_llr.decode_from_fitted_glm(
             df_X,
             df_Y,
-            offset_log,          # log(dt) per row OR scalar 0.0 if uniform bins
+            # log(dt) per row OR scalar 0.0 if uniform bins
+            offset_log,
             params_df=params_df,
-            vis_col=decoding_col                   # <-- change if your term is named 'visible', etc.
+            # <-- change if your term is named 'visible', etc.
+            vis_col=decoding_col
         )
 
         print('-'*100)
@@ -72,7 +81,8 @@ def glm_decoding_from_fit(cols_to_decode, df_X, df_Y, offset_log, report):
 
         # If you have ground-truth per-bin labels:
         auc = roc_auc_score(y_vars, llr)               # using raw LLR is fine
-        aupr = average_precision_score(y_vars, p_vis)  # PR-AUC often more informative with class imbalance
+        # PR-AUC often more informative with class imbalance
+        aupr = average_precision_score(y_vars, p_vis)
         print(f"AUC={auc:.3f}, PR-AUC={aupr:.3f}")
 
         # Pick an operating point (threshold)
@@ -86,7 +96,6 @@ def glm_decoding_from_fit(cols_to_decode, df_X, df_Y, offset_log, report):
         y_hat = (llr >= thr_llr).astype(int)
 
 
-
 def glm_decoding_cv(cols_to_decode, df_X, df_Y, groups, offset_log):
     for decoding_col in cols_to_decode:
         y_vars = df_X[decoding_col].to_numpy()
@@ -95,10 +104,12 @@ def glm_decoding_cv(cols_to_decode, df_X, df_Y, groups, offset_log):
             df_X=df_X,                 # design (must include 'any_ff_visible')
             df_Y=df_Y,                 # spikes (T x N), columns are unit IDs
             y=y_vars,               # (T,) 0/1
-            groups=groups,             # (T,) session/episode IDs for GroupKFold
+            # (T,) session/episode IDs for GroupKFold
+            groups=groups,
             offset_log=offset_log,     # scalar or (T,)
             fit_fn=stop_glm_fit.glm_mini_report,
-            fit_kwargs=dict(cov_type='HC1', fast_mle=True, do_inference=False, make_plots=False, show_plots=False),
+            fit_kwargs=dict(cov_type='HC1', fast_mle=True,
+                            do_inference=False, make_plots=False, show_plots=False),
             bins_2d=None,           # to enable guard-band evaluation
             vis_col=decoding_col,
             n_splits=5,
@@ -109,10 +120,10 @@ def glm_decoding_cv(cols_to_decode, df_X, df_Y, groups, offset_log):
         print('-'*100)
         print(f"=== CV decoding: {decoding_col} ===")
         print(f"GroupKFold AUC: {res['auc_mean']:.3f} ± {res['auc_std']:.3f} | "
-            f"PR-AUC: {res['pr_mean']:.3f} ± {res['pr_std']:.3f} | folds={res['n_splits']}")
+              f"PR-AUC: {res['pr_mean']:.3f} ± {res['pr_std']:.3f} | folds={res['n_splits']}")
         for m in res['fold_metrics']:
-            print(f"fold {m['fold']}: AUC={m['auc']:.3f}, PR-AUC={m['pr_auc']:.3f}, n_test={m['n_test']}, kept={m['n_kept']}")
-
+            print(
+                f"fold {m['fold']}: AUC={m['auc']:.3f}, PR-AUC={m['pr_auc']:.3f}, n_test={m['n_test']}, kept={m['n_kept']}")
 
 
 def glm_decoding_permutation_test(cols_to_decode, df_X, df_Y, groups, offset_log, report, print_progress=True):
@@ -138,7 +149,6 @@ def glm_decoding_permutation_test(cols_to_decode, df_X, df_Y, groups, offset_log
         )
 
         print('-'*100)
-        
 
         auc_obs, pval, null = glm_decoding_llr.auc_permutation_test(
             y_vars, p_vis, groups=groups, n_perm=2000,
