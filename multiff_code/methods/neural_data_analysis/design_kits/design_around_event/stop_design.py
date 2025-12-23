@@ -22,9 +22,100 @@ def _zscore_nan(a):
 
 def _make_rcos_basis(t, centers, width):
     """
-    Raised cosine basis functions over relative time t (seconds).
-    Each basis is centered at a value in `centers` with half-width `width`.
+    EXPLAIN LIKE I'M A HIGH SCHOOLER 🧠✨ (FUTURE ME: READ THIS)
+
+    What this function does (in plain English):
+
+    Think of time as a straight line:
+        -0.2   -0.1    0     0.05    0.1    0.2   (seconds)
+
+    These are moments around some event (like a stop or a spike).
+
+    Instead of asking sharp, annoying questions like:
+        "Is this EXACTLY 50 ms after the event?"
+
+    this function asks nicer questions like:
+        "Is this time NEAR 50 ms after the event?"
+
+    It does this by placing smooth "hills" on the timeline
+    (also called raised-cosine basis functions).
+
+    Each hill:
+      - is tallest at its center time
+      - slopes down smoothly
+      - becomes exactly zero once you're far away
+
+    Example hills:
+      - one centered at 0.0 s
+      - one centered at 0.05 s
+      - one centered at 0.1 s
+    (they overlap a bit)
+
+    ------------------------------------------------------------
+    What the output actually is
+    ------------------------------------------------------------
+
+    For EVERY time point, the function asks:
+        "How tall is each hill here?"
+
+    The output is a table (matrix) like:
+
+        time    hill@0.0   hill@0.05   hill@0.1
+        --------------------------------------
+        -0.2      0           0           0
+         0.0      1          0.5          0
+         0.05     0           1          0.5
+         0.1      0           0           1
+
+    Each row = one time point
+    Each column = one hill (basis function)
+
+    At a given time point, the model computes:
+
+        final_value =
+            (how close am I to hill #1 × weight #1)
+          + (how close am I to hill #2 × weight #2)
+          + (how close am I to hill #3 × weight #3)
+
+
+    - "How close am I?" comes from this function (the basis values)
+    - "How much do I care?" comes from the learned weights (betas)
+
+    Adding them up gives a smooth time-dependent effect.
+
+    ------------------------------------------------------------
+    Why do this instead of 0/1 time bins?
+    ------------------------------------------------------------
+
+    Asking:
+        "Was it EXACTLY at 50 ms?"
+    is brittle and noisy.
+
+    Asking:
+        "Was it NEAR 50 ms?"
+    is smooth and forgiving.
+
+    Brains like smooth.
+    GLMs like smooth.
+
+    Instead of learning:
+        200 separate numbers for 200 time bins 😵
+
+    the GLM learns:
+        a few weights for these hills 🙂
+
+    Then it combines the hills to make any smooth shape it wants.
+
+    ------------------------------------------------------------
+    One-sentence summary
+    ------------------------------------------------------------
+
+    This function turns time into
+        "how close am I to these important moments?"
+    signals, and the GLM just multiplies by weights and adds them up.
     """
+
+
     t = np.asarray(t, float)[:, None]            # (N, 1)
     c = np.asarray(centers, float)[None, :]      # (1, K)
     arg = (t - c) * (np.pi / (2.0 * width))
