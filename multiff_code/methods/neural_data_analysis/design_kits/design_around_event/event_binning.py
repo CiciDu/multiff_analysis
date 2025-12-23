@@ -46,10 +46,33 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
     if np.any(bi < 0):
         raise ValueError('bin_idx_array must be non-negative')
 
-    # Drop invalid rows (NaNs) and clamp negative durations to zero
-    valid = np.isfinite(dt) & np.all(np.isfinite(V), axis=1)
+    # # # Drop invalid rows (NaNs) and clamp negative durations to zero
+    # # valid = np.isfinite(dt) & np.all(np.isfinite(V), axis=1)
+    # # if not np.all(valid):
+    # #     V, dt, bi = V[valid], dt[valid], bi[valid]
+    
+    # # Drop rows only if dt is invalid
+    # valid_dt = np.isfinite(dt)
+    # if not np.all(valid_dt):
+    #     V, dt, bi = V[valid_dt], dt[valid_dt], bi[valid_dt]
+
+    # 1) Row is valid if dt is finite AND at least one value is finite
+    valid = np.isfinite(dt) & np.any(np.isfinite(V), axis=1)
+
     if not np.all(valid):
         V, dt, bi = V[valid], dt[valid], bi[valid]
+
+    # 2) Clamp negative durations
+    dt = np.maximum(dt, 0.0)
+
+
+    # Clamp negative durations
+    dt = np.maximum(dt, 0.0)
+
+    # Mask invalid values per feature (do NOT drop rows)
+    V = np.where(np.isfinite(V), V, 0.0)
+
+
     if V.size == 0:
         # nothing to aggregate
         return np.zeros((0,)), np.zeros((0,)), np.zeros((0,), int)
@@ -172,78 +195,10 @@ def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False
     return sample_idx, bin_idx_array, dt_array, m
 
 
-# def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False):
-#     """
-#     O(n + m) interval–bin overlap for sorted, non-overlapping bins.
-
-#     Convention (left-hold):
-#       value[i] applies on [t[i], t[i+1]) for i = 0..n-2.
-#     """
-#     import numpy as np
-
-#     t = np.asarray(time, float)
-#     n = t.size
-#     assert n >= 2, 'need ≥2 time points'
-#     bins = np.asarray(bins, float)
-#     assert bins.ndim == 2 and bins.shape[1] == 2, 'bins must be (m,2)'
-
-#     seg_lo = t[:-1]
-#     seg_hi = t[1:]
-
-#     if not assume_sorted:
-#         order = np.argsort(bins[:, 0], kind='mergesort')
-#         bins = bins[order]
-
-#     if check_nonoverlap:
-#         if np.any(bins[1:, 0] < bins[:-1, 1]):
-#             raise ValueError('bins overlap; two-pointer assumes non-overlap')
-
-#     bin_lo = bins[:, 0]
-#     bin_hi = bins[:, 1]
-#     m = bins.shape[0]
-
-#     # 🔑 accumulate unique (i, j) pairs
-#     overlap_map = {}  # (i, j) -> total dt
-
-#     i = 0
-#     j = 0
-
-#     while i < n - 1 and j < m:
-#         lo = max(seg_lo[i], bin_lo[j])
-#         hi = min(seg_hi[i], bin_hi[j])
-
-#         if hi > lo:
-#             key = (i, j)
-#             overlap_map[key] = overlap_map.get(key, 0.0) + (hi - lo)
-
-#         if seg_hi[i] <= bin_hi[j]:
-#             i += 1
-#         else:
-#             j += 1
-
-#         while j < m and i < n - 1 and bin_hi[j] <= seg_lo[i]:
-#             j += 1
-
-#         while i < n - 1 and j < m and seg_hi[i] <= bin_lo[j]:
-#             i += 1
-
-#     if overlap_map:
-#         sample_idx = np.fromiter((k[0] for k in overlap_map.keys()), dtype=int)
-#         bin_idx_array = np.fromiter((k[1] for k in overlap_map.keys()), dtype=int)
-#         dt_array = np.fromiter(overlap_map.values(), dtype=float)
-#     else:
-#         sample_idx = np.zeros(0, dtype=int)
-#         bin_idx_array = np.zeros(0, dtype=int)
-#         dt_array = np.zeros(0, dtype=float)
-
-#     return sample_idx, bin_idx_array, dt_array, m
-
-
 def pick_event_window(df, event_time_col='stop_time',
                       prev_event_col='prev_time',
                       next_event_col='next_time',
-                      pre_s=0.6, post_s=1.0,
-                      min_pre_bins=10, min_post_bins=20, bin_dt=0.04):
+                      pre_s=0.6, post_s=1.0, min_pre_bins=10, min_post_bins=20, bin_dt=0.04):
     out = df.copy()
     event_t = out[event_time_col].astype(float)
 
@@ -253,35 +208,15 @@ def pick_event_window(df, event_time_col='stop_time',
     t0 = t0_nom.copy()
     t1 = t1_nom.copy()
 
-    # ---- overlap-based clipping with previous event ----
+    # clip to midpoints with neighbors (only where defined)
     if prev_event_col in out.columns:
         prev_t = out[prev_event_col].astype(float)
         mask = prev_t.notna()
-
-        prev_end = prev_t + float(post_s)
-        overlap = prev_end > t0_nom
-
-        clip_mask = mask & overlap
-        overlap_mid = 0.5 * (prev_end + t0_nom)
-
-        t0[clip_mask] = np.maximum(t0[clip_mask], overlap_mid[clip_mask])
-
-    # ---- overlap-based clipping with next event ----
+        t0[mask] = np.maximum(t0[mask], 0.5 * (prev_t[mask] + event_t[mask]))
     if next_event_col in out.columns:
         next_t = out[next_event_col].astype(float)
         mask = next_t.notna()
-
-        next_start = next_t - float(pre_s)
-        overlap = t1_nom > next_start
-
-        clip_mask = mask & overlap
-        overlap_mid = 0.5 * (t1_nom + next_start)
-
-        t1[clip_mask] = np.minimum(t1[clip_mask], overlap_mid[clip_mask])
-
-    t0 = np.minimum(t0, event_t)
-    t1 = np.maximum(t1, event_t)
-
+        t1[mask] = np.minimum(t1[mask], 0.5 * (next_t[mask] + event_t[mask]))
 
     out['new_seg_start_time'] = t0
     out['new_seg_end_time'] = t1
@@ -298,19 +233,17 @@ def pick_event_window(df, event_time_col='stop_time',
     out['n_post_bins'] = np.floor(
         (out['new_seg_end_time'] - event_t) / dt).astype(int)
 
-    # snap to bin grid
     out['new_seg_start_time'] = event_t - out['n_pre_bins'] * dt
     out['new_seg_end_time'] = event_t + out['n_post_bins'] * dt
-    out['new_seg_duration'] = (
-        out['new_seg_end_time'] - out['new_seg_start_time'])
+    out['new_seg_duration'] = out['new_seg_end_time'] - out['new_seg_start_time']
 
     # quality flag
-    out['ok_window'] = (
-        (out['n_pre_bins'] >= int(min_pre_bins)) &
-        (out['n_post_bins'] >= int(min_post_bins))
-    )
+    out['ok_window'] = (out['n_pre_bins'] >= int(min_pre_bins)) & (
+        out['n_post_bins'] >= int(min_post_bins))
 
-    return out
+    new_seg_info = out
+    return new_seg_info
+
 
 
 def event_windows_to_bins2d(picked_windows,
@@ -326,8 +259,6 @@ def event_windows_to_bins2d(picked_windows,
                             tol=1e-9):
     """
     Turn event-centered windows into per-event fixed-width bins.
-    
-    Note: the bins are not guaranteed to be continuous in time. Instead, the function creates piecewise-continuous blocks of bins per event
 
     Produces:
       - bins_2d: (N_bins, 2) array of [left, right] for each bin across all events

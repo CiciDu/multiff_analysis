@@ -1,7 +1,16 @@
+# new script
+# new script
+
 from data_wrangling import specific_utils
 from planning_analysis.plan_indicators import diff_in_curv_utils
 import numpy as np
 import pandas as pd
+from neural_data_analysis.design_kits.design_around_event.event_binning import (
+    build_bin_assignments,
+    bin_timeseries_weighted,
+    bin_spikes_by_cluster,
+    event_windows_to_bins2d,
+)
 
 
 def add_curv_info(info_to_add, curv_df, which_ff_info):
@@ -54,8 +63,8 @@ def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_informa
     cur_end_to_next_ff_curv = compute_cur_end_to_next_ff_curv_for_pn(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
     prev_stop_to_next_ff_curv, _ = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(both_ff_df['nxt_ff_index'].values, point_indexes_before_stop,
-                                                                                     monkey_information, ff_real_position_sorted, ff_caught_T_new,
-                                                                                     curv_traj_window_before_stop=curv_traj_window_before_stop)
+                                                                                        monkey_information, ff_real_position_sorted, ff_caught_T_new,
+                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop)
     prev_stop_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index'].values
 
     diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
@@ -66,8 +75,10 @@ def find_diff_in_curv_info(both_ff_df, point_indexes_before_stop, monkey_informa
 def compute_cur_end_to_next_ff_curv_for_pn(both_ff_df, use_curv_to_ff_center=False, ff_radius_for_opt_arc=10):
     mock_monkey_info = diff_in_curv_utils._build_mock_monkey_info(
         both_ff_df, use_curv_to_ff_center=use_curv_to_ff_center)
-    null_arc_curv_df = diff_in_curv_utils._make_null_arc_curv_df(mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
-    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(null_arc_curv_df, mock_monkey_info)
+    null_arc_curv_df = diff_in_curv_utils._make_null_arc_curv_df(
+        mock_monkey_info, ff_radius_for_opt_arc=ff_radius_for_opt_arc)
+    cur_end_to_next_ff_curv = diff_in_curv_utils._compute_curv_from_cur_end(
+        null_arc_curv_df, mock_monkey_info)
     cur_end_to_next_ff_curv['ref_point_index'] = cur_end_to_next_ff_curv['point_index']
     return cur_end_to_next_ff_curv
 
@@ -164,6 +175,51 @@ def randomly_assign_random_dummy_based_on_targets(y_var):
     y_var.loc[y_var['target_index'].isin(half_targets), 'random_dummy'] = 1
     return y_var
 
+import numpy as np
+import pandas as pd
+
+
+# ============================================================
+# Helper: build bins once for all segments
+# ============================================================
+
+def _build_segment_bins(new_seg_info, bin_width):
+    bins_list = []
+    meta_rows = []
+
+    for _, r in new_seg_info.sort_values('new_segment').iterrows():
+        seg_id = int(r['new_segment'])
+        t0 = float(r['new_seg_start_time'])
+        t1 = float(r['new_seg_end_time'])
+        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
+            continue
+
+        dt = float(bin_width)
+        n_bins = int(np.floor((t1 - t0) / dt))
+        if n_bins <= 0:
+            continue
+
+        lefts = t0 + dt * np.arange(n_bins)
+        rights = lefts + dt
+
+        bins_list.append(np.column_stack([lefts, rights]))
+        meta_rows.append(pd.DataFrame({
+            'new_segment': seg_id,
+            'new_bin': np.arange(n_bins, dtype=int),
+        }))
+
+    if not bins_list:
+        return np.zeros((0, 2)), pd.DataFrame(columns=['new_segment', 'new_bin'])
+
+    bins_2d = np.vstack(bins_list)
+    meta = pd.concat(meta_rows, ignore_index=True)
+    return bins_2d, meta
+
+
+# ============================================================
+# 1️⃣ concat_new_seg_info (kept for compatibility; minimal)
+# ============================================================
+
 
 def concat_new_seg_info(df, new_seg_info, bin_width=None):
     df = df.sort_values(by='time')
@@ -194,78 +250,262 @@ def concat_new_seg_info(df, new_seg_info, bin_width=None):
     result['new_segment'] = result['new_segment'].astype(int)
     return result
 
-
-def rebin_segment_data(df, new_seg_info, bin_width=0.2):
-    # This function rebins the data by segment and time bin, and takes the median of the data within each bin
-    # It makes sure that the bins are perfectly aligned within segments (whereas in the previous method, bins are continuously assigned to all time points)
-    # df must contain columns: segment, seg_start_time, seg_end_time, time, bin,
-
-    concat_seg_data = concat_new_seg_info(
-        df, new_seg_info, bin_width=bin_width)
-
-    # Take the median of the data within each bin
-    rebinned_data = concat_seg_data.groupby(
-        ['new_segment', 'new_bin']).median().reset_index(drop=False)
-
-    return rebinned_data
-
-
-def rebin_spike_data(spikes_df, new_seg_info, bin_width=0.2):
+def segment_windows_to_bins2d(
+    new_seg_info,
+    *,
+    seg_id_col='new_segment',
+    t0_col='new_seg_start_time',
+    t1_col='new_seg_end_time',
+    bin_width
+):
     """
-    Re-bin spike data based on new segment definitions and specified bin width.
+    Segment-based bin constructor (PSTH-style, but NOT event-based).
 
-    Args:
-        spikes_df (pd.DataFrame): Original spike data with 'time' and 'cluster' columns.
-        new_seg_info (pd.DataFrame): DataFrame with new segment start/end times and metadata.
-        bin_width (float): Width of each time bin (in seconds).
-
-    Returns:
-        pd.DataFrame: Wide-format binned spike matrix indexed by (new_segment, new_bin),
-                      with spike counts per unit as columns.
+    Returns
+    -------
+    bins_2d : (N_bins, 2) array
+        [t_left, t_right] for each bin across all segments
+    meta : DataFrame
+        Columns: new_segment, new_bin, t_left, t_right, bin
     """
-    # Assign each spike to a segment and compute new time bins
-    concat_seg_data = concat_new_seg_info(
-        spikes_df, new_seg_info, bin_width=bin_width)
+    bins_list = []
+    meta_rows = []
 
-    # Convert binned spike data into wide-format matrix
-    rebinned_spike_data = _rebin_spike_data(
-        concat_seg_data, new_segments=new_seg_info['new_segment'].unique())
+    for _, r in new_seg_info.sort_values(seg_id_col).iterrows():
+        seg_id = int(r[seg_id_col])
+        t0 = float(r[t0_col])
+        t1 = float(r[t1_col])
 
-    return rebinned_spike_data
+        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
+            continue
 
+        dt = float(bin_width)
+        n_bins = int(np.floor((t1 - t0) / dt))
+        if n_bins <= 0:
+            continue
 
-def _rebin_spike_data(concat_seg_data, new_segments=None):
+        lefts = t0 + dt * np.arange(n_bins)
+        rights = lefts + dt
+
+        bins_list.append(np.column_stack([lefts, rights]))
+
+        meta_rows.append(pd.DataFrame({
+            'new_segment': seg_id,
+            'new_bin': np.arange(n_bins, dtype=int),
+            't_left': lefts,
+            't_right': rights,
+        }))
+
+    if not bins_list:
+        return np.zeros((0, 2)), pd.DataFrame(
+            columns=['new_segment', 'new_bin', 't_left', 't_right', 'bin']
+        )
+
+    bins_2d = np.vstack(bins_list)
+    meta = pd.concat(meta_rows, ignore_index=True)
+
+    # global bin index (PSTH-style)
+    meta['bin'] = np.arange(len(meta), dtype=int)
+
+    return bins_2d, meta
+
+def rebin_segment_data(
+    df,
+    new_seg_info,
+    bin_width,
+    *,
+    time_col='time',
+    segment_col='segment',
+    how='mean',
+    respect_old_segment=True,
+):
     """
-    Create a wide-format binned spike matrix with shape [segments × bins, clusters].
+    Fast PSTH-style rebinning for continuous data.
 
-    Returns:
-        rebinned_spike_data: DataFrame indexed by (new_segment, new_bin), with spike counts per unit.
+    Parameters
+    ----------
+    respect_old_segment : bool
+        If True, only data from the same old `segment` is used
+        for each new segment (old behavior).
+        If False, all data in the time window is used.
     """
-    # Group and count spikes by segment, bin, and cluster
-    rebinned_spike_data = (
-        concat_seg_data
-        .groupby(['new_segment', 'new_bin', 'cluster'])
-        .size()
-        .unstack(fill_value=0)
+
+    if how not in ('mean', 'sum'):
+        raise ValueError("how must be 'mean' or 'sum'")
+
+    # --------------------------------------------------
+    # 1) Identify value columns
+    # --------------------------------------------------
+    exclude = {
+        time_col,
+        'new_segment',
+        'new_seg_start_time',
+        'new_seg_end_time',
+        'new_seg_duration',
+    }
+    if respect_old_segment:
+        exclude.add(segment_col)
+
+    value_cols = [
+        c for c in df.select_dtypes(include='number').columns
+        if c not in exclude
+    ]
+    if not value_cols:
+        return pd.DataFrame()
+
+    # --------------------------------------------------
+    # 2) Prepare data access (fast paths)
+    # --------------------------------------------------
+    if respect_old_segment:
+        # Pre-split by old segment (fast)
+        df_by_segment = {
+            seg: g.sort_values(time_col)
+            for seg, g in df.groupby(segment_col)
+        }
+    else:
+        # Single globally sorted frame
+        df_sorted = df.sort_values(time_col)
+
+    out_blocks = []
+
+    # --------------------------------------------------
+    # 3) Loop over new segments
+    # --------------------------------------------------
+    for _, r in new_seg_info.sort_values('new_segment').iterrows():
+        new_seg_id = int(r['new_segment'])
+        t0 = float(r['new_seg_start_time'])
+        t1 = float(r['new_seg_end_time'])
+
+        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
+            continue
+
+        # ---- select data ----
+        if respect_old_segment:
+            old_seg_id = r[segment_col]
+            seg_df = df_by_segment.get(old_seg_id)
+            if seg_df is None:
+                continue
+            seg_df = seg_df[
+                (seg_df[time_col] >= t0) &
+                (seg_df[time_col] < t1)
+            ]
+        else:
+            times_all = df_sorted[time_col].to_numpy()
+
+            i0 = np.searchsorted(times_all, t0, side='left')
+            i1 = np.searchsorted(times_all, t1, side='left')
+
+            seg_df = df_sorted.iloc[i0:i1]
+
+
+        if seg_df.empty:
+            continue
+
+        # --------------------------------------------------
+        # 4) Build per-segment left-hold intervals
+        # --------------------------------------------------
+        times = seg_df[time_col].to_numpy(dtype=float)
+
+        times, uniq_idx = np.unique(times, return_index=True)
+        values = seg_df.iloc[uniq_idx][value_cols].to_numpy(dtype=float)
+
+        # close interval at segment end
+        if times[-1] < t1:
+            times = np.r_[times, t1]
+
+        if times.size < 2:
+            continue
+
+        # --------------------------------------------------
+        # 5) Build bins for THIS segment
+        # --------------------------------------------------
+        dt = float(bin_width)
+        n_bins = int(np.floor((t1 - t0) / dt))
+        if n_bins <= 0:
+            continue
+
+        lefts = t0 + dt * np.arange(n_bins)
+        rights = lefts + dt
+        bins_2d = np.column_stack([lefts, rights])
+
+        # --------------------------------------------------
+        # 6) Interval → bin overlap
+        # --------------------------------------------------
+        sample_idx, bin_idx_arr, dt_arr, _ = build_bin_assignments(
+            times,
+            bins_2d,
+            assume_sorted=True,
+            check_nonoverlap=False
+        )
+        if sample_idx.size == 0:
+            continue
+
+        # --------------------------------------------------
+        # 7) Time-weighted aggregation
+        # --------------------------------------------------
+        weighted_vals, _, used_bins = bin_timeseries_weighted(
+            values[sample_idx],
+            dt_arr,
+            bin_idx_arr,
+            how=how
+        )
+
+        block = pd.DataFrame(weighted_vals, columns=value_cols)
+        block.insert(0, 'new_bin', used_bins.astype(int))
+        block.insert(0, 'new_segment', new_seg_id)
+
+        out_blocks.append(block)
+
+    if not out_blocks:
+        return pd.DataFrame()
+
+    out = pd.concat(out_blocks, ignore_index=True)
+    out.set_index(['new_segment', 'new_bin'], inplace=True)
+    out.sort_index(inplace=True)
+    out.reset_index(drop=False, inplace=True)
+
+    return out
+
+
+def rebin_spike_data(
+    spikes_df,
+    new_seg_info,
+    bin_width,
+    *,
+    time_col='time',
+    cluster_col='cluster',
+):
+    """
+    Segment-based PSTH-style rebinning for spikes.
+    Dense output with zero-filled bins.
+    Indexed by (new_segment, new_bin).
+    """
+    bins_2d, meta = segment_windows_to_bins2d(
+        new_seg_info,
+        bin_width=bin_width
     )
 
-    # Ensure all (segment, bin) combinations and all clusters are included
-    if new_segments is None:
-        new_segments = concat_seg_data['new_segment'].unique()
-    bins = np.arange(concat_seg_data['new_bin'].max() + 1)
-    clusters = np.sort(concat_seg_data['cluster'].unique())
-    full_index = pd.MultiIndex.from_product(
-        [new_segments, bins], names=['new_segment', 'new_bin'])
+    if bins_2d.size == 0:
+        return pd.DataFrame()
 
-    rebinned_spike_data = rebinned_spike_data.reindex(
-        index=full_index, columns=clusters, fill_value=0)
+    counts, cluster_ids = bin_spikes_by_cluster(
+        spikes_df[[time_col, cluster_col]],
+        bins_2d,
+        time_col=time_col,
+        cluster_col=cluster_col,
+        assume_sorted_bins=True,
+        check_nonoverlap=False
+    )
 
-    # Clean column names
-    rebinned_spike_data.columns.name = None
-    rebinned_spike_data.columns = [
-        f'cluster_{i}' for i in clusters]
-    rebinned_spike_data.reset_index(drop=False, inplace=True)
-    return rebinned_spike_data
+    out = meta[['new_segment', 'new_bin']].copy()
+    for j, cid in enumerate(cluster_ids):
+        out[f'cluster_{cid}'] = counts[:, j]
+
+    out.set_index(['new_segment', 'new_bin'], inplace=True)
+    out.sort_index(inplace=True)
+    out.reset_index(inplace=True, drop=False)
+
+    return out
 
 
 def _get_new_seg_info(planning_data):
@@ -308,7 +548,8 @@ def add_ff_visible_or_in_memory_info_by_point(df, ff_dataframe, max_in_memory_ti
 
     # Visible: filter by visible==True, then count unique ff_index per point_index
     visible_pairs = (
-        ff_dataframe.loc[ff_dataframe['visible'].astype(bool), ['ff_index', 'point_index']]
+        ff_dataframe.loc[ff_dataframe['visible'].astype(
+            bool), ['ff_index', 'point_index']]
         .drop_duplicates()
     )
     vis_counts = (
@@ -316,7 +557,8 @@ def add_ff_visible_or_in_memory_info_by_point(df, ff_dataframe, max_in_memory_ti
         .nunique()
         .reset_index(name='num_ff_visible')
     )
-    vis_counts['any_ff_visible'] = (vis_counts['num_ff_visible'] > 0).astype('uint8')
+    vis_counts['any_ff_visible'] = (
+        vis_counts['num_ff_visible'] > 0).astype('uint8')
 
     # In-memory: time_since_last_vis < threshold, then count unique ff_index per point_index
     mem_pairs = (
@@ -329,12 +571,13 @@ def add_ff_visible_or_in_memory_info_by_point(df, ff_dataframe, max_in_memory_ti
         .nunique()
         .reset_index(name='num_ff_in_memory')
     )
-    mem_counts['any_ff_in_memory'] = (mem_counts['num_ff_in_memory'] > 0).astype('uint8')
+    mem_counts['any_ff_in_memory'] = (
+        mem_counts['num_ff_in_memory'] > 0).astype('uint8')
 
     # Merge onto df
     out = (
         df.merge(vis_counts, on='point_index', how='left')
-          .merge(mem_counts, on='point_index', how='left')
+        .merge(mem_counts, on='point_index', how='left')
     )
 
     # Fill + compact dtypes
@@ -344,7 +587,6 @@ def add_ff_visible_or_in_memory_info_by_point(df, ff_dataframe, max_in_memory_ti
         out[col] = out[col].fillna(0).astype('uint8')
 
     return out
-
 
 
 def add_ff_visible_dummy(df, ff_index_col, ff_dataframe):
@@ -370,7 +612,8 @@ def add_ff_in_memory_dummy(df, ff_index_col, ff_dataframe, max_in_memory_time_si
                                           < max_in_memory_time_since_seen].copy()
 
     ff_dataframe_in_memory = ff_dataframe_in_memory[['ff_index', 'point_index']].rename(
-        columns={'ff_index': ff_index_col}).drop_duplicates()   # align key name
+        # align key name
+        columns={'ff_index': ff_index_col}).drop_duplicates()
     ff_dataframe_in_memory['whether_ff_in_memory_dummy'] = 1
 
     out = df.merge(ff_dataframe_in_memory, on=[
