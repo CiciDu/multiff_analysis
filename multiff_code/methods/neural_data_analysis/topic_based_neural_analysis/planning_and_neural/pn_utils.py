@@ -13,6 +13,224 @@ from neural_data_analysis.design_kits.design_around_event.event_binning import (
 )
 
 
+
+def rebin_segment_data(
+    df,
+    new_seg_info,
+    bin_width,
+    *,
+    time_col='time',
+    segment_col='segment',
+    how='mean',
+    respect_old_segment=True,
+):
+    """
+    Fast PSTH-style rebinning for continuous data.
+
+    Parameters
+    ----------
+    respect_old_segment : bool
+        If True, only data from the same old `segment` is used
+        for each new segment (old behavior).
+        If False, all data in the time window is used.
+    """
+
+    if how not in ('mean', 'sum'):
+        raise ValueError("how must be 'mean' or 'sum'")
+
+    # --------------------------------------------------
+    # 1) Identify value columns
+    # --------------------------------------------------
+    exclude = {
+        time_col,
+        'new_segment',
+        'new_seg_start_time',
+        'new_seg_end_time',
+        'new_seg_duration',
+    }
+    if respect_old_segment:
+        exclude.add(segment_col)
+
+    value_cols = [
+        c for c in df.select_dtypes(include='number').columns
+        if c not in exclude
+    ]
+    if not value_cols:
+        return pd.DataFrame()
+
+    # --------------------------------------------------
+    # 2) Prepare data access (fast paths)
+    # --------------------------------------------------
+    if respect_old_segment:
+        # Pre-split by old segment (fast)
+        df_by_segment = {
+            seg: g.sort_values(time_col)
+            for seg, g in df.groupby(segment_col)
+        }
+    else:
+        # Single globally sorted frame
+        df_sorted = df.sort_values(time_col)
+
+    out_blocks = []
+
+    # --------------------------------------------------
+    # 3) Loop over new segments
+    # --------------------------------------------------
+    for _, r in new_seg_info.sort_values('new_segment').iterrows():
+        new_seg_id = int(r['new_segment'])
+        t0 = float(r['new_seg_start_time'])
+        t1 = float(r['new_seg_end_time'])
+
+        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
+            continue
+
+        # ---- select data ----
+        if respect_old_segment:
+            old_seg_id = r[segment_col]
+            seg_df = df_by_segment.get(old_seg_id)
+            if seg_df is None:
+                continue
+            seg_df = seg_df[
+                (seg_df[time_col] >= t0) &
+                (seg_df[time_col] < t1)
+            ]
+        else:
+            times_all = df_sorted[time_col].to_numpy()
+
+            i0 = np.searchsorted(times_all, t0, side='left')
+            i1 = np.searchsorted(times_all, t1, side='left')
+
+            seg_df = df_sorted.iloc[i0:i1]
+
+
+        if seg_df.empty:
+            continue
+
+        # --------------------------------------------------
+        # 4) Build per-segment left-hold intervals
+        # --------------------------------------------------
+        times = seg_df[time_col].to_numpy(dtype=float)
+
+        times, uniq_idx = np.unique(times, return_index=True)
+        values = seg_df.iloc[uniq_idx][value_cols].to_numpy(dtype=float)
+
+        # close interval at segment end
+        if times[-1] < t1:
+            times = np.r_[times, times[-1] + 0.01]
+
+        if times.size < 2:
+            continue
+
+        # --------------------------------------------------
+        # 5) Build bins for THIS segment
+        # --------------------------------------------------
+        dt = float(bin_width)
+        n_bins = int(np.floor((t1 - t0) / dt))
+        if n_bins <= 0:
+            continue
+
+        lefts = t0 + dt * np.arange(n_bins)
+        rights = lefts + dt
+        bins_2d = np.column_stack([lefts, rights])
+
+        # --------------------------------------------------
+        # 6) Interval → bin overlap
+        # --------------------------------------------------
+        sample_idx, bin_idx_arr, dt_arr, _ = build_bin_assignments(
+            times,
+            bins_2d,
+            assume_sorted=True,
+            check_nonoverlap=False
+        )
+        if sample_idx.size == 0:
+            continue
+
+        # --------------------------------------------------
+        # 7) Time-weighted aggregation
+        # --------------------------------------------------
+        weighted_vals, _, used_bins = bin_timeseries_weighted(
+            values[sample_idx],
+            dt_arr,
+            bin_idx_arr,
+            how=how
+        )
+
+        block = pd.DataFrame(weighted_vals, columns=value_cols)
+        block.insert(0, 'new_bin', used_bins.astype(int))
+        block.insert(0, 'new_segment', new_seg_id)
+
+        out_blocks.append(block)
+
+    if not out_blocks:
+        return pd.DataFrame()
+
+    out = pd.concat(out_blocks, ignore_index=True)
+    out.set_index(['new_segment', 'new_bin'], inplace=True)
+    out.sort_index(inplace=True)
+    out.reset_index(drop=False, inplace=True)
+
+    out = out.merge(
+        new_seg_info[
+            ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+        ],
+        on='new_segment',
+        how='left',
+        validate='many_to_one'
+    )
+    
+    return out
+
+
+def rebin_spike_data(
+    spikes_df,
+    new_seg_info,
+    bin_width,
+    *,
+    time_col='time',
+    cluster_col='cluster',
+):
+    """
+    Segment-based PSTH-style rebinning for spikes.
+    Dense output with zero-filled bins.
+    Indexed by (new_segment, new_bin).
+    """
+    bins_2d, meta = segment_windows_to_bins2d(
+        new_seg_info,
+        bin_width=bin_width
+    )
+
+    if bins_2d.size == 0:
+        return pd.DataFrame()
+
+    counts, cluster_ids = bin_spikes_by_cluster(
+        spikes_df[[time_col, cluster_col]],
+        bins_2d,
+        time_col=time_col,
+        cluster_col=cluster_col,
+        assume_sorted_bins=True,
+        check_nonoverlap=False
+    )
+
+    out = meta[['new_segment', 'new_bin']].copy()
+    for j, cid in enumerate(cluster_ids):
+        out[f'cluster_{cid}'] = counts[:, j]
+
+    out.set_index(['new_segment', 'new_bin'], inplace=True)
+    out.sort_index(inplace=True)
+    out.reset_index(inplace=True, drop=False)
+
+    out = out.merge(
+        new_seg_info[
+            ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+        ],
+        on='new_segment',
+        how='left',
+        validate='many_to_one'
+    )
+
+    return out
+
+
 def add_curv_info(info_to_add, curv_df, which_ff_info):
     curv_df = curv_df.copy()
     columns_to_rename = {'ff_index': f'{which_ff_info}ff_index',
@@ -308,204 +526,6 @@ def segment_windows_to_bins2d(
     meta['bin'] = np.arange(len(meta), dtype=int)
 
     return bins_2d, meta
-
-def rebin_segment_data(
-    df,
-    new_seg_info,
-    bin_width,
-    *,
-    time_col='time',
-    segment_col='segment',
-    how='mean',
-    respect_old_segment=True,
-):
-    """
-    Fast PSTH-style rebinning for continuous data.
-
-    Parameters
-    ----------
-    respect_old_segment : bool
-        If True, only data from the same old `segment` is used
-        for each new segment (old behavior).
-        If False, all data in the time window is used.
-    """
-
-    if how not in ('mean', 'sum'):
-        raise ValueError("how must be 'mean' or 'sum'")
-
-    # --------------------------------------------------
-    # 1) Identify value columns
-    # --------------------------------------------------
-    exclude = {
-        time_col,
-        'new_segment',
-        'new_seg_start_time',
-        'new_seg_end_time',
-        'new_seg_duration',
-    }
-    if respect_old_segment:
-        exclude.add(segment_col)
-
-    value_cols = [
-        c for c in df.select_dtypes(include='number').columns
-        if c not in exclude
-    ]
-    if not value_cols:
-        return pd.DataFrame()
-
-    # --------------------------------------------------
-    # 2) Prepare data access (fast paths)
-    # --------------------------------------------------
-    if respect_old_segment:
-        # Pre-split by old segment (fast)
-        df_by_segment = {
-            seg: g.sort_values(time_col)
-            for seg, g in df.groupby(segment_col)
-        }
-    else:
-        # Single globally sorted frame
-        df_sorted = df.sort_values(time_col)
-
-    out_blocks = []
-
-    # --------------------------------------------------
-    # 3) Loop over new segments
-    # --------------------------------------------------
-    for _, r in new_seg_info.sort_values('new_segment').iterrows():
-        new_seg_id = int(r['new_segment'])
-        t0 = float(r['new_seg_start_time'])
-        t1 = float(r['new_seg_end_time'])
-
-        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
-            continue
-
-        # ---- select data ----
-        if respect_old_segment:
-            old_seg_id = r[segment_col]
-            seg_df = df_by_segment.get(old_seg_id)
-            if seg_df is None:
-                continue
-            seg_df = seg_df[
-                (seg_df[time_col] >= t0) &
-                (seg_df[time_col] < t1)
-            ]
-        else:
-            times_all = df_sorted[time_col].to_numpy()
-
-            i0 = np.searchsorted(times_all, t0, side='left')
-            i1 = np.searchsorted(times_all, t1, side='left')
-
-            seg_df = df_sorted.iloc[i0:i1]
-
-
-        if seg_df.empty:
-            continue
-
-        # --------------------------------------------------
-        # 4) Build per-segment left-hold intervals
-        # --------------------------------------------------
-        times = seg_df[time_col].to_numpy(dtype=float)
-
-        times, uniq_idx = np.unique(times, return_index=True)
-        values = seg_df.iloc[uniq_idx][value_cols].to_numpy(dtype=float)
-
-        # close interval at segment end
-        if times[-1] < t1:
-            times = np.r_[times, t1]
-
-        if times.size < 2:
-            continue
-
-        # --------------------------------------------------
-        # 5) Build bins for THIS segment
-        # --------------------------------------------------
-        dt = float(bin_width)
-        n_bins = int(np.floor((t1 - t0) / dt))
-        if n_bins <= 0:
-            continue
-
-        lefts = t0 + dt * np.arange(n_bins)
-        rights = lefts + dt
-        bins_2d = np.column_stack([lefts, rights])
-
-        # --------------------------------------------------
-        # 6) Interval → bin overlap
-        # --------------------------------------------------
-        sample_idx, bin_idx_arr, dt_arr, _ = build_bin_assignments(
-            times,
-            bins_2d,
-            assume_sorted=True,
-            check_nonoverlap=False
-        )
-        if sample_idx.size == 0:
-            continue
-
-        # --------------------------------------------------
-        # 7) Time-weighted aggregation
-        # --------------------------------------------------
-        weighted_vals, _, used_bins = bin_timeseries_weighted(
-            values[sample_idx],
-            dt_arr,
-            bin_idx_arr,
-            how=how
-        )
-
-        block = pd.DataFrame(weighted_vals, columns=value_cols)
-        block.insert(0, 'new_bin', used_bins.astype(int))
-        block.insert(0, 'new_segment', new_seg_id)
-
-        out_blocks.append(block)
-
-    if not out_blocks:
-        return pd.DataFrame()
-
-    out = pd.concat(out_blocks, ignore_index=True)
-    out.set_index(['new_segment', 'new_bin'], inplace=True)
-    out.sort_index(inplace=True)
-    out.reset_index(drop=False, inplace=True)
-
-    return out
-
-
-def rebin_spike_data(
-    spikes_df,
-    new_seg_info,
-    bin_width,
-    *,
-    time_col='time',
-    cluster_col='cluster',
-):
-    """
-    Segment-based PSTH-style rebinning for spikes.
-    Dense output with zero-filled bins.
-    Indexed by (new_segment, new_bin).
-    """
-    bins_2d, meta = segment_windows_to_bins2d(
-        new_seg_info,
-        bin_width=bin_width
-    )
-
-    if bins_2d.size == 0:
-        return pd.DataFrame()
-
-    counts, cluster_ids = bin_spikes_by_cluster(
-        spikes_df[[time_col, cluster_col]],
-        bins_2d,
-        time_col=time_col,
-        cluster_col=cluster_col,
-        assume_sorted_bins=True,
-        check_nonoverlap=False
-    )
-
-    out = meta[['new_segment', 'new_bin']].copy()
-    for j, cid in enumerate(cluster_ids):
-        out[f'cluster_{cid}'] = counts[:, j]
-
-    out.set_index(['new_segment', 'new_bin'], inplace=True)
-    out.sort_index(inplace=True)
-    out.reset_index(inplace=True, drop=False)
-
-    return out
 
 
 def _get_new_seg_info(planning_data):

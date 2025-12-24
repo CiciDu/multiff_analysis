@@ -11,6 +11,7 @@ from scipy.interpolate import BSpline
 
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
 
 
 
@@ -406,4 +407,3 @@ def lagged_design_from_signal_trials(
             raise ValueError("edge must be one of {'zero','drop','renorm'}")
 
     return (out, edge_mask) if return_edge_mask else out
-
