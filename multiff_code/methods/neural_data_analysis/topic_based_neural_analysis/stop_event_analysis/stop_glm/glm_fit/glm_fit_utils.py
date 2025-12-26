@@ -84,6 +84,7 @@ def add_fdr(coefs_df, alpha: float = 0.05, by_term: bool = True,
     if by_term:
         if 'term' not in df.columns:
             raise KeyError("add_fdr(by_term=True) requires a 'term' column.")
+        print('Conducting FDR adjustment by term...')
         for term, g in df.groupby('term', sort=False):
             pvals = g[p_col].to_numpy(dtype=float, copy=False)
             qvals = _bh_adjust(pvals)
@@ -113,6 +114,24 @@ def add_rate_ratios(coefs_df, delta=1.0):
     df['rr_lo'] = np.exp(lo * delta)
     df['rr_hi'] = np.exp(hi * delta)
     return df
+
+
+def normalize_term_labels(term_series: pd.Series) -> pd.Series:
+    """
+    Normalize per-column term labels into group terms suitable for FDR grouping.
+    Rules (kept intentionally simple and idempotent):
+      - Basis-expanded columns use ':' separators (e.g., 'speed:b0:2', 'angle:sin1').
+        The base term is everything before the first ':'  -> 'speed', 'angle'.
+      - Condition one-hots created via pd.get_dummies(..., prefix='cond') look like
+        'cond_x', 'cond_y'. These collapse to 'cond'.
+      - Otherwise, leave the label unchanged.
+    """
+    s = term_series.astype(str)
+    # basis-style: keep prefix before first ':'
+    base = s.str.split(':', n=1, expand=True)[0]
+    # cond one-hots: collapse 'cond_*' -> 'cond'
+    base = base.str.replace(r'^(cond)_.+$', r'\1', regex=True)
+    return base
 
 
 def _rank_biserial_from_wilcoxon(beta):
@@ -264,8 +283,6 @@ def _score_from_beta(beta, X_val, off_val, y_val, metric='loglik'):
         return -_poisson_deviance(y_val, mu_val)
     return float(np.sum(_poisson_loglik(y_val, mu_val)))
 
-import numpy as np
-from scipy import stats
 
 def _poisson_mu_from_eta(eta, clip=(-50.0, 50.0)):
     """
@@ -699,7 +716,7 @@ def summarize_large_coeffs(coefs_df, df_X, top_n=20, beta_abs_thresh=8.0, rr_thr
 
 
 def has_all_finite_params(res):
-    
+
     try:
         b = np.asarray(getattr(res, 'params', np.nan), float)
         return np.isfinite(b).all()
@@ -725,7 +742,7 @@ def mark_result(res, *, used_ridge, msg, is_penalized, tried=None):
 
 
 def ensure_fields_present(res, p):
-    
+
     if not hasattr(res, 'bse'):
         res.bse = np.full(p, np.nan, float)
     if not hasattr(res, 'pvalues'):
@@ -748,7 +765,7 @@ def try_unpenalized(model, *, cov_type, use_overdispersion_scale, maxiter, start
 
 
 def ridge_once(model, a, const_ix):
-    
+
     p = int(model.exog.shape[1])
     alpha_vec = np.full(p, float(a), dtype=float)
     if const_ix is not None:
@@ -761,7 +778,7 @@ def inject_baseline_intercept_if_needed(res):
     If params are all zeros (or intercept is non-finite) and an intercept exists,
     set it to log(mean rate) adjusted for offset so predictions are sane.
     """
-    
+
     model = getattr(res, 'model', None)
     if model is None:
         return res
@@ -804,7 +821,7 @@ def inject_baseline_intercept_if_needed(res):
 
 def coerce_params_finite_inplace(res):
     """NaN/±inf → 0.0 (keeps vector finite)."""
-    
+
     try:
         b = np.asarray(res.params, float)
     except Exception:
@@ -827,7 +844,6 @@ def coerce_params_finite_inplace(res):
 
 
 def make_ridge_partial_result(last_ridge, last_alpha, tried):
-    
 
     class _RidgeCoercedRes:
         pass
@@ -850,7 +866,6 @@ def make_ridge_partial_result(last_ridge, last_alpha, tried):
 
 
 def make_baseline_result(model, const_ix, last_alpha, tried):
-    
 
     class _BaselineRes:
         pass
@@ -892,7 +907,6 @@ def fit_with_fallback(
     Additionally, if the returned vector is all zeros and an intercept exists,
     we inject a baseline intercept so predictions are meaningful.
     """
-    
 
     # 1) Unpenalized
     res = try_unpenalized(model, cov_type=cov_type,

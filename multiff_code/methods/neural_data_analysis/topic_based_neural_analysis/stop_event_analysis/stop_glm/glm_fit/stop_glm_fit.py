@@ -29,6 +29,7 @@ from scipy import stats as _stats
 
 # ---------- small helpers (place near the top of the file) ----------
 
+
 def _make_zero_unit_row(cid, n, alpha_val, l1_wt_val, condX):
     """Return a metrics row dict for an all-zero unit with diagnostics/flags."""
     return {
@@ -79,12 +80,12 @@ def record_cluster_outcomes(
     # coefficients table (SE/p may be NaN for penalized fits)
     coef_rows.extend(
         glm_fit_utils.collect_coef_rows(feature_names, cid, res, alpha=0.0,
-                          l1_wt=0.0, used_refit=False)
+                                        l1_wt=0.0, used_refit=False)
     )
 
     # metrics table
     mr = glm_fit_utils.collect_metric_row(cid, n, llf, llnull, dev,
-                            dev0, alpha_val, l1_wt_val)
+                                          dev0, alpha_val, l1_wt_val)
     _flag_and_update_metrics_row(mr, res, y, condX)
     metrics_rows.append(mr)
     # stash result
@@ -149,7 +150,7 @@ def fit_poisson_glm_per_cluster(
 
     # ----------------------- regular path with tuning ------------------------
     folds = glm_fit_utils._build_folds(n, n_splits=n_splits,
-                         groups=groups, cv_splitter=cv_splitter)
+                                       groups=groups, cv_splitter=cv_splitter)
     results, coef_rows, metrics_rows, cv_tables = {}, [], [], []
 
     for i, cid in enumerate(cluster_ids, 1):
@@ -331,7 +332,7 @@ def _fit_path(
     )
 
 
-def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr):
+def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr, term_groups=None):
     """
     Robust inference step.
     - Ensures a usable 'p' column (compute from z or coef/se if missing).
@@ -363,7 +364,22 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr):
 
     # ---- choose by_term only if 'term' exists ----
     has_term = ('term' in df.columns)
-
+    if has_term:
+        # Prefer meta['groups'] if provided: map column -> group term
+        col_to_term = None
+        if term_groups is not None:
+            try:
+                col_to_term = {c: t for t, cols in dict(
+                    term_groups).items() for c in list(cols)}
+            except Exception:
+                col_to_term = None
+        if col_to_term:
+            df['term'] = df['term'].map(col_to_term).fillna(df['term'])
+            print('Using term groups from meta_groups', flush=True)
+        else:
+            # Fallback: normalize labels so basis-expanded and one-hot share a term
+            df['term'] = glm_fit_utils.normalize_term_labels(df['term'])
+            print('Using normalized term labels', flush=True)
     if do_inference:
         try:
             df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=has_term)
@@ -376,7 +392,8 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr):
             if 'se' not in df.columns:
                 df['se'] = np.nan
             df = glm_fit_utils.add_rate_ratios(df, delta=delta_for_rr)
-        pop = glm_fit_utils.term_population_tests(df) if has_term else pd.DataFrame()
+        pop = glm_fit_utils.term_population_tests(
+            df) if has_term else pd.DataFrame()
         return df, pop
 
     # not doing inference, but ensure FDR exists for plotting legends
@@ -399,14 +416,14 @@ def _pick_forest_term(feature_names, forest_term):
 
 def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_n, delta_for_rr, make_plots):
     # Currently, a lot of the plots are not useful for our purposes
-    
+
     if not make_plots:
         return {}
     figs = {
         'coef_dists': plot_glm_fit.plot_coef_distributions(coefs_df),
         # 'model_quality': plot_glm_fit.plot_model_quality(metrics_df),
     }
-    
+
     # ft = _pick_forest_term(feature_names, forest_term)
     # if ft is not None:
     #     figs['forest'] = plot_glm_fit.plot_forest_for_term(
@@ -474,6 +491,7 @@ def glm_mini_report(
     offset_log,
     feature_names=None,
     cluster_ids=None,
+    meta_groups: dict | None = None,
     alpha: float = 0.05,
     delta_for_rr: float = 1.0,
     forest_term=None,
@@ -513,9 +531,9 @@ def glm_mini_report(
 
     coefs_df, pop_tests = _run_inference(
         coefs_df, do_inference=do_inference, make_plots=make_plots,
-        alpha=alpha, delta_for_rr=delta_for_rr
+        alpha=alpha, delta_for_rr=delta_for_rr, term_groups=meta_groups
     )
-    
+
     try:
         figs = _build_figs(
             coefs_df, metrics_df,
@@ -526,10 +544,10 @@ def glm_mini_report(
             make_plots=make_plots,
         )
     except Exception as e:
-        print(f'[glm_mini_report] WARNING: could not build figures: {type(e).__name__}: {e}')
+        print(
+            f'[glm_mini_report] WARNING: could not build figures: {type(e).__name__}: {e}')
         figs = {}
 
-        
     _save_outputs(save_dir, coefs_df, metrics_df,
                   pop_tests, figs, make_plots=make_plots)
     _show_or_close(figs, make_plots=make_plots, show_plots=show_plots)

@@ -65,9 +65,12 @@ def rebin_spike_data_with_pad(
 
     return design_pad, pad_info
 
+
 def compute_spike_history_designs(
     design_pad: pd.DataFrame,
+    rebinned_x_var: pd.DataFrame,
     *,
+    n_pad_bins: int,
     dt: float,
     t_max: float,
     n_basis: int = 5,
@@ -83,6 +86,8 @@ def compute_spike_history_designs(
         {cluster_col: (T × K) history matrix}
     basis : np.ndarray
         (L × K) history basis
+    colnames : dict (optional; returned iff with_colnames=True)
+        {cluster_col: list[str]} column names in 'bjk' style like add_spike_history
     """
 
     if t_min is None:
@@ -104,68 +109,101 @@ def compute_spike_history_designs(
     spike_cols = [c for c in design_pad.columns if c.startswith('cluster_')]
 
     X_hist = {}
+    colnames: dict[str, list[str]] = {}
+
+    K = basis.shape[1]
 
     for col in spike_cols:
-        X_hist[col] = temporal_feats.lagged_design_from_signal_trials(
+        hist = temporal_feats.lagged_design_from_signal_trials(
             design_pad[col].to_numpy(),
             basis,
             trial_ids,
             edge=edge,
         )
 
-    return X_hist, basis
+        colnames[col] = [f'{col}:b0:{k}' for k in range(K)]
 
-def build_glm_design_for_target(
-    design_pad: pd.DataFrame,
+        hist = pd.DataFrame(hist, columns=colnames[col])
+        hist['new_segment'] = design_pad['new_segment'].values
+        hist['new_bin'] = design_pad['new_bin'].values
+
+        hist = truncate_history_pad(hist, n_pad_bins)
+
+        hist = rebinned_x_var[['new_segment', 'new_bin']].merge(
+            hist,
+            on=['new_segment', 'new_bin'],
+            how='left',
+            validate='one_to_one',
+        )
+
+        X_hist[col] = hist
+
+        assert hist.shape[0] == rebinned_x_var.shape[0]
+        # assert hist['new_segment'].equals(rebinned_x_var['new_segment'])
+        # assert hist['new_bin'].equals(rebinned_x_var['new_bin'])
+
+    return X_hist, basis, colnames
+
+def add_spike_history_to_design(
+    design_df: pd.DataFrame,
+    colnames: dict[str, list[str]],
     X_hist: dict,
     target_col: str,
     *,
     include_self: bool = True,
     cross_neurons: list[str] | None = None,
-    task_cols: list[str] | None = None,
+    meta: dict | None = None,
 ):
     """
-    Assemble GLM design matrix for one target neuron.
+    Assemble a GLM design matrix for one target neuron by adding spike-history
+    regressors (self and optional cross-neuron history).
+
+    Optionally updates meta['groups'] to group history columns by predictor.
     """
 
-    blocks = []
+    design_df = design_df.copy()
 
-    # task covariates
-    if task_cols is not None:
-        blocks.append(design_pad[task_cols].to_numpy())
-
-    # self-history
+    # --- self-history ---
     if include_self:
-        blocks.append(X_hist[target_col])
+        target_cols = colnames[target_col]
+        design_df[target_cols] = X_hist[target_col][target_cols].values
 
-    # cross-history
+    # --- cross-neuron history ---
     if cross_neurons is not None:
-        for col in cross_neurons:
-            blocks.append(X_hist[col])
+        for neuron in cross_neurons:
+            neuron_cols = colnames[neuron]
+            design_df[neuron_cols] = X_hist[neuron][neuron_cols].values
 
-    X = np.hstack(blocks)
-    y = design_pad[target_col].to_numpy()
+    # --- optional: update meta groups ---
+    if meta is not None:
+        meta = dict(meta)  # shallow copy
+        groups = dict(meta.get('groups', {}))
 
-    return X, y
+        if include_self:
+            groups.setdefault(target_col, []).extend(colnames[target_col])
+
+        if cross_neurons is not None:
+            for neuron in cross_neurons:
+                groups.setdefault(neuron, []).extend(colnames[neuron])
+
+        meta['groups'] = groups
+        return design_df, meta
+
+    return design_df, None
+
 
 def truncate_history_pad(
-    design_pad: pd.DataFrame,
-    X: np.ndarray,
-    y: np.ndarray,
-    *,
+    df: pd.DataFrame,
     n_pad_bins: int,
 ):
     """
     Truncate padded bins after history computation.
     """
 
-    keep = design_pad['new_bin'].to_numpy() >= n_pad_bins
+    keep = df['new_bin'].to_numpy() >= n_pad_bins
 
-    X = X[keep]
-    y = y[keep]
+    df = df.loc[keep].copy()
+    df['new_bin'] -= n_pad_bins
+    df.reset_index(drop=True, inplace=True)
 
-    design = design_pad.loc[keep].copy()
-    design['new_bin'] -= n_pad_bins
-    design.reset_index(drop=True, inplace=True)
-
-    return design, X, y
+    return df
