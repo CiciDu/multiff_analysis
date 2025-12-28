@@ -152,7 +152,7 @@ def add_spike_history_to_design(
     *,
     include_self: bool = True,
     cross_neurons: list[str] | None = None,
-    meta: dict | None = None,
+    meta_groups: dict | None = None,
 ):
     """
     Assemble a GLM design matrix for one target neuron by adding spike-history
@@ -175,19 +175,16 @@ def add_spike_history_to_design(
             design_df[neuron_cols] = X_hist[neuron][neuron_cols].values
 
     # --- optional: update meta groups ---
-    if meta is not None:
-        meta = dict(meta)  # shallow copy
-        groups = dict(meta.get('groups', {}))
+    if meta_groups is not None:
 
         if include_self:
-            groups.setdefault(target_col, []).extend(colnames[target_col])
+            meta_groups.setdefault(target_col, []).extend(colnames[target_col])
 
         if cross_neurons is not None:
             for neuron in cross_neurons:
-                groups.setdefault(neuron, []).extend(colnames[neuron])
+                meta_groups.setdefault(neuron, []).extend(colnames[neuron])
 
-        meta['groups'] = groups
-        return design_df, meta
+        return design_df, meta_groups
 
     return design_df, None
 

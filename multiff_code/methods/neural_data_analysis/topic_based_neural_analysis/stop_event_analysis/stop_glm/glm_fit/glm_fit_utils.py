@@ -14,19 +14,20 @@ import warnings
 
 
 def add_fdr(coefs_df, alpha: float = 0.05, by_term: bool = True,
-            p_col: str = 'p', out_q_col: str = 'q', out_sig_col: str = 'sig_FDR'):
+            p_col: str = 'p', out_q_col: str = 'q', out_sig_col: str = 'sig_FDR',
+            group_col: str = 'group'):
     """
     Add Benjamini–Hochberg FDR-adjusted q-values to a coefficient table.
 
     Parameters
     ----------
     coefs_df : pd.DataFrame
-        Must contain a p-value column (default: 'p'). If `by_term=True`, must also
-        contain a 'term' column to adjust within each term separately.
+        Must contain a p-value column (default: 'p').
     alpha : float, default 0.05
         FDR threshold used to create the boolean significance flag.
     by_term : bool, default True
-        If True, perform BH correction *within each term* (grouped by 'term').
+        If True, perform BH correction within groups. Groups are defined by
+        `group_col` if present, otherwise fall back to 'term' for compatibility.
         If False, perform BH correction across all rows at once.
     p_col : str, default 'p'
         Name of the column containing (two-sided) p-values.
@@ -34,6 +35,9 @@ def add_fdr(coefs_df, alpha: float = 0.05, by_term: bool = True,
         Name of the output column for BH-adjusted q-values.
     out_sig_col : str, default 'sig_FDR'
         Name of the output column for the significance flag (q <= alpha).
+    group_col : str, default 'group'
+        Column name to use for grouping when `by_term=True`. If this column is
+        not present, the function will fall back to using 'term' if available.
 
     Returns
     -------
@@ -82,10 +86,19 @@ def add_fdr(coefs_df, alpha: float = 0.05, by_term: bool = True,
     df[out_sig_col] = False
 
     if by_term:
-        if 'term' not in df.columns:
-            raise KeyError("add_fdr(by_term=True) requires a 'term' column.")
-        print('Conducting FDR adjustment by term...')
-        for term, g in df.groupby('term', sort=False):
+        # Prefer explicit group column; fall back to 'term' for backward compatibility
+        if group_col in df.columns:
+            group_by = group_col
+            print(
+                f'Conducting FDR adjustment by group (column="{group_col}")...')
+        elif 'term' in df.columns:
+            group_by = 'term'
+            print('Conducting FDR adjustment by term (fallback)...')
+        else:
+            raise KeyError(
+                "add_fdr(by_term=True) requires either a 'group' or 'term' column.")
+
+        for term, g in df.groupby(group_by, sort=False):
             pvals = g[p_col].to_numpy(dtype=float, copy=False)
             qvals = _bh_adjust(pvals)
             df.loc[g.index, out_q_col] = qvals

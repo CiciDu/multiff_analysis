@@ -2,6 +2,102 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+def run_variance_explained_analysis(
+    report,
+    df_X,
+    df_Y,
+    offset_log,
+    event_ids,
+    k=10,
+    aggregate='mean',
+    plot_hist=True,
+):
+    """
+    Compute single-neuron and population variance explained (VE) metrics.
+
+    Parameters
+    ----------
+    report : dict
+        Model report containing a 'results' entry.
+    df_X : pd.DataFrame
+        Design matrix used for prediction.
+    df_Y : pd.DataFrame
+        Observed spike counts (time x neuron).
+    offset_log : np.ndarray or pd.Series
+        Log-offset used in the model.
+    event_ids : array-like
+        Event / segment IDs aligned to rows of df_Y.
+    k : int, default=10
+        Number of PCs for population VE.
+    aggregate : str, default='mean'
+        Aggregation method for single-neuron temporal VE.
+    plot_hist : bool, default=True
+        Whether to plot the single-neuron VE histogram.
+
+    Returns
+    -------
+    results : dict
+        Dictionary containing VE metrics and useful intermediate outputs.
+    """
+
+    # Rebuild predicted responses
+    df_Y_pred = build_df_Y_pred_from_results(
+        results=report['results'],
+        df_X=df_X,
+        offset_log=offset_log,
+        df_Y=df_Y,
+    )
+
+    # Sanity checks
+    assert df_Y_pred.shape == df_Y.shape
+    assert np.isfinite(df_Y_pred.values).all()
+
+    # Convert to arrays
+    X = df_Y.to_numpy()
+    X_hat = df_Y_pred.to_numpy()
+
+    # Single-neuron temporal VE
+    ve_per_neuron, ve_mean = single_neuron_temporal_VE(
+        X,
+        X_hat,
+        aggregate=aggregate,
+    )
+    ve_median = float(np.median(ve_per_neuron))
+
+    if plot_hist:
+        plot_single_neuron_VE_hist(ve_per_neuron)
+
+    # Population VE in PC space
+    ve_pop, k_eff = population_VE_in_PCspace(
+        X,
+        X_hat,
+        k=k,
+        center='neuron',
+    )
+
+    # Per-event (e.g., per-stop) breakdown
+    per_event_df = per_event_breakdown(
+        X,
+        X_hat,
+        event_ids=event_ids,
+        k=k,
+    )
+
+    summary_metrics = {
+        'VE_population_PC': ve_pop,
+        'VE_single_unit_mean': ve_mean,
+        'VE_single_unit_median': ve_median,
+        'PCs_used': k_eff,
+    }
+
+    return {
+        'summary_metrics': summary_metrics,
+        've_per_neuron': ve_per_neuron,
+        'df_Y_pred': df_Y_pred,
+        'per_event_df': per_event_df,
+    }
+
+
 def build_df_Y_pred_from_results(results, df_X, offset_log, df_Y, clip_eta=(-30.0, 30.0)):
     """
     Assemble predicted expected counts (μ) per bin × neuron, robustly.

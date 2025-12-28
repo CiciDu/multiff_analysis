@@ -17,6 +17,7 @@ Example:
 """
 
 from __future__ import annotations
+import json
 import seaborn as sns
 import ast
 
@@ -29,7 +30,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import plot_decoding
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 
 
@@ -133,8 +134,9 @@ def _load_all_results(base_dir: Path, models: Optional[List[str]]) -> pd.DataFra
     for col in ("window_start", "window_end", "mean_auc", "sd_auc"):
         if col in df_all.columns:
             df_all[col] = pd.to_numeric(df_all[col], errors="coerce")
-            
-    df_all = df_all.sort_values(by=['key', 'model_name', 'window_start'], ascending=True)
+
+    df_all = df_all.sort_values(
+        by=['key', 'model_name', 'window_start'], ascending=True)
     return df_all
 
 
@@ -344,16 +346,6 @@ def summarize_and_plot_decoding(raw_data_folder_path, cumulative=False):
     return df_all
 
 
-import ast
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-import ast
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 def safe_sorted_categories(series):
     vals = series.dropna().unique()
     str_vals = sorted([v for v in vals if isinstance(v, str)])
@@ -367,7 +359,6 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
     if df.empty:
         print(f'No entries for model {model_name}')
         return None
-
 
     df['best_params'] = df['best_params'].apply(safe_parse)
 
@@ -383,7 +374,7 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
 
     for p in params:
         df[p] = df[p].apply(lambda v: 'None' if pd.isna(v) else v)
-    
+
     if df.empty:
         print(f'No valid entries for {model_name} with params {params}')
         return None
@@ -404,9 +395,10 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
         x, y = params
         count_df = df.groupby([x, y]).size().reset_index(name='count')
 
-
-        count_df[x] = pd.Categorical(count_df[x], categories=safe_sorted_categories(count_df[x]), ordered=True)
-        count_df[y] = pd.Categorical(count_df[y], categories=safe_sorted_categories(count_df[y]), ordered=True)
+        count_df[x] = pd.Categorical(
+            count_df[x], categories=safe_sorted_categories(count_df[x]), ordered=True)
+        count_df[y] = pd.Categorical(
+            count_df[y], categories=safe_sorted_categories(count_df[y]), ordered=True)
 
         pivot = count_df.pivot(index=y, columns=x, values='count').fillna(0)
         sns.heatmap(pivot, annot=True, fmt='.0f', cmap='viridis')
@@ -430,15 +422,18 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
         n = len(z_order)
         ncols = min(n, 4)
         nrows = (n - 1) // ncols + 1
-        fig, axes = plt.subplots(nrows, ncols, figsize=(6*ncols, 5*nrows), sharey=True)
+        fig, axes = plt.subplots(
+            nrows, ncols, figsize=(6*ncols, 5*nrows), sharey=True)
         axes = axes.flatten() if n > 1 else [axes]
 
         for ax, z_val in zip(axes, z_order):
             subset = count_df[count_df[z] == z_val].copy()
 
             # Force discrete ordering for consistent ticks
-            subset[x] = pd.Categorical(subset[x], categories=x_order, ordered=True)
-            subset[y] = pd.Categorical(subset[y], categories=y_order, ordered=True)
+            subset[x] = pd.Categorical(
+                subset[x], categories=x_order, ordered=True)
+            subset[y] = pd.Categorical(
+                subset[y], categories=y_order, ordered=True)
 
             pivot = subset.pivot(index=y, columns=x, values='count').fillna(0)
             sns.heatmap(pivot, annot=True, fmt='.0f', cmap='viridis', ax=ax)
@@ -457,9 +452,6 @@ def plot_best_params_3d(df_all, model_name, param_x=None, param_y=None, param_z=
 
         return count_df.sort_values('count', ascending=False)
 
-
-import json
-import ast
 
 def safe_parse(x):
     """Parse either Python-literal dicts or JSON dicts safely."""

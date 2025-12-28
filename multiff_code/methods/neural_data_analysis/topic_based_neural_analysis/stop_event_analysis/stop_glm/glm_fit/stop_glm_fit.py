@@ -336,7 +336,7 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr, t
     """
     Robust inference step.
     - Ensures a usable 'p' column (compute from z or coef/se if missing).
-    - If 'term' is absent, falls back to by_term=False for FDR.
+    - Uses 'group' column (if present/constructed) for FDR grouping; falls back to global FDR otherwise.
     - add_rate_ratios only if 'coef' exists (adds 'se' as NaN if missing).
     """
     df = coefs_df.copy()
@@ -362,29 +362,28 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr, t
                 # last resort: create NaN p's so add_fdr can still run
                 df['p'] = np.nan
 
-    # ---- choose by_term only if 'term' exists ----
+    # ---- build 'group' column for FDR grouping, keeping 'term' strictly as feature name ----
     has_term = ('term' in df.columns)
     if has_term:
-        # Prefer meta['groups'] if provided: map column -> group term
-        col_to_term = None
+        col_to_group = None
         if term_groups is not None:
             try:
-                col_to_term = {c: t for t, cols in dict(
+                # term_groups expected as {group_label: [column_names...]}
+                col_to_group = {c: t for t, cols in dict(
                     term_groups).items() for c in list(cols)}
             except Exception:
-                col_to_term = None
-        if col_to_term:
-            df['term'] = df['term'].map(col_to_term).fillna(df['term'])
-            print('Using term groups from meta_groups', flush=True)
+                col_to_group = None
+        if col_to_group:
+            df['group'] = df['term'].map(col_to_group).fillna(df['term'])
+            print('Using group mapping from meta_groups', flush=True)
         else:
-            # Fallback: normalize labels so basis-expanded and one-hot share a term
-            df['term'] = glm_fit_utils.normalize_term_labels(df['term'])
-            print('Using normalized term labels', flush=True)
+            df['group'] = glm_fit_utils.normalize_term_labels(df['term'])
     if do_inference:
         try:
-            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=has_term)
+            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=(
+                'group' in df.columns), group_col='group')
         except KeyError:
-            # safety net if helper still enforces 'term'
+            # safety net: global FDR
             df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=False)
 
         # add rate ratios if possible
@@ -399,7 +398,8 @@ def _run_inference(coefs_df, *, do_inference, make_plots, alpha, delta_for_rr, t
     # not doing inference, but ensure FDR exists for plotting legends
     if make_plots and ('sig_FDR' not in df.columns):
         try:
-            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=has_term)
+            df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=(
+                'group' in df.columns), group_col='group')
         except KeyError:
             df = glm_fit_utils.add_fdr(df, alpha=alpha, by_term=False)
 

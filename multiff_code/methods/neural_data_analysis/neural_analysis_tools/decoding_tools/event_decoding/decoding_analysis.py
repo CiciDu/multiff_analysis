@@ -24,9 +24,9 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools import decoding_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import decoding_utils
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import compare_events
-from neural_data_analysis.neural_analysis_tools.decoding_tools import plot_decoding
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import plot_decoding
 
 
 def _json_default(o):

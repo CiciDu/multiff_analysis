@@ -16,7 +16,7 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         break
 # isort: off
 # fmt: off
-from neural_data_analysis.neural_analysis_tools.decoding_tools import (
+from neural_data_analysis.neural_analysis_tools.decoding_tools.event_decoding import (
     decoding_utils, decoding_analysis,
 )
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
