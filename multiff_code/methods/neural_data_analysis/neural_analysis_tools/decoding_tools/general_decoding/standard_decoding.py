@@ -5,6 +5,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
 
 from neural_data_analysis.design_kits.design_by_segment import create_design_df
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
@@ -14,7 +17,6 @@ from data_wrangling import general_utils
 # ---------------------------------------------------------------------
 # Core CV decoding routine
 # ---------------------------------------------------------------------
-
 def run_population_decoder(
     X_neural,
     y,
@@ -23,13 +25,20 @@ def run_population_decoder(
     n_splits=5
 ):
     """
-    decoder: 'logreg' | 'lda'
+    decoder:
+        'logreg'   - linear
+        'lda'      - linear
+        'svm_rbf'  - nonlinear
+        'rf'       - nonlinear
+        'mlp'      - nonlinear (shallow, population-size aware)
     """
 
     gkf = GroupKFold(n_splits=n_splits)
 
     aucs = []
     pr_aucs = []
+
+    n_features = X_neural.shape[1]
 
     for fold, (tr, te) in enumerate(gkf.split(X_neural, y, groups)):
 
@@ -53,6 +62,46 @@ def run_population_decoder(
 
         elif decoder == 'lda':
             clf = LinearDiscriminantAnalysis(solver='svd')
+
+        elif decoder == 'svm_rbf':
+            scaler = StandardScaler(with_mean=True, with_std=True)
+            X_tr = scaler.fit_transform(X_tr)
+            X_te = scaler.transform(X_te)
+
+            clf = SVC(
+                kernel='rbf',
+                C=1.0,
+                gamma='scale',
+                probability=True,
+                class_weight='balanced'
+            )
+
+        elif decoder == 'rf':
+            clf = RandomForestClassifier(
+                n_estimators=300,
+                max_depth=None,
+                min_samples_leaf=5,
+                class_weight='balanced',
+                n_jobs=-1,
+                random_state=fold
+            )
+
+        elif decoder == 'mlp':
+            scaler = StandardScaler(with_mean=True, with_std=True)
+            X_tr = scaler.fit_transform(X_tr)
+            X_te = scaler.transform(X_te)
+
+            hidden_units = min(20, n_features)
+
+            clf = MLPClassifier(
+                hidden_layer_sizes=(hidden_units,),
+                activation='relu',
+                solver='adam',
+                alpha=1e-3,              # stronger regularization for small N
+                max_iter=2000,
+                early_stopping=True,
+                random_state=fold
+            )
 
         else:
             raise ValueError(f'Unknown decoder: {decoder}')
@@ -82,7 +131,13 @@ def population_decoding_cv(
     df_X,
     df_Y,
     groups,
-    decoders=('logreg', 'lda'),
+    decoders = (
+                'logreg',   # linear
+                'lda',      # linear
+                'svm_rbf',  # nonlinear
+                'rf',       # nonlinear
+                'mlp'       # nonlinear
+            ),
     n_splits=5
 ):
 

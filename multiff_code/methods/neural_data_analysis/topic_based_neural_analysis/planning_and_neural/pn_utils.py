@@ -154,6 +154,9 @@ def rebin_segment_data(
             bin_idx_arr,
             how=how
         )
+        
+        if weighted_vals.ndim == 1:
+            weighted_vals = weighted_vals[None, :]
 
         block = pd.DataFrame(weighted_vals, columns=value_cols)
         block.insert(0, 'new_bin', used_bins.astype(int))

@@ -177,7 +177,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             'nxt_ff_distance_at_ref', 'nxt_ff_angle_at_ref',
             'cur_ff_distance_at_ref', 'cur_ff_angle_at_ref', 'cur_ff_angle_boundary_at_ref',
             'curv_range', 'curv_iqr', 'cur_ff_cluster_50_size',
-            'rel_cur_ff_last_seen_time_bbas', 'rel_cur_ff_first_seen_time_bbas'
+            'rel_cur_ff_last_seen_time_bbas', 'rel_cur_ff_first_seen_time_bbas',
+            'next_stop_point_index', 'next_stop_time'
         ]
 
         # ensure the helper added its columns
@@ -409,8 +410,12 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
     def _get_point_index_based_on_some_time_before_stop(self, n_seconds_before_stop=2.5):
         self.stops_near_ff_df['some_time_before_stop'] = self.stops_near_ff_df['stop_time'] - \
             n_seconds_before_stop
-        self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(
-            self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values) - 1
+        # self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(
+        #     self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values) - 1
+        idx = np.searchsorted(self.monkey_information['time'].values,
+                            self.stops_near_ff_df['some_time_before_stop'].values) - 1
+        idx = np.clip(idx, 0, len(self.monkey_information) - 1)
+        self.stops_near_ff_df['point_index_in_the_past'] = idx
 
     def _add_ff_curv_info_to_df(self, df, which_ff_info):
         ff_df = self.nxt_ff_df_from_ref if which_ff_info == 'nxt_' else self.cur_ff_df_from_ref

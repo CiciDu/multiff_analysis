@@ -122,11 +122,12 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
         self.separate_test_and_control_data()
 
     def rebin_data_in_new_segments(self, cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                                   pre_event_window=0.25, post_event_window=0.75, rebinned_max_x_lag_number=2):
+                                   pre_event_window=0.25, post_event_window=0.75, rebinned_max_x_lag_number=2, end_at_stop_time=False, end_at_next_stop_time=False):
         # time_limit_to_count_sighting: the time threshold to consider a firefly sighting valid. In other words, only the sighting between stop_time - time_limit_to_count_sighting and stop_time is considered.
         self.get_new_seg_info(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                               time_limit_to_count_sighting=time_limit_to_count_sighting,
-                              pre_event_window=pre_event_window, post_event_window=post_event_window)
+                              pre_event_window=pre_event_window, post_event_window=post_event_window,
+                              end_at_stop_time=end_at_stop_time, end_at_next_stop_time=end_at_next_stop_time)
         self._rebin_data_in_new_segments(
             rebinned_max_x_lag_number=rebinned_max_x_lag_number)
         print('Made rebinned_x_var, rebinned_y_var, rebinned_x_var_lags, and rebinned_y_var_lags.')
@@ -143,7 +144,9 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             self.rebinned_y_var['event_time']
 
     def get_new_seg_info(self, cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                         pre_event_window=0.25, post_event_window=0.75, exists_ok=True):
+                         pre_event_window=0.25, post_event_window=0.75, 
+                         end_at_stop_time=False, end_at_next_stop_time=False, 
+                         exists_ok=True):
 
         self.new_bin_start_time = -pre_event_window
         self.event_time = 0
@@ -160,8 +163,18 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             f"tlim{general_utils.clean_float(time_limit_to_count_sighting)}"
             f"_{cur_or_nxt}_{first_or_last}"
             f"_pre{general_utils.clean_float(self.pre_event_window)}"
-            f"_post{general_utils.clean_float(self.post_event_window)}.csv"
         )
+        
+        # assert that end_at_stop_time and end_at_next_stop_time are not both True
+        if end_at_stop_time and end_at_next_stop_time:
+            raise ValueError("end_at_stop_time and end_at_next_stop_time cannot both be True")
+        
+        if end_at_stop_time:
+            df_name += "_end_at_stop.csv"
+        elif end_at_next_stop_time:
+            df_name += "_end_at_next_stop.csv"
+        else:
+            df_name += f"_post{general_utils.clean_float(self.post_event_window)}.csv"
 
         df_path = os.path.join(
             folder_name, df_name)
@@ -174,7 +187,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             event_df = self.get_new_ff_first_or_last_time(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                                                           time_limit_to_count_sighting=time_limit_to_count_sighting,
                                                           )
-            self._get_new_seg_info(event_df)
+            self._get_new_seg_info(event_df, end_at_stop_time=end_at_stop_time, end_at_next_stop_time=end_at_next_stop_time)
             self.new_seg_info.to_csv(df_path, index=False)
             print(f'Made new new_seg_info and saved to {df_path}')
             return self.new_seg_info
@@ -210,7 +223,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             self.temp_segment_df, ff_index_column, self.ff_dataframe, first_or_last=first_or_last)
 
         event_df = ff_when_seen_info[['time', 'stop_point_index']].drop_duplicates().merge(
-            self.temp_segment_df[['segment', 'stop_point_index', 'stop_time', 'prev_ff_caught_time']], on='stop_point_index', how='left')
+            self.temp_segment_df[['segment', 'stop_point_index', 'stop_time', 'next_stop_point_index', 'next_stop_time', 'prev_ff_caught_time']], on='stop_point_index', how='left')
         event_df.drop(columns=['stop_point_index'], inplace=True)
         event_df.rename(columns={'time': 'event_time'}, inplace=True)
         return event_df
@@ -224,7 +237,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         # get unique segments
         segment_df = planning_data_sub[[
-            'cur_ff_index', 'nxt_ff_index', 'segment', 'stop_point_index', 'stop_time']].drop_duplicates()
+            'cur_ff_index', 'nxt_ff_index', 'segment', 'stop_point_index', 'stop_time', 'next_stop_point_index', 'next_stop_time']].drop_duplicates()
 
         # print number of segments dropped because of insufficient duration
         original_segments = len(
@@ -258,15 +271,21 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         # return event_df
 
-    def _get_new_seg_info(self, event_df):
+    def _get_new_seg_info(self, event_df, end_at_stop_time=False, end_at_next_stop_time=False):
         event_df['new_segment'] = np.arange(len(event_df))
         self.new_seg_info = event_df.copy()
 
         self.new_seg_info['new_seg_start_time'] = self.new_seg_info['event_time'] - \
             self.pre_event_window
-        self.new_seg_info['new_seg_end_time'] = self.new_seg_info['event_time'] + \
-            self.post_event_window
-        self.new_seg_info['new_seg_duration'] = self.new_seg_duration
+        if end_at_stop_time:
+            self.new_seg_info['new_seg_end_time'] = self.new_seg_info['stop_time']
+        elif end_at_next_stop_time:
+            self.new_seg_info['new_seg_end_time'] = self.new_seg_info['next_stop_time']
+        else:
+            self.new_seg_info['new_seg_end_time'] = self.new_seg_info['event_time'] + \
+                self.post_event_window
+        self.new_seg_info['new_seg_duration'] = self.new_seg_info['new_seg_end_time'] - \
+            self.new_seg_info['new_seg_start_time']
 
     def fix_post_event_window_if_needed(self, pre_event_window, post_event_window):
         self.pre_event_window = pre_event_window

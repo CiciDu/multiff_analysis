@@ -8,7 +8,15 @@ from data_wrangling import general_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
 
 
-def init_decoding_data(raw_data_folder_path):
+def init_decoding_data(raw_data_folder_path,
+                        cur_or_nxt='cur',
+                        first_or_last='first',
+                        time_limit_to_count_sighting=2,
+                        pre_event_window=0,
+                        post_event_window=1.5,
+                        end_at_stop_time=False,
+                        end_at_next_stop_time=False):
+    
     planning_data_by_point_exists_ok = True
 
     pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
@@ -18,12 +26,13 @@ def init_decoding_data(raw_data_folder_path):
         planning_data_by_point_exists_ok=planning_data_by_point_exists_ok)
 
     pn.rebin_data_in_new_segments(
-        cur_or_nxt='cur',
-        first_or_last='first',
-        time_limit_to_count_sighting=2,
-        pre_event_window=0,
-        post_event_window=1.5,
-        rebinned_max_x_lag_number=2
+        cur_or_nxt=cur_or_nxt,
+        first_or_last=first_or_last,
+        time_limit_to_count_sighting=time_limit_to_count_sighting,
+        pre_event_window=pre_event_window,
+        post_event_window=post_event_window,
+        end_at_stop_time=end_at_stop_time,
+        end_at_next_stop_time=end_at_next_stop_time,
     )
 
     for col in ['cur_vis', 'nxt_vis', 'cur_in_memory', 'nxt_in_memory']:

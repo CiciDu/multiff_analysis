@@ -393,6 +393,39 @@ def setup_logging():
     print('Set up logging configuration.')
 
 
+def outlier_cutoff(durations, method='logmad', k=3.5, iqr_k=3.0, q=0.995):
+    """
+    One-sided high cutoff for durations. Returns (cutoff, mask).
+    - Zeros are never 'too large' and are included in the mask.
+    - Negatives raise (shouldn't exist for durations).
+    """
+    x = np.asarray(durations, float)
+    if np.any(x < 0):
+        raise ValueError("Durations must be >= 0.")
+
+    pos = x[x > 0]  # ignore zeros for cutoff calc
+    if pos.size == 0:
+        return np.inf, np.ones_like(x, dtype=bool)
+
+    if method == 'logmad':
+        g = np.log(pos)
+        med = np.median(g)
+        mad = np.median(np.abs(g - med))
+        mad_normal = 1.4826 * mad
+        cutoff = np.exp(med + k * mad_normal)
+    elif method == 'iqr':
+        q1, q3 = np.percentile(pos, [25, 75])
+        iqr = q3 - q1
+        cutoff = q3 + iqr_k * iqr
+    elif method == 'quantile':
+        cutoff = np.quantile(pos, q)
+    else:
+        raise ValueError("method must be 'logmad', 'iqr', or 'quantile'.")
+
+    mask = x <= cutoff
+    return float(cutoff), mask
+
+
 def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=True):
     """
     Find and analyze rows with NA values in a DataFrame.
@@ -451,36 +484,5 @@ def check_na_in_df(df, df_name="DataFrame", return_rows_and_columns=True):
     else:
         return
 
-def outlier_cutoff(durations, method='logmad', k=3.5, iqr_k=3.0, q=0.995):
-    """
-    One-sided high cutoff for durations. Returns (cutoff, mask).
-    - Zeros are never 'too large' and are included in the mask.
-    - Negatives raise (shouldn't exist for durations).
-    """
-    x = np.asarray(durations, float)
-    if np.any(x < 0):
-        raise ValueError("Durations must be >= 0.")
-
-    pos = x[x > 0]  # ignore zeros for cutoff calc
-    if pos.size == 0:
-        return np.inf, np.ones_like(x, dtype=bool)
-
-    if method == 'logmad':
-        g = np.log(pos)
-        med = np.median(g)
-        mad = np.median(np.abs(g - med))
-        mad_normal = 1.4826 * mad
-        cutoff = np.exp(med + k * mad_normal)
-    elif method == 'iqr':
-        q1, q3 = np.percentile(pos, [25, 75])
-        iqr = q3 - q1
-        cutoff = q3 + iqr_k * iqr
-    elif method == 'quantile':
-        cutoff = np.quantile(pos, q)
-    else:
-        raise ValueError("method must be 'logmad', 'iqr', or 'quantile'.")
-
-    mask = x <= cutoff
-    return float(cutoff), mask
 
 setup_logging()
