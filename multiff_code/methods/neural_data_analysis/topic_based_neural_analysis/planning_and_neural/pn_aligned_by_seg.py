@@ -1,5 +1,5 @@
 from data_wrangling import general_utils
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils, planning_and_neural_class
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils, pn_decoding_utils, planning_and_neural_class
 from neural_data_analysis.neural_analysis_tools.gpfa_methods import gpfa_helper_class
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from neural_data_analysis.neural_analysis_tools.align_trials import align_trial_utils
@@ -7,6 +7,7 @@ from neural_data_analysis.neural_analysis_tools.align_trials import align_trial_
 import pandas as pd
 import os
 import numpy as np
+
 
 class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeural, gpfa_helper_class.GPFAHelperClass):
 

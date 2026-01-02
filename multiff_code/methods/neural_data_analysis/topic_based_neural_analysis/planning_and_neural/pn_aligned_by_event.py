@@ -22,7 +22,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
     def streamline_preparing_event_aligned_data(self, cur_or_nxt='cur', first_or_last='first',
                                                 time_limit_to_count_sighting=2,
-                                                pre_event_window=0.25, post_event_window=0.75,
+                                                start_t_rel_event=-0.25, end_t_rel_event=1.25,
                                                 rebinned_max_x_lag_number=2,
                                                 latent_dimensionality=7,
                                                 use_raw_spike_data_instead=False,
@@ -31,7 +31,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         self.prepare_seg_aligned_data(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                                       time_limit_to_count_sighting=time_limit_to_count_sighting,
-                                      pre_event_window=pre_event_window, post_event_window=post_event_window,
+                                      start_t_rel_event=start_t_rel_event, end_t_rel_event=end_t_rel_event,
                                       rebinned_max_x_lag_number=rebinned_max_x_lag_number)
 
         self.get_gpfa_traj(
@@ -51,11 +51,10 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         self.plot_trial_counts_by_timepoint()
 
-
     def get_gpfa_traj(self, latent_dimensionality=10, exists_ok=True):
         bin_width_str = f"{self.bin_width:.4f}".rstrip(
             '0').rstrip('.').replace('.', 'p')
-        file_name = f'gpfa_neural_bin{bin_width_str}_{self.cur_or_nxt}_{self.first_or_last}.pkl'
+        file_name = f'gpfa_neural_bin{bin_width_str}_{self.cur_or_nxt}_{self.first_or_last}_st{general_utils.clean_float(self.start_t_rel_event)}_et{general_utils.clean_float(self.end_t_rel_event)}.pkl'
 
         super().get_gpfa_traj(latent_dimensionality=latent_dimensionality,
                               exists_ok=exists_ok, file_name=file_name)
@@ -69,8 +68,8 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             f"scores_b{bin_width_str}"
             f"_t{general_utils.clean_float(self.time_limit_to_count_sighting)}"
             f"_{self.cur_or_nxt}_{self.first_or_last}"
-            f"_p{general_utils.clean_float(self.pre_event_window)}"
-            f"_po{general_utils.clean_float(self.post_event_window)}"
+            f"_st{general_utils.clean_float(self.start_t_rel_event)}"
+            f"_et{general_utils.clean_float(self.end_t_rel_event)}"
             f"_d{latent_dimensionality}_cv{cv_folds}.csv"
         )
         time_resolved_cv_scores_path = super()._get_time_resolved_cv_scores_file_path(
@@ -87,8 +86,8 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
     #         f"scores_bin{bin_width_str}"
     #         f"_tlim{general_utils.clean_float(self.time_limit_to_count_sighting)}"
     #         f"_{self.cur_or_nxt}_{self.first_or_last}"
-    #         f"_pre{general_utils.clean_float(self.pre_event_window)}"
-    #         f"_post{general_utils.clean_float(self.post_event_window)}"
+    #         f"_pre{general_utils.clean_float(self.start_t_rel_event)}"
+    #         f"_post{general_utils.clean_float(self.end_t_rel_event)}"
     #         f"_d{latent_dimensionality}_cv{cv_folds}.csv"
     #     )
 
@@ -96,7 +95,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
     #                                                           exists_ok=exists_ok, file_name=file_name)
 
     def prepare_seg_aligned_data(self, cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                                 pre_event_window=0.25, post_event_window=0.75, rebinned_max_x_lag_number=2):
+                                 start_t_rel_event=-0.25, end_t_rel_event=1.25, end_at_stop_time=False, rebinned_max_x_lag_number=2):
 
         self.cur_or_nxt = cur_or_nxt
         self.first_or_last = first_or_last
@@ -104,7 +103,8 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         self.rebin_data_in_new_segments(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                                         time_limit_to_count_sighting=time_limit_to_count_sighting,
-                                        pre_event_window=pre_event_window, post_event_window=post_event_window,
+                                        start_t_rel_event=start_t_rel_event, end_t_rel_event=end_t_rel_event,
+                                        end_at_stop_time=end_at_stop_time,
                                         rebinned_max_x_lag_number=rebinned_max_x_lag_number)
         self.prepare_spikes_for_gpfa()
 
@@ -122,12 +122,12 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
         self.separate_test_and_control_data()
 
     def rebin_data_in_new_segments(self, cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                                   pre_event_window=0.25, post_event_window=0.75, rebinned_max_x_lag_number=2, end_at_stop_time=False, end_at_next_stop_time=False):
+                                   start_t_rel_event=-0.25, end_t_rel_event=1.25, end_at_stop_time=False, rebinned_max_x_lag_number=2, ):
         # time_limit_to_count_sighting: the time threshold to consider a firefly sighting valid. In other words, only the sighting between stop_time - time_limit_to_count_sighting and stop_time is considered.
         self.get_new_seg_info(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                               time_limit_to_count_sighting=time_limit_to_count_sighting,
-                              pre_event_window=pre_event_window, post_event_window=post_event_window,
-                              end_at_stop_time=end_at_stop_time, end_at_next_stop_time=end_at_next_stop_time)
+                              start_t_rel_event=start_t_rel_event, end_t_rel_event=end_t_rel_event,
+                              end_at_stop_time=end_at_stop_time)
         self._rebin_data_in_new_segments(
             rebinned_max_x_lag_number=rebinned_max_x_lag_number)
         print('Made rebinned_x_var, rebinned_y_var, rebinned_x_var_lags, and rebinned_y_var_lags.')
@@ -144,11 +144,11 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             self.rebinned_y_var['event_time']
 
     def get_new_seg_info(self, cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                         pre_event_window=0.25, post_event_window=0.75, 
-                         end_at_stop_time=False, end_at_next_stop_time=False, 
+                         start_t_rel_event=-0.25, end_t_rel_event=1.25,
+                         end_at_stop_time=False,
                          exists_ok=True):
 
-        self.new_bin_start_time = -pre_event_window
+        self.new_bin_start_time = start_t_rel_event
         self.event_time = 0
 
         folder_name = os.path.join(self.planning_and_neural_folder_path,
@@ -157,24 +157,18 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
         os.makedirs(folder_name, exist_ok=True)
 
         self.fix_post_event_window_if_needed(
-            pre_event_window, post_event_window)
+            start_t_rel_event, end_t_rel_event)
 
         df_name = (
             f"tlim{general_utils.clean_float(time_limit_to_count_sighting)}"
             f"_{cur_or_nxt}_{first_or_last}"
-            f"_pre{general_utils.clean_float(self.pre_event_window)}"
+            f"_st{general_utils.clean_float(self.start_t_rel_event)}"
         )
-        
-        # assert that end_at_stop_time and end_at_next_stop_time are not both True
-        if end_at_stop_time and end_at_next_stop_time:
-            raise ValueError("end_at_stop_time and end_at_next_stop_time cannot both be True")
-        
+
         if end_at_stop_time:
             df_name += "_end_at_stop.csv"
-        elif end_at_next_stop_time:
-            df_name += "_end_at_next_stop.csv"
         else:
-            df_name += f"_post{general_utils.clean_float(self.post_event_window)}.csv"
+            df_name += f"_et{general_utils.clean_float(self.end_t_rel_event)}.csv"
 
         df_path = os.path.join(
             folder_name, df_name)
@@ -187,7 +181,8 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             event_df = self.get_new_ff_first_or_last_time(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last,
                                                           time_limit_to_count_sighting=time_limit_to_count_sighting,
                                                           )
-            self._get_new_seg_info(event_df, end_at_stop_time=end_at_stop_time, end_at_next_stop_time=end_at_next_stop_time)
+            self._get_new_seg_info(
+                event_df, end_at_stop_time=end_at_stop_time)
             self.new_seg_info.to_csv(df_path, index=False)
             print(f'Made new new_seg_info and saved to {df_path}')
             return self.new_seg_info
@@ -216,41 +211,27 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
         self.retrieve_or_make_monkey_data()
         self.make_or_retrieve_ff_dataframe()
 
-        self.temp_segment_df = self.select_segments_with_enough_duration(
-            time_limit_to_count_sighting)
-
-        ff_when_seen_info = nxt_ff_utils.find_first_or_last_ff_sighting_in_stop_period(
-            self.temp_segment_df, ff_index_column, self.ff_dataframe, first_or_last=first_or_last)
-
-        event_df = ff_when_seen_info[['time', 'stop_point_index']].drop_duplicates().merge(
-            self.temp_segment_df[['segment', 'stop_point_index', 'stop_time', 'next_stop_point_index', 'next_stop_time', 'prev_ff_caught_time']], on='stop_point_index', how='left')
-        event_df.drop(columns=['stop_point_index'], inplace=True)
-        event_df.rename(columns={'time': 'event_time'}, inplace=True)
-        return event_df
-
-    def select_segments_with_enough_duration(self, time_limit_to_count_sighting):
-        # need to make sure the segment duration is long enough to include the first seen time threshold and the duration before it
-        # min_segment_duration = time_limit_to_count_sighting + pre_event_window
-        min_segment_duration = time_limit_to_count_sighting
-        planning_data_sub = self.planning_data_by_point[
-            self.planning_data_by_point['segment_duration'] >= min_segment_duration]
-
         # get unique segments
-        segment_df = planning_data_sub[[
+        segment_df = self.planning_data_by_point[[
             'cur_ff_index', 'nxt_ff_index', 'segment', 'stop_point_index', 'stop_time', 'next_stop_point_index', 'next_stop_time']].drop_duplicates()
-
-        # print number of segments dropped because of insufficient duration
-        original_segments = len(
-            self.planning_data_by_point['stop_point_index'].unique())
-        dropped_segments = original_segments - len(segment_df)
-        print(f"Dropped {dropped_segments} out of {original_segments} segments because of insufficient duration, "
-              f"which is {round(dropped_segments/original_segments * 100, 1)}% of all segments")
-
-        # add beginning time and prev ff caught time
         segment_df['prev_ff_caught_time'] = self.ff_caught_T_new[segment_df['cur_ff_index'].values-1]
         segment_df['beginning_time'] = np.maximum(segment_df['stop_time'].values - time_limit_to_count_sighting,
                                                   segment_df['prev_ff_caught_time'].values + 0.1)
-        return segment_df
+
+        ff_when_seen_info = nxt_ff_utils.find_first_or_last_ff_sighting_in_stop_period(
+            segment_df, ff_index_column, self.ff_dataframe, first_or_last=first_or_last)
+
+        event_df = ff_when_seen_info[['time', 'stop_point_index']].drop_duplicates().merge(
+            segment_df[['segment', 'stop_point_index', 'stop_time', 'next_stop_point_index', 'next_stop_time', 'prev_ff_caught_time']], on='stop_point_index', how='left')
+        event_df.drop(columns=['stop_point_index'], inplace=True)
+        event_df.rename(columns={'time': 'event_time'}, inplace=True)
+
+        # drop rows in event_df where event_time is NA, and also print the number and percentage of rows dropped
+        original_len = len(event_df)
+        event_df = event_df[~event_df['event_time'].isna()].copy()
+        print(f"Dropped {original_len - len(event_df)} rows out of {original_len} due to event_time being NA, "
+              f"which is {(original_len - len(event_df))/original_len*100:.2f}% of the original data")
+        return event_df
 
     # def _get_even_time_through_stops_near_ff_df(self, event_time_column_name='CUR_time_ff_first_seen_bbas'):
     #     # this is currently not used because it might result in insufficient data for some segments
@@ -271,26 +252,31 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
         # return event_df
 
-    def _get_new_seg_info(self, event_df, end_at_stop_time=False, end_at_next_stop_time=False):
+    def _get_new_seg_info(self, event_df, end_at_stop_time=False):
         event_df['new_segment'] = np.arange(len(event_df))
         self.new_seg_info = event_df.copy()
 
-        self.new_seg_info['new_seg_start_time'] = self.new_seg_info['event_time'] - \
-            self.pre_event_window
+        self.new_seg_info['new_seg_start_time'] = self.new_seg_info['event_time'] + \
+            self.start_t_rel_event
         if end_at_stop_time:
             self.new_seg_info['new_seg_end_time'] = self.new_seg_info['stop_time']
-        elif end_at_next_stop_time:
-            self.new_seg_info['new_seg_end_time'] = self.new_seg_info['next_stop_time']
         else:
             self.new_seg_info['new_seg_end_time'] = self.new_seg_info['event_time'] + \
-                self.post_event_window
+                self.end_t_rel_event
         self.new_seg_info['new_seg_duration'] = self.new_seg_info['new_seg_end_time'] - \
             self.new_seg_info['new_seg_start_time']
 
-    def fix_post_event_window_if_needed(self, pre_event_window, post_event_window):
-        self.pre_event_window = pre_event_window
-        self.post_event_window = post_event_window
-        self.new_seg_duration = pre_event_window + post_event_window
+        # drop rows in new_seg_info where new_seg_duration is less than 0, and also print the number and percentage of rows dropped
+        original_len = len(self.new_seg_info)
+        self.new_seg_info = self.new_seg_info[self.new_seg_info['new_seg_duration'] > 0].copy(
+        )
+        print(f"Dropped {original_len - len(self.new_seg_info)} rows out of {original_len} due to new_seg_duration being less than 0, "
+              f"which is {(original_len - len(self.new_seg_info))/original_len*100:.2f}% of the original data")
+
+    def fix_post_event_window_if_needed(self, start_t_rel_event, end_t_rel_event):
+        self.start_t_rel_event = start_t_rel_event
+        self.end_t_rel_event = end_t_rel_event
+        self.new_seg_duration = end_t_rel_event - start_t_rel_event
         # need to make sure that new_seg_duration is a multiple of bin_width
         if self.new_seg_duration % self.bin_width != 0:
             print(
@@ -299,9 +285,9 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
                 self.new_seg_duration / self.bin_width) * self.bin_width
             # increase the precision
             self.new_seg_duration = round(self.new_seg_duration, 4)
-            self.post_event_window = self.new_seg_duration - self.pre_event_window
+            self.end_t_rel_event = self.new_seg_duration + self.start_t_rel_event
             print(
-                f"new_seg_duration is now {self.new_seg_duration}, and post_event_window is now {self.post_event_window}")
+                f"new_seg_duration is now {self.new_seg_duration}, and end_t_rel_event is now {self.end_t_rel_event}")
 
     def only_make_stops_near_ff_df(self):
         self.data_kwargs1 = {'raw_data_folder_path': self.raw_data_folder_path,
@@ -315,7 +301,7 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 # These might be useful in the future
 
     # def get_new_seg_info(self, event_time_column_name='CUR_time_ff_first_seen_bbas',
-    #                      pre_event_window=0.25, post_event_window=0.75):
+    #                      start_t_rel_event=-0.25, end_t_rel_event=1.25):
 
     #     # merge to get event time
     #     planning_data = self.planning_data_by_bin.merge(
@@ -325,20 +311,20 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
 
     #     # select segment data around event time
     #     self.planning_data_sub = pn_utils.select_segment_data_around_event_time(
-    #         planning_data, pre_event_window=pre_event_window, post_event_window=post_event_window)
+    #         planning_data, start_t_rel_event=start_t_rel_event, end_t_rel_event=end_t_rel_event)
 
     #     # get unique rows of segment info
     #     self.new_seg_info = pn_utils._get_new_seg_info(self.planning_data_sub)
 
 
 #    def build_segment_around_event(self, row, event_time_column_name='CUR_time_ff_first_seen_bbas',
-#                                    pre_event_window=0.25, post_event_window=0.75):
+#                                    start_t_rel_event=-0.25, end_t_rel_event=1.25):
 
 #         # other event_time_column_name to use: CUR_time_ff_last_seen_bbas, NXT_time_ff_first_seen_bbas, NXT_time_ff_last_seen_bbas
 
 #         event_time = row[event_time_column_name]
-#         seg_start_time = event_time - pre_event_window
-#         seg_end_time = event_time + post_event_window
+#         seg_start_time = event_time + start_t_rel_event
+#         seg_end_time = event_time + end_t_rel_event
 #         # note: segment_start = segment_end can happen if two fireflies were captured in a row.
 #         info_to_add = self.monkey_information[self.monkey_information['time'].between(
 #             seg_start_time, seg_end_time)].copy()

@@ -34,7 +34,8 @@ class GPFAHelperClass():
 
         # add a small value to common t stop
         self.common_t_stop = max(
-            self.spike_segs_df['t_duration']) + 1e-6  # originally added bin_width
+            # originally added bin_width
+            self.spike_segs_df['t_duration']) + 1e-6
 
         self.spiketrains, self.spiketrain_corr_segs = fit_gpfa_utils.turn_spike_segs_df_into_spiketrains(
             self.spike_segs_df, new_seg_info['new_segment'].unique(), common_t_stop=self.common_t_stop, align_at_beginning=self.align_at_beginning)
@@ -228,8 +229,9 @@ class GPFAHelperClass():
             'new_segment')['new_bin'].agg(['min', 'max'])
 
         self.bin_width_w_unit = self.bin_width * pq.s
-        
-        print('Number of features to regress on:', self.concat_behav_trials.shape[1])
+
+        print('Number of features to regress on:',
+              self.concat_behav_trials.shape[1])
 
         with warnings.catch_warnings():
 
@@ -339,7 +341,7 @@ class GPFAHelperClass():
                                                    planning_data_by_point_exists_ok=True,
                                                    latent_dimensionality=7,
                                                    cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
-                                                   pre_event_window=0.25, post_event_window=0.75,
+                                                   start_t_rel_event=-0.25, end_t_rel_event=1.25,
                                                    cv_folds=5):
         # get data
         self.prep_data_to_analyze_planning(
@@ -347,7 +349,7 @@ class GPFAHelperClass():
         self.planning_data_by_point, cols_to_drop = general_utils.drop_columns_with_many_nans(
             self.planning_data_by_point)
         self.prepare_seg_aligned_data(cur_or_nxt=cur_or_nxt, first_or_last=first_or_last, time_limit_to_count_sighting=time_limit_to_count_sighting,
-                                      pre_event_window=pre_event_window, post_event_window=post_event_window)
+                                      start_t_rel_event=start_t_rel_event, end_t_rel_event=end_t_rel_event)
 
         # time_resolved_cv_scores_gpfa
         self.get_concat_data_for_regression(use_raw_spike_data_instead=True)

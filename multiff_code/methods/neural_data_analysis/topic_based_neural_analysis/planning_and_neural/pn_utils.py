@@ -13,7 +13,6 @@ from neural_data_analysis.design_kits.design_around_event.event_binning import (
 )
 
 
-
 def rebin_segment_data(
     df,
     new_seg_info,
@@ -102,7 +101,6 @@ def rebin_segment_data(
 
             seg_df = df_sorted.iloc[i0:i1]
 
-
         if seg_df.empty:
             continue
 
@@ -154,7 +152,7 @@ def rebin_segment_data(
             bin_idx_arr,
             how=how
         )
-        
+
         if weighted_vals.ndim == 1:
             weighted_vals = weighted_vals[None, :]
 
@@ -174,13 +172,14 @@ def rebin_segment_data(
 
     out = out.merge(
         new_seg_info[
-            ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+            ['new_segment', 'new_seg_start_time',
+                'new_seg_end_time', 'new_seg_duration']
         ],
         on='new_segment',
         how='left',
         validate='many_to_one'
     )
-    
+
     return out
 
 
@@ -224,7 +223,8 @@ def rebin_spike_data(
 
     out = out.merge(
         new_seg_info[
-            ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+            ['new_segment', 'new_seg_start_time',
+                'new_seg_end_time', 'new_seg_duration']
         ],
         on='new_segment',
         how='left',
@@ -396,9 +396,6 @@ def randomly_assign_random_dummy_based_on_targets(y_var):
     y_var.loc[y_var['target_index'].isin(half_targets), 'random_dummy'] = 1
     return y_var
 
-import numpy as np
-import pandas as pd
-
 
 # ============================================================
 # Helper: build bins once for all segments
@@ -471,6 +468,7 @@ def concat_new_seg_info(df, new_seg_info, bin_width=None):
     result['new_segment'] = result['new_segment'].astype(int)
     return result
 
+
 def segment_windows_to_bins2d(
     new_seg_info,
     *,
@@ -539,10 +537,10 @@ def _get_new_seg_info(planning_data):
     return new_seg_info
 
 
-# def select_segment_data_around_event_time(planning_data, pre_event_window=0.25, post_event_window=0.75):
-#     planning_data['new_seg_start_time'] = planning_data['event_time'] - pre_event_window
-#     planning_data['new_seg_end_time'] = planning_data['event_time'] + post_event_window
-#     planning_data['new_seg_duration'] = pre_event_window + post_event_window
+# def select_segment_data_around_event_time(planning_data, start_t_rel_event=-0.25, end_t_rel_event=1.25):
+#     planning_data['new_seg_start_time'] = planning_data['event_time'] + start_t_rel_event
+#     planning_data['new_seg_end_time'] = planning_data['event_time'] + end_t_rel_event
+#     planning_data['new_seg_duration'] = start_t_rel_event + end_t_rel_event
 #     planning_data = planning_data[planning_data['time'].between(planning_data['new_seg_start_time'], planning_data['new_seg_end_time'])]
 #     return planning_data
 

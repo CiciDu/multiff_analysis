@@ -45,7 +45,7 @@ from machine_learning.ml_methods import regression_utils, regz_regression_utils,
 from neural_data_analysis.neural_analysis_tools.cca_methods.cca_plotting import cca_plotting, cca_plot_lag_vs_no_lag, cca_plot_cv
 from neural_data_analysis.neural_analysis_tools.cca_methods import cca_class, cca_utils, cca_cv_utils
 from neural_data_analysis.neural_analysis_tools.cca_methods import cca_class
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import planning_and_neural_class, pn_utils, pn_helper_class, pn_aligned_by_seg, pn_aligned_by_event
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import planning_and_neural_class, pn_utils, pn_decoding_utils, pn_helper_class, pn_aligned_by_seg, pn_aligned_by_event
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 from neural_data_analysis.neural_analysis_tools.model_neural_data import transform_vars, neural_data_modeling, drop_high_corr_vars, drop_high_vif_vars
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_neural_data, plot_modeling_result
@@ -179,7 +179,7 @@ def collect_stop_data_func(raw_data_folder_path):
     # rcap_last_several =  rcap[ rcap["order_in_cluster"] > 0].reset_index(drop=True)
 
     will_switch_after_miss = pd.concat([rsw_last[shared_columns],
-                                   one_stop_miss[shared_columns]])
+                                        one_stop_miss[shared_columns]])
 
     all_misses = pd.concat([one_stop_miss[shared_columns],
                             rsw_expanded[shared_columns],
@@ -208,7 +208,8 @@ def collect_stop_data_func(raw_data_folder_path):
     datasets_raw = {
         'captures': valid_captures_df.copy(),
         'no_capture': filtered_no_capture_stops_df.copy(),
-        'will_retry_after_miss': will_retry_after_miss.copy(), # note: will_retry_after_miss excludes rcap_last
+        # note: will_retry_after_miss excludes rcap_last
+        'will_retry_after_miss': will_retry_after_miss.copy(),
         'both_middle': both_middle.copy(),
         'rcap_first': rcap_first.copy(),
         'rsw_first': rsw_first.copy(),
@@ -250,7 +251,7 @@ def collect_stop_data_func(raw_data_folder_path):
 
         # ========= Maybe less interpretable because of the confounds in stops & captures surrounding the current stop =========
 
-        {'a': 'will_switch_after_miss', 'b': 'will_retry_after_miss', # will_retry_after_miss excludes rcap_last
+        {'a': 'will_switch_after_miss', 'b': 'will_retry_after_miss',  # will_retry_after_miss excludes rcap_last
          'key': 'will_switch_vs_retry_after_miss',
          'title': 'Switch vs Retry After Miss'},
 
