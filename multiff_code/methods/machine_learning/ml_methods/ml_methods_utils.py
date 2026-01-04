@@ -208,35 +208,65 @@ def _prepare_grouped_bar_data(results_df, metric, features=None):
 
     return features, groups, data_dict
 
-
-def _draw_grouped_barplot(chunk_targets, chunk_data, groups, metric, plot_title):
-    """Render a bar plot for a chunk of features."""
+def _draw_grouped_barplot(
+    chunk_targets,
+    chunk_data,
+    groups,
+    metric,
+    plot_title,
+    chunk_err_data=None,
+    capsize=0
+):
+    """Core grouped barplot renderer (optionally with error bars)."""
     num_groups = len(groups)
     bar_width = 0.25
     group_spacing = 1.0
     group_centers = np.arange(len(chunk_targets)) * group_spacing
 
-    fig, ax = plt.subplots(figsize=(max(8, len(chunk_targets) * 0.7), 6))
+    fig, ax = plt.subplots(
+        figsize=(max(8, len(chunk_targets) * 0.7), 6)
+    )
 
     for i, group in enumerate(groups):
         offsets = group_centers + (i - (num_groups - 1) / 2) * bar_width
-        ax.bar(offsets, chunk_data[:, i],
-               width=bar_width, label=group, zorder=3)
+        ax.bar(
+            offsets,
+            chunk_data[:, i],
+            yerr=None if chunk_err_data is None else chunk_err_data[:, i],
+            capsize=capsize if chunk_err_data is not None else 0,
+            width=bar_width,
+            label=group,
+            zorder=3
+        )
 
+    # Vertical separators between target groups
     for center in group_centers:
-        ax.axvline(center - group_spacing / 2, color='lightgray',
-                   linestyle='-', linewidth=1, zorder=1)
-    ax.axvline(group_centers[-1] + group_spacing / 2,
-               color='lightgray', linestyle='-', linewidth=1, zorder=1)
+        ax.axvline(
+            center - group_spacing / 2,
+            color='lightgray',
+            linestyle='-',
+            linewidth=1,
+            zorder=1
+        )
+    ax.axvline(
+        group_centers[-1] + group_spacing / 2,
+        color='lightgray',
+        linestyle='-',
+        linewidth=1,
+        zorder=1
+    )
 
+    # Metric-specific formatting
     if 'r2' in metric.lower():
         ax.set_ylim(max(-2, np.nanmin(chunk_data)), 1)
         ax.axhline(0, color='black', linewidth=0.6, alpha=0.8)
         ax.axhline(0.1, color='gray', linestyle='--', linewidth=1)
 
     ax.set_xticks(group_centers)
-    ax.set_xticklabels(chunk_targets, rotation=40, ha='right', fontsize=10)
-    ax.set_ylabel(f"{metric} (Mean)")
+    ax.set_xticklabels(
+        chunk_targets, rotation=40, ha='right', fontsize=10
+    )
+    ax.set_ylabel(f'{metric} (Mean)')
     ax.set_title(plot_title)
     ax.legend(title='test_or_control')
     ax.yaxis.grid(True, linestyle='--', alpha=0.4)
@@ -246,12 +276,47 @@ def _draw_grouped_barplot(chunk_targets, chunk_data, groups, metric, plot_title)
     plt.show()
 
 
-def make_barplot_to_compare_results(results_df, metric, features=None, max_targets_per_plot=15):
+def _extract_grouped_values(results_df, metric, features, groups, value_column):
+    """
+    Build a dict of value_column per feature per group, aligned to provided
+    features and groups order.
+    """
+    metric_df = results_df[results_df['Metric'] == metric].copy()
+    data_dict = {}
+    for feat in features:
+        vals = []
+        for group in groups:
+            val = metric_df.loc[
+                (metric_df['Feature'] == feat) &
+                (metric_df['test_or_control'] == group),
+                value_column
+            ]
+            vals.append(val.values[0] if len(val) > 0 else np.nan)
+        data_dict[feat] = vals
+    return data_dict
+
+
+def make_barplot_to_compare_results(results_df, metric, features=None, max_targets_per_plot=15, show_errorbar=True, error_capsize=4):
     """
     Main wrapper function: Prepares data and calls plot renderer in chunks.
+
+    Parameters:
+        results_df (pd.DataFrame): Results with columns ['Feature','Metric','mean','Std','test_or_control'].
+        metric (str): Metric name to visualize.
+        features (list or None): Optional subset of features to include.
+        max_targets_per_plot (int): Max number of features per figure.
+        show_errorbar (bool): If True, add error bars using 'Std' column.
+        error_capsize (int): Capsize value for error bar whiskers.
     """
     features, groups, data_dict = _prepare_grouped_bar_data(
         results_df, metric, features)
+
+    err_dict = None
+    if show_errorbar:
+        # Build error dictionary aligned with the same feature/group order
+        err_dict = _extract_grouped_values(
+            results_df, metric, features, groups, value_column='Std'
+        )
 
     num_targets = len(features)
     num_plots = math.ceil(num_targets / max_targets_per_plot)
@@ -261,6 +326,15 @@ def make_barplot_to_compare_results(results_df, metric, features=None, max_targe
         end = min(start + max_targets_per_plot, num_targets)
         chunk_targets = features[start:end]
         chunk_data = np.array([data_dict[t] for t in chunk_targets])
+        chunk_err_data = None
+        if err_dict is not None:
+            chunk_err_data = np.array([err_dict[t] for t in chunk_targets])
 
         title = f'Comparison of {metric} ({start + 1}–{end})'
-        _draw_grouped_barplot(chunk_targets, chunk_data, groups, metric, title)
+        if show_errorbar:
+            _draw_grouped_barplot(
+                chunk_targets, chunk_data, groups, metric, title, chunk_err_data=chunk_err_data, capsize=error_capsize
+            )
+        else:
+            _draw_grouped_barplot(
+                chunk_targets, chunk_data, groups, metric, title)
