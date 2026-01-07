@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime
 import hashlib
 import json
+from sklearn.model_selection import train_test_split
+
 
 from itertools import product
 
@@ -29,7 +31,7 @@ def add_interaction_terms_and_features(concat_behav_trials):
 
 def prep_behav(df,
                cont_cols=('cur_ff_distance', 'nxt_ff_distance',
-                          'time_since_last_capture'),
+                          'time_since_last_capture', 'speed', 'accel'),
                cat_vars=('cur_vis', 'nxt_vis', 'nxt_in_memory', 'any_ff_visible')):
     # keep only requested features (that exist), copy to avoid side effects
     out = df.copy()
@@ -128,6 +130,9 @@ def run_cv_decoding(
     n_splits=5,
     config: DecodingRunConfig | None = None,
     context_label=None,
+    verbosity: int = 1,
+    shuffle_y: bool = False,
+    shuffle_seed: int = 0,
 ):
     if config is None:
         config = DecodingRunConfig()
@@ -141,7 +146,7 @@ def run_cv_decoding(
         if y_df[behav_feature].nunique() <= 1:
             continue
 
-        print(behav_feature)
+        log(behav_feature, verbosity=verbosity, level=1)
 
         y = y_df[behav_feature].to_numpy().ravel()
 
@@ -150,6 +155,10 @@ def run_cv_decoding(
         y_ok = y[ok]
         groups_ok = groups_arr[ok]
 
+        if shuffle_y:
+            rng = np.random.default_rng(shuffle_seed)
+            y_ok = rng.permutation(y_ok)
+    
         # --- build CV splits on filtered data ---
         gcv_ok = GroupKFold(n_splits=n_splits)
         cv_splits_ok = list(gcv_ok.split(X_ok, groups=groups_ok))
@@ -157,9 +166,12 @@ def run_cv_decoding(
         # --- default model (CatBoost) ---
         if config.model_class is None:
             model_class = CatBoostRegressor
+            # CatBoost verbosity: 0/silent if verbosity == 0; show progress sparsely if verbosity >= 2
+            cb_verbose = False if verbosity == 0 else (
+                100 if verbosity >= 2 else False)
             model_kwargs = dict(
                 loss_function='RMSE',
-                verbose=False,
+                verbose=cb_verbose,
                 random_seed=0,
                 od_type='Iter' if config.use_early_stopping else None,
                 od_wait=config.od_wait if config.use_early_stopping else None,
@@ -170,31 +182,52 @@ def run_cv_decoding(
 
         # --- CV prediction ---
         y_cv_pred = np.full_like(y_ok, np.nan, dtype=float)
-        
-        for train_idx, test_idx in cv_splits_ok:
-            X_tr, X_te = X_ok[train_idx], X_ok[test_idx]
-            y_tr = y_ok[train_idx]
 
+        for train_idx, test_idx in cv_splits_ok:
+            X_tr_full = X_ok[train_idx]
+            y_tr_full = y_ok[train_idx]
+            X_te = X_ok[test_idx]
+
+            
             # ---- NEW GUARD: skip constant-target folds ----
-            if np.unique(y_tr).size <= 1:
+            if np.unique(y_tr_full).size <= 1:
                 # Predict the constant value for this fold
-                y_cv_pred[test_idx] = y_tr[0]
+                y_cv_pred[test_idx] = y_tr_full[0]
                 continue
 
             model = model_class(**model_kwargs)
 
             fit_kwargs = {}
+
             if config.use_early_stopping:
-                fit_kwargs.update(
-                    dict(
-                        eval_set=(X_te, y_ok[test_idx]),
-                        use_best_model=True,
-                        verbose=False,
-                    )
+                # --- inner split for early stopping ---
+                X_tr, X_val, y_tr, y_val = train_test_split(
+                    X_tr_full,
+                    y_tr_full,
+                    test_size=0.2,
+                    shuffle=True,
+                    random_state=shuffle_seed,
                 )
+
+                # Guard: val must have variance
+                if np.unique(y_val).size <= 1:
+                    X_tr, y_tr = X_tr_full, y_tr_full
+                else:
+                    fit_verbose = False if verbosity == 0 else (
+                        100 if verbosity >= 2 else False)
+                    fit_kwargs.update(
+                        dict(
+                            eval_set=(X_val, y_val),
+                            use_best_model=True,
+                            verbose=fit_verbose,
+                        )
+                    )
+            else:
+                X_tr, y_tr = X_tr_full, y_tr_full
 
             model.fit(X_tr, y_tr, **fit_kwargs)
             y_cv_pred[test_idx] = model.predict(X_te)
+
 
         # --- metrics (AFTER all folds) ---
         if np.isnan(y_cv_pred).any():
@@ -247,11 +280,16 @@ def _normalize_num_ff(v):
     return v
 
 
+def log(msg: str, verbosity: int = 1, level: int = 1):
+    if verbosity >= level:
+        print(msg)
+
+
 def decode_by_num_ff_visible_or_in_memory(
     x_var,
     y_var,
     behav_features,
-    ff_visibility_col='num_ff_visible', # 'num_ff_visible' or 'num_ff_in_memory'
+    ff_visibility_col='num_ff_visible',  # 'num_ff_visible' or 'num_ff_in_memory'
     group_col='new_segment',
     n_splits=5,
     config: DecodingRunConfig | None = None,
@@ -259,11 +297,14 @@ def decode_by_num_ff_visible_or_in_memory(
     include_pooled=True,
     load_if_exists=True,
     overwrite=False,
+    verbosity: int = 1,
+    shuffle_y: bool = False,
+    shuffle_seed: int = 0,
 ):
     """
     Decode behavioral features stratified by num_ff_visible or num_ff_in_memory,
     with optional pooled ('any') decoding.
-    
+
     Caching logic:
     - If CSV + JSON exist and metadata matches → load
     - If CSV exists without JSON → load only if overwrite=False
@@ -322,7 +363,7 @@ def decode_by_num_ff_visible_or_in_memory(
     params_hash = hashlib.sha1(
         json.dumps(hash_payload, sort_keys=True, default=str).encode('utf-8')
     ).hexdigest()[:10]
-    
+
     metadata['params_hash'] = params_hash
 
     csv_path = None
@@ -337,7 +378,10 @@ def decode_by_num_ff_visible_or_in_memory(
             # Treat as directory; keep filenames short (user preference)
             # Example: dec_numff_vis_u64_k5_CatBoost_abc123def4.csv
             tag = 'vis' if ff_visibility_col == 'num_ff_visible' else 'mem'
-            fname = f"{tag}_u{n_units}_k{n_splits}_{model_name}_{params_hash}.csv"
+            fname = f"{tag}_u{n_units}_k{n_splits}_{model_name}_{params_hash}"
+            if shuffle_y:
+                fname += '_shuffled'
+            fname += '.csv'
             save_path.mkdir(parents=True, exist_ok=True)
             csv_path = save_path / fname
             json_path = csv_path.with_suffix('.json')
@@ -349,34 +393,60 @@ def decode_by_num_ff_visible_or_in_memory(
                     with open(json_path, 'r') as f:
                         existing_meta = json.load(f)
                     if existing_meta.get('params_hash') == params_hash:
-                        print(f'Loaded cached results from {csv_path} (params_hash matches)')
+                        log(
+                            f'Loaded cached results from {csv_path} (params_hash matches)',
+                            verbosity=verbosity,
+                            level=1,
+                        )
                         return pd.read_csv(csv_path)
                     else:
-                        print(f'Cached results do not match metadata. Recomputing.')
+                        log(f'Cached results do not match metadata. Recomputing.',
+                            verbosity=verbosity,
+                            level=1,
+                        )
                 else:
                     # No metadata sidecar; conservatively load only if allowed
                     if not overwrite:
-                        print(f'No metadata sidecar. Loaded cached results from {csv_path} (overwrite=False)')
+                        log(
+                            f'No metadata sidecar. Loaded cached results from {csv_path} (overwrite=False)',
+                            verbosity=verbosity,
+                            level=1,
+                        )
                         return pd.read_csv(csv_path)
                     else:
-                        print(f'No metadata sidecar. Recomputing. (overwrite=True)')
-                    
+                        log(f'No metadata sidecar. Recomputing. (overwrite=True)',
+                            verbosity=verbosity,
+                            level=1,
+                        )
+
             except Exception as e:
-                print(f'Error loading cached results from {csv_path}: {e}')
+                log(f'Error loading cached results from {csv_path}: {e}',
+                    verbosity=verbosity,
+                    level=1,
+                )
                 pass
     else:
-        print('No save_path provided. Recomputing.')
-
+        log('No save_path provided. Recomputing.',
+            verbosity=verbosity,
+            level=1,
+        )
 
     all_results = []
 
     # ---------- Helper to run one decoding pass ----------
     def _run_one_pass(X_sub, y_sub, groups_sub, context_label, num_ff_label):
-        
-        if config.model_class is not None:
-            print('Fitting:', config.model_class.__name__)
-        else:
-            print('Fitting: CatBoostRegressor')
+
+        if verbosity >= 1:
+            if config.model_class is not None:
+                log(f'Fitting: {config.model_class.__name__}',
+                    verbosity=verbosity,
+                    level=2,
+                )
+            else:
+                log('Fitting: CatBoostRegressor',
+                    verbosity=verbosity,
+                    level=2,
+                )
 
         results_df = run_cv_decoding(
             X=X_sub,
@@ -386,6 +456,9 @@ def decode_by_num_ff_visible_or_in_memory(
             n_splits=n_splits,
             config=config,
             context_label=context_label,
+            verbosity=verbosity,
+            shuffle_y=shuffle_y,
+            shuffle_seed=shuffle_seed,
         )
 
         results_df[ff_visibility_col] = num_ff_label
@@ -393,7 +466,10 @@ def decode_by_num_ff_visible_or_in_memory(
 
     # ---------- Per-num_ff decoding ----------
     for num_ff in np.sort(num_ff_visible_or_in_memory_clean.unique()):
-        print(f'\nnum_ff: {num_ff}')
+        log(f'\nnum_ff: {num_ff}',
+            verbosity=verbosity,
+            level=1,
+        )
 
         mask = num_ff_visible_or_in_memory_clean == num_ff
         X_sub = x_var[mask]
@@ -401,9 +477,11 @@ def decode_by_num_ff_visible_or_in_memory(
         groups_sub = y_sub[group_col].values
 
         if len(y_sub) < 50:
-            print(f'Skipping num_ff={num_ff}: too few samples')
+            log(f'Skipping num_ff={num_ff}: too few samples',
+                verbosity=verbosity,
+                level=1,
+            )
             continue
-
 
         results_df = _run_one_pass(
             X_sub=X_sub,
@@ -420,7 +498,10 @@ def decode_by_num_ff_visible_or_in_memory(
 
     # ---------- Pooled decoding ----------
     if include_pooled:
-        print('\nnum_ff: any (pooled)')
+        log('\nnum_ff: any (pooled)',
+            verbosity=verbosity,
+            level=1,
+        )
 
         results_df = _run_one_pass(
             X_sub=x_var,
@@ -441,9 +522,11 @@ def decode_by_num_ff_visible_or_in_memory(
         if overwrite or (not csv_path.exists()):
             results_df.to_csv(csv_path, index=False)
             # Save sidecar metadata for robust retrieval
+            print(f'Saving results to {csv_path}')
             try:
                 with open(json_path, 'w') as f:
                     json.dump(metadata, f, indent=2)
+                print(f'Saving metadata to {json_path}')
             except Exception:
                 pass
 
@@ -454,9 +537,10 @@ def decode_cur_ff_only(
     x_var,
     y_var,
     behav_features,
-    ff_visibility_col='num_ff_visible', # 'num_ff_visible' or 'num_ff_in_memory'
+    ff_visibility_col='num_ff_visible',  # 'num_ff_visible' or 'num_ff_in_memory'
     group_col='new_segment',
     n_splits=5,
+    verbosity: int = 1,
     config: DecodingRunConfig | None = None,
     save_path=None,
 ):
@@ -479,11 +563,14 @@ def decode_cur_ff_only(
     y_sub = y_var.loc[mask]
     groups_sub = y_sub[group_col].values
 
-    print(f'\ncur_ff_only: n_samples={mask.sum()}')
+    log(f'\ncur_ff_only: n_samples={mask.sum()}',
+        verbosity=verbosity,
+        level=1,
+    )
 
     # --- DO NOT precompute CV splits here ---
     # run_cv_decoding will build GroupKFold on the filtered data
-    
+
     context_label = 'cur_ff_visible_only' if ff_visibility_col == 'num_ff_visible' else 'cur_ff_in_memory_only'
 
     results_df = run_cv_decoding(

@@ -1,6 +1,7 @@
 from sklearn.linear_model import Ridge, Lasso, ElasticNet, LogisticRegression
 # import HuberRegressor
 from sklearn.linear_model import HuberRegressor
+from catboost import CatBoostRegressor
 
 MODEL_SPECS = {
 
