@@ -9,8 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
 
 
-
-    # ------------------------
+# ------------------------
    
 MODEL_REGISTRY = {
     'logreg': 'Logistic regression (L2)',

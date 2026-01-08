@@ -21,6 +21,216 @@ DEG15 = np.deg2rad(15)
 DEG45 = np.deg2rad(45)
 DEG90 = np.deg2rad(90)
 
+import numpy as np
+import pandas as pd
+
+# ------------------------
+# Constants (task-aware)
+# ------------------------
+
+STOP_EPS = 5.0
+CAPTURE_RADIUS = 25.0
+
+# Angular thresholds (radians)
+DEG15 = np.deg2rad(15)
+DEG45 = np.deg2rad(45)
+DEG90 = np.deg2rad(90)
+
+# Turn-rate thresholds (from quantiles)
+ANG_SLOW = 0.3    # ~75th percentile
+ANG_FAST = 0.8    # ~90th percentile
+
+# Angular acceleration thresholds
+ANG_ACC_SMOOTH = 1.0
+ANG_ACC_JERK = 4.0
+
+
+# ============================================================
+# Angular speed (turn rate)
+# ============================================================
+
+def add_ang_speed_band(df):
+    """
+    Adds signed angular speed bands:
+    LEFT_FAST / LEFT_SLOW / STRAIGHT / RIGHT_SLOW / RIGHT_FAST
+    """
+    omega = df['ang_speed'].values
+
+    band = np.full(len(df), 'STRAIGHT', dtype=object)
+
+    band[(omega < -ANG_FAST)] = 'LEFT_FAST'
+    band[(omega >= -ANG_FAST) & (omega < -ANG_SLOW)] = 'LEFT_SLOW'
+
+    band[(omega > ANG_SLOW) & (omega <= ANG_FAST)] = 'RIGHT_SLOW'
+    band[(omega > ANG_FAST)] = 'RIGHT_FAST'
+
+    df = df.copy()
+    df['ang_speed_band'] = pd.Categorical(
+        band,
+        categories=[
+            'LEFT_FAST',
+            'LEFT_SLOW',
+            'STRAIGHT',
+            'RIGHT_SLOW',
+            'RIGHT_FAST',
+        ],
+        ordered=True
+    )
+
+    return df
+
+
+# ============================================================
+# Angular acceleration (change in turning)
+# ============================================================
+
+def add_ang_accel_band(df):
+    """
+    Adds signed angular acceleration bands:
+    LEFT_JERK / LEFT_SMOOTH / NEUTRAL / RIGHT_SMOOTH / RIGHT_JERK
+    """
+    a = df['ang_accel'].values
+
+    band = np.full(len(df), 'NEUTRAL', dtype=object)
+
+    band[a < -ANG_ACC_JERK] = 'LEFT_JERK'
+    band[(a >= -ANG_ACC_JERK) & (a < -ANG_ACC_SMOOTH)] = 'LEFT_SMOOTH'
+
+    band[(a > ANG_ACC_SMOOTH) & (a <= ANG_ACC_JERK)] = 'RIGHT_SMOOTH'
+    band[a > ANG_ACC_JERK] = 'RIGHT_JERK'
+
+    df = df.copy()
+    df['ang_accel_band'] = pd.Categorical(
+        band,
+        categories=[
+            'LEFT_JERK',
+            'LEFT_SMOOTH',
+            'NEUTRAL',
+            'RIGHT_SMOOTH',
+            'RIGHT_JERK',
+        ],
+        ordered=True
+    )
+
+    return df
+
+
+# ============================================================
+# Next firefly angle (planning-relevant, coarse)
+# ============================================================
+
+def add_nxt_ff_angle_band(df):
+    """
+    Adds coarse signed angle-to-next-FF bands:
+    LEFT / AHEAD / RIGHT / BEHIND
+    """
+    theta = df['nxt_ff_angle'].values
+    abs_theta = np.abs(theta)
+
+    band = np.full(len(df), 'AHEAD', dtype=object)
+
+    band[(abs_theta > DEG90)] = 'BEHIND'
+    band[(theta < -DEG15) & (abs_theta <= DEG90)] = 'LEFT'
+    band[(theta > DEG15) & (abs_theta <= DEG90)] = 'RIGHT'
+
+    df = df.copy()
+    df['nxt_ff_angle_band'] = pd.Categorical(
+        band,
+        categories=['LEFT', 'AHEAD', 'RIGHT', 'BEHIND'],
+        ordered=True
+    )
+
+    return df
+
+
+# ============================================================
+# Egocentric lateral offset (cur FF)
+# ============================================================
+
+def add_cur_ff_rel_x_band(df):
+    """
+    Adds lateral offset bands for current FF:
+    LEFT_FAR / LEFT_NEAR / CENTER / RIGHT_NEAR / RIGHT_FAR
+    """
+    x = df['cur_ff_rel_x'].values
+
+    band = np.full(len(df), 'CENTER', dtype=object)
+
+    band[x < -50] = 'LEFT_FAR'
+    band[(x >= -50) & (x < -20)] = 'LEFT_NEAR'
+
+    band[(x > 20) & (x <= 50)] = 'RIGHT_NEAR'
+    band[x > 50] = 'RIGHT_FAR'
+
+    df = df.copy()
+    df['cur_ff_rel_x_band'] = pd.Categorical(
+        band,
+        categories=[
+            'LEFT_FAR',
+            'LEFT_NEAR',
+            'CENTER',
+            'RIGHT_NEAR',
+            'RIGHT_FAR',
+        ],
+        ordered=True
+    )
+
+    return df
+
+
+# ============================================================
+# Egocentric forward offset (cur FF)
+# ============================================================
+
+def add_cur_ff_rel_y_band(df):
+    """
+    Adds forward-distance bands for current FF:
+    VERY_NEAR / NEAR / MID / FAR
+    """
+    y = df['cur_ff_rel_y'].values
+
+    band = np.full(len(df), 'MID', dtype=object)
+
+    band[y <= CAPTURE_RADIUS] = 'VERY_NEAR'
+    band[(y > CAPTURE_RADIUS) & (y <= 80)] = 'NEAR'
+    band[y > 180] = 'FAR'
+
+    df = df.copy()
+    df['cur_ff_rel_y_band'] = pd.Categorical(
+        band,
+        categories=['VERY_NEAR', 'NEAR', 'MID', 'FAR'],
+        ordered=True
+    )
+
+    return df
+
+
+# ============================================================
+# Distance at reference (commitment timing)
+# ============================================================
+
+def add_cur_ff_distance_at_ref_band(df):
+    """
+    Adds commitment-distance bands:
+    EARLY_COMMIT / MID_COMMIT / LATE_COMMIT
+    """
+    d = df['cur_ff_distance_at_ref'].values
+
+    band = np.full(len(df), 'MID_COMMIT', dtype=object)
+
+    band[d <= 130] = 'EARLY_COMMIT'
+    band[d > 200] = 'LATE_COMMIT'
+
+    df = df.copy()
+    df['cur_ff_dist_ref_band'] = pd.Categorical(
+        band,
+        categories=['EARLY_COMMIT', 'MID_COMMIT', 'LATE_COMMIT'],
+        ordered=True
+    )
+
+    return df
+
+
 
 def get_neural_feature_columns(df):
     """
@@ -123,28 +333,50 @@ def add_nxt_ff_distance_band(df):
 
 def add_cur_ff_angle_band(df):
     """
-    Adds binned angle-to-current-FF bands:
-    AHEAD / SLIGHT_TURN / LARGE_TURN / BEHIND
+    Adds signed angle-to-current-FF bands.
 
-    Assumes cur_ff_angle is signed radians.
+    Categories (ordered):
+    LEFT_BEHIND / LEFT_LARGE / LEFT_SLIGHT / AHEAD /
+    RIGHT_SLIGHT / RIGHT_LARGE / RIGHT_BEHIND
+
+    Assumes cur_ff_angle is signed radians:
+        negative = left, positive = right
     """
-    theta = np.abs(df['cur_ff_angle'].values)
+    theta = df['cur_ff_angle'].values
 
-    angle_band = np.full(len(df), 'LARGE_TURN', dtype=object)
+    angle_band = np.full(len(df), 'AHEAD', dtype=object)
 
-    angle_band[theta <= DEG15] = 'AHEAD'
-    angle_band[(theta > DEG15) & (theta <= DEG45)] = 'SLIGHT_TURN'
-    angle_band[(theta > DEG45) & (theta <= DEG90)] = 'LARGE_TURN'
-    angle_band[theta > DEG90] = 'BEHIND'
+    # Ahead
+    angle_band[np.abs(theta) <= DEG15] = 'AHEAD'
+
+    # Left side
+    angle_band[(theta < -DEG15) & (theta >= -DEG45)] = 'LEFT_SLIGHT'
+    angle_band[(theta < -DEG45) & (theta >= -DEG90)] = 'LEFT_LARGE'
+    angle_band[theta < -DEG90] = 'LEFT_BEHIND'
+
+    # Right side
+    angle_band[(theta > DEG15) & (theta <= DEG45)] = 'RIGHT_SLIGHT'
+    angle_band[(theta > DEG45) & (theta <= DEG90)] = 'RIGHT_LARGE'
+    angle_band[theta > DEG90] = 'RIGHT_BEHIND'
 
     df = df.copy()
     df['cur_ff_angle_band'] = pd.Categorical(
         angle_band,
-        categories=['AHEAD', 'SLIGHT_TURN', 'LARGE_TURN', 'BEHIND'],
+        categories=[
+            'LEFT_BEHIND',
+            'LEFT_LARGE',
+            'LEFT_SLIGHT',
+            'AHEAD',
+            'RIGHT_SLIGHT',
+            'RIGHT_LARGE',
+            'RIGHT_BEHIND',
+        ],
         ordered=True
     )
 
     return df
+
+
 
 
 def add_behavior_bands(df):
@@ -156,6 +388,12 @@ def add_behavior_bands(df):
     df = add_cur_ff_distance_band(df)
     df = add_nxt_ff_distance_band(df)
     df = add_cur_ff_angle_band(df)
+    df = add_ang_speed_band(df)
+    df = add_ang_accel_band(df)
+    df = add_nxt_ff_angle_band(df)
+    df = add_cur_ff_rel_x_band(df)
+    df = add_cur_ff_rel_y_band(df)
+    df = add_cur_ff_distance_at_ref_band(df)
 
     return df
 
@@ -174,52 +412,6 @@ def add_speed_angle_interaction(df):
     df['speed_angle_state'] = pd.Categorical(df['speed_angle_state'])
 
     return df
-
-
-def add_speed_angle_distance_interaction(df):
-    """
-    Adds speed × angle × current-FF-distance interaction label.
-    """
-    df = df.copy()
-
-    df['speed_angle_dist_state'] = (
-        df['speed_band'].astype(str) + '__' +
-        df['cur_ff_angle_band'].astype(str) + '__' +
-        df['cur_ff_dist_band'].astype(str)
-    )
-
-    df['speed_angle_dist_state'] = pd.Categorical(
-        df['speed_angle_dist_state']
-    )
-
-    return df
-
-
-def add_planning_interaction(df):
-    """
-    Adds interaction probing anticipation of next FF.
-    """
-    df = df.copy()
-
-    df['planning_state'] = (
-        df['speed_band'].astype(str) + '__' +
-        df['cur_ff_angle_band'].astype(str) + '__' +
-        df['nxt_ff_dist_band'].astype(str)
-    )
-
-    df['planning_state'] = pd.Categorical(df['planning_state'])
-
-    return df
-
-
-def prune_rare_states(df, label_col, min_count=20):
-    """
-    Drops rows belonging to rare interaction states.
-    """
-    counts = df[label_col].value_counts()
-    keep_states = counts[counts >= min_count].index
-
-    return df[df[label_col].isin(keep_states)].copy()
 
 
 def prune_rare_states_two_dfs(
@@ -291,43 +483,3 @@ def add_pairwise_interaction(
         df[new_col] = df[new_col].cat.remove_unused_categories()
 
     return df
-
-
-def add_pairwise_interactions_from_spec(
-    *,
-    df,
-    interaction_specs,
-    sep='__',
-    drop_unused_categories=False,
-):
-    """
-    Add multiple pairwise interaction columns from an explicit spec list.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-    interaction_specs : list of (var_a, var_b, new_col)
-    sep : str
-    drop_unused_categories : bool
-
-    Returns
-    -------
-    df : pandas.DataFrame
-    added_cols : list of str
-    """
-    df = df.copy()
-    added_cols = []
-
-    for var_a, var_b, new_col in interaction_specs:
-        df = add_pairwise_interaction(
-            df=df,
-            var_a=var_a,
-            var_b=var_b,
-            new_col=new_col,
-            sep=sep,
-            drop_unused_categories=drop_unused_categories,
-        )
-        added_cols.append(new_col)
-
-    return df, added_cols
-
