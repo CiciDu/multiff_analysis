@@ -146,7 +146,7 @@ def run_cv_decoding(
         if y_df[behav_feature].nunique() <= 1:
             continue
 
-        log(behav_feature, verbosity=verbosity, level=1)
+        log(behav_feature, verbosity=verbosity, level=2)
 
         y = y_df[behav_feature].to_numpy().ravel()
 
