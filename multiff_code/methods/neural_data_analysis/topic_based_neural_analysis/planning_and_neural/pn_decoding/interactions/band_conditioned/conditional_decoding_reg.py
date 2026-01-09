@@ -1,317 +1,683 @@
 """
-Conditional decoding of a continuous variable y given a discrete 'band' label.
+Conditional decoding (regression):
+Decode a continuous target variable conditioned on a categorical variable.
 
-Implements three approaches:
-  A) per-band decoder: fit separate model for each band
-  B) pooled decoder with band main effect and X-by-band interactions
-  C) residual decoding: remove band mean from y, then decode residual y'
+Supports multiple regression models:
+  - ridge
+  - lasso
+  - elasticnet
+  - kernel_ridge_rbf
+  - svr_rbf
 
-Uses ridge regression with standardization inside each CV fold.
-Outputs tidy DataFrames with R^2, MSE, Corr for each approach (and per band when applicable).
-
-Expected inputs:
-  - X: np.ndarray, shape (n_samples, n_features)
-  - y: np.ndarray, shape (n_samples,)
-  - band: array-like, shape (n_samples,) with discrete labels (int/str)
-  - groups (optional): array-like, shape (n_samples,) for GroupKFold (e.g., session id)
-
-Dependencies: numpy, pandas, scikit-learn
+Implements:
+  1) Global decoding:        y ~ X
+  2) Conditioned decoding:   y ~ X | condition
+  3) Bootstrapped delta:     conditioned − global
 """
-
-from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-from sklearn.model_selection import KFold, GroupKFold
+import warnings
+from pathlib import Path
+from datetime import datetime
+import hashlib
+import json
+from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Ridge
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import Ridge, Lasso, ElasticNet
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.svm import SVR
 from sklearn.metrics import r2_score, mean_squared_error
 
-
-def _safe_corr(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    y_true = np.asarray(y_true).ravel()
-    y_pred = np.asarray(y_pred).ravel()
-    if y_true.size < 2:
-        return np.nan
-    if np.std(y_true) == 0 or np.std(y_pred) == 0:
-        return np.nan
-    return float(np.corrcoef(y_true, y_pred)[0, 1])
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding.interactions import (
+    add_interactions, interaction_decoding
+)
 
 
-def _make_cv(n_splits: int, groups: np.ndarray | None, random_state: int) -> object:
-    if groups is None:
-        return KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    return GroupKFold(n_splits=n_splits)
+# ============================================================
+# Model factory
+# ============================================================
 
-
-def _fit_predict_ridge(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_test: np.ndarray,
-    alpha: float,
-) -> np.ndarray:
-    scaler = StandardScaler(with_mean=True, with_std=True)
-    X_train_z = scaler.fit_transform(X_train)
-    X_test_z = scaler.transform(X_test)
-
-    model = Ridge(alpha=alpha, fit_intercept=True, random_state=0)
-    model.fit(X_train_z, y_train)
-    return model.predict(X_test_z)
-
-
-def _band_means_from_train(y_train: np.ndarray, band_train: np.ndarray) -> dict:
-    band_means = {}
-    for b in np.unique(band_train):
-        mask = band_train == b
-        band_means[b] = float(np.mean(y_train[mask])) if np.any(mask) else 0.0
-    return band_means
-
-
-def _residualize_y_by_band(
-    y: np.ndarray,
-    band: np.ndarray,
-    band_means: dict,
-    global_fallback: float,
-) -> np.ndarray:
-    # y_res[i] = y[i] - mean_train(y | band=b_i)
-    # if unseen band in test fold, subtract global mean of train fold
-    y_res = np.empty_like(y, dtype=float)
-    for i, b in enumerate(band):
-        y_res[i] = float(y[i]) - float(band_means.get(b, global_fallback))
-    return y_res
-
-
-def decode_continuous_conditioned_on_band(
-    X: np.ndarray,
-    y: np.ndarray,
-    band: np.ndarray,
-    groups: np.ndarray | None = None,
-    n_splits: int = 5,
-    alpha: float = 1.0,
-    random_state: int = 0,
-) -> dict[str, pd.DataFrame]:
+def make_regressor(model_type, random_state=0):
     """
-    Returns dict of DataFrames:
-      - 'per_band': approach A metrics per band per fold
-      - 'pooled_interaction': approach B metrics per fold (overall + per band)
-      - 'residual': approach C metrics per fold (overall + per band)
+    Returns a standardized regression pipeline.
     """
-    X = np.asarray(X, dtype=float)
-    y = np.asarray(y, dtype=float).ravel()
-    band = np.asarray(band)
-    if groups is not None:
-        groups = np.asarray(groups)
 
-    unique_bands = np.unique(band)
-    cv = _make_cv(n_splits=n_splits, groups=groups, random_state=random_state)
+    if model_type == 'ridge':
+        model = Ridge(alpha=1.0)
 
-    per_band_rows = []
-    pooled_rows = []
-    resid_rows = []
+    elif model_type == 'lasso':
+        model = Lasso(alpha=0.01, max_iter=5000)
 
-    # Precompute one-hot for band (stable ordering)
-    band_to_col = {b: i for i, b in enumerate(unique_bands)}
-    B = np.zeros((band.size, unique_bands.size), dtype=float)
-    for i, b in enumerate(band):
-        B[i, band_to_col[b]] = 1.0
+    elif model_type == 'elasticnet':
+        model = ElasticNet(alpha=0.05, l1_ratio=0.5, max_iter=5000)
 
-    # Build pooled interaction design: [X, B, X*B]
-    # X*B is block-wise: for each band column k, include X * B[:, k]
-    X_by_band_blocks = []
-    for k in range(B.shape[1]):
-        X_by_band_blocks.append(X * B[:, [k]])
-    X_int = np.concatenate(X_by_band_blocks, axis=1)  # (n, n_features*n_bands)
-    X_pooled = np.concatenate([X, B, X_int], axis=1)
+    elif model_type == 'kernel_ridge_rbf':
+        model = KernelRidge(
+            kernel='rbf',
+            alpha=1.0,
+            gamma=None,  # uses 1 / n_features by default
+        )
 
-    split_iter = cv.split(X, y, groups=groups) if groups is not None else cv.split(X, y)
+    elif model_type == 'svr_rbf':
+        model = SVR(
+            kernel='rbf',
+            C=1.0,
+            epsilon=0.1,
+        )
 
-    for fold_idx, (train_idx, test_idx) in enumerate(split_iter):
-        X_train, X_test = X[train_idx], X[test_idx]
-        y_train, y_test = y[train_idx], y[test_idx]
-        band_train, band_test = band[train_idx], band[test_idx]
+    else:
+        raise ValueError(f'Unknown model_type: {model_type}')
 
-        # -------------------------
-        # A) Per-band decoder
-        # -------------------------
-        for b in unique_bands:
-            tr_mask = band_train == b
-            te_mask = band_test == b
-            if np.sum(tr_mask) < 5 or np.sum(te_mask) < 2:
-                per_band_rows.append({
-                    'approach': 'per_band',
-                    'fold': fold_idx,
-                    'band': b,
-                    'n_train': int(np.sum(tr_mask)),
-                    'n_test': int(np.sum(te_mask)),
-                    'r2': np.nan,
-                    'mse': np.nan,
-                    'corr': np.nan,
-                })
-                continue
+    return Pipeline([
+        ('scaler', StandardScaler()),
+        ('model', model),
+    ])
 
-            y_pred_b = _fit_predict_ridge(
-                X_train=X_train[tr_mask],
-                y_train=y_train[tr_mask],
-                X_test=X_test[te_mask],
-                alpha=alpha,
-            )
-            y_true_b = y_test[te_mask]
 
-            per_band_rows.append({
-                'approach': 'per_band',
-                'fold': fold_idx,
-                'band': b,
-                'n_train': int(np.sum(tr_mask)),
-                'n_test': int(np.sum(te_mask)),
-                'r2': float(r2_score(y_true_b, y_pred_b)),
-                'mse': float(mean_squared_error(y_true_b, y_pred_b)),
-                'corr': _safe_corr(y_true_b, y_pred_b),
-            })
-
-        # -------------------------
-        # B) Pooled with band main + interactions
-        # -------------------------
-        Xp_train, Xp_test = X_pooled[train_idx], X_pooled[test_idx]
-        y_pred_pooled = _fit_predict_ridge(Xp_train, y_train, Xp_test, alpha=alpha)
-
-        pooled_rows.append({
-            'approach': 'pooled_interaction',
-            'fold': fold_idx,
-            'band': 'ALL',
-            'n_train': int(train_idx.size),
-            'n_test': int(test_idx.size),
-            'r2': float(r2_score(y_test, y_pred_pooled)),
-            'mse': float(mean_squared_error(y_test, y_pred_pooled)),
-            'corr': _safe_corr(y_test, y_pred_pooled),
-        })
-        for b in unique_bands:
-            te_mask = band_test == b
-            if np.sum(te_mask) < 2:
-                pooled_rows.append({
-                    'approach': 'pooled_interaction',
-                    'fold': fold_idx,
-                    'band': b,
-                    'n_train': int(np.sum(band_train == b)),
-                    'n_test': int(np.sum(te_mask)),
-                    'r2': np.nan,
-                    'mse': np.nan,
-                    'corr': np.nan,
-                })
-                continue
-            y_true_b = y_test[te_mask]
-            y_pred_b = y_pred_pooled[te_mask]
-            pooled_rows.append({
-                'approach': 'pooled_interaction',
-                'fold': fold_idx,
-                'band': b,
-                'n_train': int(np.sum(band_train == b)),
-                'n_test': int(np.sum(te_mask)),
-                'r2': float(r2_score(y_true_b, y_pred_b)),
-                'mse': float(mean_squared_error(y_true_b, y_pred_b)),
-                'corr': _safe_corr(y_true_b, y_pred_b),
-            })
-
-        # -------------------------
-        # C) Residual decoding: y' = y - E[y|band] (estimated on train fold)
-        # -------------------------
-        band_means = _band_means_from_train(y_train=y_train, band_train=band_train)
-        global_mean = float(np.mean(y_train))
-
-        y_train_res = _residualize_y_by_band(y_train, band_train, band_means, global_mean)
-        y_test_res = _residualize_y_by_band(y_test, band_test, band_means, global_mean)
-
-        y_pred_res = _fit_predict_ridge(X_train, y_train_res, X_test, alpha=alpha)
-
-        resid_rows.append({
-            'approach': 'residual',
-            'fold': fold_idx,
-            'band': 'ALL',
-            'n_train': int(train_idx.size),
-            'n_test': int(test_idx.size),
-            'r2': float(r2_score(y_test_res, y_pred_res)),
-            'mse': float(mean_squared_error(y_test_res, y_pred_res)),
-            'corr': _safe_corr(y_test_res, y_pred_res),
-        })
-        for b in unique_bands:
-            te_mask = band_test == b
-            if np.sum(te_mask) < 2:
-                resid_rows.append({
-                    'approach': 'residual',
-                    'fold': fold_idx,
-                    'band': b,
-                    'n_train': int(np.sum(band_train == b)),
-                    'n_test': int(np.sum(te_mask)),
-                    'r2': np.nan,
-                    'mse': np.nan,
-                    'corr': np.nan,
-                })
-                continue
-            y_true_b = y_test_res[te_mask]
-            y_pred_b = y_pred_res[te_mask]
-            resid_rows.append({
-                'approach': 'residual',
-                'fold': fold_idx,
-                'band': b,
-                'n_train': int(np.sum(band_train == b)),
-                'n_test': int(np.sum(te_mask)),
-                'r2': float(r2_score(y_true_b, y_pred_b)),
-                'mse': float(mean_squared_error(y_true_b, y_pred_b)),
-                'corr': _safe_corr(y_true_b, y_pred_b),
-            })
-
-    df_per_band = pd.DataFrame(per_band_rows)
-    df_pooled = pd.DataFrame(pooled_rows)
-    df_resid = pd.DataFrame(resid_rows)
-
+def regression_metrics(y_true, y_pred):
     return {
-        'per_band': df_per_band.sort_values(['band', 'fold']).reset_index(drop=True),
-        'pooled_interaction': df_pooled.sort_values(['band', 'fold']).reset_index(drop=True),
-        'residual': df_resid.sort_values(['band', 'fold']).reset_index(drop=True),
+        'r2': r2_score(y_true, y_pred),
+        'mse': mean_squared_error(y_true, y_pred),
     }
 
 
-# -------------------------
-# Example usage (replace with your arrays)
-# -------------------------
-if __name__ == '__main__':
-    rng = np.random.default_rng(0)
-    n = 2000
-    p = 40
+# ============================================================
+# Bootstrap: conditioned − global
+# ============================================================
 
-    # Fake data: 3 bands, band-dependent slope
-    band = rng.choice(['low', 'mid', 'high'], size=n, replace=True)
-    X = rng.standard_normal((n, p))
+def bootstrap_conditioned_minus_global(
+    *,
+    x_df,
+    y_df,
+    target_col,
+    condition_col,
+    model_type,
+    n_splits=3,
+    n_bootstraps=100,
+    min_samples=50,
+    random_state=0,
+):
+    # Guard: insufficient total samples
+    if len(y_df) < 2 or n_splits < 2:
+        return pd.DataFrame(columns=[
+            'bootstrap_id', 'fold', 'condition_value',
+            'global_score', 'cond_score', 'delta_score'
+        ])
 
-    true_w = {
-        'low': rng.standard_normal(p) * 0.2,
-        'mid': rng.standard_normal(p) * 0.4,
-        'high': rng.standard_normal(p) * 0.6,
-    }
-    y = np.zeros(n)
-    for i in range(n):
-        y[i] = X[i] @ true_w[band[i]] + (0.3 if band[i] == 'high' else 0.0) + rng.standard_normal() * 0.5
+    rng = np.random.default_rng(random_state)
 
-    # Optional grouping (e.g., session ids) to avoid leakage
-    groups = rng.integers(0, 20, size=n)
+    X = x_df.values
+    y = y_df[target_col].values
+    c = y_df[condition_col].values
 
-    out = decode_continuous_conditioned_on_band(
-        X=X,
-        y=y,
-        band=band,
-        groups=groups,
-        n_splits=5,
-        alpha=10.0,
-        random_state=0,
+    # Adjust splits to available samples
+    n_splits_eff = min(max(2, n_splits), len(y))
+    if n_splits_eff < 2:
+        return pd.DataFrame(columns=[
+            'bootstrap_id', 'fold', 'condition_value',
+            'global_score', 'cond_score', 'delta_score'
+        ])
+
+    cv = KFold(n_splits=n_splits_eff, shuffle=True, random_state=random_state)
+
+    rows = []
+
+    for b in range(n_bootstraps):
+        idx = rng.choice(len(y), size=len(y), replace=True)
+
+        Xb, yb, cb = X[idx], y[idx], c[idx]
+
+        for fold, (tr, te) in enumerate(cv.split(Xb)):
+            Xtr, Xte = Xb[tr], Xb[te]
+            ytr, yte = yb[tr], yb[te]
+            ctr, cte = cb[tr], cb[te]
+
+            # ----------------------------
+            # Global decoding
+            # ----------------------------
+            model = make_regressor(model_type, random_state)
+            model.fit(Xtr, ytr)
+            yhat_global = model.predict(Xte)
+            global_metrics = regression_metrics(yte, yhat_global)
+
+            # ----------------------------
+            # Conditioned decoding
+            # ----------------------------
+            for cond_val in np.unique(cte):
+                tr_mask = ctr == cond_val
+                te_mask = cte == cond_val
+
+                if (
+                    np.sum(tr_mask) < min_samples or
+                    np.sum(te_mask) < min_samples
+                ):
+                    continue
+
+                model_c = make_regressor(model_type, random_state)
+                model_c.fit(Xtr[tr_mask], ytr[tr_mask])
+                yhat_cond = model_c.predict(Xte[te_mask])
+
+                cond_metrics = regression_metrics(
+                    yte[te_mask], yhat_cond
+                )
+
+                rows.append({
+                    'bootstrap_id': b,
+                    'fold': fold,
+                    'condition_value': cond_val,
+
+                    'global_score': global_metrics['r2'],
+                    'cond_score': cond_metrics['r2'],
+                    'delta_score': (
+                        cond_metrics['r2'] - global_metrics['r2']
+                    ),
+                })
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# Public API
+# ============================================================
+
+def run_conditional_decoding(
+    *,
+    x_df,
+    y_df,
+    target_col,
+    condition_col,
+    model_types=('ridge',),
+    min_count=200,
+    n_splits=5,
+    n_bootstraps=200,
+    random_state=0,
+    save_path=None,
+    load_if_exists=True,
+    overwrite=False,
+    verbosity: int = 1,
+    processing_flags: dict | None = None,
+    cache_tag: str | None = None,
+):
+    """
+    Decode a continuous variable conditioned on a categorical variable.
+    """
+
+    # --------------------------------------------------------
+    # 1. Prune rare condition values
+    # --------------------------------------------------------
+    y_pruned, x_pruned = add_interactions.prune_rare_states_two_dfs(
+        df_behavior=y_df,
+        df_neural=x_df,
+        label_col=condition_col,
+        min_count=min_count,
     )
 
-    for k, df in out.items():
-        print('\n===', k, '===')
-        # quick summary: mean across folds for ALL + each band
-        summary = (
-            df.groupby(['approach', 'band'], dropna=False)[['r2', 'mse', 'corr']]
-              .mean()
-              .reset_index()
-              .sort_values(['approach', 'band'])
+    # --------------------------------------------------------
+    # 2. Global decoding (no bootstrap)
+    # --------------------------------------------------------
+    X = x_pruned.values
+    y = y_pruned[target_col].values
+
+    # --------------------------------------------------------
+    # 2b. Optional: cache load/save setup
+    # --------------------------------------------------------
+    def _log(msg, level=1):
+        if verbosity >= level:
+            print(msg)
+
+    def _build_cache_paths(sp, params_hash):
+        """
+        Returns dict of paths:
+          - meta: Path to metadata json
+          - global, global_summary, cond_raw, cond_boot, cond_summary: CSV paths
+        """
+        sp = Path(sp)
+        # Optional processing-aware subdirectory
+        tag = _make_processing_tag(processing_flags, cache_tag)
+        if sp.suffix.lower() != '.csv' and tag:
+            sp = sp / tag
+        if sp.suffix.lower() == '.csv':
+            prefix = sp.with_suffix('')
+        else:
+            sp.mkdir(parents=True, exist_ok=True)
+            prefix = sp / f'cond_{params_hash}'
+        paths = {
+            'meta': Path(str(prefix) + '_meta.json'),
+            'global': Path(str(prefix) + '_global.csv'),
+            'global_summary': Path(str(prefix) + '_global_summary.csv'),
+            'cond_raw': Path(str(prefix) + '_cond_raw.csv'),
+            'cond_boot': Path(str(prefix) + '_cond_boot.csv'),
+            'cond_summary': Path(str(prefix) + '_cond_summary.csv'),
+        }
+        return paths
+
+    def _save_outputs(paths, metadata, outs):
+        try:
+            outs['global_results'].to_csv(paths['global'], index=False)
+            outs['global_summary'].to_csv(paths['global_summary'], index=False)
+            outs['cond_delta_raw'].to_csv(paths['cond_raw'], index=False)
+            outs['cond_delta_bootstrap'].to_csv(
+                paths['cond_boot'], index=False)
+            outs['cond_delta_summary'].to_csv(
+                paths['cond_summary'], index=False)
+            with open(paths['meta'], 'w') as f:
+                json.dump(metadata, f, indent=2)
+            _log(f"Saved results to {paths['global']}", level=1)
+        except Exception as e:
+            _log(f'Warning: failed saving cached results: {e}', level=1)
+
+    def _load_outputs(paths):
+        try:
+            out = {
+                'x_pruned': None,
+                'y_pruned': None,
+                'global_results': pd.read_csv(paths['global']),
+                'global_summary': pd.read_csv(paths['global_summary']),
+                'cond_delta_raw': pd.read_csv(paths['cond_raw']),
+                'cond_delta_bootstrap': pd.read_csv(paths['cond_boot']),
+                'cond_delta_summary': pd.read_csv(paths['cond_summary']),
+            }
+            return out
+        except Exception as e:
+            _log(f'Warning: failed loading cached results: {e}', level=1)
+            return None
+
+    save_paths = None
+    metadata = None
+
+    def _make_processing_tag(proc_flags, explicit_tag):
+        if explicit_tag:
+            return str(explicit_tag)
+        if not proc_flags:
+            return None
+        # Compact, stable tag emphasizing known keys
+        key_map = {
+            'use_raw_spike_data_instead': 'raw',
+            'apply_pca_on_raw_spike_data': 'pca',
+            'use_lagged_raw_spike_data': 'lag',
+        }
+        parts = []
+        for k in ['use_raw_spike_data_instead',
+                  'apply_pca_on_raw_spike_data',
+                  'use_lagged_raw_spike_data']:
+            if k in proc_flags:
+                v = proc_flags.get(k)
+                try:
+                    val = 1 if bool(v) else 0
+                except Exception:
+                    val = v
+                parts.append(f"{key_map[k]}{val}")
+        # Include any other flags deterministically
+        for k in sorted(k for k in proc_flags.keys() if k not in key_map):
+            v = proc_flags[k]
+            if isinstance(v, (bool, int)):
+                v = int(bool(v))
+            parts.append(f"{k}={v}")
+        return '_'.join(parts) if parts else None
+
+    if save_path is not None:
+        # Prepare metadata for stable hashing
+        n_units_meta = int(X.shape[1]) if X.ndim >= 2 else 1
+        n_samples_meta = int(X.shape[0])
+        metadata = {
+            'version': 1,
+            'target_col': str(target_col),
+            'condition_col': str(condition_col),
+            'model_types': list(model_types),
+            'min_count': int(min_count),
+            'n_splits': int(n_splits),
+            'n_bootstraps': int(n_bootstraps),
+            'random_state': int(random_state),
+            'n_units': n_units_meta,
+            'n_samples': n_samples_meta,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'processing_flags': dict(processing_flags) if processing_flags else None,
+            'cache_tag': cache_tag,
+        }
+        hash_payload = {
+            'target_col': metadata['target_col'],
+            'condition_col': metadata['condition_col'],
+            'model_types': tuple(sorted(metadata['model_types'])),
+            'min_count': metadata['min_count'],
+            'n_splits': metadata['n_splits'],
+            'n_bootstraps': metadata['n_bootstraps'],
+            'random_state': metadata['random_state'],
+            'n_units': metadata['n_units'],
+            'processing_flags': metadata['processing_flags'],
+            'cache_tag': metadata['cache_tag'],
+        }
+        params_hash = hashlib.sha1(
+            json.dumps(hash_payload, sort_keys=True,
+                       default=str).encode('utf-8')
+        ).hexdigest()[:10]
+        metadata['params_hash'] = params_hash
+
+        save_paths = _build_cache_paths(save_path, params_hash)
+
+        # Try to load cached results (all files must exist and meta hash match)
+        if load_if_exists and all(p.exists() for p in save_paths.values()):
+            try:
+                with open(save_paths['meta'], 'r') as f:
+                    existing_meta = json.load(f)
+                if existing_meta.get('params_hash') == params_hash:
+                    _log(
+                        f"Loaded cached results (hash={params_hash})", level=1)
+                    loaded = _load_outputs(save_paths)
+                    if loaded is not None:
+                        return loaded
+                else:
+                    _log('Cached metadata mismatch. Recomputing.', level=1)
+            except Exception as e:
+                _log(f'Error reading cache metadata: {e}', level=1)
+        else:
+            _log('Computing new results...')
+
+    # Handle insufficient samples early
+    n_samples = len(y)
+    if n_samples == 0:
+        warnings.warn(
+            f'run_conditional_decoding: no samples after pruning '
+            f'({condition_col}, min_count={min_count}); returning empty results.'
         )
-        print(summary.to_string(index=False))
+        empty_global = pd.DataFrame(columns=['model', 'fold', 'r2', 'mse'])
+        empty_cond_raw = pd.DataFrame(columns=[
+            'bootstrap_id', 'fold', 'condition_value',
+            'global_score', 'cond_score', 'delta_score', 'model'
+        ])
+        collapsed, summary = summarize_bootstrap_deltas_reg(
+            empty_cond_raw.copy()
+        )
+        outs = {
+            'x_pruned': x_pruned,
+            'y_pruned': y_pruned,
+            'global_results': empty_global,
+            'global_summary': pd.DataFrame(columns=['model', 'r2', 'mse']),
+            'cond_delta_raw': empty_cond_raw,
+            'cond_delta_bootstrap': collapsed,
+            'cond_delta_summary': summary,
+        }
+        if save_paths is not None and (overwrite or not all(p.exists() for p in save_paths.values())):
+            _save_outputs(save_paths, metadata, outs)
+        return outs
+
+    # Adjust CV splits to available samples
+    n_splits_eff = min(max(2, n_splits), n_samples)
+    if n_splits_eff < 2:
+        warnings.warn(
+            f'run_conditional_decoding: insufficient samples for CV '
+            f'(n_samples={n_samples}); returning empty results.'
+        )
+        empty_global = pd.DataFrame(columns=['model', 'fold', 'r2', 'mse'])
+        empty_cond_raw = pd.DataFrame(columns=[
+            'bootstrap_id', 'fold', 'condition_value',
+            'global_score', 'cond_score', 'delta_score', 'model'
+        ])
+        collapsed, summary = summarize_bootstrap_deltas_reg(
+            empty_cond_raw.copy()
+        )
+        outs = {
+            'x_pruned': x_pruned,
+            'y_pruned': y_pruned,
+            'global_results': empty_global,
+            'global_summary': pd.DataFrame(columns=['model', 'r2', 'mse']),
+            'cond_delta_raw': empty_cond_raw,
+            'cond_delta_bootstrap': collapsed,
+            'cond_delta_summary': summary,
+        }
+        if save_paths is not None and (overwrite or not all(p.exists() for p in save_paths.values())):
+            _save_outputs(save_paths, metadata, outs)
+        return outs
+
+    cv = KFold(n_splits=n_splits_eff, shuffle=True, random_state=random_state)
+
+    global_rows = []
+
+    for model_type in model_types:
+        for fold, (tr, te) in enumerate(cv.split(X)):
+            model = make_regressor(model_type, random_state)
+            model.fit(X[tr], y[tr])
+            yhat = model.predict(X[te])
+
+            metrics = regression_metrics(y[te], yhat)
+
+            global_rows.append({
+                'model': model_type,
+                'fold': fold,
+                **metrics,
+            })
+
+    # Ensure consistent columns even if no rows
+    global_results = pd.DataFrame(
+        global_rows, columns=['model', 'fold', 'r2', 'mse'])
+
+    global_summary = (
+        global_results
+        .groupby('model', as_index=False)
+        .mean()
+    )
+
+    # --------------------------------------------------------
+    # 3. Bootstrapped conditioned − global
+    # --------------------------------------------------------
+    all_models = []
+
+    for model_type in model_types:
+        df = bootstrap_conditioned_minus_global(
+            x_df=x_pruned,
+            y_df=y_pruned,
+            target_col=target_col,
+            condition_col=condition_col,
+            model_type=model_type,
+            n_splits=n_splits_eff,
+            n_bootstraps=n_bootstraps,
+            min_samples=min_count,
+            random_state=random_state,
+        )
+        df['model'] = model_type
+        all_models.append(df)
+
+    cond_raw = (
+        pd.concat(all_models, ignore_index=True)
+        if len(all_models) and sum(len(df) for df in all_models) > 0
+        else pd.DataFrame(columns=[
+            'bootstrap_id', 'fold', 'condition_value',
+            'global_score', 'cond_score', 'delta_score', 'model'
+        ])
+    )
+
+    # --------------------------------------------------------
+    # 4. Collapse → CI
+    # --------------------------------------------------------
+    collapsed, summary = summarize_bootstrap_deltas_reg(cond_raw)
+
+    # --------------------------------------------------------
+    # 5. Attach condition sample sizes
+    # --------------------------------------------------------
+    counts = (
+        y_pruned[condition_col]
+        .value_counts()
+        .rename_axis('condition_value')
+        .reset_index(name='n_samples')
+    )
+
+    collapsed = collapsed.merge(
+        counts, on='condition_value', how='left'
+    )
+
+    outs = {
+        'x_pruned': x_pruned,
+        'y_pruned': y_pruned,
+
+        'global_results': global_results,
+        'global_summary': global_summary,
+
+        'cond_delta_raw': cond_raw,
+        'cond_delta_bootstrap': collapsed,
+        'cond_delta_summary': summary,
+    }
+    if save_paths is not None and (overwrite or not all(p.exists() for p in save_paths.values())):
+        _save_outputs(save_paths, metadata, outs)
+    return outs
+
+
+def summarize_bootstrap_deltas_reg(df):
+    """
+    Collapse CV folds within each bootstrap, then compute CI across bootstraps
+    for regression decoding.
+
+    Expects columns:
+      - bootstrap_id
+      - condition_value
+      - model
+      - delta_score
+      - global_score
+      - cond_score
+    """
+
+    # Ensure required columns exist; handle empty/missing gracefully
+    required_cols = [
+        'bootstrap_id', 'condition_value', 'model',
+        'delta_score', 'global_score', 'cond_score'
+    ]
+    df = df.copy()
+    for col in required_cols:
+        if col not in df.columns:
+            if col in ('condition_value', 'model'):
+                df[col] = pd.Series(dtype=object)
+            elif col == 'bootstrap_id':
+                df[col] = pd.Series(dtype='Int64')
+            else:
+                df[col] = pd.Series(dtype=float)
+
+    if len(df) == 0:
+        collapsed = pd.DataFrame(columns=[
+            'bootstrap_id', 'condition_value', 'model',
+            'delta_score', 'global_score', 'cond_score'
+        ])
+        summary = pd.DataFrame(columns=[
+            'condition_value', 'model',
+            'mean_delta_score', 'ci_low', 'ci_high'
+        ])
+        return collapsed, summary
+
+    # ------------------------------------------------------------
+    # Collapse folds within each bootstrap
+    # ------------------------------------------------------------
+    collapsed = (
+        df
+        .groupby(
+            ['bootstrap_id', 'condition_value', 'model'],
+            as_index=False,
+        )
+        .agg(
+            delta_score=('delta_score', 'mean'),
+            global_score=('global_score', 'mean'),
+            cond_score=('cond_score', 'mean'),
+        )
+    )
+
+    # ------------------------------------------------------------
+    # CI across bootstraps
+    # ------------------------------------------------------------
+    summary = (
+        collapsed
+        .groupby(['condition_value', 'model'], as_index=False)
+        .agg(
+            mean_delta_score=('delta_score', 'mean'),
+            ci_low=('delta_score',
+                    lambda x: np.percentile(x, 2.5)),
+            ci_high=('delta_score',
+                     lambda x: np.percentile(x, 97.5)),
+        )
+    )
+
+    return collapsed, summary
+
+
+
+
+def run_band_conditioned_reg_decoding(
+    df,
+    concat_neural_trials,
+    CONTINUOUS_INTERACTIONS,
+    conditional_decoding_reg,
+    conditional_decoding_plots,
+    flags,
+    max_pairs=100,
+    save_path=None,
+):
+    """
+    Run conditional decoding regression analyses and plotting for continuous interaction pairs.
+
+    Parameters
+    ----------
+    pn : object
+        Planning/neural data container with attributes:
+        - planning_and_neural_folder_path
+        - concat_neural_trials
+    df : pd.DataFrame
+        Behavioral or target dataframe.
+    CONTINUOUS_INTERACTIONS : iterable of (str, str)
+        Pairs of (target_col, condition_col).
+    conditional_decoding_reg : module
+        Module providing run_conditional_decoding.
+    conditional_decoding_plots : module
+        Module providing plotting functions.
+    flags : dict
+        Processing flags passed to decoding.
+    max_pairs : int, optional
+        Maximum number of pairs to process.
+    """
+
+
+
+    counter = 0
+    for var_a, var_b in CONTINUOUS_INTERACTIONS:
+        print(f'target_col: {var_a}, condition_col: {var_b}')
+
+        out = conditional_decoding_reg.run_conditional_decoding(
+            x_df=concat_neural_trials,
+            y_df=df,
+            target_col=var_a,
+            condition_col=var_b,
+            model_types=('ridge', 'elasticnet'),
+            save_path=save_path,
+            processing_flags=flags
+        )
+
+        fig = conditional_decoding_plots.plot_pairwise_interaction_analysis_reg(
+            analysis_out=out,
+            model_type='ridge',
+            target_name=var_a,
+            condition_name=var_b,
+        )
+        plt.show()
+
+        fig = conditional_decoding_plots.plot_condition_scatterpanels_reg(
+            analysis_out=out,
+            target_name=var_a,
+            condition_name=var_b,
+            x_df=concat_neural_trials,
+            y_df=df,
+            model_type='ridge',
+            n_splits=5,
+        )
+        plt.show()
+
+        fig = conditional_decoding_plots.plot_global_scatter_reg(
+            analysis_out=out,
+            target_name=var_a,
+            x_df=concat_neural_trials,
+            y_df=df,
+            model_type='ridge',
+            n_splits=5,
+        )
+        plt.show()
+
+        if counter >= max_pairs:
+            break
+        counter += 1

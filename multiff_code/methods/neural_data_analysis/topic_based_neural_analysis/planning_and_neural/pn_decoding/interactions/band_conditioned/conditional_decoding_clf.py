@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding.interactions import discrete_decoders
 from joblib import Parallel, delayed
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 def bootstrap_trials(x_df, y_df, stratify_col, random_state=None):
@@ -171,6 +171,8 @@ def bootstrap_conditioned_minus_global(
         for b in tqdm(
             range(n_bootstraps),
             desc=f'Bootstrap Δ: {target_col} | {condition_col} [{model_type}]',
+            leave=False,
+            dynamic_ncols=True,
         )
     )
 

@@ -9,7 +9,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
 
-
 # ------------------------
 # Constants (task-aware)
 # ------------------------
@@ -21,8 +20,6 @@ DEG15 = np.deg2rad(15)
 DEG45 = np.deg2rad(45)
 DEG90 = np.deg2rad(90)
 
-import numpy as np
-import pandas as pd
 
 # ------------------------
 # Constants (task-aware)
@@ -231,7 +228,6 @@ def add_cur_ff_distance_at_ref_band(df):
     return df
 
 
-
 def get_neural_feature_columns(df):
     """
     Returns sorted neural feature columns: unit_0, unit_1, ...
@@ -377,6 +373,49 @@ def add_cur_ff_angle_band(df):
     return df
 
 
+def add_log1p_cur_ff_distance_band(df):
+    """
+    Adds fine-grained current-firefly distance bands:
+    VERY_NEAR / NEAR / MID / FAR
+    """
+    d = df['log1p_cur_ff_distance'].values
+
+    band = np.full(len(df), 'MID', dtype=object)
+
+    band[d <= 2.74800] = 'VERY_NEAR'     # 5%
+    band[(d > 2.74800) & (d <= 3.88725)] = 'NEAR'  # 25%
+    band[d > 5.40585] = 'FAR'            # 90%
+
+    df = df.copy()
+    df['log1p_cur_ff_distance_band'] = pd.Categorical(
+        band,
+        categories=['VERY_NEAR', 'NEAR', 'MID', 'FAR'],
+        ordered=True
+    )
+
+    return df
+
+
+def add_log1p_nxt_ff_distance_band(df):
+    """
+    Adds next-firefly distance bands based on log1p distance:
+    NEAR / MID / FAR
+    """
+    d = df['log1p_nxt_ff_distance'].values
+
+    band = np.full(len(df), 'MID', dtype=object)
+
+    band[d <= 5.02961] = 'NEAR'
+    band[d > 6.21049] = 'FAR'
+
+    df = df.copy()
+    df['log1p_nxt_ff_distance_band'] = pd.Categorical(
+        band,
+        categories=['NEAR', 'MID', 'FAR'],
+        ordered=True
+    )
+
+    return df
 
 
 def add_behavior_bands(df):
@@ -394,6 +433,8 @@ def add_behavior_bands(df):
     df = add_cur_ff_rel_x_band(df)
     df = add_cur_ff_rel_y_band(df)
     df = add_cur_ff_distance_at_ref_band(df)
+    df = add_log1p_cur_ff_distance_band(df)
+    df = add_log1p_nxt_ff_distance_band(df)
 
     return df
 
