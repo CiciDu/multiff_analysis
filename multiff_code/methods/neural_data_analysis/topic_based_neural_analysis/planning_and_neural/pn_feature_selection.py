@@ -8,7 +8,7 @@ all_features = ['cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis',
                 'whether_test', 'turning_right', 'time_since_last_capture',
                 'accel', 'ang_accel', 'target_cluster_last_seen_distance',
                 'target_cluster_last_seen_angle_to_boundary',
-                'num_ff_visible', 'num_ff_in_memory', 'any_ff_visible', 'any_ff_in_memory',
+                'num_ff_visible', 'num_ff_in_memory', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory',
 
                 # features added after inspecting loadings (mostly in the 1st dim):
                 'cum_distance_since_target_last_seen', 'time_rel_to_stop',
@@ -18,7 +18,7 @@ all_features = ['cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis',
                 ]
 
 
-temporal_vars = ['capture_ff', 'any_ff_visible', 'any_ff_in_memory', 'cluster_around_target',
+temporal_vars = ['capture_ff', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'cluster_around_target',
                  'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
 

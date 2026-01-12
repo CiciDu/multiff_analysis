@@ -407,3 +407,178 @@ def plot_coef_scatter(wide_coefs, cfg_a, cfg_b, term, limits=None):
     plt.tight_layout()
     return fig
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def plot_insample_model_diagnostics(
+    metrics_df,
+    *,
+    bins=20,
+    dev_expl_xlim=(0.0, 0.1),
+    mcfadden_xlim=(0.0, 0.08),
+    ll_xlim=(-2000, 500),
+    ll_per_obs_xlim=(-0.05, 0.05),
+    show=True,
+):
+    """
+    Plot IN-SAMPLE GLM performance diagnostics.
+
+    Notes
+    -----
+    - Metrics reflect goodness-of-fit, not generalization.
+    - Axis limits are applied for visualization only.
+    """
+
+    df = metrics_df.copy()
+
+    # ---- derived quantities ----
+    df['ll_improvement'] = df['llf'] - df['llnull']
+    df['ll_improvement_per_obs'] = df['ll_improvement'] / df['n_obs']
+
+    # ---- clipped copies for plotting only ----
+    dev_expl_plot = df['deviance_explained'].clip(*dev_expl_xlim)
+    mcf_plot = df['mcfadden_R2'].clip(*mcfadden_xlim)
+    ll_plot = df['ll_improvement'].clip(*ll_xlim)
+    ll_per_obs_plot = df['ll_improvement_per_obs'].clip(*ll_per_obs_xlim)
+
+    # ---- figure layout ----
+    fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+    axes = axes.ravel()
+
+    # 1. Deviance explained
+    axes[0].hist(dev_expl_plot.dropna(), bins=bins)
+    axes[0].axvline(np.nanmedian(df['deviance_explained']), linestyle='--')
+    axes[0].set_xlim(dev_expl_xlim)
+    axes[0].set_xlabel('Deviance explained')
+    axes[0].set_ylabel('Number of neurons')
+    axes[0].set_title('In-sample deviance explained')
+
+    # 2. McFadden R²
+    axes[1].hist(mcf_plot.dropna(), bins=bins)
+    axes[1].axvline(np.nanmedian(df['mcfadden_R2']), linestyle='--')
+    axes[1].set_xlim(mcfadden_xlim)
+    axes[1].set_xlabel('McFadden $R^2$')
+    axes[1].set_ylabel('Number of neurons')
+    axes[1].set_title('In-sample pseudo-$R^2$')
+
+    # 3. Consistency check
+    axes[2].scatter(dev_expl_plot, mcf_plot, alpha=0.7)
+    axes[2].set_xlim(dev_expl_xlim)
+    axes[2].set_ylim(mcfadden_xlim)
+    axes[2].set_xlabel('Deviance explained')
+    axes[2].set_ylabel('McFadden $R^2$')
+    axes[2].set_title('In-sample consistency check')
+
+    # 4. Dependence on firing statistics
+    axes[3].scatter(df['null_deviance'], dev_expl_plot, alpha=0.7)
+    axes[3].set_ylim(dev_expl_xlim)
+    axes[3].set_xlabel('Null deviance')
+    axes[3].set_ylabel('Deviance explained')
+    axes[3].set_title('Dependence on firing statistics')
+
+    # 5. Log-likelihood gain
+    axes[4].hist(ll_plot.dropna(), bins=bins)
+    axes[4].axvline(0, linestyle='--')
+    axes[4].set_xlim(ll_xlim)
+    axes[4].set_xlabel('Log-likelihood gain')
+    axes[4].set_ylabel('Number of neurons')
+    axes[4].set_title('In-sample log-likelihood gain')
+
+    # 6. Normalized gain
+    axes[5].hist(ll_per_obs_plot.dropna(), bins=bins)
+    axes[5].axvline(0, linestyle='--')
+    axes[5].set_xlim(ll_per_obs_xlim)
+    axes[5].set_xlabel('Δ log-likelihood per observation')
+    axes[5].set_ylabel('Number of neurons')
+    axes[5].set_title('In-sample normalized gain')
+
+    plt.tight_layout()
+    if show:
+        plt.show()
+
+
+def plot_cv_model_diagnostics(
+    metrics_df,
+    *,
+    bins=40,
+    cv_dev_xlim=(-0.1, 0.2),
+    cv_ll_xlim=(-2000, 500),
+    cv_ll_per_obs_xlim=(-0.05, 0.05),
+    show=True,
+):
+    """
+    Plot CROSS-VALIDATED GLM performance diagnostics.
+
+    Notes
+    -----
+    - Metrics reflect generalization performance.
+    - Axis limits are applied for visualization only.
+    """
+
+    df = metrics_df.copy()
+
+    df['cv_ll_improvement'] = df['cv_loglik_improvement']
+    df['cv_ll_improvement_per_obs'] = df['cv_ll_improvement'] / df['n_obs']
+
+    cv_dev_plot = df['cv_deviance_explained'].clip(*cv_dev_xlim)
+    cv_ll_plot = df['cv_ll_improvement'].clip(*cv_ll_xlim)
+    cv_ll_per_obs_plot = df['cv_ll_improvement_per_obs'].clip(*cv_ll_per_obs_xlim)
+
+    fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+    axes = axes.ravel()
+
+    # 1. Deviance explained
+    axes[0].hist(cv_dev_plot.dropna(), bins=bins)
+    axes[0].axvline(np.nanmedian(df['cv_deviance_explained']), linestyle='--')
+    axes[0].set_xlim(cv_dev_xlim)
+    axes[0].set_xlabel('Deviance explained')
+    axes[0].set_ylabel('Number of neurons')
+    axes[0].set_title('CV deviance explained')
+
+    # 2. Log-likelihood gain
+    axes[1].hist(cv_ll_plot.dropna(), bins=bins)
+    axes[1].axvline(0, linestyle='--')
+    axes[1].set_xlim(cv_ll_xlim)
+    axes[1].set_xlabel('Log-likelihood gain')
+    axes[1].set_ylabel('Number of neurons')
+    axes[1].set_title('CV log-likelihood gain')
+
+    # 3. Normalized gain
+    axes[2].hist(cv_ll_per_obs_plot.dropna(), bins=bins)
+    axes[2].axvline(0, linestyle='--')
+    axes[2].set_xlim(cv_ll_per_obs_xlim)
+    axes[2].set_xlabel('Δ log-likelihood per observation')
+    axes[2].set_ylabel('Number of neurons')
+    axes[2].set_title('CV normalized gain')
+
+    # 4. Dependence on firing statistics
+    axes[3].scatter(df['null_deviance'], cv_dev_plot, alpha=0.7)
+    axes[3].set_ylim(cv_dev_xlim)
+    axes[3].set_xlabel('Null deviance')
+    axes[3].set_ylabel('Deviance explained')
+    axes[3].set_title('Dependence on firing statistics')
+
+    # 5. Consistency check
+    axes[4].scatter(cv_dev_plot, cv_ll_plot, alpha=0.7)
+    axes[4].axhline(0, linestyle='--')
+    axes[4].set_xlim(cv_dev_xlim)
+    axes[4].set_ylim(cv_ll_xlim)
+    axes[4].set_xlabel('Deviance explained')
+    axes[4].set_ylabel('Log-likelihood gain')
+    axes[4].set_title('CV consistency check')
+
+    # 6. Effect of sparsity
+    if 'zero_frac' in df.columns:
+        axes[5].scatter(df['zero_frac'], cv_ll_plot, alpha=0.7)
+        axes[5].axhline(0, linestyle='--')
+        axes[5].set_ylim(cv_ll_xlim)
+        axes[5].set_xlabel('Zero fraction')
+        axes[5].set_ylabel('Log-likelihood gain')
+        axes[5].set_title('Effect of sparsity')
+    else:
+        axes[5].axis('off')
+
+    plt.tight_layout()
+    if show:
+        plt.show()

@@ -48,7 +48,7 @@ def strict_median(series, method='lower'):
 
 def _bin_behav_data_by_point(ori_df):
     col_max = ['target_visible_dummy', 'target_cluster_visible_dummy', 'capture_ff',
-               # 'num_visible_ff', 'any_ff_visible', 'catching_ff' # these features are merged into df after binning later
+               # 'num_visible_ff', 'log1p_num_ff_visible', 'catching_ff' # these features are merged into df after binning later
                ]
     col_strict_median = ['point_index', 'valid_view_point']
 
@@ -246,7 +246,7 @@ def get_ff_info_for_bins(bins_df, ff_dataframe, ff_caught_T_new, time_bins):
     bins_df = _add_min_visible_ff_info(bins_df, ff_dataframe)
     bins_df = _mark_bin_where_ff_is_caught(
         bins_df, ff_caught_T_new, time_bins)
-    bins_df = _add_whether_any_ff_is_visible(bins_df)
+    bins_df['log1p_num_ff_visible'] = np.log1p(bins_df['num_visible_ff'])
     bins_df = bins_df.ffill().reset_index(drop=True)
     bins_df = bins_df.bfill().reset_index(drop=True)
     return bins_df
@@ -356,7 +356,7 @@ def _add_stop_rate_and_success_rate(monkey_info_in_bins_essential,
     """Add stop_rate and stop_success_rate to monkey_info_in_bins_essential."""
 
     # Create a Gaussian kernel
-    gaussian_kernel = scipy.signal.gaussian(kernel_size, std_dev)
+    gaussian_kernel = scipy.signal.windows.gaussian(kernel_size, std_dev)
     # Normalize the kernel so it sums to 1
     gaussian_kernel /= gaussian_kernel.sum()
 
@@ -459,14 +459,4 @@ def _mark_bin_where_ff_is_caught(binned_features, ff_caught_T_new, time_bins):
     catching_target_bins = np.digitize(ff_caught_T_new, time_bins)-1
     binned_features.loc[binned_features['bin'].isin(
         catching_target_bins), 'catching_ff'] = 1
-    return binned_features
-
-
-def _add_whether_any_ff_is_visible(binned_features):
-    # only add the column if the ratio of bins with visible ff is between 10% and 90% within all the bins, since otherwise it might not be so meaningful (a.k.a. most bins have visible ff or most bins don't have visible ff)
-    any_ff_visible = (binned_features['num_visible_ff'] > 0).astype(int)
-    if (any_ff_visible.sum()/len(binned_features) > 0.1) and (any_ff_visible.sum()/len(binned_features) < 0.9):
-        binned_features['any_ff_visible'] = binned_features['num_visible_ff'] > 0
-        binned_features['any_ff_visible'] = binned_features['any_ff_visible'].astype(
-            int)
     return binned_features

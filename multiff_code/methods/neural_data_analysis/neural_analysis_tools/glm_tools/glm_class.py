@@ -16,7 +16,7 @@ class GLMclass():
     # for
 
     # for the original neural vs behavior analysis
-    # temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
+    # temporal_vars = ['catching_ff', 'log1p_num_ff_visible', 'monkey_speeddummy',
     #                  'min_target_has_disappeared_for_last_time_dummy',
     #                  'min_target_cluster_has_disappeared_for_last_time_dummy',
     #                  'max_target_visible_dummy', 'max_target_cluster_visible_dummy',

@@ -31,15 +31,16 @@ from sklearn.linear_model import Ridge, Lasso, ElasticNet
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.svm import SVR
 from sklearn.metrics import r2_score, mean_squared_error
+from joblib import Parallel, delayed
+from tqdm.auto import tqdm
 
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding.interactions import (
-    add_interactions, interaction_decoding
-)
-
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding.interactions import add_interactions
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding.interactions.band_conditioned import cond_decoding_plots
 
 # ============================================================
 # Model factory
 # ============================================================
+
 
 def make_regressor(model_type, random_state=0):
     """
@@ -89,6 +90,72 @@ def regression_metrics(y_true, y_pred):
 # Bootstrap: conditioned − global
 # ============================================================
 
+
+def _single_bootstrap_delta_reg(
+    b,
+    *,
+    x_df,
+    y_df,
+    target_col,
+    condition_col,
+    model_type,
+    n_splits_eff,
+    min_samples,
+    random_state,
+):
+    rows = []
+
+    rng = np.random.default_rng(random_state + b)
+
+    X = x_df.values
+    y = y_df[target_col].values
+    c = y_df[condition_col].values
+
+    idx = rng.choice(len(y), size=len(y), replace=True)
+    Xb, yb, cb = X[idx], y[idx], c[idx]
+
+    cv = KFold(n_splits=n_splits_eff, shuffle=True, random_state=random_state)
+
+    for fold, (tr, te) in enumerate(cv.split(Xb)):
+        Xtr, Xte = Xb[tr], Xb[te]
+        ytr, yte = yb[tr], yb[te]
+        ctr, cte = cb[tr], cb[te]
+
+        # Global decoding
+        model = make_regressor(model_type, random_state)
+        model.fit(Xtr, ytr)
+        yhat_global = model.predict(Xte)
+        global_metrics = regression_metrics(yte, yhat_global)
+
+        # Conditioned decoding
+        for cond_val in np.unique(cte):
+            tr_mask = ctr == cond_val
+            te_mask = cte == cond_val
+
+            if (
+                np.sum(tr_mask) < min_samples or
+                np.sum(te_mask) < min_samples
+            ):
+                continue
+
+            model_c = make_regressor(model_type, random_state)
+            model_c.fit(Xtr[tr_mask], ytr[tr_mask])
+            yhat_cond = model_c.predict(Xte[te_mask])
+
+            cond_metrics = regression_metrics(yte[te_mask], yhat_cond)
+
+            rows.append({
+                'bootstrap_id': b,
+                'fold': fold,
+                'condition_value': cond_val,
+                'global_score': global_metrics['r2'],
+                'cond_score': cond_metrics['r2'],
+                'delta_score': cond_metrics['r2'] - global_metrics['r2'],
+            })
+
+    return rows
+
+
 def bootstrap_conditioned_minus_global(
     *,
     x_df,
@@ -100,6 +167,7 @@ def bootstrap_conditioned_minus_global(
     n_bootstraps=100,
     min_samples=50,
     random_state=0,
+    n_jobs=-1,
 ):
     # Guard: insufficient total samples
     if len(y_df) < 2 or n_splits < 2:
@@ -108,11 +176,7 @@ def bootstrap_conditioned_minus_global(
             'global_score', 'cond_score', 'delta_score'
         ])
 
-    rng = np.random.default_rng(random_state)
-
-    X = x_df.values
     y = y_df[target_col].values
-    c = y_df[condition_col].values
 
     # Adjust splits to available samples
     n_splits_eff = min(max(2, n_splits), len(y))
@@ -122,69 +186,98 @@ def bootstrap_conditioned_minus_global(
             'global_score', 'cond_score', 'delta_score'
         ])
 
-    cv = KFold(n_splits=n_splits_eff, shuffle=True, random_state=random_state)
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(_single_bootstrap_delta_reg)(
+            b,
+            x_df=x_df,
+            y_df=y_df,
+            target_col=target_col,
+            condition_col=condition_col,
+            model_type=model_type,
+            n_splits_eff=n_splits_eff,
+            min_samples=min_samples,
+            random_state=random_state,
+        )
+        for b in tqdm(
+            range(n_bootstraps),
+            desc=f'Bootstrap Δ (reg): {target_col} | {condition_col} [{model_type}]',
+            leave=False,
+            dynamic_ncols=True,
+        )
+    )
 
-    rows = []
-
-    for b in range(n_bootstraps):
-        idx = rng.choice(len(y), size=len(y), replace=True)
-
-        Xb, yb, cb = X[idx], y[idx], c[idx]
-
-        for fold, (tr, te) in enumerate(cv.split(Xb)):
-            Xtr, Xte = Xb[tr], Xb[te]
-            ytr, yte = yb[tr], yb[te]
-            ctr, cte = cb[tr], cb[te]
-
-            # ----------------------------
-            # Global decoding
-            # ----------------------------
-            model = make_regressor(model_type, random_state)
-            model.fit(Xtr, ytr)
-            yhat_global = model.predict(Xte)
-            global_metrics = regression_metrics(yte, yhat_global)
-
-            # ----------------------------
-            # Conditioned decoding
-            # ----------------------------
-            for cond_val in np.unique(cte):
-                tr_mask = ctr == cond_val
-                te_mask = cte == cond_val
-
-                if (
-                    np.sum(tr_mask) < min_samples or
-                    np.sum(te_mask) < min_samples
-                ):
-                    continue
-
-                model_c = make_regressor(model_type, random_state)
-                model_c.fit(Xtr[tr_mask], ytr[tr_mask])
-                yhat_cond = model_c.predict(Xte[te_mask])
-
-                cond_metrics = regression_metrics(
-                    yte[te_mask], yhat_cond
-                )
-
-                rows.append({
-                    'bootstrap_id': b,
-                    'fold': fold,
-                    'condition_value': cond_val,
-
-                    'global_score': global_metrics['r2'],
-                    'cond_score': cond_metrics['r2'],
-                    'delta_score': (
-                        cond_metrics['r2'] - global_metrics['r2']
-                    ),
-                })
-
+    rows = [r for sublist in results for r in sublist]
     return pd.DataFrame(rows)
 
 
 # ============================================================
 # Public API
 # ============================================================
+def summarize_bootstrap_deltas_reg(df: pd.DataFrame):
+    """
+    Collapse CV folds within each bootstrap, then compute CI across bootstraps.
 
-def run_conditional_decoding(
+    Expects columns:
+      - bootstrap_id
+      - condition_value
+      - model
+      - delta_score
+      - global_score
+      - cond_score
+    """
+    df = df.copy()
+
+    required_cols = [
+        'bootstrap_id', 'condition_value', 'model',
+        'delta_score', 'global_score', 'cond_score'
+    ]
+    for col in required_cols:
+        if col not in df.columns:
+            if col in ('condition_value', 'model'):
+                df[col] = pd.Series(dtype=object)
+            elif col == 'bootstrap_id':
+                df[col] = pd.Series(dtype='Int64')
+            else:
+                df[col] = pd.Series(dtype=float)
+
+    if len(df) == 0:
+        collapsed = pd.DataFrame(columns=[
+            'bootstrap_id', 'condition_value', 'model',
+            'delta_score', 'global_score', 'cond_score'
+        ])
+        summary = pd.DataFrame(columns=[
+            'condition_value', 'model',
+            'mean_delta_score', 'ci_low', 'ci_high'
+        ])
+        return collapsed, summary
+
+    collapsed = (
+        df
+        .groupby(
+            ['bootstrap_id', 'condition_value', 'model'],
+            as_index=False,
+        )
+        .agg(
+            delta_score=('delta_score', 'mean'),
+            global_score=('global_score', 'mean'),
+            cond_score=('cond_score', 'mean'),
+        )
+    )
+
+    summary = (
+        collapsed
+        .groupby(['condition_value', 'model'], as_index=False)
+        .agg(
+            mean_delta_score=('delta_score', 'mean'),
+            ci_low=('delta_score', lambda x: np.percentile(x, 2.5)),
+            ci_high=('delta_score', lambda x: np.percentile(x, 97.5)),
+        )
+    )
+
+    return collapsed, summary
+
+
+def run_conditional_decoding_reg(
     *,
     x_df,
     y_df,
@@ -199,32 +292,13 @@ def run_conditional_decoding(
     load_if_exists=True,
     overwrite=False,
     verbosity: int = 1,
-    processing_flags: dict | None = None,
-    cache_tag: str | None = None,
+    load_only=False,
 ):
     """
     Decode a continuous variable conditioned on a categorical variable.
     """
 
-    # --------------------------------------------------------
-    # 1. Prune rare condition values
-    # --------------------------------------------------------
-    y_pruned, x_pruned = add_interactions.prune_rare_states_two_dfs(
-        df_behavior=y_df,
-        df_neural=x_df,
-        label_col=condition_col,
-        min_count=min_count,
-    )
 
-    # --------------------------------------------------------
-    # 2. Global decoding (no bootstrap)
-    # --------------------------------------------------------
-    X = x_pruned.values
-    y = y_pruned[target_col].values
-
-    # --------------------------------------------------------
-    # 2b. Optional: cache load/save setup
-    # --------------------------------------------------------
     def _log(msg, level=1):
         if verbosity >= level:
             print(msg)
@@ -236,10 +310,6 @@ def run_conditional_decoding(
           - global, global_summary, cond_raw, cond_boot, cond_summary: CSV paths
         """
         sp = Path(sp)
-        # Optional processing-aware subdirectory
-        tag = _make_processing_tag(processing_flags, cache_tag)
-        if sp.suffix.lower() != '.csv' and tag:
-            sp = sp / tag
         if sp.suffix.lower() == '.csv':
             prefix = sp.with_suffix('')
         else:
@@ -289,40 +359,8 @@ def run_conditional_decoding(
     save_paths = None
     metadata = None
 
-    def _make_processing_tag(proc_flags, explicit_tag):
-        if explicit_tag:
-            return str(explicit_tag)
-        if not proc_flags:
-            return None
-        # Compact, stable tag emphasizing known keys
-        key_map = {
-            'use_raw_spike_data_instead': 'raw',
-            'apply_pca_on_raw_spike_data': 'pca',
-            'use_lagged_raw_spike_data': 'lag',
-        }
-        parts = []
-        for k in ['use_raw_spike_data_instead',
-                  'apply_pca_on_raw_spike_data',
-                  'use_lagged_raw_spike_data']:
-            if k in proc_flags:
-                v = proc_flags.get(k)
-                try:
-                    val = 1 if bool(v) else 0
-                except Exception:
-                    val = v
-                parts.append(f"{key_map[k]}{val}")
-        # Include any other flags deterministically
-        for k in sorted(k for k in proc_flags.keys() if k not in key_map):
-            v = proc_flags[k]
-            if isinstance(v, (bool, int)):
-                v = int(bool(v))
-            parts.append(f"{k}={v}")
-        return '_'.join(parts) if parts else None
-
+    
     if save_path is not None:
-        # Prepare metadata for stable hashing
-        n_units_meta = int(X.shape[1]) if X.ndim >= 2 else 1
-        n_samples_meta = int(X.shape[0])
         metadata = {
             'version': 1,
             'target_col': str(target_col),
@@ -332,11 +370,7 @@ def run_conditional_decoding(
             'n_splits': int(n_splits),
             'n_bootstraps': int(n_bootstraps),
             'random_state': int(random_state),
-            'n_units': n_units_meta,
-            'n_samples': n_samples_meta,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'processing_flags': dict(processing_flags) if processing_flags else None,
-            'cache_tag': cache_tag,
         }
         hash_payload = {
             'target_col': metadata['target_col'],
@@ -346,9 +380,6 @@ def run_conditional_decoding(
             'n_splits': metadata['n_splits'],
             'n_bootstraps': metadata['n_bootstraps'],
             'random_state': metadata['random_state'],
-            'n_units': metadata['n_units'],
-            'processing_flags': metadata['processing_flags'],
-            'cache_tag': metadata['cache_tag'],
         }
         params_hash = hashlib.sha1(
             json.dumps(hash_payload, sort_keys=True,
@@ -376,11 +407,38 @@ def run_conditional_decoding(
         else:
             _log('Computing new results...')
 
+    
+    
+    if load_only:
+        print('Failed to load cached results. Returning empty results.')
+        return None
+
+
+    # --------------------------------------------------------
+    # 1. Prune rare condition values
+    # --------------------------------------------------------
+    y_pruned, x_pruned = add_interactions.prune_rare_states_two_dfs(
+        df_behavior=y_df,
+        df_neural=x_df,
+        label_col=condition_col,
+        min_count=min_count,
+    )
+
+    # --------------------------------------------------------
+    # 2. Global decoding (no bootstrap)
+    # --------------------------------------------------------
+    X = x_pruned.values
+    y = y_pruned[target_col].values
+
+    # --------------------------------------------------------
+    # 2b. Optional: cache load/save setup
+    # --------------------------------------------------------
+
     # Handle insufficient samples early
     n_samples = len(y)
     if n_samples == 0:
         warnings.warn(
-            f'run_conditional_decoding: no samples after pruning '
+            f'run_conditional_decoding_reg: no samples after pruning '
             f'({condition_col}, min_count={min_count}); returning empty results.'
         )
         empty_global = pd.DataFrame(columns=['model', 'fold', 'r2', 'mse'])
@@ -408,7 +466,7 @@ def run_conditional_decoding(
     n_splits_eff = min(max(2, n_splits), n_samples)
     if n_splits_eff < 2:
         warnings.warn(
-            f'run_conditional_decoding: insufficient samples for CV '
+            f'run_conditional_decoding_reg: insufficient samples for CV '
             f'(n_samples={n_samples}); returning empty results.'
         )
         empty_global = pd.DataFrame(columns=['model', 'fold', 'r2', 'mse'])
@@ -524,91 +582,22 @@ def run_conditional_decoding(
     return outs
 
 
-def summarize_bootstrap_deltas_reg(df):
+def summarize_bootstrap_deltas_reg_reg(df):
     """
-    Collapse CV folds within each bootstrap, then compute CI across bootstraps
-    for regression decoding.
-
-    Expects columns:
-      - bootstrap_id
-      - condition_value
-      - model
-      - delta_score
-      - global_score
-      - cond_score
+    Deprecated: use summarize_bootstrap_deltas_reg instead.
     """
-
-    # Ensure required columns exist; handle empty/missing gracefully
-    required_cols = [
-        'bootstrap_id', 'condition_value', 'model',
-        'delta_score', 'global_score', 'cond_score'
-    ]
-    df = df.copy()
-    for col in required_cols:
-        if col not in df.columns:
-            if col in ('condition_value', 'model'):
-                df[col] = pd.Series(dtype=object)
-            elif col == 'bootstrap_id':
-                df[col] = pd.Series(dtype='Int64')
-            else:
-                df[col] = pd.Series(dtype=float)
-
-    if len(df) == 0:
-        collapsed = pd.DataFrame(columns=[
-            'bootstrap_id', 'condition_value', 'model',
-            'delta_score', 'global_score', 'cond_score'
-        ])
-        summary = pd.DataFrame(columns=[
-            'condition_value', 'model',
-            'mean_delta_score', 'ci_low', 'ci_high'
-        ])
-        return collapsed, summary
-
-    # ------------------------------------------------------------
-    # Collapse folds within each bootstrap
-    # ------------------------------------------------------------
-    collapsed = (
-        df
-        .groupby(
-            ['bootstrap_id', 'condition_value', 'model'],
-            as_index=False,
-        )
-        .agg(
-            delta_score=('delta_score', 'mean'),
-            global_score=('global_score', 'mean'),
-            cond_score=('cond_score', 'mean'),
-        )
-    )
-
-    # ------------------------------------------------------------
-    # CI across bootstraps
-    # ------------------------------------------------------------
-    summary = (
-        collapsed
-        .groupby(['condition_value', 'model'], as_index=False)
-        .agg(
-            mean_delta_score=('delta_score', 'mean'),
-            ci_low=('delta_score',
-                    lambda x: np.percentile(x, 2.5)),
-            ci_high=('delta_score',
-                     lambda x: np.percentile(x, 97.5)),
-        )
-    )
-
-    return collapsed, summary
-
-
+    return summarize_bootstrap_deltas_reg(df)
 
 
 def run_band_conditioned_reg_decoding(
     df,
     concat_neural_trials,
     CONTINUOUS_INTERACTIONS,
-    conditional_decoding_reg,
-    conditional_decoding_plots,
-    flags,
     max_pairs=100,
     save_path=None,
+    load_only=False,
+    verbosity=1,
+    make_plots=True,
 ):
     """
     Run conditional decoding regression analyses and plotting for continuous interaction pairs.
@@ -623,61 +612,62 @@ def run_band_conditioned_reg_decoding(
         Behavioral or target dataframe.
     CONTINUOUS_INTERACTIONS : iterable of (str, str)
         Pairs of (target_col, condition_col).
-    conditional_decoding_reg : module
-        Module providing run_conditional_decoding.
-    conditional_decoding_plots : module
-        Module providing plotting functions.
-    flags : dict
-        Processing flags passed to decoding.
     max_pairs : int, optional
         Maximum number of pairs to process.
     """
 
-
-
     counter = 0
+    outs = {}
     for var_a, var_b in CONTINUOUS_INTERACTIONS:
         print(f'target_col: {var_a}, condition_col: {var_b}')
 
-        out = conditional_decoding_reg.run_conditional_decoding(
+        out = run_conditional_decoding_reg(
             x_df=concat_neural_trials,
             y_df=df,
             target_col=var_a,
             condition_col=var_b,
             model_types=('ridge', 'elasticnet'),
             save_path=save_path,
-            processing_flags=flags
+            load_only=load_only,
+            verbosity=verbosity,
         )
+        
+        if out is None:
+            continue
+        
+        outs[f'{var_a}_vs_{var_b}'] = out
+        
+        if make_plots:
 
-        fig = conditional_decoding_plots.plot_pairwise_interaction_analysis_reg(
-            analysis_out=out,
-            model_type='ridge',
-            target_name=var_a,
-            condition_name=var_b,
-        )
-        plt.show()
+            fig = cond_decoding_plots.plot_pairwise_interaction_analysis_reg(
+                analysis_out=out,
+                model_type='ridge',
+                target_name=var_a,
+                condition_name=var_b,
+            )
 
-        fig = conditional_decoding_plots.plot_condition_scatterpanels_reg(
-            analysis_out=out,
-            target_name=var_a,
-            condition_name=var_b,
-            x_df=concat_neural_trials,
-            y_df=df,
-            model_type='ridge',
-            n_splits=5,
-        )
-        plt.show()
+            fig = cond_decoding_plots.plot_condition_scatterpanels_reg(
+                analysis_out=out,
+                target_name=var_a,
+                condition_name=var_b,
+                x_df=concat_neural_trials,
+                y_df=df,
+                model_type='ridge',
+                n_splits=5,
+            )
 
-        fig = conditional_decoding_plots.plot_global_scatter_reg(
-            analysis_out=out,
-            target_name=var_a,
-            x_df=concat_neural_trials,
-            y_df=df,
-            model_type='ridge',
-            n_splits=5,
-        )
-        plt.show()
+            fig = cond_decoding_plots.plot_global_scatter_reg(
+                analysis_out=out,
+                target_name=var_a,
+                x_df=concat_neural_trials,
+                y_df=df,
+                model_type='ridge',
+                n_splits=5,
+            )
+            plt.show()
 
         if counter >= max_pairs:
             break
         counter += 1
+        
+    return outs

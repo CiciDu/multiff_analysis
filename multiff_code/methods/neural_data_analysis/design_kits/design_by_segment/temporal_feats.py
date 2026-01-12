@@ -12,7 +12,7 @@ from scipy.interpolate import BSpline
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
-
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,193 +151,6 @@ def specs_to_design_df(
 
 
 
-def build_predictor_specs_from_behavior(
-    data: pd.DataFrame,
-    dt: float,
-    trial_ids: np.ndarray | None = None,
-    *,
-    events_to_include: Optional[Sequence[str]] = ['stop', 'capture_ff'],
-    trial_id_col: str = 'trial_id',
-    # temporal basis for true events
-    basis_family_event: str = 'rc',   # 'rc' | 'spline'
-    n_basis_event: int = 6,
-    tmax_event: float = 0.60,
-    # how to treat state columns (visibility / memory)
-    state_mode: str = 'passthrough',  # 'passthrough' | 'short'
-    basis_family_state: str = 'rc',   # used if state_mode == 'short'
-    n_basis_state: int = 5,
-    tmax_state: float = 0.30,
-    center_states: bool = False,      # subtract mean from state columns
-    column_map: Optional[Dict[str, str]] = None,
-) -> Tuple[Dict[str, PredictorSpec], dict]:
-    """
-    Build predictor->spec dict:
-      - States (cur_vis, nxt_vis, cur_in_memory, nxt_in_memory): passthrough or short causal basis
-      - Events (stop, capture): event window basis
-    Spatial/circular features are added later.
-    """
-    def _a1d(x): return np.asarray(x).ravel()
-    def _n_lags(t_max, dt, t_min=0.0): return int(np.floor((t_max - t_min)/dt)) + 1
-
-    def _build_basis(family: str, n_basis: int, t_max: float, dt: float, *, t_min: float = 0.0) -> np.ndarray:
-        L = _n_lags(t_max, dt, t_min)
-        K = max(1, min(int(n_basis), L))
-        if family == 'rc':
-            _, B = glm_bases.raised_cosine_basis(n_basis=K, t_max=t_max, dt=dt, t_min=t_min, log_spaced=True)
-        elif family == 'spline':
-            _, B = glm_bases.spline_basis(n_basis=K, t_max=t_max, dt=dt, t_min=t_min, degree=3, log_spaced=(t_max > 0.4))
-        else:
-            raise ValueError("family must be 'rc' or 'spline'")
-        return B
-
-    # remap
-    column_map = {} if column_map is None else dict(column_map)
-    col = lambda name: column_map.get(name, name)
-
-    needed = {'cur_vis', 'nxt_vis', 'cur_in_memory', 'nxt_in_memory', 'stop', 'capture_ff'}
-    missing = [c for c in needed if col(c) not in data.columns]
-    if missing:
-        raise KeyError(f'missing required columns in DataFrame: {missing}')
-
-    # trial ids
-    if trial_ids is None:
-        if col(trial_id_col) not in data.columns:
-            raise KeyError(f'need trial_ids or a {trial_id_col!r} column in DataFrame')
-        trial_ids = _a1d(data[col(trial_id_col)])
-    else:
-        trial_ids = _a1d(trial_ids)
-    if len(trial_ids) != len(data):
-        raise ValueError('len(trial_ids) must equal len(data)')
-
-    # bases
-    B_event = _build_basis(basis_family_event, n_basis_event, t_max=tmax_event, dt=dt, t_min=0.0)
-    B_state = _build_basis(basis_family_state, n_basis_state, t_max=tmax_state, dt=dt, t_min=0.0) \
-              if state_mode == 'short' else None
-
-    # states
-    cur_vis       = _a1d(data[col('cur_vis')]).astype(float, copy=False)
-    nxt_vis       = _a1d(data[col('nxt_vis')]).astype(float, copy=False)
-    cur_in_memory = _a1d(data[col('cur_in_memory')]).astype(float, copy=False)
-    nxt_in_memory = _a1d(data[col('nxt_in_memory')]).astype(float, copy=False)
-
-    if center_states:
-        for arr in (cur_vis, nxt_vis, cur_in_memory, nxt_in_memory):
-            arr -= np.nanmean(arr)
-
-    specs: Dict[str, PredictorSpec] = {}
-
-    def add_state(name, x):
-        if state_mode == 'passthrough':
-            specs[name] = PredictorSpec(signal=x, bases=[])          # one raw column
-        else:  # 'short'
-            specs[name] = PredictorSpec(signal=x, bases=[B_state])   # short causal basis
-
-    add_state('cur_vis',       cur_vis)
-    add_state('nxt_vis',       nxt_vis)
-    add_state('cur_in_memory', cur_in_memory)
-    add_state('nxt_in_memory', nxt_in_memory)
-
-    # true events (delta at event time) get event window basis
-    for event in events_to_include:
-        specs[event]    = PredictorSpec(signal=_a1d(data[col(event)]).astype(float, copy=False),       bases=[B_event])
-
-    meta = {
-        'trial_ids': np.asarray(trial_ids),
-        'dt': float(dt),
-        'raw_predictors': {k: specs[k].signal for k in specs},
-        'bases_info_default': {k: [b.shape for b in specs[k].bases] for k in specs},
-        'bases_by_predictor': {k: list(specs[k].bases) for k in specs},
-        'basis_families': {'event': basis_family_event, 'state': (basis_family_state if state_mode == 'short' else None)},
-        'B_hist': glm_bases.raised_cosine_basis(n_basis=5, t_max=0.20, dt=dt, t_min=dt)[1],
-        'dropped_all_zero_predictors': [k for k in events_to_include if np.allclose(specs[k].signal, 0)],
-        # gates for angle features (use column *names* so you can pull from `data` later)
-        'angle_gates': {'cur_angle': col('cur_in_memory'), 'nxt_angle': col('nxt_in_memory')},
-        'builder': f'states_{state_mode}_events_temporal',
-    }
-    return specs, meta
-
-
-
-def add_spike_history(
-    design_df: pd.DataFrame,
-    spike_counts: np.ndarray | pd.Series,
-    trial_ids: np.ndarray,
-    dt: float,
-    *,
-    n_basis: int = 5,
-    t_max: float = 0.20,
-    t_min: float | None = None,
-    prefix: str = 'spk_hist',
-    style: str = 'bjk',                 # 'bjk' or 'rc'
-    edge: str = 'zero',
-    basis: np.ndarray | None = None,
-    meta: dict | None = None,
-) -> tuple[pd.DataFrame, dict | None]:
-    """
-    Add trial-aware spike history columns to an existing design_df.
-    Excludes lag-0 by default (t_min = dt) to avoid self-count leakage in Poisson GLMs.
-    """
-    x = np.asarray(spike_counts, float).ravel()
-    trial_ids = np.asarray(trial_ids).ravel()
-    if len(x) != len(design_df) or len(trial_ids) != len(design_df):
-        raise ValueError('Lengths must match: len(spike_counts) == len(trial_ids) == len(design_df)')
-
-    if basis is None:
-        if t_min is None:
-            t_min = dt  # exclude lag-0 by default
-        _, basis = glm_bases.raised_cosine_basis(
-            n_basis=n_basis, t_max=t_max, dt=dt, t_min=t_min, log_spaced=True)
-    L, K = basis.shape
-
-    if edge == 'drop':
-        Xh, _ = lagged_design_from_signal_trials(x, basis, trial_ids, edge=edge, return_edge_mask=True)
-    else:
-        Xh = lagged_design_from_signal_trials(x, basis, trial_ids, edge=edge)
-
-    if style == 'bjk':
-        colnames = [f'{prefix}:b0:{k}' for k in range(K)]
-        meta_key = prefix
-    elif style == 'rc':
-        colnames = [f'hist_rc{k}' for k in range(K)]
-        meta_key = 'spk_hist'
-    else:
-        raise ValueError("style must be 'bjk' or 'rc'")
-
-    out = design_df.copy()
-    out[colnames] = Xh
-
-    if meta is not None:
-        meta = dict(meta)
-        groups = dict(meta.get('groups', {}))
-        groups.setdefault(meta_key, [])
-        groups[meta_key].extend(colnames)
-        meta['groups'] = groups
-
-        bases_info = dict(meta.get('bases', {}))
-        bases_info.setdefault(meta_key, [])
-        bases_info[meta_key].append((L, K))
-        meta['bases'] = bases_info
-
-        bmap = dict(meta.get('bases_by_predictor', {}))
-        blist = list(bmap.get(meta_key, []))
-        blist.append(basis)
-        bmap[meta_key] = blist
-        meta['bases_by_predictor'] = bmap
-        return out, meta
-
-    return out, None
-
-
-def inverse_hist_weights(x, bins='fd', eps=1e-6):
-    """Inverse-occupancy weights (mean ≈ 1)."""
-    x = np.asarray(x, float).ravel()
-    h, edges = np.histogram(x[~np.isnan(x)], bins=bins)
-    p = h / max(h.sum(), eps)
-    idx = np.clip(np.searchsorted(edges, x, side='right') - 1, 0, len(h) - 1)
-    w = 1.0 / np.clip(p[idx], eps, None)
-    return w / np.mean(w)
-
-
 def lagged_design_from_signal_trials(
     x: np.ndarray,
     basis: np.ndarray,
@@ -407,3 +220,179 @@ def lagged_design_from_signal_trials(
             raise ValueError("edge must be one of {'zero','drop','renorm'}")
 
     return (out, edge_mask) if return_edge_mask else out
+
+
+
+def _a1d(x):
+    return np.asarray(x).ravel()
+
+def _n_lags(t_max, dt, t_min=0.0):
+    return int(np.floor((t_max - t_min) / dt)) + 1
+
+def _build_basis(family: str, n_basis: int, t_max: float, dt: float, *, t_min: float = 0.0):
+    L = _n_lags(t_max, dt, t_min)
+    K = max(1, min(int(n_basis), L))
+
+    if family == 'rc':
+        _, B = glm_bases.raised_cosine_basis(
+            n_basis=K, t_max=t_max, dt=dt, t_min=t_min, log_spaced=True
+        )
+    elif family == 'spline':
+        _, B = glm_bases.spline_basis(
+            n_basis=K, t_max=t_max, dt=dt, t_min=t_min,
+            degree=3, log_spaced=(t_max > 0.4)
+        )
+    else:
+        raise ValueError("family must be 'rc' or 'spline'")
+
+    return B
+
+
+def add_stop_and_capture_columns(data: pd.DataFrame, trial_ids: np.ndarray | None = None,
+                                  ff_caught_T_new: np.ndarray | None = None) -> pd.DataFrame:
+    if 'whether_new_distinct_stop' in data.columns:
+        data['stop'] = (data['whether_new_distinct_stop'] == 1).astype(int)
+    elif 'monkey_speeddummy' in data.columns:
+        stopped = (data['monkey_speeddummy'] == 0)
+        if trial_ids is not None:
+            prev = stopped.groupby(trial_ids, sort=False).shift(
+                1, fill_value=False
+            )
+            data['stop'] = (stopped & ~prev).astype(int)
+        else:
+            data['stop'] = stopped.astype(int)
+    else:
+        raise KeyError(
+            "need 'whether_new_distinct_stop' or 'monkey_speeddummy' to define stop onsets"
+        )
+
+    # ---------- builder: events + raw states (passthrough) ----------
+    if 'capture_ff' not in data.columns:
+        if ff_caught_T_new is not None:
+            data = prep_target_data.add_capture_target(data, ff_caught_T_new)
+        else:
+            raise ValueError('ff_caught_T_new is required to add capture_ff column')
+
+    return data
+
+def init_predictor_specs(
+    data: pd.DataFrame,
+    dt: float,
+    trial_ids: np.ndarray | None = None,
+    *,
+    trial_id_col: str = 'trial_id',
+) -> Tuple[Dict[str, PredictorSpec], dict]:
+
+
+    if trial_ids is None:
+        if trial_id_col not in data.columns:
+            raise KeyError(f'need trial_ids or a {trial_id_col!r} column in DataFrame')
+        trial_ids = _a1d(data[trial_id_col])
+    else:
+        trial_ids = _a1d(trial_ids)
+
+    if len(trial_ids) != len(data):
+        raise ValueError('len(trial_ids) must equal len(data)')
+
+    specs: Dict[str, PredictorSpec] = {}
+
+    meta = {
+        'trial_ids': np.asarray(trial_ids),
+        'dt': float(dt),
+        'raw_predictors': {},
+        'bases_by_predictor': {},
+        'bases_info_default': {},
+        'basis_families': {},
+        'dropped_all_zero_predictors': [],
+        'builder': [],
+    }
+
+    return specs, meta
+
+
+def add_state_predictors(
+    specs: Dict[str, PredictorSpec],
+    meta: dict,
+    data: pd.DataFrame,
+    *,
+    state_cols: Sequence[str] = ['cur_vis', 'nxt_vis', 'cur_in_memory', 'nxt_in_memory'],
+    state_mode: str = 'passthrough',   # 'passthrough' | 'short'
+    basis_family_state: str = 'rc',
+    n_basis_state: int = 5,
+    tmax_state: float = 0.30,
+    center_states: bool = False,
+):
+
+    required = state_cols
+    missing = [c for c in required if c not in data.columns]
+    if missing:
+        raise KeyError(f'missing required state columns: {missing}')
+
+    B_state = (
+        _build_basis(
+            basis_family_state,
+            n_basis_state,
+            t_max=tmax_state,
+            dt=meta['dt'],
+        )
+        if state_mode == 'short'
+        else None
+    )
+
+    for name in required:
+        x = _a1d(data[name]).astype(float, copy=False)
+        if center_states:
+            x -= np.nanmean(x)
+
+        bases = [] if state_mode == 'passthrough' else [B_state]
+        specs[name] = PredictorSpec(signal=x, bases=bases)
+
+        meta['raw_predictors'][name] = x
+        meta['bases_by_predictor'][name] = bases
+        meta['bases_info_default'][name] = [b.shape for b in bases]
+
+    meta['basis_families']['state'] = (
+        basis_family_state if state_mode == 'short' else None
+    )
+    meta['builder'].append(f'states_{state_mode}')
+
+    return specs, meta
+
+
+def add_event_predictors(
+    specs: Dict[str, PredictorSpec],
+    meta: dict,
+    data: pd.DataFrame,
+    *,
+    events_to_include: Sequence[str],
+    basis_family_event: str = 'rc',
+    n_basis_event: int = 6,
+    tmax_event: float = 0.60,
+):
+
+    for event in events_to_include:
+        if event not in data.columns:
+            raise KeyError(f'missing event column: {event}')
+
+    B_event = _build_basis(
+        basis_family_event,
+        n_basis_event,
+        t_max=tmax_event,
+        dt=meta['dt'],
+    )
+
+    for event in events_to_include:
+        x = _a1d(data[event]).astype(float, copy=False)
+        specs[event] = PredictorSpec(signal=x, bases=[B_event])
+
+        meta['raw_predictors'][event] = x
+        meta['bases_by_predictor'][event] = [B_event]
+        meta['bases_info_default'][event] = [B_event.shape]
+
+        if np.allclose(x, 0):
+            meta['dropped_all_zero_predictors'].append(event)
+
+    meta['basis_families']['event'] = basis_family_event
+    meta['builder'].append('events_temporal')
+
+    return specs, meta

@@ -34,7 +34,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
         cols = ['cur_vis', 'nxt_vis',
                 'cur_in_memory', 'nxt_in_memory',
-                'any_ff_visible', 'any_ff_in_memory']
+                'log1p_num_ff_visible', 'log1p_num_ff_in_memory']
         self.planning_data_by_bin[cols] = self.planning_data_by_bin[cols].fillna(
             0).gt(0).astype('uint8')
 

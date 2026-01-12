@@ -50,7 +50,7 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
 
     def _rebin_data_in_new_segments(self, rebinned_max_x_lag_number=2):
         # rebin y_var (behavioral data)
-        self.rebinned_y_var = pn_utils.rebin_segment_data(
+        self.rebinned_y_var = pn_utils.rebin_all_segments_local_bins(
             self.planning_data_by_point, self.new_seg_info, bin_width=self.bin_width)
 
         # drop columns with na

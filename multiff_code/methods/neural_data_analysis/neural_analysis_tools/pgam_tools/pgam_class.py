@@ -37,7 +37,7 @@ for path in [pgam_src, pgam_src_pg]:
 
 class PGAMclass():
 
-    # temporal_vars = ['catching_ff', 'any_ff_visible', 'monkey_speeddummy',
+    # temporal_vars = ['catching_ff', 'log1p_num_ff_visible', 'monkey_speeddummy',
     #                  'min_target_has_disappeared_for_last_time_dummy',
     #                  'min_target_cluster_has_disappeared_for_last_time_dummy',
     #                  'max_target_visible_dummy', 'max_target_cluster_visible_dummy',
@@ -47,7 +47,7 @@ class PGAMclass():
     #                  'retry_capture', 'retry_switch', 'cluster_around_target',
     #                  ]
 
-    temporal_vars = ['capture_ff', 'any_ff_visible', 'any_ff_in_memory', 'turning_right', 'stop', 'whether_test',
+    temporal_vars = ['capture_ff', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'turning_right', 'stop', 'whether_test',
                      'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
     def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):

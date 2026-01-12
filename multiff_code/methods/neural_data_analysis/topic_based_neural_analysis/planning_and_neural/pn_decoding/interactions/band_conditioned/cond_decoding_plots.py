@@ -2,7 +2,7 @@
 Plotting utilities for conditional regression decoding.
 
 Expects output from:
-  conditional_decoding_reg.run_conditional_decoding
+  conditional_decoding_reg.run_conditional_decoding_reg
 """
 
 import numpy as np
@@ -497,7 +497,7 @@ def plot_condition_scatterpanels_reg(
         ax.axis('off')
         return fig
 
-    ncols = min(3, n)
+    ncols = min(4, n)
     nrows = int(np.ceil(n / ncols))
     fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
     axes = np.atleast_1d(axes).ravel()
@@ -581,7 +581,7 @@ def plot_condition_confusion_heatmaps_clf(
         ax.axis('off')
         return fig
 
-    ncols = min(3, n)
+    ncols = min(4, n)
     nrows = int(np.ceil(n / ncols))
     fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
     axes = np.atleast_1d(axes).ravel()
@@ -740,7 +740,7 @@ def plot_global_scatter_reg(
         rng = np.random.default_rng(0)
         idx = rng.choice(idx, size=max_points, replace=False)
 
-    fig, ax = plt.subplots(figsize=(4, 4))
+    fig, ax = plt.subplots(figsize=(3, 3))
     ax.scatter(y[idx], y_pred_all[idx], s=8, alpha=0.5)
     lo = float(np.nanmin([y[idx].min(), np.nanmin(y_pred_all[idx])]))
     hi = float(np.nanmax([y[idx].max(), np.nanmax(y_pred_all[idx])]))
@@ -806,7 +806,7 @@ def plot_global_confusion_heatmap_clf(
         with np.errstate(invalid='ignore', divide='ignore'):
             cm = cm / cm.sum(axis=1, keepdims=True)
 
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(3, 3))
     im = ax.imshow(cm, origin='lower', vmin=0, vmax=1 if normalize else None)
     ax.set_xticks(np.arange(len(labels)))
     ax.set_yticks(np.arange(len(labels)))

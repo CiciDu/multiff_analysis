@@ -38,7 +38,7 @@ firefly_columns = [
     'min_abs_visible_ff_angle',
     'min_abs_visible_ff_angle_boundary',
     'catching_ff',
-    'any_ff_visible',
+    'log1p_num_ff_visible',
 ]
 
 # Target-related features

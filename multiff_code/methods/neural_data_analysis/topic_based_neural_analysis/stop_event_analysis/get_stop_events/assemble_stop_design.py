@@ -235,8 +235,8 @@ def build_stop_design(
     _add_group('cluster_progress', ['cluster_progress_c', 'cluster_progress_c2'])
     _add_group('cluster_rel_time', ['cluster_rel_time_s_z'])
 
-    _add_group('ff_visible', ['any_ff_visible', 'k_ff_visible'])
-    _add_group('ff_in_memory', ['any_ff_in_memory', 'k_ff_in_memory'])
+    _add_group('ff_visible', ['log1p_num_ff_visible', 'k_ff_visible'])
+    _add_group('ff_in_memory', ['log1p_num_ff_in_memory', 'k_ff_in_memory'])
 
     _add_group(
         'retries',

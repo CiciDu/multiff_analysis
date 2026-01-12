@@ -257,7 +257,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
 
         self.add_ff_visible_dummy_to_both_ff_across_time_df()
         self.add_ff_in_memory_dummy_to_both_ff_across_time_df()
-        # add any_ff_visible, any_ff_in_memory, num_ff_visible, num_ff_in_memory
+        # add log1p_num_ff_visible, log1p_num_ff_in_memory, num_ff_visible, num_ff_in_memory
         self.both_ff_across_time_df = pn_utils.add_ff_visible_or_in_memory_info_by_point(
             self.both_ff_across_time_df, self.ff_dataframe)
 

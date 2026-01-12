@@ -10,9 +10,11 @@ from datetime import datetime
 import hashlib
 import json
 from sklearn.model_selection import train_test_split
+import os
 
 
 from itertools import product
+from data_wrangling import general_utils
 
 
 def add_interaction_terms_and_features(concat_behav_trials):
@@ -32,7 +34,7 @@ def add_interaction_terms_and_features(concat_behav_trials):
 def prep_behav(df,
                cont_cols=('cur_ff_distance', 'nxt_ff_distance',
                           'time_since_last_capture', 'speed', 'accel'),
-               cat_vars=('cur_vis', 'nxt_vis', 'nxt_in_memory', 'any_ff_visible')):
+               cat_vars=('cur_vis', 'nxt_vis', 'nxt_in_memory', 'log1p_num_ff_visible')):
     # keep only requested features (that exist), copy to avoid side effects
     out = df.copy()
     added_cols = []
@@ -591,3 +593,35 @@ def decode_cur_ff_only(
         results_df.to_csv(save_path, index=False)
 
     return results_df
+
+
+def make_raw_neural_data_processing_tag(pn):
+    parts = []
+    if not pn.use_raw_spike_data_instead:
+        parts.extend(['raw0', 'pca0', 'lag0'])
+    else:
+        parts.append("raw1")
+        if pn.apply_pca_on_raw_spike_data:
+            parts.append(f"pca{pn.num_pca_components}")
+        else:
+            parts.append("pca0")
+        if pn.use_lagged_raw_spike_data:
+            parts.append(f"lag{pn.rebinned_max_x_lag_number}")
+        else:
+            parts.append("lag0")
+    return '_'.join(parts) if parts else None
+
+
+
+def get_band_conditioned_save_path(pn, reg_or_clf):
+    neural_data_tag = make_raw_neural_data_processing_tag(pn)
+    bin_width_str = f"{pn.bin_width:.4f}".rstrip('0').rstrip('.').replace('.', 'p')
+    seg_str = f'bin{bin_width_str}_{pn.cur_or_nxt}_{pn.first_or_last}_st{general_utils.clean_float(pn.start_t_rel_event)}_et{general_utils.clean_float(pn.end_t_rel_event)}'
+    if reg_or_clf == 'reg':
+        save_path = os.path.join(pn.planning_and_neural_folder_path, 'pn_decoding', 'band_conditioned_reg', neural_data_tag, seg_str)
+    elif reg_or_clf == 'clf':
+        save_path = os.path.join(pn.planning_and_neural_folder_path, 'pn_decoding', 'band_conditioned_clf', neural_data_tag, seg_str)
+    else:
+        raise ValueError(f'Invalid reg_or_clf: {reg_or_clf}')
+    return save_path
+

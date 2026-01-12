@@ -384,3 +384,4 @@ def add_visibility_transition_kernels(
             signal=off, bases=[B])
 
     return specs
+

@@ -161,7 +161,7 @@ def _rank_biserial_from_wilcoxon(beta):
     return np.nan if denom == 0 else (r_plus - r_minus) / denom
 
 
-def _bootstrap_ci(a, stat_fn, n_boot=2000, alpha=0.05, random_state=0):
+def summarize_bootstrap_ci(a, stat_fn, n_boot=2000, alpha=0.05, random_state=0):
     rng = np.random.default_rng(random_state)
     x = np.asarray(a, float)
     x = x[np.isfinite(x)]

@@ -269,7 +269,7 @@ def add_acceleration_features(
     meta: dict,
     *,
     accel_col: str = 'accel',
-    make_spline: bool = True,
+    make_spline: bool = False,
     spline_K: int = 5,
     spline_degree: int = 3,
     spline_percentiles: tuple[int, int] = (2, 98),
@@ -386,7 +386,7 @@ def add_ff_distance_features(
     meta: dict,
     *,
     dist_col: str = 'cur_ff_distance',
-    make_spline: bool = False,
+    make_spline: bool = True,
     log_eps: float = 1e-2,
     K: int = 6,
     degree: int = 3,
@@ -399,41 +399,42 @@ def add_ff_distance_features(
       (b) optional row-normalized tuning spline on log-distance,
       (c) optional gating by a binary column (multiplies the design columns).
     """
-    out, m = add_raw_feature(
-        design_df, feature=dist_col, data=data,
-        name=f'log_{dist_col}', transform='log', eps=log_eps,
-        center=True, scale=False, meta=meta
-    )
+    if not make_spline:
+        out, m = add_raw_feature(
+            design_df, feature=dist_col, data=data,
+            name=f'log_{dist_col}', transform='log', eps=log_eps,
+            center=True, scale=False, meta=meta
+        )
 
-    out, m = add_raw_feature(
-        out, feature=dist_col, data=data,
-        name=dist_col, transform='linear', meta=m
-    )
-
-    spline_name = 'ff_distance_spline'
-    if make_spline:
+        out, m = add_raw_feature(
+            out, feature=dist_col, data=data,
+            name=dist_col, transform='linear', meta=m
+        )
+    else:
+        spline_name = f'{dist_col}_spline'
         d = data[dist_col].to_numpy()
         log_dist = np.log(np.maximum(d, 0.0) + log_eps)
         out, m = spatial_feats.add_spatial_spline_feature(
-            design_df=out, feature=log_dist, name=spline_name,
+            design_df=design_df, feature=log_dist, name=spline_name,
             knots_mode='percentile', K=K, degree=degree, percentiles=pct,
-            row_normalize=True, drop_one=True, center=True, meta=m
+            row_normalize=True, drop_one=True, center=True, meta=meta
         )
 
     # ----- optional gating -----
     if gate_with is not None and gate_with in data.columns:
         gate = (data[gate_with].to_numpy() > 0).astype(float)
 
-        # ramp columns we just created
-        ramp_cols = [f'log_{dist_col}', dist_col]
-        for c in ramp_cols:
-            if c in out.columns:
-                out[c] = out[c].to_numpy() * gate
-
-        # spline columns if present (they're registered under their prefix)
-        for c in m.get('groups', {}).get(spline_name, []):
-            if c in out.columns:
-                out[c] = out[c].to_numpy() * gate
+        if not make_spline:
+            # ramp columns we just created
+            ramp_cols = [f'log_{dist_col}', dist_col]
+            for c in ramp_cols:
+                if c in out.columns:
+                    out[c] = out[c].to_numpy() * gate
+        else:
+            # spline columns if present (they're registered under their prefix)
+            for c in m.get('groups', {}).get(spline_name, []):
+                if c in out.columns:
+                    out[c] = out[c].to_numpy() * gate
     # ---------------------------
 
     return out, m
@@ -621,12 +622,3 @@ def add_speed_features(
     return out, m
 
 
-def add_memory_state_feature(
-    design_df: pd.DataFrame,
-    data: pd.DataFrame,
-    meta: dict,
-    *,
-    col: str = 'any_ff_in_memory',
-):
-    """Binary state passthrough."""
-    return add_raw_feature(design_df, feature=col, data=data, name=col, transform='linear', meta=meta)

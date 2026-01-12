@@ -71,6 +71,75 @@ def _flag_and_update_metrics_row(mr, res, y, condX):
         mr['nonzeros'] < 3) or (mr['condX'] > 1e8)
 
 
+def _compute_cv_loglik_and_deviance(y, X, off, folds, *, maxiter=100):
+    """
+    Compute grouped K-Fold cross-validated metrics for a Poisson GLM without regularization.
+    Returns (cv_loglik_improvement, cv_deviance_explained) where:
+      - cv_loglik_improvement = sum_over_folds[ ll(model) - ll(null) ] on held-out data
+      - cv_deviance_explained = 1 - (sum dev_model) / (sum dev_null) on held-out data
+    """
+    fam = sm.families.Poisson()
+    total_ll_model = 0.0
+    total_ll_null = 0.0
+    total_dev_model = 0.0
+    total_dev_null = 0.0
+
+    for tr_idx, te_idx in folds:
+        y_tr = y[tr_idx]
+        y_te = y[te_idx]
+        X_tr = X[tr_idx, :]
+        X_te = X[te_idx, :]
+        off_tr = None if off is None else off[tr_idx]
+        off_te = None if off is None else off[te_idx]
+
+        model = sm.GLM(y_tr, X_tr, family=fam, offset=off_tr)
+        # Fast, unpenalized IRLS; avoid heavy cov computations
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', ConvergenceWarning)
+            try:
+                res_tr = glm_fit_utils.fit_with_fallback(
+                    model, cov_type='nonrobust',
+                    use_overdispersion_scale=False,
+                    maxiter=maxiter, try_unpenalized_refit=False
+                )
+            except Exception:
+                # last-resort trivial fit to avoid crashing CV (rare)
+                res_tr = model.fit(maxiter=maxiter, disp=0)
+
+        # Predict mean rate on held-out fold
+        mu_te = res_tr.predict(exog=X_te, offset=off_te, linear=False)
+        mu_te = np.clip(mu_te, 1e-12, np.inf)
+
+        # Null model on training: intercept-only with offset
+        # beta0_hat = log(sum(y_tr) / sum(exp(off_tr))) when offset present,
+        # otherwise beta0_hat = log(mean(y_tr))
+        if off_tr is None:
+            rate_tr = float(np.mean(y_tr))
+            mu_null_te = np.full_like(y_te, fill_value=max(rate_tr, 1e-12), dtype=float)
+        else:
+            sum_exp_off_tr = float(np.sum(np.exp(off_tr)))
+            base_rate = float(np.sum(y_tr)) / max(sum_exp_off_tr, 1e-12)
+            mu_null_te = base_rate * np.exp(off_te)
+        mu_null_te = np.clip(mu_null_te, 1e-12, np.inf)
+
+        # Accumulate held-out metrics (model vs null)
+        ll_te_model = np.sum(fam.loglike_obs(y_te, mu_te))
+        ll_te_null = np.sum(fam.loglike_obs(y_te, mu_null_te))
+        dev_te_model = float(fam.deviance(y_te, mu_te))
+        dev_te_null = float(fam.deviance(y_te, mu_null_te))
+
+        total_ll_model += float(ll_te_model)
+        total_ll_null += float(ll_te_null)
+        total_dev_model += float(dev_te_model)
+        total_dev_null += float(dev_te_null)
+
+    cv_ll_improvement = float(total_ll_model - total_ll_null)
+    cv_dev_explained = np.nan
+    if np.isfinite(total_dev_null) and (total_dev_null > 0):
+        cv_dev_explained = 1.0 - (float(total_dev_model) / float(total_dev_null))
+    return cv_ll_improvement, cv_dev_explained
+
+
 def record_cluster_outcomes(
     *, cid, y, n, res, alpha_val, l1_wt_val, feature_names, X, off, condX,
     results, coef_rows, metrics_rows, used_refit=False
@@ -107,6 +176,7 @@ def fit_poisson_glm_per_cluster(
     groups=None,
     refit_on_support=True,
     return_cv_tables=True,
+    compute_cv_metrics: bool = True,
     *,
     cv_splitter=None,
     use_overdispersion_scale=False
@@ -121,6 +191,11 @@ def fit_poisson_glm_per_cluster(
                  == (0.0,) and tuple(l1_wt_grid) == (0.0,))
     if no_tuning:
         results, coef_rows, metrics_rows = {}, [], []
+        # Build grouped folds for CV metrics if requested
+        folds = None
+        if compute_cv_metrics:
+            folds = glm_fit_utils._build_folds(
+                n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter)
         for i, cid in enumerate(cluster_ids, 1):
             print(
                 f'Fitting cluster {i}/{len(cluster_ids)}: {cid} ...', flush=True)
@@ -129,6 +204,9 @@ def fit_poisson_glm_per_cluster(
             if np.all(y == 0):
                 metrics_rows.append(_make_zero_unit_row(
                     cid, n, alpha_val=0.0, l1_wt_val=0.0, condX=condX_once))
+                # add CV columns with NaN to keep schema consistent
+                metrics_rows[-1]['cv_loglik_improvement'] = np.nan
+                metrics_rows[-1]['cv_deviance_explained'] = np.nan
                 continue
 
             # unpenalized single fit (with your fallback inside _fit_once)
@@ -138,12 +216,24 @@ def fit_poisson_glm_per_cluster(
                 use_overdispersion_scale=use_overdispersion_scale,
                 feature_names=feature_names
             )
+            # Compute grouped K-Fold CV metrics for this cluster
+            if compute_cv_metrics and folds is not None:
+                try:
+                    cv_ll_imp, cv_dev_expl = _compute_cv_loglik_and_deviance(
+                        y, X, off, folds, maxiter=100)
+                except Exception:
+                    cv_ll_imp, cv_dev_expl = np.nan, np.nan
+            else:
+                cv_ll_imp, cv_dev_expl = np.nan, np.nan
             record_cluster_outcomes(
                 cid=cid, y=y, n=n, res=res,
                 alpha_val=0.0, l1_wt_val=0.0,
                 feature_names=feature_names, X=X, off=off, condX=condX_once,
                 results=results, coef_rows=coef_rows, metrics_rows=metrics_rows, used_refit=False
             )
+            # attach CV metrics to the latest metrics row
+            metrics_rows[-1]['cv_loglik_improvement'] = cv_ll_imp
+            metrics_rows[-1]['cv_deviance_explained'] = cv_dev_expl
             print('  done (MLE)', flush=True)
 
         return pd.Series(results).to_dict(), pd.DataFrame(coef_rows), pd.DataFrame(metrics_rows), pd.DataFrame()
@@ -212,6 +302,10 @@ def fit_poisson_glm_per_cluster_fast_mle(
     cov_type: str = 'HC1',    # use 'nonrobust' for max speed
     maxiter: int = 100,
     show_progress: bool = False,
+    n_splits: int = 5,
+    groups=None,
+    cv_splitter=None,
+    compute_cv_metrics: bool = True,
 ):
     """
     Ultra-fast MLE per cluster: no CV/inference/plots.
@@ -225,18 +319,26 @@ def fit_poisson_glm_per_cluster_fast_mle(
 
     results, coef_rows, metrics_rows = {}, [], []
     fam = sm.families.Poisson()
+    # Precompute grouped folds for CV metrics if requested
+    n = X.shape[0]
+    folds = None
+    if compute_cv_metrics:
+        folds = glm_fit_utils._build_folds(
+            n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter)
 
     for i, cid in enumerate(eff_ids, 1):
         if show_progress:
             print(f'Fitting cluster {i}/{len(eff_ids)}: {cid} ...', flush=True)
 
         y = np.asarray(df_Y[cid], dtype=float)
-        n = y.shape[0]
+        n_obs = y.shape[0]
 
         # All-zero unit → flagged metrics row, skip fit
         if np.all(y == 0):
             metrics_rows.append(_make_zero_unit_row(
-                cid, n, alpha_val=0.0, l1_wt_val=0.0, condX=condX_once))
+                cid, n_obs, alpha_val=0.0, l1_wt_val=0.0, condX=condX_once))
+            metrics_rows[-1]['cv_loglik_improvement'] = np.nan
+            metrics_rows[-1]['cv_deviance_explained'] = np.nan
             if show_progress:
                 print('  skipped (all-zero unit)', flush=True)
             continue
@@ -249,13 +351,25 @@ def fit_poisson_glm_per_cluster_fast_mle(
             maxiter=maxiter, try_unpenalized_refit=True
         )
 
+        # Grouped K-Fold CV metrics for this cluster
+        if compute_cv_metrics and folds is not None:
+            try:
+                cv_ll_imp, cv_dev_expl = _compute_cv_loglik_and_deviance(
+                    y, X, off, folds, maxiter=maxiter)
+            except Exception:
+                cv_ll_imp, cv_dev_expl = np.nan, np.nan
+        else:
+            cv_ll_imp, cv_dev_expl = np.nan, np.nan
+
         # Bookkeeping identical to CV path (adds coef/metrics + flags)
         record_cluster_outcomes(
-            cid=cid, y=y, n=n, res=res,
+            cid=cid, y=y, n=n_obs, res=res,
             alpha_val=0.0, l1_wt_val=0.0,
             feature_names=feature_names, X=X, off=off, condX=condX_once,
             results=results, coef_rows=coef_rows, metrics_rows=metrics_rows, used_refit=False
         )
+        metrics_rows[-1]['cv_loglik_improvement'] = cv_ll_imp
+        metrics_rows[-1]['cv_deviance_explained'] = cv_dev_expl
 
         if show_progress:
             print('  done (fast MLE)', flush=True)
@@ -308,6 +422,7 @@ def _fit_path(
     fast_mle, regularization, alpha_grid, l1_wt_grid,
     n_splits, cv_metric, groups, refit_on_support,
     cv_splitter, use_overdispersion_scale, return_cv_tables,
+    compute_cv_metrics,
     show_progress
 ):
     if fast_mle:
@@ -315,6 +430,8 @@ def _fit_path(
             df_X=df_X, df_Y=df_Y, offset_log=offset_log,
             cluster_ids=eff_clusters, cov_type=cov_type,
             maxiter=100, show_progress=show_progress,
+            n_splits=n_splits, groups=groups, cv_splitter=cv_splitter,
+            compute_cv_metrics=compute_cv_metrics,
         )
         return results, coefs_df, metrics_df, pd.DataFrame()
 
@@ -329,6 +446,7 @@ def _fit_path(
         n_splits=n_splits, cv_metric=cv_metric, groups=groups,
         refit_on_support=refit_on_support, cv_splitter=cv_splitter,
         use_overdispersion_scale=use_overdispersion_scale, return_cv_tables=rcv,
+        compute_cv_metrics=compute_cv_metrics,
     )
 
 
@@ -513,6 +631,7 @@ def glm_mini_report(
     do_inference: bool = True,
     return_cv_tables: bool = True,
     show_progress: bool = False,
+    compute_cv_metrics: bool = True,
 ):
     """Thin orchestration wrapper: fit → inference → figs → save/show → offenders."""
     feature_names, eff_clusters = _resolve_inputs(
@@ -526,7 +645,8 @@ def glm_mini_report(
         n_splits=n_splits, cv_metric=cv_metric, groups=groups,
         refit_on_support=refit_on_support, cv_splitter=cv_splitter,
         use_overdispersion_scale=use_overdispersion_scale,
-        return_cv_tables=return_cv_tables, show_progress=show_progress
+        return_cv_tables=return_cv_tables, show_progress=show_progress,
+        compute_cv_metrics=compute_cv_metrics
     )
 
     coefs_df, pop_tests = _run_inference(
