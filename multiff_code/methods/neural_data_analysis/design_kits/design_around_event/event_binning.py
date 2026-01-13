@@ -5,7 +5,8 @@ import statsmodels.api as sm
 
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
-
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import get_stops_utils
+import neural_data_analysis.design_kits.design_around_event.event_binning as event_binning
 
 def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
     """
@@ -245,140 +246,6 @@ def pick_event_window(df, event_time_col='stop_time',
     return new_seg_info
 
 
-
-def event_windows_to_bins2d(picked_windows,
-                            event_id_col='event_id',
-                            event_time_col='event_time',
-                            win_t0_col='new_seg_start_time',
-                            win_t1_col='new_seg_end_time',
-                            n_pre_col='n_pre_bins',
-                            n_post_col='n_post_bins',
-                            ok_col='ok_window',
-                            only_ok=True,
-                            bin_dt=None,
-                            tol=1e-9):
-    """
-    Turn event-centered windows into per-event fixed-width bins.
-
-    Produces:
-      - bins_2d: (N_bins, 2) array of [left, right] for each bin across all events
-      - meta: tidy DataFrame with per-bin metadata (event_id, indices, centers, etc.)
-
-    Parameters
-    ----------
-    only_ok : bool
-        If True and `ok_col` exists, keep only rows where ok_window is True.
-    bin_dt : float or None
-        Bin width. If None, infer from (event - new_seg_start_time)/n_pre or (new_seg_end_time - event)/n_post.
-
-    Returns
-    -------
-    bins_2d : ndarray, shape (N, 2)
-        All bins concatenated: [t_left, t_right].
-    meta : DataFrame, shape (N, ?)
-        Per-bin info: event_id, k_within_seg, is_pre, t_left, t_right, t_center,
-        rel_left, rel_right, rel_center, exposure_s (=bin_dt), event_time.
-    """
-    df = picked_windows.copy()
-
-    # Optional filter
-    if only_ok and ok_col in df.columns:
-        df = df[df[ok_col].astype(bool)].copy()
-
-    required = [event_id_col, event_time_col,
-                win_t0_col, win_t1_col, n_pre_col, n_post_col]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise KeyError(f'missing required columns: {missing}')
-
-    # Infer bin_dt if needed
-    if bin_dt is None:
-        # Gather candidates from any row with positive counts
-        dts = []
-        for _, r in df.iterrows():
-            npre = int(r[n_pre_col])
-            npost = int(r[n_post_col])
-            if npre > 0:
-                dts.append((float(r[event_time_col]) -
-                           float(r[win_t0_col])) / npre)
-            if npost > 0:
-                dts.append((float(r[win_t1_col]) -
-                           float(r[event_time_col])) / npost)
-        if not dts:
-            raise ValueError(
-                'cannot infer bin_dt: no rows with positive pre/post bin counts')
-        # Use median for robustness
-        bin_dt = float(np.median(dts))
-
-    bins_list = []
-    meta_rows = []
-
-    for _, r in df.iterrows():
-        event_id = r[event_id_col]
-        s = float(r[event_time_col])
-        npre = int(r[n_pre_col])
-        npost = int(r[n_post_col])
-        n_bins = npre + npost
-        if n_bins <= 0:
-            continue
-
-        # Build bin edges centered around event (pre first, then post)
-        # Left edge of the first bin is s - npre*dt
-        left0 = s - npre * bin_dt
-        lefts = left0 + bin_dt * np.arange(n_bins)
-        rights = lefts + bin_dt
-        centers = 0.5 * (lefts + rights)
-
-        # Sanity: edges should lie within [new_seg_start_time, new_seg_end_time] up to tol
-        if win_t0_col in r and win_t1_col in r:
-            t0 = float(r[win_t0_col])
-            t1 = float(r[win_t1_col])
-            if (lefts[0] < t0 - tol) or (rights[-1] > t1 + tol):
-                # If upstream rounding created tiny drift, gently clip
-                lefts[0] = max(lefts[0], t0)
-                rights[-1] = min(rights[-1], t1)
-
-        # Append bins and metadata
-        bins_list.append(np.column_stack([lefts, rights]))
-
-        # Per-bin flags: first npre bins are 'pre'
-        is_pre = np.zeros(n_bins, dtype=bool)
-        if npre > 0:
-            is_pre[:npre] = True
-
-        meta_rows.append(pd.DataFrame({
-            'event_id': event_id,
-            'k_within_seg': np.arange(n_bins, dtype=int),
-            'is_pre': is_pre,
-            't_left': lefts,
-            't_right': rights,
-            't_center': centers,
-            'rel_left': lefts - s,
-            'rel_right': rights - s,
-            'rel_center': centers - s,
-            'exposure_s': np.full(n_bins, bin_dt),
-            'event_time': np.full(n_bins, s),
-        }))
-
-    if not bins_list:
-        # No bins created
-        return np.zeros((0, 2), float), pd.DataFrame(columns=[
-            'event_id', 'k_within_seg', 'is_pre', 't_left', 't_right', 't_center',
-            'rel_left', 'rel_right', 'rel_center', 'exposure_s', 'event_time'
-        ])
-
-    bins_2d = np.vstack(bins_list)
-    meta = pd.concat(meta_rows, ignore_index=True)
-
-    # Global bin index in time order (stable sort)
-    order = np.argsort(np.asarray(meta['t_left'], dtype=float))
-    bins_2d = bins_2d[order]
-    meta = meta.iloc[order].reset_index(drop=True)
-    meta['bin'] = np.arange(len(meta), dtype=int)
-
-    return bins_2d, meta
-
-
 def bin_spikes_by_cluster(spikes_df,
                           bins_2d,
                           time_col='time',
@@ -553,3 +420,322 @@ def selective_zscore(
         scaled.append(col)
 
     return out, scaled
+
+
+def make_new_seg_info_for_stop_design(stops_with_stats, closest_stop_to_capture_df, monkey_information):
+
+    new_seg_info = event_binning.pick_event_window(stops_with_stats,
+                                                    pre_s=0.2, post_s=1.0, min_pre_bins=1, min_post_bins=20, bin_dt=0.04)
+
+    if 'stop_id' not in closest_stop_to_capture_df.columns:
+        closest_stop_to_capture_df = get_stops_utils.add_stop_id_to_closest_stop_to_capture_df(
+            closest_stop_to_capture_df,
+            monkey_information,
+        )
+        
+    if 'captured' not in new_seg_info.columns:
+        closest_stop_to_capture_df['captured'] = 1
+        new_seg_info = new_seg_info.merge(closest_stop_to_capture_df[['stop_id', 'captured']].drop_duplicates(), on='stop_id', how='left')
+        new_seg_info['captured'] = new_seg_info['captured'].fillna(0)
+        
+    new_seg_info['event_id'] = new_seg_info['stop_id']
+    new_seg_info['event_time'] = new_seg_info['stop_time']
+
+    return new_seg_info
+
+def _event_windows_to_bins2d_local(
+    picked_windows,
+    *,
+    event_id_col='event_id',
+    event_time_col='event_time',
+    win_t0_col='new_seg_start_time',
+    win_t1_col='new_seg_end_time',
+    n_pre_col='n_pre_bins',
+    n_post_col='n_post_bins',
+    ok_col='ok_window',
+    only_ok=True,
+    bin_dt=None,
+    tol=1e-9,
+):
+    """
+    Turn event-centered windows into per-event fixed-width bins (LOCAL mode).
+
+    Produces:
+      - bins_2d: (N_bins, 2) array of [left, right] for each bin across all events
+      - meta: tidy DataFrame with per-bin metadata
+    """
+
+    df = picked_windows.copy()
+
+    # Optional filter
+    if only_ok and ok_col in df.columns:
+        df = df[df[ok_col].astype(bool)].copy()
+
+    required = [
+        event_id_col, event_time_col,
+        win_t0_col, win_t1_col,
+        n_pre_col, n_post_col,
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f'missing required columns: {missing}')
+
+    # --------------------------------------------------
+    # Infer bin_dt if needed
+    # --------------------------------------------------
+    if bin_dt is None:
+        dts = []
+        for _, r in df.iterrows():
+            npre = int(r[n_pre_col])
+            npost = int(r[n_post_col])
+            if npre > 0:
+                dts.append(
+                    (float(r[event_time_col]) - float(r[win_t0_col])) / npre
+                )
+            if npost > 0:
+                dts.append(
+                    (float(r[win_t1_col]) - float(r[event_time_col])) / npost
+                )
+        if not dts:
+            raise ValueError(
+                'cannot infer bin_dt: no rows with positive pre/post bin counts'
+            )
+        bin_dt = float(np.median(dts))
+
+    bins_list = []
+    meta_rows = []
+
+    # --------------------------------------------------
+    # Main loop over events
+    # --------------------------------------------------
+    for _, r in df.iterrows():
+        event_id = r[event_id_col]
+        s = float(r[event_time_col])
+        npre = int(r[n_pre_col])
+        npost = int(r[n_post_col])
+        n_bins = npre + npost
+        if n_bins <= 0:
+            continue
+
+        # Build local bins centered on event
+        left0 = s - npre * bin_dt
+        lefts = left0 + bin_dt * np.arange(n_bins)
+        rights = lefts + bin_dt
+        centers = 0.5 * (lefts + rights)
+
+        # Clip tiny numerical drift to window
+        t0 = float(r[win_t0_col])
+        t1 = float(r[win_t1_col])
+        if lefts[0] < t0 - tol:
+            lefts[0] = t0
+        if rights[-1] > t1 + tol:
+            rights[-1] = t1
+
+        bins_list.append(np.column_stack([lefts, rights]))
+
+        # Pre / post flags
+        is_pre = np.zeros(n_bins, dtype=bool)
+        if npre > 0:
+            is_pre[:npre] = True
+
+        meta_rows.append(pd.DataFrame({
+            'event_id': event_id,
+            'k_within_seg': np.arange(n_bins, dtype=int),
+            'is_pre': is_pre,
+            't_left': lefts,
+            't_right': rights,
+            't_center': centers,
+            'rel_left': lefts - s,
+            'rel_right': rights - s,
+            'rel_center': centers - s,
+            'exposure_s': np.full(n_bins, bin_dt),
+            'event_time': np.full(n_bins, s),
+        }))
+
+    # --------------------------------------------------
+    # Empty case
+    # --------------------------------------------------
+    if not bins_list:
+        empty_cols = [
+            'event_id', 'k_within_seg', 'is_pre',
+            't_left', 't_right', 't_center',
+            'rel_left', 'rel_right', 'rel_center',
+            'exposure_s', 'event_time', 'bin',
+        ]
+        return np.zeros((0, 2), float), pd.DataFrame(columns=empty_cols)
+
+    # --------------------------------------------------
+    # Concatenate + global ordering
+    # --------------------------------------------------
+    bins_2d = np.vstack(bins_list)
+    meta = pd.concat(meta_rows, ignore_index=True)
+
+    order = np.argsort(meta['t_left'].to_numpy(dtype=float))
+    bins_2d = bins_2d[order]
+    meta = meta.iloc[order].reset_index(drop=True)
+
+    meta['bin'] = np.arange(len(meta), dtype=int)
+
+    return bins_2d, meta
+
+
+def _event_windows_to_bins2d_global(
+    picked_windows,
+    *,
+    global_bins_2d,
+    event_id_col='event_id',
+    event_time_col='event_time',
+    win_t0_col='new_seg_start_time',
+    win_t1_col='new_seg_end_time',
+    n_pre_col='n_pre_bins',
+    n_post_col='n_post_bins',
+    ok_col='ok_window',
+    only_ok=True,
+    enforce_exact_counts=False,
+):
+    """
+    Global-bin mode:
+    Select bins directly from global_bins_2d that fall within each event window.
+
+    No local bins are constructed.
+    bin_dt is ignored by design.
+    """
+
+    df = picked_windows.copy()
+
+    if only_ok and ok_col in df.columns:
+        df = df[df[ok_col].astype(bool)].copy()
+
+    required = [
+        event_id_col, event_time_col,
+        win_t0_col, win_t1_col,
+        n_pre_col, n_post_col,
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f'missing required columns: {missing}')
+
+    global_bins_2d = np.asarray(global_bins_2d, dtype=float)
+    if global_bins_2d.ndim != 2 or global_bins_2d.shape[1] != 2:
+        raise ValueError('global_bins_2d must have shape (B, 2)')
+
+    g_left = global_bins_2d[:, 0]
+    g_right = global_bins_2d[:, 1]
+    g_center = 0.5 * (g_left + g_right)
+
+    bins_list = []
+    meta_rows = []
+
+    for _, r in df.iterrows():
+        event_id = r[event_id_col]
+        s = float(r[event_time_col])
+        t0 = float(r[win_t0_col])
+        t1 = float(r[win_t1_col])
+        npre = int(r[n_pre_col])
+        npost = int(r[n_post_col])
+
+        # bins fully inside the window
+        in_window = (g_left >= t0) & (g_right <= t1)
+        if not np.any(in_window):
+            continue
+
+        # pre / post relative to event
+        is_pre = g_right <= s
+        is_post = g_left >= s
+
+        pre_idx = np.where(in_window & is_pre)[0]
+        post_idx = np.where(in_window & is_post)[0]
+
+        # choose bins
+        if enforce_exact_counts:
+            if (npre > 0 and pre_idx.size < npre) or (npost > 0 and post_idx.size < npost):
+                continue  # drop this event entirely
+
+            pre_idx = pre_idx[-npre:] if npre > 0 else np.array([], dtype=int)
+            post_idx = post_idx[:npost] if npost > 0 else np.array([], dtype=int)
+        else:
+            pre_idx = pre_idx[-npre:] if npre > 0 else np.array([], dtype=int)
+            post_idx = post_idx[:npost] if npost > 0 else np.array([], dtype=int)
+
+        sel_idx = np.concatenate([pre_idx, post_idx])
+        if sel_idx.size == 0:
+            continue
+
+        bins_list.append(global_bins_2d[sel_idx])
+
+        k_within = np.arange(sel_idx.size, dtype=int)
+        is_pre_flag = np.zeros(sel_idx.size, dtype=bool)
+        if pre_idx.size > 0:
+            is_pre_flag[:pre_idx.size] = True
+
+        meta_rows.append(pd.DataFrame({
+            'event_id': event_id,
+            'global_bin': sel_idx.astype(int),
+            'k_within_seg': k_within,
+            'is_pre': is_pre_flag,
+            't_left': g_left[sel_idx],
+            't_right': g_right[sel_idx],
+            't_center': g_center[sel_idx],
+            'rel_left': g_left[sel_idx] - s,
+            'rel_right': g_right[sel_idx] - s,
+            'rel_center': g_center[sel_idx] - s,
+            'event_time': np.full(sel_idx.size, s),
+        }))
+
+    if not bins_list:
+        empty_cols = [
+            'event_id', 'global_bin', 'k_within_seg', 'is_pre',
+            't_left', 't_right', 't_center',
+            'rel_left', 'rel_right', 'rel_center',
+            'event_time', 'bin',
+        ]
+        return np.zeros((0, 2)), pd.DataFrame(columns=empty_cols)
+
+    bins_2d = np.vstack(bins_list)
+    meta = pd.concat(meta_rows, ignore_index=True)
+
+    # stable time ordering
+    order = np.argsort(meta['t_left'].to_numpy())
+    bins_2d = bins_2d[order]
+    meta = meta.iloc[order].reset_index(drop=True)
+    meta['bin'] = np.arange(len(meta), dtype=int)
+
+    return bins_2d, meta
+
+
+def event_windows_to_bins2d(
+    picked_windows,
+    *,
+    global_bins_2d=None,
+    bin_dt=None,
+    enforce_exact_counts=False,
+    **kwargs,
+):
+    """
+    Turn event-centered windows into bins.
+
+    Mode is inferred:
+      - global mode if global_bins_2d is provided
+      - local mode otherwise
+    """
+
+    if global_bins_2d is not None:
+        if bin_dt is not None:
+            print('bin_dt is ignored when global_bins_2d is provided')
+
+        return _event_windows_to_bins2d_global(
+            picked_windows,
+            global_bins_2d=global_bins_2d,
+            enforce_exact_counts=enforce_exact_counts,
+            **kwargs,
+        )
+
+    # ---- local mode (original behavior) ----
+    if bin_dt is None:
+        raise ValueError('bin_dt is required when global_bins_2d is not provided')
+
+    return _event_windows_to_bins2d_local(
+        picked_windows,
+        bin_dt=bin_dt,
+        **kwargs,
+    )

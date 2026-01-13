@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import rc
+import statsmodels.api as sm
+
 
 # --- Neuroscience / modeling imports
 from neural_data_analysis.design_kits.design_around_event import (
@@ -44,7 +46,8 @@ def build_stop_design(
     bin_dt: float = 0.04,
     add_ff_visible_info: bool = True,
     add_retries_info: bool = True,
-    datasets: dict = None
+    datasets: dict = None,
+    global_bins_2d: np.ndarray = None, # optional global bins_2d to restrict to
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build a stop-aligned, bin-level design matrix and offset for GLM/decoding.
@@ -67,7 +70,7 @@ def build_stop_design(
     # 1) Build bins from event windows
     # -------------------------------------------------------------------------
     bins_2d, meta = event_binning.event_windows_to_bins2d(
-        new_seg_info, bin_dt=bin_dt, only_ok=False
+        new_seg_info, bin_dt=bin_dt, only_ok=False, global_bins_2d=global_bins_2d
     )
 
     # -------------------------------------------------------------------------
@@ -111,6 +114,8 @@ def build_stop_design(
     pos = used_bins[mask_used]
 
     binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
+    
+    print('meta.shape', meta.shape)
 
     meta_used = (
         meta.set_index('bin')
@@ -332,8 +337,8 @@ def add_ff_visible_and_in_memory_info(
         k_ff = vis_design.count_visible_from_time_df_fast(
             ff_df_sub, bins_2d, vis_col=state
         )
-        binned_feats[f'any_ff_{state}'] = (k_ff > 0).astype('int8')[used_bins]
-        binned_feats[f'k_ff_{state}'] = k_ff[used_bins]
+        binned_feats[f'num_ff_{state}'] = k_ff[used_bins]
+        binned_feats[f'log1p_num_ff_{state}'] = np.log1p(binned_feats[f'num_ff_{state}'])
 
     return binned_feats
 
@@ -350,3 +355,34 @@ def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_used, mask)
         offset_log[mask],
         meta_used.loc[mask].reset_index(drop=True),
     )
+
+def add_interaction_columns(binned_feats):
+    # list of variables you want to interact with 'whether_in_retry_series'
+    excluded_exact = {'intercept', 'const', 'miss', 'next_gap_s_z'}
+    excluded_substrings = {'rsw', 'rcap', 'retry'}
+
+    vars_to_interact = [
+        c for c in binned_feats.columns
+        if c not in excluded_exact
+        and not any(s in c for s in excluded_substrings)
+    ]
+
+    for c in vars_to_interact:
+        new_col = f'{c}*retry'
+        binned_feats[new_col] = binned_feats[c] * binned_feats['whether_in_retry_series']  
+        
+    return binned_feats
+
+
+def scale_binned_feats(binned_feats):
+    binned_feats_sc, scaled_cols = event_binning.selective_zscore(binned_feats)
+    binned_feats_sc = sm.add_constant(binned_feats_sc, has_constant='add')
+    print('Scaled columns:', scaled_cols)
+
+    # drop columns that are constant
+    const_cols = [c for c in binned_feats_sc.columns 
+                if binned_feats_sc[c].nunique(dropna=False) <= 1 and c not in ['intercept', 'const']]
+    print("Constant columns:", const_cols)
+
+    binned_feats_sc = binned_feats_sc.drop(columns=const_cols)
+    return binned_feats_sc

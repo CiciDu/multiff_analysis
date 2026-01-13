@@ -41,7 +41,7 @@ kinematics = [
     'ang_speed:s0',
     'ang_speed:s1',
     'ang_speed:s2',
-    'curv_of_traj',
+    #'curv_of_traj',
 ]
 
 # -------------------------
@@ -133,11 +133,11 @@ acceleration_state = [
 pn_design_predictors = (
     visibility_state
     + visibility_transients
-    + kinematics
-    + ff_count_memory
     + ff_angle
     + ff_distance
     + temporal_context
+    # + kinematics
+    # + ff_count_memory
     # + gaze_state
     # + eye_motion_energy
     # + acceleration_state

@@ -4,6 +4,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_dec
 from neural_data_analysis.neural_analysis_tools.gpfa_methods import gpfa_helper_class
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from neural_data_analysis.neural_analysis_tools.align_trials import align_trial_utils
+from neural_data_analysis.design_kits.design_by_segment import spike_history, rebin_segments
 
 import pandas as pd
 import os
@@ -50,7 +51,7 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
 
     def _rebin_data_in_new_segments(self, rebinned_max_x_lag_number=2):
         # rebin y_var (behavioral data)
-        self.rebinned_y_var = pn_utils.rebin_all_segments_local_bins(
+        self.rebinned_y_var = rebin_segments.rebin_all_segments_local_bins(
             self.planning_data_by_point, self.new_seg_info, bin_width=self.bin_width)
 
         # drop columns with na
@@ -67,7 +68,7 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
             self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                                    self.monkey_information, sampling_rate=self.sampling_rate)
 
-        self.rebinned_x_var = pn_utils.rebin_spike_data(
+        self.rebinned_x_var = spike_history.rebin_spike_data(
             self.spikes_df, self.new_seg_info, bin_width=self.bin_width)
 
         # only keep the combination of ['new_segment', 'new_bin'] in self.rebinned_x_var
