@@ -106,60 +106,37 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
 
     return weighted_values, exposure, used_bins
 
-
 def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False):
-    """
-    O(n + m) interval–bin overlap for sorted, non-overlapping bins.
-
-    Convention (left-hold):
-      value[i] applies on [t[i], t[i+1]) for i = 0..n-2.
-
-    Parameters
-    ----------
-    time : (n,) strictly increasing float array
-    bins : (m, 2) float array of [left, right] per bin
-           Must be sorted by left edge ascending. Non-overlapping recommended.
-    assume_sorted : bool
-        If False, we sort bins by left edge first.
-    check_nonoverlap : bool
-        If True, assert that bins do not overlap.
-
-    Returns
-    -------
-    sample_idx : (L,) int    # interval index i contributing
-    bin_idx_array    : (L,) int    # bin index j receiving contribution
-    dt_array   : (L,) float  # overlap duration for that (i, j)
-    m          : int         # number of bins
-    """
     t = np.asarray(time, float)
     n = t.size
     assert n >= 2, 'need ≥2 time points'
+
     bins = np.asarray(bins, float)
-    assert bins.ndim == 2 and bins.shape[1] == 2, 'bins must be (m,2)'
+    assert bins.ndim == 2 and bins.shape[1] == 2
 
-    # intervals (left-hold): [t[i], t[i+1]) for i=0..n-2
-    seg_lo = t[:-1]
-    seg_hi = t[1:]
+    m = bins.shape[0]
+    orig_bin_idx = np.arange(m)
 
-    # sort bins if needed
     if not assume_sorted:
         order = np.argsort(bins[:, 0], kind='mergesort')
         bins = bins[order]
+        orig_bin_idx = orig_bin_idx[order]
 
     if check_nonoverlap:
         if np.any(bins[1:, 0] < bins[:-1, 1]):
-            raise ValueError('bins overlap; two-pointer assumes non-overlap')
+            raise ValueError('bins overlap')
 
+    seg_lo = t[:-1]
+    seg_hi = t[1:]
     bin_lo = bins[:, 0]
     bin_hi = bins[:, 1]
-    m = bins.shape[0]
 
     sample_idx = []
     bin_idx_array = []
     dt_array = []
 
-    i = 0  # interval pointer (0..n-2)
-    j = 0  # bin pointer (0..m-1)
+    i = 0
+    j = 0
 
     while i < n - 1 and j < m:
         lo = max(seg_lo[i], bin_lo[j])
@@ -167,33 +144,25 @@ def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False
 
         if hi > lo:
             sample_idx.append(i)
-            bin_idx_array.append(j)
+            bin_idx_array.append(orig_bin_idx[j])  # 👈 ORIGINAL bin index
             dt_array.append(hi - lo)
 
-        # advance whichever segment ends first
         if seg_hi[i] <= bin_hi[j]:
             i += 1
         else:
             j += 1
 
-        # skip bins entirely before next interval
-        while j < m and bin_hi[j] <= seg_lo[i] if i < n - 1 else False:
+        while j < m and i < n - 1 and bin_hi[j] <= seg_lo[i]:
             j += 1
-
-        # skip intervals entirely before next bin
-        while i < n - 1 and seg_hi[i] <= bin_lo[j] if j < m else False:
+        while i < n - 1 and j < m and seg_hi[i] <= bin_lo[j]:
             i += 1
 
-    if sample_idx:
-        sample_idx = np.asarray(sample_idx, dtype=int)
-        bin_idx_array = np.asarray(bin_idx_array,    dtype=int)
-        dt_array = np.asarray(dt_array,   dtype=float)
-    else:
-        sample_idx = np.zeros(0, dtype=int)
-        bin_idx_array = np.zeros(0, dtype=int)
-        dt_array = np.zeros(0, dtype=float)
-
-    return sample_idx, bin_idx_array, dt_array, m
+    return (
+        np.asarray(sample_idx, int),
+        np.asarray(bin_idx_array, int),
+        np.asarray(dt_array, float),
+        m
+    )
 
 
 def pick_event_window(df, event_time_col='stop_time',
@@ -245,7 +214,6 @@ def pick_event_window(df, event_time_col='stop_time',
     new_seg_info = out
     return new_seg_info
 
-
 def bin_spikes_by_cluster(spikes_df,
                           bins_2d,
                           time_col='time',
@@ -254,90 +222,93 @@ def bin_spikes_by_cluster(spikes_df,
                           assume_sorted_bins=True,
                           check_nonoverlap=False):
     """
-    Bin point spikes into possibly disjoint, sorted bins.
+    Bin point spikes into possibly disjoint bins.
 
     Bins use the half-open convention [left, right): left-inclusive, right-exclusive.
     Each spike increments exactly one bin if it falls inside; spikes in gaps are ignored.
 
-    Parameters
-    ----------
-    spikes_df : DataFrame with columns [time_col, cluster_col]
-    bins_2d   : (M, 2) ndarray of [left, right] per bin, sorted by left edge
-    time_col  : str, spike time column name
-    cluster_col : str, cluster/unit id column name (int or str ok)
-    clusters  : optional sequence of cluster IDs to include (and order to use).
-                If None, uses sorted unique IDs found in spikes_df after masking to bins.
-    assume_sorted_bins : bool, if False, will sort bins by left edge
-    check_nonoverlap   : bool, if True, raise if bins overlap
-
-    Returns
-    -------
-    counts : (M, C) int ndarray
-        Spike counts per bin (rows) and per cluster (columns).
-    cluster_ids : (C,) ndarray
-        Cluster IDs corresponding to columns of `counts`.
+    Returns counts in the SAME ORDER as the input bins_2d.
     """
+    import numpy as np
+
     # Extract arrays
     t = np.asarray(spikes_df[time_col], float)
     cl = np.asarray(spikes_df[cluster_col])
 
     bins = np.asarray(bins_2d, float)
     assert bins.ndim == 2 and bins.shape[1] == 2, 'bins_2d must be shape (M, 2)'
+
+    M = bins.shape[0]
+
+    # Track original bin order
+    orig_order = np.arange(M)
+
+    # Optionally sort bins internally
     if not assume_sorted_bins:
         order = np.argsort(bins[:, 0], kind='mergesort')
         bins = bins[order]
+        orig_order = orig_order[order]
+
     if check_nonoverlap and np.any(bins[1:, 0] < bins[:-1, 1]):
         raise ValueError(
             'bins overlap; expected non-overlapping bins for single assignment')
 
     lefts = bins[:, 0]
     rights = bins[:, 1]
-    M = bins.shape[0]
 
-    # Map each spike time -> candidate bin via left edges,
-    # then keep only spikes that also satisfy t < rights[idx]
+    # Assign spikes to bins (in sorted-bin space)
     idx = np.searchsorted(lefts, t, side='right') - 1
     valid = (idx >= 0) & (idx < M)
-    valid &= t < rights[np.clip(idx, 0, M-1)]
+    valid &= t < rights[np.clip(idx, 0, M - 1)]
+
     if not np.any(valid):
-        # No spikes fall in any bin
         if clusters is None:
-            return np.zeros((M, 0), dtype=int), np.array([], dtype=cl.dtype)
+            counts = np.zeros((M, 0), dtype=int)
+            cluster_ids = np.array([], dtype=cl.dtype)
         else:
-            return np.zeros((M, len(clusters)), dtype=int), np.asarray(clusters)
+            counts = np.zeros((M, len(clusters)), dtype=int)
+            cluster_ids = np.asarray(clusters)
+
+        # Restore original bin order
+        if not assume_sorted_bins:
+            inv_order = np.argsort(orig_order)
+            counts = counts[inv_order]
+
+        return counts, cluster_ids
 
     idx = idx[valid]
     cl = cl[valid]
 
     # Choose cluster columns
     if clusters is None:
-        # use sorted unique cluster IDs present in the filtered spikes
-        # (preserves numeric order; if you prefer first-seen order, use pd.unique)
         cluster_ids = np.unique(cl)
     else:
         cluster_ids = np.asarray(clusters)
     C = cluster_ids.size
 
-    # Build mapping cluster_id -> column index
-    # For speed, if cluster_ids are numeric and sorted, use searchsorted
+    # Map cluster IDs -> column indices
     try:
         col = np.searchsorted(cluster_ids, cl)
-        # Ensure cl values are indeed in cluster_ids; otherwise filter them out
         in_range = (col >= 0) & (col < C) & (cluster_ids[col] == cl)
         idx = idx[in_range]
         col = col[in_range]
     except Exception:
-        # Fallback: general mapping (works for strings too)
         id2col = {cid: k for k, cid in enumerate(cluster_ids)}
-        col = np.fromiter((id2col.get(x, -1)
-                          for x in cl), count=cl.size, dtype=int)
+        col = np.fromiter((id2col.get(x, -1) for x in cl),
+                          count=cl.size, dtype=int)
         keep = col >= 0
         idx = idx[keep]
         col = col[keep]
 
-    # Accumulate counts
+    # Accumulate counts (still in sorted-bin order)
     counts = np.zeros((M, C), dtype=int)
     np.add.at(counts, (idx, col), 1)
+
+    # Restore original bin order
+    if not assume_sorted_bins:
+        inv_order = np.argsort(orig_order)
+        counts = counts[inv_order]
+
     return counts, cluster_ids
 
 

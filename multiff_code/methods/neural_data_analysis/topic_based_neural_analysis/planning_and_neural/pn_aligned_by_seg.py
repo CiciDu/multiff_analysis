@@ -5,6 +5,7 @@ from neural_data_analysis.neural_analysis_tools.gpfa_methods import gpfa_helper_
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from neural_data_analysis.neural_analysis_tools.align_trials import align_trial_utils
 from neural_data_analysis.design_kits.design_by_segment import spike_history, rebin_segments
+from neural_data_analysis.design_kits.design_around_event import event_binning
 
 import pandas as pd
 import os
@@ -14,7 +15,7 @@ import numpy as np
 class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeural, gpfa_helper_class.GPFAHelperClass):
 
     def __init__(self, raw_data_folder_path=None,
-                 bin_width=0.05,
+                 bin_width=0.04,
                  one_point_index_per_bin=False):
         super().__init__(raw_data_folder_path=raw_data_folder_path,
                          bin_width=bin_width,
@@ -51,8 +52,8 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
 
     def _rebin_data_in_new_segments(self, rebinned_max_x_lag_number=2):
         # rebin y_var (behavioral data)
-        self.rebinned_y_var = rebin_segments.rebin_all_segments_local_bins(
-            self.planning_data_by_point, self.new_seg_info, bin_width=self.bin_width)
+        self.rebinned_y_var, self.bin_edges = rebin_segments.rebin_all_segments_local_bins(
+            self.planning_data_by_point, self.new_seg_info, bin_width=self.bin_width, add_bin_edges=True)
 
         # drop columns with na
         self.rebinned_y_var = general_utils.drop_na_cols(
@@ -68,16 +69,32 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
             self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
                                                                    self.monkey_information, sampling_rate=self.sampling_rate)
 
-        self.rebinned_x_var = spike_history.rebin_spike_data(
-            self.spikes_df, self.new_seg_info, bin_width=self.bin_width)
+        # self.rebinned_x_var = spike_history.rebin_spike_data(
+        #     self.spikes_df, self.new_seg_info, bin_width=self.bin_width)
+        
+        bins_2d = self.bin_edges
+        spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
+            self.spikes_df, bins_2d, time_col='time', cluster_col='cluster'
+        )
 
-        # only keep the combination of ['new_segment', 'new_bin'] in self.rebinned_x_var
-        self.rebinned_x_var = self.rebinned_x_var.merge(self.rebinned_y_var[[
-                                                        'new_segment', 'new_bin']], on=['new_segment', 'new_bin'], how='right')
+        self.rebinned_x_var = (
+            pd.DataFrame(spike_counts, columns=cluster_ids)
+            .reset_index(drop=True)
+        )       
+        
+        # add 'cluster_' prefix to the column names
+        self.rebinned_x_var.columns = ['cluster_' + str(col) for col in self.rebinned_x_var.columns]
+         
+        self.rebinned_x_var['new_segment'] = self.rebinned_y_var['new_segment'].values
+        self.rebinned_x_var['new_bin'] = self.rebinned_y_var['new_bin'].values
+            
+        # # only keep the combination of ['new_segment', 'new_bin'] in self.rebinned_x_var
+        # self.rebinned_x_var = self.rebinned_x_var.merge(self.rebinned_y_var[[
+        #                                                 'new_segment', 'new_bin']], on=['new_segment', 'new_bin'], how='right')
 
-        # assert that rebinned_y_var's [['new_segment', 'new_bin']] are the same as rebinned_x_var's [['new_segment', 'new_bin']]
-        assert self.rebinned_y_var[['new_segment', 'new_bin']].equals(
-            self.rebinned_x_var[['new_segment', 'new_bin']])
+        # # assert that rebinned_y_var's [['new_segment', 'new_bin']] are the same as rebinned_x_var's [['new_segment', 'new_bin']]
+        # assert self.rebinned_y_var[['new_segment', 'new_bin']].equals(
+        #     self.rebinned_x_var[['new_segment', 'new_bin']])
 
         self._get_rebinned_x_var_lags(
             rebinned_max_x_lag_number=rebinned_max_x_lag_number)

@@ -12,7 +12,7 @@ import os
 class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
     def __init__(self, raw_data_folder_path=None,
-                 bin_width=0.05,
+                 bin_width=0.04,
                  one_point_index_per_bin=False):
         super().__init__(raw_data_folder_path=raw_data_folder_path,
                          bin_width=bin_width,

@@ -12,7 +12,7 @@
 # - Public functions preserved: add_fdr, add_rate_ratios, term_population_tests,
 #   fit_poisson_glm_per_cluster, glm_mini_report
 # - New knobs are optional and default to your original (no penalty).
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import glm_fit_utils
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import glm_fit_utils
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import plot_spikes, plot_glm_fit
 
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
@@ -26,6 +26,9 @@ import statsmodels.api as sm
 from pathlib import Path
 from sklearn.model_selection import GroupKFold, KFold
 from scipy import stats as _stats
+import pickle
+import hashlib
+import json
 
 # ---------- small helpers (place near the top of the file) ----------
 
@@ -71,7 +74,7 @@ def _flag_and_update_metrics_row(mr, res, y, condX):
         mr['nonzeros'] < 3) or (mr['condX'] > 1e8)
 
 
-def _compute_cv_loglik_and_deviance(y, X, off, folds, *, maxiter=100):
+def _compute_cv_loglik_and_deviance(y, X, off, folds, *, maxiter=25):
     """
     Compute grouped K-Fold cross-validated metrics for a Poisson GLM without regularization.
     Returns (cv_loglik_improvement, cv_deviance_explained) where:
@@ -179,6 +182,7 @@ def fit_poisson_glm_per_cluster(
     compute_cv_metrics: bool = True,
     *,
     cv_splitter=None,
+    buffer_bins: int = 250,
     use_overdispersion_scale=False
 ):
     """Fit Poisson GLMs per cluster with optional Elastic-Net and CV."""
@@ -194,8 +198,8 @@ def fit_poisson_glm_per_cluster(
         # Build grouped folds for CV metrics if requested
         folds = None
         if compute_cv_metrics:
-            folds = glm_fit_utils._build_folds(
-                n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter)
+            folds =_build_folds(
+                n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
         for i, cid in enumerate(cluster_ids, 1):
             print(
                 f'Fitting cluster {i}/{len(cluster_ids)}: {cid} ...', flush=True)
@@ -220,7 +224,7 @@ def fit_poisson_glm_per_cluster(
             if compute_cv_metrics and folds is not None:
                 try:
                     cv_ll_imp, cv_dev_expl = _compute_cv_loglik_and_deviance(
-                        y, X, off, folds, maxiter=100)
+                        y, X, off, folds)
                 except Exception:
                     cv_ll_imp, cv_dev_expl = np.nan, np.nan
             else:
@@ -239,8 +243,8 @@ def fit_poisson_glm_per_cluster(
         return pd.Series(results).to_dict(), pd.DataFrame(coef_rows), pd.DataFrame(metrics_rows), pd.DataFrame()
 
     # ----------------------- regular path with tuning ------------------------
-    folds = glm_fit_utils._build_folds(n, n_splits=n_splits,
-                                       groups=groups, cv_splitter=cv_splitter)
+    folds =_build_folds(n, n_splits=n_splits,
+                                       groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
     results, coef_rows, metrics_rows, cv_tables = {}, [], [], []
 
     for i, cid in enumerate(cluster_ids, 1):
@@ -305,6 +309,7 @@ def fit_poisson_glm_per_cluster_fast_mle(
     n_splits: int = 5,
     groups=None,
     cv_splitter=None,
+    buffer_bins: int = 250,
     compute_cv_metrics: bool = True,
 ):
     """
@@ -323,8 +328,8 @@ def fit_poisson_glm_per_cluster_fast_mle(
     n = X.shape[0]
     folds = None
     if compute_cv_metrics:
-        folds = glm_fit_utils._build_folds(
-            n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter)
+        folds =_build_folds(
+            n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
 
     for i, cid in enumerate(eff_ids, 1):
         if show_progress:
@@ -355,7 +360,7 @@ def fit_poisson_glm_per_cluster_fast_mle(
         if compute_cv_metrics and folds is not None:
             try:
                 cv_ll_imp, cv_dev_expl = _compute_cv_loglik_and_deviance(
-                    y, X, off, folds, maxiter=maxiter)
+                    y, X, off, folds)
             except Exception:
                 cv_ll_imp, cv_dev_expl = np.nan, np.nan
         else:
@@ -421,7 +426,7 @@ def _fit_path(
     *, df_X, df_Y, offset_log, eff_clusters, cov_type,
     fast_mle, regularization, alpha_grid, l1_wt_grid,
     n_splits, cv_metric, groups, refit_on_support,
-    cv_splitter, use_overdispersion_scale, return_cv_tables,
+    cv_splitter, buffer_bins, use_overdispersion_scale, return_cv_tables,
     compute_cv_metrics,
     show_progress
 ):
@@ -430,7 +435,7 @@ def _fit_path(
             df_X=df_X, df_Y=df_Y, offset_log=offset_log,
             cluster_ids=eff_clusters, cov_type=cov_type,
             maxiter=100, show_progress=show_progress,
-            n_splits=n_splits, groups=groups, cv_splitter=cv_splitter,
+            n_splits=n_splits, groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins,
             compute_cv_metrics=compute_cv_metrics,
         )
         return results, coefs_df, metrics_df, pd.DataFrame()
@@ -444,7 +449,7 @@ def _fit_path(
         cluster_ids=eff_clusters, cov_type=cov_type,
         regularization=regularization, alpha_grid=alpha_grid, l1_wt_grid=l1_wt_grid,
         n_splits=n_splits, cv_metric=cv_metric, groups=groups,
-        refit_on_support=refit_on_support, cv_splitter=cv_splitter,
+        refit_on_support=refit_on_support, cv_splitter=cv_splitter, buffer_bins=buffer_bins,
         use_overdispersion_scale=use_overdispersion_scale, return_cv_tables=rcv,
         compute_cv_metrics=compute_cv_metrics,
     )
@@ -556,7 +561,7 @@ def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_
     return figs
 
 
-def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots):
+def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots, cv_tables_df=None, results=None, metadata: dict | None = None):
     if save_dir is None:
         return
     p = Path(save_dir)
@@ -564,11 +569,196 @@ def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots
     coefs_df.to_csv(p / 'coefs.csv', index=False)
     metrics_df.to_csv(p / 'metrics.csv', index=False)
     pop_tests.to_csv(p / 'population_tests.csv', index=False)
+    # save metadata sidecar for robust retrieval
+    if metadata is not None:
+        try:
+            with open(p / 'meta.json', 'w') as f:
+                json.dump(metadata, f, indent=2, default=str)
+        except Exception as e:
+            print(f'[save_outputs] WARNING: could not save meta.json: {type(e).__name__}: {e}')
+    # save optional CV tables
+    if cv_tables_df is not None and isinstance(cv_tables_df, pd.DataFrame) and not cv_tables_df.empty:
+        cv_tables_df.to_csv(p / 'cv_tables.csv', index=False)
+    # try to persist model results if provided (may be large)
+    if results is not None:
+        try:
+            with open(p / 'results.pkl', 'wb') as f:
+                pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f'[save_outputs] Saved results.pkl to {p / "results.pkl"}')
+        except Exception as e:
+            print(f'[save_outputs] WARNING: could not save results.pkl: {type(e).__name__}: {e}')
     if make_plots:
         for name, fig in figs.items():
             if fig is not None:
                 fig.savefig(p / f'{name}.png', dpi=150, bbox_inches='tight')
 
+
+def _load_outputs(save_dir, *, expected_hash: str | None = None):
+    """
+    Best-effort loader for previously saved report artifacts.
+    Returns tuple (loaded, payload) where:
+      - loaded: bool indicating whether anything substantive was loaded
+      - payload: dict mirroring glm_mini_report's return schema
+    """
+    if save_dir is None:
+        return False, {}
+    p = Path(save_dir)
+    coefs_fp = p / 'coefs.csv'
+    metrics_fp = p / 'metrics.csv'
+    pop_fp = p / 'population_tests.csv'
+    cv_fp = p / 'cv_tables.csv'
+    res_fp = p / 'results.pkl'
+    meta_fp = p / 'meta.json'
+
+    loaded_any = False
+    coefs_df = pd.DataFrame()
+    metrics_df = pd.DataFrame()
+    pop_df = pd.DataFrame()
+    cv_df = pd.DataFrame()
+    results = {}
+    meta = {}
+
+    # If an expected hash is provided, require meta.json to exist and match
+    if expected_hash is not None:
+        try:
+            if meta_fp.exists():
+                with open(meta_fp, 'r') as f:
+                    meta = json.load(f)
+                if meta.get('params_hash') != expected_hash:
+                    return False, {}
+            else:
+                return False, {}
+        except Exception as e:
+            print(f'[load_outputs] WARNING: could not verify meta.json: {type(e).__name__}: {e}')
+            return False, {}
+
+    try:
+        if coefs_fp.exists():
+            coefs_df = pd.read_csv(coefs_fp)
+            loaded_any = True
+    except Exception as e:
+        print(f'[load_outputs] WARNING: could not load {coefs_fp.name}: {type(e).__name__}: {e}')
+    try:
+        if metrics_fp.exists():
+            metrics_df = pd.read_csv(metrics_fp)
+            loaded_any = True
+    except Exception as e:
+        print(f'[load_outputs] WARNING: could not load {metrics_fp.name}: {type(e).__name__}: {e}')
+    try:
+        if pop_fp.exists():
+            pop_df = pd.read_csv(pop_fp)
+            loaded_any = True
+    except Exception as e:
+        print(f'[load_outputs] WARNING: could not load {pop_fp.name}: {type(e).__name__}: {e}')
+    try:
+        if cv_fp.exists():
+            cv_df = pd.read_csv(cv_fp)
+    except Exception as e:
+        print(f'[load_outputs] WARNING: could not load {cv_fp.name}: {type(e).__name__}: {e}')
+    try:
+        if res_fp.exists():
+            with open(res_fp, 'rb') as f:
+                results = pickle.load(f)
+    except Exception as e:
+        print(f'[load_outputs] WARNING: could not load {res_fp.name}: {type(e).__name__}: {e}')
+
+    offenders_df = _compute_offenders(metrics_df) if not metrics_df.empty else pd.DataFrame()
+    # Figures are not reconstructed on load; provide empty dict
+    figs = {}
+    payload = {
+        'results': results,
+        'coefs_df': coefs_df,
+        'metrics_df': metrics_df,
+        'population_tests_df': pop_df,
+        'figures': figs,
+        'cv_tables_df': cv_df,
+        'offenders_df': offenders_df,
+        'meta': meta,
+    }
+    return loaded_any, payload
+
+
+def _compute_params_hash_for_report(
+    *,
+    df_X: pd.DataFrame,
+    df_Y: pd.DataFrame,
+    offset_log,
+    feature_names,
+    eff_clusters,
+    cov_type: str,
+    fast_mle: bool,
+    regularization: str,
+    alpha_grid,
+    l1_wt_grid,
+    n_splits: int,
+    cv_metric: str,
+    refit_on_support: bool,
+    cv_splitter,
+    buffer_bins: int,
+    use_overdispersion_scale: bool,
+    return_cv_tables: bool,
+    compute_cv_metrics: bool,
+    make_plots: bool,
+    do_inference: bool,
+):
+    """
+    Build a stable parameters hash to guard cache retrieval.
+    Uses shapes, selected features/clusters, and relevant knobs (not raw data).
+    """
+    n_samples = int(len(df_X))
+    n_features = int(len(feature_names))
+    n_clusters = int(len(eff_clusters))
+    off_present = offset_log is not None
+    off_stats = None
+    if off_present:
+        try:
+            off_arr = np.asarray(offset_log, dtype=float).ravel()
+            off_stats = {
+                'n': int(off_arr.size),
+                'sum': float(np.sum(off_arr)),
+                'mean': float(np.mean(off_arr)),
+                'std': float(np.std(off_arr)),
+            }
+        except Exception:
+            off_stats = {'present': True}
+
+    hash_payload = {
+        'version': 1,
+        'n_samples': n_samples,
+        'n_features': n_features,
+        'n_clusters': n_clusters,
+        'feature_names': list(feature_names),
+        'cluster_ids': list(eff_clusters),
+        'cov_type': cov_type,
+        'fast_mle': bool(fast_mle),
+        'regularization': str(regularization),
+        'alpha_grid': list(alpha_grid) if alpha_grid is not None else None,
+        'l1_wt_grid': list(l1_wt_grid) if l1_wt_grid is not None else None,
+        'n_splits': int(n_splits),
+        'cv_metric': str(cv_metric),
+        'refit_on_support': bool(refit_on_support),
+        'use_overdispersion_scale': bool(use_overdispersion_scale),
+        'return_cv_tables': bool(return_cv_tables),
+        'compute_cv_metrics': bool(compute_cv_metrics),
+        'make_plots': bool(make_plots),
+        'do_inference': bool(do_inference),
+        'offset_stats': off_stats if off_present else None,
+        'cv_splitter_class': None if cv_splitter is None else cv_splitter.__class__.__name__,
+        'buffer_bins': int(buffer_bins),
+    }
+    params_hash = hashlib.sha1(
+        json.dumps(hash_payload, sort_keys=True, default=str).encode('utf-8')
+    ).hexdigest()[:10]
+    metadata = {
+        'params_hash': params_hash,
+        'summary': {
+            'n_samples': n_samples,
+            'n_features': n_features,
+            'n_clusters': n_clusters,
+        },
+        'config': {k: hash_payload[k] for k in hash_payload if k not in ('feature_names', 'cluster_ids')},
+    }
+    return params_hash, metadata
 
 def _show_or_close(figs, *, make_plots, show_plots):
     if not make_plots:
@@ -625,6 +815,7 @@ def glm_mini_report(
     groups=None,
     refit_on_support: bool = True,
     cv_splitter=None,
+    buffer_bins: int = 250,
     use_overdispersion_scale: bool = False,
     fast_mle: bool = False,
     make_plots: bool = True,
@@ -632,10 +823,28 @@ def glm_mini_report(
     return_cv_tables: bool = True,
     show_progress: bool = False,
     compute_cv_metrics: bool = True,
+    exists_ok: bool = True,
 ):
     """Thin orchestration wrapper: fit → inference → figs → save/show → offenders."""
     feature_names, eff_clusters = _resolve_inputs(
         df_X, df_Y, feature_names, cluster_ids)
+
+    # Prepare params hash and attempt to load cached results if allowed
+    params_hash, metadata = _compute_params_hash_for_report(
+        df_X=df_X, df_Y=df_Y, offset_log=offset_log,
+        feature_names=feature_names, eff_clusters=eff_clusters,
+        cov_type=cov_type, fast_mle=fast_mle, regularization=regularization,
+        alpha_grid=alpha_grid, l1_wt_grid=l1_wt_grid, n_splits=n_splits,
+        cv_metric=cv_metric, refit_on_support=refit_on_support,
+        cv_splitter=cv_splitter, buffer_bins=buffer_bins, use_overdispersion_scale=use_overdispersion_scale,
+        return_cv_tables=return_cv_tables, compute_cv_metrics=compute_cv_metrics,
+        make_plots=make_plots, do_inference=do_inference,
+    )
+    if exists_ok and save_dir is not None:
+        loaded, payload = _load_outputs(save_dir, expected_hash=params_hash)
+        if loaded:
+            print('[glm_mini_report] Loaded cached results from save_dir (exists_ok=True, hash match).')
+            return payload
 
     results, coefs_df, metrics_df, cv_tables_df = _fit_path(
         df_X=df_X, df_Y=df_Y, offset_log=offset_log,
@@ -643,7 +852,7 @@ def glm_mini_report(
         fast_mle=fast_mle, regularization=regularization,
         alpha_grid=alpha_grid, l1_wt_grid=l1_wt_grid,
         n_splits=n_splits, cv_metric=cv_metric, groups=groups,
-        refit_on_support=refit_on_support, cv_splitter=cv_splitter,
+        refit_on_support=refit_on_support, cv_splitter=cv_splitter, buffer_bins=buffer_bins,
         use_overdispersion_scale=use_overdispersion_scale,
         return_cv_tables=return_cv_tables, show_progress=show_progress,
         compute_cv_metrics=compute_cv_metrics
@@ -668,8 +877,12 @@ def glm_mini_report(
             f'[glm_mini_report] WARNING: could not build figures: {type(e).__name__}: {e}')
         figs = {}
 
-    _save_outputs(save_dir, coefs_df, metrics_df,
-                  pop_tests, figs, make_plots=make_plots)
+    # add hash to metadata before saving
+    _save_outputs(
+        save_dir, coefs_df, metrics_df, pop_tests, figs,
+        make_plots=make_plots, cv_tables_df=cv_tables_df, results=results,
+        metadata=metadata
+    )
     _show_or_close(figs, make_plots=make_plots, show_plots=show_plots)
 
     # summary + offenders
@@ -694,3 +907,76 @@ def glm_mini_report(
         'cv_tables_df': cv_tables_df,
         'offenders_df': offenders_df,
     }
+
+
+def _build_folds(
+    n,
+    *,
+    n_splits=5,
+    groups=None,
+    cv_splitter=None,
+    random_state=0,
+    buffer_bins=250 # for default: 5s/0.02s = 250 bins
+):
+    """
+    Return a list of (train_idx, valid_idx) pairs.
+
+    cv_splitter options:
+      - 'blocked_time_buffered': contiguous time blocks with buffers on both sides
+      - 'blocked_time': forward-chaining (past → future)
+      - groups != None: GroupKFold
+      - default: shuffled KFold
+    """
+    idx = np.arange(n)
+
+    # -------- BLOCKED TIME + BUFFER (recommended) --------
+    if cv_splitter == 'blocked_time_buffered':
+        # contiguous blocks
+        edges = np.linspace(0, n, n_splits + 1, dtype=int)
+        folds = []
+
+        for k in range(n_splits):
+            test_start, test_end = edges[k], edges[k + 1]
+
+            test_idx = idx[test_start:test_end]
+
+            # buffer region in time
+            buf_start = max(0, test_start - buffer_bins)
+            buf_end   = min(n, test_end + buffer_bins)
+            buffer_idx = idx[buf_start:buf_end]
+
+            train_mask = np.ones(n, dtype=bool)
+            train_mask[test_idx] = False
+            train_mask[buffer_idx] = False
+
+            train_idx = idx[train_mask]
+
+            if len(train_idx) == 0 or len(test_idx) == 0:
+                continue
+
+            folds.append((train_idx, test_idx))
+
+        print('cv_splitter = blocked_time_buffered: Split into contiguous blocks with buffer region')
+        return folds
+
+    # -------- FORWARD-CHAINING (causal CV) --------
+    if cv_splitter == 'blocked_time':
+        bps = np.linspace(0, n, n_splits + 1, dtype=int)
+        folds = []
+        for k in range(1, len(bps)):
+            start, stop = bps[k-1], bps[k]
+            train = idx[:start]
+            valid = idx[start:stop]
+            if len(train) and len(valid):
+                folds.append((train, valid))
+        print('cv_splitter = blocked_time: Forward-chaining (past → future)')
+        return folds
+
+    # -------- GROUPED CV --------
+    if groups is not None:
+        gkf = GroupKFold(n_splits=n_splits)
+        return list(gkf.split(idx, groups=groups))
+
+    # -------- DEFAULT (NOT recommended for time series) --------
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    return list(kf.split(idx))

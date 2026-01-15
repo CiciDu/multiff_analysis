@@ -12,7 +12,7 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import stop_glm_fit, cv_stop_glm
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import general_glm_fit, cv_stop_glm
 
 
 # ----------------------------- types -----------------------------------------
@@ -362,7 +362,7 @@ class SweepAndCompare:
         return df
 
 
-# assumes: _config_to_label, stop_glm_fit.glm_mini_report, cv_score_per_cluster are imported
+# assumes: _config_to_label, general_glm_fit.glm_mini_report, cv_score_per_cluster are imported
 
 def _compute_sparsity_and_sig(coefs: pd.DataFrame) -> tuple[float, float]:
     terms = pd.Series(coefs['term']).dropna().unique()
@@ -411,7 +411,7 @@ def fit_fn(
     )
     label = _config_to_label(cfg)
 
-    out = stop_glm_fit.glm_mini_report(
+    out = general_glm_fit.glm_mini_report(
         df_X=df_X, df_Y=df_Y, offset_log=offset_log,
         feature_names=feature_names, cluster_ids=cluster_ids,
         cov_type=cov_type,

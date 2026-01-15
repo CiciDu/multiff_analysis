@@ -1,7 +1,7 @@
 import numpy as np
 
 from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve, precision_recall_curve
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import stop_glm_fit, cv_stop_glm
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import general_glm_fit, cv_stop_glm
 from neural_data_analysis.design_kits.design_by_segment import create_design_df
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 from data_wrangling import general_utils

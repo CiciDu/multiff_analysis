@@ -253,37 +253,6 @@ def safe_mcfadden_r2(ll_full, ll_null, eps=1e-12):
     return 1.0 - (ll_full / ll_null)
 
 
-def _build_folds(n, *, n_splits=5, groups=None, cv_splitter=None, random_state=0):
-    """
-    Return a list of (train_idx, valid_idx) pairs.
-      - If cv_splitter == 'blocked_time': forward-chaining, contiguous blocks (row order = time).
-      - Else if groups is not None: GroupKFold.
-      - Else: KFold(shuffle=True).
-    """
-    idx = np.arange(n)
-
-    if cv_splitter == 'blocked_time':
-        # forward-chaining: use earlier rows to predict a later contiguous block
-        # split the range [0, n) into n_splits equal-ish blocks as validation sets
-        bps = np.linspace(0, n, n_splits + 1, dtype=int)
-        folds = []
-        for k in range(1, len(bps)):
-            start, stop = bps[k-1], bps[k]
-            valid = idx[start:stop]
-            train = idx[:start]  # only past rows (no look-ahead)
-            if len(train) == 0 or len(valid) == 0:
-                continue
-            folds.append((train, valid))
-        return folds
-
-    if groups is not None:
-        gkf = GroupKFold(n_splits=n_splits)
-        return list(gkf.split(idx, groups=groups))
-
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    return list(kf.split(idx))
-
-
 def _score_from_beta(beta, X_val, off_val, y_val, metric='loglik'):
     """
     Score coefficients on validation data.

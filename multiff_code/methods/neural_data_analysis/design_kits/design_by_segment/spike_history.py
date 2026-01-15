@@ -1,73 +1,61 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
-
 import numpy as np
 import pandas as pd
 
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.design_kits.design_by_segment import temporal_feats
 from neural_data_analysis.design_kits.design_around_event.event_binning import (
-    build_bin_assignments,
     bin_spikes_by_cluster,
-    segment_windows_to_bins2d,
-)
-from neural_data_analysis.design_kits.design_around_event.event_binning import (
-    rebin_all_segments_global_bins,
 )
 
 # ============================================================
-# Padding-aware spike rebinning (LOCAL / GLOBAL)
+# Padding utilities
 # ============================================================
-def rebin_spike_data_with_pad(
+
+def _pad_bin_table_for_history(
+    bin_df: pd.DataFrame,
     *,
-    spikes_df: pd.DataFrame,
-    new_seg_info: pd.DataFrame,
+    dt: float,
     t_max: float,
-    mode: str,
-    bin_width: float | None = None,
-    bins_2d: np.ndarray | None = None,
-    time_col: str = 'time',
-    cluster_col: str = 'cluster',
 ):
     """
-    Apply backward padding in time, then rebin.
-    Padding is truncated AFTER history construction.
-    """
+    Prepend padding bins (in time) per segment for spike-history support.
 
-    if mode == 'local':
-        dt = float(bin_width)
-    else:
-        dt = np.median(np.diff(bins_2d[:, 0]))
+    Parameters
+    ----------
+    bin_df : DataFrame
+        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right']
+    """
+    
+    bin_dt = _assert_dt_matches_bins(bin_df, dt)
+    dt = bin_dt
+
 
     n_pad_bins = int(np.ceil(t_max / dt))
     pad_time = n_pad_bins * dt
 
-    # --------------------------------------------------
-    # Pad segments backward in time
-    # --------------------------------------------------
-    new_seg_info_pad = new_seg_info.copy()
-    new_seg_info_pad['new_seg_start_time'] -= pad_time
-    new_seg_info_pad['new_seg_duration'] = (
-        new_seg_info_pad['new_seg_end_time']
-        - new_seg_info_pad['new_seg_start_time']
-    )
+    pad_blocks = []
 
-    # --------------------------------------------------
-    # Rebin (IDENTICAL global or local)
-    # --------------------------------------------------
-    design_pad = rebin_spike_data(
-        spikes_df=spikes_df,
-        new_seg_info=new_seg_info_pad,
-        mode=mode,
-        bin_width=bin_width,
-        bins_2d=bins_2d,
-        time_col=time_col,
-        cluster_col=cluster_col,
-    )
+    for seg_id, g in bin_df.groupby('new_segment'):
+        g = g.sort_values('new_bin')
 
-    return design_pad, dict(
+        first = g.iloc[0]
+        left0 = float(first['bin_left'])
+
+        pad_lefts = left0 - dt * np.arange(n_pad_bins, 0, -1)
+        pad_rights = pad_lefts + dt
+
+        pad = pd.DataFrame({
+            'new_segment': seg_id,
+            'new_bin': np.arange(-n_pad_bins, 0, dtype=int),
+            'bin_left': pad_lefts,
+            'bin_right': pad_rights,
+        })
+
+        pad_blocks.append(pd.concat([pad, g], ignore_index=True))
+
+    bin_df_pad = pd.concat(pad_blocks, ignore_index=True)
+
+    return bin_df_pad, dict(
         n_pad_bins=n_pad_bins,
         pad_time=pad_time,
         dt=dt,
@@ -75,98 +63,22 @@ def rebin_spike_data_with_pad(
 
 
 # ============================================================
-# Rebinning backends
+# Spike rebinning using explicit bins
 # ============================================================
-def rebin_spike_data(
+
+def _rebin_spikes_from_bin_table(
     *,
     spikes_df: pd.DataFrame,
-    new_seg_info: pd.DataFrame,
-    mode: str,
-    bin_width: float | None = None,
-    bins_2d: np.ndarray | None = None,
+    bin_df: pd.DataFrame,
     time_col: str = 'time',
     cluster_col: str = 'cluster',
 ):
     """
-    Unified spike rebinning.
-
-    mode:
-      - 'local'  : segment-local bins (unchanged)
-      - 'global' : IDENTICAL to rebin_all_segments_global_bins
+    Rebin spikes using an explicit bin table.
+    Bin identity comes entirely from bin_df.
     """
 
-    if mode == 'local':
-        if bin_width is None:
-            raise ValueError('bin_width required for local mode')
-
-        bins_2d_local, meta = segment_windows_to_bins2d(
-            new_seg_info,
-            bin_width=bin_width,
-        )
-
-        if bins_2d_local.size == 0:
-            return pd.DataFrame()
-
-        counts, cluster_ids = bin_spikes_by_cluster(
-            spikes_df[[time_col, cluster_col]],
-            bins_2d_local,
-            time_col=time_col,
-            cluster_col=cluster_col,
-            assume_sorted_bins=True,
-            check_nonoverlap=False,
-        )
-
-        out = meta[['new_segment', 'new_bin']].copy()
-        for j, cid in enumerate(cluster_ids):
-            out[f'cluster_{cid}'] = counts[:, j]
-
-        return out.merge(
-            new_seg_info[
-                ['new_segment', 'new_seg_start_time',
-                 'new_seg_end_time', 'new_seg_duration']
-            ],
-            on='new_segment',
-            how='left',
-            validate='many_to_one',
-        )
-
-    # --------------------------------------------------
-    # GLOBAL (IDENTICAL path)
-    # --------------------------------------------------
-    if mode == 'global':
-        if bins_2d is None:
-            raise ValueError('bins_2d required for global mode')
-
-        return rebin_spike_data_global_bins_identical(
-            spikes_df=spikes_df,
-            new_seg_info=new_seg_info,
-            bins_2d=bins_2d,
-            time_col=time_col,
-            cluster_col=cluster_col,
-        )
-
-    raise ValueError("mode must be 'local' or 'global'")
-
-
-def rebin_spike_data_local_bins(
-    spikes_df,
-    new_seg_info,
-    *,
-    bin_width,
-    time_col,
-    cluster_col,
-):
-    """
-    Original segment-local PSTH-style binning.
-    """
-
-    bins_2d, meta = segment_windows_to_bins2d(
-        new_seg_info,
-        bin_width=bin_width,
-    )
-
-    if bins_2d.size == 0:
-        return pd.DataFrame()
+    bins_2d = bin_df[['bin_left', 'bin_right']].to_numpy()
 
     counts, cluster_ids = bin_spikes_by_cluster(
         spikes_df[[time_col, cluster_col]],
@@ -177,96 +89,64 @@ def rebin_spike_data_local_bins(
         check_nonoverlap=False,
     )
 
-    out = meta[['new_segment', 'new_bin']].copy()
+    bin_df = bin_df.sort_values(['new_segment', 'new_bin']).reset_index(drop=True)
+
+
     for j, cid in enumerate(cluster_ids):
-        out[f'cluster_{cid}'] = counts[:, j]
+        bin_df[f'cluster_{cid}'] = counts[:, j]
 
-    out = out.merge(
-        new_seg_info[
-            ['new_segment', 'new_seg_start_time',
-             'new_seg_end_time', 'new_seg_duration']
-        ],
-        on='new_segment',
-        how='left',
-        validate='many_to_one',
-    )
-
-    return out
-
-def rebin_spike_data_global_bins(
-    *,
-    spikes_df: pd.DataFrame,
-    new_seg_info: pd.DataFrame,
-    bins_2d: np.ndarray,
-    time_col: str = 'time',
-    cluster_col: str = 'cluster',
-):
-    """
-    Global-bin spike rebinning that is IDENTICAL to
-    rebin_all_segments_global_bins, up to padding.
-    """
-
-    if spikes_df.empty:
-        return pd.DataFrame()
-
-    # --------------------------------------------------
-    # Convert spikes → wide left-hold timeseries
-    # --------------------------------------------------
-    wide = (
-        spikes_df
-        .assign(value=1.0)
-        .pivot_table(
-            index=time_col,
-            columns=cluster_col,
-            values='value',
-            aggfunc='sum',
-            fill_value=0.0,
-        )
-        .reset_index()
-    )
-
-    wide.columns = [
-        time_col if c == time_col else f'cluster_{c}'
-        for c in wide.columns
-    ]
-
-    # --------------------------------------------------
-    # Delegate to canonical global binning
-    # --------------------------------------------------
-    out = rebin_all_segments_global_bins(
-        wide,
-        new_seg_info,
-        bins_2d=bins_2d,
-        time_col=time_col,
-        how='sum',                 # spike counts
-        respect_old_segment=False, # spikes have no old segment
-        add_bin_edges=False,
-        require_full_bin=False,
-        add_support_duration=False,
-    )
-
-    return out
+    return bin_df
 
 
 # ============================================================
-# Spike history (UNCHANGED)
+# Public entry point
 # ============================================================
 
 def compute_spike_history_designs(
-    design_pad: pd.DataFrame,
-    bin_info: pd.DataFrame,
     *,
-    n_pad_bins: int,
+    spikes_df: pd.DataFrame,
+    bin_df: pd.DataFrame,
     dt: float,
     t_max: float,
     n_basis: int = 5,
     t_min: float | None = None,
     edge: str = 'zero',
 ):
+    """
+    Build spike-history design matrices using externally defined bins.
+
+    Parameters
+    ----------
+    spikes_df : DataFrame
+        Must contain ['time', 'cluster']
+    bin_df : DataFrame
+        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right']
+        Produced by rebin_all_segments (local or global) with add_bin_edges=True.
+    """
 
     if t_min is None:
         t_min = dt
 
+    # --------------------------------------------------
+    # 1) Pad bins
+    # --------------------------------------------------
+    bin_df_pad, pad_info = _pad_bin_table_for_history(
+        bin_df,
+        dt=dt,
+        t_max=t_max,
+    )
+
+    # --------------------------------------------------
+    # 2) Rebin spikes
+    # --------------------------------------------------
+    design_pad = _rebin_spikes_from_bin_table(
+        spikes_df=spikes_df,
+        bin_df=bin_df_pad,
+    )
+
+    # --------------------------------------------------
+    # 3) Build history basis (ONCE)
+    # --------------------------------------------------
     _, basis = glm_bases.raised_cosine_basis(
         n_basis=n_basis,
         t_max=t_max,
@@ -281,6 +161,12 @@ def compute_spike_history_designs(
     X_hist = {}
     colnames = {}
 
+    n_pad_bins = pad_info['n_pad_bins']
+    K = basis.shape[1]
+
+    # --------------------------------------------------
+    # 4) History per neuron
+    # --------------------------------------------------
     for col in spike_cols:
         hist = temporal_feats.lagged_design_from_signal_trials(
             design_pad[col].to_numpy(),
@@ -289,30 +175,190 @@ def compute_spike_history_designs(
             edge=edge,
         )
 
-        K = basis.shape[1]
-        colnames[col] = [f'{col}:b0:{k}' for k in range(K)]
+        cols = [f'{col}:b0:{k}' for k in range(K)]
+        colnames[col] = cols
 
-        hist = pd.DataFrame(hist, columns=colnames[col])
+        hist = pd.DataFrame(hist, columns=cols)
         hist['new_segment'] = design_pad['new_segment'].values
         hist['new_bin'] = design_pad['new_bin'].values
 
-        hist = truncate_history_pad(hist, n_pad_bins)
-
-        hist = bin_info[['new_segment', 'new_bin']].merge(
-            hist,
-            on=['new_segment', 'new_bin'],
-            how='left',
-            validate='one_to_one',
-        )
+        # --------------------------------------------------
+        # 5) Truncate padding
+        # Padding bins have new_bin < 0 and are removed after history construction
+        # --------------------------------------------------
+        keep = hist['new_bin'] >= 0
+        hist = hist.loc[keep].copy()
+        hist.reset_index(drop=True, inplace=True)
 
         X_hist[col] = hist
+        
+    # pick one representative neuron to check that the sequence of 'new_segment', 'new_bin' is the same as the original bin_df
+    rep_col = spike_cols[0]
+    rep_hist = X_hist[rep_col]
+
+    assert np.array_equal(
+        rep_hist['new_segment'].values,
+        bin_df['new_segment'].values,
+    )
+    assert np.array_equal(
+        rep_hist['new_bin'].values,
+        bin_df['new_bin'].values,
+    )
 
     return X_hist, basis, colnames
 
+def _assert_dt_matches_bins(bin_df, dt, *, tol=1e-9):
+    widths = (bin_df['bin_right'] - bin_df['bin_left']).to_numpy(dtype=float)
 
-def truncate_history_pad(df: pd.DataFrame, n_pad_bins: int):
-    keep = df['new_bin'].to_numpy() >= n_pad_bins
-    df = df.loc[keep].copy()
-    df['new_bin'] -= n_pad_bins
-    df.reset_index(drop=True, inplace=True)
-    return df
+    # ignore pathological bins (e.g. empty or NaN)
+    widths = widths[np.isfinite(widths)]
+
+    unique = np.unique(np.round(widths / tol) * tol)
+
+    if unique.size != 1:
+        raise ValueError(
+            f'Bin widths are not uniform: {unique}'
+        )
+
+    bin_dt = unique[0]
+
+    if not np.isclose(bin_dt, dt, rtol=0, atol=tol):
+        raise ValueError(
+            f'dt={dt} does not match bin width from bin_df ({bin_dt})'
+        )
+
+    # also assert monotonic bins per segment
+    for seg, g in bin_df.groupby('new_segment'):
+        if not np.all(np.diff(g['bin_left']) > 0):
+            raise ValueError(f'Bins not strictly increasing in segment {seg}')
+
+
+    return bin_dt
+
+
+def add_spike_history_to_design(
+    design_df: pd.DataFrame,
+    colnames: dict[str, list[str]],
+    X_hist: dict,
+    target_col: str,
+    *,
+    include_self: bool = True,
+    cross_neurons: list[str] | None = None,
+    meta_groups: dict | None = None,
+):
+    """
+    Assemble a GLM design matrix for one target neuron by adding spike-history
+    regressors (self and optional cross-neuron history).
+
+    Optionally updates meta['groups'] to group history columns by predictor.
+    """
+
+    design_df = design_df.copy()
+
+    # --- self-history ---
+    if include_self:
+        target_cols = colnames[target_col]
+        design_df[target_cols] = X_hist[target_col][target_cols].values
+
+    # --- cross-neuron history ---
+    if cross_neurons is not None:
+        for neuron in cross_neurons:
+            neuron_cols = colnames[neuron]
+            design_df[neuron_cols] = X_hist[neuron][neuron_cols].values
+
+    # --- optional: update meta groups ---
+    if meta_groups is not None:
+
+        if include_self:
+            meta_groups.setdefault(target_col, []).extend(colnames[target_col])
+
+        if cross_neurons is not None:
+            for neuron in cross_neurons:
+                meta_groups.setdefault(neuron, []).extend(colnames[neuron])
+
+        return design_df, meta_groups
+
+    return design_df, None
+
+def build_design_with_spike_history_from_bins(
+    *,
+    spikes_df,
+    bin_df,
+    X_pruned,
+    meta_groups,
+    dt,
+    t_max,
+    n_basis=5,
+):
+    """
+    Compute spike-history regressors from an explicit bin table and
+    add them to an existing design matrix.
+
+    Parameters
+    ----------
+    spikes_df : DataFrame
+        Must contain ['time', 'cluster'].
+    bin_df : DataFrame
+        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right'].
+    X_pruned : DataFrame
+        Base design matrix with ['new_segment', 'new_bin'].
+    meta_groups : dict
+        Meta groups dict to be updated in-place.
+    dt : float
+        Bin width.
+    t_max : float
+        Maximum history length.
+    """
+
+    # --------------------------------------------------
+    # 1) Compute spike-history designs
+    # --------------------------------------------------
+    X_hist, basis, colnames = compute_spike_history_designs(
+        spikes_df=spikes_df,
+        bin_df=bin_df,
+        dt=dt,
+        t_max=t_max,
+        n_basis=n_basis,
+    )
+
+    # --------------------------------------------------
+    # 2) Choose target + cross neurons
+    # --------------------------------------------------
+    spike_cols = list(colnames.keys())
+    if len(spike_cols) == 0:
+        raise ValueError('No spike columns found in colnames')
+
+    # It is sufficient to do this once
+    target_col = spike_cols[0]
+    cross_neurons = [c for c in spike_cols if c != target_col]
+
+    # --------------------------------------------------
+    # 3) Add history to design
+    # --------------------------------------------------
+    design_w_history, meta_groups = add_spike_history_to_design(
+        design_df=X_pruned,
+        colnames=colnames,
+        X_hist=X_hist,
+        target_col=target_col,
+        include_self=True,
+        cross_neurons=cross_neurons,
+        meta_groups=meta_groups,
+    )
+
+    return design_w_history, basis, colnames, meta_groups
+
+
+def make_bin_df_from_stop_meta(meta_used):
+    return (
+        meta_used[['event_id', 'k_within_seg', 't_left', 't_right']]
+        .copy()
+        .rename(columns={
+            'event_id': 'new_segment',
+            'k_within_seg': 'new_bin',
+            't_left': 'bin_left',
+            't_right': 'bin_right',
+        })
+        .drop_duplicates()
+        .sort_values(['new_segment', 'new_bin'])
+        .reset_index(drop=True)
+    )

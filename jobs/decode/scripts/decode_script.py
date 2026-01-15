@@ -178,7 +178,7 @@ def main():
             pn=pn,
             cfg=compare_events.core_stops_psth.PSTHConfig(
                 pre_window=0.5, post_window=0.5,
-                bin_width=0.05, smoothing_sigma=0.1,
+                bin_width=0.04, smoothing_sigma=0.1,
                 min_trials=5, normalize='zscore',
             ),
             model_name=args.model,

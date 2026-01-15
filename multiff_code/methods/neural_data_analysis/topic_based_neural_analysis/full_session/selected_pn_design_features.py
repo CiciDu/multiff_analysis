@@ -5,9 +5,9 @@
 # -------------------------
 # 1. Intercept
 # -------------------------
-# intercept = [
-#     'const',
-# ]
+intercept = [
+    'const',
+]
 
 # -------------------------
 # 2. Visibility & memory state (current / next)
@@ -31,27 +31,6 @@ visibility_transients = [
     'cur_vis_off:b0:2',
 ]
 
-# -------------------------
-# 4. Kinematics (movement state)
-# -------------------------
-kinematics = [
-    'speed:s0',
-    'speed:s1',
-    'speed:s2',
-    'ang_speed:s0',
-    'ang_speed:s1',
-    'ang_speed:s2',
-    #'curv_of_traj',
-]
-
-# -------------------------
-# 5. Firefly count & memory load
-# -------------------------
-ff_count_memory = [
-    'num_ff_visible',
-    'log1p_num_ff_visible',
-    'log1p_num_ff_in_memory',
-]
 
 # -------------------------
 # 6. Firefly egocentric geometry
@@ -86,10 +65,51 @@ temporal_context = [
 ]
 
 
+# -------------------------
+# Full ordered predictor list
+# -------------------------
+pn_design_predictors = (
+    visibility_state
+    + visibility_transients
+    + ff_angle
+    + ff_distance
+    + temporal_context
+    # + kinematics
+    # + ff_count_memory
+    # + gaze_state
+    # + eye_motion_energy
+    # + acceleration_state
+)
 
 
 
 
+
+
+
+
+
+# -------------------------
+# 4. Kinematics (movement state)
+# -------------------------
+kinematics = [
+    'speed:s0',
+    'speed:s1',
+    'speed:s2',
+    'ang_speed:s0',
+    'ang_speed:s1',
+    'ang_speed:s2',
+    #'curv_of_traj',
+]
+
+# -------------------------
+# 5. Firefly count & memory load
+# -------------------------
+ff_count_memory = [
+    'num_ff_visible',
+    'log1p_num_ff_visible',
+    'log1p_num_ff_in_memory',
+]
 
 
 
@@ -117,6 +137,9 @@ eye_motion_energy = [
     'LDy_mag',
 ]
 
+
+
+
 # -------------------------
 # 10. Acceleration & angular acceleration
 # -------------------------
@@ -127,18 +150,16 @@ acceleration_state = [
     'ang_accel_mag',
 ]
 
-# -------------------------
-# Full ordered predictor list
-# -------------------------
-pn_design_predictors = (
-    visibility_state
+full_pn_design_predictors = (
+    intercept
+    + visibility_state
     + visibility_transients
     + ff_angle
     + ff_distance
     + temporal_context
-    # + kinematics
-    # + ff_count_memory
-    # + gaze_state
-    # + eye_motion_energy
-    # + acceleration_state
+    + kinematics
+    + ff_count_memory
+    + gaze_state
+    + eye_motion_energy
+    + acceleration_state
 )

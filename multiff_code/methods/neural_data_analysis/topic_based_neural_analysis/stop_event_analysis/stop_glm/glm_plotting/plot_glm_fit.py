@@ -1,4 +1,4 @@
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_fit import stop_glm_fit
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import general_glm_fit
 
 import numpy as np
 import pandas as pd

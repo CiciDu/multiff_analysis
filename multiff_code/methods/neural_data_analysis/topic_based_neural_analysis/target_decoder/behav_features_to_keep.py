@@ -2,6 +2,7 @@
 trial_info_columns = [
     'bin',
     'point_index',
+    'time',
 ]
 
 # Monkey movement and position features

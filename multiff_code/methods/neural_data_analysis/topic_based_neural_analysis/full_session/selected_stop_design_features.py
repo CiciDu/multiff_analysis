@@ -78,11 +78,11 @@ stop_design_predictors = [
 ]
 
 
-additional_stop_design_predictors = [    # --- Kinematics ---
+full_stop_design_predictors = [    # --- Kinematics ---
     'accel',
     'speed',
     'ang_speed',
 
     # --- Belief state (single encoding) ---
     'num_ff_visible',
-    'num_ff_in_memory', ]
+    'num_ff_in_memory'] + stop_design_predictors

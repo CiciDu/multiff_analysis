@@ -121,7 +121,6 @@ def rebin_all_segments_global_bins(
     df,
     new_seg_info,
     bins_2d=None,
-    bin_width=None,
     *,
     time_col='time',
     segment_col='segment',
@@ -148,6 +147,12 @@ def rebin_all_segments_global_bins(
         If True, only keep bins fully contained in the segment window.
     add_support_duration : bool
         If True, add bin_support_dt = total overlap duration accumulated into that (segment, new_bin).
+    Returns
+    -------
+    out : pd.DataFrame
+        Rebinned values per (`new_segment`, `new_bin`).
+    bin_edges : np.ndarray, optional
+        Only returned when add_bin_edges=True. Shape (len(out), 2) with [left, right).
     """
 
     if how not in ('mean', 'sum'):
@@ -176,7 +181,7 @@ def rebin_all_segments_global_bins(
         if c not in exclude
     ]
     if not value_cols:
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # Build signal
     extra_cols = [segment_col] if respect_old_segment else []
@@ -190,16 +195,16 @@ def rebin_all_segments_global_bins(
         t_end=t_end,
     )
     if times.size < 2:
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # Assign each interval to a new_segment id
     sample_segment, _, _, _ = _assign_intervals_to_new_segments(times, new_seg_info)
     if sample_segment.size == 0:
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     valid_samples = sample_segment >= 0
     if not np.any(valid_samples):
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # Global overlaps ONCE
     sample_idx, bin_idx, dt_arr, _ = build_bin_assignments(
@@ -209,7 +214,7 @@ def rebin_all_segments_global_bins(
         check_nonoverlap=False,
     )
     if sample_idx.size == 0:
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # Keep only overlaps whose sample interval belongs to some new segment
     keep = valid_samples[sample_idx]
@@ -237,7 +242,7 @@ def rebin_all_segments_global_bins(
         new_seg_id = new_seg_id[ok_old]
 
         if sample_idx.size == 0:
-            return pd.DataFrame()
+            return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # require_full_bin mask (optional)
     if require_full_bin:
@@ -257,7 +262,7 @@ def rebin_all_segments_global_bins(
         new_seg_id = new_seg_id[full]
 
         if sample_idx.size == 0:
-            return pd.DataFrame()
+            return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # Sparse accumulation into (new_segment, global_bin)
     n_bins = bins_2d.shape[0]
@@ -274,7 +279,7 @@ def rebin_all_segments_global_bins(
 
     valid = time_acc > 0
     if not np.any(valid):
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     if how == 'mean':
         acc[valid] /= time_acc[valid, None]
@@ -288,10 +293,6 @@ def rebin_all_segments_global_bins(
     if add_support_duration:
         out['bin_support_dt'] = time_acc[out_seg, out_bin]
 
-    if add_bin_edges:
-        out['bin_left'] = bins_2d[out_bin, 0]
-        out['bin_right'] = bins_2d[out_bin, 1]
-
     out = out.merge(
         new_seg_info[
             ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
@@ -302,13 +303,15 @@ def rebin_all_segments_global_bins(
         validate='many_to_one',
     )
 
+    if add_bin_edges:
+        bin_edges = bins_2d[out_bin, :]
+        return out, bin_edges
     return out
 
 
 def rebin_all_segments_local_bins(
     df,
     new_seg_info,
-    bins_2d=None,          # unused, kept for interface symmetry
     bin_width=None,
     *,
     time_col='time',
@@ -316,12 +319,17 @@ def rebin_all_segments_local_bins(
     how='mean',
     respect_old_segment=True,
     add_bin_edges=False,
-    require_full_bin=False,      # no-op by design (kept for symmetry)
     add_support_duration=False,
 ):
     """
     Provably identical refactor of the original rebin_segment_data
     (local / segment-defined bins).
+    Returns
+    -------
+    out : pd.DataFrame
+        Rebinned values per (`new_segment`, `new_bin`).
+    bin_edges : np.ndarray, optional
+        Only returned when add_bin_edges=True. Shape (len(out), 2) with [left, right).
     """
 
     if how not in ('mean', 'sum'):
@@ -352,7 +360,7 @@ def rebin_all_segments_local_bins(
         if c not in exclude
     ]
     if not value_cols:
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     # --------------------------------------------------
     # Prepare data access (IDENTICAL logic)
@@ -367,6 +375,7 @@ def rebin_all_segments_local_bins(
         times_all = df_sorted[time_col].to_numpy()
 
     out_blocks = []
+    edges_blocks = [] if add_bin_edges else None
 
     # --------------------------------------------------
     # Loop over new segments (IDENTICAL logic)
@@ -462,13 +471,12 @@ def rebin_all_segments_local_bins(
             block['bin_support_dt'] = support[used_bins.astype(int)]
 
         if add_bin_edges:
-            block['bin_left'] = seg_bins_2d[used_bins.astype(int), 0]
-            block['bin_right'] = seg_bins_2d[used_bins.astype(int), 1]
+            edges_blocks.append(seg_bins_2d[used_bins.astype(int), :])
 
         out_blocks.append(block)
 
     if not out_blocks:
-        return pd.DataFrame()
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
 
     out = pd.concat(out_blocks, ignore_index=True)
 
@@ -491,60 +499,186 @@ def rebin_all_segments_local_bins(
         validate='many_to_one',
     )
 
+    if add_bin_edges:
+        bin_edges = np.vstack(edges_blocks) if edges_blocks else np.empty((0, 2))
+        return out, bin_edges
     return out
 
 
-def rebin_all_segments(
+
+def rebin_all_segments_global_bins_pick_point(
     df,
     new_seg_info,
-    *,
-    mode,
     bins_2d=None,
-    bin_width=None,
+    *,
     time_col='time',
     segment_col='segment',
-    how='mean',
     respect_old_segment=True,
-    add_bin_edges=False,
     require_full_bin=False,
-    add_support_duration=False,
+    add_bin_edges=False,
 ):
     """
-    Unified public wrapper.
+    Rebin across ALL segments using predefined global bins_2d,
+    but select ONE representative point per (new_segment, bin)
+    instead of a weighted sum / mean.
 
-    mode:
-      - 'global': uses bins_2d (vectorized across segments)
-      - 'local':  uses bin_width (segment-local bins)
+    Representative point = sample with MAX overlap duration (dt)
+    within that (new_segment, global_bin).
+
+    Parameters
+    ----------
+    bins_2d : (B, 2) array-like
+        Global bins [left, right) in absolute time.
+    bin_width : unused (kept for signature symmetry)
+    respect_old_segment : bool
+        If True, only samples from the same old `segment_col`
+        are used for each new segment.
+    require_full_bin : bool
+        If True, only keep bins fully contained in the segment window.
+
+    Returns
+    -------
+    out : pd.DataFrame
+        Rebinned values per (`new_segment`, `new_bin`)
+        using a single representative point.
+    bin_edges : np.ndarray, optional
+        Only returned when add_bin_edges=True.
     """
-    if mode == 'global':
-        return rebin_all_segments_global_bins(
-            df,
-            new_seg_info,
-            bins_2d=bins_2d,
-            bin_width=bin_width,
-            time_col=time_col,
-            segment_col=segment_col,
-            how=how,
-            respect_old_segment=respect_old_segment,
-            add_bin_edges=add_bin_edges,
-            require_full_bin=require_full_bin,
-            add_support_duration=add_support_duration,
-        )
 
-    if mode == 'local':
-        return rebin_all_segments_local_bins(
-            df,
-            new_seg_info,
-            bins_2d=bins_2d,
-            bin_width=bin_width,
-            time_col=time_col,
-            segment_col=segment_col,
-            how=how,
-            respect_old_segment=respect_old_segment,
-            add_bin_edges=add_bin_edges,
-            require_full_bin=require_full_bin,
-            add_support_duration=add_support_duration,
-        )
+    if bins_2d is None:
+        raise ValueError('bins_2d is required for global-bins mode')
 
-    raise ValueError("mode must be 'global' or 'local'")
+    bins_2d = np.asarray(bins_2d, dtype=float)
+    if bins_2d.ndim != 2 or bins_2d.shape[1] != 2:
+        raise ValueError('bins_2d must have shape (B, 2)')
 
+    # Identify value columns
+    exclude = {
+        'new_segment',
+        'new_seg_start_time',
+        'new_seg_end_time',
+        'new_seg_duration',
+    }
+    if respect_old_segment:
+        exclude.add(segment_col)
+
+    value_cols = [
+        c for c in df.select_dtypes(include='number').columns
+        if c not in exclude
+    ]
+    if not value_cols:
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # Build left-hold signal
+    extra_cols = [segment_col] if respect_old_segment else []
+    t_end = float(np.nanmax(new_seg_info['new_seg_end_time'].to_numpy(dtype=float)))
+
+    times, values, extras = _make_left_hold_signal_from_df(
+        df,
+        time_col=time_col,
+        value_cols=value_cols,
+        extra_cols=extra_cols,
+        t_end=t_end,
+    )
+    if times.size < 2:
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # Assign each interval to a new segment
+    sample_segment, _, _, _ = _assign_intervals_to_new_segments(times, new_seg_info)
+    valid_samples = sample_segment >= 0
+    if not np.any(valid_samples):
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # Global bin overlaps
+    sample_idx, bin_idx, dt_arr, _ = build_bin_assignments(
+        times,
+        bins_2d,
+        assume_sorted=True,
+        check_nonoverlap=False,
+    )
+    if sample_idx.size == 0:
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # Keep only samples belonging to a new segment
+    keep = valid_samples[sample_idx]
+    sample_idx = sample_idx[keep]
+    bin_idx = bin_idx[keep]
+    dt_arr = dt_arr[keep]
+    new_seg_id = sample_segment[sample_idx].astype(int)
+
+    # respect_old_segment filter
+    if respect_old_segment:
+        if segment_col not in new_seg_info.columns:
+            raise ValueError(
+                f"respect_old_segment=True requires new_seg_info to have column '{segment_col}'"
+            )
+
+        old_seg_per_sample = extras[segment_col]
+        required_old_seg = new_seg_info.set_index('new_segment')[segment_col]
+        req = required_old_seg.loc[new_seg_id].to_numpy()
+
+        ok = old_seg_per_sample[sample_idx] == req
+        sample_idx = sample_idx[ok]
+        bin_idx = bin_idx[ok]
+        dt_arr = dt_arr[ok]
+        new_seg_id = new_seg_id[ok]
+
+        if sample_idx.size == 0:
+            return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # require_full_bin filter
+    if require_full_bin:
+        seg_starts = new_seg_info.set_index('new_segment')['new_seg_start_time']
+        seg_ends = new_seg_info.set_index('new_segment')['new_seg_end_time']
+
+        seg_t0 = seg_starts.loc[new_seg_id].to_numpy(dtype=float)
+        seg_t1 = seg_ends.loc[new_seg_id].to_numpy(dtype=float)
+
+        b0 = bins_2d[bin_idx, 0]
+        b1 = bins_2d[bin_idx, 1]
+
+        full = (b0 >= seg_t0) & (b1 <= seg_t1)
+
+        sample_idx = sample_idx[full]
+        bin_idx = bin_idx[full]
+        dt_arr = dt_arr[full]
+        new_seg_id = new_seg_id[full]
+
+        if sample_idx.size == 0:
+            return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # ------------------------------------------------------------------
+    # Pick ONE best sample per (new_segment, bin): max dt
+    # ------------------------------------------------------------------
+    key = np.stack([new_seg_id, bin_idx], axis=1)
+
+    # stable sort: first by bin, then segment, then -dt
+    order = np.lexsort((-dt_arr, bin_idx, new_seg_id))
+    key_sorted = key[order]
+
+    # keep first occurrence of each (segment, bin)
+    _, first_idx = np.unique(key_sorted, axis=0, return_index=True)
+    chosen = order[first_idx]
+
+    out_seg = new_seg_id[chosen]
+    out_bin = bin_idx[chosen]
+    out_vals = values[sample_idx[chosen]]
+
+    out = pd.DataFrame(out_vals, columns=value_cols)
+    out.insert(0, 'new_bin', out_bin.astype(int))
+    out.insert(0, 'new_segment', out_seg.astype(int))
+
+    out = out.merge(
+        new_seg_info[
+            ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+            + ([segment_col] if segment_col in new_seg_info.columns else [])
+        ],
+        on='new_segment',
+        how='left',
+        validate='many_to_one',
+    )
+
+    if add_bin_edges:
+        return out, bins_2d[out_bin]
+
+    return out

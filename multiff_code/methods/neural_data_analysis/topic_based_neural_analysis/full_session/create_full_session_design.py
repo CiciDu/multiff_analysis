@@ -64,3 +64,28 @@ def get_initial_full_session_design_df(
     # NOTE: no finalize/normalize shims needed; grouping now matches the checker logic
     return design_df, meta0, meta
 
+
+def merge_design_blocks(fs_df, best_arc_df, pn_df, stop_df):
+    fs_cols = set(fs_df.columns) - {'bin'}
+    best_arc_cols = set(best_arc_df.columns) - {'bin'}
+    pn_cols = set(pn_df.columns) - {'bin'}
+    stop_cols = set(stop_df.columns) - {'bin'}
+    
+    print(f'Duplicated FS–Best Arc columns ({len(fs_cols & best_arc_cols)}):')
+    print(sorted(fs_cols & best_arc_cols))
+
+    print(f'Duplicated FS–PN columns ({len(fs_cols & pn_cols)}):')
+    print(sorted(fs_cols & pn_cols))
+
+    print(f'Duplicated FS–STOP columns ({len(fs_cols & stop_cols)}):')
+    print(sorted(fs_cols & stop_cols))
+
+    return (
+        fs_df
+            .merge(best_arc_df, on='bin', how='left', suffixes=('', ''))
+            .merge(pn_df, on='bin', how='left', suffixes=('', '_pn'))
+            .merge(stop_df, on='bin', how='left', suffixes=('', '_stop'))
+            .fillna(0.0)
+            .sort_values('bin')
+            .reset_index(drop=True)
+    )
