@@ -119,6 +119,9 @@ class DecodingRunConfig:
     n_jobs: int = -1
     use_early_stopping: bool = False
     od_wait: int = 20
+    # CV options
+    cv_mode: str = 'group_kfold'  # reserved for future extensibility
+    buffer_samples: int = 0       # if > 0, drop ±buffer around test indices from train
 
     model_class: type | None = None
     model_kwargs: dict | None = None
@@ -160,10 +163,37 @@ def run_cv_decoding(
         if shuffle_y:
             rng = np.random.default_rng(shuffle_seed)
             y_ok = rng.permutation(y_ok)
-    
+
         # --- build CV splits on filtered data ---
-        gcv_ok = GroupKFold(n_splits=n_splits)
-        cv_splits_ok = list(gcv_ok.split(X_ok, groups=groups_ok))
+        n = X_ok.shape[0]
+        if getattr(config, 'cv_mode', 'group_kfold') == 'sequential_block':
+            # Split indices into n_splits contiguous blocks in order
+            all_indices = np.arange(n, dtype=int)
+            blocks = np.array_split(all_indices, n_splits)
+            buf = int(getattr(config, 'buffer_samples', 0) or 0)
+            cv_splits_ok = []
+            for block in blocks:
+                te = block
+                if te.size == 0:
+                    cv_splits_ok.append((np.array([], dtype=int), te))
+                    continue
+                if buf > 0:
+                    start = max(0, te[0] - buf)
+                    end = min(n, te[-1] + buf + 1)
+                    forbidden = np.arange(start, end, dtype=int)
+                    tr = np.setdiff1d(all_indices, forbidden,
+                                      assume_unique=False)
+                    # Guard: if pruning wipes out the train set, fall back to excluding only test indices
+                    if tr.size == 0:
+                        tr = np.setdiff1d(all_indices, te, assume_unique=False)
+                else:
+                    tr = np.setdiff1d(all_indices, te, assume_unique=False)
+                cv_splits_ok.append((tr, te))
+        else:
+            gcv_ok = GroupKFold(n_splits=n_splits)
+            base_splits = list(gcv_ok.split(X_ok, groups=groups_ok))
+            # In pure GroupKFold mode, do NOT apply buffer pruning
+            cv_splits_ok = base_splits
 
         # --- default model (CatBoost) ---
         if config.model_class is None:
@@ -190,7 +220,6 @@ def run_cv_decoding(
             y_tr_full = y_ok[train_idx]
             X_te = X_ok[test_idx]
 
-            
             # ---- NEW GUARD: skip constant-target folds ----
             if np.unique(y_tr_full).size <= 1:
                 # Predict the constant value for this fold
@@ -229,7 +258,6 @@ def run_cv_decoding(
 
             model.fit(X_tr, y_tr, **fit_kwargs)
             y_cv_pred[test_idx] = model.predict(X_te)
-
 
         # --- metrics (AFTER all folds) ---
         if np.isnan(y_cv_pred).any():
@@ -347,6 +375,8 @@ def decode_by_num_ff_visible_or_in_memory(
             'n_jobs': int(config.n_jobs),
             'use_early_stopping': bool(config.use_early_stopping),
             'od_wait': int(config.od_wait),
+            'cv_mode': getattr(config, 'cv_mode', 'group_kfold'),
+            'buffer_samples': int(getattr(config, 'buffer_samples', 0)),
         },
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -405,7 +435,7 @@ def decode_by_num_ff_visible_or_in_memory(
                         log(f'Cached results do not match metadata. Recomputing.',
                             verbosity=verbosity,
                             level=1,
-                        )
+                            )
                 else:
                     # No metadata sidecar; conservatively load only if allowed
                     if not overwrite:
@@ -419,19 +449,19 @@ def decode_by_num_ff_visible_or_in_memory(
                         log(f'No metadata sidecar. Recomputing. (overwrite=True)',
                             verbosity=verbosity,
                             level=1,
-                        )
+                            )
 
             except Exception as e:
                 log(f'Error loading cached results from {csv_path}: {e}',
                     verbosity=verbosity,
                     level=1,
-                )
+                    )
                 pass
     else:
         log('No save_path provided. Recomputing.',
             verbosity=verbosity,
             level=1,
-        )
+            )
 
     all_results = []
 
@@ -443,12 +473,12 @@ def decode_by_num_ff_visible_or_in_memory(
                 log(f'Fitting: {config.model_class.__name__}',
                     verbosity=verbosity,
                     level=2,
-                )
+                    )
             else:
                 log('Fitting: CatBoostRegressor',
                     verbosity=verbosity,
                     level=2,
-                )
+                    )
 
         results_df = run_cv_decoding(
             X=X_sub,
@@ -471,7 +501,7 @@ def decode_by_num_ff_visible_or_in_memory(
         log(f'\nnum_ff: {num_ff}',
             verbosity=verbosity,
             level=1,
-        )
+            )
 
         mask = num_ff_visible_or_in_memory_clean == num_ff
         X_sub = x_var[mask]
@@ -482,7 +512,7 @@ def decode_by_num_ff_visible_or_in_memory(
             log(f'Skipping num_ff={num_ff}: too few samples',
                 verbosity=verbosity,
                 level=1,
-            )
+                )
             continue
 
         results_df = _run_one_pass(
@@ -503,7 +533,7 @@ def decode_by_num_ff_visible_or_in_memory(
         log('\nnum_ff: any (pooled)',
             verbosity=verbosity,
             level=1,
-        )
+            )
 
         results_df = _run_one_pass(
             X_sub=x_var,
@@ -568,7 +598,7 @@ def decode_cur_ff_only(
     log(f'\ncur_ff_only: n_samples={mask.sum()}',
         verbosity=verbosity,
         level=1,
-    )
+        )
 
     # --- DO NOT precompute CV splits here ---
     # run_cv_decoding will build GroupKFold on the filtered data
@@ -612,16 +642,17 @@ def make_raw_neural_data_processing_tag(pn):
     return '_'.join(parts) if parts else None
 
 
-
 def get_band_conditioned_save_path(pn, reg_or_clf):
     neural_data_tag = make_raw_neural_data_processing_tag(pn)
-    bin_width_str = f"{pn.bin_width:.4f}".rstrip('0').rstrip('.').replace('.', 'p')
+    bin_width_str = f"{pn.bin_width:.4f}".rstrip(
+        '0').rstrip('.').replace('.', 'p')
     seg_str = f'bin{bin_width_str}_{pn.cur_or_nxt}_{pn.first_or_last}_st{general_utils.clean_float(pn.start_t_rel_event)}_et{general_utils.clean_float(pn.end_t_rel_event)}'
     if reg_or_clf == 'reg':
-        save_path = os.path.join(pn.planning_and_neural_folder_path, 'pn_decoding', 'band_conditioned_reg', neural_data_tag, seg_str)
+        save_path = os.path.join(pn.planning_and_neural_folder_path,
+                                 'pn_decoding', 'band_conditioned_reg', neural_data_tag, seg_str)
     elif reg_or_clf == 'clf':
-        save_path = os.path.join(pn.planning_and_neural_folder_path, 'pn_decoding', 'band_conditioned_clf', neural_data_tag, seg_str)
+        save_path = os.path.join(pn.planning_and_neural_folder_path,
+                                 'pn_decoding', 'band_conditioned_clf', neural_data_tag, seg_str)
     else:
         raise ValueError(f'Invalid reg_or_clf: {reg_or_clf}')
     return save_path
-
