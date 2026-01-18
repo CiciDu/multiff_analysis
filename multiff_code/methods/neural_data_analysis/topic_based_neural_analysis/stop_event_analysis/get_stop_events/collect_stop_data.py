@@ -84,9 +84,9 @@ pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 50)
 
 
-def collect_stop_data_func(raw_data_folder_path):
+def collect_stop_data_func(raw_data_folder_path, bin_width=0.04):
     pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
-        raw_data_folder_path=raw_data_folder_path)
+        raw_data_folder_path=raw_data_folder_path, bin_width=bin_width)
     pn.retrieve_neural_data()
 
     if not hasattr(pn, 'spikes_df'):

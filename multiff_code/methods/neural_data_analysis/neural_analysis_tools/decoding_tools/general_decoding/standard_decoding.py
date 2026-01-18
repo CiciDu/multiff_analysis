@@ -9,7 +9,7 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 
-from neural_data_analysis.design_kits.design_by_segment import create_design_df
+from neural_data_analysis.design_kits.design_by_segment import create_pn_design_df
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 from data_wrangling import general_utils
 
@@ -131,13 +131,13 @@ def population_decoding_cv(
     df_X,
     df_Y,
     groups,
-    decoders = (
-                'logreg',   # linear
-                'lda',      # linear
-                'svm_rbf',  # nonlinear
-                'rf',       # nonlinear
-                'mlp'       # nonlinear
-            ),
+    decoders=(
+        'logreg',   # linear
+        'lda',      # linear
+        'svm_rbf',  # nonlinear
+        'rf',       # nonlinear
+        'mlp'       # nonlinear
+    ),
     n_splits=5
 ):
 
@@ -182,4 +182,3 @@ def permutation_test_auc(y, p, groups, n_perm=2000, rng=0):
 
     pval = (1 + np.sum(null >= auc_obs)) / (1 + n_perm)
     return auc_obs, pval, null
-

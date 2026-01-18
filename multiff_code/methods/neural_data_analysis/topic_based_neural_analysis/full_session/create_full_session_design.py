@@ -1,4 +1,4 @@
-from neural_data_analysis.design_kits.design_by_segment import create_design_df
+from neural_data_analysis.design_kits.design_by_segment import create_pn_design_df
 
 
 import numpy as np
@@ -18,13 +18,12 @@ from typing import Optional, Tuple, Union
 ArrayLike = Union[np.ndarray, pd.Series, list]
 
 
-
 def get_initial_full_session_design_df(
     data: pd.DataFrame,
     dt: float,
     trial_ids: np.ndarray | None = None,
 ) -> tuple[pd.DataFrame, dict, dict]:
-    
+
     # work on a copy
     data = data.copy()
     data = temporal_feats.add_stop_and_capture_columns(data, trial_ids)
@@ -53,9 +52,8 @@ def get_initial_full_session_design_df(
     )
     rows_mask = meta.get('valid_rows_mask')  # None for edge='zero'
 
-
     # ---------- refactored block ----------
-    design_df, meta = create_design_df.add_state_and_spatial_features(
+    design_df, meta = create_pn_design_df.add_state_and_spatial_features(
         design_df=design_df,
         data=data,
         meta=meta,
@@ -70,7 +68,7 @@ def merge_design_blocks(fs_df, best_arc_df, pn_df, stop_df):
     best_arc_cols = set(best_arc_df.columns) - {'bin'}
     pn_cols = set(pn_df.columns) - {'bin'}
     stop_cols = set(stop_df.columns) - {'bin'}
-    
+
     print(f'Duplicated FS–Best Arc columns ({len(fs_cols & best_arc_cols)}):')
     print(sorted(fs_cols & best_arc_cols))
 
@@ -82,10 +80,10 @@ def merge_design_blocks(fs_df, best_arc_df, pn_df, stop_df):
 
     return (
         fs_df
-            .merge(best_arc_df, on='bin', how='left', suffixes=('', ''))
-            .merge(pn_df, on='bin', how='left', suffixes=('', '_pn'))
-            .merge(stop_df, on='bin', how='left', suffixes=('', '_stop'))
-            .fillna(0.0)
-            .sort_values('bin')
-            .reset_index(drop=True)
+        .merge(best_arc_df, on='bin', how='left', suffixes=('', ''))
+        .merge(pn_df, on='bin', how='left', suffixes=('', '_pn'))
+        .merge(stop_df, on='bin', how='left', suffixes=('', '_stop'))
+        .fillna(0.0)
+        .sort_values('bin')
+        .reset_index(drop=True)
     )

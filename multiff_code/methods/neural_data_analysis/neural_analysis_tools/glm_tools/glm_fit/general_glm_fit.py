@@ -561,7 +561,8 @@ def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_
     return figs
 
 
-def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots, cv_tables_df=None, results=None, metadata: dict | None = None):
+def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots, cv_tables_df=None, results=None, metadata: dict | None = None,
+                  fig_dir=None):
     if save_dir is None:
         return
     p = Path(save_dir)
@@ -587,10 +588,10 @@ def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots
             print(f'[save_outputs] Saved results.pkl to {p / "results.pkl"}')
         except Exception as e:
             print(f'[save_outputs] WARNING: could not save results.pkl: {type(e).__name__}: {e}')
-    if make_plots:
+    if make_plots and fig_dir is not None:
         for name, fig in figs.items():
             if fig is not None:
-                fig.savefig(p / f'{name}.png', dpi=150, bbox_inches='tight')
+                fig.savefig(fig_dir / f'{name}.png', dpi=150, bbox_inches='tight')
 
 
 def _load_outputs(save_dir, *, expected_hash: str | None = None):
@@ -807,6 +808,7 @@ def glm_mini_report(
     cov_type: str = 'HC1',
     show_plots: bool = True,
     save_dir=None,
+    fig_dir=None,
     regularization: str = 'none',
     alpha_grid=(0.1, 0.3, 1.0),
     l1_wt_grid=(1.0, 0.5, 0.0),
@@ -845,6 +847,10 @@ def glm_mini_report(
         if loaded:
             print('[glm_mini_report] Loaded cached results from save_dir (exists_ok=True, hash match).')
             return payload
+        else:
+            print('[glm_mini_report] No cached results found, fitting from scratch.')
+    else:
+        print('[glm_mini_report] Not loading cached results because exists_ok=False or save_dir is None.')
 
     results, coefs_df, metrics_df, cv_tables_df = _fit_path(
         df_X=df_X, df_Y=df_Y, offset_log=offset_log,
@@ -881,7 +887,7 @@ def glm_mini_report(
     _save_outputs(
         save_dir, coefs_df, metrics_df, pop_tests, figs,
         make_plots=make_plots, cv_tables_df=cv_tables_df, results=results,
-        metadata=metadata
+        metadata=metadata, fig_dir=fig_dir
     )
     _show_or_close(figs, make_plots=make_plots, show_plots=show_plots)
 

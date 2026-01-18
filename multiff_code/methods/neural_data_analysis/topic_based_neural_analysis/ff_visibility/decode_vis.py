@@ -2,7 +2,7 @@ import numpy as np
 
 from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve, precision_recall_curve
 from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import general_glm_fit, cv_stop_glm
-from neural_data_analysis.design_kits.design_by_segment import create_design_df
+from neural_data_analysis.design_kits.design_by_segment import create_pn_design_df
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 from data_wrangling import general_utils
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
@@ -44,7 +44,7 @@ def get_data_for_decoding_vis(rebinned_x_var, rebinned_y_var, dt):
     data = rebinned_y_var.copy()
     trial_ids = data['new_segment']
 
-    design_df, meta0, meta = create_design_df.get_initial_design_df(
+    design_df, meta0, meta = create_pn_design_df.get_initial_design_df(
         data, dt, trial_ids)
 
     df_X = design_df[

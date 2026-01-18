@@ -11,7 +11,7 @@ import hashlib
 import json
 from sklearn.model_selection import train_test_split
 import os
-
+from tqdm import tqdm
 
 from itertools import product
 from data_wrangling import general_utils
@@ -138,6 +138,7 @@ def run_cv_decoding(
     verbosity: int = 1,
     shuffle_y: bool = False,
     shuffle_seed: int = 0,
+    save_dir: str | Path | None = None,
 ):
     if config is None:
         config = DecodingRunConfig()
@@ -146,12 +147,52 @@ def run_cv_decoding(
     groups_arr = np.asarray(groups)
 
     results = []
+    rng_global = np.random.default_rng(shuffle_seed)
 
-    for behav_feature in behav_features:
+    # ---------------- helpers ----------------
+
+    def log_msg(msg, level=1):
+        log(msg, verbosity=verbosity, level=level)
+
+    def shuffle_y_groupwise(y, groups, rng):
+        y_shuf = y.copy()
+        for g in np.unique(groups):
+            m = groups == g
+            y_shuf[m] = rng.permutation(y_shuf[m])
+        return y_shuf
+
+    def group_train_val_split(X, y, groups, val_frac=0.2, rng=None):
+        unique_groups = np.unique(groups)
+        n_val = max(1, int(np.floor(len(unique_groups) * val_frac)))
+        val_groups = rng.choice(unique_groups, size=n_val, replace=False)
+
+        val_mask = np.isin(groups, val_groups)
+        tr_mask = ~val_mask
+
+        return (
+            X[tr_mask], X[val_mask],
+            y[tr_mask], y[val_mask],
+        )
+
+    # -----------------------------------------
+
+    # Prepare optional per-feature save directory and constants
+    out_dir = None
+    n_units = int(X.shape[1]) if X.ndim >= 2 else 1
+    if save_dir is not None:
+        out_dir = Path(save_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    total_features = len(behav_features)
+
+    for feat_i, behav_feature in enumerate(
+            tqdm(behav_features, total=total_features,
+                 desc='Processing features'),
+            start=1):
         if y_df[behav_feature].nunique() <= 1:
             continue
 
-        log(behav_feature, verbosity=verbosity, level=2)
+        log_msg(behav_feature, level=2)
 
         y = y_df[behav_feature].to_numpy().ravel()
 
@@ -160,45 +201,52 @@ def run_cv_decoding(
         y_ok = y[ok]
         groups_ok = groups_arr[ok]
 
-        if shuffle_y:
-            rng = np.random.default_rng(shuffle_seed)
-            y_ok = rng.permutation(y_ok)
+        # ---- assert temporal order preserved ----
+        orig_idx = np.where(ok)[0]
+        if not np.all(np.diff(orig_idx) > 0):
+            raise RuntimeError('Temporal order violated after filtering')
 
-        # --- build CV splits on filtered data ---
+        # ---- structure-aware y shuffle ----
+        if shuffle_y:
+            if getattr(config, 'cv_mode', 'group_kfold') == 'group_kfold':
+                y_ok = shuffle_y_groupwise(y_ok, groups_ok, rng_global)
+            else:
+                y_ok = rng_global.permutation(y_ok)
+
+        # ---- build CV splits ----
         n = X_ok.shape[0]
+
         if getattr(config, 'cv_mode', 'group_kfold') == 'sequential_block':
-            # Split indices into n_splits contiguous blocks in order
+            print('cv_mode = sequential_block')
             all_indices = np.arange(n, dtype=int)
             blocks = np.array_split(all_indices, n_splits)
             buf = int(getattr(config, 'buffer_samples', 0) or 0)
+
             cv_splits_ok = []
             for block in blocks:
                 te = block
                 if te.size == 0:
                     cv_splits_ok.append((np.array([], dtype=int), te))
                     continue
+
                 if buf > 0:
                     start = max(0, te[0] - buf)
                     end = min(n, te[-1] + buf + 1)
                     forbidden = np.arange(start, end, dtype=int)
-                    tr = np.setdiff1d(all_indices, forbidden,
-                                      assume_unique=False)
-                    # Guard: if pruning wipes out the train set, fall back to excluding only test indices
+                    tr = np.setdiff1d(all_indices, forbidden)
                     if tr.size == 0:
-                        tr = np.setdiff1d(all_indices, te, assume_unique=False)
+                        tr = np.setdiff1d(all_indices, te)
                 else:
-                    tr = np.setdiff1d(all_indices, te, assume_unique=False)
+                    tr = np.setdiff1d(all_indices, te)
+
                 cv_splits_ok.append((tr, te))
         else:
             gcv_ok = GroupKFold(n_splits=n_splits)
-            base_splits = list(gcv_ok.split(X_ok, groups=groups_ok))
-            # In pure GroupKFold mode, do NOT apply buffer pruning
-            cv_splits_ok = base_splits
+            cv_splits_ok = list(gcv_ok.split(X_ok, groups=groups_ok))
 
-        # --- default model (CatBoost) ---
+        # ---- model ----
         if config.model_class is None:
             model_class = CatBoostRegressor
-            # CatBoost verbosity: 0/silent if verbosity == 0; show progress sparsely if verbosity >= 2
             cb_verbose = False if verbosity == 0 else (
                 100 if verbosity >= 2 else False)
             model_kwargs = dict(
@@ -212,38 +260,44 @@ def run_cv_decoding(
             model_class = config.model_class
             model_kwargs = config.model_kwargs or {}
 
-        # --- CV prediction ---
+        # ---- CV prediction ----
         y_cv_pred = np.full_like(y_ok, np.nan, dtype=float)
 
-        for train_idx, test_idx in cv_splits_ok:
+        for fold_i, (train_idx, test_idx) in enumerate(cv_splits_ok):
             X_tr_full = X_ok[train_idx]
             y_tr_full = y_ok[train_idx]
             X_te = X_ok[test_idx]
 
-            # ---- NEW GUARD: skip constant-target folds ----
             if np.unique(y_tr_full).size <= 1:
-                # Predict the constant value for this fold
+                log_msg(
+                    f'{behav_feature} | fold {fold_i}: constant y, using mean',
+                    level=2,
+                )
                 y_cv_pred[test_idx] = y_tr_full[0]
                 continue
 
             model = model_class(**model_kwargs)
-
             fit_kwargs = {}
 
             if config.use_early_stopping:
-                # --- inner split for early stopping ---
-                X_tr, X_val, y_tr, y_val = train_test_split(
-                    X_tr_full,
-                    y_tr_full,
-                    test_size=0.2,
-                    shuffle=True,
-                    random_state=shuffle_seed,
-                )
-
-                # Guard: val must have variance
-                if np.unique(y_val).size <= 1:
-                    X_tr, y_tr = X_tr_full, y_tr_full
+                if getattr(config, 'cv_mode', 'group_kfold') == 'group_kfold':
+                    X_tr, X_val, y_tr, y_val = group_train_val_split(
+                        X_tr_full,
+                        y_tr_full,
+                        groups_ok[train_idx],
+                        val_frac=0.2,
+                        rng=rng_global,
+                    )
                 else:
+                    X_tr, X_val, y_tr, y_val = train_test_split(
+                        X_tr_full,
+                        y_tr_full,
+                        test_size=0.2,
+                        shuffle=True,
+                        random_state=shuffle_seed,
+                    )
+
+                if X_val is not None and np.unique(y_val).size > 1:
                     fit_verbose = False if verbosity == 0 else (
                         100 if verbosity >= 2 else False)
                     fit_kwargs.update(
@@ -253,49 +307,117 @@ def run_cv_decoding(
                             verbose=fit_verbose,
                         )
                     )
+                else:
+                    X_tr, y_tr = X_tr_full, y_tr_full
             else:
                 X_tr, y_tr = X_tr_full, y_tr_full
 
             model.fit(X_tr, y_tr, **fit_kwargs)
             y_cv_pred[test_idx] = model.predict(X_te)
 
-        # --- metrics (AFTER all folds) ---
+        # ---- metrics ----
         if np.isnan(y_cv_pred).any():
-            raise RuntimeError(
-                f'NaNs in CV predictions for {behav_feature}'
-            )
+            raise RuntimeError(f'NaNs in CV predictions for {behav_feature}')
 
-        r2 = r2_score(y_ok, y_cv_pred)
-        rmse = np.sqrt(mean_squared_error(y_ok, y_cv_pred))
-        r = np.corrcoef(y_ok, y_cv_pred)[0, 1]
-
-        results.append({
+        row = {
             'behav_feature': behav_feature,
             'n_samples': len(y_ok),
-            'r2_cv': r2,
-            'rmse_cv': rmse,
-            'r_cv': r,
+            'r2_cv': r2_score(y_ok, y_cv_pred),
+            'rmse_cv': np.sqrt(mean_squared_error(y_ok, y_cv_pred)),
+            'r_cv': np.corrcoef(y_ok, y_cv_pred)[0, 1],
             'context': context_label,
             'model_name': model_class.__name__,
-        })
+        }
+        results.append(row)
 
-        if config.make_plots and not config.fast_mode:
-            lo = float(min(y_ok.min(), y_cv_pred.min()))
-            hi = float(max(y_ok.max(), y_cv_pred.max()))
+        # Optional per-feature save (short filenames)
+        if out_dir is not None:
+            feat_tag = ''.join(ch if ch.isalnum()
+                               else '_' for ch in behav_feature)[:24]
+            model_name = (config.model_class.__name__
+                          if (config is not None and config.model_class is not None)
+                          else CatBoostRegressor.__name__)
+            hash_payload = {
+                'feat': behav_feature,
+                'k': int(n_splits),
+                'model': model_name,
+                'ctx': context_label,
+                'shuf': bool(shuffle_y),
+            }
+            params_hash = hashlib.sha1(
+                json.dumps(hash_payload, sort_keys=True,
+                           default=str).encode('utf-8')
+            ).hexdigest()[:8]
+            fname = f"{feat_tag}_{params_hash}.csv"
+            csv_path = out_dir / fname
+            pd.DataFrame([row]).to_csv(csv_path, index=False)
 
-            plt.figure(figsize=(5, 5))
-            plt.scatter(y_ok, y_cv_pred, s=6, alpha=0.5)
-            plt.plot([lo, hi], [lo, hi], 'k--', linewidth=1)
-            plt.xlabel('True')
-            plt.ylabel('Predicted (CV)')
-            plt.title(
-                behav_feature if context_label is None
-                else f'{behav_feature} | {context_label}'
-            )
-            plt.tight_layout()
-            plt.show()
+            meta = {
+                'params_hash': params_hash,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'behav_feature': behav_feature,
+                'n_units': n_units,
+                'n_splits': int(n_splits),
+                'context': context_label,
+                'model_name': model_name,
+                'shuffle_y': bool(shuffle_y),
+            }
+            try:
+                with open(csv_path.with_suffix('.json'), 'w') as f:
+                    json.dump(meta, f, indent=2)
+            except Exception:
+                pass
 
-    return pd.DataFrame(results)
+    results_df = pd.DataFrame(results)
+
+    # optional saving if directory provided
+    if save_dir is not None:
+        out_dir = Path(save_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        X_arr = np.asarray(X)
+        n_units = int(X_arr.shape[1]) if X_arr.ndim >= 2 else 1
+        model_name = (config.model_class.__name__
+                      if (config is not None and config.model_class is not None)
+                      else CatBoostRegressor.__name__)
+        model_kwargs = (config.model_kwargs or {}
+                        ) if config is not None else {}
+
+        hash_payload = {
+            'behav_features': sorted(list(behav_features)),
+            'n_splits': int(n_splits),
+            'model_name': model_name,
+            'model_kwargs': model_kwargs,
+            'context': context_label,
+            'shuffle_y': bool(shuffle_y),
+        }
+        params_hash = hashlib.sha1(
+            json.dumps(hash_payload, sort_keys=True,
+                       default=str).encode('utf-8')
+        ).hexdigest()[:10]
+
+        fname = f"cv_u{n_units}_k{n_splits}_{model_name}_{params_hash}.csv"
+        csv_path = out_dir / fname
+        results_df.to_csv(csv_path, index=False)
+
+        meta = {
+            'params_hash': params_hash,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'context': context_label,
+            'n_units': n_units,
+            'n_splits': int(n_splits),
+            'behav_features': list(behav_features),
+            'model_name': model_name,
+            'model_kwargs': model_kwargs,
+            'shuffle_y': bool(shuffle_y),
+        }
+        try:
+            with open(csv_path.with_suffix('.json'), 'w') as f:
+                json.dump(meta, f, indent=2)
+        except Exception:
+            pass
+
+    return results_df
 
 
 def _normalize_num_ff(v):

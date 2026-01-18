@@ -43,9 +43,8 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             if not hasattr(self, 'ff_caught_T_sorted'):
                 self.get_basic_data()
 
-            self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
-                                                                   self.monkey_information, sampling_rate=self.sampling_rate)
-
+            self._make_spikes_df()
+            
             self.time_bins, self.binned_spikes_df = neural_data_processing.prepare_binned_spikes_df(
                 self.spikes_df, bin_width=self.bin_width)
             self.binned_spikes_df.to_csv(binned_spikes_df_path, index=False)
@@ -55,6 +54,15 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         if self.max_bin is not None:
             self.binned_spikes_df = self.binned_spikes_df[self.binned_spikes_df['bin'] <= self.max_bin]
 
+    def _make_spikes_df(self):
+        self.sampling_rate = 20000 if 'Bruno' in self.raw_data_folder_path else 30000
+        if not hasattr(self, 'ff_caught_T_sorted') or not hasattr(self, 'monkey_information'):
+            self.retrieve_or_make_monkey_data(already_made_ok=True)
+            
+        self.spikes_df = neural_data_processing.make_spikes_df(self.raw_data_folder_path, self.ff_caught_T_sorted,
+                                                               self.monkey_information, sampling_rate=self.sampling_rate)
+        
+        
     def _make_or_retrieve_target_df(self, exists_ok=True, fill_na=False):
         target_df_filepath = os.path.join(
             self.patterns_and_features_folder_path, 'target_df.csv')

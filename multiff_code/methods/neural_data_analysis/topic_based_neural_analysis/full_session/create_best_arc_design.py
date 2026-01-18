@@ -17,14 +17,13 @@ import pandas as pd
 from typing import Optional, Tuple, Union
 
 
-def get_best_arc_ff_design_df(
+def get_best_arc_design_df(
     data: pd.DataFrame,
     dt: float,
 ) -> tuple[pd.DataFrame, dict, dict]:
-    
-    
+
     trial_ids = np.repeat(0, len(data))
-    
+
     specs, meta0 = temporal_feats.init_predictor_specs(
         data,
         dt,
@@ -71,7 +70,6 @@ def get_best_arc_ff_design_df(
         dist_col='best_arc_ff_distance',
     )
 
-
     for k in ['best_arc_opt_arc_length', 'best_arc_abs_curv_diff']:
         if k not in data.columns:
             raise KeyError(f'missing raw feature {k!r} in data')
@@ -86,7 +84,7 @@ def get_best_arc_ff_design_df(
             scale=False,
             meta=meta,
         )
-        
+
     # ---------- spatial splines ----------
     spatial_covs = (
         # 'cur_ff_distance', 'nxt_ff_distance',
