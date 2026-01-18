@@ -320,56 +320,56 @@ class FullSessionGLMRunner:
 
     def _build_stop_design(self):
 
-        pn, datasets, _ = collect_stop_data.collect_stop_data_func(
-            self.raw_data_folder_path,
-            bin_width=self.bin_width,
-        )
+        # pn, datasets, _ = collect_stop_data.collect_stop_data_func(
+        #     self.raw_data_folder_path,
+        #     bin_width=self.bin_width,
+        # )
 
-        captures_df, valid_captures_df, filtered_no_capture_stops_df, stops_with_stats = (
-            get_stops_utils.prepare_no_capture_and_captures(
-                monkey_information=pn.monkey_information,
-                closest_stop_to_capture_df=pn.closest_stop_to_capture_df,
-                ff_caught_T_new=pn.ff_caught_T_new,
-                distance_col='distance_from_ff_to_stop',
-            )
-        )
+        # captures_df, valid_captures_df, filtered_no_capture_stops_df, stops_with_stats = (
+        #     get_stops_utils.prepare_no_capture_and_captures(
+        #         monkey_information=pn.monkey_information,
+        #         closest_stop_to_capture_df=pn.closest_stop_to_capture_df,
+        #         ff_caught_T_new=pn.ff_caught_T_new,
+        #         distance_col='distance_from_ff_to_stop',
+        #     )
+        # )
 
-        stops_with_stats['stop_time'] = stops_with_stats['stop_id_start_time']
-        stops_with_stats['prev_time'] = stops_with_stats['stop_id_end_time'].shift(
-            1)
-        stops_with_stats['next_time'] = stops_with_stats['stop_id_start_time'].shift(
-            -1)
+        # stops_with_stats['stop_time'] = stops_with_stats['stop_id_start_time']
+        # stops_with_stats['prev_time'] = stops_with_stats['stop_id_end_time'].shift(
+        #     1)
+        # stops_with_stats['next_time'] = stops_with_stats['stop_id_start_time'].shift(
+        #     -1)
 
-        new_seg_info = event_binning.make_new_seg_info_for_stop_design(
-            stops_with_stats,
-            pn.closest_stop_to_capture_df,
-            pn.monkey_information,
-        )
+        # new_seg_info = event_binning.make_new_seg_info_for_stop_design(
+        #     stops_with_stats,
+        #     pn.closest_stop_to_capture_df,
+        #     pn.monkey_information,
+        # )
 
-        events_with_stats = stops_with_stats[[
-            'stop_id',
-            'stop_cluster_id',
-            'stop_id_start_time',
-            'stop_id_end_time',
-        ]].rename(columns={
-            'stop_id': 'event_id',
-            'stop_cluster_id': 'event_cluster_id',
-            'stop_id_start_time': 'event_id_start_time',
-            'stop_id_end_time': 'event_id_end_time',
-        })
+        # events_with_stats = stops_with_stats[[
+        #     'stop_id',
+        #     'stop_cluster_id',
+        #     'stop_id_start_time',
+        #     'stop_id_end_time',
+        # ]].rename(columns={
+        #     'stop_id': 'event_id',
+        #     'stop_cluster_id': 'event_cluster_id',
+        #     'stop_id_start_time': 'event_id_start_time',
+        #     'stop_id_end_time': 'event_id_end_time',
+        # })
 
-        _, stop_binned_feats, _, stop_meta_used, stop_meta_groups = (
-            assemble_stop_design.build_stop_design(
-                new_seg_info,
-                events_with_stats,
-                pn.monkey_information,
-                pn.spikes_df,
-                pn.ff_dataframe,
-                datasets=datasets,
-                add_ff_visible_info=True,
-                global_bins_2d=self.global_bins_2d,
-            )
-        )
+        # _, stop_binned_feats, _, stop_meta_used, stop_meta_groups = (
+        #     assemble_stop_design.build_stop_design(
+        #         new_seg_info,
+        #         events_with_stats,
+        #         pn.monkey_information,
+        #         pn.spikes_df,
+        #         pn.ff_dataframe,
+        #         datasets=datasets,
+        #         add_ff_visible_info=True,
+        #         global_bins_2d=self.global_bins_2d,
+        #     )
+        # )
 
         stop_binned_feats = assemble_stop_design.add_interaction_columns(
             stop_binned_feats
