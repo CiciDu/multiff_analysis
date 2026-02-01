@@ -38,21 +38,52 @@ def examine_and_compare_columns_between_two_df(df1, df2, verbose=True,
 
 
 def _match_combo_of_columns(df1, df2, combo_of_columns_to_match):
+    """
+    Filter `df2` to retain only rows whose values match at least one unique
+    combination of specified columns present in `df1`.
+
+    This function identifies the subset of columns in `combo_of_columns_to_match`
+    that exist in both `df1` and `df2`. For each unique combination of values
+    across these columns in `df1`, it selects rows in `df2` with an exact match
+    on all columns. Rows in `df2` that do not match any combination observed in
+    `df1` are discarded.
+
+    If none of the specified columns exist in both DataFrames, `df2` is returned
+    unchanged.
+
+    Parameters
+    ----------
+    df1 : pandas.DataFrame
+        Reference DataFrame defining the valid combinations of column values.
+    df2 : pandas.DataFrame
+        DataFrame to be filtered based on matching column combinations in `df1`.
+    combo_of_columns_to_match : list of str
+        Column names whose joint values define a matching combination.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A filtered version of `df2` containing only rows whose values across the
+        matched columns correspond to at least one combination present in `df1`.
+    """
     combo_of_columns_to_match = [col for col in combo_of_columns_to_match if (
         col in df1.columns) and (col in df2.columns)]
-    new_df1 = pd.DataFrame()
-    new_df2 = pd.DataFrame()
-    for index, combo in df1[combo_of_columns_to_match].drop_duplicates().iterrows():
-        df2_sub = df2[df2[combo_of_columns_to_match].eq(combo).all(axis=1)]
-        if df2_sub.shape[0] == 0:
-            continue
-        new_df1 = pd.concat(
-            [new_df1, df1[df1[combo_of_columns_to_match].eq(combo).all(axis=1)]], axis=0)
-        new_df2 = pd.concat([new_df2, df2_sub], axis=0)
+    if len(combo_of_columns_to_match) > 0:
+        new_df1 = pd.DataFrame()
+        new_df2 = pd.DataFrame()
+        for index, combo in df1[combo_of_columns_to_match].drop_duplicates().iterrows():
+            df2_sub = df2[df2[combo_of_columns_to_match].eq(combo).all(axis=1)]
+            if df2_sub.shape[0] == 0:
+                continue
+            new_df1 = pd.concat(
+                [new_df1, df1[df1[combo_of_columns_to_match].eq(combo).all(axis=1)]], axis=0)
+            new_df2 = pd.concat([new_df2, df2_sub], axis=0)
 
-    new_df1 = new_df1.reset_index(drop=True)
-    new_df2 = new_df2.reset_index(drop=True)
-    return new_df2
+        new_df1 = new_df1.reset_index(drop=True)
+        new_df2 = new_df2.reset_index(drop=True)
+        return new_df2
+    else:
+        return df2
 
 
 def make_both_players_df(monkey_df, agent_df,

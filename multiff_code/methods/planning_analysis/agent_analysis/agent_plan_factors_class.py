@@ -8,7 +8,7 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
 
     def __init__(self,
                  # overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu',
-                 model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
+                 model_folder_name,
                  data_name='data_0',
                  use_curv_to_ff_center=False,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,

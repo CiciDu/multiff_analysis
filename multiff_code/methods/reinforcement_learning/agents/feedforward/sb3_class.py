@@ -85,7 +85,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
     def regular_training(self, timesteps=2000000, eval_eps_freq=20, best_model_save_path=None):
         if best_model_save_path is None:
-            best_model_save_path = self.model_folder_name
+            best_model_save_path = self.best_model_postcurriculum_dir
 
         stop_train_callback = sb3_utils.StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=15, verbose=1, model_folder_name=self.model_folder_name,
                                                                          overall_folder=self.overall_folder, agent_id=self.agent_id,

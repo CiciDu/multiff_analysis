@@ -367,17 +367,21 @@ def get_ff_info_for_rsw(rsw_indices_df,
     rsw_ff_info['candidate_target'] = rsw_ff_info['latest_visible_ff'].astype(
         'int64')
     rsw_ff_info['ff_index'] = rsw_ff_info['candidate_target']
-
-    rsw_ff_info.sort_values(by=['trial', 'stop_1_time'], inplace=True)
-
+        
     # Add stop point indices and handle duplicates
     rsw_ff_info = rsw_vs_rcap_utils.add_stop_point_index(
         rsw_ff_info, monkey_information, ff_real_position_sorted)
     # print('before calling deal_with_duplicated_stop_point_index, len(rsw_ff_info)', len(
     #     rsw_ff_info))
-    rsw_ff_info = rsw_vs_rcap_utils.deal_with_duplicated_stop_point_index(
-        rsw_ff_info)
 
+    if len(rsw_ff_info) > 0:
+
+        rsw_ff_info.sort_values(by=['trial', 'stop_1_time'], inplace=True)
+
+        rsw_ff_info = rsw_vs_rcap_utils.deal_with_duplicated_stop_point_index(
+            rsw_ff_info)
+
+        
     # print('after calling deal_with_duplicated_stop_point_index, len(rsw_ff_info)', len(
     #     rsw_ff_info))
     return rsw_ff_info

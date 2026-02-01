@@ -3,18 +3,19 @@ set -euo pipefail
 
 PROJECT_ROOT=/user_data/cicid/Multifirefly-Project
 JOB_DIR=$PROJECT_ROOT/multiff_analysis/jobs/glm
-RAW_PATH_FILE=$JOB_DIR/raw_data_paths.txt
+CONFIG_DIR=$PROJECT_ROOT/multiff_analysis/jobs/data_configs
 
 mkdir -p "$JOB_DIR/logs/run_stdout"
 
 usage() {
   cat <<EOF
 Usage:
-  submit_glm.sh --monkey MONKEY_NAME [sbatch args]
+  submit_glm.sh --monkey MONKEY_NAME [--hyperparam_tuning True|False] [sbatch args]
 
 Example:
-  submit_glm.sh --monkey monkey_Bruno
-  submit_glm.sh --monkey monkey_Schro -p cpu --time=12:00:00
+  submit_glm.sh --monkey Bruno
+  submit_glm.sh --monkey Schro -p cpu --time=12:00:00
+  submit_glm.sh --monkey Bruno --hyperparam_tuning True
 EOF
 }
 
@@ -22,12 +23,19 @@ EOF
 # Parse args
 # ------------------------------
 MONKEY_NAME=""
-
+HYPERPARAM_TUNING=""
 FORWARD_ARGS=()
+
 while (( "$#" )); do
   case "$1" in
     --monkey)
+      [ -z "${2:-}" ] && { echo "--monkey requires an argument"; exit 1; }
       MONKEY_NAME="$2"
+      shift 2
+      ;;
+    --hyperparam_tuning)
+      [ -z "${2:-}" ] && { echo "--hyperparam_tuning requires an argument (True|False)"; exit 1; }
+      HYPERPARAM_TUNING="$2"
       shift 2
       ;;
     -h|--help)
@@ -42,76 +50,47 @@ while (( "$#" )); do
 done
 
 if [ -z "$MONKEY_NAME" ]; then
-    echo "[SUBMIT] Error: --monkey is required" >&2
-    exit 1
-fi
-
-echo "[SUBMIT] Monkey: $MONKEY_NAME"
-
-# ------------------------------
-# Generate raw data path list (PYTHON, canonical)
-# ------------------------------
-echo "[SUBMIT] Generating raw data folder list via Python..."
-
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-  source "$HOME/miniconda3/etc/profile.d/conda.sh"
-else
-  echo "[SUBMIT] conda.sh not found" >&2
+  echo "[SUBMIT] Error: --monkey is required" >&2
   exit 1
 fi
-conda activate multiff_clean || { echo "[SUBMIT] Conda activation failed"; exit 1; }
 
-python <<EOF
-import os
-from pathlib import Path
-import sys
+RAW_PATH_FILE=$CONFIG_DIR/raw_data_paths_${MONKEY_NAME}.txt
 
-# Ensure project root
-project_root = Path('$PROJECT_ROOT')
-os.chdir(project_root)
-sys.path.insert(0, str(project_root / 'multiff_analysis/multiff_code/methods'))
+if [ ! -f "$RAW_PATH_FILE" ]; then
+  echo "[SUBMIT] Missing config: $RAW_PATH_FILE" >&2
+  exit 1
+fi
 
-from data_wrangling import combine_info_utils
+# ------------------------------
+# Determine array size
+# ------------------------------
+NUM_JOBS=$(grep -cv '^[[:space:]]*$' "$RAW_PATH_FILE")
 
-raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
-monkey_name = '$MONKEY_NAME'
-
-sessions_df = combine_info_utils.make_sessions_df_for_one_monkey(
-    raw_data_dir_name, monkey_name
-)
-
-paths = []
-for _, row in sessions_df.iterrows():
-    path = os.path.join(
-        raw_data_dir_name,
-        row['monkey_name'],
-        row['data_name']
-    )
-    paths.append(os.path.abspath(path))
-
-out_file = Path('$RAW_PATH_FILE')
-out_file.write_text('\n'.join(paths) + '\n')
-
-print(f'[SUBMIT] Wrote {len(paths)} raw data paths to {out_file}')
-EOF
-
-NUM_JOBS=$(wc -l < "$RAW_PATH_FILE")
 
 if [ "$NUM_JOBS" -eq 0 ]; then
-    echo "[SUBMIT] No sessions found for $MONKEY_NAME" >&2
-    exit 1
+  echo "[SUBMIT] No sessions listed in $RAW_PATH_FILE" >&2
+  exit 1
 fi
 
 ARRAY_MAX=$((NUM_JOBS - 1))
+MAX_CONCURRENT=5
 
-echo "[SUBMIT] Submitting SLURM array: 0-$ARRAY_MAX"
+echo "[SUBMIT] Monkey: $MONKEY_NAME"
+echo "[SUBMIT] Sessions: $NUM_JOBS"
+echo "[SUBMIT] Using config: $RAW_PATH_FILE"
+if [ -n "$HYPERPARAM_TUNING" ]; then
+  echo "[SUBMIT] hyperparam_tuning: $HYPERPARAM_TUNING"
+else
+  echo "[SUBMIT] hyperparam_tuning: (default in job script)"
+fi
+echo "[SUBMIT] Submitting array: 0-$ARRAY_MAX (max $MAX_CONCURRENT concurrent)"
 
 # ------------------------------
 # Submit job
 # ------------------------------
-MAX_CONCURRENT=5
-
 sbatch \
-    --array=0-"$ARRAY_MAX"%$MAX_CONCURRENT \
-    "$JOB_DIR/slurm/glm_job.slurm" \
-    "${FORWARD_ARGS[@]}"
+  --array=0-"$ARRAY_MAX"%$MAX_CONCURRENT \
+  "${FORWARD_ARGS[@]}" \
+  "$JOB_DIR/slurm/glm_job.slurm" \
+  "$MONKEY_NAME" \
+  "$HYPERPARAM_TUNING"

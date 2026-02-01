@@ -29,6 +29,7 @@ from scipy import stats as _stats
 import pickle
 import hashlib
 import json
+import os
 
 # ---------- small helpers (place near the top of the file) ----------
 
@@ -562,7 +563,7 @@ def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_
 
 
 def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots, cv_tables_df=None, results=None, metadata: dict | None = None,
-                  fig_dir=None):
+                  fig_dir=None, session_id=None):
     if save_dir is None:
         return
     p = Path(save_dir)
@@ -589,9 +590,26 @@ def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots
         except Exception as e:
             print(f'[save_outputs] WARNING: could not save results.pkl: {type(e).__name__}: {e}')
     if make_plots and fig_dir is not None:
-        for name, fig in figs.items():
-            if fig is not None:
-                fig.savefig(fig_dir / f'{name}.png', dpi=150, bbox_inches='tight')
+        save_figs(figs, fig_dir, session_id=session_id)
+        
+
+
+def save_figs(figs, fig_dir, session_id=None, dpi=150):
+    fig_dir = Path(fig_dir)
+
+    for name, fig in figs.items():
+        if fig is None:
+            continue
+
+        if session_id is not None:
+            out_dir = fig_dir / name
+            fname = f'{session_id}.png'
+        else:
+            out_dir = fig_dir
+            fname = f'{name}.png'
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_dir / fname, dpi=dpi, bbox_inches='tight')
 
 
 def _load_outputs(save_dir, *, expected_hash: str | None = None):
@@ -809,6 +827,7 @@ def glm_mini_report(
     show_plots: bool = True,
     save_dir=None,
     fig_dir=None,
+    session_id=None,
     regularization: str = 'none',
     alpha_grid=(0.1, 0.3, 1.0),
     l1_wt_grid=(1.0, 0.5, 0.0),
@@ -887,7 +906,7 @@ def glm_mini_report(
     _save_outputs(
         save_dir, coefs_df, metrics_df, pop_tests, figs,
         make_plots=make_plots, cv_tables_df=cv_tables_df, results=results,
-        metadata=metadata, fig_dir=fig_dir
+        metadata=metadata, fig_dir=fig_dir, session_id=session_id
     )
     _show_or_close(figs, make_plots=make_plots, show_plots=show_plots)
 

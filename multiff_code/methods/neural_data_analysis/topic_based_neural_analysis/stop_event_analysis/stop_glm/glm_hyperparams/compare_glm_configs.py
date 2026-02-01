@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib
+import os
 
 
 def show_hyperparams_for_config(results, config_label):
@@ -143,6 +144,7 @@ def save_sweep_results(results, summary_df, cv_tables_df, out_dir):
             if fig is None:
                 continue
             try:
-                fig.savefig(fig_dir / f'{name}.png', dpi=150, bbox_inches='tight')
+                os.makedirs(fig_dir, exist_ok=True)
+                fig.savefig(os.path.join(fig_dir, f'{name}.png'), dpi=150, bbox_inches='tight')
             except Exception as e:
                 print(f'[warn] could not save figure {label}/{name}: {e}')

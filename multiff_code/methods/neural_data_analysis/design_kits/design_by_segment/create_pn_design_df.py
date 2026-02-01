@@ -215,3 +215,19 @@ def add_state_and_spatial_features(
 
     return design_df, meta
 
+def make_bin_df_for_pn(rebinned_x_var, bin_edges):
+    bin_df = (
+        rebinned_x_var
+        [['new_segment', 'new_bin']]
+    ).copy()
+
+    bin_df['bin_left'] = bin_edges[:, 0]
+    bin_df['bin_right'] = bin_edges[:, -1]
+
+    bin_df = (
+        bin_df.drop_duplicates()
+        .sort_values(['new_segment', 'new_bin'])
+        .reset_index(drop=True)
+    )
+    
+    return bin_df

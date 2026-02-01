@@ -83,3 +83,18 @@ backups/
 .coverage
 htmlcov/
 .pytest_cache/
+
+**/jobs/rppo/logs/run_stdout/
+**/jobs/decoding/event_decoding/logs/run_stdout/
+**/jobs/decoding/cond_decoding/logs/
+**/jobs/decoding/decode_stops/logs/
+**/jobs/sb3/logs/run_stdout/
+**/jobs/glm/cond_decoding/
+**/jobs/glm/logs/
+
+
+## jobs
+# **/jobs/
+# **/RL_models/
+
+**/logs/

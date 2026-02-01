@@ -5,6 +5,7 @@ from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
 from planning_analysis.agent_analysis import agent_plan_factors_class
 from planning_analysis.factors_vs_indicators import variations_base_class
 from reinforcement_learning.base_classes import rl_base_class
+from data_wrangling import further_processing_class
 
 import pandas as pd
 import os
@@ -12,13 +13,11 @@ import warnings
 from os.path import exists
 import os
 
-# This class collects data from many agents and compares them
-
 
 class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
     def __init__(self,
-                 model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
+                 model_folder_name,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
                  # note, currently we use 900s / dt = 9000 steps (15 mins)
@@ -256,6 +255,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
     def get_test_and_ctrl_heading_info_df_across_sessions(self,
                                                           num_datasets_to_collect=1,
+                                                          num_steps_per_dataset=9000,
                                                           ref_point_mode='distance', ref_point_value=-150,
                                                           curv_traj_window_before_stop=[
                                                               -25, 0],
@@ -279,6 +279,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 raise Exception('combd_heading_df_x_sessions_exists_ok is False.')
 
         except Exception as e:
+            self.num_steps_per_dataset = num_steps_per_dataset
             print(
                 f'Will make new combd_heading_df_x_sessions for the agent because {e}.')
             self.make_combd_heading_df_x_sessions(num_steps_per_dataset=self.num_steps_per_dataset, num_datasets_to_collect=num_datasets_to_collect,
@@ -305,10 +306,11 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.ctrl_heading_info_df['data_name'] = data_name
         self.test_heading_info_df['whether_test'] = 1
         self.ctrl_heading_info_df['whether_test'] = 0
-        self.test_heading_info_df = pd.concat(
-            [self.test_heading_info_df, self.test_heading_info_df], axis=0)
-        self.ctrl_heading_info_df = pd.concat(
-            [self.ctrl_heading_info_df, self.ctrl_heading_info_df], axis=0)
+        ## not sure what the following is for
+        # self.test_heading_info_df = pd.concat(
+        #     [self.test_heading_info_df, self.test_heading_info_df], axis=0)
+        # self.ctrl_heading_info_df = pd.concat(
+        #     [self.ctrl_heading_info_df, self.ctrl_heading_info_df], axis=0)
 
     def make_or_retrieve_all_ref_pooled_median_info(self, **kwargs):
         self.all_ref_pooled_median_info = super(

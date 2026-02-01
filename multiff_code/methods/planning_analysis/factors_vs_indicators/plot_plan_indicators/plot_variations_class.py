@@ -12,6 +12,7 @@ import numpy as np
 from planning_analysis.factors_vs_indicators.plot_plan_indicators import (
     plot_variations_functions as pvf
 )
+import matplotlib.pyplot as plt
 
 
 class _PlotVariations:
@@ -62,7 +63,7 @@ class _PlotVariations:
             is_difference=is_difference,
             backend=self.backend,
         )
-        return self.fig
+        
 
     def plot_median_curv(
         self,
@@ -93,7 +94,7 @@ class _PlotVariations:
             is_difference=is_difference,
             backend=self.backend,
         )
-        return self.fig
+        
 
     def plot_same_side_percentage(
         self,
@@ -127,7 +128,7 @@ class _PlotVariations:
             y_max=y_max,
             backend=self.backend,
         )
-        return self.fig
+        
 
     def plot_same_side_percentage_across_monkeys(
         self,
@@ -149,7 +150,7 @@ class _PlotVariations:
             add_ci_bounds=add_ci_bounds,
             backend=self.backend,
         )
-        return self.fig
+        
 
     # ---------------------------------------------------------------
     # Complex 2-panel “main vs diff” APIs
@@ -180,7 +181,6 @@ class _PlotVariations:
             use_subplots_based_on_changeable_variables=use_subplots_based_on_changeable_variables,
             backend=self.backend,
         )
-        return self.fig
 
     def plot_median_heading_across_monkeys_and_arc_types_with_difference(
         self,
@@ -197,6 +197,7 @@ class _PlotVariations:
         use_subplots_based_on_changeable_variables=True,
         constant_marker_size=12,
     ):
+        
         self.fig = pvf.plot_median_heading_across_monkeys_and_arc_types_with_difference(
             all_ref_median_info=all_ref_median_info,
             x_var_column_list=x_var_column_list,
@@ -209,4 +210,8 @@ class _PlotVariations:
             constant_marker_size=constant_marker_size,
             backend=self.backend,
         )
-        return self.fig
+        
+        for num in plt.get_fignums():
+            if num != self.fig.number:
+                plt.close(num)
+                

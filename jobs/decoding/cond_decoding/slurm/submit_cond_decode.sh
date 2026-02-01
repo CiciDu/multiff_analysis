@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Pre-create SLURM log dirs before submission (SLURM writes logs itself)
-mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs/run_stdout
+mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/cond_decoding/logs/run_stdout
 
 usage() {
   cat <<'EOF'
-Usage: submit_decode.sh [--models "svm logreg"] [--cumulative] [sbatch args...]
+Usage: submit_cond_decode.sh [--models "svm logreg"] [--cumulative] [sbatch args...]
 
 Options:
   --models "LIST"     Space- or comma-delimited model list to try (e.g., "svm,logreg").
@@ -50,7 +50,7 @@ while (( "$#" )); do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-JOB_FILE="$SCRIPT_DIR/../slurm/decode_job.slurm"
+JOB_FILE="$SCRIPT_DIR/../slurm/cond_decoding_job.slurm"
 
 if [ ! -f "$JOB_FILE" ]; then
   echo "Error: SLURM job file not found at $JOB_FILE" >&2
@@ -66,9 +66,4 @@ if [ "$CUMULATIVE_FLAG" = "1" ]; then
   EXPORT_VARS="${EXPORT_VARS},CUMULATIVE=1"
 fi
 
-# Submit the job with forwarded args and exported vars
 sbatch --export="$EXPORT_VARS" "$JOB_FILE" "${FORWARD_ARGS[@]}"
-
-
-
-

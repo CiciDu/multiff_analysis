@@ -7,6 +7,8 @@ from planning_analysis.factors_vs_indicators import variations_base_class
 from pattern_discovery import organize_patterns_and_features
 from reinforcement_learning.base_classes import rl_base_class
 from pattern_discovery import patterns_and_features_class
+from reinforcement_learning.agents.feedforward import sb3_class
+from pattern_discovery import make_ff_dataframe
 
 import pandas as pd
 import os
@@ -17,22 +19,25 @@ import os
 # This class collects data from many agents and compares them
 
 
-class AgentPatterns(patterns_and_features_class.PatternsAndFeatures):
+class AgentPatterns(variations_base_class._VariationsBase, patterns_and_features_class.PatternsAndFeatures):
 
     def __init__(self,
-                 model_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/ff3/dv10_dw10_w10_mem3',
+                 model_folder_name,
                  # options are: norm_opt_arc, opt_arc_stop_first_vis_bdry, opt_arc_stop_closest,
                  opt_arc_type='opt_arc_stop_closest',
                  # note, currently we use 900s / dt = 9000 steps (15 mins)
                  backend='matplotlib',
                  ):
 
-        super().__init__(opt_arc_type=opt_arc_type, backend=backend)
+        super().__init__()
         self.model_folder_name = model_folder_name
         self.opt_arc_type = opt_arc_type
         rl_base_class._RLforMultifirefly.get_related_folder_names_from_model_folder_name(
             self, self.model_folder_name)
         self.monkey_name = None
+        
+        self.combd_patterns_and_features_folder_path = os.path.join(model_folder_name.replace(
+                'all_agents', 'all_collected_data/patterns_and_features'), 'combined_data')
 
         self.combd_planning_info_folder_path = os.path.join(model_folder_name.replace(
             'all_agents', 'all_collected_data/planning'), 'combined_data')
@@ -72,8 +77,7 @@ class AgentPatterns(patterns_and_features_class.PatternsAndFeatures):
             print('model_folder_name:', model_folder_name)
             print('data_name:', data_name)
             
-            
-            model_folder_name ="multiff_analysis/RL_models/selected_models/all_agents/ff3_mem3_rank_keep_visible_and_memory_job201550_22"
+        
             self.agent = sb3_class.SB3forMultifirefly(model_folder_name=model_folder_name, data_name=data_name)
             self.agent.streamline_getting_data_from_agent(
                 n_steps=9000, exists_ok=True, save_data=True)

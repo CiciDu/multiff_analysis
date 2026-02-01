@@ -86,7 +86,7 @@ def _build_child_fig(
     else:
         raise ValueError(
             f"Unknown backend {backend!r} (expected 'plotly' or 'matplotlib').")
-        
+
     if hasattr(fig, "_combinations"):
         combinations = fig._combinations
     else:
@@ -94,7 +94,7 @@ def _build_child_fig(
 
     if use_subplots_based_on_changeable_variables and combinations:
         _inject_changeable_variable_titles(fig, combinations, backend)
-        
+
     return fig
 
 
@@ -514,6 +514,10 @@ def plot_median_with_difference(
         x_title=x_title,
     )
 
+    # Prevent child figures from being auto-displayed in notebooks
+    plt.close(main_fig)
+    plt.close(diff_fig)
+
     return fig
 
 
@@ -597,6 +601,7 @@ def plot_median_heading_across_monkeys_and_arc_types_with_difference(
         constant_marker_size=constant_marker_size,
         backend=backend,
     )
+
 
 def _inject_changeable_variable_titles(fig, combinations, backend):
     """

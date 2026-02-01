@@ -1,13 +1,14 @@
 #!/bin/bash
 #SBATCH -J sb3_sweep
 #SBATCH --partition=gpu,xaqq
-#SBATCH -c 2
+#SBATCH -c 1
 #SBATCH --gres=gpu:1
 #SBATCH --mem=5G
 #SBATCH -t 24:00:00
-#SBATCH --array=1-40
+#SBATCH --array=1-40%5
 #SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.out
 #SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.err
+#SBATCH --exclude=mind-1-29
 
 set -euo pipefail
 cd /user_data/cicid/Multifirefly-Project

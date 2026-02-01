@@ -99,35 +99,59 @@ class GLMPipeline:
     # GLM fitting
     # ------------------------------------------------------------------
 
-    def fit_glm(self, name, df_X, *, use_groups: bool, glm_results_exists_ok: bool = True):
+    def fit_glm(self, name, df_X, *, use_groups: bool, glm_results_exists_ok: bool = True,
+                hyperparam_tuning: bool = True, show_plots: bool = False):
         """
         Fit a Poisson GLM and store the report.
         """
-        importlib.reload(glm_fit_utils)
-        importlib.reload(general_glm_fit)
-
         subfolder_name = name.replace(' ', '_').replace('+', 'plus').lower()
 
-        self.save_dir = os.path.join(self.output_root, 'glm_fit', subfolder_name)
-        self.fig_dir = self.save_dir.replace('all_monkey_data/', 'figures/')
-        print('Calling glm_mini_report with save_dir: ', self.save_dir)
-        report = general_glm_fit.glm_mini_report(
+
+        self.save_dir = os.path.join(
+            self.output_root,
+            'glm_fit_w_hyperparam_tuning' if hyperparam_tuning else 'glm_fit',
+            subfolder_name,
+        )
+
+        temp_fig_dir = self.save_dir.replace('all_monkey_data/', 'figures/')
+        data_part, self.fig_dir = extract_and_remove_data_part(temp_fig_dir)
+
+        common_kwargs = dict(
             df_X=df_X,
             df_Y=self.df_Y,
             offset_log=self.offset_log,
             cov_type=self.cov_type,
-            fast_mle=True,
             do_inference=True,
             make_plots=True,
-            show_plots=True,
+            show_plots=show_plots,
             fig_dir=self.fig_dir,
+            session_id=data_part,
             meta_groups=self.meta_groups if use_groups else None,
             save_dir=self.save_dir,
             cv_splitter=self.cv_splitter,
             buffer_bins=250,
-            exists_ok=glm_results_exists_ok
+            exists_ok=glm_results_exists_ok,
         )
 
+        if hyperparam_tuning:
+            report = general_glm_fit.glm_mini_report(
+                **common_kwargs,
+                fast_mle=False,
+                regularization='elastic_net',
+                alpha_grid=(1e-4, 3e-4, 1e-3, 3e-3, 1e-2),
+                l1_wt_grid=(0.0,),
+                n_splits=5,
+                cv_metric='loglik',
+                refit_on_support=False,
+            )
+        else:
+            report = general_glm_fit.glm_mini_report(
+                **common_kwargs,
+                fast_mle=True,
+            )
+
+            
+            
         self.reports[name] = report
         return report
 
@@ -137,7 +161,9 @@ class GLMPipeline:
 
     def run_behavior_only(self,
                           glm_results_exists_ok=True,
-                          pruned_columns_exists_ok=True):
+                          pruned_columns_exists_ok=True,
+                          **kwargs,
+                          ):
         """Fit behavior-only GLM."""
         cols_path = os.path.join(
             self.output_root,
@@ -157,11 +183,13 @@ class GLMPipeline:
             df_X=self.X_behavior,
             use_groups=False,
             glm_results_exists_ok=glm_results_exists_ok,
+            **kwargs,
         )
 
     def run_behavior_plus_history(self,
                                   glm_results_exists_ok=True,
-                                  pruned_columns_exists_ok=True):
+                                  pruned_columns_exists_ok=True,
+                                  **kwargs):
         """Fit GLM with behavior and spike-history covariates."""
         # Build spike-history design once
         self.build_design_with_history()
@@ -184,9 +212,10 @@ class GLMPipeline:
             df_X=self.X_beh_hist,
             use_groups=True,
             glm_results_exists_ok=glm_results_exists_ok,
+            **kwargs,
         )
 
-    def run_history_only(self, glm_results_exists_ok=True, pruned_columns_exists_ok=True):
+    def run_history_only(self, glm_results_exists_ok=True, pruned_columns_exists_ok=True, **kwargs):
         """Fit GLM with spike-history covariates only."""
         all_history_cols = [
             c for c in self.design_w_history.columns
@@ -212,11 +241,13 @@ class GLMPipeline:
             df_X=self.X_hist_only,
             use_groups=True,
             glm_results_exists_ok=glm_results_exists_ok,
+            **kwargs,
         )
 
     def run(self,
             glm_results_exists_ok=True,
-            pruned_columns_exists_ok=True):
+            pruned_columns_exists_ok=True, 
+            **kwargs):
         """
         Run all three models:
         1) Behavior only
@@ -224,11 +255,12 @@ class GLMPipeline:
         3) Spike history only
         """
         self.run_behavior_only(glm_results_exists_ok=glm_results_exists_ok,
-                               pruned_columns_exists_ok=pruned_columns_exists_ok)
+                               pruned_columns_exists_ok=pruned_columns_exists_ok, **kwargs)
         self.run_behavior_plus_history(
-            glm_results_exists_ok=glm_results_exists_ok, pruned_columns_exists_ok=pruned_columns_exists_ok)
+            glm_results_exists_ok=glm_results_exists_ok, pruned_columns_exists_ok=pruned_columns_exists_ok, **kwargs)
         self.run_history_only(glm_results_exists_ok=glm_results_exists_ok,
-                              pruned_columns_exists_ok=pruned_columns_exists_ok)
+                              pruned_columns_exists_ok=pruned_columns_exists_ok,
+                              **kwargs)
 
         return self.reports
 
@@ -272,3 +304,13 @@ class GLMPipeline:
                 dpi=150,
                 bbox_inches='tight',
             )
+            
+from pathlib import Path
+
+def extract_and_remove_data_part(path):
+    path = Path(path)
+    data_parts = [p for p in path.parts if p.startswith('data_')]
+    assert len(data_parts) == 1, f'Expected exactly one data_ part, found {data_parts}'
+    data_part = data_parts[0]
+    remaining_path = Path(*[p for p in path.parts if p != data_part])
+    return data_part, remaining_path

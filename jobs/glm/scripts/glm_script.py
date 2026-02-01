@@ -28,6 +28,12 @@ def main():
         default=None,
         help='If provided, run GLM only on this raw data folder'
     )
+
+    parser.add_argument(
+        '--hyperparam_tuning',
+        default=True,
+        help='If True, perform hyperparam tuning'
+    )
     args = parser.parse_args()
 
     # Case 1: user explicitly provides a raw data folder
@@ -38,7 +44,10 @@ def main():
         runner = full_session_glm_runner.FullSessionGLMRunner(
             raw_data_folder_path=args.raw_data_folder_path,
         )
-        runner.run()
+        runner.run(
+            show_plots=False,
+            hyperparam_tuning=args.hyperparam_tuning,
+        )
         return
 
     # Case 2: no folder provided -> iterate through all sessions
@@ -61,7 +70,10 @@ def main():
             runner = full_session_glm_runner.FullSessionGLMRunner(
                 raw_data_folder_path=raw_data_folder_path,
             )
-            runner.run()
+            runner.run(
+                show_plots=False,
+                hyperparam_tuning=args.hyperparam_tuning,
+            )
 
         except Exception as e:
             print(f'Error processing {row["data_name"]}: {e}')

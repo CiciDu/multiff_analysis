@@ -37,3 +37,5 @@ __pycache__/
 **/jobs/rppo/logs/
 **/jobs/decode/logs/
 **/jobs/sb3/logs/
+
+**/logs/

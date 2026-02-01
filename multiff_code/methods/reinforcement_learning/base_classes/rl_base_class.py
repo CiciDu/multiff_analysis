@@ -222,7 +222,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.processed_data_folder_path = build_path('processed_data')
         self.planning_data_folder_path = build_path('planning')
-        self.patterns_and_features_folder_path = build_path('patterns_and_features')
+        self.patterns_and_features_folder_path = build_path(
+            'patterns_and_features')
         self.decision_making_folder_path = build_path('decision_making')
 
         # Make the directories
@@ -240,7 +241,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             'patterns_and_features': self.patterns_and_features_folder_path,
             'decision_making': self.decision_making_folder_path,
         }
-
 
     def get_current_info_condition(self, df):
         minimal_current_info = self.get_minimum_current_info()
@@ -512,10 +512,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         stage_summary = {'before': before, 'after': after, 'targets': targets}
         print('Stage summary:', stage_summary)
 
-    def collect_data(self, n_steps=8000, exists_ok=False, save_data=True):
+    def collect_data(self, n_steps=8000, exists_ok=False, save_data=True, retrieve_ff_flash_sorted=False):
         if exists_ok:
             try:
-                self.retrieve_monkey_data()
+                self.retrieve_monkey_data(retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.ff_caught_T_new = self.ff_caught_T_sorted
                 self.make_or_retrieve_ff_dataframe_for_agent(
                     exists_ok=exists_ok, save_data=save_data)
@@ -698,6 +698,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         last_error = None
         self.loaded_agent_dir = None
         for d, name in zip(candidates, candidate_names):
+            if name == 'post/best':
+                print(f'Loading best model from post/best')
             try:
                 self.load_agent(
                     load_replay_buffer=load_replay_buffer, dir_name=d, restore_env_from_checkpoint=True)
@@ -746,7 +748,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
                                     data_exists_ok=False, save_video=True, save_format='html', display_inline=False, **animate_kwargs):
-        self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok)
+        self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok, retrieve_ff_flash_sorted=True)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                             duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline,
@@ -805,7 +807,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
             if make_animation:
                 self.streamline_loading_and_making_animation(currentTrial_for_animation=currentTrial_for_animation, duration=duration,
-                                                            num_trials_for_animation=num_trials_for_animation, n_steps=n_steps)
+                                                             num_trials_for_animation=num_trials_for_animation, n_steps=n_steps)
 
         # to_update_record, to_make_plots = self.whether_to_update_record_and_make_plots()
         # if to_make_plots or to_update_record:

@@ -532,3 +532,150 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
     
     
     return fig
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+import warnings
+
+
+def plot_grouped_percent_bars(
+    df: pd.DataFrame,
+    *,
+    group_order=('control', 'test'),
+    monkey_order=None,
+    bar_width=0.36,
+    capsize=4,
+    ylabel='Percentage',
+    title=None,
+    figsize=(7.5, 3.8),
+    palette=None,
+    ylim=None,
+    show_values=False,
+    ax=None,
+):
+    """
+    Grouped bar chart with asymmetric CI error bars (Matplotlib).
+
+    Notes
+    -----
+    - Expects 'perc', 'ci_lower', 'ci_upper' in [0, 1].
+    - If values appear to be in [0, 100], they are automatically converted.
+    """
+
+    d = df.copy()
+    d = d[d['test_or_control'].isin(group_order)]
+    
+    if 'ci_lower' not in d.columns:
+        try:
+            d['ci_lower'] = d['perc_ci_low_95']
+            d['ci_upper'] = d['perc_ci_high_95']
+        except:
+            raise ValueError('ci_lower and ci_upper columns not found in dataframe, and perc_ci_low_95 and perc_ci_high_95 columns not found either')
+
+    # ------------------------------------------------------------------
+    # Auto-detect and convert 0–100 percentages → [0, 1]
+    # ------------------------------------------------------------------
+    value_cols = ['perc', 'ci_lower', 'ci_upper']
+    max_vals = d[value_cols].max()
+
+    if (max_vals > 1.5).all():
+        warnings.warn(
+            'Detected percentage values in [0, 100]; converting to [0, 1].',
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        d[value_cols] = d[value_cols] / 100.0
+
+    # ------------------------------------------------------------------
+    # Category orders
+    # ------------------------------------------------------------------
+    if monkey_order is None:
+        monkey_order = d['monkey_name'].drop_duplicates().tolist()
+
+    d['monkey_name'] = pd.Categorical(
+        d['monkey_name'], categories=monkey_order, ordered=True
+    )
+    d['test_or_control'] = pd.Categorical(
+        d['test_or_control'], categories=list(group_order), ordered=True
+    )
+    d = d.sort_values(['monkey_name', 'test_or_control'])
+
+    # X positions
+    monkeys = pd.Index(monkey_order)
+    x = np.arange(len(monkeys), dtype=float)
+
+    # Group offsets
+    n_groups = len(group_order)
+    offsets = np.linspace(
+        -bar_width * (n_groups - 1) / 2,
+        bar_width * (n_groups - 1) / 2,
+        n_groups,
+    )
+
+    # Axes
+    created_fig = False
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+        created_fig = True
+    else:
+        fig = ax.figure
+
+    for i, grp in enumerate(group_order):
+        sub = d[d['test_or_control'] == grp]
+        sub = sub.set_index('monkey_name').reindex(monkeys)
+
+        y = sub['perc'].to_numpy()
+        lo = sub['ci_lower'].to_numpy()
+        hi = sub['ci_upper'].to_numpy()
+        yerr = np.vstack([y - lo, hi - y])
+
+        color = None if palette is None else palette.get(grp, None)
+
+        bars = ax.bar(
+            x + offsets[i],
+            y,
+            width=bar_width,
+            yerr=yerr,
+            capsize=capsize,
+            label=grp,
+            color=color,
+            edgecolor='none',
+        )
+
+        if show_values:
+            for rect, val in zip(bars, y):
+                ax.annotate(
+                    f'{val * 100:.1f}%',
+                    xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
+                    xytext=(0, 3),
+                    textcoords='offset points',
+                    ha='center',
+                    va='bottom',
+                    fontsize=9,
+                )
+
+    # Axes cosmetics
+    ax.set_xticks(x, monkeys.tolist())
+    ax.set_ylabel(ylabel)
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
+    ax.yaxis.grid(True, linestyle='-', alpha=0.15)
+    ax.set_axisbelow(True)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.legend(title='Group', frameon=False)
+
+    if title:
+        ax.set_title(title)
+
+    if created_fig:
+        fig.tight_layout()
+
+    return fig, ax

@@ -40,7 +40,7 @@ from neural_data_analysis.design_kits.design_around_event import (
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     get_stops_utils,
-    assemble_stop_design,
+    prepare_stop_design,
     collect_stop_data,
 )
 
@@ -53,6 +53,8 @@ from decision_making_analysis.data_compilation import (
 )
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
+
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import assemble_stop_design
 
 
 class FullSessionGLMRunner:
@@ -93,10 +95,10 @@ class FullSessionGLMRunner:
     # =====================
     # Public API
     # =====================
-    def run(self):
+    def run(self, show_plots: bool = False, hyperparam_tuning: bool = True):
         self.assemble_merged_designs()
         # self._fit_glm()
-        self._fit_glm_sel_cols()
+        self._fit_glm_sel_cols(show_plots=show_plots, hyperparam_tuning=hyperparam_tuning)
         print('done')  # preserve original behavior
 
     def assemble_merged_designs(self):
@@ -318,73 +320,6 @@ class FullSessionGLMRunner:
                                                                    'const'], errors='ignore')
         self.best_arc_design_df_sub['having_best_arc_ff'] = 1
 
-    def _build_stop_design(self):
-
-        # pn, datasets, _ = collect_stop_data.collect_stop_data_func(
-        #     self.raw_data_folder_path,
-        #     bin_width=self.bin_width,
-        # )
-
-        # captures_df, valid_captures_df, filtered_no_capture_stops_df, stops_with_stats = (
-        #     get_stops_utils.prepare_no_capture_and_captures(
-        #         monkey_information=pn.monkey_information,
-        #         closest_stop_to_capture_df=pn.closest_stop_to_capture_df,
-        #         ff_caught_T_new=pn.ff_caught_T_new,
-        #         distance_col='distance_from_ff_to_stop',
-        #     )
-        # )
-
-        # stops_with_stats['stop_time'] = stops_with_stats['stop_id_start_time']
-        # stops_with_stats['prev_time'] = stops_with_stats['stop_id_end_time'].shift(
-        #     1)
-        # stops_with_stats['next_time'] = stops_with_stats['stop_id_start_time'].shift(
-        #     -1)
-
-        # new_seg_info = event_binning.make_new_seg_info_for_stop_design(
-        #     stops_with_stats,
-        #     pn.closest_stop_to_capture_df,
-        #     pn.monkey_information,
-        # )
-
-        # events_with_stats = stops_with_stats[[
-        #     'stop_id',
-        #     'stop_cluster_id',
-        #     'stop_id_start_time',
-        #     'stop_id_end_time',
-        # ]].rename(columns={
-        #     'stop_id': 'event_id',
-        #     'stop_cluster_id': 'event_cluster_id',
-        #     'stop_id_start_time': 'event_id_start_time',
-        #     'stop_id_end_time': 'event_id_end_time',
-        # })
-
-        # _, stop_binned_feats, _, stop_meta_used, stop_meta_groups = (
-        #     assemble_stop_design.build_stop_design(
-        #         new_seg_info,
-        #         events_with_stats,
-        #         pn.monkey_information,
-        #         pn.spikes_df,
-        #         pn.ff_dataframe,
-        #         datasets=datasets,
-        #         add_ff_visible_info=True,
-        #         global_bins_2d=self.global_bins_2d,
-        #     )
-        # )
-
-        stop_binned_feats = assemble_stop_design.add_interaction_columns(
-            stop_binned_feats
-        )
-        stop_binned_feats = assemble_stop_design.scale_binned_feats(
-            stop_binned_feats
-        )
-
-        self.stop_design_df_sub = stop_binned_feats[
-            selected_stop_design_features.stop_design_predictors
-        ].copy()
-        self.stop_design_df_sub['bin'] = stop_meta_used['global_bin']
-        self.stop_design_df_sub['in_stop_window'] = 1
-        self.stop_meta_groups = stop_meta_groups
-
     def _check_meta_groups(self):
 
         if len(self.merged_meta_groups) != (
@@ -480,7 +415,7 @@ class FullSessionGLMRunner:
         self.pipeline.run()
         self.pipeline.plot_comparisons()
 
-    def _fit_glm_sel_cols(self):
+    def _fit_glm_sel_cols(self, show_plots: bool = False, hyperparam_tuning: bool = True):
         df_X = self.merged_design_df[select_fs_features.ALL_REGRESSORS].copy()
         df_Y = self.binned_spikes.copy()
 
@@ -499,5 +434,23 @@ class FullSessionGLMRunner:
         )
 
         self.pipeline_sel_cols.run(
-            glm_results_exists_ok=False, pruned_columns_exists_ok=True)
+            glm_results_exists_ok=False, pruned_columns_exists_ok=True,
+            show_plots=show_plots,
+            hyperparam_tuning=hyperparam_tuning,
+        )
         self.pipeline_sel_cols.plot_comparisons()
+
+    def _build_stop_design(self):
+
+        pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups = assemble_stop_design.assemble_stop_design_func(
+            self.raw_data_folder_path,
+            self.bin_width,
+            self.global_bins_2d,
+        )
+
+        self.stop_design_df_sub = stop_binned_feats[
+            selected_stop_design_features.stop_design_predictors
+        ].copy()
+        self.stop_design_df_sub['bin'] = stop_meta_used['global_bin']
+        self.stop_design_df_sub['in_stop_window'] = 1
+        self.stop_meta_groups = stop_meta_groups

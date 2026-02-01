@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional, Type
+from typing import Any, Optional, Type
 from tqdm import tqdm
 
 import numpy as np
@@ -214,6 +214,7 @@ def run_cv_decoding(
     shuffle_y: bool = False,
     shuffle_seed: int = 0,
     save_dir: str | Path | None = None,
+    load_existing_only = False,
 ):
     if config is None:
         config = DecodingRunConfig()
@@ -227,6 +228,9 @@ def run_cv_decoding(
         out_dir.mkdir(parents=True, exist_ok=True)
 
     results = []
+    
+    if behav_features is None:
+        behav_features = y_df.columns.tolist()
 
     for feature in tqdm(behav_features, desc='Decoding features'):
         y = y_df[feature].to_numpy().ravel()
@@ -246,9 +250,17 @@ def run_cv_decoding(
             out_dir, feature, mode, params_hash
         )
 
-        if csv_path is not None and csv_path.exists():
-            results.append(pd.read_csv(csv_path).iloc[0].to_dict())
-            print(f'Loaded results from {csv_path}')
+        if csv_path is not None: 
+            if csv_path.exists():
+                results.append(pd.read_csv(csv_path).iloc[0].to_dict())
+                if verbosity > 0:
+                    print(f'Loaded results from {csv_path}')
+                continue
+            else:
+                if verbosity > 0:
+                    print(f'No results found for {csv_path}')
+                
+        if load_existing_only:
             continue
 
         splits = build_group_kfold_splits(X_ok, g_ok, n_splits)
@@ -274,17 +286,7 @@ def run_cv_decoding(
 
         if csv_path is not None:
             pd.DataFrame([row]).to_csv(csv_path, index=False)
-            with open(csv_path.with_suffix('.json'), 'w') as f:
-                json.dump(
-                    dict(
-                        feature=feature,
-                        mode=mode,
-                        n_splits=n_splits,
-                        shuffle_y=shuffle_y,
-                        timestamp=datetime.now().isoformat(),
-                    ),
-                    f,
-                    indent=2,
-                )
+            print(f'Saved results to {csv_path}')
+
 
     return pd.DataFrame(results)

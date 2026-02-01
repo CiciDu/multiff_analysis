@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=cond_decoding
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/cond_decoding/logs/run_stdout/decode_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/cond_decoding/logs/run_stdout/decode_%A_%a.err
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/cond_decoding/logs/run_stdout/decode_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/cond_decoding/logs/run_stdout/decode_%A_%a.err
 #SBATCH --array=0
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=16
@@ -15,7 +15,7 @@
 
 set -euo pipefail
 # trap 'echo "[SLURM] Error on line $LINENO: $BASH_COMMAND" >&2' ERR
-mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/cond_decoding/logs/run_stdout
+mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/cond_decoding/logs/run_stdout
 
 # --- Project setup ---
 cd /user_data/cicid/Multifirefly-Project || { echo "[SLURM] Failed to cd into project"; exit 1; }
@@ -53,7 +53,7 @@ for MODEL in "${MODELS[@]}"; do
 
     echo "[SLURM] Running model $MODEL for comparison index $SLURM_ARRAY_TASK_ID"
     # Build args and optionally append --cumulative
-    PY_ARGS=(-u multiff_analysis/jobs/cond_decoding/scripts/cond_decoding_script.py \
+    PY_ARGS=(-u multiff_analysis/jobs/decoding/cond_decoding/scripts/cond_decoding_script.py \
         --comparisons multiff_analysis/configs/comparisons.json \
         --idx "$SLURM_ARRAY_TASK_ID" \
         --model "$MODEL" \

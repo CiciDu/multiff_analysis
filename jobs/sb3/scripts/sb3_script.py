@@ -48,6 +48,20 @@ if __name__ == "__main__":
                         help="Angular terminal velocity threshold")
     parser.add_argument("--identity-slot-strategy", type=str, default="rank_keep",
                         help="Strategy for identity slot handling in env")
+    # Dynamics noise
+    parser.add_argument("--v-noise-std", type=float, default=None,
+                        help="Std of linear velocity noise (env v_noise_std)")
+    parser.add_argument("--w-noise-std", type=float, default=None,
+                        help="Std of angular velocity noise (env w_noise_std)")
+    # Observation noise (perception/memory/lognormal)
+    parser.add_argument("--obs-perc-r", "--perc-r", dest="obs_perc_r", type=float, default=None,
+                        help="Perception radial Weber fraction")
+    parser.add_argument("--obs-perc-th", "--perc-th", dest="obs_perc_th", type=float, default=None,
+                        help="Perception angular base std")
+    parser.add_argument("--obs-mem-r", "--mem-r", dest="obs_mem_r", type=float, default=None,
+                        help="Memory radial Weber step")
+    parser.add_argument("--obs-mem-th", "--mem-th", dest="obs_mem_th", type=float, default=None,
+                        help="Memory angular step base std")
     # Cost factors
     parser.add_argument("--dv-cost-factor", type=float, default=None,
                         help="Cost factor for dv^2 term (optional override)")
@@ -108,6 +122,23 @@ if __name__ == "__main__":
         'max_in_memory_time': args.max_in_memory_time,
         'identity_slot_strategy': args.identity_slot_strategy,
     }
+    # Dynamics noise if provided
+    if args.v_noise_std is not None:
+        env_kwargs['v_noise_std'] = args.v_noise_std
+    if args.w_noise_std is not None:
+        env_kwargs['w_noise_std'] = args.w_noise_std
+    # Observation noise if provided (partial dict allowed; defaults fill the rest)
+    obs_noise_updates = {}
+    if args.obs_perc_r is not None:
+        obs_noise_updates['perc_r'] = args.obs_perc_r
+    if args.obs_perc_th is not None:
+        obs_noise_updates['perc_th'] = args.obs_perc_th
+    if args.obs_mem_r is not None:
+        obs_noise_updates['mem_r'] = args.obs_mem_r
+    if args.obs_mem_th is not None:
+        obs_noise_updates['mem_th'] = args.obs_mem_th
+    if len(obs_noise_updates) > 0:
+        env_kwargs['obs_noise'] = obs_noise_updates
     # Optional overrides for cost factors
     if args.dv_cost_factor is not None:
         env_kwargs['dv_cost_factor'] = args.dv_cost_factor
@@ -160,6 +191,19 @@ if __name__ == "__main__":
         sweep_params['jerk_cost_factor'] = args.jerk_cost_factor
     if args.cost_per_stop is not None:
         sweep_params['cost_per_stop'] = args.cost_per_stop
+    # Include noise settings if provided
+    if args.v_noise_std is not None:
+        sweep_params['v_noise_std'] = args.v_noise_std
+    if args.w_noise_std is not None:
+        sweep_params['w_noise_std'] = args.w_noise_std
+    if args.obs_perc_r is not None:
+        sweep_params['obs_perc_r'] = args.obs_perc_r
+    if args.obs_perc_th is not None:
+        sweep_params['obs_perc_th'] = args.obs_perc_th
+    if args.obs_mem_r is not None:
+        sweep_params['obs_mem_r'] = args.obs_mem_r
+    if args.obs_mem_th is not None:
+        sweep_params['obs_mem_th'] = args.obs_mem_th
 
     # Attach sweep params to agent for curriculum stage logging and set PPO params
     try:

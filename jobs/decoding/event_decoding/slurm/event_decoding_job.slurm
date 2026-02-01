@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=decode_sess
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs/run_stdout/decode_sess_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs/run_stdout/decode_sess_%A_%a.err
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/event_decoding/logs/run_stdout/decode_sess_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/event_decoding/logs/run_stdout/decode_sess_%A_%a.err
 # NOTE: Set this range high enough; out-of-range indices will no-op safely below.
 #SBATCH --cpus-per-task=11
 #SBATCH --partition=cpu,xaqq
@@ -10,7 +10,7 @@
 #SBATCH --mail-type=END,FAIL
 
 set -euo pipefail
-mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs/run_stdout
+mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/event_decoding/logs/run_stdout
 
 # --- Project setup ---
 cd /user_data/cicid/Multifirefly-Project || { echo "[SLURM] Failed to cd into project"; exit 1; }
@@ -89,7 +89,7 @@ keys_csv = os.environ.get('KEYS_CSV', '').strip()
 models = [m.strip() for m in os.environ.get('MODELS_CSV', '').split(',') if m.strip()]
 
 cumulative = os.environ.get('CUMULATIVE', '0') == '1'
-base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs')
+base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/event_decoding/logs')
 subdir = 'retry_decoder_cumulative' if cumulative else 'retry_decoder'
 progress_dir = base_logs / subdir
 progress_dir.mkdir(parents=True, exist_ok=True)
@@ -137,7 +137,7 @@ session = os.environ.get('SESSION_NAME', '')
 keys_csv = os.environ.get('KEYS_CSV', '').strip()
 models = [m.strip() for m in os.environ.get('MODELS_CSV', '').split(',') if m.strip()]
 cumulative = os.environ.get('CUMULATIVE', '0') == '1'
-base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs')
+base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/event_decoding/logs')
 subdir = 'retry_decoder_cumulative' if cumulative else 'retry_decoder'
 progress_dir = base_logs / subdir
 progress_dir.mkdir(parents=True, exist_ok=True)
@@ -171,7 +171,7 @@ fi
 for MODEL in "${MODELS[@]}"; do
     echo "[SLURM] Running model=$MODEL for session=$SESSION_NAME"
     # Build python args, forwarding keys if provided
-    PY_ARGS=(-u multiff_analysis/jobs/decode/scripts/decode_script.py
+    PY_ARGS=(-u multiff_analysis/jobs/decoding/event_decoding/scripts/decode_script.py
         --comparisons multiff_analysis/configs/comparisons.json
         --model "$MODEL"
         --model_kwargs '{}'
@@ -211,7 +211,7 @@ keys_csv = os.environ.get('KEYS_CSV', '').strip()
 models = [m.strip() for m in os.environ.get('MODELS_CSV', '').split(',') if m.strip()]
 
 cumulative = os.environ.get('CUMULATIVE', '0') == '1'
-base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decode/logs')
+base_logs = Path('/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/event_decoding/logs')
 subdir = 'retry_decoder_cumulative' if cumulative else 'retry_decoder'
 progress_dir = base_logs / subdir
 progress_dir.mkdir(parents=True, exist_ok=True)

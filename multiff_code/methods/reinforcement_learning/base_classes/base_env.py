@@ -30,16 +30,11 @@ class ObsNoiseCfg:
     mem_r: float = 0.02      # Weber radial step
     mem_th: float = 0.01    # angular step base (std_th = mem_th)
 
-    # lognormal obs (if you use it)
-    lognorm_k: float = 0.10  # dimensionless log-std multiplier (0..0.5)
-
     seed: Optional[int] = None
-    preset: str = 'weber_perc_ego_mem'  # doc label only
 
     def validate(self):
         assert self.perc_r >= 0 and self.perc_th >= 0
         assert self.mem_r >= 0 and self.mem_th >= 0
-        assert 0.0 <= self.lognorm_k <= 0.5
         return self
 
     @staticmethod
