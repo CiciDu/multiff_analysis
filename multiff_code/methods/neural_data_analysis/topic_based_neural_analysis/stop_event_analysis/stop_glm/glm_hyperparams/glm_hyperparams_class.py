@@ -7,7 +7,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 from collections import Counter
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -78,7 +78,7 @@ class SweepAndCompare:
         configs: Iterable[ConfigSpec | dict],
         df_X: pd.DataFrame,
         df_Y: pd.DataFrame,
-        offset_log: np.ndarray | pd.Series,
+        offset_log: Union[np.ndarray, pd.Series],
         fit_fn: Callable[..., tuple[dict, dict, pd.DataFrame]],
         feature_names: Optional[list[str]] = None,
         cluster_ids: Optional[list[str]] = None,
@@ -286,7 +286,7 @@ class SweepAndCompare:
         checkpoint_dir: str | Path,
         df_X: pd.DataFrame,
         df_Y: pd.DataFrame,
-        offset_log: np.ndarray | pd.Series,
+        offset_log: Union[np.ndarray, pd.Series],
         fit_fn: Callable[..., tuple[dict, dict, pd.DataFrame]],
         feature_names: Optional[list[str]] = None,
         cluster_ids: Optional[list[str]] = None,

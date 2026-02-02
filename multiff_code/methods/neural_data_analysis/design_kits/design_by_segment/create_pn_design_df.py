@@ -1,34 +1,26 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Sequence, Optional, Tuple, List, Mapping
+from typing import Optional, Union
 
-import warnings
 import numpy as np
 import pandas as pd
-from scipy import signal
-from scipy.interpolate import BSpline
+from neural_data_analysis.design_kits.design_by_segment import (
+    other_feats,
+    spatial_feats,
+    temporal_feats
+)
 
 # your modules
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.design_kits.design_by_segment import temporal_feats, spatial_feats, predictor_utils, other_feats
-
-
-import numpy as np
-import pandas as pd
-from typing import Optional, Tuple, Union
 
 ArrayLike = Union[np.ndarray, pd.Series, list]
-
-
 
 
 def get_initial_design_df(
     data: pd.DataFrame,
     dt: float,
-    trial_ids: np.ndarray | None = None,
+    trial_ids: Optional[np.ndarray] = None,
 ) -> tuple[pd.DataFrame, dict, dict]:
-    
+
     # work on a copy
     data = data.copy()
     trial_ids = np.asarray(trial_ids).ravel()
@@ -53,11 +45,10 @@ def get_initial_design_df(
         specs,
         meta0,
         data,
-        events_to_include=[], #['stop', 'capture_ff'],
+        events_to_include=[],  # ['stop', 'capture_ff'],
         basis_family_event='rc',
         n_basis_event=6,
     )
-
 
     specs = spatial_feats.add_visibility_transition_kernels(
         specs,
@@ -143,15 +134,12 @@ def get_initial_design_df(
     return design_df, meta0, meta
 
 
-
-
 def add_state_and_spatial_features(
     design_df: pd.DataFrame,
     data: pd.DataFrame,
     meta: dict,
 ) -> tuple[pd.DataFrame, dict]:
     """Add memory, eye, acceleration, raw, and spatial spline features."""
-
 
     design_df, meta = other_feats.add_eye_speed_features(
         design_df, data, meta
@@ -172,7 +160,7 @@ def add_state_and_spatial_features(
 
     # ---------- raw passthrough features ----------
     raw_features = [
-        #'curv_of_traj',
+        # 'curv_of_traj',
         'num_ff_visible', 'log1p_num_ff_visible',
         'num_ff_in_memory', 'log1p_num_ff_in_memory',
     ]
@@ -215,6 +203,7 @@ def add_state_and_spatial_features(
 
     return design_df, meta
 
+
 def make_bin_df_for_pn(rebinned_x_var, bin_edges):
     bin_df = (
         rebinned_x_var
@@ -229,5 +218,5 @@ def make_bin_df_for_pn(rebinned_x_var, bin_edges):
         .sort_values(['new_segment', 'new_bin'])
         .reset_index(drop=True)
     )
-    
+
     return bin_df

@@ -1,18 +1,16 @@
-from null_behaviors import curvature_utils
-
-import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-from dash import html, dcc
-import pandas as pd
-import plotly.graph_objects as go
-import matplotlib
 import os
 import socket
 from contextlib import closing
+from typing import Optional
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from dash import dcc, html
+from matplotlib import rc
+from null_behaviors import curvature_utils
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -60,7 +58,8 @@ def put_down_the_dropdown_menu_for_ref_point_mode(ref_point_mode, id='ref_point_
             # placeholder="Select a mode to determine the reference point",
         )
     ],
-        style={'width': '40%', 'padding': '10px 10px 10px 10px', 'background-color': '#9FD4A3'})  # light green
+        # light green
+        style={'width': '40%', 'padding': '10px 10px 10px 10px', 'background-color': '#9FD4A3'})
 
 
 def put_down_the_input_for_ref_point_descr(ref_point_value, id="ref_point_value"):
@@ -89,7 +88,8 @@ def put_down_the_dropdown_menu_for_curv_of_traj_mode(curv_of_traj_mode, label='C
             # placeholder="Select a mode to calculate curvature of trajectory",
         )
     ],
-        style={'width': '40%', 'padding': '10px 10px 10px 10px', 'background-color': '#B5D3E7'})  # light blue
+        # light blue
+        style={'width': '40%', 'padding': '10px 10px 10px 10px', 'background-color': '#B5D3E7'})
 
 
 def put_down_the_input_for_window_lower_end_and_upper_end(window_for_curv_of_traj, ids=['window_lower_end', 'window_upper_end']):
@@ -345,8 +345,7 @@ def put_down_raster_plot(fig_raster, id='raster_plot', width='50%', height=300):
     ], style={'width': width, 'padding': '0 0 10 0'})
 
 
-
-def _find_open_port(preferred: int | None, max_tries: int = 50) -> int:
+def _find_open_port(preferred: Optional[int], max_tries: int = 50) -> int:
     """
     Try preferred first (or $PORT if set and preferred is None), then scan upward.
     Returns an open port number or raises RuntimeError if none found.

@@ -1,6 +1,6 @@
 
 
-from typing import Tuple, Callable, Optional
+from typing import Tuple, Callable, Optional, Union
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter1d
 def prepare_no_capture_and_captures(
     monkey_information: pd.DataFrame,
     closest_stop_to_capture_df: pd.DataFrame,
-    ff_caught_T_new: np.ndarray | pd.Series,
+    ff_caught_T_new: Union[np.ndarray, pd.Series],
     *,
     min_stop_duration: float = 0.0,
     max_stop_duration=None,

@@ -3,6 +3,7 @@ import pandas as pd
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding
 
 
@@ -60,7 +61,7 @@ def decode_by_num_ff_visible_or_in_memory(
     ff_visibility_col='num_ff_visible',
     group_col='new_segment',
     n_splits=5,
-    config: cv_decoding.DecodingRunConfig | None = None,
+    config: Optional[cv_decoding.DecodingRunConfig] = None,
     save_path=None,
     include_pooled=True,
     load_if_exists=True,
@@ -182,7 +183,7 @@ def decode_cur_ff_only(
     group_col='new_segment',
     n_splits=5,
     verbosity: int = 1,
-    config: cv_decoding.DecodingRunConfig | None = None,
+    config: Optional[cv_decoding.DecodingRunConfig] = None,
     save_path=None,
 ):
     if config is None:

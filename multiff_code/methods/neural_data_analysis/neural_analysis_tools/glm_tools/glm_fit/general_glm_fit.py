@@ -12,24 +12,24 @@
 # - Public functions preserved: add_fdr, add_rate_ratios, term_population_tests,
 #   fit_poisson_glm_per_cluster, glm_mini_report
 # - New knobs are optional and default to your original (no penalty).
-from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import glm_fit_utils
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import plot_spikes, plot_glm_fit
-
-from statsmodels.tools.sm_exceptions import ConvergenceWarning
-import warnings
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from scipy import stats
-import statsmodels.api as sm
-from pathlib import Path
-from sklearn.model_selection import GroupKFold, KFold
-from scipy import stats as _stats
-import pickle
 import hashlib
 import json
-import os
+import pickle
+import warnings
+from pathlib import Path
+from typing import Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import glm_fit_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_glm.glm_plotting import (
+    plot_glm_fit
+)
+from scipy import stats as _stats
+from sklearn.model_selection import GroupKFold, KFold
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 # ---------- small helpers (place near the top of the file) ----------
 
@@ -119,7 +119,8 @@ def _compute_cv_loglik_and_deviance(y, X, off, folds, *, maxiter=25):
         # otherwise beta0_hat = log(mean(y_tr))
         if off_tr is None:
             rate_tr = float(np.mean(y_tr))
-            mu_null_te = np.full_like(y_te, fill_value=max(rate_tr, 1e-12), dtype=float)
+            mu_null_te = np.full_like(
+                y_te, fill_value=max(rate_tr, 1e-12), dtype=float)
         else:
             sum_exp_off_tr = float(np.sum(np.exp(off_tr)))
             base_rate = float(np.sum(y_tr)) / max(sum_exp_off_tr, 1e-12)
@@ -140,7 +141,8 @@ def _compute_cv_loglik_and_deviance(y, X, off, folds, *, maxiter=25):
     cv_ll_improvement = float(total_ll_model - total_ll_null)
     cv_dev_explained = np.nan
     if np.isfinite(total_dev_null) and (total_dev_null > 0):
-        cv_dev_explained = 1.0 - (float(total_dev_model) / float(total_dev_null))
+        cv_dev_explained = 1.0 - \
+            (float(total_dev_model) / float(total_dev_null))
     return cv_ll_improvement, cv_dev_explained
 
 
@@ -199,7 +201,7 @@ def fit_poisson_glm_per_cluster(
         # Build grouped folds for CV metrics if requested
         folds = None
         if compute_cv_metrics:
-            folds =_build_folds(
+            folds = _build_folds(
                 n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
         for i, cid in enumerate(cluster_ids, 1):
             print(
@@ -244,8 +246,8 @@ def fit_poisson_glm_per_cluster(
         return pd.Series(results).to_dict(), pd.DataFrame(coef_rows), pd.DataFrame(metrics_rows), pd.DataFrame()
 
     # ----------------------- regular path with tuning ------------------------
-    folds =_build_folds(n, n_splits=n_splits,
-                                       groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
+    folds = _build_folds(n, n_splits=n_splits,
+                         groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
     results, coef_rows, metrics_rows, cv_tables = {}, [], [], []
 
     for i, cid in enumerate(cluster_ids, 1):
@@ -329,7 +331,7 @@ def fit_poisson_glm_per_cluster_fast_mle(
     n = X.shape[0]
     folds = None
     if compute_cv_metrics:
-        folds =_build_folds(
+        folds = _build_folds(
             n, n_splits=n_splits, groups=groups, cv_splitter=cv_splitter, buffer_bins=buffer_bins)
 
     for i, cid in enumerate(eff_ids, 1):
@@ -562,7 +564,7 @@ def _build_figs(coefs_df, metrics_df, *, feature_names, forest_term, forest_top_
     return figs
 
 
-def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots, cv_tables_df=None, results=None, metadata: dict | None = None,
+def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots, cv_tables_df=None, results=None, metadata: Optional[dict] = None,
                   fig_dir=None, session_id=None):
     if save_dir is None:
         return
@@ -577,7 +579,8 @@ def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots
             with open(p / 'meta.json', 'w') as f:
                 json.dump(metadata, f, indent=2, default=str)
         except Exception as e:
-            print(f'[save_outputs] WARNING: could not save meta.json: {type(e).__name__}: {e}')
+            print(
+                f'[save_outputs] WARNING: could not save meta.json: {type(e).__name__}: {e}')
     # save optional CV tables
     if cv_tables_df is not None and isinstance(cv_tables_df, pd.DataFrame) and not cv_tables_df.empty:
         cv_tables_df.to_csv(p / 'cv_tables.csv', index=False)
@@ -588,10 +591,10 @@ def _save_outputs(save_dir, coefs_df, metrics_df, pop_tests, figs, *, make_plots
                 pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
             print(f'[save_outputs] Saved results.pkl to {p / "results.pkl"}')
         except Exception as e:
-            print(f'[save_outputs] WARNING: could not save results.pkl: {type(e).__name__}: {e}')
+            print(
+                f'[save_outputs] WARNING: could not save results.pkl: {type(e).__name__}: {e}')
     if make_plots and fig_dir is not None:
         save_figs(figs, fig_dir, session_id=session_id)
-        
 
 
 def save_figs(figs, fig_dir, session_id=None, dpi=150):
@@ -612,7 +615,7 @@ def save_figs(figs, fig_dir, session_id=None, dpi=150):
         fig.savefig(out_dir / fname, dpi=dpi, bbox_inches='tight')
 
 
-def _load_outputs(save_dir, *, expected_hash: str | None = None):
+def _load_outputs(save_dir, *, expected_hash: Optional[str] = None):
     """
     Best-effort loader for previously saved report artifacts.
     Returns tuple (loaded, payload) where:
@@ -648,7 +651,8 @@ def _load_outputs(save_dir, *, expected_hash: str | None = None):
             else:
                 return False, {}
         except Exception as e:
-            print(f'[load_outputs] WARNING: could not verify meta.json: {type(e).__name__}: {e}')
+            print(
+                f'[load_outputs] WARNING: could not verify meta.json: {type(e).__name__}: {e}')
             return False, {}
 
     try:
@@ -656,32 +660,38 @@ def _load_outputs(save_dir, *, expected_hash: str | None = None):
             coefs_df = pd.read_csv(coefs_fp)
             loaded_any = True
     except Exception as e:
-        print(f'[load_outputs] WARNING: could not load {coefs_fp.name}: {type(e).__name__}: {e}')
+        print(
+            f'[load_outputs] WARNING: could not load {coefs_fp.name}: {type(e).__name__}: {e}')
     try:
         if metrics_fp.exists():
             metrics_df = pd.read_csv(metrics_fp)
             loaded_any = True
     except Exception as e:
-        print(f'[load_outputs] WARNING: could not load {metrics_fp.name}: {type(e).__name__}: {e}')
+        print(
+            f'[load_outputs] WARNING: could not load {metrics_fp.name}: {type(e).__name__}: {e}')
     try:
         if pop_fp.exists():
             pop_df = pd.read_csv(pop_fp)
             loaded_any = True
     except Exception as e:
-        print(f'[load_outputs] WARNING: could not load {pop_fp.name}: {type(e).__name__}: {e}')
+        print(
+            f'[load_outputs] WARNING: could not load {pop_fp.name}: {type(e).__name__}: {e}')
     try:
         if cv_fp.exists():
             cv_df = pd.read_csv(cv_fp)
     except Exception as e:
-        print(f'[load_outputs] WARNING: could not load {cv_fp.name}: {type(e).__name__}: {e}')
+        print(
+            f'[load_outputs] WARNING: could not load {cv_fp.name}: {type(e).__name__}: {e}')
     try:
         if res_fp.exists():
             with open(res_fp, 'rb') as f:
                 results = pickle.load(f)
     except Exception as e:
-        print(f'[load_outputs] WARNING: could not load {res_fp.name}: {type(e).__name__}: {e}')
+        print(
+            f'[load_outputs] WARNING: could not load {res_fp.name}: {type(e).__name__}: {e}')
 
-    offenders_df = _compute_offenders(metrics_df) if not metrics_df.empty else pd.DataFrame()
+    offenders_df = _compute_offenders(
+        metrics_df) if not metrics_df.empty else pd.DataFrame()
     # Figures are not reconstructed on load; provide empty dict
     figs = {}
     payload = {
@@ -779,6 +789,7 @@ def _compute_params_hash_for_report(
     }
     return params_hash, metadata
 
+
 def _show_or_close(figs, *, make_plots, show_plots):
     if not make_plots:
         return
@@ -818,7 +829,7 @@ def glm_mini_report(
     offset_log,
     feature_names=None,
     cluster_ids=None,
-    meta_groups: dict | None = None,
+    meta_groups: Optional[dict] = None,
     alpha: float = 0.05,
     delta_for_rr: float = 1.0,
     forest_term=None,
@@ -864,7 +875,8 @@ def glm_mini_report(
     if exists_ok and save_dir is not None:
         loaded, payload = _load_outputs(save_dir, expected_hash=params_hash)
         if loaded:
-            print('[glm_mini_report] Loaded cached results from save_dir (exists_ok=True, hash match).')
+            print(
+                '[glm_mini_report] Loaded cached results from save_dir (exists_ok=True, hash match).')
             return payload
         else:
             print('[glm_mini_report] No cached results found, fitting from scratch.')
@@ -941,7 +953,7 @@ def _build_folds(
     groups=None,
     cv_splitter=None,
     random_state=0,
-    buffer_bins=250 # for default: 5s/0.02s = 250 bins
+    buffer_bins=250  # for default: 5s/0.02s = 250 bins
 ):
     """
     Return a list of (train_idx, valid_idx) pairs.
@@ -967,7 +979,7 @@ def _build_folds(
 
             # buffer region in time
             buf_start = max(0, test_start - buffer_bins)
-            buf_end   = min(n, test_end + buffer_bins)
+            buf_end = min(n, test_end + buffer_bins)
             buffer_idx = idx[buf_start:buf_end]
 
             train_mask = np.ones(n, dtype=bool)

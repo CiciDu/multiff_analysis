@@ -1,19 +1,13 @@
-from neural_data_analysis.design_kits.design_by_segment import create_pn_design_df
-
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
-from scipy import signal
-from scipy.interpolate import BSpline
+from neural_data_analysis.design_kits.design_by_segment import (
+    create_pn_design_df,
+    temporal_feats
+)
 
 # your modules
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.design_kits.design_by_segment import temporal_feats, spatial_feats, predictor_utils, other_feats
-
-
-import numpy as np
-import pandas as pd
-from typing import Optional, Tuple, Union
 
 ArrayLike = Union[np.ndarray, pd.Series, list]
 
@@ -21,7 +15,7 @@ ArrayLike = Union[np.ndarray, pd.Series, list]
 def get_initial_full_session_design_df(
     data: pd.DataFrame,
     dt: float,
-    trial_ids: np.ndarray | None = None,
+    trial_ids: Optional[np.ndarray] = None,
 ) -> tuple[pd.DataFrame, dict, dict]:
 
     # work on a copy

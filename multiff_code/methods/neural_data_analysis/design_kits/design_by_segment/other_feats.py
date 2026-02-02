@@ -1,26 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Sequence, Optional, Tuple, List, Mapping
+from typing import Optional, Tuple, Union
 
-import warnings
 import numpy as np
 import pandas as pd
-from scipy import signal
-from scipy.interpolate import BSpline
+from neural_data_analysis.design_kits.design_by_segment import spatial_feats
 
 # your modules
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.design_kits.design_by_segment import temporal_feats, spatial_feats, predictor_utils
-
-import numpy as np
-import pandas as pd
-from typing import Optional, Tuple, Union
-
-
-import numpy as np
-import pandas as pd
-from typing import Optional, Tuple, Union
 
 ArrayLike = Union[np.ndarray, pd.Series, list]
 
@@ -391,7 +377,7 @@ def add_ff_distance_features(
     K: int = 6,
     degree: int = 3,
     pct: tuple[int, int] = (2, 98),
-    gate_with: str | None = None,  # e.g., 'cur_ff_in_memory'
+    gate_with: Optional[str] = None,  # e.g., 'cur_ff_in_memory'
 ):
     """
     Distance to target:
@@ -620,5 +606,3 @@ def add_speed_features(
     out, m = add_raw_feature(out,        feature=col, data=data,
                              name='speed_z',     transform='zscore', meta=m)
     return out, m
-
-

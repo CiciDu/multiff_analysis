@@ -1,14 +1,15 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
 from sklearn.cross_decomposition import CCA
 from sklearn.model_selection import GroupKFold
 from tqdm import tqdm
 
-
+from typing import Optional
 
 # ============================================================
 # --------------------- basic helpers ------------------------
@@ -44,7 +45,8 @@ def fit_rrr_ranked(Xtr: np.ndarray, Ytr: np.ndarray, *, max_rank: int, ridge: fl
     """
     if ridge > 0:
         XtX = Xtr.T @ Xtr
-        B_ols = np.linalg.solve(XtX + ridge * np.eye(XtX.shape[0]), Xtr.T @ Ytr)
+        B_ols = np.linalg.solve(
+            XtX + ridge * np.eye(XtX.shape[0]), Xtr.T @ Ytr)
     else:
         B_ols = np.linalg.pinv(Xtr) @ Ytr
 
@@ -134,7 +136,7 @@ def run_parity_cv(
     time_idx,
     cond=None,
     *,
-    config: ParityConfig | None = None
+    config: Optional[ParityConfig] = None
 ):
     """
     Canonical parity benchmark for CCA vs RRR.
@@ -147,10 +149,9 @@ def run_parity_cv(
         cca_by_fold
         rrr_B_by_fold
     """
-    
+
     if config is None:
         config = ParityConfig()
-
 
     rng = np.random.default_rng(config.rng_seed)
 
@@ -338,7 +339,7 @@ def get_latents_for_model(
     Y: np.ndarray,
     trial_ids: np.ndarray,
     time_idx: np.ndarray,
-    cond: np.ndarray | None = None
+    cond: Optional[np.ndarray] = None
 ) -> pd.DataFrame:
     """
     Extract latent trajectories for a given model / rank / fold.
@@ -375,7 +376,8 @@ def get_latents_for_model(
         cond = np.asarray(cond)
 
     # ---------- recover CV split ----------
-    splits = make_group_splits(trial_ids, parity_res['df_rank']['fold'].nunique())
+    splits = make_group_splits(
+        trial_ids, parity_res['df_rank']['fold'].nunique())
     tr_idx, te_idx = splits[fold]
 
     Xtr, Xte = X[tr_idx], X[te_idx]

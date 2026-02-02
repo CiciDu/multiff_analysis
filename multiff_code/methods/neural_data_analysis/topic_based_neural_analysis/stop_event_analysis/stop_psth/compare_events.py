@@ -1,10 +1,14 @@
-import numpy as np
-import pandas as pd
-from scipy.optimize import linear_sum_assignment
-import matplotlib.pyplot as plt
 import warnings
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import (
+    core_stops_psth,
+    psth_postprocessing
+)
+from scipy.optimize import linear_sum_assignment
+from typing import Optional
 
 # ---------- schema & key utilities ----------
 
@@ -17,7 +21,7 @@ def _infer_key_cols(df: pd.DataFrame) -> list[str]:
     return ['stop_time']
 
 
-def _key_series(df: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3) -> pd.Series:
+def _key_series(df: pd.DataFrame, keys: Optional[list[str]] = None, time_round: int = 3) -> pd.Series:
     if keys is None:
         keys = _infer_key_cols(df)
     vals = []
@@ -29,7 +33,7 @@ def _key_series(df: pd.DataFrame, keys: list[str] | None = None, time_round: int
     return pd.Series(list(zip(*vals)), index=df.index)
 
 
-def _report_overlap(A: pd.DataFrame, B: pd.DataFrame, keys: list[str] | None = None, time_round: int = 3):
+def _report_overlap(A: pd.DataFrame, B: pd.DataFrame, keys: Optional[list[str]] = None, time_round: int = 3):
     kA = _key_series(A, keys, time_round)
     kB = _key_series(B, keys, time_round)
     overlap = list(set(kA) & set(kB))
@@ -56,7 +60,7 @@ def match_events(
     B: pd.DataFrame,
     features: list[str],
     strategy: str = 'hungarian',       # 'hungarian' | 'greedy'
-    caliper: float | None = None,      # max distance in standardized space
+    caliper: Optional[float] = None,      # max distance in standardized space
     random_seed: int = 0
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -157,7 +161,7 @@ def ensure_event_schema(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def dedupe_within(df: pd.DataFrame,
-                  keys: list[str] | None = None,
+                  keys: Optional[list[str]] = None,
                   time_round: int = 3) -> pd.DataFrame:
     """Raise a warning if there are duplicate stops within a set."""
     if keys is None:
@@ -327,14 +331,14 @@ def validate(datasets: dict[str, pd.DataFrame], comparisons: list[dict]) -> None
 
 def build_analyzer(comp, datasets, spikes_df, monkey_information, config,
                    align_by_stop_end=True,
-                   dedupe_keys: list[str] | None = None,
+                   dedupe_keys: Optional[list[str]] = None,
                    time_round: int = 3,
                    warn_on_overlap: bool = True,
                    # matching knobs
                    # e.g., ['stop_duration','dist_to_target','cluster_order']
-                   match_features: list[str] | None = None,
+                   match_features: Optional[list[str]] = None,
                    match_strategy: str = 'hungarian',
-                   match_caliper: float | None = None,
+                   match_caliper: Optional[float] = None,
                    results=None,
                    verbose=True,
                    ):
@@ -404,14 +408,14 @@ def run_all_comparisons(
     align_by_stop_end=False,
     windows_summary: bool = True,
     # dedupe knobs
-    dedupe_keys: list[str] | None = None,
+    dedupe_keys: Optional[list[str]] = None,
     time_round: int = 3,
     warn_on_overlap: bool = True,
     # matching knobs
     # e.g., ['stop_duration','dist_to_target','cluster_order']
-    match_features: list[str] | None = None,
+    match_features: Optional[list[str]] = None,
     match_strategy: str = 'hungarian',
-    match_caliper: float | None = None,
+    match_caliper: Optional[float] = None,
 ) -> dict:
     results = {
         'analyzers': {},

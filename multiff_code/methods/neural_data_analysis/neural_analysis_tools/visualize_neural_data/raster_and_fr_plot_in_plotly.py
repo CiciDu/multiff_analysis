@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import plotly.graph_objects as go
+from typing import Optional
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import get_colors_utils

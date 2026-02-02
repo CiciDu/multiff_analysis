@@ -1,19 +1,10 @@
-
-from scipy import stats
-from planning_analysis.factors_vs_indicators import make_variations_utils, process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
-from data_wrangling import specific_utils, process_monkey_information, base_processing_class, combine_info_utils, further_processing_class
-
-from pattern_discovery.learning.proportion_trend import analyze_proportion_trend
-
-
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-import statsmodels.formula.api as smf
 import statsmodels.api as sm
-import os
+import statsmodels.formula.api as smf
+from scipy import stats
+from typing import Optional
 
 
 # ---------- Helpers ----------
@@ -159,7 +150,7 @@ def summarize_early_late_event_rate_with_glm(df_sessions, session_col="session",
         "metric": "captures_per_min",
         "descriptive_ratio_late_over_early": tstats["ratio"],
         "descriptive_percent_change": tstats["percent_change"],
-        "ttest_pval": tstats["pval"], 
+        "ttest_pval": tstats["pval"],
         "GLM_rate_ratio": RR,
         "GLM_95CI": f"[{RR_lo:.3f}, {RR_hi:.3f}]",
         "GLM_pval": pval
@@ -273,7 +264,6 @@ def summarize_early_late_duration_with_glm(df_trials, df_sessions,
     return phase_tbl, ttest_contrast_tbl, glm_contrast_tbl, effect_summary_tbl
 
 
-
 def analyze_early_late_capture_and_duration(df_sessions, df_trials):
     """
     Runs both metrics with plots, and returns:
@@ -295,9 +285,12 @@ def _format_p(p, p_fmt='{:.2g}', stars=True):
         return None, ''
     label = f'p = {p_fmt.format(p)}'
     if stars:
-        if p < 0.001: label += ' (***)'
-        elif p < 0.01: label += ' (**)'
-        elif p < 0.05: label += ' (*)'
+        if p < 0.001:
+            label += ' (***)'
+        elif p < 0.01:
+            label += ' (**)'
+        elif p < 0.05:
+            label += ' (*)'
     return p, label
 
 
@@ -311,7 +304,7 @@ def plot_early_late_with_ci(
     order=('early', 'late'),
     fmt='{:.2f}',
     # --- NEW ---
-    pval: float | None = None,          # e.g., from Welch t-test or GLM
+    pval: Optional[float] = None,          # e.g., from Welch t-test or GLM
     p_source: str = 'Welch t-test',     # label prefix
     p_fmt: str = '{:.2g}',              # p-value formatting
     show_bracket: bool = True,          # draw a bracket between bars
@@ -325,7 +318,7 @@ def plot_early_late_with_ci(
     Parameters
     ----------
     ...
-    pval : float | None
+    pval : Optional[float]
         P-value to annotate. If None, no annotation is drawn.
     p_source : str
         Label prefix shown before the p-value (e.g., 'GLM', 'Welch t-test').

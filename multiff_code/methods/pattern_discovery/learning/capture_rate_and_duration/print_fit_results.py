@@ -1,6 +1,6 @@
-from IPython.display import display, HTML
-import numpy as np
 import pandas as pd
+from IPython.display import display
+from typing import Optional
 
 # ---------- formatting helpers ----------
 
@@ -27,10 +27,10 @@ def _fmt_p(p):
 def _style(
     df: pd.DataFrame,
     caption: str = "",
-    round_map: dict | None = None,
-    percent_cols: list[str] | None = None,
-    ci_cols_as_text: list[str] | None = None,
-    highlight_sig_on: str | None = None
+    round_map: Optional[dict] = None,
+    percent_cols: Optional[list[str]] = None,
+    ci_cols_as_text: Optional[list[str]] = None,
+    highlight_sig_on: Optional[str] = None
 ):
     # Copy so we don’t mutate originals
     df = df.copy()

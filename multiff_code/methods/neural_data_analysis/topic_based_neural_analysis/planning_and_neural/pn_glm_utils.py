@@ -1,9 +1,11 @@
 import pandas as pd
+from typing import Optional
 from planning_analysis.show_planning.cur_vs_nxt_ff import cvn_from_ref_class
 
 
 def get_test_heading_df(raw_data_folder_path):
-    cvn = cvn_from_ref_class.CurVsNxtFfFromRefClass(raw_data_folder_path=raw_data_folder_path)
+    cvn = cvn_from_ref_class.CurVsNxtFfFromRefClass(
+        raw_data_folder_path=raw_data_folder_path)
     # Quick method - tries to retrieve first, creates if needed
     cvn.make_heading_info_df_without_long_process(
         test_or_control='test',  # or 'control'
@@ -16,8 +18,10 @@ def get_test_heading_df(raw_data_folder_path):
 
     # Access the result
     heading_info_df = cvn.heading_info_df
-    heading_df = heading_info_df[['cur_ff_index', 'diff_in_abs_angle_to_nxt_ff']].copy()
-    heading_df = heading_df.sort_values(by='diff_in_abs_angle_to_nxt_ff', ascending=False).reset_index(drop=True)
+    heading_df = heading_info_df[['cur_ff_index',
+                                  'diff_in_abs_angle_to_nxt_ff']].copy()
+    heading_df = heading_df.sort_values(
+        by='diff_in_abs_angle_to_nxt_ff', ascending=False).reset_index(drop=True)
 
     return heading_info_df, heading_df
 
@@ -27,8 +31,8 @@ def select_ff_subset(
     rebinned_x_var: pd.DataFrame,
     rebinned_y_var: pd.DataFrame,
     top: bool = True,
-    n: int | None = None,
-    pct: float | None = None,
+    n: Optional[int] = None,
+    pct: Optional[float] = None,
     col: str = 'cur_ff_index',
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -47,9 +51,10 @@ def select_ff_subset(
         selected_ff = heading_df.iloc[:k][col].to_numpy()
     else:
         selected_ff = heading_df.iloc[-k:][col].to_numpy()
-    
+
     direction = 'top' if top else 'bottom'
-    print(f'Selecting {k} rows from the {direction} of heading_df (total={total})')
+    print(
+        f'Selecting {k} rows from the {direction} of heading_df (total={total})')
 
     print('rebinned_y_var.shape (before):', rebinned_y_var.shape)
     mask = rebinned_y_var[col].isin(selected_ff)
@@ -82,10 +87,12 @@ def select_ff_subset_by_dir_from_cur_ff_same_side(
     and apply the same filter to both X and Y re-binned variables.
     """
     if same_side:
-        selected_ff = heading_df.loc[heading_df['dir_from_cur_ff_same_side'] == 1, 'cur_ff_index'].to_numpy()
+        selected_ff = heading_df.loc[heading_df['dir_from_cur_ff_same_side']
+                                     == 1, 'cur_ff_index'].to_numpy()
     else:
-        selected_ff = heading_df.loc[heading_df['dir_from_cur_ff_same_side'] == 0, 'cur_ff_index'].to_numpy()
-    
+        selected_ff = heading_df.loc[heading_df['dir_from_cur_ff_same_side']
+                                     == 0, 'cur_ff_index'].to_numpy()
+
     print('rebinned_y_var.shape (before):', rebinned_y_var.shape)
     mask = rebinned_y_var['cur_ff_index'].isin(selected_ff)
     rebinned_y_var_filt = rebinned_y_var[mask]

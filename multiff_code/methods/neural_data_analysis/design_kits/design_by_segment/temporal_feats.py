@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Sequence, Optional, Tuple, List, Mapping
+from typing import Dict, Optional, Sequence, Tuple
 
-import warnings
 import numpy as np
 import pandas as pd
-from scipy import signal
-from scipy.interpolate import BSpline
-
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import (
+    prep_target_data
+)
+from scipy import signal
 
 
 @dataclass(frozen=True, slots=True)
 class PredictorSpec:
     signal: np.ndarray                  # (T,)
-    bases: list[np.ndarray] = field(default_factory=list)  # each: (L, K), causal
+    bases: list[np.ndarray] = field(
+        default_factory=list)  # each: (L, K), causal
 
 
 # =============================
@@ -63,7 +62,8 @@ def specs_to_design_df(
 
         sig = np.asarray(ps.signal, float).ravel()
         if sig.size != n:
-            raise ValueError(f'Predictor {name!r} has length {sig.size}, expected {n}')
+            raise ValueError(
+                f'Predictor {name!r} has length {sig.size}, expected {n}')
 
         added_any_for_name = False
 
@@ -93,14 +93,17 @@ def specs_to_design_df(
                     # if the whole block is zero, skip it (do not constrain mask)
                     if drop_all_zero and np.allclose(Phi, 0.0, atol=zero_atol):
                         L, K = B.shape
-                        dropped_cols.extend([f'{name}:b{j}:{k}' for k in range(K)])
+                        dropped_cols.extend(
+                            [f'{name}:b{j}:{k}' for k in range(K)])
                         continue
                     valid_rows_mask &= mask
                 else:
-                    Phi = lagged_design_from_signal_trials(sig, B, trial_ids, edge=edge)
+                    Phi = lagged_design_from_signal_trials(
+                        sig, B, trial_ids, edge=edge)
                     if drop_all_zero and np.allclose(Phi, 0.0, atol=zero_atol):
                         L, K = B.shape
-                        dropped_cols.extend([f'{name}:b{j}:{k}' for k in range(K)])
+                        dropped_cols.extend(
+                            [f'{name}:b{j}:{k}' for k in range(K)])
                         continue
 
                 # keep this block
@@ -120,7 +123,8 @@ def specs_to_design_df(
                 dropped_predictors.add(name)
 
     # build frame
-    X = np.column_stack(cols).astype(dtype, copy=False) if cols else np.empty((n, 0), dtype=dtype)
+    X = np.column_stack(cols).astype(
+        dtype, copy=False) if cols else np.empty((n, 0), dtype=dtype)
     design_df = pd.DataFrame(X, columns=names)
 
     row_index_original = None
@@ -138,7 +142,8 @@ def specs_to_design_df(
         'intercept_added': bool(add_intercept),
         'valid_rows_mask': valid_rows_mask if edge == 'drop' else None,
         'row_index_original': row_index_original,
-        'bases_by_predictor': bases_by_predictor,  # only keys that actually have kept bases
+        # only keys that actually have kept bases
+        'bases_by_predictor': bases_by_predictor,
         'dropped_all_zero': {
             'enabled': bool(drop_all_zero),
             'zero_atol': float(zero_atol),
@@ -148,7 +153,6 @@ def specs_to_design_df(
         'dropped_all_zero_predictors': sorted(dropped_predictors),
     }
     return design_df, meta
-
 
 
 def lagged_design_from_signal_trials(
@@ -210,7 +214,8 @@ def lagged_design_from_signal_trials(
 
         elif edge == 'drop':
             if Tt >= L:
-                W = np.lib.stride_tricks.sliding_window_view(xt, L)  # (Tt-L+1, L)
+                W = np.lib.stride_tricks.sliding_window_view(
+                    xt, L)  # (Tt-L+1, L)
                 # multiply by reversed basis columns
                 Brev = B[::-1, :]  # (L, K)
                 Y = W @ Brev
@@ -222,12 +227,13 @@ def lagged_design_from_signal_trials(
     return (out, edge_mask) if return_edge_mask else out
 
 
-
 def _a1d(x):
     return np.asarray(x).ravel()
 
+
 def _n_lags(t_max, dt, t_min=0.0):
     return int(np.floor((t_max - t_min) / dt)) + 1
+
 
 def _build_basis(family: str, n_basis: int, t_max: float, dt: float, *, t_min: float = 0.0):
     L = _n_lags(t_max, dt, t_min)
@@ -248,8 +254,8 @@ def _build_basis(family: str, n_basis: int, t_max: float, dt: float, *, t_min: f
     return B
 
 
-def add_stop_and_capture_columns(data: pd.DataFrame, trial_ids: np.ndarray | None = None,
-                                  ff_caught_T_new: np.ndarray | None = None) -> pd.DataFrame:
+def add_stop_and_capture_columns(data: pd.DataFrame, trial_ids: Optional[np.ndarray] = None,
+                                 ff_caught_T_new: Optional[np.ndarray] = None) -> pd.DataFrame:
     if 'whether_new_distinct_stop' in data.columns:
         data['stop'] = (data['whether_new_distinct_stop'] == 1).astype(int)
     elif 'monkey_speeddummy' in data.columns:
@@ -271,22 +277,24 @@ def add_stop_and_capture_columns(data: pd.DataFrame, trial_ids: np.ndarray | Non
         if ff_caught_T_new is not None:
             data = prep_target_data.add_capture_target(data, ff_caught_T_new)
         else:
-            raise ValueError('ff_caught_T_new is required to add capture_ff column')
+            raise ValueError(
+                'ff_caught_T_new is required to add capture_ff column')
 
     return data
+
 
 def init_predictor_specs(
     data: pd.DataFrame,
     dt: float,
-    trial_ids: np.ndarray | None = None,
+    trial_ids: Optional[np.ndarray] = None,
     *,
     trial_id_col: str = 'trial_id',
 ) -> Tuple[Dict[str, PredictorSpec], dict]:
 
-
     if trial_ids is None:
         if trial_id_col not in data.columns:
-            raise KeyError(f'need trial_ids or a {trial_id_col!r} column in DataFrame')
+            raise KeyError(
+                f'need trial_ids or a {trial_id_col!r} column in DataFrame')
         trial_ids = _a1d(data[trial_id_col])
     else:
         trial_ids = _a1d(trial_ids)
@@ -315,7 +323,8 @@ def add_state_predictors(
     meta: dict,
     data: pd.DataFrame,
     *,
-    state_cols: Sequence[str] = ['cur_vis', 'nxt_vis', 'cur_in_memory', 'nxt_in_memory'],
+    state_cols: Sequence[str] = ['cur_vis',
+                                 'nxt_vis', 'cur_in_memory', 'nxt_in_memory'],
     state_mode: str = 'passthrough',   # 'passthrough' | 'short'
     basis_family_state: str = 'rc',
     n_basis_state: int = 5,

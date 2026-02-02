@@ -1,30 +1,22 @@
 # --- Imports (duplicates kept intentionally to preserve your original layout) ---
+from typing import Dict, Iterable, List, Optional, Tuple
+
 import matplotlib.pyplot as plt
-
 import numpy as np
 import pandas as pd
-
-
-import numpy as np
-import pandas as pd
-import numpy as np
-import pandas as pd
-
-import numpy as np
-import pandas as pd
-from typing import Tuple, Iterable, List, Dict
 
 # ======================================================================
 # Public API: glm_tuning_curve
 # ======================================================================
 
+
 def glm_tuning_curve(model_res,
                      X_df: pd.DataFrame,
                      var: str,
-                     grid: np.ndarray | None = None,
-                     offset_log: np.ndarray | float | None = None,
+                     grid: Optional[np.ndarray] = None,
+                     offset_log: np.ndarray | Optional[float] = None,
                      average: str = 'marginal',
-                     weights: np.ndarray | None = None,
+                     weights: Optional[np.ndarray] = None,
                      return_ci: bool = True,
                      ci_level: float = 0.95) -> pd.DataFrame:
     """
@@ -104,6 +96,7 @@ def glm_tuning_curve(model_res,
 # Model/Design alignment helpers
 # ======================================================================
 
+
 def _coerce_params_to_series(model_res, X_df):
     """
     Ensure we have a pandas Series of coefficients aligned to X_df's columns.
@@ -140,6 +133,7 @@ def _coerce_params_to_series(model_res, X_df):
     beta_s = beta_s.reindex(X_df.columns, fill_value=0.0)
     return beta_s, X_df
 
+
 def _is_binary_series(s: pd.Series) -> bool:
     """
     Return True if a Series is boolean or strictly {0,1} (ignoring NaNs).
@@ -150,7 +144,8 @@ def _is_binary_series(s: pd.Series) -> bool:
     u = pd.unique(s.dropna())
     return set(u.tolist()) <= {0, 1}
 
-def _get_cov(model_res, p: int) -> np.ndarray | None:
+
+def _get_cov(model_res, p: int) -> Optional[np.ndarray]:
     """
     Try to fetch the parameter covariance matrix; return None if missing or wrong shape.
     """
@@ -160,8 +155,9 @@ def _get_cov(model_res, p: int) -> np.ndarray | None:
     except Exception:
         return None
 
+
 def _resolve_offset(model_res, X_df: pd.DataFrame,
-                    offset_log: np.ndarray | float | None) -> np.ndarray | float:
+                    offset_log: np.ndarray | Optional[float]) -> np.ndarray | float:
     """
     Resolve the log-offset:
       1) use user-provided `offset_log` if given (scalar or vector),
@@ -188,6 +184,7 @@ def _resolve_offset(model_res, X_df: pd.DataFrame,
         pass
     return 0.0
 
+
 def _numeric_default_grid(s: pd.Series) -> np.ndarray:
     """
     Default sweep for numeric columns:
@@ -198,13 +195,15 @@ def _numeric_default_grid(s: pd.Series) -> np.ndarray:
         return np.array([0, 1], dtype=int if s.dtype != bool else bool)
     x = s.to_numpy()
     finite = np.isfinite(x)
-    lo, hi = np.percentile(x[finite], [1, 99]) if finite.any() else (np.nanmin(x), np.nanmax(x))
+    lo, hi = np.percentile(x[finite], [1, 99]) if finite.any() else (
+        np.nanmin(x), np.nanmax(x))
     if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
         # Fallbacks if data are constant/heavy-NaN
         lo, hi = np.nanmin(x), np.nanmax(x)
         if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
             lo, hi = float(x.min()), float(x.max())
     return np.linspace(lo, hi, 50)
+
 
 def _categorical_family(var: str, X_df: pd.DataFrame) -> Tuple[List[str], List[str], bool]:
     """
@@ -215,11 +214,13 @@ def _categorical_family(var: str, X_df: pd.DataFrame) -> Tuple[List[str], List[s
     fam_cols = [c for c in X_df.columns if c.startswith(var + '[T.')]
     if not fam_cols:
         raise ValueError(f'Variable "{var}" not found as numeric or one-hot.')
-    levels = [c[len(var) + 3:-1] for c in fam_cols]  # strip 'var[T.' and trailing ']'
+    levels = [c[len(var) + 3:-1]
+              for c in fam_cols]  # strip 'var[T.' and trailing ']'
     base_present = any(c == var for c in X_df.columns)
     return levels, fam_cols, base_present
 
-def _build_grid(var: str, X_df: pd.DataFrame, grid) -> Tuple[bool, np.ndarray, int | None, List[str] | None]:
+
+def _build_grid(var: str, X_df: pd.DataFrame, grid) -> Tuple[bool, np.ndarray, Optional[int], Optional[list[str]]]:
     """
     Determine whether `var` is numeric or categorical, and build the appropriate grid.
     Returns:
@@ -229,20 +230,24 @@ def _build_grid(var: str, X_df: pd.DataFrame, grid) -> Tuple[bool, np.ndarray, i
       - fam_cols (list of dummy column names for categorical; None if numeric).
     """
     if var in X_df.columns:
-        g = _numeric_default_grid(X_df[var]) if grid is None else np.asarray(grid)
+        g = _numeric_default_grid(
+            X_df[var]) if grid is None else np.asarray(grid)
         return False, g, X_df.columns.get_loc(var), None
     levels, fam_cols, base_present = _categorical_family(var, X_df)
     if grid is None:
-        grid = np.array(levels if base_present else levels + ['<base>'], dtype=object)
+        grid = np.array(levels if base_present else levels +
+                        ['<base>'], dtype=object)
     else:
         grid = np.asarray(grid, dtype=object)
     return True, grid, None, fam_cols
+
 
 def _mean_row(X_df: pd.DataFrame) -> np.ndarray:
     """
     Column means of X_df as a numeric row vector (for 'at_means' predictions).
     """
     return X_df.mean(axis=0).to_numpy()
+
 
 def _off_bar(off: np.ndarray | float) -> float:
     """
@@ -254,11 +259,13 @@ def _off_bar(off: np.ndarray | float) -> float:
 # ======================================================================
 # Prediction cores (delta-method SEs)
 # ======================================================================
+
+
 def _avg_and_se(Xg: np.ndarray,
                 beta: np.ndarray,
-                cov: np.ndarray | None,
+                cov: Optional[np.ndarray],
                 off: np.ndarray | float,
-                weights: np.ndarray | None) -> Tuple[float, float | None]:
+                weights: Optional[np.ndarray]) -> Tuple[float, Optional[float]]:
     """
     Compute an average **rate (Hz)** over rows of Xg.
 
@@ -285,23 +292,27 @@ def _avg_and_se(Xg: np.ndarray,
 
     mu = np.exp(eta)                    # expected counts per bin
     # per-row rate in Hz
-    rate_i = mu / t                     # equals exp(Xβ) when off varies per-row
+    # equals exp(Xβ) when off varies per-row
+    rate_i = mu / t
 
     # choose averaging rule
     if weights is None:
         # simple mean of per-row rates
         r = float(rate_i.mean())
-        agg_grad = (rate_i[:, None] * Xg).mean(axis=0) if cov is not None else None
+        agg_grad = (rate_i[:, None] *
+                    Xg).mean(axis=0) if cov is not None else None
     else:
         # time-weighted mean rate using weights (exposures) in seconds
         w = np.asarray(weights, dtype=float).reshape(-1)
         if w.size != Xg.shape[0]:
-            raise ValueError('weights length must match X_df rows for marginal averaging.')
+            raise ValueError(
+                'weights length must match X_df rows for marginal averaging.')
         W = w.sum()
         if W <= 0 or not np.isfinite(W):
             raise ValueError('weights must sum to a positive finite value.')
         r = float(mu.sum() / W)         # == (Σ t_i * exp(Xβ)) / Σ weights
-        agg_grad = (mu[:, None] * Xg).sum(axis=0) / W if cov is not None else None
+        agg_grad = (mu[:, None] * Xg).sum(axis=0) / \
+            W if cov is not None else None
 
     if cov is None:
         return r, None
@@ -312,8 +323,8 @@ def _avg_and_se(Xg: np.ndarray,
 
 def _at_means_and_se(xmean: np.ndarray,
                      beta: np.ndarray,
-                     cov: np.ndarray | None,
-                     off_bar: float) -> Tuple[float, float | None]:
+                     cov: Optional[np.ndarray],
+                     off_bar: float) -> Tuple[float, Optional[float]]:
     """
     At-means **rate (Hz)**.
 
@@ -336,15 +347,16 @@ def _at_means_and_se(xmean: np.ndarray,
 # Grid sweep strategies (numeric vs categorical)
 # ======================================================================
 
+
 def _sweep_numeric(grid: Iterable,
                    X: np.ndarray,
                    X_df: pd.DataFrame,
                    xcol: int,
                    beta: np.ndarray,
-                   cov: np.ndarray | None,
+                   cov: Optional[np.ndarray],
                    off: np.ndarray | float,
                    average: str,
-                   weights: np.ndarray | None,
+                   weights: Optional[np.ndarray],
                    var: str) -> List[Dict]:
     """
     Sweep numeric `var` over `grid`, predicting rate under the chosen averaging mode.
@@ -364,15 +376,16 @@ def _sweep_numeric(grid: Iterable,
         rows.append({var: float(g), 'rate_hz': rate, 'se_rate': se})
     return rows
 
+
 def _sweep_categorical(grid: Iterable,
                        fam_cols: List[str],
                        X: np.ndarray,
                        X_df: pd.DataFrame,
                        beta: np.ndarray,
-                       cov: np.ndarray | None,
+                       cov: Optional[np.ndarray],
                        off: np.ndarray | float,
                        average: str,
-                       weights: np.ndarray | None,
+                       weights: Optional[np.ndarray],
                        var: str) -> List[Dict]:
     """
     Sweep categorical `var` over its levels.
@@ -390,7 +403,8 @@ def _sweep_categorical(grid: Iterable,
             if g != '<base>':
                 cname = f'{var}[T.{g}]'
                 if cname not in X_df.columns:
-                    raise ValueError(f'Level "{g}" not found among one-hots for {var}.')
+                    raise ValueError(
+                        f'Level "{g}" not found among one-hots for {var}.')
                 Xg[:, X_df.columns.get_loc(cname)] = 1.0
             rate, se = _avg_and_se(Xg, beta, cov, off, weights)
         elif average == 'at_means':
@@ -403,6 +417,7 @@ def _sweep_categorical(grid: Iterable,
             raise ValueError('average must be "marginal" or "at_means"')
         rows.append({var: g, 'rate_hz': rate, 'se_rate': se})
     return rows
+
 
 def _attach_ci(df: pd.DataFrame, ci_level: float) -> pd.DataFrame:
     """
@@ -425,8 +440,6 @@ def _attach_ci(df: pd.DataFrame, ci_level: float) -> pd.DataFrame:
 # Empirical tuning (data-binned reference)
 # ======================================================================
 
-import numpy as np
-import pandas as pd
 
 def empirical_tuning_curve(binned_spikes,      # 1D array of counts for one unit
                            predictor_vals,     # 1D array aligned to bins
@@ -532,6 +545,7 @@ def empirical_tuning_curve(binned_spikes,      # 1D array of counts for one unit
 # Plotting helpers for tuning curves
 # ======================================================================
 
+
 def plot_tuning_curve(df, xcol, ycol='rate_hz', title=None):
     """
     Simple line plot of a single tuning curve DataFrame (continuous or ordinal x).
@@ -544,9 +558,6 @@ def plot_tuning_curve(df, xcol, ycol='rate_hz', title=None):
         plt.title(title)
     plt.tight_layout()
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 
 def _extract_x_y(df, xcol_hint, ycol):
     """
@@ -583,10 +594,12 @@ def _extract_x_y(df, xcol_hint, ycol):
     if xcol_hint in df.columns:
         x = df[xcol_hint].to_numpy()
         y = df[ycol].to_numpy()
-        is_cat = pd.unique(x).size <= 6 and (df[xcol_hint].dtype.kind in 'Obifc')
+        is_cat = pd.unique(x).size <= 6 and (
+            df[xcol_hint].dtype.kind in 'Obifc')
         return x, y, is_cat
 
     raise KeyError(f'Could not find x in columns: {list(df.columns)}')
+
 
 def overlay_tuning_curves(emp_df,
                           model_df,
@@ -604,11 +617,12 @@ def overlay_tuning_curves(emp_df,
     x_e, y_e, cat_e = _extract_x_y(emp_df, xcol, ycol)
     x_m, y_m, cat_m = _extract_x_y(model_df, xcol, ycol)
 
-    plt.figure(figsize=(4,3))
+    plt.figure(figsize=(4, 3))
 
     # Categorical overlay: map levels to integer ticks and align both series
     if cat_e or cat_m:
-        levels = np.unique(np.concatenate([np.atleast_1d(x_e), np.atleast_1d(x_m)]))
+        levels = np.unique(np.concatenate(
+            [np.atleast_1d(x_e), np.atleast_1d(x_m)]))
         level_to_idx = {lvl: i for i, lvl in enumerate(levels)}
         xe = np.array([level_to_idx[l] for l in x_e])
         xm = np.array([level_to_idx[l] for l in x_m])
@@ -635,16 +649,12 @@ def overlay_tuning_curves(emp_df,
     plt.show()
 
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
 def plot_tuning_with_ci(df: pd.DataFrame,
-                        xcol: str | None = None,
+                        xcol: Optional[str] = None,
                         ycol: str = 'rate_hz',
                         ci_lo: str = 'ci_lo',
                         ci_hi: str = 'ci_hi',
-                        title: str | None = None,
+                        title: Optional[str] = None,
                         kind: str = 'auto',          # 'auto' | 'line' | 'bar'
                         ci_style: str = 'auto',      # 'auto' | 'band' | 'errorbar' | 'none'
                         show_counts: bool = False,   # annotate n_bins/time per point
@@ -660,7 +670,7 @@ def plot_tuning_with_ci(df: pd.DataFrame,
 
     Parameters
     ----------
-    xcol : str | None
+    xcol : Optional[str]
         Used if neither 'bin_center' nor 'level' are present.
     kind : 'auto' | 'line' | 'bar'
         For categoricals, 'bar' often reads better; for continuous, 'line'.
@@ -674,7 +684,8 @@ def plot_tuning_with_ci(df: pd.DataFrame,
 
     cols = set(df.columns)
     has_ci = (ci_lo in cols) and (ci_hi in cols)
-    is_continuous = {'bin_center'}.issubset(cols) or {'bin_left','bin_right'}.issubset(cols)
+    is_continuous = {'bin_center'}.issubset(
+        cols) or {'bin_left', 'bin_right'}.issubset(cols)
     is_categorical = {'level'}.issubset(cols)
 
     # ---- Choose x and ordering

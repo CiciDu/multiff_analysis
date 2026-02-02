@@ -1,4 +1,5 @@
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import raster_plot
+from typing import Optional
 
 import numpy as np
 import pandas as pd

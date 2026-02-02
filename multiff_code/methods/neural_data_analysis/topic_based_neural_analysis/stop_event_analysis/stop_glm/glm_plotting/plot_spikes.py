@@ -1,8 +1,8 @@
-import statsmodels.api as sm
+from typing import Optional, Sequence
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from typing import Optional, Sequence
 
 
 def _safe_div(a, b, fill=0.0):
@@ -158,10 +158,10 @@ def plot_observed_vs_predicted_event(
     time_col: str = 'rel_center',
     seg_col: str = 'event_id',
     # if None, derived from offset_log
-    exposure_s: pd.Series | np.ndarray | None = None,
+    exposure_s: pd.Series | Optional[np.ndarray] = None,
     sort_by_time: bool = True,
     title_prefix: str = 'Observed vs Predicted',
-    ax: plt.Axes | None = None,
+    ax: Optional[plt.Axes] = None,
 ):
     """
     Plot observed vs predicted firing rate (Hz) for one cluster and one stop,
@@ -253,7 +253,8 @@ def plot_observed_vs_predicted_event(
         exp_s = exp_s[good]
 
     # --- predictions: expected COUNTS per bin
-    pred_counts = model_res.predict(np.asarray(X_stop_full, dtype=float), offset=off_stop)
+    pred_counts = model_res.predict(np.asarray(
+        X_stop_full, dtype=float), offset=off_stop)
 
     # --- convert to Hz using per-bin exposure
     obs_rate_hz = y_counts.to_numpy() / exp_s
@@ -280,7 +281,8 @@ def plot_observed_vs_predicted_event(
     ax.axvline(0, color='k', ls='--', lw=1, alpha=0.5)
     ax.set_xlabel('Time relative to stop (s)')
     ax.set_ylabel('Firing rate (Hz)')
-    ax.set_title(f'{title_prefix} • cluster {cluster_label} • Segment {seg_id}')
+    ax.set_title(
+        f'{title_prefix} • cluster {cluster_label} • Segment {seg_id}')
     ax.legend()
     plt.tight_layout()
 

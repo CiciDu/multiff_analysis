@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Sequence
 import re
+from typing import List, Optional, Sequence, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 # -------------------------------
 # Core helpers (names, params, cov)
 # -------------------------------
-def _exog_names(result, design_df: pd.DataFrame | None = None) -> List[str]:
+def _exog_names(result, design_df: Optional[pd.DataFrame] = None) -> List[str]:
     names = getattr(getattr(result, 'model', None), 'exog_names', None)
     if names is None:
         names = getattr(result, 'exog_names', None)
@@ -46,6 +47,7 @@ def _cov_df(result, names: Sequence[str]) -> pd.DataFrame:
 _rc_pat = r'_rc(\d+)$'
 _bjk_pat = r':b(\d+):(\d+)$'
 
+
 def _cols_for_prefix(prefix: str, names: Sequence[str]) -> List[str]:
     # raw passthrough (no basis)
     raw = [n for n in names if n == prefix]
@@ -53,15 +55,18 @@ def _cols_for_prefix(prefix: str, names: Sequence[str]) -> List[str]:
         return raw
 
     # rc-style: '<prefix>_rc0', '<prefix>_rc1', ...
-    rc_cols = [n for n in names if re.search(rf'^{re.escape(prefix)}{_rc_pat}', n)]
+    rc_cols = [n for n in names if re.search(
+        rf'^{re.escape(prefix)}{_rc_pat}', n)]
     if rc_cols:
         rc_cols.sort(key=lambda c: int(re.search(_rc_pat, c).group(1)))
         return rc_cols
 
     # bjk-style: '<prefix>:b{j}:{k}'
-    bjk_cols = [n for n in names if re.search(rf'^{re.escape(prefix)}{_bjk_pat}', n)]
+    bjk_cols = [n for n in names if re.search(
+        rf'^{re.escape(prefix)}{_bjk_pat}', n)]
     if bjk_cols:
-        bjk_cols.sort(key=lambda c: tuple(int(g) for g in re.search(_bjk_pat, c).groups()))
+        bjk_cols.sort(key=lambda c: tuple(int(g)
+                      for g in re.search(_bjk_pat, c).groups()))
         return bjk_cols
 
     # generic prefix (e.g., '<prefix>:sin1', '<prefix>:cos1', other)
@@ -71,7 +76,7 @@ def _cols_for_prefix(prefix: str, names: Sequence[str]) -> List[str]:
 # -------------------------------
 # Basis retrieval & stacking
 # -------------------------------
-def _stack_bases_for(prefix: str, meta: dict, bases_by_predictor: dict[str, list[np.ndarray]] | None) -> np.ndarray:
+def _stack_bases_for(prefix: str, meta: dict, bases_by_predictor: Optional[dict[str, list[np.ndarray]]]) -> np.ndarray:
     # 1) explicit arg
     if bases_by_predictor and prefix in bases_by_predictor:
         Bs = bases_by_predictor[prefix]
@@ -93,7 +98,8 @@ def _stack_bases_for(prefix: str, meta: dict, bases_by_predictor: dict[str, list
 
     Ls = {B.shape[0] for B in Bs}
     if len(Ls) != 1:
-        raise ValueError(f'all bases for {prefix!r} must share the same number of lags; got {Ls}')
+        raise ValueError(
+            f'all bases for {prefix!r} must share the same number of lags; got {Ls}')
     return np.hstack(Bs) if len(Bs) > 1 else Bs[0]
 
 
@@ -103,9 +109,12 @@ def _stack_bases_for(prefix: str, meta: dict, bases_by_predictor: dict[str, list
 _sin_static_pat = r':sin(\d+)$'
 _cos_static_pat = r':cos(\d+)$'
 
+
 def _static_angle_cols(base_prefix: str, names: Sequence[str]) -> Tuple[List[str], List[str]]:
-    sin_cols = [n for n in names if re.search(rf'^{re.escape(base_prefix)}{_sin_static_pat}', n)]
-    cos_cols = [n for n in names if re.search(rf'^{re.escape(base_prefix)}{_cos_static_pat}', n)]
+    sin_cols = [n for n in names if re.search(
+        rf'^{re.escape(base_prefix)}{_sin_static_pat}', n)]
+    cos_cols = [n for n in names if re.search(
+        rf'^{re.escape(base_prefix)}{_cos_static_pat}', n)]
     # sort by harmonic index
     sin_cols.sort(key=lambda c: int(re.search(r'(\d+)$', c).group(1)))
     cos_cols.sort(key=lambda c: int(re.search(r'(\d+)$', c).group(1)))
@@ -117,12 +126,12 @@ def _static_angle_cols(base_prefix: str, names: Sequence[str]) -> Tuple[List[str
 # -------------------------------
 def _kernel_and_ci_for_prefix(
     result,
-    design_df: pd.DataFrame | None,
+    design_df: Optional[pd.DataFrame],
     meta: dict,
     dt: float,
     prefix: str,
     *,
-    bases_by_predictor: dict[str, list[np.ndarray]] | None = None,
+    bases_by_predictor: Optional[dict[str, list[np.ndarray]]] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Return t (s), mean kernel, std kernel for one predictor prefix.
@@ -148,7 +157,8 @@ def _kernel_and_ci_for_prefix(
 
     B = _stack_bases_for(prefix, meta, bases_by_predictor)
     if B.shape[1] != len(cols):
-        raise ValueError(f'basis/columns mismatch for {prefix!r}: K={B.shape[1]} vs {len(cols)} cols')
+        raise ValueError(
+            f'basis/columns mismatch for {prefix!r}: K={B.shape[1]} vs {len(cols)} cols')
 
     beta = coef.loc[cols].to_numpy()
     mean = B @ beta
@@ -172,7 +182,7 @@ def plot_fitted_kernels(
     prefixes=None,
     bases_by_predictor=None,
     z: float = 1.96,          # 95% CI (use 1.64 for ~90%, 2.58 for ~99%)
-    alpha_fill: float = 0.20, # CI shading opacity
+    alpha_fill: float = 0.20,  # CI shading opacity
 ):
     """Quick plots of reconstructed kernels with confidence bands."""
     if prefixes is None:
@@ -198,21 +208,22 @@ def plot_fitted_kernels(
             # Degenerate / missing predictor: annotate clearly
             ax.text(0.5, 0.5, f"No kernel columns for '{p}' (or dropped as all-zero)",
                     transform=ax.transAxes, ha='center', va='center', alpha=0.7)
-            ax.set_xlabel('Time lag (s)'); ax.set_ylabel('Kernel weight')
+            ax.set_xlabel('Time lag (s)')
+            ax.set_ylabel('Kernel weight')
             ax.set_title(f'{p} kernel')
-            plt.tight_layout(); plt.show()
+            plt.tight_layout()
+            plt.show()
             continue
 
         ax.plot(t, mean, label=p)
-        ax.fill_between(t, mean - z * std, mean + z * std, alpha=alpha_fill, label=f'{int(round((2*scipy.stats.norm.cdf(z)-1)*100))}% CI' if 'scipy' in globals() else 'CI')
+        ax.fill_between(t, mean - z * std, mean + z * std, alpha=alpha_fill,
+                        label=f'{int(round((2*scipy.stats.norm.cdf(z)-1)*100))}% CI' if 'scipy' in globals() else 'CI')
         ax.set_xlabel('Time lag (s)')
         ax.set_ylabel('Kernel weight')
         ax.set_title(f'{p} kernel')
         ax.legend()
         plt.tight_layout()
         plt.show()
-
-
 
 
 # -------------------------------
@@ -238,8 +249,10 @@ def plot_history_kernels_population(hist_df: pd.DataFrame, *, overlay_mean=True,
             if i >= max_overlays:
                 break
             plt.plot(df_n['lag_s'], df_n['mean'], alpha=0.3)
-        plt.plot(agg['lag_s'], agg['mean'], linewidth=2, label='population mean')
-        plt.fill_between(agg['lag_s'], agg['lo'], agg['hi'], alpha=0.2, label='95% CI (across neurons)')
+        plt.plot(agg['lag_s'], agg['mean'],
+                 linewidth=2, label='population mean')
+        plt.fill_between(agg['lag_s'], agg['lo'], agg['hi'],
+                         alpha=0.2, label='95% CI (across neurons)')
         plt.xlabel('Time lag (s)')
         plt.ylabel('History weight')
         plt.title('Spike-history kernels (population)')
@@ -248,7 +261,8 @@ def plot_history_kernels_population(hist_df: pd.DataFrame, *, overlay_mean=True,
         plt.show()
 
     if heatmap:
-        pivot = hist_df.pivot(index='neuron', columns='lag_idx', values='mean').sort_index()
+        pivot = hist_df.pivot(
+            index='neuron', columns='lag_idx', values='mean').sort_index()
         plt.figure()
         plt.imshow(pivot.values, aspect='auto', origin='lower')
         plt.colorbar(label='History weight')
@@ -265,8 +279,9 @@ def get_angle_tuning_with_ci(
     meta: dict,
     *,
     base_prefix: str = 'cur_ff_angle',
-    bases_by_predictor: dict[str, list[np.ndarray]] | None = None,
-    mode: str = 'peak',         # 'peak' | 'lag' | 'integrate'  (kernel mode only)
+    bases_by_predictor: Optional[dict[str, list[np.ndarray]]] = None,
+    # 'peak' | 'lag' | 'integrate'  (kernel mode only)
+    mode: str = 'peak',
     lag: Optional[int] = None,  # used when mode='lag'
     M: Optional[int] = None,    # static mode: #harmonics (auto if None)
     include_intercept: bool = False,
@@ -278,11 +293,12 @@ def get_angle_tuning_with_ci(
     The CI is delta-method using the GLM coefficient covariance.
     """
     names = _exog_names(result, design_df)
-    coef  = _params_series(result, names)
-    cov   = _cov_df(result, names)
+    coef = _params_series(result, names)
+    cov = _cov_df(result, names)
 
     # grid
-    theta = np.linspace(-np.pi, np.pi, 361, endpoint=True) if theta_grid is None else np.asarray(theta_grid)
+    theta = np.linspace(-np.pi, np.pi, 361,
+                        endpoint=True) if theta_grid is None else np.asarray(theta_grid)
 
     # try KERNEL mode first
     sin_prefix = f'{base_prefix}_sin'
@@ -297,7 +313,8 @@ def get_angle_tuning_with_ci(
         if B_sin.shape[1] != len(sin_cols_k) or B_cos.shape[1] != len(cos_cols_k):
             raise ValueError('Angle kernel basis/columns mismatch.')
         if B_sin.shape[0] != B_cos.shape[0]:
-            raise ValueError('Sin and cos angle kernels must share lag length.')
+            raise ValueError(
+                'Sin and cos angle kernels must share lag length.')
 
         beta_s = coef.loc[sin_cols_k].to_numpy()
         beta_c = coef.loc[cos_cols_k].to_numpy()
@@ -405,7 +422,7 @@ def plot_angle_tuning_function(
     meta: dict,
     *,
     base_prefix: str = 'cur_ff_angle',
-    bases_by_predictor: dict[str, list[np.ndarray]] | None = None,
+    bases_by_predictor: Optional[dict[str, list[np.ndarray]]] = None,
     mode: str = 'peak',         # kernel mode
     lag: Optional[int] = None,  # kernel mode
     M: Optional[int] = None,    # static mode
@@ -434,17 +451,20 @@ def plot_angle_tuning_function(
         ax.fill_between(theta, lo, hi, alpha=alpha_fill, label=f'±{z:.2f}·SE')
         ax.set_title(f"{base_prefix} tuning ({info['mode']})")
         ax.legend()
-        plt.tight_layout(); plt.show()
+        plt.tight_layout()
+        plt.show()
     else:
         plt.figure()
         plt.plot(theta, f, label='mean')
         plt.fill_between(theta, lo, hi, alpha=alpha_fill, label=f'±{z:.2f}·SE')
-        plt.xlabel('Angle (rad)'); plt.ylabel('Tuning f(θ)')
+        plt.xlabel('Angle (rad)')
+        plt.ylabel('Tuning f(θ)')
         title_bits = [base_prefix, info['mode']]
         if info.get('lag_idx') is not None:
             title_bits.append(f"lag={info['lag_idx']}")
         plt.title(' | '.join(title_bits))
         plt.legend()
-        plt.tight_layout(); plt.show()
+        plt.tight_layout()
+        plt.show()
 
     return theta, f, std, info

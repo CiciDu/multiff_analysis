@@ -1,13 +1,14 @@
-import os
-import numpy as np
-import math
-from math import pi
 import inspect
+import math
+import os
+
+import numpy as np
+from typing import Optional
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 def theta_half_and_delta_abs(theta_center: float, theta_boundary: float):
-    import math
 
     def wrap(a):
         return (a + math.pi) % (2*math.pi) - math.pi
@@ -29,8 +30,8 @@ def make_ff_flash_from_random_sampling(
     duration: float,
     non_flashing_interval_mean: float = 3.0,
     flash_on_interval: float = 0.3,
-    rng: np.random.Generator | None = None,
-    seed: int | None = None,
+    rng: Optional[np.random.Generator] = None,
+    seed: Optional[int] = None,
     *,
     chunk: int = 16,  # number of intervals generated per active FF per iteration
 ):
@@ -48,7 +49,7 @@ def make_ff_flash_from_random_sampling(
     non_flashing_interval_mean : float
     flash_on_interval : float
     rng : np.random.Generator | None
-    seed : int | None
+    seed : Optional[int]
     chunk : int
         How many intervals to simulate per active firefly per loop iteration.
         Larger = fewer Python iterations (usually faster), but more temporary memory.
@@ -242,9 +243,6 @@ def find_visible_ff(time, ff_distance_all, ff_angle_all,
                 visible_ff[i] = False
 
     return np.where(visible_ff)[0]
-
-
-import inspect
 
 
 def get_env_default_kwargs(env_cls):

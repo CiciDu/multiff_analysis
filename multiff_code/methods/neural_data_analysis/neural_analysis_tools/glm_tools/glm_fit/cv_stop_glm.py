@@ -1,16 +1,21 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from sklearn.model_selection import GroupKFold
 from scipy.stats import poisson
+from sklearn.model_selection import GroupKFold
+from typing import Optional
 
 # ---------- helpers ----------
 
+
 def _resolve_offset(offset_log, n_rows):
     if isinstance(offset_log, (pd.Series, pd.DataFrame)):
-        off = pd.Series(np.asarray(offset_log).reshape(-1), index=range(n_rows))
+        off = pd.Series(np.asarray(offset_log).reshape(-1),
+                        index=range(n_rows))
     else:
-        off = pd.Series(np.asarray(offset_log).reshape(-1), index=range(n_rows))
+        off = pd.Series(np.asarray(offset_log).reshape(-1),
+                        index=range(n_rows))
     if off.shape[0] != n_rows:
         raise ValueError('offset_log length does not match X rows.')
     if not np.all(np.isfinite(off)):
@@ -22,10 +27,11 @@ def ll_poisson(y, mu):
     # exact log-likelihood (includes log(y!))
     return poisson(mu).logpmf(y).sum()
 
-# ---------- optional plotting helpers (headless-safe) ----------
-import matplotlib.pyplot as plt
 
-def plot_cv_scores(scores: pd.DataFrame, title: str | None = None):
+# ---------- optional plotting helpers (headless-safe) ----------
+
+
+def plot_cv_scores(scores: pd.DataFrame, title: Optional[str] = None):
     """
     Bar plot of McFadden's R^2 (CV) per unit. Saves to disk (no GUI).
     """
@@ -34,19 +40,15 @@ def plot_cv_scores(scores: pd.DataFrame, title: str | None = None):
 
     plt.figure(figsize=(9, 4))
     plt.bar(range(len(scores_sorted)), scores_sorted['mcfadden_R2_cv'])
-    plt.xticks(range(len(scores_sorted)), scores_sorted['cluster'], rotation=90)
+    plt.xticks(range(len(scores_sorted)),
+               scores_sorted['cluster'], rotation=90)
     plt.ylabel("McFadden's R² (CV)")
     plt.xlabel('Cluster / neuron')
     plt.title(title)
     plt.tight_layout()
     plt.show()
-    return 
+    return
 
-
-import numpy as np
-import pandas as pd
-import statsmodels.api as sm
-import matplotlib.pyplot as plt
 
 def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
     # predict with guards
@@ -71,11 +73,16 @@ def plot_pred_vs_obs(res, df_X, y, offset_log, outpath=None, title=None):
     plt.figure(figsize=(5, 5))
     plt.plot(mu_f, y_f, '.', alpha=0.5, markersize=4)
     plt.plot(lim, lim, lw=1)
-    plt.xlim(lim); plt.ylim(lim)
-    plt.xlabel('Predicted mean (μ)'); plt.ylabel('Observed count')
-    if title: plt.title(title)
-    if outpath: plt.savefig(outpath, bbox_inches='tight', dpi=150)
+    plt.xlim(lim)
+    plt.ylim(lim)
+    plt.xlabel('Predicted mean (μ)')
+    plt.ylabel('Observed count')
+    if title:
+        plt.title(title)
+    if outpath:
+        plt.savefig(outpath, bbox_inches='tight', dpi=150)
     plt.show()
+
 
 def safe_predict_mu(res, df_X, offset_log, clip_eta=30.0):
     """
@@ -143,7 +150,8 @@ def cv_score_per_cluster(
 
         for train_idx, test_idx in gkf.split(df_X, groups=groups):
             Xt, Xv = df_X.iloc[train_idx], df_X.iloc[test_idx]
-            yt, yv = df_Y.iloc[train_idx, j].to_numpy(), df_Y.iloc[test_idx, j].to_numpy()
+            yt, yv = df_Y.iloc[train_idx, j].to_numpy(
+            ), df_Y.iloc[test_idx, j].to_numpy()
             ot, ov = offset.iloc[train_idx], offset.iloc[test_idx]
 
             # Full model
@@ -153,13 +161,14 @@ def cv_score_per_cluster(
             mu_v = res.predict(Xv, offset=ov)
 
             # Null model: intercept + offset only
-            ones_train = pd.DataFrame(index=Xt.index)  # empty -> const only after add_constant
-            ones_test  = pd.DataFrame(index=Xv.index)
+            # empty -> const only after add_constant
+            ones_train = pd.DataFrame(index=Xt.index)
+            ones_test = pd.DataFrame(index=Xv.index)
             ones_train_c = sm.add_constant(ones_train, has_constant='add')
-            ones_test_c  = sm.add_constant(ones_test,  has_constant='add')
+            ones_test_c = sm.add_constant(ones_test,  has_constant='add')
 
-
-            model0 = sm.GLM(yt, ones_train_c, family=sm.families.Poisson(), offset=ot)
+            model0 = sm.GLM(yt, ones_train_c,
+                            family=sm.families.Poisson(), offset=ot)
             res0 = model0.fit(method='newton', maxiter=100, disp=False)
             mu0_v = res0.predict(ones_test_c, offset=ov)
 
@@ -167,7 +176,7 @@ def cv_score_per_cluster(
             ll_test.append(ll_poisson(yv, np.clip(mu_v, 1e-12, None)))
             ll_test_null.append(ll_poisson(yv, np.clip(mu0_v, 1e-12, None)))
 
-        ll_mean  = float(np.mean(ll_test))
+        ll_mean = float(np.mean(ll_test))
         ll0_mean = float(np.mean(ll_test_null))
         mcfadden_R2 = 1 - (ll_mean / ll0_mean) if ll0_mean != 0 else np.nan
 
@@ -179,4 +188,3 @@ def cv_score_per_cluster(
         })
 
     return pd.DataFrame(scores)
-

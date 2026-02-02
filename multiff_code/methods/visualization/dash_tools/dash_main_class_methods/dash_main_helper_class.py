@@ -1,26 +1,33 @@
-from visualization.plotly_tools import plotly_for_correlation, plotly_preparation, plotly_for_time_series
-from visualization.dash_tools import dash_prep_class, dash_utils
-from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils, plot_monkey_heading_helper_class
-from visualization.matplotlib_tools import monkey_heading_utils
-from visualization.plotly_tools import plotly_for_monkey
-from null_behaviors import show_null_trajectory
-from visualization.plotly_tools import plotly_for_null_arcs
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils
-from planning_analysis.plan_factors import build_factor_comp
-
-import os
-import numpy as np
-import matplotlib
-from matplotlib import rc
-import matplotlib.pyplot as plt
-import pandas as pd
-from dash import html
-from dash.exceptions import PreventUpdate
-import pandas as pd
-from dash import dcc
 import copy
 import logging
+import os
+from typing import Optional
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from dash import dcc, html
+from dash.exceptions import PreventUpdate
+from matplotlib import rc
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
+    pn_utils
+)
+from null_behaviors import show_null_trajectory
+from planning_analysis.plan_factors import build_factor_comp
+from planning_analysis.show_planning.cur_vs_nxt_ff import (
+    find_cvn_utils,
+    plot_monkey_heading_helper_class
+)
+from visualization.dash_tools import dash_prep_class, dash_utils
+from visualization.matplotlib_tools import monkey_heading_utils
+from visualization.plotly_tools import (
+    plotly_for_correlation,
+    plotly_for_monkey,
+    plotly_for_null_arcs,
+    plotly_for_time_series,
+    plotly_preparation
+)
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -447,7 +454,7 @@ class DashMainHelper(dash_prep_class.DashCartesianPreparation):
             raise ValueError('previous_or_next should be previous or next')
         self._update_after_changing_stop_point_index()
 
-    def _get_previous_or_next_stops_near_ff_row(self, previous_or_next: str = "previous", order_by: str | None = None):
+    def _get_previous_or_next_stops_near_ff_row(self, previous_or_next: str = "previous", order_by: Optional[str] = None):
         df = self.stops_near_ff_df
         if df is None or df.empty:
             raise ValueError("stops_near_ff_df is empty")

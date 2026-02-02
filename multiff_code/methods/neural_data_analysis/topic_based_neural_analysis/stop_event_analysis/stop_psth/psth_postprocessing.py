@@ -1,12 +1,9 @@
-from matplotlib.colors import TwoSlopeNorm
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional, Literal
+from typing import List, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy import stats
-from scipy.ndimage import gaussian_filter1d
+from matplotlib.colors import TwoSlopeNorm
 
 
 def export_psth_to_df(
@@ -84,7 +81,6 @@ def export_psth_to_df(
         columns=(['time', 'cluster', 'condition', 'mean'] +
                  (["sem", "lower", "upper"] if include_ci else []))
     )
-
 
 
 def _bh_fdr(pvals, alpha=0.05):
@@ -261,7 +257,7 @@ def plot_effect_heatmap_all(summary: pd.DataFrame,
     return fig, ax
 
 
-def _pick_sample_sizes(df: pd.DataFrame) -> tuple[int | None, int | None]:
+def _pick_sample_sizes(df: pd.DataFrame) -> tuple[Optional[int], Optional[int]]:
     nA = nB = None
     if 'n_event_a' in df.columns and df['n_event_a'].notna().any():
         nA = int(pd.to_numeric(df['n_event_a'],
@@ -298,8 +294,8 @@ def _extract_paren_content(seq):
 
 
 def plot_sig_heatmap(summary: pd.DataFrame,
-                     title: str | None = None,
-                     window_order: list | None = None,
+                     title: Optional[str] = None,
+                     window_order: Optional[list] = None,
                      cmap: str = 'coolwarm',
                      drop_empty_windows: bool = False,
                      show_y_tick_label: bool = False,

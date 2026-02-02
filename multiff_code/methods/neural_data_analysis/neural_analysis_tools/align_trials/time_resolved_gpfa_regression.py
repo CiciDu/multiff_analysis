@@ -4,6 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 import logging
+from typing import Optional
 
 from sklearn.metrics import r2_score
 from sklearn.linear_model import RidgeCV

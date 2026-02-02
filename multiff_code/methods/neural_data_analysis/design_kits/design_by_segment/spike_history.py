@@ -1,15 +1,16 @@
 import numpy as np
 import pandas as pd
-
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.design_kits.design_by_segment import temporal_feats
+from typing import Optional
 from neural_data_analysis.design_kits.design_around_event.event_binning import (
-    bin_spikes_by_cluster,
+    bin_spikes_by_cluster
 )
+from neural_data_analysis.design_kits.design_by_segment import temporal_feats
+from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 
 # ============================================================
 # Padding utilities
 # ============================================================
+
 
 def _pad_bin_table_for_history(
     bin_df: pd.DataFrame,
@@ -25,10 +26,9 @@ def _pad_bin_table_for_history(
     bin_df : DataFrame
         Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right']
     """
-    
+
     bin_dt = _assert_dt_matches_bins(bin_df, dt)
     dt = bin_dt
-
 
     n_pad_bins = int(np.ceil(t_max / dt))
     pad_time = n_pad_bins * dt
@@ -89,8 +89,8 @@ def _rebin_spikes_from_bin_table(
         check_nonoverlap=False,
     )
 
-    bin_df = bin_df.sort_values(['new_segment', 'new_bin']).reset_index(drop=True)
-
+    bin_df = bin_df.sort_values(
+        ['new_segment', 'new_bin']).reset_index(drop=True)
 
     for j, cid in enumerate(cluster_ids):
         bin_df[f'cluster_{cid}'] = counts[:, j]
@@ -109,7 +109,7 @@ def compute_spike_history_designs(
     dt: float,
     t_max: float,
     n_basis: int = 5,
-    t_min: float | None = None,
+    t_min: Optional[float] = None,
     edge: str = 'zero',
 ):
     """
@@ -191,7 +191,7 @@ def compute_spike_history_designs(
         hist.reset_index(drop=True, inplace=True)
 
         X_hist[col] = hist
-        
+
     # pick one representative neuron to check that the sequence of 'new_segment', 'new_bin' is the same as the original bin_df
     rep_col = spike_cols[0]
     rep_hist = X_hist[rep_col]
@@ -206,6 +206,7 @@ def compute_spike_history_designs(
     )
 
     return X_hist, basis, colnames
+
 
 def _assert_dt_matches_bins(bin_df, dt, *, tol=1e-9):
     widths = (bin_df['bin_right'] - bin_df['bin_left']).to_numpy(dtype=float)
@@ -232,7 +233,6 @@ def _assert_dt_matches_bins(bin_df, dt, *, tol=1e-9):
         if not np.all(np.diff(g['bin_left']) > 0):
             raise ValueError(f'Bins not strictly increasing in segment {seg}')
 
-
     return bin_dt
 
 
@@ -243,8 +243,8 @@ def add_spike_history_to_design(
     target_col: str,
     *,
     include_self: bool = True,
-    cross_neurons: list[str] | None = None,
-    meta_groups: dict | None = None,
+    cross_neurons: Optional[list[str]] = None,
+    meta_groups: Optional[dict] = None,
 ):
     """
     Assemble a GLM design matrix for one target neuron by adding spike-history
@@ -279,6 +279,7 @@ def add_spike_history_to_design(
         return design_df, meta_groups
 
     return design_df, None
+
 
 def build_design_with_spike_history_from_bins(
     *,

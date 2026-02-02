@@ -301,7 +301,7 @@ def find_alive_target_clusters(ff_real_position_sorted, ff_caught_T_new, ff_life
 
 def lookup_rows_by_time(
     df: pd.DataFrame,
-    target_times: np.ndarray | list[float],
+    target_times,
     time_col: str = 'time',
     max_diff = 0.1,
 ) -> pd.DataFrame:

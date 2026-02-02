@@ -655,7 +655,7 @@ def add_whether_new_distinct_stop_and_stop_id(
     speed_threshold_for_distinct_stop: float = 1.0,
     close_gap_seconds: float = 0.2,
     min_stop_duration: float = 0.0,  # seconds
-    initial_long_stop_threshold: float | None = 3.0,
+    initial_long_stop_threshold = 3.0,
     max_initial_long_stops: int = 5,
 ) -> pd.DataFrame:
     df = monkey_information.copy()

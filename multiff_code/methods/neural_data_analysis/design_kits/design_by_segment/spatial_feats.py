@@ -1,15 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Dict, Sequence, Optional, Tuple, List, Mapping
+from typing import Dict, Optional, Sequence, Union
 
-import warnings
 import numpy as np
 import pandas as pd
-from scipy import signal
-from scipy.interpolate import BSpline
-
+from neural_data_analysis.design_kits.design_by_segment import temporal_feats
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.design_kits.design_by_segment import temporal_feats
+from scipy.interpolate import BSpline
 
 
 def _knots_from_breaks(breaks: np.ndarray, degree: int) -> np.ndarray:
@@ -28,8 +24,9 @@ def _build_spatial_knots(
     degree: int = 3,
     K: int = 6,                          # used only in 'percentile' mode
     percentiles: tuple[float, float] = (2, 98),
-    breaks: np.ndarray | None = None,    # used in 'breaks' mode
-    knots:  np.ndarray | None = None     # used in 'knots'  mode (full clamped)
+    breaks: Optional[np.ndarray] = None,    # used in 'breaks' mode
+    # used in 'knots'  mode (full clamped)
+    knots:  Optional[np.ndarray] = None
 ) -> tuple[np.ndarray, int]:
     """
     Returns (full_knots, K) where len(full_knots) = K + degree + 1.
@@ -86,20 +83,20 @@ def _bspline_design_from_knots(x: np.ndarray, full_knots: np.ndarray, degree: in
 
 def add_spatial_spline_feature(
     design_df: pd.DataFrame,
-    feature: str | np.ndarray | pd.Series,
+    feature: Optional[Union[str, np.ndarray, pd.Series]] = None,
     *,
-    name: str | None = None,
-    data: pd.DataFrame | None = None,
-    rows_mask: np.ndarray | None = None,
+    name: Optional[str] = None,
+    data: Optional[pd.DataFrame] = None,
+    rows_mask: Optional[np.ndarray] = None,
 
     # spline controls
     knots_mode: str = 'percentile',              # 'percentile' | 'breaks' | 'knots'
     K: int = 6,                                  # used in percentile mode
     degree: int = 3,
     percentiles: tuple[float, float] = (2, 98),  # for percentile mode
-    breaks: np.ndarray | None = None,            # for breaks mode
+    breaks: Optional[np.ndarray] = None,            # for breaks mode
     # for knots mode (full clamped vector)
-    knots:  np.ndarray | None = None,
+    knots:  Optional[np.ndarray] = None,
 
     # identifiability & scaling
     # True/False or 'auto' (True only in percentile mode)
@@ -108,8 +105,8 @@ def add_spatial_spline_feature(
     # center columns (orthogonal to intercept)
     center: bool = True,
 
-    meta: dict | None = None,
-) -> tuple[pd.DataFrame, dict | None]:
+    meta: Optional[dict] = None,
+) -> tuple[pd.DataFrame, Optional[dict]]:
     # --- coerce the vector ---
     if isinstance(feature, str):
         if data is None:
@@ -184,22 +181,23 @@ def add_spatial_spline_feature(
 
 def add_circular_fourier_feature(
     design_df: pd.DataFrame,
-    theta: str | np.ndarray | pd.Series,   # column name or vector of angles
+    theta: Union[str, np.ndarray, pd.Series],   # column name or vector of angles
     *,
     # logical feature name (e.g., 'cur_angle')
-    name: str | None = None,
-    data: pd.DataFrame | None = None,      # required if theta is a column name
+    name: Optional[str] = None,
+    # required if theta is a column name
+    data: Optional[pd.DataFrame] = None,
     # mask used when you built design_df (edge='drop')
-    rows_mask: np.ndarray | None = None,
+    rows_mask: Optional[np.ndarray] = None,
     # 0/1 mask to “turn on” the angle rows
-    gate: str | np.ndarray | pd.Series | None = None,
+    gate=None,
     M: int = 3,                            # number of harmonics
     degrees: bool = False,                 # set True if theta is in degrees
     center: bool = True,                   # column-center -> orthogonal to intercept
     # per-column unit variance (after centering)
     standardize: bool = False,
-    meta: dict | None = None,
-) -> tuple[pd.DataFrame, dict | None]:
+    meta: Optional[dict] = None,
+) -> tuple[pd.DataFrame, Optional[dict]]:
     """
     Add sin/cos Fourier harmonics of an angle into design_df.
 
@@ -290,7 +288,7 @@ def add_visibility_transition_kernels(
     dt: float,
     *,
     stems: Sequence[str] = ('cur_vis', 'nxt_vis'),
-    basis: np.ndarray | None = None,
+    basis: Optional[np.ndarray] = None,
     family: str = 'rc',          # 'rc' | 'spline' (used if basis is None)
     n_basis: int = 3,
     t_max: float = 0.30,
@@ -384,4 +382,3 @@ def add_visibility_transition_kernels(
             signal=off, bases=[B])
 
     return specs
-

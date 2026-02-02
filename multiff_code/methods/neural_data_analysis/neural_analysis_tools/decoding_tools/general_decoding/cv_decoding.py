@@ -208,12 +208,12 @@ def run_cv_decoding(
     behav_features,
     groups,
     n_splits=5,
-    config: DecodingRunConfig | None = None,
+    config: Optional[DecodingRunConfig] = None,
     context_label=None,
     verbosity: int = 1,
     shuffle_y: bool = False,
     shuffle_seed: int = 0,
-    save_dir: str | Path | None = None,
+    save_dir: Optional[str | Path] = None,
     load_existing_only = False,
 ):
     if config is None:

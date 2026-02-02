@@ -1,11 +1,11 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from decision_making_analysis.event_detection import (
+    detect_rsw_and_rcap,
+    get_miss_to_switch_data
+)
 
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
-from decision_making_analysis.data_enrichment import rsw_vs_rcap_utils
-from decision_making_analysis.event_detection import get_miss_to_switch_data
-from decision_making_analysis.ff_data_acquisition import get_missed_ff_data
-
+from typing import Optional
 
 def make_stop_category_df(monkey_information, ff_caught_T_new, closest_stop_to_capture_df, temp_rcap_events_df, ff_dataframe, ff_real_position_sorted):
     stop_category_df = init_stop_category_df(
@@ -301,7 +301,7 @@ def add_stop_cluster_id(
     stop_category_df: pd.DataFrame,
     ff_col: str = 'candidate_target',
     point_col: str = 'point_index',
-    order_by: str | None = 'time',
+    order_by: Optional[str] = 'time',
     id_col: str = 'stop_cluster_id',
     size_col: str = 'stop_cluster_size',
     start_col: str = 'stop_cluster_start_point',

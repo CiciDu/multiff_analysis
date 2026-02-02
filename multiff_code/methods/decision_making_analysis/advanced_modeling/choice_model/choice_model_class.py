@@ -1,3 +1,9 @@
+from typing import Optional
+
+import torch
+import torch.nn as nn
+
+
 class ContextAwareChoice(nn.Module):
     """
     Scores each option at a decision point using:
@@ -20,13 +26,14 @@ class ContextAwareChoice(nn.Module):
       - Real candidates live at indices 1..K_b for item b.
       - Padded slots (to reach K_max) are masked out (no prob, no gradient).
     """
+
     def __init__(self, dim_ego: int, dim_retry: int, dim_cand: int, hidden: int = 128):
         super().__init__()
 
         # Project raw features to a common hidden space (H)
-        self.ego_proj   = nn.Linear(dim_ego,  hidden)  # (B, E)    → (B, H)
+        self.ego_proj = nn.Linear(dim_ego,  hidden)  # (B, E)    → (B, H)
         self.retry_proj = nn.Linear(dim_retry, hidden)  # (B, R)    → (B, H)
-        self.cand_proj  = nn.Linear(dim_cand, hidden)   # (B, K, C) → (B, K, H)
+        self.cand_proj = nn.Linear(dim_cand, hidden)   # (B, K, C) → (B, K, H)
 
         # Final scoring head takes:
         #   [ option_embed (H) , set_summary (H) , 3 scalars (p_succ, -time_cost, -attempts) ] → score
@@ -36,7 +43,7 @@ class ContextAwareChoice(nn.Module):
         )
 
     @staticmethod
-    def _set_summary(Hcand: torch.Tensor, mask: torch.Tensor | None) -> torch.Tensor:
+    def _set_summary(Hcand: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Tensor:
         """
         Permutation-invariant pooled summary over the candidate set.
         This gives the model a sense of the *overall set context*.
@@ -49,21 +56,29 @@ class ContextAwareChoice(nn.Module):
         if mask is None:
             return Hcand.mean(dim=1)
         valid = (~mask).float().unsqueeze(-1)           # (B, K, 1)
-        num   = valid.sum(dim=1).clamp_min(1.0)         # (B, 1)
+        num = valid.sum(dim=1).clamp_min(1.0)         # (B, 1)
         return (Hcand * valid).sum(dim=1) / num         # (B, H)
 
     def forward(
         self,
         ego: torch.Tensor,                # (B, E)     shared ego features
         retry_feat: torch.Tensor,         # (B, R)     retry-only features
-        cand_feat: torch.Tensor,          # (B, K, C)  per-candidate features (padded to K_max)
-        time_cost_retry: torch.Tensor,    # (B,)       scalar cost for retrying (time to reattempt)
-        time_cost_cand: torch.Tensor,     # (B, K)     scalar cost per candidate (time to travel and stop)
-        attempts_retry: torch.Tensor,     # (B,)       recent attempts counter for the same target
-        attempts_cand: torch.Tensor,      # (B, K)     recent attempts per candidate (often zeros)
-        p_succ_retry: torch.Tensor,       # (B,)       predicted success prob for retry (from SuccessPredictor)
-        p_succ_cand: torch.Tensor,        # (B, K)     predicted success prob per candidate
-        mask: torch.Tensor | None = None  # (B, K) bool; True = padded/invalid candidate slot
+        # (B, K, C)  per-candidate features (padded to K_max)
+        cand_feat: torch.Tensor,
+        # (B,)       scalar cost for retrying (time to reattempt)
+        time_cost_retry: torch.Tensor,
+        # (B, K)     scalar cost per candidate (time to travel and stop)
+        time_cost_cand: torch.Tensor,
+        # (B,)       recent attempts counter for the same target
+        attempts_retry: torch.Tensor,
+        # (B, K)     recent attempts per candidate (often zeros)
+        attempts_cand: torch.Tensor,
+        # (B,)       predicted success prob for retry (from SuccessPredictor)
+        p_succ_retry: torch.Tensor,
+        # (B, K)     predicted success prob per candidate
+        p_succ_cand: torch.Tensor,
+        # (B, K) bool; True = padded/invalid candidate slot
+        mask: Optional[torch.Tensor] = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Returns:
@@ -71,7 +86,8 @@ class ContextAwareChoice(nn.Module):
           probs:  (B, K+1)  # softmax over columns
         """
 
-        B, K, _ = cand_feat.shape  # (batch_size, batch_max_candidates, dim_cand)
+        # (batch_size, batch_max_candidates, dim_cand)
+        B, K, _ = cand_feat.shape
 
         # --- Embed ego, retry, and candidate features into hidden space (H) ---
         E = torch.relu(self.ego_proj(ego))              # (B, H)
@@ -121,7 +137,8 @@ class ContextAwareChoice(nn.Module):
                 torch.zeros(B, 1, dtype=torch.bool, device=mask.device),
                 mask
             ], dim=1)                                        # (B, K+1)
-            scores = scores.masked_fill(pad_mask_full, -1e9) # large negative avoids NaNs
+            # large negative avoids NaNs
+            scores = scores.masked_fill(pad_mask_full, -1e9)
 
         probs = F.softmax(scores, dim=1)                     # (B, K+1)
         return scores, probs
@@ -157,7 +174,7 @@ def collate_retry_switch(batch: list[dict]) -> dict[str, torch.Tensor]:
 
     B = len(batch)
     K_list = [ex["cand_feat"].shape[0] for ex in batch]  # real K per item
-    K_max  = max(K_list)                                 # batch max K
+    K_max = max(K_list)                                 # batch max K
 
     # Infer dimensions
     E = batch[0]["ego"].shape[-1]
@@ -166,30 +183,34 @@ def collate_retry_switch(batch: list[dict]) -> dict[str, torch.Tensor]:
     C = batch[0]["cand_feat"].shape[-1] if K_max > 0 else batch[0]["cand_feat_template_dim"]
 
     # Allocate tensors on CPU for now (move to device later)
-    ego             = torch.zeros(B, E)
-    retry_feat      = torch.zeros(B, R)
-    cand_feat       = torch.zeros(B, K_max, C) if K_max > 0 else torch.zeros(B, 0, C)
-    cand_mask       = torch.ones(B, K_max, dtype=torch.bool)  # start as all PAD=True
+    ego = torch.zeros(B, E)
+    retry_feat = torch.zeros(B, R)
+    cand_feat = torch.zeros(B, K_max, C) if K_max > 0 else torch.zeros(B, 0, C)
+    cand_mask = torch.ones(B, K_max, dtype=torch.bool)  # start as all PAD=True
     time_cost_retry = torch.zeros(B)
-    time_cost_cand  = torch.zeros(B, K_max) if K_max > 0 else torch.zeros(B, 0)
-    attempts_retry  = torch.zeros(B, dtype=torch.long)
-    attempts_cand   = torch.zeros(B, K_max, dtype=torch.long) if K_max > 0 else torch.zeros(B, 0, dtype=torch.long)
-    chosen_idx      = torch.zeros(B, dtype=torch.long)
+    time_cost_cand = torch.zeros(B, K_max) if K_max > 0 else torch.zeros(B, 0)
+    attempts_retry = torch.zeros(B, dtype=torch.long)
+    attempts_cand = torch.zeros(
+        B, K_max, dtype=torch.long) if K_max > 0 else torch.zeros(B, 0, dtype=torch.long)
+    chosen_idx = torch.zeros(B, dtype=torch.long)
 
     for b, ex in enumerate(batch):
         # Copy shared/ retry fields
-        ego[b]             = torch.as_tensor(ex["ego"])
-        retry_feat[b]      = torch.as_tensor(ex["retry_feat"])
+        ego[b] = torch.as_tensor(ex["ego"])
+        retry_feat[b] = torch.as_tensor(ex["retry_feat"])
         time_cost_retry[b] = torch.as_tensor(ex["time_cost_retry"])
-        attempts_retry[b]  = torch.as_tensor(ex["attempts_retry"])
+        attempts_retry[b] = torch.as_tensor(ex["attempts_retry"])
 
         # Copy candidate arrays into the front of padded buffers
         Kb = K_list[b]  # real number of candidates in this example
         if Kb > 0:
-            cand_feat[b, :Kb]      = torch.as_tensor(ex["cand_feat"])         # (Kb, C)
-            time_cost_cand[b, :Kb] = torch.as_tensor(ex["time_cost_cand"])    # (Kb,)
-            attempts_cand[b, :Kb]  = torch.as_tensor(ex["attempts_cand"])     # (Kb,)
-            cand_mask[b, :Kb]      = False  # mark these as VALID (not padded)
+            cand_feat[b, :Kb] = torch.as_tensor(
+                ex["cand_feat"])         # (Kb, C)
+            time_cost_cand[b, :Kb] = torch.as_tensor(
+                ex["time_cost_cand"])    # (Kb,)
+            attempts_cand[b, :Kb] = torch.as_tensor(
+                ex["attempts_cand"])     # (Kb,)
+            cand_mask[b, :Kb] = False  # mark these as VALID (not padded)
 
         # Map the behavior choice to the global column index:
         #   0 = retry
@@ -207,4 +228,3 @@ def collate_retry_switch(batch: list[dict]) -> dict[str, torch.Tensor]:
         "attempts_retry": attempts_retry, "attempts_cand": attempts_cand,
         "chosen_idx": chosen_idx
     }
-

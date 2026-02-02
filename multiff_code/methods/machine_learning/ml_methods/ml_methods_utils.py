@@ -1,3 +1,5 @@
+from typing import Optional
+
 from machine_learning.ml_methods import classification_utils, regression_utils
 import pandas as pd
 import numpy as np

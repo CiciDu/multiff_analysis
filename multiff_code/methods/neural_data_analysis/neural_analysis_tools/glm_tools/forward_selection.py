@@ -1,10 +1,12 @@
 # forward_block_select.py
 from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
 
 # ---------- scoring & guards ----------
 
@@ -80,7 +82,7 @@ def forward_block_select(df_X_full: pd.DataFrame,
                          trial_ids: np.ndarray,
                          offset_log: np.ndarray | float,
                          base_groups: List[str],
-                         candidate_groups: List[str] | None = None,
+                         candidate_groups: Optional[list[str]] = None,
                          nfolds: int = 5,
                          min_rel_improve: float = 0.002,
                          max_steps: int = 20,
