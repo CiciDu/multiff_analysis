@@ -105,6 +105,7 @@ def make_feature_hash(feature, mode, n_splits, shuffle_y, context, config):
 def get_feature_csv_path(out_dir, feature, mode, params_hash):
     if out_dir is None:
         return None
+    out_dir = Path(out_dir)  # Ensure out_dir is a Path object
     tag = ''.join(c if c.isalnum() else '_' for c in feature)[:24]
     return out_dir / f'{tag}_{mode}_{params_hash}.csv'
 
@@ -201,26 +202,45 @@ def serialize_decoding_config(config):
         classification_model_kwargs=config.classification_model_kwargs,
     )
 
-def try_load_existing_result(csv_path, verbosity: int = 1):
+def try_load_existing_result(
+    out_dir,
+    feature,
+    mode,
+    n_splits,
+    shuffle_y,
+    context_label,
+    config,
+    verbosity: int = 1,
+):
     """
-    Try to load an existing CSV result.
+    Try to load an existing decoding result for a feature.
 
     Returns
     -------
     row_dict : dict or None
         Loaded result row if found, otherwise None.
     """
-    if csv_path is None:
+    if out_dir is None:
+        print('out_dir is None')
         return None
 
+    params_hash = make_feature_hash(
+        feature, mode, n_splits, shuffle_y, context_label, config
+    )
+    csv_path = get_feature_csv_path(
+        out_dir, feature, mode, params_hash
+    )
+
     if csv_path.exists():
-        if verbosity > 0:
+        if verbosity > 1:
             print(f'Loaded results from {csv_path}')
         return pd.read_csv(csv_path).iloc[0].to_dict()
     else:
         if verbosity > 0:
             print(f'No results found for {csv_path}')
         return None
+
+
 
 def run_cv_decoding(
     X,
@@ -235,6 +255,7 @@ def run_cv_decoding(
     shuffle_seed: int = 0,
     save_dir: Optional[str | Path] = None,
     load_existing_only=False,
+    exists_ok=True,
 ):
     if config is None:
         config = DecodingRunConfig()
@@ -263,17 +284,20 @@ def run_cv_decoding(
         if shuffle_y:
             y_ok = shuffle_y_groupwise(y_ok, g_ok, rng)
 
-        params_hash = make_feature_hash(
-            feature, mode, n_splits, shuffle_y, context_label, config
-        )
-        csv_path = get_feature_csv_path(
-            out_dir, feature, mode, params_hash
-        )
-
-        loaded_row = try_load_existing_result(csv_path, verbosity)
-        if loaded_row is not None:
-            results.append(loaded_row)
-            continue
+        if exists_ok:
+            loaded_row = try_load_existing_result(
+                out_dir=out_dir,
+                feature=feature,
+                mode=mode,
+                n_splits=n_splits,
+                shuffle_y=shuffle_y,
+                context_label=context_label,
+                config=config,
+                verbosity=verbosity,
+            )
+            if loaded_row is not None:
+                results.append(loaded_row)
+                continue
 
         if load_existing_only:
             continue
@@ -299,7 +323,13 @@ def run_cv_decoding(
 
         results.append(row)
 
-        if csv_path is not None:
+        if out_dir is not None:
+            params_hash = make_feature_hash(
+                feature, mode, n_splits, shuffle_y, context_label, config
+            )
+            csv_path = get_feature_csv_path(
+                out_dir, feature, mode, params_hash
+            )
             pd.DataFrame([row]).to_csv(csv_path, index=False)
             if verbosity > 0:
                 print(f'Saved results to {csv_path}')
