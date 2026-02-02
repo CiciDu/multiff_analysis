@@ -171,7 +171,7 @@ class FFVisDecodingRunner:
             'ff_vis_decoding',
         )
 
-    def run(self, n_splits=5):
+    def run(self, n_splits=5, save_dir=None):
         self._collect_data()
 
         (
@@ -180,7 +180,10 @@ class FFVisDecodingRunner:
             meta_used,
         ) = self._prepare_design_matrices()
 
-        save_dir = self._get_save_dir()
+        if save_dir is None:
+            save_dir = self._get_save_dir()
+        else:
+            save_dir = Path(save_dir)
 
         all_results = []
 
@@ -203,6 +206,16 @@ class FFVisDecodingRunner:
                 # shared
                 use_early_stopping=False,
             )
+            
+            # first try to load existing results
+            results_df = cv_decoding.load_results(
+                save_dir=save_dir,
+                model_name=model_name,
+            )
+            if results_df is not None:
+                print(f'Loaded results from {save_dir}/{model_name}.csv')
+                all_results.append(results_df)
+                continue
 
             print('model_name:', model_name)
             print('config:', config)

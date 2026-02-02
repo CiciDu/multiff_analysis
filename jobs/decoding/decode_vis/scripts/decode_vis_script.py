@@ -12,8 +12,7 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         sys.path.insert(0, str(p / 'multiff_analysis/multiff_code/methods'))
         break
 
-from ff_vis_decoding_pipeline import FFVisDecodingRunner
-
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import decode_vis_pipeline
 
 def main():
     parser = argparse.ArgumentParser()
@@ -29,7 +28,7 @@ def main():
 
     args = parser.parse_args()
 
-    runner = FFVisDecodingRunner(
+    runner = decode_vis_pipeline.FFVisDecodingRunner(
         raw_data_folder_path=args.raw_data_folder_path,
         bin_width=args.bin_width,
         t_max=args.t_max,

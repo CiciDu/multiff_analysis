@@ -201,6 +201,26 @@ def serialize_decoding_config(config):
         classification_model_kwargs=config.classification_model_kwargs,
     )
 
+def try_load_existing_result(csv_path, verbosity: int = 1):
+    """
+    Try to load an existing CSV result.
+
+    Returns
+    -------
+    row_dict : dict or None
+        Loaded result row if found, otherwise None.
+    """
+    if csv_path is None:
+        return None
+
+    if csv_path.exists():
+        if verbosity > 0:
+            print(f'Loaded results from {csv_path}')
+        return pd.read_csv(csv_path).iloc[0].to_dict()
+    else:
+        if verbosity > 0:
+            print(f'No results found for {csv_path}')
+        return None
 
 def run_cv_decoding(
     X,
@@ -214,7 +234,7 @@ def run_cv_decoding(
     shuffle_y: bool = False,
     shuffle_seed: int = 0,
     save_dir: Optional[str | Path] = None,
-    load_existing_only = False,
+    load_existing_only=False,
 ):
     if config is None:
         config = DecodingRunConfig()
@@ -228,7 +248,7 @@ def run_cv_decoding(
         out_dir.mkdir(parents=True, exist_ok=True)
 
     results = []
-    
+
     if behav_features is None:
         behav_features = y_df.columns.tolist()
 
@@ -250,16 +270,11 @@ def run_cv_decoding(
             out_dir, feature, mode, params_hash
         )
 
-        if csv_path is not None: 
-            if csv_path.exists():
-                results.append(pd.read_csv(csv_path).iloc[0].to_dict())
-                if verbosity > 0:
-                    print(f'Loaded results from {csv_path}')
-                continue
-            else:
-                if verbosity > 0:
-                    print(f'No results found for {csv_path}')
-                
+        loaded_row = try_load_existing_result(csv_path, verbosity)
+        if loaded_row is not None:
+            results.append(loaded_row)
+            continue
+
         if load_existing_only:
             continue
 
@@ -286,7 +301,7 @@ def run_cv_decoding(
 
         if csv_path is not None:
             pd.DataFrame([row]).to_csv(csv_path, index=False)
-            print(f'Saved results to {csv_path}')
-
+            if verbosity > 0:
+                print(f'Saved results to {csv_path}')
 
     return pd.DataFrame(results)
