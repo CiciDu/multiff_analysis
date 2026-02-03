@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=decode_stops
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_stops/logs/run_stdout/decode_stops_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_stops/logs/run_stdout/decode_stops_%A_%a.err
+#SBATCH --job-name=decode_pn
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_pn/logs/run_stdout/decode_pn_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_pn/logs/run_stdout/decode_pn_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=10G
@@ -95,9 +95,9 @@ else
 fi
 
 # ------------------------------
-# Run decode_stops
+# Run decode_pn
 # ------------------------------
-python -u multiff_analysis/jobs/decoding/decode_stops/scripts/decode_stops_script.py \
+python -u multiff_analysis/jobs/decoding/decode_pn/scripts/decode_pn_script.py \
     --raw_data_folder_path "$RAW_DATA_FOLDER_PATH" \
 
 echo "[SLURM] Done"

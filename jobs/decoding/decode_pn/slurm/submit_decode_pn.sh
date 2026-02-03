@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=/user_data/cicid/Multifirefly-Project
-JOB_DIR=$PROJECT_ROOT/multiff_analysis/jobs/decoding/decode_stops
+JOB_DIR=$PROJECT_ROOT/multiff_analysis/jobs/decoding/decode_pn
 CONFIG_DIR=$PROJECT_ROOT/multiff_analysis/jobs/data_configs
 
 mkdir -p "$JOB_DIR/logs/run_stdout"
@@ -10,11 +10,11 @@ mkdir -p "$JOB_DIR/logs/run_stdout"
 usage() {
   cat <<EOF
 Usage:
-  submit_decode_stops.sh --monkey MONKEY_NAME [sbatch args]
+  submit_decode_pn.sh --monkey MONKEY_NAME [sbatch args]
 
 Example:
-  submit_decode_stops.sh --monkey Bruno
-  submit_decode_stops.sh --monkey Schro -p cpu --time=12:00:00
+  submit_decode_pn.sh --monkey Bruno
+  submit_decode_pn.sh --monkey Schro -p cpu --time=12:00:00
 EOF
 }
 
@@ -77,5 +77,5 @@ echo "[SUBMIT] Submitting array: 0-$ARRAY_MAX (max $MAX_CONCURRENT concurrent)"
 sbatch \
   --array=0-"$ARRAY_MAX"%$MAX_CONCURRENT \
   "${FORWARD_ARGS[@]}" \
-  "$JOB_DIR/slurm/decode_stops_job.slurm" \
+  "$JOB_DIR/slurm/decode_pn_job.slurm" \
   "$MONKEY_NAME"
