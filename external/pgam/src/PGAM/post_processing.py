@@ -165,6 +165,13 @@ def alignRateForMI(
     Slow aligment method.
     """
     reward = np.squeeze(sm_handler[var]._x)[filter_trials]
+    
+    if y.shape[0] != reward.shape[0]:
+        y = y[filter_trials]
+        lam_s = lam_s[filter_trials]
+        trial_idx = trial_idx[filter_trials]
+        
+        
     # temp kernel where 161 timepoints long
     size_kern = smooth_info[var]["time_pt_for_kernel"].shape[0]
     if size_kern % 2 == 0:
@@ -599,6 +606,7 @@ def temporal_prediction_and_kernel_str(fit, var):
     signed_kern_str = simps(fX, dx=fit.time_bin) / (fit.time_bin * fX.shape[0])
     return xx2, fX, fminus, fplus, kern_str, signed_kern_str
 
+
 def postprocess_results(
     neuron_id,
     counts,
@@ -676,7 +684,7 @@ def postprocess_results(
         var_zscore_par = {v: {'loc': 0, 'scale': 1} for v in full_fit.var_list}
 
     # -----------------------
-    # precompute expensive model-level quantities
+    # precompute model-level quantities
     # -----------------------
     results['full_pseudo_r2_train'][:] = full_fit.pseudo_r2
     full_pseudo_r2_eval, exog_full = pseudo_r2_comp(
@@ -696,7 +704,6 @@ def postprocess_results(
     # -----------------------
     # pre-index significance tables
     # -----------------------
-
     cs_full = {
         row['covariate']: row
         for row in full_fit.covariate_significance
@@ -711,28 +718,30 @@ def postprocess_results(
         else None
     )
 
-
     # -----------------------
     # MI cache
     # -----------------------
     mi_cache = {}
 
     # -----------------------
-    # main loop (now thin)
+    # main loop
     # -----------------------
     for cc, var in enumerate(full_fit.var_list):
         results['variable'][cc] = var
         results['penalization'][cc] = sm_handler[var].lam
 
+        # ---------- p-values ----------
         results['pval'][cc] = cs_full[var]['p-val']
 
-        if reduced_fit is not None and var in cs_red:
-            results['reduced_pval'][cc] = cs_red[var]['p-val']
+        if reduced_fit is not None and var in reduced_fit.var_list:
+            if cs_red is not None and var in cs_red:
+                results['reduced_pval'][cc] = cs_red[var]['p-val']
+            else:
+                results['reduced_pval'][cc] = np.nan
         else:
             results['reduced_pval'][cc] = np.nan
 
-
-        # -------- FULL MI (train) --------
+        # ---------- FULL MI (train) ----------
         try:
             mi, tun = _get_mutual_info(
                 mi_cache,
@@ -757,9 +766,9 @@ def postprocess_results(
         results['y_rate_Hz_model'][cc] = tun.y_model
         results['y_rate_Hz_raw'][cc] = tun.y_raw
 
-        # -------- FULL MI (eval) --------
+        # ---------- FULL MI (eval) ----------
         try:
-            mi, tun = _get_mutual_info(
+            _, tun = _get_mutual_info(
                 mi_cache,
                 ('full', var, False),
                 counts,
@@ -780,7 +789,7 @@ def postprocess_results(
         results['eval_y_rate_Hz_model'][cc] = tun.y_model
         results['eval_y_rate_Hz_raw'][cc] = tun.y_raw
 
-        # -------- kernels --------
+        # ---------- kernels ----------
         (
             results['x_kernel'][cc],
             results['y_kernel'][cc],
@@ -805,10 +814,10 @@ def postprocess_results(
         if reduced_fit is not None:
             results['intercept_reduced'][cc] = reduced_fit.beta[0]
 
-        # -------- REDUCED MI (only if var exists) --------
+        # ---------- REDUCED MI ----------
         if reduced_fit is not None and var in reduced_fit.var_list:
             try:
-                mi, tun = _get_mutual_info(
+                _, tun = _get_mutual_info(
                     mi_cache,
                     ('reduced', var, True),
                     counts,
@@ -830,7 +839,7 @@ def postprocess_results(
             results['reduced_y_rate_Hz_raw'][cc] = tun.y_raw
 
             try:
-                mi, tun = _get_mutual_info(
+                _, tun = _get_mutual_info(
                     mi_cache,
                     ('reduced', var, False),
                     counts,
@@ -852,6 +861,7 @@ def postprocess_results(
             results['eval_reduced_y_rate_Hz_raw'][cc] = tun.y_raw
 
     return results
+
 
 
 def sum_trial(ev_sender, ev_reciever, rate_reciever, DT, num_DT):

@@ -73,10 +73,19 @@ def wSumChisq_cdf(x, df, w):
 def alignRateForMI(
     y, lam_s, var, sm_handler, smooth_info, time_bin, filter_trials, trial_idx
 ):
+    """
+    Slow alignment method (functionally matches the original implementation).
+
+    Key equivalence points vs old version:
+    - count_bins increments by the number of samples landing in each bin (not 1/event/bin)
+    - tuning/sc_based_tuning accumulate sums over samples, then divide by count_bins
+    """
     reward = np.squeeze(sm_handler[var]._x)[filter_trials]
-    lam_s = lam_s[filter_trials]
-    y = y[filter_trials]
-    trial_idx = trial_idx[filter_trials]
+
+    if y.shape[0] != reward.shape[0]:
+        y = y[filter_trials]
+        lam_s = lam_s[filter_trials]
+        trial_idx = trial_idx[filter_trials]
 
     size_kern = smooth_info[var]['time_pt_for_kernel'].shape[0]
     if size_kern % 2 == 0:
@@ -84,16 +93,20 @@ def alignRateForMI(
     half_size = (size_kern - 1) // 2
 
     timept = np.arange(-half_size, half_size + 1) * time_bin
-    nbin = timept.size if (var.startswith('neu') or var == 'spike_hist') else 15
-    if nbin % 2 == 0:
-        nbin += 1
+
+    if (var.startswith('neu')) or (var == 'spike_hist'):
+        nbin = timept.size
+        if nbin % 2 == 0:
+            nbin += 1
+    else:
+        nbin = 15
 
     temp_bins = np.linspace(timept[0], timept[-1], nbin)
     bin_w = temp_bins[1] - temp_bins[0]
 
-    tuning = np.zeros(nbin)
-    count_bins = np.zeros(nbin)
-    sc_based_tuning = np.zeros(nbin)
+    tuning = np.zeros(nbin, dtype=float)
+    count_bins = np.zeros(nbin, dtype=float)
+    sc_based_tuning = np.zeros(nbin, dtype=float)
 
     for tr in np.unique(trial_idx):
         sel = trial_idx == tr
@@ -106,27 +119,38 @@ def alignRateForMI(
 
         for ii in rwd_idx:
             i0 = max(0, ii - half_size)
-            i1 = min(len(lam_tr), ii + half_size + 1)
+            i1 = min(lam_tr.shape[0], ii + half_size + 1)
 
             rel = np.arange(i0, i1) - ii
-            bin_idx = np.round(
-                nbin // 2 + rel * time_bin / bin_w
-            ).astype(int)
+            bin_idx = np.round((nbin // 2) + rel * time_bin / bin_w).astype(int)
 
             valid = (bin_idx >= 0) & (bin_idx < nbin)
-            bin_idx = bin_idx[valid]
+            if not np.any(valid):
+                continue
 
-            np.add.at(tuning, bin_idx, lam_tr[i0:i1][valid])
-            np.add.at(sc_based_tuning, bin_idx, y_tr[i0:i1][valid])
-            np.add.at(count_bins, bin_idx, 1)
+            bin_idx = bin_idx[valid]
+            lam_seg = lam_tr[i0:i1][valid]
+            y_seg = y_tr[i0:i1][valid]
+
+            # Accumulate sums per-bin
+            np.add.at(tuning, bin_idx, lam_seg)
+            np.add.at(sc_based_tuning, bin_idx, y_seg)
+
+            # IMPORTANT: increment by number of samples in bin (matches original)
+            # We can do this efficiently by counting occurrences:
+            uniq_bins, uniq_counts = np.unique(bin_idx, return_counts=True)
+            count_bins[uniq_bins] += uniq_counts
 
     with np.errstate(divide='ignore', invalid='ignore'):
-        tuning /= count_bins
-        sc_based_tuning /= count_bins
+        tuning = tuning / count_bins
+        sc_based_tuning = sc_based_tuning / count_bins
 
-    entropy_s = sts.poisson.entropy(tuning)
+    # Entropy per-bin; keep NaNs where tuning is NaN
+    entropy_s = np.full_like(tuning, np.nan, dtype=float)
+    finite = np.isfinite(tuning)
+    entropy_s[finite] = sts.poisson.entropy(tuning[finite])
 
-    if var.startswith('neu') or var == 'spike_hist':
+    if (var.startswith('neu')) or (var == 'spike_hist'):
         sel = temp_bins > 0
         temp_bins = temp_bins[sel]
         tuning = tuning[sel]
@@ -137,11 +161,14 @@ def alignRateForMI(
     prob_s = count_bins / np.sum(count_bins)
     mean_lam = np.sum(prob_s * tuning)
 
-    mi = (
-        (sts.poisson.entropy(mean_lam) - np.sum(prob_s * entropy_s))
-        * np.log2(np.exp(1))
-        / time_bin
-    )
+    try:
+        mi = (
+            (sts.poisson.entropy(mean_lam) - np.nansum(prob_s * entropy_s))
+            * np.log2(np.exp(1))
+            / time_bin
+        )
+    except Exception:
+        mi = np.nan
 
     tv = empty_container()
     tv.x = temp_bins
@@ -184,19 +211,19 @@ class GAM_result(object):
         for var in sm_handler.smooths_var:
             self.domain_fun[var] = sm_handler[var].domain_fun
 
+        # Basis cache for repeated basis evaluations (kept conservative in eval_basis)
         self._basis_cache = {}
 
         if not beta_hist is None:
             self.beta_hist = beta_hist
 
-        # self.gam_fit = fit_OLS # has all the data inside !! no good
         self.beta = beta
 
         # get the translation constant used for identifiability constraints
         self.transl_tuning = {}
         for var in var_list:
             mdl_matrix = sm_handler[var].X
-            if mdl_matrix.shape[1] != 1:  # if a column as been removed
+            if mdl_matrix.shape[1] != 1:  # if a column has been removed
                 beta_var = np.hstack((self.beta[index_var[var]], [0]))
             else:
                 beta_var = self.beta[index_var[var]]
@@ -208,31 +235,32 @@ class GAM_result(object):
 
         self.family = family
         self.index_dict = index_var
-        # extract the info regarding the spline basis (useful to reconstruct the smooths)
+
+        # extract the info regarding the spline basis
         self.get_smooths_info(sm_handler)
 
         X = model.wexog[:n_obs, :]
-        Q, R = np.linalg.qr(X, "reduced")
+        Q, R = np.linalg.qr(X, 'reduced')
 
         rho0 = np.log(self.smooth_pen)
         self.gcv, alpha, delta, H_S_inv = gcv_comp(
-            rho0, X, Q, R, model.wendog, sm_handler, var_list, return_par="all"
+            rho0, X, Q, R, model.wendog, sm_handler, var_list, return_par='all'
         )
-        #
+
         # get F matrix for computing the dof
         F = np.dot(H_S_inv, np.dot(X.T, X))
-        self.edf1 = 2 * np.trace(F) - np.sum(F * F)
-
+        FF = np.dot(F, F)  # REQUIRED for p-value computation and original edf
+        self.edf1 = 2 * np.trace(F) - np.trace(FF)
 
         # compute cov_beta
         B = sm_handler.get_penalty_agumented(var_list)
         B = np.array(B, dtype=np.float64)
         U, s, V_T = linalg.svd(np.vstack((R, B[:, :])))
 
-        # remove low val singolar values
+        # remove low singular values
         i_rem = np.where(s < 10 ** (-8) * s.max())[0]
 
-        # remove cols
+        # remove cols/rows accordingly
         s = np.delete(s, i_rem, 0)
         U = np.delete(U, i_rem, 1)
         V_T = np.delete(V_T, i_rem, 0)
@@ -250,19 +278,19 @@ class GAM_result(object):
         self.covariate_significance = np.zeros(
             len(index_var.keys()),
             dtype={
-                "names": (
-                    "covariate",
-                    "Tc",
-                    "p-val",
-                    "nu",
-                    "nu1",
-                    "nu2",
-                    "df_nu",
-                    "df_nu1",
-                    "df_nu2",
+                'names': (
+                    'covariate',
+                    'Tc',
+                    'p-val',
+                    'nu',
+                    'nu1',
+                    'nu2',
+                    'df_nu',
+                    'df_nu1',
+                    'df_nu2',
                 ),
-                "formats": (
-                    "U80",
+                'formats': (
+                    'U80',
                     float,
                     float,
                     float,
@@ -275,24 +303,19 @@ class GAM_result(object):
             },
         )
         cc = 0
-
         for var_name in index_var.keys():
             p_val, T_c, nu, nu1, nu2, df = self.compute_p_values_covariate(
                 var_name, np.diag(F), np.diag(FF), sm_handler
             )
-            self.covariate_significance["covariate"][cc] = var_name
-            self.covariate_significance["Tc"][cc] = T_c
-            self.covariate_significance["p-val"][cc] = p_val
-            self.covariate_significance["nu"][cc] = nu
-            self.covariate_significance["nu1"][cc] = nu1
-            self.covariate_significance["nu2"][cc] = nu2
-            self.covariate_significance["df_nu"][cc] = df
-            self.covariate_significance["df_nu1"][
-                cc
-            ] = 1  # fixed to 1 (see formula for p-vals
-            self.covariate_significance["df_nu2"][
-                cc
-            ] = 1  # fixed to 1 (see formula for p-vals
+            self.covariate_significance['covariate'][cc] = var_name
+            self.covariate_significance['Tc'][cc] = T_c
+            self.covariate_significance['p-val'][cc] = p_val
+            self.covariate_significance['nu'][cc] = nu
+            self.covariate_significance['nu1'][cc] = nu1
+            self.covariate_significance['nu2'][cc] = nu2
+            self.covariate_significance['df_nu'][cc] = df
+            self.covariate_significance['df_nu1'][cc] = 1
+            self.covariate_significance['df_nu2'][cc] = 1
             cc += 1
 
         # compute pseudo-R^2
@@ -315,8 +338,8 @@ class GAM_result(object):
         t = np.linspace(-2 * filtwidth, 2 * filtwidth, 4 * filtwidth + 1)
         h = np.exp(-(t**2) / (2 * filtwidth**2))
         h = h / sum(h)
-        smooth_y = np.convolve(y, h, mode="same")
-        mu_smooth = np.convolve(mu, h, mode="same")
+        smooth_y = np.convolve(y, h, mode='same')
+        mu_smooth = np.convolve(mu, h, mode='same')
         self.sse = sum((smooth_y - mu_smooth) ** 2)
         self.sst = sum((smooth_y - np.mean(smooth_y)) ** 2)
         self.var_expl = 1 - (self.sse / self.sst)
@@ -329,28 +352,24 @@ class GAM_result(object):
 
         if compute_mutual_info:
             self.tuning_Hz = empty_container()
-            # compute mutual info
-            # compute the mu in log space
             self.mutual_info = {}
+
             mu = np.dot(model.exog[:n_obs, :], self.beta)
             sigma2 = np.einsum(
-                "ij,jk,ik->i",
+                'ij,jk,ik->i',
                 model.exog[:n_obs, :],
                 self.cov_beta,
                 model.exog[:n_obs, :],
                 optimize=True,
             )
 
-            # convert to rate space
             lam_s = np.exp(mu + sigma2 * 0.5)
             sigm2_s = (np.exp(sigma2) - 1) * np.exp(2 * mu + sigma2)
-            lam_s = lam_s
-            sigm2_s = sigm2_s
 
             for var in self.var_list:
                 if (
-                    self.smooth_info[var]["is_temporal_kernel"]
-                    and self.smooth_info[var]["is_event_input"]
+                    self.smooth_info[var]['is_temporal_kernel']
+                    and self.smooth_info[var]['is_event_input']
                 ):
                     mi, tv = alignRateForMI(
                         y,
@@ -363,13 +382,12 @@ class GAM_result(object):
                         self.trial_idx,
                     )
                 else:
-                    # this gives error for 2d variable
                     vels = np.squeeze(sm_handler[var]._x)[filter_trials]
                     if len(vels.shape) > 1:
-                        print("Mutual info not implemented for multidim variable")
+                        print('Mutual info not implemented for multidim variable')
                         continue
-                    if not self.smooth_info[var]["is_temporal_kernel"]:
-                        knots = self.smooth_info[var]["knots"][0]
+                    if not self.smooth_info[var]['is_temporal_kernel']:
+                        knots = self.smooth_info[var]['knots'][0]
                         vel_bins = np.linspace(knots[0], knots[-2], 16)
                     else:
                         lb = np.nanpercentile(vels, 2)
@@ -385,16 +403,12 @@ class GAM_result(object):
                     x_axis = 0.5 * (vel_bins[:-1] + vel_bins[1:])
 
                     cc = 0
-
                     for v0 in vel_bins[:-1]:
                         idx = (vels >= v0) * (vels < v0 + dv)
-                        non_nan = ~np.isnan(vels)
                         tuning[cc] = np.nanmean(lam_s[idx])
                         var_tuning[cc] = np.nanpercentile(sigm2_s[idx], 90)
-
                         sc_based_tuning[cc] = y[idx].mean()
                         tot_s_vec[cc] = np.sum(idx)
-                        # print(var, tuning)
                         try:
                             if tuning[cc] > 10**4:
                                 break
@@ -405,7 +419,6 @@ class GAM_result(object):
 
                     prob_s = tot_s_vec / tot_s_vec.sum()
                     mean_lam = np.sum(prob_s * tuning)
-                    # set attributes for plotting rate
                     tv = empty_container()
                     tv.x = x_axis
                     tv.y_raw = sc_based_tuning / self.time_bin
@@ -417,12 +430,12 @@ class GAM_result(object):
                             * np.log2(np.exp(1))
                             / self.time_bin
                         )
-                    except:
+                    except Exception:
                         mi = np.nan
 
                 if any(tv.y_model > 10**4):
                     self.mutual_info[var] = np.nan
-                    print("\n\nDISCARD NEURON \n\n")
+                    print('\n\nDISCARD NEURON \n\n')
                 else:
                     self.mutual_info[var] = mi
                     setattr(self.tuning_Hz, var, tv)
@@ -446,72 +459,106 @@ class GAM_result(object):
             self.smooth_info[var_name]["is_event_input"] = smooth.is_event_input
             self.smooth_info[var_name]["colMean_X"] = smooth.colMean_X
 
-def eval_basis(
-    self,
-    X,
-    var_name,
-    sparseX=True,
-    trial_idx=-1,
-    pre_trial_dur=None,
-    post_trial_dur=None,
-    domain_fun=lambda x: np.ones(x, dtype=bool),
-):
-    key = (id(X), var_name, trial_idx, pre_trial_dur, post_trial_dur)
-    if key in self._basis_cache:
-        return self._basis_cache[key]
 
-    is_temporal = self.smooth_info[var_name]['is_temporal_kernel']
-    ord_spline = self.smooth_info[var_name]['ord']
-    is_cyclic = self.smooth_info[var_name]['is_cyclic']
-    knots = self.smooth_info[var_name]['knots']
-    basis_kernel = self.smooth_info[var_name]['basis_kernel']
+    def eval_basis(
+        self,
+        X,
+        var_name,
+        sparseX=True,
+        trial_idx=-1,
+        pre_trial_dur=None,
+        post_trial_dur=None,
+        domain_fun=lambda x: np.ones(x, dtype=bool),
+    ):
+        """
+        Correctly a method of GAM_result (your new version accidentally de-indented it).
 
-    try:
-        penalty_type = self.smooth_info[var_name]['penalty_type']
-        xmin = self.smooth_info[var_name]['xmin']
-        xmax = self.smooth_info[var_name]['xmax']
-        der = self.smooth_info[var_name]['der']
-    except KeyError:
-        penalty_type = 'EqSpaced'
-        xmin = xmax = der = None
+        Cache is conservative: only reuses when the same X object is passed again with same
+        key parameters. If trial_idx is an array, we key by its id (assuming trial_idx
+        content is stable for the life of the object).
+        """
+        # Build a safe-ish cache key
+        if isinstance(trial_idx, np.ndarray):
+            trial_key = id(trial_idx)
+        else:
+            trial_key = trial_idx
 
-    if not is_temporal:
-        fX = basisAndPenalty(
-            X,
-            knots,
-            is_cyclic=is_cyclic,
-            ord=ord_spline,
-            penalty_type=penalty_type,
-            xmin=xmin,
-            xmax=xmax,
-            der=der,
-            compute_pen=False,
-            domain_fun=self.domain_fun[var_name],
-        )[0]
-    else:
-        if sparse.issparse(basis_kernel):
-            basis_kernel = basis_kernel.toarray()
-
-        if np.isscalar(trial_idx) and trial_idx == -1:
-            trial_idx = self.trial_idx
-
-        if pre_trial_dur is None:
-            pre_trial_dur = self.pre_trial_dur
-        if post_trial_dur is None:
-            post_trial_dur = self.post_trial_dur
-
-        fX = basis_temporal(
-            X,
-            basis_kernel,
-            trial_idx,
+        key = (
+            id(X),
+            var_name,
+            bool(sparseX),
+            trial_key,
             pre_trial_dur,
             post_trial_dur,
-            self.time_bin,
-            sparseX=sparseX,
         )
 
-    self._basis_cache[key] = fX
-    return fX
+        if key in self._basis_cache:
+            return self._basis_cache[key]
+
+        is_temporal = self.smooth_info[var_name]['is_temporal_kernel']
+        ord_spline = self.smooth_info[var_name]['ord']
+        is_cyclic = self.smooth_info[var_name]['is_cyclic']
+        knots = self.smooth_info[var_name]['knots']
+        basis_kernel = self.smooth_info[var_name]['basis_kernel']
+
+        try:
+            penalty_type = self.smooth_info[var_name]['penalty_type']
+            xmin = self.smooth_info[var_name]['xmin']
+            xmax = self.smooth_info[var_name]['xmax']
+            der = self.smooth_info[var_name]['der']
+        except KeyError:
+            penalty_type = 'EqSpaced'
+            xmin = None
+            xmax = None
+            der = None
+
+        if not is_temporal:
+            fX = basisAndPenalty(
+                X,
+                knots,
+                is_cyclic=is_cyclic,
+                ord=ord_spline,
+                penalty_type=penalty_type,
+                xmin=xmin,
+                xmax=xmax,
+                der=der,
+                compute_pen=False,
+                domain_fun=self.domain_fun[var_name],
+            )[0]
+        else:
+            if sparse.issparse(basis_kernel):
+                basis_kernel = basis_kernel.toarray()
+
+            if trial_idx is None:
+                # follow original behavior: leave as-is, basis_temporal handles it if allowed
+                pass
+            elif np.isscalar(trial_idx):
+                if trial_idx == -1:
+                    trial_idx = self.trial_idx
+                else:
+                    raise ValueError('trial_idx can be an array of int, -1 or None')
+
+            if pre_trial_dur is None:
+                pre_trial_dur = self.pre_trial_dur
+            if post_trial_dur is None:
+                post_trial_dur = self.post_trial_dur
+
+            fX = basis_temporal(
+                X,
+                basis_kernel,
+                trial_idx,
+                pre_trial_dur,
+                post_trial_dur,
+                self.time_bin,
+                sparseX=sparseX,
+            )
+
+        # Simple cache size guard to avoid unbounded growth
+        if len(self._basis_cache) > 256:
+            self._basis_cache.clear()
+
+        self._basis_cache[key] = fX
+        return fX
 
 
     def compute_AIC(self, y, sm_handler, Vb, phi_est=1, family=None):
