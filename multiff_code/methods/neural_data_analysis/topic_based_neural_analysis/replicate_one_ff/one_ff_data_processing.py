@@ -1,5 +1,5 @@
 """
-nav_covariates.py
+one_ff_data_processing.py
 
 Navigation covariates for One-FF task.
 Faithful Python replication of AnalyseBehaviour.m outputs

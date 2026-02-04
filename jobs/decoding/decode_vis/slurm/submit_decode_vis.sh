@@ -65,7 +65,7 @@ if [ "$NUM_JOBS" -eq 0 ]; then
 fi
 
 ARRAY_MAX=$((NUM_JOBS - 1))
-MAX_CONCURRENT=3
+MAX_CONCURRENT=5
 
 echo "[SUBMIT] Monkey: $MONKEY_NAME"
 echo "[SUBMIT] Sessions: $NUM_JOBS"

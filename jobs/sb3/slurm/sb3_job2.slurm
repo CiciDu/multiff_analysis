@@ -25,16 +25,16 @@ RANDOM_SEED=12345
 # ---------------------
 declare -a V_NOISE_STDS=(0.0)
 declare -a W_NOISE_STDS=(0.0)
-declare -a PERC_R_LIST=(0.0 0.05 0.1 0.2)
-declare -a PERC_TH_LIST=(0.0 0.05 0.1 0.2)
-declare -a MEM_R_LIST=(0.0 0.05 0.1 0.2)
-declare -a MEM_TH_LIST=(0.0 0.05 0.1 0.2)
+declare -a PERC_R_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
+declare -a PERC_TH_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
+declare -a MEM_R_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
+declare -a MEM_TH_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
 
 N_ENVS=1
 
 declare -a LRS=(3e-4)
-declare -a NUM_OBS_FF_LIST=(4)
-declare -a MAX_IN_MEMORY_TIME_LIST=(2)
+declare -a NUM_OBS_FF_LIST=(5)
+declare -a MAX_IN_MEMORY_TIME_LIST=(3)
 declare -a IDENTITY_SLOT_STRATEGY_LIST=("drop_fill_visible_only")
 
 # Compute total combinations across all lists (dims with singletons don't expand the search)
