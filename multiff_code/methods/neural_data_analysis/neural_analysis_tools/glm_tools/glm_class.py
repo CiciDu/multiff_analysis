@@ -1,13 +1,14 @@
 
-import sys
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_feature_selection
+import math
 
-import os
-import sys
 import numpy as np
 import pandas as pd
-import math
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
+    plot_modeling_result
+)
+from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
+    pn_feature_selection
+)
 from sklearn.preprocessing import StandardScaler
 
 
@@ -44,7 +45,7 @@ class GLMclass():
             temporal_vars = self.temporal_vars
         self._categorize_features(temporal_vars)
         self._scale_features()
-        self._get_mock_events_df(num_total_trials)
+        self._get_mock_trials_df(num_total_trials)
 
     def _categorize_features(self, temporal_vars):
         # Keep only valid temporal variables that exist in y_var
@@ -72,7 +73,7 @@ class GLMclass():
         self.spatial_sub = pd.DataFrame(
             spatial_sub, columns=self.spatial_sub_unscaled.columns)
 
-    def _get_mock_events_df(self, num_total_trials=10):
+    def _get_mock_trials_df(self, num_total_trials=10):
         self.num_total_trials = num_total_trials
         num_data_points = self.y_var.shape[0]
         num_repeats = math.ceil(num_data_points/num_total_trials)

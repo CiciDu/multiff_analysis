@@ -1,17 +1,18 @@
-from PGAM.GAM_library import *
-import PGAM.gam_data_handlers as gdh
-import matplotlib.pylab as plt
-import pandas as pd
-from post_processing import postprocess_results
-from scipy.io import savemat
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import plot_modeling_result
-import numpy as np
 import math
-from sklearn.preprocessing import StandardScaler
-from pathlib import Path
-from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
-import sys
 import os
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import PGAM.gam_data_handlers as gdh
+from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
+    plot_modeling_result
+)
+from PGAM.GAM_library import *
+from post_processing import postprocess_results
+from sklearn.preprocessing import StandardScaler
 
 
 def find_project_root(marker="multiff_analysis"):
@@ -50,11 +51,11 @@ class PGAMclass():
     temporal_vars = ['capture_ff', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'turning_right', 'stop', 'whether_test',
                      'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
-    def __init__(self, x_var, y_var, bin_width, processed_neural_data_folder_path):
+    def __init__(self, x_var=None, y_var=None, bin_width=None, save_dir=None):
         self.x_var = x_var
         self.y_var = y_var
         self.bin_width = bin_width
-        self.processed_neural_data_folder_path = processed_neural_data_folder_path
+        self.save_dir = save_dir
 
     def _categorize_features(self, temporal_vars):
         self.temporal_vars = [
@@ -79,7 +80,7 @@ class PGAMclass():
             temporal_vars = self.temporal_vars
         self._categorize_features(temporal_vars)
         self._scale_features()
-        self._get_mock_events_df(num_total_trials)
+        self._get_mock_trials_df(num_total_trials)
         self.sm_handler = gdh.smooths_handler()
 
     def run_pgam(self, neural_cluster_number=5):
@@ -145,10 +146,10 @@ class PGAMclass():
     def load_pgam_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
 
-        self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.processed_neural_data_folder_path,
+        self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.save_dir,
                                                                                   self.cluster_name)
 
-    def save_results(self):
+    def save_results(self, save_dir=None):
         # after you compute self.res = postprocess_results(...):
         extra_meta = {
             "bin_width": float(self.bin_width),
@@ -157,7 +158,10 @@ class PGAMclass():
             "reduced_AIC": float(getattr(self.reduced, "AIC", np.nan)) if hasattr(self.reduced, "AIC") else np.nan,
             "full_AIC": float(getattr(self.full, "AIC", np.nan)) if hasattr(self.full, "AIC") else np.nan,
         }
-        pgam_utils.save_full_results_npz(self.processed_neural_data_folder_path,
+        
+        if save_dir is None:
+            save_dir = self.save_dir
+        pgam_utils.save_full_results_npz(save_dir,
                                          self.cluster_name,
                                          self.res,                       # the structured array
                                          getattr(self.reduced, "var_list", []),
@@ -170,7 +174,7 @@ class PGAMclass():
         self.spatial_sub = pd.DataFrame(
             spatial_sub, columns=self.spatial_sub_unscaled.columns)
 
-    def _get_mock_events_df(self, num_total_trials=10):
+    def _get_mock_trials_df(self, num_total_trials=10):
         self.num_total_trials = num_total_trials
         num_data_points = self.y_var.shape[0]
         num_repeats = math.ceil(num_data_points/num_total_trials)
