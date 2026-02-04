@@ -5,7 +5,7 @@
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=20G
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --exclude=mind-1-29
 
@@ -92,7 +92,7 @@ else
         exit 1
     fi
 
-    echo "[SLURM] Array job $SLURM_JOB_ID | Index $SLURM_ARRAY_TASK_ID"
+
     echo "[SLURM] Monkey: $MONKEY_NAME"
     echo "[SLURM] Processing: $RAW_DATA_FOLDER_PATH"
 fi

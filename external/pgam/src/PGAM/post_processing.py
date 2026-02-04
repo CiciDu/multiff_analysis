@@ -599,7 +599,6 @@ def temporal_prediction_and_kernel_str(fit, var):
     signed_kern_str = simps(fX, dx=fit.time_bin) / (fit.time_bin * fX.shape[0])
     return xx2, fX, fminus, fplus, kern_str, signed_kern_str
 
-
 def postprocess_results(
     neuron_id,
     counts,
@@ -613,109 +612,131 @@ def postprocess_results(
     info_save={},
     bins=30,
 ):
+    # -----------------------
+    # dtype construction
+    # -----------------------
     dtypes = {
-        "neuron_id": "U100",
-        "variable": "U100",
-        "fr": float,
-        "full_pseudo_r2_train": float,
-        "full_pseudo_r2_eval": float,
-        "reduced_pseudo_r2_train": float,
-        "reduced_pseudo_r2_eval": float,
-        "pval": float,
-        "reduced_pval": float,
-        "x_rate_Hz": object,
-        "y_rate_Hz_model": object,
-        "y_rate_Hz_raw": object,
-        "reduced_x_rate_Hz": object,
-        "reduced_y_rate_Hz_model": object,
-        "reduced_y_rate_Hz_raw": object,
-        "eval_x_rate_Hz": object,
-        "eval_y_rate_Hz_model": object,
-        "eval_y_rate_Hz_raw": object,
-        "eval_reduced_x_rate_Hz": object,
-        "eval_reduced_y_rate_Hz_model": object,
-        "eval_reduced_y_rate_Hz_raw": object,
-        "kernel_strength": float,
-        "signed_kernel_strength": float,
-        "reduced_kernel_strength": float,
-        "reduced_signed_kernel_strength": float,
-        "x_kernel": object,
-        "y_kernel": object,
-        "y_kernel_mCI": object,
-        "y_kernel_pCI": object,
-        "reduced_x_kernel": object,
-        "reduced_y_kernel": object,
-        "reduced_y_kernel_mCI": object,
-        "reduced_y_kernel_pCI": object,
-        "beta_full": object,
-        "beta_reduced": object,
-        "intercept_full": float,
-        "intercept_reduced": float,
-        "mutual_info": float,
-        "penalization": object,
+        'neuron_id': 'U100',
+        'variable': 'U100',
+        'fr': float,
+        'full_pseudo_r2_train': float,
+        'full_pseudo_r2_eval': float,
+        'reduced_pseudo_r2_train': float,
+        'reduced_pseudo_r2_eval': float,
+        'pval': float,
+        'reduced_pval': float,
+        'x_rate_Hz': object,
+        'y_rate_Hz_model': object,
+        'y_rate_Hz_raw': object,
+        'reduced_x_rate_Hz': object,
+        'reduced_y_rate_Hz_model': object,
+        'reduced_y_rate_Hz_raw': object,
+        'eval_x_rate_Hz': object,
+        'eval_y_rate_Hz_model': object,
+        'eval_y_rate_Hz_raw': object,
+        'eval_reduced_x_rate_Hz': object,
+        'eval_reduced_y_rate_Hz_model': object,
+        'eval_reduced_y_rate_Hz_raw': object,
+        'kernel_strength': float,
+        'signed_kernel_strength': float,
+        'reduced_kernel_strength': float,
+        'reduced_signed_kernel_strength': float,
+        'x_kernel': object,
+        'y_kernel': object,
+        'y_kernel_mCI': object,
+        'y_kernel_pCI': object,
+        'reduced_x_kernel': object,
+        'reduced_y_kernel': object,
+        'reduced_y_kernel_mCI': object,
+        'reduced_y_kernel_pCI': object,
+        'beta_full': object,
+        'beta_reduced': object,
+        'intercept_full': float,
+        'intercept_reduced': float,
+        'mutual_info': float,
+        'penalization': object,
     }
-    for name in info_save.keys():
-        # set object as a type for unknown info save
+
+    for name in info_save:
         dtypes[name] = object
 
-    dtype_dict = {"names": [], "formats": []}
-    for name in dtypes.keys():
-        dtype_dict["names"] += [name]
-        dtype_dict["formats"] += [dtypes[name]]
+    dtype_dict = {'names': list(dtypes.keys()), 'formats': list(dtypes.values())}
+    results = np.zeros(len(full_fit.var_list), dtype=dtype_dict)
 
-    results = np.zeros(len((full_fit.var_list)), dtype=dtype_dict)
-    for name in info_save.keys():
+    for name in info_save:
         results[name] = info_save[name]
 
-    results["neuron_id"] = neuron_id
-    results["fr"] = counts.mean() / full_fit.time_bin
+    results['neuron_id'] = neuron_id
+    results['fr'] = counts.mean() / full_fit.time_bin
 
-    cs_table = full_fit.covariate_significance
-    if not reduced_fit is None:
-        cs_table_red = reduced_fit.covariate_significance
-    else:
-        cs_table_red = None
-
-    exog_full = None
-    exog_reduced = None
+    # -----------------------
+    # zscore defaults
+    # -----------------------
     if var_zscore_par is None:
-        var_zscore_par = {}
-        for var in full_fit.var_list:
-            var_zscore_par[var] = {"loc": 0, "scale": 1}
+        var_zscore_par = {v: {'loc': 0, 'scale': 1} for v in full_fit.var_list}
 
-    for cc in range(len(full_fit.var_list)):
-        var = full_fit.var_list[cc]
-        print('processing: ', var)
-        cs_var = cs_table[cs_table["covariate"] == var]
-        if not reduced_fit is None:
-            if var in reduced_fit.var_list:
-                cs_var_red = cs_table_red[cs_table_red["covariate"] == var]
+    # -----------------------
+    # precompute expensive model-level quantities
+    # -----------------------
+    results['full_pseudo_r2_train'][:] = full_fit.pseudo_r2
+    full_pseudo_r2_eval, exog_full = pseudo_r2_comp(
+        counts, full_fit, sm_handler, family, use_tp=~train_bool
+    )
+    results['full_pseudo_r2_eval'][:] = full_pseudo_r2_eval
 
-        results["variable"][cc] = var
-        results["penalization"][cc] = sm_handler[var].lam
-        # results['trial_type'][cc] = trial_type
-        results["full_pseudo_r2_train"][cc] = full_fit.pseudo_r2
-        results["full_pseudo_r2_eval"][cc], exog_full = pseudo_r2_comp(
-            counts, full_fit, sm_handler, family, use_tp=~(train_bool), exog=exog_full
+    if reduced_fit is not None:
+        results['reduced_pseudo_r2_train'][:] = reduced_fit.pseudo_r2
+        reduced_pseudo_r2_eval, exog_reduced = pseudo_r2_comp(
+            counts, reduced_fit, sm_handler, family, use_tp=~train_bool
         )
-        if not reduced_fit is None:
-            results["reduced_pseudo_r2_train"][cc] = reduced_fit.pseudo_r2
-            results["reduced_pseudo_r2_eval"][cc], exog_reduced = pseudo_r2_comp(
-                counts,
-                reduced_fit,
-                sm_handler,
-                family,
-                use_tp=~(train_bool),
-                exog=exog_reduced,
-            )
-        results["pval"][cc] = cs_var["p-val"]
-        if not reduced_fit is None:
-            if var in reduced_fit.var_list:
-                results["reduced_pval"][cc] = cs_var_red["p-val"]
-            else:
-                results["reduced_pval"][cc] = np.nan
+        results['reduced_pseudo_r2_eval'][:] = reduced_pseudo_r2_eval
+    else:
+        exog_reduced = None
+
+    # -----------------------
+    # pre-index significance tables
+    # -----------------------
+
+    cs_full = {
+        row['covariate']: row
+        for row in full_fit.covariate_significance
+    }
+
+    cs_red = (
+        {
+            row['covariate']: row
+            for row in reduced_fit.covariate_significance
+        }
+        if reduced_fit is not None
+        else None
+    )
+
+
+    # -----------------------
+    # MI cache
+    # -----------------------
+    mi_cache = {}
+
+    # -----------------------
+    # main loop (now thin)
+    # -----------------------
+    for cc, var in enumerate(full_fit.var_list):
+        results['variable'][cc] = var
+        results['penalization'][cc] = sm_handler[var].lam
+
+        results['pval'][cc] = cs_full[var]['p-val']
+
+        if reduced_fit is not None and var in cs_red:
+            results['reduced_pval'][cc] = cs_red[var]['p-val']
+        else:
+            results['reduced_pval'][cc] = np.nan
+
+
+        # -------- FULL MI (train) --------
         try:
-            mi_full, tun_full = mutual_info_est(
+            mi, tun = _get_mutual_info(
+                mi_cache,
+                ('full', var, True),
                 counts,
                 exog_full,
                 full_fit,
@@ -723,35 +744,24 @@ def postprocess_results(
                 sm_handler,
                 train_bool,
                 trial_idx,
-                dt=full_fit.time_bin,
-                bins=bins,
+                full_fit.time_bin,
+                bins,
             )
+        except Exception:
+            mi = np.nan
+            tun = empty_container()
+            tun.x = tun.y_raw = tun.y_model = np.nan
 
-        except SystemError:
-            mi_full = np.nan
-            tun_full = empty_container()
-            tun_full.x = np.nan
-            tun_full.y_raw = np.nan
-            tun_full.y_model = np.nan
+        results['mutual_info'][cc] = mi
+        results['x_rate_Hz'][cc] = _scale_x(tun.x, var, var_zscore_par)
+        results['y_rate_Hz_model'][cc] = tun.y_model
+        results['y_rate_Hz_raw'][cc] = tun.y_raw
 
-        results["mutual_info"][cc] = mi_full
-        if ~np.isnan(var_zscore_par[var]["loc"]):
-            xx_scaled = []
-            for kk in range(len(tun_full.x)):
-                xx = (
-                    tun_full.x[kk] * var_zscore_par[var]["scale"]
-                    + var_zscore_par[var]["loc"]
-                )
-                xx_scaled.append(xx)
-        else:
-            xx_scaled = tun_full.x
-
-        results["x_rate_Hz"][cc] = xx_scaled
-        results["y_rate_Hz_model"][cc] = tun_full.y_model
-        results["y_rate_Hz_raw"][cc] = tun_full.y_raw
-
+        # -------- FULL MI (eval) --------
         try:
-            mi_full, tun_full = mutual_info_est(
+            mi, tun = _get_mutual_info(
+                mi_cache,
+                ('full', var, False),
                 counts,
                 exog_full,
                 full_fit,
@@ -759,57 +769,48 @@ def postprocess_results(
                 sm_handler,
                 ~train_bool,
                 trial_idx,
-                dt=full_fit.time_bin,
-                bins=bins,
+                full_fit.time_bin,
+                bins,
             )
-        except:
-            mi_full = np.nan
-            tun_full = empty_container()
-            tun_full.x = np.nan
-            tun_full.y_raw = np.nan
-            tun_full.y_model = np.nan
+        except Exception:
+            tun = empty_container()
+            tun.x = tun.y_raw = tun.y_model = np.nan
 
-        if ~np.isnan(var_zscore_par[var]["loc"]):
-            xx_scaled = []
-            for kk in range(len(tun_full.x)):
-                xx = (
-                    tun_full.x[kk] * var_zscore_par[var]["scale"]
-                    + var_zscore_par[var]["loc"]
-                )
-                xx_scaled.append(xx)
-        else:
-            xx_scaled = tun_full.x
+        results['eval_x_rate_Hz'][cc] = _scale_x(tun.x, var, var_zscore_par)
+        results['eval_y_rate_Hz_model'][cc] = tun.y_model
+        results['eval_y_rate_Hz_raw'][cc] = tun.y_raw
 
-        results["eval_x_rate_Hz"][cc] = xx_scaled
-        results["eval_y_rate_Hz_model"][cc] = tun_full.y_model
-        results["eval_y_rate_Hz_raw"][cc] = tun_full.y_raw
-
-        # compute kernel strength
+        # -------- kernels --------
         (
-            results["x_kernel"][cc],
-            results["y_kernel"][cc],
-            results["y_kernel_mCI"][cc],
-            results["y_kernel_pCI"][cc],
-            results["kernel_strength"][cc],
-            results["signed_kernel_strength"][cc],
+            results['x_kernel'][cc],
+            results['y_kernel'][cc],
+            results['y_kernel_mCI'][cc],
+            results['y_kernel_pCI'][cc],
+            results['kernel_strength'][cc],
+            results['signed_kernel_strength'][cc],
         ) = prediction_and_kernel_str(full_fit, var, var_zscore_par)
 
         (
-            results["reduced_x_kernel"][cc],
-            results["reduced_y_kernel"][cc],
-            results["reduced_y_kernel_mCI"][cc],
-            results["reduced_y_kernel_pCI"][cc],
-            _,
-            _,
+            results['reduced_x_kernel'][cc],
+            results['reduced_y_kernel'][cc],
+            results['reduced_y_kernel_mCI'][cc],
+            results['reduced_y_kernel_pCI'][cc],
+            results['reduced_kernel_strength'][cc],
+            results['reduced_signed_kernel_strength'][cc],
         ) = prediction_and_kernel_str(reduced_fit, var, var_zscore_par)
 
-        results["beta_full"][cc] = full_fit.beta[full_fit.index_dict[var]]
-        results["intercept_full"][cc] = full_fit.beta[0]
+        results['beta_full'][cc] = full_fit.beta[full_fit.index_dict[var]]
+        results['intercept_full'][cc] = full_fit.beta[0]
 
-        if not (reduced_fit is None):
-            results["intercept_reduced"][cc] = reduced_fit.beta[0]
+        if reduced_fit is not None:
+            results['intercept_reduced'][cc] = reduced_fit.beta[0]
+
+        # -------- REDUCED MI (only if var exists) --------
+        if reduced_fit is not None and var in reduced_fit.var_list:
             try:
-                mi_red, tun_red = mutual_info_est(
+                mi, tun = _get_mutual_info(
+                    mi_cache,
+                    ('reduced', var, True),
                     counts,
                     exog_reduced,
                     reduced_fit,
@@ -817,34 +818,21 @@ def postprocess_results(
                     sm_handler,
                     train_bool,
                     trial_idx,
-                    dt=full_fit.time_bin,
-                    bins=bins,
+                    full_fit.time_bin,
+                    bins,
                 )
-                if ~np.isnan(var_zscore_par[var]["loc"]):
-                    xx_scaled = []
-                    for kk in range(len(tun_red.x)):
-                        xx = (
-                            tun_red.x[kk] * var_zscore_par[var]["scale"]
-                            + var_zscore_par[var]["loc"]
-                        )
-                        xx_scaled.append(xx)
+            except Exception:
+                tun = empty_container()
+                tun.x = tun.y_raw = tun.y_model = np.nan
 
-                else:
-                    xx_scaled = tun_red.x
-            except:
-                mi_red = np.nan
-                tun_red = empty_container()
-                tun_red.x = np.nan
-                tun_red.y_raw = np.nan
-                tun_red.y_model = np.nan
-                xx_scaled = np.nan
-
-            results["reduced_x_rate_Hz"][cc] = xx_scaled
-            results["reduced_y_rate_Hz_model"][cc] = tun_red.y_model
-            results["reduced_y_rate_Hz_raw"][cc] = tun_red.y_raw
+            results['reduced_x_rate_Hz'][cc] = _scale_x(tun.x, var, var_zscore_par)
+            results['reduced_y_rate_Hz_model'][cc] = tun.y_model
+            results['reduced_y_rate_Hz_raw'][cc] = tun.y_raw
 
             try:
-                mi_red, tun_red = mutual_info_est(
+                mi, tun = _get_mutual_info(
+                    mi_cache,
+                    ('reduced', var, False),
                     counts,
                     exog_reduced,
                     reduced_fit,
@@ -852,30 +840,16 @@ def postprocess_results(
                     sm_handler,
                     ~train_bool,
                     trial_idx,
-                    dt=full_fit.time_bin,
-                    bins=bins,
+                    full_fit.time_bin,
+                    bins,
                 )
+            except Exception:
+                tun = empty_container()
+                tun.x = tun.y_raw = tun.y_model = np.nan
 
-                if ~np.isnan(var_zscore_par[var]["loc"]):
-                    xx_scaled = []
-                    for kk in range(len(tun_red.x)):
-                        xx = (
-                            tun_red.x[kk] * var_zscore_par[var]["scale"]
-                            + var_zscore_par[var]["loc"]
-                        )
-                        xx_scaled.append(xx)
-                else:
-                    xx_scaled = tun_red.x
-            except:
-                tun_red = empty_container()
-                tun_red.x = np.nan
-                tun_red.y_raw = np.nan
-                tun_red.y_model = np.nan
-                xx_scaled = np.nan
-
-            results["eval_reduced_x_rate_Hz"][cc] = xx_scaled
-            results["eval_reduced_y_rate_Hz_model"][cc] = tun_red.y_model
-            results["eval_reduced_y_rate_Hz_raw"][cc] = tun_red.y_raw
+            results['eval_reduced_x_rate_Hz'][cc] = _scale_x(tun.x, var, var_zscore_par)
+            results['eval_reduced_y_rate_Hz_model'][cc] = tun.y_model
+            results['eval_reduced_y_rate_Hz_raw'][cc] = tun.y_raw
 
     return results
 
@@ -982,3 +956,56 @@ def compute_tuning_temporal_fast(
     rate_DT = rate_DT / tp_DT
     counts_DT = counts_DT / tp_DT
     return edges, rate_DT / dt, counts_DT / dt, tp_DT
+
+def _scale_x(x, var, var_zscore_par):
+    pars = var_zscore_par[var]
+
+    # pass through NaNs
+    if x is None or (isinstance(x, float) and np.isnan(x)):
+        return x
+
+    # nothing to do
+    if np.isnan(pars['loc']):
+        return x
+
+    scale = pars['scale']
+    loc = pars['loc']
+
+    # ensure numeric array
+    x_arr = np.asarray(x)
+
+    x_scaled = x_arr * scale + loc
+
+    # preserve original container type
+    if isinstance(x, list):
+        return x_scaled.tolist()
+    else:
+        return x_scaled
+
+
+def _get_mutual_info(
+    mi_cache,
+    cache_key,
+    counts,
+    exog,
+    fit,
+    var,
+    sm_handler,
+    split_bool,
+    trial_idx,
+    dt,
+    bins,
+):
+    if cache_key not in mi_cache:
+        mi_cache[cache_key] = mutual_info_est(
+            counts,
+            exog,
+            fit,
+            var,
+            sm_handler,
+            split_bool,
+            trial_idx,
+            dt=dt,
+            bins=bins,
+        )
+    return mi_cache[cache_key]

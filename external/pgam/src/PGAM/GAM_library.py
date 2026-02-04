@@ -70,89 +70,85 @@ def wSumChisq_cdf(x, df, w):
     numpy2ri.deactivate()
     return np.clip(pval, 0, 1)
 
-
 def alignRateForMI(
     y, lam_s, var, sm_handler, smooth_info, time_bin, filter_trials, trial_idx
 ):
-    """
-    Slow aligment method.
-    """
     reward = np.squeeze(sm_handler[var]._x)[filter_trials]
-    # temp kernel where 161 timepoints long
-    size_kern = smooth_info[var]["time_pt_for_kernel"].shape[0]
+    lam_s = lam_s[filter_trials]
+    y = y[filter_trials]
+    trial_idx = trial_idx[filter_trials]
+
+    size_kern = smooth_info[var]['time_pt_for_kernel'].shape[0]
     if size_kern % 2 == 0:
         size_kern += 1
     half_size = (size_kern - 1) // 2
+
     timept = np.arange(-half_size, half_size + 1) * time_bin
-    if (var.startswith("neu")) or var == "spike_hist":
-        nbin = timept.shape[0]
-        if nbin % 2 == 0:
-            nbin += 1
-    else:
-        nbin = 15
+    nbin = timept.size if (var.startswith('neu') or var == 'spike_hist') else 15
+    if nbin % 2 == 0:
+        nbin += 1
+
     temp_bins = np.linspace(timept[0], timept[-1], nbin)
-    # sum spikes
-    tuning = np.zeros(temp_bins.shape[0])
-    count_bins = np.zeros(temp_bins.shape[0])
-    sc_based_tuning = np.zeros(temp_bins.shape[0])
+    bin_w = temp_bins[1] - temp_bins[0]
+
+    tuning = np.zeros(nbin)
+    count_bins = np.zeros(nbin)
+    sc_based_tuning = np.zeros(nbin)
+
     for tr in np.unique(trial_idx):
-        select = trial_idx == tr
-        rwd_tr = reward[select]
-        lam_s_tr = lam_s[select]
-        y_tr = y[select]
-        for ii in np.where(rwd_tr == 1)[0]:
+        sel = trial_idx == tr
+        rwd_idx = np.flatnonzero(reward[sel] == 1)
+        if rwd_idx.size == 0:
+            continue
+
+        lam_tr = lam_s[sel]
+        y_tr = y[sel]
+
+        for ii in rwd_idx:
             i0 = max(0, ii - half_size)
-            i1 = min(len(rwd_tr), ii + half_size + 1)
-            d0 = ii - i0
-            d1 = i1 - ii
-            tmpmu = lam_s_tr[i0:i1]
-            tmpy = y_tr[i0:i1]
-            iidx = np.array(
-                np.round(
-                    nbin // 2
-                    + (-d0 + np.arange(0, d1 + d0))
-                    * time_bin
-                    / (temp_bins[1] - temp_bins[0])
-                ),
-                dtype=int,
-            )
-            for cc in np.unique(iidx):
-                tuning[cc] = tuning[cc] + tmpmu[iidx == cc].sum()
-                count_bins[cc] = count_bins[cc] + (iidx == cc).sum()
-                sc_based_tuning[cc] = sc_based_tuning[cc] + tmpy[iidx == cc].sum()
+            i1 = min(len(lam_tr), ii + half_size + 1)
 
-    tuning = tuning / count_bins
-    sc_based_tuning = sc_based_tuning / count_bins
+            rel = np.arange(i0, i1) - ii
+            bin_idx = np.round(
+                nbin // 2 + rel * time_bin / bin_w
+            ).astype(int)
 
-    entropy_s = np.zeros(temp_bins.shape[0]) * np.nan
-    for cc in range(tuning.shape[0]):
-        entropy_s[cc] = sts.poisson.entropy(tuning[cc])
+            valid = (bin_idx >= 0) & (bin_idx < nbin)
+            bin_idx = bin_idx[valid]
 
-    if (var.startswith("neu")) or var == "spike_hist":
+            np.add.at(tuning, bin_idx, lam_tr[i0:i1][valid])
+            np.add.at(sc_based_tuning, bin_idx, y_tr[i0:i1][valid])
+            np.add.at(count_bins, bin_idx, 1)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        tuning /= count_bins
+        sc_based_tuning /= count_bins
+
+    entropy_s = sts.poisson.entropy(tuning)
+
+    if var.startswith('neu') or var == 'spike_hist':
         sel = temp_bins > 0
         temp_bins = temp_bins[sel]
-        count_bins = count_bins[sel]
         tuning = tuning[sel]
         sc_based_tuning = sc_based_tuning[sel]
         entropy_s = entropy_s[sel]
-    prob_s = count_bins / count_bins.sum()
+        count_bins = count_bins[sel]
+
+    prob_s = count_bins / np.sum(count_bins)
     mean_lam = np.sum(prob_s * tuning)
 
-    try:
-        mi = (
-            (sts.poisson.entropy(mean_lam) - (prob_s * entropy_s).sum())
-            * np.log2(np.exp(1))
-            / time_bin
-        )
-    except:
-        mi = np.nan
+    mi = (
+        (sts.poisson.entropy(mean_lam) - np.sum(prob_s * entropy_s))
+        * np.log2(np.exp(1))
+        / time_bin
+    )
 
-    tmp_val = empty_container()
-    tmp_val.x = temp_bins
-    tmp_val.y_raw = sc_based_tuning / time_bin
-    tmp_val.y_model = tuning / time_bin
+    tv = empty_container()
+    tv.x = temp_bins
+    tv.y_raw = sc_based_tuning / time_bin
+    tv.y_model = tuning / time_bin
 
-    return mi, tmp_val
+    return mi, tv
 
 
 class GAM_result(object):
@@ -187,6 +183,8 @@ class GAM_result(object):
         self.domain_fun = {}
         for var in sm_handler.smooths_var:
             self.domain_fun[var] = sm_handler[var].domain_fun
+
+        self._basis_cache = {}
 
         if not beta_hist is None:
             self.beta_hist = beta_hist
@@ -223,9 +221,8 @@ class GAM_result(object):
         #
         # get F matrix for computing the dof
         F = np.dot(H_S_inv, np.dot(X.T, X))
-        FF = np.dot(F, F)
+        self.edf1 = 2 * np.trace(F) - np.sum(F * F)
 
-        self.edf1 = 2 * np.trace(F) - np.trace(FF)
 
         # compute cov_beta
         B = sm_handler.get_penalty_agumented(var_list)
@@ -449,88 +446,73 @@ class GAM_result(object):
             self.smooth_info[var_name]["is_event_input"] = smooth.is_event_input
             self.smooth_info[var_name]["colMean_X"] = smooth.colMean_X
 
-    def eval_basis(
-        self,
-        X,
-        var_name,
-        sparseX=True,
-        trial_idx=-1,
-        pre_trial_dur=None,
-        post_trial_dur=None,
-        domain_fun=lambda x: np.ones(x, dtype=bool),
-    ):
-        """
-        Description: for temporal kernel, if None is passed, then use the ild version
-        that convolves over all x vector (if no trial structure is passed)
-        :param X:
-        :param var_name:
-        :param sparseX:
-        :param trial_idx:
-        :param pre_trial_dur:
-        :param post_trial_dur:
-        :return:
-        """
-        is_temporal = self.smooth_info[var_name]["is_temporal_kernel"]
-        ord_spline = self.smooth_info[var_name]["ord"]
-        is_cyclic = self.smooth_info[var_name]["is_cyclic"]
-        knots = self.smooth_info[var_name]["knots"]
-        basis_kernel = self.smooth_info[var_name]["basis_kernel"]
-        try:
-            penalty_type = self.smooth_info[var_name]["penalty_type"]
-            xmin = self.smooth_info[var_name]["xmin"]
-            xmax = self.smooth_info[var_name]["xmax"]
-            der = self.smooth_info[var_name]["der"]
-        except KeyError:  # old fits do ont have the key
-            penalty_type = "EqSpaced"
-            xmin = None
-            xmax = None
-            der = None
+def eval_basis(
+    self,
+    X,
+    var_name,
+    sparseX=True,
+    trial_idx=-1,
+    pre_trial_dur=None,
+    post_trial_dur=None,
+    domain_fun=lambda x: np.ones(x, dtype=bool),
+):
+    key = (id(X), var_name, trial_idx, pre_trial_dur, post_trial_dur)
+    if key in self._basis_cache:
+        return self._basis_cache[key]
 
-        if not is_temporal:
-            fX = basisAndPenalty(
-                X,
-                knots,
-                is_cyclic=is_cyclic,
-                ord=ord_spline,
-                penalty_type=penalty_type,
-                xmin=xmin,
-                xmax=xmax,
-                der=der,
-                compute_pen=False,
-                domain_fun=self.domain_fun[var_name],
-            )[0]
-        else:
-            if (
-                type(basis_kernel) is sparse.csr.csr_matrix
-                or type(basis_kernel) is sparse.csr.csr_matrix
-            ):
-                basis_kernel = basis_kernel.toarray()
+    is_temporal = self.smooth_info[var_name]['is_temporal_kernel']
+    ord_spline = self.smooth_info[var_name]['ord']
+    is_cyclic = self.smooth_info[var_name]['is_cyclic']
+    knots = self.smooth_info[var_name]['knots']
+    basis_kernel = self.smooth_info[var_name]['basis_kernel']
 
-            if trial_idx is None:
-                pass
+    try:
+        penalty_type = self.smooth_info[var_name]['penalty_type']
+        xmin = self.smooth_info[var_name]['xmin']
+        xmax = self.smooth_info[var_name]['xmax']
+        der = self.smooth_info[var_name]['der']
+    except KeyError:
+        penalty_type = 'EqSpaced'
+        xmin = xmax = der = None
 
-            elif np.isscalar(trial_idx):
-                if trial_idx == -1:
-                    trial_idx = self.trial_idx
-                else:
-                    raise ValueError("trial_idx can be an array of int, -1 or None")
+    if not is_temporal:
+        fX = basisAndPenalty(
+            X,
+            knots,
+            is_cyclic=is_cyclic,
+            ord=ord_spline,
+            penalty_type=penalty_type,
+            xmin=xmin,
+            xmax=xmax,
+            der=der,
+            compute_pen=False,
+            domain_fun=self.domain_fun[var_name],
+        )[0]
+    else:
+        if sparse.issparse(basis_kernel):
+            basis_kernel = basis_kernel.toarray()
 
-            if pre_trial_dur is None:
-                pre_trial_dur = self.pre_trial_dur
+        if np.isscalar(trial_idx) and trial_idx == -1:
+            trial_idx = self.trial_idx
 
-            if post_trial_dur is None:
-                post_trial_dur = self.post_trial_dur
+        if pre_trial_dur is None:
+            pre_trial_dur = self.pre_trial_dur
+        if post_trial_dur is None:
+            post_trial_dur = self.post_trial_dur
 
-            fX = basis_temporal(
-                X,
-                basis_kernel,
-                trial_idx,
-                pre_trial_dur,
-                post_trial_dur,
-                self.time_bin,
-                sparseX=sparseX,
-            )
-        return fX
+        fX = basis_temporal(
+            X,
+            basis_kernel,
+            trial_idx,
+            pre_trial_dur,
+            post_trial_dur,
+            self.time_bin,
+            sparseX=sparseX,
+        )
+
+    self._basis_cache[key] = fX
+    return fX
+
 
     def compute_AIC(self, y, sm_handler, Vb, phi_est=1, family=None):
         # can be super slow...
