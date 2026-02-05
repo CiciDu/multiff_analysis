@@ -863,7 +863,6 @@ def postprocess_results(
     return results
 
 
-
 def sum_trial(ev_sender, ev_reciever, rate_reciever, DT, num_DT):
     num_bin = int(np.ceil(num_DT / DT))
     counts_DT = np.zeros(num_bin)
@@ -1019,3 +1018,7 @@ def _get_mutual_info(
             bins=bins,
         )
     return mi_cache[cache_key]
+
+
+
+

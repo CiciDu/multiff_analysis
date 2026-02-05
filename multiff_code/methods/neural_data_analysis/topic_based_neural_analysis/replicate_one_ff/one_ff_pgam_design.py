@@ -260,7 +260,7 @@ def build_smooth_handler_for_unit(
             kernel_direction=1,  # causal
         )
 
-    for evt in ['t_move', 't_rew']:
+    for evt in ['t_move', 't_rew', 't_stop']:
         if evt in all_events:
             add_event_temporal_filter(
                 sm_handler=sm_handler,

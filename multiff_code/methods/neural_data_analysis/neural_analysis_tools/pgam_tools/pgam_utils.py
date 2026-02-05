@@ -42,7 +42,7 @@ def save_full_results_npz(
     base_dir: Path,
     cluster_name: str,
     results_struct: np.ndarray,
-    reduced_var_list: list[str],
+    reduced_vars: list[str],
     extra_meta: Optional[Dict[str, Any]] = None,
 ) -> Path:
     """
@@ -56,7 +56,7 @@ def save_full_results_npz(
         Neuron/cluster name used in the filename.
     results_struct : np.ndarray
         Structured array returned by postprocess_results(...).
-    reduced_var_list : list[str]
+    reduced_vars : list[str]
         Features kept in the reduced model.
     extra_meta : Optional[dict]
         Optional JSON-serializable metadata.
@@ -84,7 +84,7 @@ def save_full_results_npz(
     _atomic_save_npz(
         out_path,
         results_struct=results_struct,
-        reduced_var_list=np.array(list(reduced_var_list), dtype="U100"),
+        reduced_vars=np.array(list(reduced_vars), dtype="U100"),
         meta_json=np.frombuffer(json.dumps(
             meta).encode("utf-8"), dtype=np.uint8),
     )
@@ -98,7 +98,7 @@ def load_full_results_npz(base_dir: Path, cluster_name: str):
 
     Returns
     -------
-    (results_struct, reduced_var_list, meta_dict)
+    (results_struct, reduced_vars, meta_dict)
     """
     fn = Path(base_dir) / "pgam_res" / f"neuron_{cluster_name}.npz"
     if not fn.exists() or fn.stat().st_size == 0:
@@ -110,8 +110,8 @@ def load_full_results_npz(base_dir: Path, cluster_name: str):
         # Try new schema first
         if "results_struct" in keys:
             results_struct = data["results_struct"]
-            reduced_var_list = list(
-                data["reduced_var_list"]) if "reduced_var_list" in keys else []
+            reduced_vars = list(
+                data["reduced_vars"]) if "reduced_vars" in keys else []
             meta = json.loads(bytes(data["meta_json"].tolist()).decode(
                 "utf-8")) if "meta_json" in keys else {}
         # Fallback to old/simple schema
@@ -120,7 +120,7 @@ def load_full_results_npz(base_dir: Path, cluster_name: str):
             if results_struct.dtype == object and results_struct.shape == ():
                 # unwrap 0-d object array that holds the struct
                 results_struct = results_struct.item()
-            reduced_var_list = []
+            reduced_vars = []
             meta = {}
         else:
             raise KeyError(
@@ -133,4 +133,4 @@ def load_full_results_npz(base_dir: Path, cluster_name: str):
         raise KeyError(
             "Field 'variable' missing inside the structured results array.")
 
-    return results_struct, reduced_var_list, meta
+    return results_struct, reduced_vars, meta

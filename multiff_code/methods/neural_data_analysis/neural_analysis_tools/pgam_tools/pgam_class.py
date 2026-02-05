@@ -108,6 +108,7 @@ class PGAMclass():
         try:
             print('Minimal subset of variables driving the activity:')
             print(self.reduced.var_list)
+            self.reduced_vars = self.reduced.var_list
         except Exception as e:
             print(f"Error occurred while printing reduced variable list: {e}")
 
@@ -131,7 +132,7 @@ class PGAMclass():
         if plot_vars_in_reduced_list_only:
             try:
                 indices_of_vars_to_plot = np.where(
-                    np.isin(self.res['variable'], self.reduced.var_list))[0]
+                    np.isin(self.res['variable'], self.reduced_vars))[0]
             except Exception as e:
                 print(
                     f"Error occurred while plotting results: {e}. Skipping...")
@@ -143,7 +144,7 @@ class PGAMclass():
         plot_modeling_result.plot_pgam_tuning_curvetions(
             self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
 
-    def load_pgam_pgam_results(self, neural_cluster_number):
+    def load_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
 
         self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.save_dir,
@@ -161,6 +162,10 @@ class PGAMclass():
         
         if save_dir is None:
             save_dir = self.save_dir
+            
+        # make sure the save directory exists
+        os.makedirs(save_dir, exist_ok=True)
+        
         pgam_utils.save_full_results_npz(save_dir,
                                          self.cluster_name,
                                          self.res,                       # the structured array

@@ -136,7 +136,7 @@ class FFVisDecodingRunner:
     def _get_save_dir(self):
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
-            'ff_vis_decoding',
+            'vis_decoder_outputs',
         )
     
     def _get_design_matrix_paths(self):
