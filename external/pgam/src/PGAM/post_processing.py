@@ -639,6 +639,19 @@ def postprocess_results(
         'reduced_x_rate_Hz': object,
         'reduced_y_rate_Hz_model': object,
         'reduced_y_rate_Hz_raw': object,
+        # ---- marginal tuning (FULL) ----
+        'marginal_x_rate_Hz': object,
+        'marginal_y_rate_Hz': object,
+        'marginal_y_rate_Hz_lo': object,
+        'marginal_y_rate_Hz_hi': object,
+
+        # ---- marginal tuning (EVAL) ----
+        'eval_marginal_x_rate_Hz': object,
+        'eval_marginal_y_rate_Hz': object,
+
+        # ---- marginal tuning (REDUCED) ----
+        'reduced_marginal_x_rate_Hz': object,
+        'reduced_marginal_y_rate_Hz': object,
         'eval_x_rate_Hz': object,
         'eval_y_rate_Hz_model': object,
         'eval_y_rate_Hz_raw': object,
@@ -761,6 +774,28 @@ def postprocess_results(
             tun = empty_container()
             tun.x = tun.y_raw = tun.y_model = np.nan
 
+        # ---------- MARGINAL TUNING (FULL, train) ----------
+        try:
+            mx, my = compute_marginal_tuning(
+                full_fit, exog_full, var, train_bool,
+                dt=full_fit.time_bin
+            )
+            lo, hi = compute_marginal_tuning_ci(
+                full_fit, exog_full, var, train_bool,
+                dt=full_fit.time_bin
+            )
+
+            results['marginal_x_rate_Hz'][cc] = _scale_x(mx, var, var_zscore_par)
+            results['marginal_y_rate_Hz'][cc] = my
+            results['marginal_y_rate_Hz_lo'][cc] = lo
+            results['marginal_y_rate_Hz_hi'][cc] = hi
+        except Exception:
+            results['marginal_x_rate_Hz'][cc] = np.nan
+            results['marginal_y_rate_Hz'][cc] = np.nan
+            results['marginal_y_rate_Hz_lo'][cc] = np.nan
+            results['marginal_y_rate_Hz_hi'][cc] = np.nan
+            
+            
         results['mutual_info'][cc] = mi
         results['x_rate_Hz'][cc] = _scale_x(tun.x, var, var_zscore_par)
         results['y_rate_Hz_model'][cc] = tun.y_model
@@ -785,10 +820,26 @@ def postprocess_results(
             tun = empty_container()
             tun.x = tun.y_raw = tun.y_model = np.nan
 
+
         results['eval_x_rate_Hz'][cc] = _scale_x(tun.x, var, var_zscore_par)
         results['eval_y_rate_Hz_model'][cc] = tun.y_model
         results['eval_y_rate_Hz_raw'][cc] = tun.y_raw
 
+        # ---------- MARGINAL TUNING (FULL, eval) ----------
+        try:
+            mx, my = compute_marginal_tuning(
+                full_fit,
+                exog_full,
+                var,
+                ~train_bool,
+                dt=full_fit.time_bin,
+            )
+            results['eval_marginal_x_rate_Hz'][cc] = _scale_x(mx, var, var_zscore_par)
+            results['eval_marginal_y_rate_Hz'][cc] = my
+        except Exception:
+            results['eval_marginal_x_rate_Hz'][cc] = np.nan
+            results['eval_marginal_y_rate_Hz'][cc] = np.nan
+            
         # ---------- kernels ----------
         (
             results['x_kernel'][cc],
@@ -860,6 +911,25 @@ def postprocess_results(
             results['eval_reduced_y_rate_Hz_model'][cc] = tun.y_model
             results['eval_reduced_y_rate_Hz_raw'][cc] = tun.y_raw
 
+            # ============================================================
+            # >>> INSERTED: REDUCED MARGINAL TUNING (TRAIN)
+            # ============================================================
+            try:
+                mx, my = compute_marginal_tuning(
+                    reduced_fit,
+                    exog_reduced,
+                    var,
+                    train_bool,
+                    dt=full_fit.time_bin,
+                )
+                results['reduced_marginal_x_rate_Hz'][cc] = _scale_x(
+                    mx, var, var_zscore_par
+                )
+                results['reduced_marginal_y_rate_Hz'][cc] = my
+            except Exception:
+                results['reduced_marginal_x_rate_Hz'][cc] = np.nan
+                results['reduced_marginal_y_rate_Hz'][cc] = np.nan
+                
     return results
 
 
@@ -1019,6 +1089,156 @@ def _get_mutual_info(
         )
     return mi_cache[cache_key]
 
+def compute_marginal_tuning(
+    fit,
+    exog,
+    var,
+    filter_trials,
+    dt=0.006,
+    bins=15,
+    grid_n=200,  # like your kernel_strength grid density
+):
+    """
+    Marginal tuning for `var`:
+        rate(x_var) = invlink( f_var(x_var) + mean_t[ sum_{k != var} f_k(x_k(t)) ] ) / dt
+
+    Args
+    ----
+    fit : fitted GAM object (your PGAM fit)
+    exog : (T, P) design matrix used for predictions
+    var : str
+    filter_trials : boolean mask of timepoints to use for marginalization (e.g. train_bool)
+    dt : float, seconds/bin
+    bins : int, used for temporal kernel binning only (optional; kept for API symmetry)
+    grid_n : int, resolution for 1D/2D grid for plotting the marginal tuning
+
+    Returns
+    -------
+    x_axis : np.ndarray or list of np.ndarray (meshgrid) for 2D
+    rate_hz : np.ndarray marginal rate in Hz (shape matches x_axis)
+    """
+
+    # -----------------------
+    # indices for this variable
+    # -----------------------
+    idx_var = np.atleast_1d(fit.index_dict[var])  # can be slice-like or array-like in your code
+    idx_all = np.arange(exog.shape[1])
+
+    # exclude intercept and var columns
+    idx_other = np.setdiff1d(idx_all, np.concatenate(([0], idx_var)))
+
+    # -----------------------
+    # mean linear contribution of other variables
+    # -----------------------
+    lin_other = exog[filter_trials][:, idx_other] @ fit.beta[idx_other]
+    other_mean = np.nanmean(lin_other)
+
+    smooth_info = fit.smooth_info[var]
+
+    # -----------------------
+    # temporal kernel case
+    # -----------------------
+    if smooth_info.get('is_temporal_kernel', False):
+        dim_kern = smooth_info['basis_kernel'].shape[0]
+
+        # impulse at center to evaluate kernel on its internal time support
+        x = np.zeros(dim_kern)
+        x[(dim_kern - 1) // 2] = 1
+
+        # time axis in seconds (matches your temporal_prediction_and_kernel_str)
+        t = np.arange(dim_kern) * fit.time_bin - np.where(x)[0][0] * fit.time_bin
+
+        fX = fit.smooth_compute([x], var, 0.0)[0]  # shape (dim_kern,)
+
+        # optional directional selection like your temporal helpers
+        if smooth_info.get('is_event_input', False):
+            kd = smooth_info.get('kernel_direction', 0)
+            if kd == 1:
+                sel = t > 0
+                t = t[sel]
+                fX = fX[sel]
+            elif kd == -1:
+                sel = t < 0
+                t = t[sel]
+                fX = fX[sel]
+
+        eta = fX + other_mean
+        rate_hz = fit.family.fitted(eta) / dt
+
+        return t.reshape(1, -1), rate_hz.reshape(1, -1)
+
+    # -----------------------
+    # spatial / non-temporal case (1D or 2D)
+    # -----------------------
+    knots = smooth_info['knots']
+    if isinstance(knots, list):
+        # 2D (or ND) smooth: knots is list of arrays
+        grid = [np.linspace(k.min(), k.max(), grid_n) for k in knots]
+        mesh = np.meshgrid(*grid)
+        XY = [m.flatten() for m in mesh]  # list of flattened coordinate arrays
+
+        fX = fit.smooth_compute(XY, var, 0.0)[0]  # flat
+        eta = fX + other_mean
+        rate_hz = (fit.family.fitted(eta) / dt).reshape(mesh[0].shape)
+
+        return mesh, rate_hz
+
+    # 1D smooth
+    x_axis = np.linspace(knots.min(), knots.max(), grid_n)
+    fX = fit.smooth_compute([x_axis], var, 0.0)[0]
+    eta = fX + other_mean
+    rate_hz = fit.family.fitted(eta) / dt
+
+    return x_axis.reshape(1, -1), rate_hz.reshape(1, -1)
 
 
+def compute_marginal_tuning_ci(
+    fit,
+    exog,
+    var,
+    filter_trials,
+    dt,
+    grid_n=200,
+    nsamp=200,
+    alpha=0.05,
+):
+    """
+    Compute pointwise CI for marginal tuning using beta covariance.
+    """
 
+    x, rate_mean = compute_marginal_tuning(
+        fit, exog, var, filter_trials, dt=dt, grid_n=grid_n
+    )
+
+    beta_mean = fit.beta
+    cov = fit.cov_beta
+
+    # flatten x grid for sampling
+    if isinstance(x, list):  # 2D
+        X = [xx.flatten() for xx in x]
+        shape = x[0].shape
+    else:
+        X = [x.flatten()]
+        shape = x.shape
+
+    # sample beta
+    beta_samp = np.random.multivariate_normal(beta_mean, cov, size=nsamp)
+
+    idx_var = np.atleast_1d(fit.index_dict[var])
+    idx_other = np.setdiff1d(np.arange(len(beta_mean)), np.concatenate(([0], idx_var)))
+
+    lin_other = exog[filter_trials][:, idx_other] @ beta_mean[idx_other]
+    other_mean = np.nanmean(lin_other)
+
+    rates = np.zeros((nsamp, X[0].size))
+
+    for k in range(nsamp):
+        fit_k = beta_samp[k]
+        fX = fit.smooth_compute(X, var, 0.0)[0]
+        eta = fX + other_mean
+        rates[k] = fit.family.fitted(eta) / dt
+
+    lo = np.quantile(rates, alpha / 2, axis=0).reshape(shape)
+    hi = np.quantile(rates, 1 - alpha / 2, axis=0).reshape(shape)
+
+    return lo, hi

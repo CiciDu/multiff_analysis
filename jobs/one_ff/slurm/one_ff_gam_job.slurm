@@ -28,7 +28,7 @@ else
     exit 1
 fi
 
-conda activate multiff_clean || {
+conda activate pgam || {
     echo "[SLURM][ERROR] Conda activation failed"
     exit 1
 }

@@ -69,7 +69,16 @@ def main(args):
         session_num=0,
     )
 
+    covariate_names = [
+        'v', 'w', 'd', 'phi',
+        'r_targ', 'theta_targ',
+        'eye_ver', 'eye_hor', 'move',
+    ]
+
+    data_obj.compute_covariates(covariate_names)
     data_obj.compute_spike_counts()
+    data_obj.smooth_spikes()
+    data_obj.compute_events()
     binned_spikes_df = data_obj.get_binned_spikes_df()
     
     
@@ -85,20 +94,6 @@ def main(args):
         return
     except FileNotFoundError:
         print(f"running PGAM for unit {args.unit_idx}")
-
-
-    covariate_names = [
-        'v', 'w', 'd', 'phi',
-        'r_targ', 'theta_targ',
-        'eye_ver', 'eye_hor', 'move',
-    ]
-
-
-    # preprocessing
-    data_obj.compute_covariates(covariate_names)
-    data_obj.smooth_spikes()
-    data_obj.compute_events()
-
 
     # ------------------
     # Build PGAM design

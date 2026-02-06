@@ -128,7 +128,7 @@ class PGAMclass():
 
     def plot_results(self, plot_vars_in_reduced_list_only=True):
         # find which variables in res['variable'] are in reduced.var_list
-        # and then plot the corresponding x_rate_Hz
+        # and then plot the corresponding x_rate_Hz 
         if plot_vars_in_reduced_list_only:
             try:
                 indices_of_vars_to_plot = np.where(
