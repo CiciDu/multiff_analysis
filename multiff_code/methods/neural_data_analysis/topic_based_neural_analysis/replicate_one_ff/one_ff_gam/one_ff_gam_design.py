@@ -16,12 +16,26 @@ Paper mapping:
 You can swap in your own kernels later by replacing the temporal-kernel smooths with explicit
 convolution regressors, but this should get you very close in practice.
 """
-
 from __future__ import annotations
-
 import sys
 from pathlib import Path
+
+# PGAM external library
+PGAM_PATH = Path(
+    'multiff_analysis/external/pgam/src'
+).expanduser().resolve()
+if str(PGAM_PATH) not in sys.path:
+    sys.path.append(str(PGAM_PATH))
+    
+
+from PGAM.GAM_library import *
+
+import PGAM.gam_data_handlers as gdh
+import numpy as np
+
 import os
+import sys
+from pathlib import Path
 
 
 def find_project_root(marker="multiff_analysis"):
@@ -44,17 +58,45 @@ for path in [pgam_src, pgam_src_pg]:
     if str(path) not in sys.path:
         sys.path.append(str(path))
 
-import numpy as np
-from PGAM.GAM_library import *
-import PGAM.gam_data_handlers as gdh
-import matplotlib.pylab as plt
-import pandas as pd
-from post_processing import postprocess_results
-from scipy.io import savemat
 
 # -------------------------
 # Helpers
 # -------------------------
+
+
+def build_smooth_handler(
+    data_obj,
+    unit_idx,
+    covariate_names,
+    tuning_covariates=None,
+    use_cyclic=None,
+    order=4,
+):
+    """
+    Build a PGAM smooth handler for a single unit.
+
+    Assumes covariates, spike counts, and events have already been computed.
+    """
+    if tuning_covariates is None:
+        tuning_covariates = covariate_names
+
+    if use_cyclic is None:
+        use_cyclic = set()
+
+    data_obj.sm_handler = build_smooth_handler_for_unit(
+        unit_idx=unit_idx,
+        covariates_concat=data_obj.covariates,
+        covariate_names=covariate_names,
+        trial_id_vec=data_obj.covariate_trial_ids,
+        Y_binned=data_obj.Y,
+        all_events=data_obj.events,
+        dt=data_obj.prs.dt,
+        tuning_covariates=tuning_covariates,
+        use_cyclic=use_cyclic,
+        order=order,
+    )
+    return data_obj.sm_handler
+
 
 def _compute_equal_knots(x: np.ndarray, num_bins: int) -> np.ndarray:
     """Return equally-spaced knot locations across the finite range of x."""
@@ -67,6 +109,7 @@ def _compute_equal_knots(x: np.ndarray, num_bins: int) -> np.ndarray:
         # Degenerate predictor; fall back to a tiny span
         x_max = x_min + 1.0
     return np.linspace(x_min, x_max, num_bins)
+
 
 def add_tuning_smooth_10boxcar_approx(
     sm_handler,
@@ -96,6 +139,7 @@ def add_tuning_smooth_10boxcar_approx(
         trial_idx=trial_ids,
         is_cyclic=[bool(is_cyclic)],
     )
+
 
 def add_event_temporal_filter(
     sm_handler,
@@ -135,6 +179,7 @@ def add_event_temporal_filter(
         kernel_direction=int(kernel_direction),
     )
 
+
 def add_spike_history_filter(
     sm_handler,
     name: str,
@@ -160,6 +205,7 @@ def add_spike_history_filter(
         order=order,
         kernel_direction=1,  # causal
     )
+
 
 def add_coupling_filters(
     sm_handler,
@@ -193,6 +239,7 @@ def add_coupling_filters(
 # Main: build smooth handlers per neuron
 # -------------------------
 
+
 def build_smooth_handler_for_unit(
     *,
     unit_idx: int,
@@ -225,14 +272,16 @@ def build_smooth_handler_for_unit(
     n_time, n_units = Y_binned.shape
 
     if unit_idx < 0 or unit_idx >= n_units:
-        raise IndexError(f'unit_idx {unit_idx} out of bounds for n_units={n_units}')
+        raise IndexError(
+            f'unit_idx {unit_idx} out of bounds for n_units={n_units}')
 
     sm_handler = gdh.smooths_handler()
 
     # ---- f(·): tuning functions
     for cov_name in tuning_covariates:
         if cov_name not in covariates_concat:
-            raise KeyError(f'Covariate "{cov_name}" not found in covariates_concat.')
+            raise KeyError(
+                f'Covariate "{cov_name}" not found in covariates_concat.')
 
         x = covariates_concat[cov_name]  # shape (T,)
 

@@ -88,6 +88,10 @@ def compute_target_relative(tr, dt):
     indx_beg = np.searchsorted(ts, tr.events.t_targ)
     indx_stop = np.searchsorted(ts, tr.events.t_stop)
 
+    if indx_beg >= indx_stop:
+        print('Empty movement window:', indx_beg, indx_stop)
+        
+    
     # Trial-level target position (median during movement)
     x_fly = np.nanmedian(tr.continuous.xfp[indx_beg:indx_stop])
     y_fly = np.nanmedian(tr.continuous.yfp[indx_beg:indx_stop])

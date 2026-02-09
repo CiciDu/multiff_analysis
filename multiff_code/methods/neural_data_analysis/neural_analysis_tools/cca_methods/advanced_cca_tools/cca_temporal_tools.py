@@ -15,16 +15,18 @@ Author: ChatGPT
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any, List, Optional, Tuple
+
 import numpy as np
 from numpy.linalg import svd
-from scipy.linalg import cholesky, solve_triangular
 from scipy import signal
-from typing import Tuple, Optional, Dict, Any, List
-from dataclasses import dataclass
+from scipy.linalg import cholesky, solve_triangular
 
 # -----------------------------
 # Utilities
 # -----------------------------
+
 
 def _center(X) -> Tuple[np.ndarray, np.ndarray]:
     X = np.asarray(X)                 # <— force to NumPy
@@ -38,6 +40,7 @@ def _cov(X: np.ndarray) -> np.ndarray:
     n = X.shape[0]
     return (X.T @ X) / max(1, n - 1)
 
+
 def _safe_cholesky(A: np.ndarray, jitter: float = 0) -> np.ndarray:
     """Cholesky with optional jitter on the diagonal."""
     A = np.asarray(A)
@@ -50,6 +53,7 @@ def _safe_cholesky(A: np.ndarray, jitter: float = 0) -> np.ndarray:
 # -----------------------------
 # Ridge-regularized CCA (RCCA)
 # -----------------------------
+
 
 @dataclass
 class RCCA:
@@ -102,7 +106,8 @@ class RCCA:
 
         # Back to data space: Wx = Lx^{-T} U, Wy = Ly^{-T} V
         Wx = solve_triangular(Lx.T, U[:, :k], lower=False, check_finite=False)
-        Wy = solve_triangular(Ly.T, Vt[:k, :].T, lower=False, check_finite=False)
+        Wy = solve_triangular(
+            Ly.T, Vt[:k, :].T, lower=False, check_finite=False)
 
         self.Wx_, self.Wy_, self.corrs_ = Wx, Wy, s[:k]
         return self
@@ -122,9 +127,11 @@ class RCCA:
 # Kernel CCA (KCCA)
 # -----------------------------
 
+
 def _linear_kernel(X, Y=None):
     Y = X if Y is None else Y
     return X @ Y.T
+
 
 def _rbf_kernel(X, Y=None, gamma: float = None):
     Y = X if Y is None else Y
@@ -135,12 +142,14 @@ def _rbf_kernel(X, Y=None, gamma: float = None):
     K = Xn + Yn - 2.0 * (X @ Y.T)
     return np.exp(-gamma * np.maximum(K, 0.0))
 
+
 def _center_kernel(K: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     K = np.asarray(K)
     n = K.shape[0]
     one = np.ones((n, n)) / n
     Kc = K - one @ K - K @ one + one @ K @ one
     return Kc, one  # return centering matrix info if needed
+
 
 @dataclass
 class KCCA:
@@ -210,7 +219,8 @@ class KCCA:
         k = min(self.n_components, U.shape[1])
 
         Ax = solve_triangular(Lx.T, U[:, :k], lower=False, check_finite=False)
-        Ay = solve_triangular(Ly.T, Vt[:k, :].T, lower=False, check_finite=False)
+        Ay = solve_triangular(
+            Ly.T, Vt[:k, :].T, lower=False, check_finite=False)
 
         self.Ax_, self.Ay_, self.corrs_ = Ax, Ay, s[:k]
         return self
@@ -266,12 +276,17 @@ class KCCA:
 # Spectral / Temporal CCA via cross-spectra
 # ------------------------------------------
 
+
 @dataclass
 class SpectralCCAResult:
     freqs: np.ndarray                # (F,)
-    coh: np.ndarray                  # (k, F) canonical coherence spectrum (k up to min(p,q))
-    Ux: Optional[List[np.ndarray]]   # per-frequency weights for X (p x k), or None
-    Uy: Optional[List[np.ndarray]]   # per-frequency weights for Y (q x k), or None
+    # (k, F) canonical coherence spectrum (k up to min(p,q))
+    coh: np.ndarray
+    # per-frequency weights for X (p x k), or None
+    Ux: Optional[List[np.ndarray]]
+    # per-frequency weights for Y (q x k), or None
+    Uy: Optional[List[np.ndarray]]
+
 
 def _csd_matrix(X: np.ndarray, fs: float, nperseg: int, noverlap: Optional[int]) -> Tuple[np.ndarray, np.ndarray]:
     """Compute cross-spectral density matrix for multivariate X (n x p).
@@ -282,17 +297,21 @@ def _csd_matrix(X: np.ndarray, fs: float, nperseg: int, noverlap: Optional[int])
     # We standardize each channel to zero-mean to avoid DC bias
     Xc = X - X.mean(axis=0, keepdims=True)
     # Compute frequencies using the first pair
-    freqs, _ = signal.welch(Xc[:, 0], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
+    freqs, _ = signal.welch(
+        Xc[:, 0], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
     F = len(freqs)
     S = np.zeros((F, p, p), dtype=np.complex128)
     for i in range(p):
-        fi, Pii = signal.welch(Xc[:, i], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
+        fi, Pii = signal.welch(
+            Xc[:, i], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
         S[:, i, i] = Pii
         for j in range(i+1, p):
-            _, Pij = signal.csd(Xc[:, i], Xc[:, j], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
+            _, Pij = signal.csd(
+                Xc[:, i], Xc[:, j], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
             S[:, i, j] = Pij
             S[:, j, i] = np.conjugate(Pij)
     return freqs, S
+
 
 def spectral_cca(
     X: np.ndarray, Y: np.ndarray, *, fs: float = 1.0, nperseg: int = 256, noverlap: Optional[int] = None,
@@ -325,7 +344,8 @@ def spectral_cca(
     Sxy = np.zeros((F, p, q), dtype=np.complex128)
     for i in range(p):
         for j in range(q):
-            _, Pxy = signal.csd(Xc[:, i], Yc[:, j], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
+            _, Pxy = signal.csd(
+                Xc[:, i], Yc[:, j], fs=fs, nperseg=nperseg, noverlap=noverlap, return_onesided=True)
             Sxy[:, i, j] = Pxy
 
     coh = np.zeros((kmax, F))
@@ -346,15 +366,19 @@ def spectral_cca(
 
         # R = Lx^{-1} Cxy Ly^{-H}
         R = solve_triangular(Lx, Cxy, lower=True, check_finite=False)
-        R = solve_triangular(Ly.conj().T, R.conj().T, lower=False, check_finite=False).conj().T
+        R = solve_triangular(Ly.conj().T, R.conj().T,
+                             lower=False, check_finite=False).conj().T
 
         U, s, Vh = svd(R, full_matrices=False)
         r = min(kmax, len(s))
-        coh[:r, f] = np.clip(s[:r].real, 0, 1)  # canonical coherence (singular values)
+        # canonical coherence (singular values)
+        coh[:r, f] = np.clip(s[:r].real, 0, 1)
 
         if return_weights:
-            Wx = solve_triangular(Lx.T.conj(), U[:, :r], lower=False, check_finite=False)
-            Wy = solve_triangular(Ly.T.conj(), Vh[:r, :].T, lower=False, check_finite=False)
+            Wx = solve_triangular(
+                Lx.T.conj(), U[:, :r], lower=False, check_finite=False)
+            Wy = solve_triangular(
+                Ly.T.conj(), Vh[:r, :].T, lower=False, check_finite=False)
             Ux.append(Wx)  # p x r
             Uy.append(Wy)  # q x r
 
@@ -364,8 +388,9 @@ def spectral_cca(
 # Reduced bases for lags (raised cosines)
 # ------------------------------------------
 
-def raised_cosine_basis(n_basis: int, t_max: float, dt: float, *, t_min: float = 0.0,
-                        log_spaced: bool = True, eps: float = 1e-3) -> Tuple[np.ndarray, np.ndarray]:
+
+def raised_log_cosine_basis(n_basis: int, t_max: float, dt: float, *, t_min: float = 0.0,
+                            log_spaced: bool = True, eps: float = 1e-3) -> Tuple[np.ndarray, np.ndarray]:
     """Causal raised-cosine basis that tiles [t_min, t_max].
     Returns lags (L,), B (L x K) with unit-area columns (sum * dt = 1).
     """
@@ -384,12 +409,14 @@ def raised_cosine_basis(n_basis: int, t_max: float, dt: float, *, t_min: float =
     for c in centers:
         arg = (W - c) * np.pi / (2 * widths)
         phi = np.cos(np.clip(arg, -np.pi, np.pi))
-        phi = np.where(np.abs(arg) <= np.pi, (phi + 1) / 2.0, 0.0)  # raised cosine [0,1]
+        phi = np.where(np.abs(arg) <= np.pi, (phi + 1) /
+                       2.0, 0.0)  # raised cosine [0,1]
         B.append(phi)
     B = np.stack(B, axis=1)  # (L x K)
     # Unit area
     B /= (B.sum(axis=0, keepdims=True) + 1e-12)
     return lags, B
+
 
 def embed_with_basis(X: np.ndarray, B: np.ndarray) -> np.ndarray:
     """Convolve each channel of X (n x p) with each basis in B (L x K), causal.
@@ -401,7 +428,8 @@ def embed_with_basis(X: np.ndarray, B: np.ndarray) -> np.ndarray:
         x = X[:, j]
         for k in range(K):
             # Causal FIR: y[t] = sum_{l=0..L-1} B[l,k] * x[t-l]
-            y = signal.lfilter(B[::-1, k], [1.0], x)  # reverse for lfilter convention
+            # reverse for lfilter convention
+            y = signal.lfilter(B[::-1, k], [1.0], x)
             out[:, j*K + k] = y
     return out
 
@@ -409,40 +437,49 @@ def embed_with_basis(X: np.ndarray, B: np.ndarray) -> np.ndarray:
 # Demo
 # -----------------------------
 
+
 def _demo():
     rng = np.random.default_rng(0)
     n = 3000
     p, q = 6, 4
     # Generate latent drivers with lead-lag structure
     t = np.arange(n)
-    z = signal.lfilter([1], [1, -0.95], rng.standard_normal((n, 2)))  # AR(1) latent
+    z = signal.lfilter(
+        [1], [1, -0.95], rng.standard_normal((n, 2)))  # AR(1) latent
 
     X = z @ rng.normal(size=(2, p)) + 0.2 * rng.standard_normal((n, p))
-    Y = np.roll(z, 3, axis=0) @ rng.normal(size=(2, q)) + 0.2 * rng.standard_normal((n, q))  # Y lags X by ~3
+    Y = np.roll(z, 3, axis=0) @ rng.normal(size=(2, q)) + 0.2 * \
+        rng.standard_normal((n, q))  # Y lags X by ~3
 
     # RCCA on raw signals
     rcca = RCCA(n_components=2, reg_x=1e-2, reg_y=1e-2).fit(X, Y)
     U, V = rcca.transform(X, Y)
-    print("[RCCA] corr #1 ~", np.corrcoef(U[:,0], V[:,0])[0,1])
+    print("[RCCA] corr #1 ~", np.corrcoef(U[:, 0], V[:, 0])[0, 1])
 
     # Basis-embedded RCCA
-    lags, B = raised_cosine_basis(n_basis=6, t_max=10, dt=1.0, log_spaced=True)
+    lags, B = raised_log_cosine_basis(
+        n_basis=6, t_max=10, dt=1.0, log_spaced=True)
     Xb = embed_with_basis(X, B)
     Yb = embed_with_basis(Y, B)
     rcca_b = RCCA(n_components=2, reg_x=1e-2, reg_y=1e-2).fit(Xb, Yb)
     Ub, Vb = rcca_b.transform(Xb, Yb)
-    print("[RCCA + basis] corr #1 ~", np.corrcoef(Ub[:,0], Vb[:,0])[0,1])
+    print("[RCCA + basis] corr #1 ~", np.corrcoef(Ub[:, 0], Vb[:, 0])[0, 1])
 
     # KCCA (RBF)
-    kcca = KCCA(n_components=2, kernel_x='rbf', kernel_y='rbf', reg_x=1e-2, reg_y=1e-2).fit(X, Y)
+    kcca = KCCA(n_components=2, kernel_x='rbf', kernel_y='rbf',
+                reg_x=1e-2, reg_y=1e-2).fit(X, Y)
     Uk, Vk = kcca.transform(X, Y)
-    print("[KCCA-RBF] corr #1 ~", np.corrcoef(np.real(Uk[:,0]), np.real(Vk[:,0]))[0,1])
+    print("[KCCA-RBF] corr #1 ~",
+          np.corrcoef(np.real(Uk[:, 0]), np.real(Vk[:, 0]))[0, 1])
 
     # Spectral CCA: canonical coherence spectrum
-    spec = spectral_cca(X, Y, fs=1.0, nperseg=512, noverlap=256, reg_x=1e-3, reg_y=1e-3, n_components=1)
+    spec = spectral_cca(X, Y, fs=1.0, nperseg=512, noverlap=256,
+                        reg_x=1e-3, reg_y=1e-3, n_components=1)
     # Report peak frequency
     f_peak = spec.freqs[np.argmax(spec.coh[0])]
-    print(f"[Spectral CCA] Peak canonical coherence at f={f_peak:.3f} cycles/bin, value={spec.coh[0].max():.3f}")
+    print(
+        f"[Spectral CCA] Peak canonical coherence at f={f_peak:.3f} cycles/bin, value={spec.coh[0].max():.3f}")
+
 
 if __name__ == "__main__":
     _demo()

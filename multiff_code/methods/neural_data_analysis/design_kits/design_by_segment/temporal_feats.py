@@ -5,10 +5,11 @@ from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import (
-    prep_target_data
+    prep_target_data,
 )
 from scipy import signal
 
@@ -27,6 +28,7 @@ def specs_to_design_df(
     specs: Dict[str, PredictorSpec],
     trial_ids: np.ndarray,
     *,
+    respect_trial_boundaries: bool = True,
     edge: str = 'zero',         # 'zero' | 'drop' | 'renorm'
     add_intercept: bool = True,
     dtype: str = 'float64',
@@ -36,10 +38,9 @@ def specs_to_design_df(
     '''
     Expand PredictorSpecs into a basis-expanded GLM design DataFrame.
 
-    For edge='drop', we keep rows valid for *all* kept basis-expanded predictors
-    (intersection across masks). All-zero passthrough predictors and all-zero
-    basis blocks are omitted and recorded in meta['dropped_all_zero'].
+    If respect_trial_boundaries=False, lagging is continuous across trials.
     '''
+
     trial_ids = np.asarray(trial_ids).ravel()
     n = trial_ids.shape[0]
 
@@ -49,12 +50,16 @@ def specs_to_design_df(
     bases_info: dict[str, list[tuple[int, int]]] = {}
     bases_by_predictor: dict[str, list[np.ndarray]] = {}
 
-    # intersection for edge='drop' (start all True; only kept basis blocks constrain)
     valid_rows_mask = np.ones(n, dtype=bool)
 
-    # bookkeeping for dropped content
     dropped_cols: list[str] = []
     dropped_predictors: set[str] = set()
+
+    # choose lagging function ONCE
+    if respect_trial_boundaries:
+        lag_fn = lagged_design_from_signal_trials
+    else:
+        lag_fn = lagged_design_from_signal
 
     for name, ps in specs.items():
         groups[name] = []
@@ -77,44 +82,59 @@ def specs_to_design_df(
                 names.append(colname)
                 groups[name].append(colname)
                 added_any_for_name = True
-            # no bases registered for passthrough
             if not added_any_for_name:
                 continue
+
         else:
             kept_Bs: list[np.ndarray] = []
-            # basis-expanded predictors
+
             for j, B in enumerate(ps.bases):
                 B = np.asarray(B, float)
                 if B.ndim != 2:
                     raise ValueError(f'Basis for {name!r} must be 2D (L, K).')
+
                 if edge == 'drop':
-                    Phi, mask = lagged_design_from_signal_trials(sig, B, trial_ids,
-                                                                 edge=edge, return_edge_mask=True)
-                    # if the whole block is zero, skip it (do not constrain mask)
-                    if drop_all_zero and np.allclose(Phi, 0.0, atol=zero_atol):
-                        L, K = B.shape
-                        dropped_cols.extend(
-                            [f'{name}:b{j}:{k}' for k in range(K)])
-                        continue
-                    valid_rows_mask &= mask
-                else:
-                    Phi = lagged_design_from_signal_trials(
-                        sig, B, trial_ids, edge=edge)
+                    if respect_trial_boundaries:
+                        Phi, mask = lag_fn(
+                            sig, B, trial_ids,
+                            edge=edge, return_edge_mask=True
+                        )
+                    else:
+                        Phi, mask = lag_fn(
+                            sig, B,
+                            edge=edge, return_edge_mask=True
+                        )
+
                     if drop_all_zero and np.allclose(Phi, 0.0, atol=zero_atol):
                         L, K = B.shape
                         dropped_cols.extend(
                             [f'{name}:b{j}:{k}' for k in range(K)])
                         continue
 
-                # keep this block
+                    valid_rows_mask &= mask
+
+                else:
+                    if respect_trial_boundaries:
+                        Phi = lag_fn(sig, B, trial_ids, edge=edge)
+                    else:
+                        Phi = lag_fn(sig, B, edge=edge)
+
+                    if drop_all_zero and np.allclose(Phi, 0.0, atol=zero_atol):
+                        L, K = B.shape
+                        dropped_cols.extend(
+                            [f'{name}:b{j}:{k}' for k in range(K)])
+                        continue
+
                 L, K = B.shape
                 bases_info[name].append((L, K))
                 kept_Bs.append(B)
+
                 for k in range(Phi.shape[1]):
                     colname = f'{name}:b{j}:{k}'
                     cols.append(Phi[:, k].astype(dtype, copy=False))
                     names.append(colname)
                     groups[name].append(colname)
+
                 added_any_for_name = True
 
             if kept_Bs:
@@ -122,7 +142,6 @@ def specs_to_design_df(
             if not added_any_for_name:
                 dropped_predictors.add(name)
 
-    # build frame
     X = np.column_stack(cols).astype(
         dtype, copy=False) if cols else np.empty((n, 0), dtype=dtype)
     design_df = pd.DataFrame(X, columns=names)
@@ -139,10 +158,10 @@ def specs_to_design_df(
         'groups': groups,
         'bases': bases_info,
         'edge': edge,
+        'respect_trial_boundaries': bool(respect_trial_boundaries),
         'intercept_added': bool(add_intercept),
         'valid_rows_mask': valid_rows_mask if edge == 'drop' else None,
         'row_index_original': row_index_original,
-        # only keys that actually have kept bases
         'bases_by_predictor': bases_by_predictor,
         'dropped_all_zero': {
             'enabled': bool(drop_all_zero),
@@ -152,7 +171,58 @@ def specs_to_design_df(
         },
         'dropped_all_zero_predictors': sorted(dropped_predictors),
     }
+
     return design_df, meta
+
+
+def lagged_design_from_signal(
+    x: np.ndarray,
+    basis: np.ndarray,
+    *,
+    edge: str = 'zero',   # 'zero' | 'drop' | 'renorm'
+    return_edge_mask: bool = False
+):
+    """
+    Continuous causal design: Phi[t,k] = sum_{ℓ>=0} basis[ℓ,k] * x[t-ℓ],
+    with NO trial boundaries.
+    """
+    x = np.asarray(x, float).ravel()
+    B = np.asarray(basis, float)
+    if B.ndim != 2:
+        raise ValueError('basis must be 2D (L, K)')
+
+    L, K = B.shape
+    T = x.shape[0]
+    out = np.zeros((T, K), float)
+    edge_mask = np.zeros(T, dtype=bool)
+
+    if edge == 'renorm':
+        cum = np.cumsum(B, axis=0)   # (L, K)
+        full = cum[-1, :]            # (K,)
+
+    if edge in ('zero', 'renorm'):
+        for k in range(K):
+            h = B[:, k]
+            y = signal.lfilter(h, [1.0], x)
+            if edge == 'renorm':
+                last = np.minimum(np.arange(T), L - 1)
+                avail = cum[last, k]
+                scale = full[k] / np.clip(avail, 1e-12, None)
+                y = y * scale
+            out[:, k] = y
+        edge_mask[:] = True
+
+    elif edge == 'drop':
+        if T >= L:
+            W = np.lib.stride_tricks.sliding_window_view(x, L)  # (T-L+1, L)
+            Brev = B[::-1, :]                                  # (L, K)
+            Y = W @ Brev
+            out[L - 1:, :] = Y
+            edge_mask[L - 1:] = True
+    else:
+        raise ValueError("edge must be one of {'zero','drop','renorm'}")
+
+    return (out, edge_mask) if return_edge_mask else out
 
 
 def lagged_design_from_signal_trials(
@@ -240,7 +310,7 @@ def _build_basis(family: str, n_basis: int, t_max: float, dt: float, *, t_min: f
     K = max(1, min(int(n_basis), L))
 
     if family == 'rc':
-        _, B = glm_bases.raised_cosine_basis(
+        _, B = glm_bases.raised_log_cosine_basis(
             n_basis=K, t_max=t_max, dt=dt, t_min=t_min, log_spaced=True
         )
     elif family == 'spline':
@@ -301,6 +371,16 @@ def init_predictor_specs(
 
     if len(trial_ids) != len(data):
         raise ValueError('len(trial_ids) must equal len(data)')
+
+    specs, meta = _init_predictor_specs(dt, trial_ids)
+
+    return specs, meta
+
+
+def _init_predictor_specs(
+    dt: float,
+    trial_ids: np.ndarray,
+) -> Tuple[Dict[str, PredictorSpec], dict]:
 
     specs: Dict[str, PredictorSpec] = {}
 
@@ -405,3 +485,4 @@ def add_event_predictors(
     meta['builder'].append('events_temporal')
 
     return specs, meta
+

@@ -15,9 +15,9 @@ glm_design principles
 """
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import List, Tuple
+
 import numpy as np
-from typing import Tuple
 from scipy.interpolate import BSpline
 
 # -----------------
@@ -44,8 +44,76 @@ def _unique_trials(trial_ids: np.ndarray) -> np.ndarray:
 # -----------------
 # Basis construction
 # -----------------
+from typing import Tuple, List
+import numpy as np
+
 
 def raised_cosine_basis(
+    n_basis: int,
+    t_min: float,
+    t_max: float,
+    dt: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Build a (possibly non-causal) *linear-time* raised cosine basis
+    that tiles the interval [t_min, t_max].
+
+    This is the correct basis for **event-related temporal kernels**
+    in the paper (e.g. movement onset, reward), NOT log-spaced.
+
+    Each column integrates to 1 (unit area), so coefficients scale
+    average kernel magnitude and are invariant to dt.
+
+    Parameters
+    ----------
+    n_basis : int
+        Number of basis functions (columns).
+    t_min : float
+        Minimum lag in seconds (can be negative for non-causal kernels).
+    t_max : float
+        Maximum lag in seconds.
+    dt : float
+        Bin width in seconds.
+
+    Returns
+    -------
+    lags : ndarray of shape (L,)
+        Time lags in seconds.
+    B : ndarray of shape (L, K)
+        Raised cosine basis matrix (unit-area columns).
+    """
+    if t_max <= t_min:
+        raise ValueError('t_max must be greater than t_min')
+
+    # Discrete lag grid
+    lags = np.arange(t_min, t_max + 1e-12, dt)
+    K = int(n_basis)
+
+    # Linearly spaced centers
+    centers = np.linspace(t_min, t_max, K)
+    delta = centers[1] - centers[0] if K > 1 else (t_max - t_min + 1e-12)
+    width = delta * 1.5  # overlap to ensure smooth tiling
+
+    B_cols: List[np.ndarray] = []
+    for c in centers:
+        arg = (lags - c) / width
+        bk = np.cos(np.clip(arg, -np.pi, np.pi))
+        bk[np.abs(arg) > np.pi] = 0.0
+        bk = np.maximum(bk, 0.0)
+
+        # Normalize to unit area
+        area = bk.sum() * dt
+        if area > 0:
+            bk = bk / area
+
+        B_cols.append(bk)
+
+    B = np.column_stack(B_cols) if B_cols else np.zeros((lags.size, 0))
+    return lags, B
+
+
+
+def raised_log_cosine_basis(
     n_basis: int,
     t_max: float,
     dt: float,
@@ -54,11 +122,34 @@ def raised_cosine_basis(
     log_spaced: bool = True,
     eps: float = 1e-3,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Build a *causal* raised-cosine basis that tiles ``[t_min, t_max]``.
+    """
+    Build a *causal* raised-cosine basis that tiles ``[t_min, t_max]``.
 
     Each column integrates to 1 (unit area), so a weight directly scales the
     *average* contribution over its temporal support. This improves interpretability
     and keeps units consistent across different ``dt``.
+
+    Notes
+    -----
+    This implementation follows the standard *log–raised-cosine* construction
+    commonly used for temporal history filters (e.g. Pillow et al., 2008),
+    with two intentional differences from some conventional codebases:
+
+    1. **Unit-area normalization**:
+    Each basis function is normalized to integrate to 1 (rather than to
+    unit L2 norm). As a result, fitted coefficients correspond to the
+    *average contribution* of the kernel over the basis’ temporal support
+    and are invariant to the choice of time bin width ``dt``.
+
+    2. **Explicit causal masking**:
+    Basis functions are evaluated on a full lag grid and explicitly
+    masked to enforce causality and the specified ``t_min`` window,
+    which simplifies composition with other temporal bases.
+
+    These choices do not change the span of the basis, but improve
+    interpretability and comparability of fitted filters across models
+    and discretizations.
+
 
     Parameters
     ----------
@@ -116,8 +207,6 @@ def raised_cosine_basis(
 
     B = np.column_stack(B_cols) if B_cols else np.zeros((len(lags), 0))
     return lags, B
-
-
 
 
 def spline_basis(n_basis: int,
@@ -232,6 +321,7 @@ def spline_basis(n_basis: int,
 # -----------------
 # Link / intensity utilities
 # -----------------
+
 
 def safe_poisson_lambda(
     eta: float | np.ndarray,

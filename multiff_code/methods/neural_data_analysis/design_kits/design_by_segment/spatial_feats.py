@@ -3,6 +3,7 @@ from typing import Dict, Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 from neural_data_analysis.design_kits.design_by_segment import temporal_feats
+
 # your modules
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from scipy.interpolate import BSpline
@@ -181,7 +182,8 @@ def add_spatial_spline_feature(
 
 def add_circular_fourier_feature(
     design_df: pd.DataFrame,
-    theta: Union[str, np.ndarray, pd.Series],   # column name or vector of angles
+    # column name or vector of angles
+    theta: Union[str, np.ndarray, pd.Series],
     *,
     # logical feature name (e.g., 'cur_angle')
     name: Optional[str] = None,
@@ -281,6 +283,36 @@ def add_circular_fourier_feature(
     return out, meta
 
 
+def circular_fourier_design(
+    theta: np.ndarray,
+    M: int = 3,
+    degrees: bool = False,
+):
+    """
+    A cleaner version to add circular Fourier features.
+    
+    Build circular tuning using sin/cos Fourier harmonics.
+    Returns 2*M columns.
+    """
+    th = np.asarray(theta).ravel()
+    if degrees:
+        th = np.deg2rad(th)
+
+    # wrap to [-pi, pi]
+    th = np.angle(np.exp(1j * th))
+
+    cols = []
+    names = []
+    for m in range(1, M + 1):
+        cols.append(np.sin(m * th))
+        names.append(f'sin{m}')
+        cols.append(np.cos(m * th))
+        names.append(f'cos{m}')
+
+    X = np.column_stack(cols) if cols else np.empty((len(th), 0))
+    return X, names
+
+
 def add_visibility_transition_kernels(
     specs: Dict[str, temporal_feats.PredictorSpec],
     data: pd.DataFrame,
@@ -340,7 +372,7 @@ def add_visibility_transition_kernels(
     # Build or validate basis
     if basis is None:
         if family == 'rc':
-            _, B = glm_bases.raised_cosine_basis(
+            _, B = glm_bases.raised_log_cosine_basis(
                 n_basis=int(n_basis), t_max=float(t_max), dt=float(dt),
                 t_min=float(t_min), log_spaced=bool(log_spaced)
             )
@@ -382,3 +414,36 @@ def add_visibility_transition_kernels(
             signal=off, bases=[B])
 
     return specs
+
+def boxcar_design(x, n_bins=10, limits=None):
+    """
+    Boxcar (one-hot) binning with NA-baseline behavior:
+
+    - If x contains any NaN: do NOT drop any column.
+      NaN rows become all-zero -> baseline (requires intercept downstream).
+    - If x contains no NaN: drop the last bin for identifiability (w/ intercept).
+
+    Returns
+    -------
+    X : (T, n_bins) or (T, n_bins-1)
+    edges : (n_bins+1,)
+    """
+    x = np.asarray(x)
+    has_nan = np.isnan(x).any()
+
+    if limits is None:
+        lo, hi = np.nanpercentile(x, [1, 99])
+    else:
+        lo, hi = limits
+
+    edges = np.linspace(lo, hi, n_bins + 1)
+    X = np.zeros((x.size, n_bins), dtype=float)
+
+    for k in range(n_bins):
+        X[:, k] = (x >= edges[k]) & (x < edges[k + 1])
+
+    # If no NaNs exist, drop one column for identifiability (with intercept).
+    if not has_nan:
+        X = X[:, :-1]
+
+    return X, edges

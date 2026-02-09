@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT=/user_data/cicid/Multifirefly-Project
 JOB_DIR=$PROJECT_ROOT/multiff_analysis/jobs/one_ff
-SLURM_SCRIPT=$JOB_DIR/slurm/one_ff_gam_job.slurm
+SLURM_SCRIPT=$JOB_DIR/slurm/one_ff_pgam_job.slurm
 
 LOG_DIR=$JOB_DIR/logs/run_stdout
 mkdir -p "$LOG_DIR"
@@ -11,7 +11,7 @@ mkdir -p "$LOG_DIR"
 usage() {
   cat <<EOF
 Usage:
-  submit_one_ff_gam.sh [options]
+  submit_one_ff_pgam.sh [options]
 
 Options (handled by this script):
   --units N        Number of units (default: 128)
@@ -20,10 +20,10 @@ Options (handled by this script):
 All other arguments are forwarded to sbatch.
 
 Examples:
-  submit_one_ff_gam.sh
-  submit_one_ff_gam.sh --units 96
-  submit_one_ff_gam.sh --units 128 --max-parallel 8
-  submit_one_ff_gam.sh -p cpu --time=24:00:00
+  submit_one_ff_pgam.sh
+  submit_one_ff_pgam.sh --units 96
+  submit_one_ff_pgam.sh --units 128 --max-parallel 8
+  submit_one_ff_pgam.sh -p cpu --time=24:00:00
 EOF
 }
 

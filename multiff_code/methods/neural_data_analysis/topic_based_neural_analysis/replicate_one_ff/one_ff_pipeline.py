@@ -5,7 +5,6 @@ import pandas as pd
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
     one_ff_data_processing,
     population_analysis_utils,
-    one_ff_pgam_design
 )
 
 class OneFFSessionData:
@@ -165,39 +164,5 @@ class OneFFSessionData:
         self.events = all_events
 
 
-    def build_smooth_handler(
-        self,
-        unit_idx,
-        covariate_names,
-        tuning_covariates=None,
-        use_cyclic=None,
-        order=4,
-    ):
-        """
-        Build a PGAM smooth handler for a single unit.
-
-        Assumes covariates, spike counts, and events have already been computed.
-        """
-        if tuning_covariates is None:
-            tuning_covariates = covariate_names
-
-        if use_cyclic is None:
-            use_cyclic = set()
-
-        sm_handler = one_ff_pgam_design.build_smooth_handler_for_unit(
-            unit_idx=unit_idx,
-            covariates_concat=self.covariates,
-            covariate_names=covariate_names,
-            trial_id_vec=self.covariate_trial_ids,
-            Y_binned=self.Y,
-            all_events=self.events,
-            dt=self.prs.dt,
-            tuning_covariates=tuning_covariates,
-            use_cyclic=use_cyclic,
-            order=order,
-        )
-
-        return sm_handler
-        
     def get_binned_spikes_df(self):
         return pd.DataFrame(self.Y, columns=np.arange(self.n_units))

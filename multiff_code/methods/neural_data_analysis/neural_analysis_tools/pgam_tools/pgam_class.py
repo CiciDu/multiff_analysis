@@ -56,6 +56,7 @@ class PGAMclass():
         self.y_var = y_var
         self.bin_width = bin_width
         self.save_dir = save_dir
+        self.sm_handler = gdh.smooths_handler()
 
     def _categorize_features(self, temporal_vars):
         self.temporal_vars = [
@@ -81,7 +82,7 @@ class PGAMclass():
         self._categorize_features(temporal_vars)
         self._scale_features()
         self._get_mock_trials_df(num_total_trials)
-        self.sm_handler = gdh.smooths_handler()
+        
 
     def run_pgam(self, neural_cluster_number=5):
         self.neural_cluster_number = neural_cluster_number

@@ -1242,3 +1242,4 @@ def compute_marginal_tuning_ci(
     hi = np.quantile(rates, 1 - alpha / 2, axis=0).reshape(shape)
 
     return lo, hi
+

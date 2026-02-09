@@ -101,6 +101,7 @@ class FullSessionGLMRunner:
         self._fit_glm_sel_cols(show_plots=show_plots, hyperparam_tuning=hyperparam_tuning)
         print('done')  # preserve original behavior
 
+
     def assemble_merged_designs(self):
         if self._try_load_cached():
             return
@@ -224,7 +225,8 @@ class FullSessionGLMRunner:
             pn.monkey_information, pn.ff_dataframe
         )
 
-        self.new_seg_info = pd.DataFrame({
+        # new_seg_info here is basically the whole session
+        new_seg_info_fs = pd.DataFrame({
             'new_segment': 0,
             'new_seg_start_time': max(0, pn.ff_caught_T_sorted.min() - 1),
             'new_seg_end_time': pn.ff_caught_T_sorted.max(),
@@ -235,7 +237,7 @@ class FullSessionGLMRunner:
 
         rebinned_monkey_data, self.global_bins_2d = rebin_segments.rebin_all_segments_local_bins(
             pn.monkey_information,
-            self.new_seg_info,
+            new_seg_info_fs,
             bin_width=self.bin_width,
             respect_old_segment=False,
             add_bin_edges=True,
@@ -307,7 +309,7 @@ class FullSessionGLMRunner:
         best_arc_df_sub['time'] = self.mec.best_arc_df['time']
 
         rebinned_best_arc_df, best_arc_bin_edges = rebin_segments.rebin_all_segments_global_bins_pick_point(
-            best_arc_df_sub, self.new_seg_info, bins_2d=self.global_bins_2d, respect_old_segment=False,
+            best_arc_df_sub, new_seg_info, bins_2d=self.global_bins_2d, respect_old_segment=False,
             add_bin_edges=True,
         )
 
