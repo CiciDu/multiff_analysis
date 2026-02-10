@@ -8,19 +8,24 @@ import os
 import sys
 from pathlib import Path
 
+from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_class
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
+    one_ff_pipeline
+)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    one_ff_pgam_design
+)
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.parameters import (
+    default_prs
+)
+
 for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == 'Multifirefly-Project':
         os.chdir(p)
         sys.path.insert(0, str(p / 'multiff_analysis/multiff_code/methods'))
         break
-    
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_pipeline
-    
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.parameters import default_prs
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import one_ff_gam_design
 
-from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_class
 # -------------------------------------------------------
 # Repo path bootstrap
 # -------------------------------------------------------
@@ -75,7 +80,7 @@ def main(args):
     covariate_names = [
         'v', 'w', 'd', 'phi',
         'r_targ', 'theta_targ',
-        'eye_ver', 'eye_hor', 'move',
+        'eye_ver', 'eye_hor',
     ]
 
     data_obj.compute_covariates(covariate_names)
@@ -100,7 +105,7 @@ def main(args):
     # ------------------
     # Build PGAM design
     # ------------------
-    sm_handler = one_ff_gam_design.build_smooth_handler(
+    sm_handler = one_ff_pgam_design.build_smooth_handler(
         data_obj=data_obj,
         unit_idx=args.unit_idx,
         covariate_names=covariate_names,

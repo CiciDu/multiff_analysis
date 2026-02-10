@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=one_ff_pgam
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/pgam/one_ff_pgam_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/pgam/one_ff_pgam_%A_%a.err
+#SBATCH --job-name=one_ff_my_gam
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/my_gam/one_ff_my_gam_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/my_gam/one_ff_my_gam_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=30G
@@ -18,7 +18,7 @@ set -o pipefail
 # Paths
 # --------------------------------------------------
 PROJECT_ROOT='/user_data/cicid/Multifirefly-Project'
-SCRIPT_PATH="$PROJECT_ROOT/multiff_analysis/jobs/one_ff/scripts/one_ff_pgam_script.py"
+SCRIPT_PATH="$PROJECT_ROOT/multiff_analysis/jobs/one_ff/scripts/one_ff_my_gam_script.py"
 
 cd "$PROJECT_ROOT"
 
@@ -34,7 +34,7 @@ else
   exit 1
 fi
 
-conda activate pgam || {
+conda activate multiff_clean || {
   echo '[SLURM][ERROR] Conda activation failed' >&2
   exit 1
 }
@@ -49,13 +49,13 @@ set -u
 # --------------------------------------------------
 UNIT_IDX="${SLURM_ARRAY_TASK_ID}"
 
-echo '[SLURM] Running one-FF PGAM'
+echo '[SLURM] Running one-FF MY GAM'
 echo "[SLURM] Unit index: $UNIT_IDX"
 echo "[SLURM] Host: $(hostname)"
 echo "[SLURM] Start time: $(date)"
 
 # --------------------------------------------------
-# Run PGAM
+# Run MY GAM
 # --------------------------------------------------
 python -u "$SCRIPT_PATH" \
   --unit_idx "$UNIT_IDX"

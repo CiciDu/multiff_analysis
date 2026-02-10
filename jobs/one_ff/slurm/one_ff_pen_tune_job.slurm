@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=one_ff_pen_tune
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/run_stdout/one_ff_pen_tune_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/run_stdout/one_ff_pen_tune_%A_%a.err
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/pen_tune/one_ff_pen_tune_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/one_ff/logs/pen_tune/one_ff_pen_tune_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=30G
@@ -32,7 +32,7 @@ else
     exit 1
 fi
 
-conda activate pgam || {
+conda activate multiff_clean || {
     echo "[SLURM][ERROR] Conda activation failed"
     exit 1
 }

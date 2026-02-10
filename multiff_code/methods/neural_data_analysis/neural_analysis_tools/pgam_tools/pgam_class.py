@@ -127,24 +127,55 @@ class PGAMclass():
         self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, self.train_trials, self.sm_handler, self.poissFam, self.trial_ids,
                                        var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
 
-    def plot_results(self, plot_vars_in_reduced_list_only=True):
-        # find which variables in res['variable'] are in reduced.var_list
-        # and then plot the corresponding x_rate_Hz 
-        if plot_vars_in_reduced_list_only:
-            try:
-                indices_of_vars_to_plot = np.where(
-                    np.isin(self.res['variable'], self.reduced_vars))[0]
-            except Exception as e:
-                print(
-                    f"Error occurred while plotting results: {e}. Skipping...")
-                return
-        else:
-            indices_of_vars_to_plot = np.arange(self.res.shape[0])
+
+    def plot_results(
+        self,
+        plot_vars_in_reduced_list_only=False,
+        plot_var_order=None,
+    ):
 
         self._rename_variables_in_results()
-        plot_modeling_result.plot_pgam_tuning_curvetions(
-            self.res, indices_of_vars_to_plot=indices_of_vars_to_plot)
 
+        res_vars = np.array(self.res['variable'])
+
+        # ---------------------------------
+        # Determine variable ordering
+        # ---------------------------------
+        if plot_var_order is not None:
+            # keep only variables that exist
+            ordered_vars = [v for v in plot_var_order if v in res_vars]
+
+        else:
+            # default: preserve order in res
+            ordered_vars = list(res_vars)
+
+        if plot_vars_in_reduced_list_only:
+            ordered_vars = [
+                v for v in ordered_vars
+                if v in self.reduced_vars
+            ]
+
+        if len(ordered_vars) == 0:
+            print('No variables to plot after filtering.')
+            return
+
+        # ---------------------------------
+        # Map variables → indices
+        # ---------------------------------
+        indices_of_vars_to_plot = np.concatenate([
+            np.where(res_vars == v)[0]
+            for v in ordered_vars
+        ])
+
+        # ---------------------------------
+        # Plot
+        # ---------------------------------
+        plot_modeling_result.plot_pgam_tuning_curvetions(
+            self.res,
+            indices_of_vars_to_plot=indices_of_vars_to_plot,
+        )
+        
+        
     def load_pgam_results(self, neural_cluster_number):
         self.cluster_name = self.x_var.columns[neural_cluster_number]
 
@@ -257,25 +288,6 @@ class PGAMclass():
                 plot_modeling_result.plot_smoothed_spatial_feature(
                     self.spatial_sub, column, self.sm_handler)
 
-    def _rename_variables_in_results(self):
-        variable = self.res['variable']
-        # rename each variable to the corresponding label
-        variable[variable ==
-                 'catching_ff'] = 'whether catching ff at current time bin'
-        variable[variable == 'min_target_cluster_has_disappeared_for_last_time_dummy'] = 'whether target cluster has disappeared for last time'
-        variable[variable ==
-                 'max_target_cluster_visible_dummy'] = 'whether target cluster is visible'
-        variable[variable == 'gaze_world_y'] = 'gaze y-coordinate'
-        variable[variable == 'speed'] = 'monkey linear speed'
-        variable[variable == 'ang_speed'] = 'monkey linear acceleration'
-        variable[variable == 'ang_accel'] = 'change in monkey linear acceleration'
-        variable[variable == 'accel'] = 'change in monkey angular acceleration'
-        variable[variable == 'avg_target_cluster_last_seen_distance'] = 'distance of target cluster last seen'
-        variable[variable ==
-                 'avg_target_cluster_last_seen_angle'] = 'angle of target cluster last seen'
-        variable[variable ==
-                 'target_cluster_has_disappeared_for_last_time_dummy'] = 'whether target cluster has disappeared for last time'
-        self.res['variable'] = variable
 
     def _rename_variables_in_results(self):
         variable = self.res['variable']

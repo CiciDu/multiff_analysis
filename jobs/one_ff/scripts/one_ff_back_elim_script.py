@@ -2,13 +2,16 @@
 
 import os
 import sys
-import pickle
 from pathlib import Path
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
-import matplotlib.pyplot as plt
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    one_ff_gam_fit,
+    backward_elimination
+)
 
 # ---------------------------------------------------------------------
 # Locate project root
@@ -24,15 +27,7 @@ else:
 # ---------------------------------------------------------------------
 # Project-specific imports
 # ---------------------------------------------------------------------
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
-    parameters,
-    one_ff_pipeline,
-)
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_fit,
-    assemble_one_ff_gam_design,
-)
 
 # ---------------------------------------------------------------------
 # Global config (kept minimal)
@@ -52,95 +47,43 @@ np.set_printoptions(suppress=True)
 # ---------------------------------------------------------------------
 # Main analysis
 # ---------------------------------------------------------------------
+
+
 def main(unit_idx: int):
-    print(f'Running GAM analysis for unit {unit_idx}')
 
-    covariate_names = [
-        'v', 'w', 'd', 'phi',
-        'r_targ', 'theta_targ',
-        'eye_ver', 'eye_hor', 'move',
-    ]
-
-    prs = parameters.default_prs()
-
-    data_obj = one_ff_pipeline.OneFFSessionData(
-        mat_path='all_monkey_data/one_ff_data/sessions_python.mat',
-        prs=prs,
+    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_pgam_design(
+        unit_idx=unit_idx,
         session_num=0,
     )
 
-    # -------------------------------
-    # Preprocessing
-    # -------------------------------
-    data_obj.compute_covariates(covariate_names)
-    data_obj.compute_spike_counts()
-    data_obj.smooth_spikes()
-    data_obj.compute_events()
+    # Setup output directory and paths
+    outdir = Path(
+        f'all_monkey_data/one_ff_data/my_gam_results/neuron_{unit_idx}')
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    linear_vars = [
-        'v', 'w', 'd', 'r_targ',
-        'eye_ver', 'eye_hor',
-    ]
+    # Generate descriptive filename with lambda configuration
+    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(groups)
+    save_path = outdir / 'backward_elimination' / f'{lam_suffix}.pkl'
 
-    angular_vars = [
-        'phi', 'theta_targ',
-    ]
-
-    # -------------------------------
-    # Build shared design
-    # -------------------------------
-    temporal_df, temporal_meta, specs_meta = (
-        assemble_one_ff_gam_design.build_temporal_design_base(data_obj)
-    )
-
-    X_tuning, tuning_meta = (
-        assemble_one_ff_gam_design.build_tuning_design(
-            data_obj,
-            linear_vars,
-            angular_vars,
-        )
-    )
-
-    # -------------------------------
-    # Per-unit GAM
-    # -------------------------------
-    design_df, y, groups = (
-        assemble_one_ff_gam_design.assemble_unit_design_and_groups(
-            unit_idx=unit_idx,
-            data_obj=data_obj,
-            temporal_df=temporal_df,
-            temporal_meta=temporal_meta,
-            X_tuning=X_tuning,
-            tuning_meta=tuning_meta,
-            specs_meta=specs_meta,
-        )
-    )
-
-    kept, history = one_ff_gam_fit.backward_elimination_gam(
+    kept, history = backward_elimination.backward_elimination_gam(
         design_df=design_df,
         y=y,
         groups=groups,
         alpha=0.05,
         n_folds=10,
         verbose=True,
+        save_path=str(save_path),
+        save_metadata={'all_meta': all_meta},
     )
 
-    print('Final retained variables:')
+    print('\nFinal retained variables:')
     for g in kept:
         print(' ', g.name)
 
-    # -------------------------------
-    # Save results
-    # -------------------------------
-    outdir = Path(f'all_monkey_data/one_ff_data/my_gam_results/neuron_{unit_idx}')
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    pd.DataFrame(history).to_csv(outdir / 'history.csv', index=False)
-
-    with open(outdir / 'kept_groups.pkl', 'wb') as f:
-        pickle.dump(kept, f)
-
-    print(f'Saved results to {outdir}')
+    # Export history to CSV for easy viewing
+    if history:
+        pd.DataFrame(history).to_csv(outdir / 'history.csv', index=False)
+        print(f'\n✓ History exported to {outdir / "history.csv"}')
 
 
 # ---------------------------------------------------------------------

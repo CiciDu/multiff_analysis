@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     assemble_one_ff_gam_design,
-    penalty_tuning
+    one_ff_gam_fit
 )
 
 # ---------------------------------------------------------------------
@@ -49,7 +49,7 @@ np.set_printoptions(suppress=True)
 
 
 def main(unit_idx: int):
-    print(f'Running GAM penalty tuning for unit {unit_idx}')
+    print(f'Running GAM MAP fit for unit {unit_idx}')
     # -------------------------------
     # Per-unit design
     # -------------------------------
@@ -58,50 +58,31 @@ def main(unit_idx: int):
         session_num=0,
     )
 
-    # -------------------------------
-    # Penalty tuning
-    # -------------------------------
-    l1_groups = []  # coupling Laplace prior can go here later
-
-    lam_grid = {
-        'lam_f': [10, 50, 100, 300],
-        'lam_g': [1, 5, 10, 30],
-        'lam_h': [1, 5, 10],
-    }
-
-    group_name_map = {
-        'lam_f': list(all_meta['tuning']['groups'].keys()),
-        'lam_g': ['t_targ', 't_move', 't_rew'],
-        'lam_h': ['spike_hist'],
-    }
-
     outdir = Path(
         f'all_monkey_data/one_ff_data/my_gam_results/neuron_{unit_idx}')
     outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / 'fit_results').mkdir(parents=True, exist_ok=True)
 
-    best_lams, cv_results = penalty_tuning.tune_penalties(
+    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(groups)
+    save_path = outdir / 'fit_results' / f'{lam_suffix}.pkl'
+
+    fit_res = one_ff_gam_fit.fit_poisson_gam_map(
         design_df=design_df,
         y=y,
-        base_groups=groups,
-        l1_groups=l1_groups,
-        lam_grid=lam_grid,
-        group_name_map=group_name_map,
-        n_folds=5,
-        save_path=outdir / 'penalty_tuning.pkl',
+        groups=groups,
+        l1_groups=[],
+        max_iter=200,
+        tol=1e-6,
+        verbose=True,
+        save_path=str(save_path),
         save_metadata={'all_meta': all_meta},
     )
 
-    if best_lams is not None:
-        print('Best lambdas:')
-        for k, v in best_lams.items():
-            print(f'  {k}: {v}')
-        print(
-            f'Saved penalty tuning results to {outdir / "penalty_tuning.pkl"}')
-    else:
-        print('ERROR: Penalty tuning failed - no valid model fits found.')
-        print('Check the output above for details.')
-        import sys
-        sys.exit(1)
+    print('success:', fit_res.success)
+    print('message:', fit_res.message)
+    print('n_iter:', fit_res.n_iter)
+    print('final objective:', fit_res.fun)
+    print('grad_norm:', fit_res.grad_norm)
 
 
 # ---------------------------------------------------------------------
@@ -110,8 +91,7 @@ def main(unit_idx: int):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description='Run one-FF GAM penalty tuning')
+    parser = argparse.ArgumentParser(description='Run one-FF GAM fit')
     parser.add_argument('--unit_idx', type=int, required=True)
 
     args = parser.parse_args()

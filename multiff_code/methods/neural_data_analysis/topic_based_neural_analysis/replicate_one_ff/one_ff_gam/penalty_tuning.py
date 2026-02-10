@@ -117,16 +117,18 @@ def cv_score_gam(
     l1_groups,
     n_folds=5,
     random_state=0,
+    verbose_errors=False,
 ):
     """
     Returns mean held-out Poisson log-likelihood.
     """
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     ll_vals = []
+    failed_folds = []
 
     X = design_df.to_numpy()
 
-    for train_idx, test_idx in kf.split(X):
+    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X)):
         X_train = design_df.iloc[train_idx]
         y_train = y[train_idx]
 
@@ -146,11 +148,18 @@ def cv_score_gam(
         if not fit_res.success:
             # Hard fail → terrible score
             ll_vals.append(-np.inf)
+            failed_folds.append((fold_idx, fit_res.message, fit_res.grad_norm))
             continue
 
         beta = fit_res.coef.values
         rate_test = np.exp(X_test.to_numpy() @ beta)
         ll_vals.append(poisson_log_likelihood(y_test, rate_test))
+
+    # If verbose and all folds failed, print diagnostic info
+    if verbose_errors and len(failed_folds) == n_folds:
+        print(f'\n  ⚠ ALL {n_folds} FOLDS FAILED!')
+        for fold_idx, msg, grad_norm in failed_folds[:2]:  # Show first 2
+            print(f'    Fold {fold_idx}: {msg} (|grad|={grad_norm:.3e})')
 
     return np.mean(ll_vals)
 
@@ -276,15 +285,89 @@ def _print_final_summary(results, n_combinations, combo_times, best_lams, best_s
     print('='*80)
     print(f'✓ Tested {len(results)}/{n_combinations} combinations')
     print(f'✓ Total time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)')
-    print(f'✓ Average time per combination: {np.mean(combo_times):.1f}s')
-    print('\n✓ BEST PARAMETERS:')
-    for k, v in best_lams.items():
-        print(f'    {k} = {v}')
-    print(f'✓ BEST SCORE: {best_score:.6f}')
+    if combo_times:
+        print(f'✓ Average time per combination: {np.mean(combo_times):.1f}s')
+    
+    if best_lams is not None:
+        print('\n✓ BEST PARAMETERS:')
+        for k, v in best_lams.items():
+            print(f'    {k} = {v}')
+        print(f'✓ BEST SCORE: {best_score:.6f}')
+    else:
+        print('\n⚠ WARNING: No valid model fits found!')
+        print('⚠ All cross-validation fits failed (all scores were -inf)')
+        print('⚠ This may indicate:')
+        print('    - Numerical instability in the model')
+        print('    - Inappropriate penalty values')
+        print('    - Issues with the data or design matrix')
     
     if save_path is not None:
         print(f'\n✓ Results saved to: {save_path}')
     print('='*80)
+
+
+def _validate_data(design_df, y, base_groups):
+    """Validate data before running grid search."""
+    print('Validating data...')
+    
+    # Check for NaN/Inf in design matrix
+    X = design_df.to_numpy()
+    if np.any(np.isnan(X)):
+        n_nan = np.sum(np.isnan(X))
+        print(f'  ⚠ WARNING: Design matrix contains {n_nan} NaN values!')
+        return False
+    if np.any(np.isinf(X)):
+        n_inf = np.sum(np.isinf(X))
+        print(f'  ⚠ WARNING: Design matrix contains {n_inf} Inf values!')
+        return False
+    
+    # Check for NaN/Inf in response
+    if np.any(np.isnan(y)):
+        print(f'  ⚠ WARNING: Response variable contains NaN values!')
+        return False
+    if np.any(np.isinf(y)):
+        print(f'  ⚠ WARNING: Response variable contains Inf values!')
+        return False
+    
+    # Check for negative spike counts
+    if np.any(y < 0):
+        print(f'  ⚠ WARNING: Response variable contains negative values!')
+        return False
+    
+    # Check data dimensions
+    print(f'  ✓ Design matrix shape: {X.shape}')
+    print(f'  ✓ Response shape: {y.shape}')
+    print(f'  ✓ Mean spike count: {y.mean():.3f}')
+    print(f'  ✓ Spike count range: [{y.min():.1f}, {y.max():.1f}]')
+    print(f'  ✓ Non-zero spike bins: {np.sum(y > 0)} / {len(y)} ({100*np.mean(y > 0):.1f}%)')
+    print(f'  ✓ Number of groups: {len(base_groups)}')
+    
+    # Check for extreme values in design matrix
+    X_abs_max = np.abs(X).max()
+    X_abs_mean = np.abs(X).mean()
+    print(f'  ✓ Design matrix |values|: max={X_abs_max:.2e}, mean={X_abs_mean:.2e}')
+    if X_abs_max > 1e3:
+        print(f'  ⚠ WARNING: Design matrix has very large values (max={X_abs_max:.2e})')
+        print(f'  ⚠ This may cause numerical instability. Consider standardizing features.')
+    
+    # Check group specifications
+    col_index = {c: i for i, c in enumerate(design_df.columns)}
+    for g in base_groups:
+        missing_cols = [c for c in g.cols if c not in col_index]
+        if missing_cols:
+            print(f'  ⚠ WARNING: Group {g.name} has missing columns: {missing_cols}')
+            return False
+    
+    # Check for constant columns (besides intercept)
+    for col in design_df.columns:
+        if col == 'const':
+            continue
+        col_vals = design_df[col].values
+        if np.std(col_vals) < 1e-10:
+            print(f'  ⚠ WARNING: Column {col} appears to be constant!')
+    
+    print('  ✓ All data validation checks passed\n')
+    return True
 
 
 def tune_penalties(
@@ -298,6 +381,7 @@ def tune_penalties(
     save_path: Optional[str] = None,
     load_if_exists: bool = True,
     save_metadata: Optional[Dict] = None,
+    retrieve_only: bool = False,
 ):
     """
     Grid search over penalty parameters using cross-validation.
@@ -332,11 +416,16 @@ def tune_penalties(
         left off, by default True
     save_metadata : Optional[Dict], optional
         Additional metadata to save with results, by default None
+    retrieve_only : bool, optional
+        If True, only retrieve existing results without running any new fits.
+        Returns partial results if available. Useful for checking progress or
+        retrieving results from interrupted runs. Requires save_path to be set
+        and existing results file to exist, by default False
     
     Returns
     -------
-    Tuple[Dict, List[Tuple]]
-        best_lams: Dictionary of best lambda values
+    Tuple[Optional[Dict], List[Tuple]]
+        best_lams: Dictionary of best lambda values, or None if all fits failed
         results: List of (lam_setting, score) tuples for all combinations
     
     Notes
@@ -362,8 +451,46 @@ def tune_penalties(
     ...     group_name_map=group_name_map,
     ...     save_path=f'results/{filename}'
     ... )
+    
+    >>> # Retrieve existing results without running new fits
+    >>> best_lams, results = tune_penalties(
+    ...     design_df, y, base_groups, l1_groups,
+    ...     lam_grid=lam_grid,
+    ...     group_name_map=group_name_map,
+    ...     save_path='results/tuning.pkl',
+    ...     retrieve_only=True
+    ... )
     """
-    # Try to load existing results
+    # Handle retrieve_only mode
+    if retrieve_only:
+        if save_path is None:
+            raise ValueError("retrieve_only=True requires save_path to be specified")
+        if not Path(save_path).exists():
+            raise FileNotFoundError(f"No results file found at {save_path}")
+        
+        # Load whatever results exist
+        saved_data, tested_combos, best_score, best_lams, results = _load_existing_results(
+            save_path, lam_grid
+        )
+        if saved_data is not None:
+            # Complete results found
+            print(f"✓ Retrieved complete results: {len(results)} combinations")
+            return saved_data['best_lams'], saved_data['results']
+        elif results:
+            # Partial results found
+            print(f"✓ Retrieved partial results: {len(results)} combinations tested")
+            if best_lams is not None:
+                print(f"  Current best score: {best_score:.6f}")
+                print(f"  Current best lambdas: {best_lams}")
+            return best_lams, results
+        else:
+            raise ValueError(f"Results file exists at {save_path} but contains no valid results")
+    
+    # Validate data before proceeding with new fits
+    if not _validate_data(design_df, y, base_groups):
+        raise ValueError('Data validation failed! See warnings above.')
+    
+    # Try to load existing results for resumption
     if save_path is not None and load_if_exists:
         saved_data, tested_combos, best_score, best_lams, results = _load_existing_results(
             save_path, lam_grid
@@ -393,6 +520,7 @@ def tune_penalties(
     # Initialize timing
     start_time = time.time()
     combo_times = []
+    n_tested = 0  # Track how many we've actually tested (not resumed)
 
     # Main grid search loop
     for idx, values in enumerate(itertools.product(*[lam_grid[k] for k in keys]), 1):
@@ -412,9 +540,11 @@ def tune_penalties(
             for gname in group_name_map[k]:
                 lam_map[gname] = lam
 
-        # Fit and score
+        # Fit and score (show errors for first few combinations)
         groups = clone_groups_with_lams(base_groups, lam_map)
-        score = cv_score_gam(design_df, y, groups, l1_groups, n_folds)
+        verbose_errors = (n_tested < 3)  # Show detailed errors for first 3 combinations
+        score = cv_score_gam(design_df, y, groups, l1_groups, n_folds, verbose_errors=verbose_errors)
+        n_tested += 1
 
         # Track timing
         combo_time = time.time() - combo_start

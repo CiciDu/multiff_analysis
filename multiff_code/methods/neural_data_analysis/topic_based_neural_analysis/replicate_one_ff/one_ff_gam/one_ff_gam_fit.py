@@ -131,248 +131,6 @@ def _laplacian_2d_matrix(n: int) -> sparse.csr_matrix:
 # -----------------------------
 # Poisson log-link GAM (MAP)
 # -----------------------------
-def fit_poisson_gam_map(
-    design_df: pd.DataFrame,
-    y: np.ndarray,
-    *,
-    groups: List[GroupSpec],
-    l1_groups: Optional[List[GroupSpec]] = None,
-    l1_smooth_eps: float = 1e-6,
-    max_iter: int = 200,
-    tol: float = 1e-6,
-    verbose: bool = True,
-    save_path: Optional[str] = None,
-    save_design: bool = False,
-    save_metadata: Optional[Dict] = None,
-    # softclip_lo: float = -50.0,
-    # softclip_hi: float = 50.0,
-    # softclip_k: float = 5.0,
-) -> FitResult:
-    """
-    Fit Poisson log-link GAM via MAP:
-      f(beta) = sum(exp(u_tilde) - y*u_tilde) + 0.5*beta^T P beta + L1_terms
-
-    This version FIXES SciPy trust-ncg sparse Hessian issues by providing hessp
-    (Hessian-vector product) instead of returning a sparse Hessian.
-
-    Numerics:
-    - Smooth soft-clipping of u to keep exp stable while keeping derivatives consistent.
-    - Smooth L1: |b| ≈ sqrt(b^2 + eps) so Newton/trust-region remains valid.
-    
-    Parameters
-    ----------
-    design_df : pd.DataFrame
-        Design matrix with columns corresponding to features
-    y : np.ndarray
-        Response variable (spike counts)
-    groups : List[GroupSpec]
-        List of GroupSpec objects defining penalty groups
-    l1_groups : Optional[List[GroupSpec]], optional
-        List of GroupSpec objects for L1 penalty, by default None
-    l1_smooth_eps : float, optional
-        Smoothing parameter for L1 penalty, by default 1e-6
-    max_iter : int, optional
-        Maximum number of optimization iterations, by default 200
-    tol : float, optional
-        Tolerance for optimization convergence, by default 1e-6
-    verbose : bool, optional
-        Print optimization progress, by default True
-    save_path : Optional[str], optional
-        Path to save fit results (as pickle file). If None, results are not saved, by default None
-    save_design : bool, optional
-        If True, save design_df and y along with fit results, by default False
-    save_metadata : Optional[Dict], optional
-        Additional metadata to save (e.g., neuron ID, session info), by default None
-    
-    Returns
-    -------
-    FitResult
-        Fitted model results including coefficients and convergence information
-    """
-    X = design_df.to_numpy(dtype=float)
-    y = np.asarray(y, dtype=float).ravel()
-    n, p = X.shape
-
-    col_index = {c: i for i, c in enumerate(design_df.columns)}
-    P, _ = build_penalty_blocks(groups, col_index, ridge=1e-6)
-
-    # L1 groups (smooth |b| with sqrt(b^2 + eps))
-    l1_groups = l1_groups or []
-    l1_terms: List[Tuple[np.ndarray, float]] = []
-    for g in l1_groups:
-        if g.lam is None or float(g.lam) == 0.0:
-            continue
-        idx = np.array([col_index[c] for c in g.cols if c in col_index], dtype=int)
-        if idx.size == 0:
-            continue
-        l1_terms.append((idx, float(g.lam)))
-
-    def _l1_smooth_diag(beta: np.ndarray) -> Tuple[float, np.ndarray, np.ndarray]:
-        """
-        Smooth L1:
-          phi(b) = sqrt(b^2 + eps)
-        Accumulates:
-          f_l1 (scalar), grad_l1 (p,), hess_l1_diag (p,)
-        """
-        if not l1_terms:
-            return 0.0, np.zeros_like(beta), np.zeros_like(beta)
-
-        eps = float(l1_smooth_eps)
-        f_l1 = 0.0
-        grad_l1 = np.zeros_like(beta)
-        hess_l1_diag = np.zeros_like(beta)
-
-        for idx, lam in l1_terms:
-            b = beta[idx]
-            s = np.sqrt(b * b + eps)
-            f_l1 += lam * float(np.sum(s))
-            grad_l1[idx] += lam * (b / s)
-            hess_l1_diag[idx] += lam * (eps / (s ** 3))
-
-        return f_l1, grad_l1, hess_l1_diag
-
-    def _core_terms(beta: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Exact Poisson terms (no soft clipping) so Hessian is PSD and matches MATLAB.
-        Returns: u, du (ones), d2u (zeros), rate, w2 (rate)
-        """
-        u = X @ beta
-        rate = np.exp(u)     # exact
-        # For exact Poisson with u = Xb:
-        # du = 1, d2u = 0 so
-        # w2 = rate (since rate * du^2 + (rate - y)*d2u = rate)
-        du = np.ones_like(u)
-        d2u = np.zeros_like(u)
-        w2 = rate
-        return u, du, d2u, rate, w2
-
-    def fun(beta: np.ndarray) -> float:
-        u_tilde, _, _, rate, _ = _core_terms(beta)
-
-        f_data = float(np.sum(rate - y * u_tilde))
-
-        Pb = P @ beta
-        f_pen = 0.5 * float(beta @ Pb)
-
-        f_l1, _, _ = _l1_smooth_diag(beta)
-
-        return f_data + f_pen + f_l1
-
-    def jac(beta: np.ndarray) -> np.ndarray:
-        u_tilde, du, _, rate, _ = _core_terms(beta)
-
-        # df/dbeta from data term via chain: X.T @ ((rate - y) * du)
-        w1 = (rate - y) * du
-        grad_data = X.T @ w1
-
-        grad_pen = P @ beta
-
-        _, grad_l1, _ = _l1_smooth_diag(beta)
-
-        return grad_data + grad_pen + grad_l1
-
-    def hessp(beta: np.ndarray, v: np.ndarray) -> np.ndarray:
-        """
-        Hessian-vector product:
-          (X.T diag(w2) X) v + P v + diag(hess_l1_diag) v
-        """
-        _, _, _, _, w2 = _core_terms(beta)
-
-        Xv = X @ v
-        Hv_data = X.T @ (w2 * Xv)
-
-        Hv_pen = P @ v
-
-        _, _, hess_l1_diag = _l1_smooth_diag(beta)
-        Hv_l1 = hess_l1_diag * v
-
-        return Hv_data + Hv_pen + Hv_l1
-
-    rng = np.random.default_rng(0)
-    beta0 = 1e-3 * rng.standard_normal(p)
-
-    # sensible intercept init if column exists
-    if 'const' in col_index:
-        idx0 = col_index['const']
-        eps = 1e-8
-        beta0[idx0] = np.log(np.maximum(y.mean(), eps))
-        
-    # --- INSERT THIS BLOCK right before:  res = minimize(...)
-    progress_state = {'iter': 0, 'prev_beta': beta0.copy()}
-
-    def _callback(xk: np.ndarray) -> None:
-        # Called once per iteration by scipy.optimize.minimize
-        progress_state['iter'] += 1
-
-        f = float(fun(xk))
-        gnorm = float(np.linalg.norm(jac(xk)))
-        step_norm = float(np.linalg.norm(xk - progress_state['prev_beta']))
-        progress_state['prev_beta'] = xk.copy()
-
-        print(f'[iter {progress_state["iter"]:4d}] fun={f: .6e} |grad|={gnorm: .3e} |step|={step_norm: .3e}')
-        
-           
-    res = minimize(
-        fun=fun,
-        x0=beta0,
-        method='trust-ncg',
-        jac=jac,
-        hessp=hessp,               # <-- key fix (no sparse Hessian returned)
-        callback=_callback if verbose else None,        # <-- ADD THIS LINE
-        options={'maxiter': int(max_iter), 'gtol': float(tol), 'disp': bool(verbose)},
-    )
-
-    beta_hat = res.x
-    grad_norm = float(np.linalg.norm(jac(beta_hat)))
-
-    fit_result = FitResult(
-        coef=pd.Series(beta_hat, index=design_df.columns, name='beta'),
-        success=bool(res.success),
-        message=str(res.message),
-        n_iter=int(getattr(res, 'nit', -1)),
-        fun=float(res.fun),
-        grad_norm=grad_norm,
-    )
-    
-    # Save results if save_path is provided
-    if save_path is not None:
-        save_path = Path(save_path)
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        save_dict = {
-            'fit_result': {
-                'coef': fit_result.coef,
-                'success': fit_result.success,
-                'message': fit_result.message,
-                'n_iter': fit_result.n_iter,
-                'fun': fit_result.fun,
-                'grad_norm': fit_result.grad_norm,
-            },
-            'groups': [asdict(g) for g in groups],
-            'l1_groups': [asdict(g) for g in l1_groups] if l1_groups else None,
-            'hyperparameters': {
-                'l1_smooth_eps': l1_smooth_eps,
-                'max_iter': max_iter,
-                'tol': tol,
-            },
-        }
-        
-        if save_design:
-            save_dict['design_df'] = design_df
-            save_dict['y'] = y
-        
-        if save_metadata is not None:
-            save_dict['metadata'] = save_metadata
-        
-        with open(save_path, 'wb') as f:
-            pickle.dump(save_dict, f)
-        
-        if verbose:
-            print(f'\nResults saved to: {save_path}')
-
-    return fit_result
-    
-    
 def load_fit_results(save_path: str) -> Dict:
     """
     Load saved GAM fit results from pickle file.
@@ -415,7 +173,7 @@ def load_elimination_results(save_path: str) -> Dict:
         - history: List of elimination steps with statistics
         - completed: Boolean indicating if elimination finished
         - current_step: Number of steps completed
-        - lambda_config: Dict mapping group names to lambda values used
+        - lambda_config: Dict with 4 main lambda parameters (lam_f, lam_g, lam_h, lam_p)
         - metadata: Additional metadata (if provided during elimination)
         
     Note
@@ -582,412 +340,380 @@ def _format_lambda(lam):
 
 def generate_lambda_suffix(groups, delimiter='_'):
     """
-    Generate a filename suffix based on lambda configuration.
+    Generate a filename suffix based on the 4 main lambda parameters.
     
     Parameters
     ----------
     groups : List[GroupSpec]
         Groups with lambda values
     delimiter : str, optional
-        Delimiter between group-lambda pairs, by default '_'
+        Delimiter between lambda pairs, by default '_'
     
     Returns
     -------
     str
-        Filename suffix like 'pos-100_vel-100_spike-1'
+        Filename suffix like 'lamF-100_lamG-10_lamH-10_lamP-10'
         
     Examples
     --------
-    >>> groups = [GroupSpec('position', cols, '2D', lam=100.0),
-    ...           GroupSpec('velocity', cols, '2D', lam=100.0)]
+    >>> groups = [
+    ...     GroupSpec('t_targ', cols, 'event', lam=10.0),
+    ...     GroupSpec('spike_hist', cols, 'event', lam=10.0),
+    ...     GroupSpec('position', cols, '1D', lam=100.0)
+    ... ]
     >>> generate_lambda_suffix(groups)
-    'position-100_velocity-100'
+    'lamF-100_lamG-10_lamH-10'
+    
+    Notes
+    -----
+    Extracts the 4 main lambda parameters:
+    - lam_f: firefly features (tuning curves)
+    - lam_g: temporal event kernels (t_*)
+    - lam_h: spike history
+    - lam_p: coupling (cpl_*)
     """
+    lambda_config = _extract_lambda_config(groups)
+    
     parts = []
-    for g in groups:
-        lam_str = _format_lambda(g.lam).replace('.', 'p')
-        parts.append(f'{g.name}-{lam_str}')
+    # Order: F, G, H, P for consistency
+    for key in ['lam_f', 'lam_g', 'lam_h', 'lam_p']:
+        if key in lambda_config:
+            lam_str = _format_lambda(lambda_config[key]).replace('.', 'p')
+            # Use capitalized short names: lamF, lamG, lamH, lamP
+            short_name = key.replace('lam_', 'lam').upper()
+            parts.append(f'{short_name}-{lam_str}')
+    
     return delimiter.join(parts)
 
 
 def _extract_lambda_config(groups):
-    """Extract lambda configuration from groups for validation."""
-    return {g.name: g.lam for g in groups}
-
-
-def _validate_lambda_match(saved_lambdas, current_lambdas):
-    """Check if lambda configurations match."""
-    if saved_lambdas.keys() != current_lambdas.keys():
-        return False, "Group names don't match"
+    """
+    Extract the 4 main lambda parameters from groups for validation.
     
-    mismatches = []
-    for name in saved_lambdas:
-        if abs(saved_lambdas[name] - current_lambdas[name]) > 1e-10:
-            mismatches.append(
-                f"{name}: saved={saved_lambdas[name]:.6e}, current={current_lambdas[name]:.6e}"
-            )
+    Returns:
+        dict: {'lam_f': float, 'lam_g': float, 'lam_h': float, 'lam_p': float}
+    """
+    lambda_config = {}
     
-    if mismatches:
-        return False, "Lambda values don't match:\n  " + "\n  ".join(mismatches)
-    
-    return True, "Lambda values match"
-
-
-def _load_elimination_results(save_path, current_groups):
-    """Load existing backward elimination results and validate lambda values."""
-    save_path_obj = Path(save_path)
-    if not save_path_obj.exists():
-        return None
-    
-    print('='*80)
-    print(f'Loading existing results from: {save_path}')
-    
-    with open(save_path, 'rb') as f:
-        saved_data = pickle.load(f)
-    
-    # Validate lambda configuration
-    if 'lambda_config' in saved_data:
-        current_lambdas = _extract_lambda_config(current_groups)
-        matches, msg = _validate_lambda_match(saved_data['lambda_config'], current_lambdas)
-        
-        if not matches:
-            print('⚠ WARNING: Lambda mismatch detected!')
-            print(f'⚠ {msg}')
-            print('⚠ Ignoring cached results due to lambda mismatch.')
-            print('='*80)
-            return None
-        else:
-            print('✓ Lambda values validated - match saved configuration')
-    else:
-        print('⚠ Warning: No lambda information in saved file (old format)')
-    
-    if saved_data.get('completed', False):
-        print('✓ Backward elimination already complete.')
-        print(f'✓ Final model has {len(saved_data["kept_groups"])} groups')
-        print(f'✓ Groups retained: {[g["name"] for g in saved_data["kept_groups"]]}')
-        print('='*80)
-        return saved_data
-    
-    print(f'⚠ Found partial results: {saved_data["current_step"]} steps completed')
-    print(f'⚠ Current model has {len(saved_data["kept_groups"])} groups')
-    print('⚠ Resuming elimination...')
-    print('='*80)
-    return saved_data
-
-
-def _save_elimination_state(save_path_obj, kept, history, completed, current_step, 
-                            save_metadata, initial_groups):
-    """Save the current backward elimination state with lambda configuration."""
-    # Convert GroupSpec objects to dicts for serialization
-    kept_dicts = [
-        {
-            'name': g.name,
-            'cols': g.cols,
-            'vartype': g.vartype,
-            'lam': g.lam,
-        }
-        for g in kept
-    ]
-    
-    # Extract lambda configuration from initial groups for validation
-    lambda_config = _extract_lambda_config(initial_groups)
-    
-    save_dict = {
-        'kept_groups': kept_dicts,
-        'history': history,
-        'completed': completed,
-        'current_step': current_step,
-        'lambda_config': lambda_config,  # Save lambda values for validation
-    }
-    
-    if save_metadata is not None:
-        save_dict['metadata'] = save_metadata
-    
-    with open(save_path_obj, 'wb') as f:
-        pickle.dump(save_dict, f)
-
-
-def _print_elimination_header(groups, n_folds, alpha, ll_initial):
-    """Print header for backward elimination."""
-    print('='*80)
-    print('BACKWARD ELIMINATION - GAM')
-    print('='*80)
-    print(f'Initial groups: {len(groups)}')
-    print(f'CV folds: {n_folds}')
-    print(f'Significance level (α): {alpha}')
-    print(f'Initial model LL: {ll_initial:.6f}')
-    print('\nPenalty (λ) configuration:')
     for g in groups:
-        print(f'  {g.name}: λ={_format_lambda(g.lam)}')
-    print('='*80)
-
-
-def _print_elimination_step_header(step, n_kept):
-    """Print header for elimination step."""
-    print(f'\n{"="*80}')
-    print(f'STEP {step}: Evaluating {n_kept} groups for removal')
-    print(f'{"="*80}')
-
-
-def _print_candidate_progress(idx, total, group_name, mean_delta, p_val, elapsed, avg_time):
-    """Print progress for candidate evaluation."""
-    progress = idx / total
-    bar_length = 30
-    filled = int(bar_length * progress)
-    bar = '█' * filled + '░' * (bar_length - filled)
+        # Determine which lambda type this group uses
+        if g.name.startswith('t_'):
+            # lam_g: temporal event kernels
+            key = 'lam_g'
+        elif g.name == 'spike_hist':
+            # lam_h: spike history
+            key = 'lam_h'
+        elif g.name.startswith('cpl_'):
+            # lam_p: coupling
+            key = 'lam_p'
+        else:
+            # lam_f: tuning curves (firefly features)
+            key = 'lam_f'
+        
+        # Store or verify consistency
+        if key in lambda_config:
+            if abs(lambda_config[key] - g.lam) > 1e-10:
+                raise ValueError(
+                    f"Inconsistent lambda values for {key}: "
+                    f"found {lambda_config[key]} and {g.lam}"
+                )
+        else:
+            lambda_config[key] = g.lam
     
-    print(f'  [{idx}/{total}] {bar} {100*progress:.0f}%')
-    print(f'    Group: {group_name}')
-    print(f'    ΔLL = {mean_delta:+.6f}, p = {p_val:.4f}')
-    print(f'    Time: {elapsed:.1f}s (avg: {avg_time:.1f}s/candidate)')
+    return lambda_config
 
 
-def _print_elimination_decision(best, removed, kept_names):
-    """Print decision after evaluating all candidates."""
-    print('\n' + '─'*80)
-    print('DECISION:')
-    if removed:
-        print(f'  ✓ REMOVED: {best["group"].name}')
-        print(f'    ΔLL = {best["mean_delta"]:+.6f}, p = {best["p_value"]:.4f}')
-        print(f'  → Remaining groups ({len(kept_names)}): {kept_names}')
-    else:
-        print(f'  ✗ STOP: {best["group"].name} is significant (p = {best["p_value"]:.4f})')
-        print('  → All remaining groups are necessary')
-        print(f'  → Final groups ({len(kept_names)}): {kept_names}')
-    print('─'*80)
+def _maybe_load_saved_fit(save_path, load_if_exists, verbose):
+    if save_path is None or not load_if_exists:
+        return None
+
+    save_path = Path(save_path)
+    if not save_path.exists():
+        return None
+
+    if verbose:
+        print('=' * 80)
+        print(f'Loading existing results from: {save_path}')
+        print('=' * 80)
+
+    saved = load_fit_results(save_path)['fit_result']
+    fit_result = FitResult(**saved)
+
+    if verbose:
+        print(f'✓ Loaded saved fit result:')
+        print(f'  Success: {fit_result.success}')
+        print(f'  Iterations: {fit_result.n_iter}')
+        print(f'  Final objective: {fit_result.fun:.6e}')
+        print(f'  Gradient norm: {fit_result.grad_norm:.3e}')
+        print('=' * 80)
+
+    return fit_result
 
 
-def _print_elimination_summary(kept, history, total_time):
-    """Print final summary of backward elimination."""
-    print('\n' + '='*80)
-    print('BACKWARD ELIMINATION COMPLETE')
-    print('='*80)
-    print(f'✓ Total steps: {len(history)}')
-    print(f'✓ Variables removed: {len(history)}')
-    print(f'✓ Variables retained: {len(kept)}')
-    print(f'✓ Total time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)')
-    
-    print(f'\n✓ FINAL MODEL ({len(kept)} groups):')
-    for g in kept:
-        print(f'    • {g.name}')
-    
-    if history:
-        print('\n✓ ELIMINATION HISTORY:')
-        for h in history:
-            print(f'    Step {h["step"]}: Removed {h["removed"]} '
-                  f'(ΔLL={h["delta_ll"]:+.4f}, p={h["p_value"]:.4f})')
-    
-    print('='*80)
+def _build_l1_terms(l1_groups, col_index):
+    terms = []
+    for g in l1_groups:
+        if g.lam is None or float(g.lam) == 0.0:
+            continue
+        idx = np.array([col_index[c] for c in g.cols if c in col_index], dtype=int)
+        if idx.size > 0:
+            terms.append((idx, float(g.lam)))
+    return terms
 
 
-def backward_elimination_gam(
+def _make_l1_smooth_fns(l1_terms, eps, p):
+    def f(beta):
+        if not l1_terms:
+            return 0.0
+        return sum(lam * np.sum(np.sqrt(beta[idx] ** 2 + eps)) for idx, lam in l1_terms)
+
+    def grad(beta):
+        g = np.zeros(p)
+        for idx, lam in l1_terms:
+            b = beta[idx]
+            s = np.sqrt(b * b + eps)
+            g[idx] += lam * (b / s)
+        return g
+
+    def hess_diag(beta):
+        h = np.zeros(p)
+        for idx, lam in l1_terms:
+            b = beta[idx]
+            s = np.sqrt(b * b + eps)
+            h[idx] += lam * (eps / (s ** 3))
+        return h
+
+    return f, grad, hess_diag
+
+
+def _make_poisson_objective(X, y, P, l1_fun, l1_grad, l1_hess_diag):
+    def fun(beta):
+        u = X @ beta
+        rate = np.exp(u)
+        return (
+            np.sum(rate - y * u)
+            + 0.5 * beta @ (P @ beta)
+            + l1_fun(beta)
+        )
+
+    def jac(beta):
+        u = X @ beta
+        rate = np.exp(u)
+        return (
+            X.T @ (rate - y)
+            + P @ beta
+            + l1_grad(beta)
+        )
+
+    def hessp(beta, v):
+        u = X @ beta
+        rate = np.exp(u)
+        return (
+            X.T @ (rate * (X @ v))
+            + P @ v
+            + l1_hess_diag(beta) * v
+        )
+
+    return fun, jac, hessp
+
+
+def _init_beta(y, p, col_index):
+    rng = np.random.default_rng(0)
+    beta0 = 1e-3 * rng.standard_normal(p)
+    if 'const' in col_index:
+        beta0[col_index['const']] = np.log(max(y.mean(), 1e-8))
+    return beta0
+
+
+def _make_callback(fun, jac, beta0):
+    state = {'iter': 0, 'prev_beta': beta0.copy()}
+
+    def callback(xk):
+        state['iter'] += 1
+        f = float(fun(xk))
+        gnorm = float(np.linalg.norm(jac(xk)))
+        step = float(np.linalg.norm(xk - state['prev_beta']))
+        state['prev_beta'] = xk.copy()
+        print(f'[iter {state["iter"]:4d}] fun={f: .6e} |grad|={gnorm: .3e} |step|={step: .3e}')
+
+    return callback
+
+
+def _save_fit_results(
+    *,
+    save_path,
+    fit_result,
+    groups,
+    l1_groups,
     design_df,
     y,
-    groups,
-    *,
-    alpha=0.05,
-    n_folds=10,
-    verbose=True,
-    save_path: Optional[str] = None,
-    load_if_exists: bool = True,
-    save_metadata: Optional[Dict] = None,
+    save_metadata,
+    hyperparameters,
+    verbose,
 ):
-    """
-    Paper-faithful backward elimination for one neuron with incremental saving.
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
 
-    Parameters
-    ----------
-    design_df : pd.DataFrame
-        Design matrix
-    y : np.ndarray
-        Response variable
-    groups : List[GroupSpec]
-        Initial group specifications with penalty (lambda) values
-    alpha : float, optional
-        Significance level for retention, by default 0.05
-    n_folds : int, optional
-        Number of CV folds, by default 10
-    verbose : bool, optional
-        Print progress information, by default True
-    save_path : Optional[str], optional
-        Path to save elimination results. If provided, results are saved after
-        each step, by default None
-    load_if_exists : bool, optional
-        If True and save_path exists, load and resume from saved state. 
-        Lambda values are validated against saved configuration - if they don't
-        match, cached results are ignored, by default True
-    save_metadata : Optional[Dict], optional
-        Additional metadata to save with results, by default None
+    save_dict = {
+        'fit_result': asdict(fit_result),
+        'groups': [asdict(g) for g in groups],
+        'l1_groups': [asdict(g) for g in l1_groups] if l1_groups else None,
+        'hyperparameters': hyperparameters,
+    }
 
-    Returns
-    -------
-    kept_groups : list of GroupSpec
-        Variables retained in the final model.
-    history : list of dict
-        Elimination steps and statistics.
+    if design_df is not None:
+        save_dict['design_df'] = design_df
+        save_dict['y'] = y
+
+    if save_metadata is not None:
+        save_dict['metadata'] = save_metadata
+
+    with open(save_path, 'wb') as f:
+        pickle.dump(save_dict, f)
+
+    if verbose:
+        print(f'\nResults saved to: {save_path}')
         
-    Notes
-    -----
-    Lambda (penalty) values from the input groups are saved with the results.
-    When loading cached results, the function validates that lambda values match.
-    This ensures that elimination results are only reused when penalty settings
-    are identical.
-    
-    For convenience, use `generate_lambda_suffix(groups)` to create descriptive
-    filenames that include lambda configuration, e.g.:
-        suffix = generate_lambda_suffix(groups)
-        save_path = f'results/elimination_{suffix}.pkl'
-    
-    Examples
-    --------
-    >>> # Basic usage
-    >>> kept, history = backward_elimination_gam(
-    ...     design_df, y, groups,
-    ...     save_path='results/elim.pkl'
-    ... )
-    
-    >>> # With lambda-based filename
-    >>> suffix = generate_lambda_suffix(groups)
-    >>> kept, history = backward_elimination_gam(
-    ...     design_df, y, groups,
-    ...     save_path=f'results/elim_{suffix}.pkl'
-    ... )
-    """
-    import time
-    start_time = time.time()
-    
-    # Save initial groups for lambda validation throughout
-    initial_groups = groups.copy()
-    
-    # Try to load existing results
-    if save_path is not None and load_if_exists:
-        saved_data = _load_elimination_results(save_path, initial_groups)
-        if saved_data is not None and saved_data.get('completed', False):
-            # Reconstruct GroupSpec objects
-            kept = [
-                GroupSpec(
-                    name=g['name'],
-                    cols=g['cols'],
-                    vartype=g['vartype'],
-                    lam=g['lam'],
-                )
-                for g in saved_data['kept_groups']
-            ]
-            return kept, saved_data['history']
-    
-    # Initialize or resume
-    kept = groups.copy()
-    history = []
-    step = 0
-    
-    # Prepare save path if needed
-    save_path_obj = None
-    if save_path is not None:
-        save_path_obj = Path(save_path)
-        save_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
-    # Compute baseline CV LL for full model
-    ll_full = cross_validated_ll(
-        design_df, y, kept, n_folds=n_folds
+def fit_poisson_gam_map(
+    design_df: pd.DataFrame,
+    y: np.ndarray,
+    *,
+    groups: List[GroupSpec],
+    l1_groups: Optional[List[GroupSpec]] = None,
+    l1_smooth_eps: float = 1e-6,
+    max_iter: int = 200,
+    tol: float = 1e-6,
+    optimizer: str = 'L-BFGS-B',
+    verbose: bool = True,
+    save_path: Optional[str] = None,
+    save_design: bool = False,
+    save_metadata: Optional[Dict] = None,
+    load_if_exists: bool = True,
+) -> FitResult:
+    # ------------------------------------------------------------------
+    # 1) Load cached result if requested
+    # ------------------------------------------------------------------
+    maybe_loaded = _maybe_load_saved_fit(
+        save_path=save_path,
+        load_if_exists=load_if_exists,
+        verbose=verbose,
     )
-    
+    if maybe_loaded is not None:
+        return maybe_loaded
+
+    # ------------------------------------------------------------------
+    # 2) Prepare data and penalties
+    # ------------------------------------------------------------------
+    X = design_df.to_numpy(dtype=float)
+    y = np.asarray(y, dtype=float).ravel()
+    n, p = X.shape
+
+    col_index = {c: i for i, c in enumerate(design_df.columns)}
+    P, _ = build_penalty_blocks(groups, col_index, ridge=1e-6)
+
+    l1_terms = _build_l1_terms(l1_groups or [], col_index)
+
+    l1_fun, l1_grad, l1_hess_diag = _make_l1_smooth_fns(
+        l1_terms=l1_terms,
+        eps=l1_smooth_eps,
+        p=p,
+    )
+
+    # ------------------------------------------------------------------
+    # 3) Objective, gradient, Hessian-vector product
+    # ------------------------------------------------------------------
+    fun, jac, hessp = _make_poisson_objective(
+        X=X,
+        y=y,
+        P=P,
+        l1_fun=l1_fun,
+        l1_grad=l1_grad,
+        l1_hess_diag=l1_hess_diag,
+    )
+
+    # ------------------------------------------------------------------
+    # 4) Initialization and callback
+    # ------------------------------------------------------------------
+    beta0 = _init_beta(y=y, p=p, col_index=col_index)
+
+    callback = _make_callback(fun, jac, beta0) if verbose else None
+
+    # ------------------------------------------------------------------
+    # 4.5) Diagnostics
+    # ------------------------------------------------------------------
     if verbose:
-        _print_elimination_header(initial_groups, n_folds, alpha, ll_full.mean())
+        u0 = X @ beta0
+        print('\n' + '=' * 80)
+        print('PRE-OPTIMIZATION DIAGNOSTICS')
+        print('=' * 80)
+        print(f"Design matrix shape: {X.shape}")
+        print(f"X range: [{X.min():.2e}, {X.max():.2e}]")
+        print(f"y range: [{y.min():.2e}, {y.max():.2e}]")
+        print(f"y mean: {y.mean():.2e}, y sum: {y.sum():.2e}")
+        print(f"Initial beta range: [{beta0.min():.2e}, {beta0.max():.2e}]")
+        print(f"Initial u = X @ beta0 range: [{u0.min():.2e}, {u0.max():.2e}]")
+        print(f"Initial rate = exp(u) range: [{np.exp(u0).min():.2e}, {np.exp(u0).max():.2e}]")
+        print(f"Initial objective: {fun(beta0):.6e}")
+        print(f"Initial gradient norm: {np.linalg.norm(jac(beta0)):.3e}")
+        print('=' * 80 + '\n')
 
-    improved = True
-
-    while improved and len(kept) > 1:
-        step += 1
-        improved = False
-        candidates = []
-        
-        if verbose:
-            _print_elimination_step_header(step, len(kept))
-        
-        # Timing for candidate evaluation
-        candidate_times = []
-
-        for i, g in enumerate(kept, start=1):
-            cand_start = time.time()
-            
-            reduced = [gg for gg in kept if gg.name != g.name]
-
-            ll_reduced = cross_validated_ll(
-                design_df, y, reduced, n_folds=n_folds
-            )
-
-            delta = ll_reduced - ll_full  # per fold
-            mean_delta = delta.mean()
-
-            # Paired test: is removal NOT harmful?
-            t_stat, p_val = ttest_1samp(delta, 0.0)
-
-            candidates.append({
-                'group': g,
-                'mean_delta': mean_delta,
-                'p_value': p_val,
-                'll_reduced': ll_reduced,
-            })
-            
-            cand_time = time.time() - cand_start
-            candidate_times.append(cand_time)
-
-            if verbose:
-                avg_time = np.mean(candidate_times)
-                _print_candidate_progress(
-                    i, len(kept), g.name, mean_delta, p_val, cand_time, avg_time
-                )
-
-        # Choose the variable whose removal hurts least
-        candidates.sort(key=lambda x: x['mean_delta'], reverse=True)
-        best = candidates[0]
-
-        # Decision rule:
-        # If removal does NOT significantly decrease LL → remove it
-        will_remove = best['p_value'] > alpha and best['mean_delta'] >= 0
-        
-        if will_remove:
-            removed_group = best['group']
-            kept = [g for g in kept if g.name != removed_group.name]
-            ll_full = best['ll_reduced']
-            improved = True
-
-            history.append({
-                'step': step,
-                'removed': removed_group.name,
-                'delta_ll': best['mean_delta'],
-                'p_value': best['p_value'],
-            })
-        
-        if verbose:
-            kept_names = [g.name for g in kept]
-            _print_elimination_decision(best, will_remove, kept_names)
-        
-        # Save incrementally after each step
-        if save_path_obj is not None:
-            _save_elimination_state(
-                save_path_obj, kept, history, 
-                completed=not improved,  # Mark complete if we're stopping
-                current_step=step,
-                save_metadata=save_metadata,
-                initial_groups=initial_groups
-            )
-
-    # Print final summary
-    total_time = time.time() - start_time
-    if verbose:
-        _print_elimination_summary(kept, history, total_time)
-    
-    # Final save marking completion
-    if save_path_obj is not None:
-        _save_elimination_state(
-            save_path_obj, kept, history,
-            completed=True,
-            current_step=step,
-            save_metadata=save_metadata,
-            initial_groups=initial_groups
+    # ------------------------------------------------------------------
+    # 5) Optimize
+    # ------------------------------------------------------------------
+    if optimizer.upper() == 'L-BFGS-B':
+        res = minimize(
+            fun=fun,
+            x0=beta0,
+            method='L-BFGS-B',
+            jac=jac,
+            callback=callback,
+            options={'maxiter': int(max_iter), 'ftol': float(tol), 'disp': bool(verbose)},
         )
-        if verbose:
-            print(f'\n✓ Results saved to: {save_path}')
+    elif optimizer.lower() == 'trust-ncg':
+        res = minimize(
+            fun=fun,
+            x0=beta0,
+            method='trust-ncg',
+            jac=jac,
+            hessp=hessp,
+            callback=callback,
+            options={'maxiter': int(max_iter), 'gtol': float(tol), 'disp': bool(verbose)},
+        )
+    else:
+        raise ValueError(f"Unsupported optimizer: {optimizer}. Choose 'L-BFGS-B' or 'trust-ncg'.")
 
-    return kept, history
+    beta_hat = res.x
+    grad_norm = float(np.linalg.norm(jac(beta_hat)))
+
+    fit_result = FitResult(
+        coef=pd.Series(beta_hat, index=design_df.columns, name='beta'),
+        success=bool(res.success),
+        message=str(res.message),
+        n_iter=int(getattr(res, 'nit', -1)),
+        fun=float(res.fun),
+        grad_norm=grad_norm,
+    )
+
+    # ------------------------------------------------------------------
+    # 6) Save results
+    # ------------------------------------------------------------------
+    if save_path is not None:
+        _save_fit_results(
+            save_path=save_path,
+            fit_result=fit_result,
+            groups=groups,
+            l1_groups=l1_groups,
+            design_df=design_df if save_design else None,
+            y=y if save_design else None,
+            save_metadata=save_metadata,
+            hyperparameters={
+                'l1_smooth_eps': l1_smooth_eps,
+                'max_iter': max_iter,
+                'tol': tol,
+                'optimizer': optimizer,
+            },
+            verbose=verbose,
+        )
+
+    return fit_result

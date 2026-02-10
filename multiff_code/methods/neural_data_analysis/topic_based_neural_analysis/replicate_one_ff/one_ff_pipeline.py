@@ -110,6 +110,7 @@ class OneFFSessionData:
 
         self.covariates = covariates_concat
         self.covariate_trial_ids = trial_id_vec
+        self.data_df = pd.DataFrame(self.covariates, columns=covariate_names)
 
     def compute_spike_counts(self):
         """
@@ -144,7 +145,7 @@ class OneFFSessionData:
         self.Y_smooth = Y_smooth
 
 
-    def compute_events(self, event_names=('t_targ', 't_move', 't_rew')):
+    def compute_events(self, event_names=('t_move', 't_stop', 't_targ', 't_rew')):
         """
         Concatenate event impulse vectors across trials.
         """

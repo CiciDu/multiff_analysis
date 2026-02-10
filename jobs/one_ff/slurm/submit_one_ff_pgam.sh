@@ -5,7 +5,7 @@ PROJECT_ROOT=/user_data/cicid/Multifirefly-Project
 JOB_DIR=$PROJECT_ROOT/multiff_analysis/jobs/one_ff
 SLURM_SCRIPT=$JOB_DIR/slurm/one_ff_pgam_job.slurm
 
-LOG_DIR=$JOB_DIR/logs/run_stdout
+LOG_DIR=$JOB_DIR/logs/pgam
 mkdir -p "$LOG_DIR"
 
 usage() {
@@ -31,7 +31,7 @@ EOF
 # Defaults
 # ------------------------------
 N_UNITS=128
-MAX_PARALLEL=4
+MAX_PARALLEL=3
 FORWARD_ARGS=()
 
 # ------------------------------
@@ -72,5 +72,5 @@ echo "[SUBMIT] Slurm script: $SLURM_SCRIPT"
 # ------------------------------
 sbatch \
   --array=0-"$ARRAY_MAX"%$MAX_PARALLEL \
-  "${FORWARD_ARGS[@]}" \
+  ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
   "$SLURM_SCRIPT"

@@ -71,17 +71,31 @@ def build_smooth_handler(
     tuning_covariates=None,
     use_cyclic=None,
     order=4,
+    binrange_dict=None,
 ):
     """
     Build a PGAM smooth handler for a single unit.
 
     Assumes covariates, spike counts, and events have already been computed.
+    
+    Args:
+        data_obj: Data object with covariates, events, and parameters
+        unit_idx: Index of the unit to build handler for
+        covariate_names: List of covariate names
+        tuning_covariates: Optional list of covariates to use for tuning
+        use_cyclic: Optional set of covariates that are cyclic
+        order: Spline order (default: 4)
+        binrange_dict: Optional dict of binranges. If None, uses data_obj.prs.binrange
     """
     if tuning_covariates is None:
         tuning_covariates = covariate_names
 
     if use_cyclic is None:
         use_cyclic = set()
+    
+    # If binrange_dict not provided, try to get from data_obj.prs
+    if binrange_dict is None and hasattr(data_obj, 'prs') and hasattr(data_obj.prs, 'binrange'):
+        binrange_dict = data_obj.prs.binrange
 
     data_obj.sm_handler = build_smooth_handler_for_unit(
         unit_idx=unit_idx,
@@ -94,17 +108,33 @@ def build_smooth_handler(
         tuning_covariates=tuning_covariates,
         use_cyclic=use_cyclic,
         order=order,
+        binrange_dict=binrange_dict,
     )
     return data_obj.sm_handler
 
 
-def _compute_equal_knots(x: np.ndarray, num_bins: int) -> np.ndarray:
-    """Return equally-spaced knot locations across the finite range of x."""
-    x_finite = x[np.isfinite(x)]
-    if x_finite.size == 0:
-        raise ValueError('Predictor has no finite values.')
-    x_min = float(np.min(x_finite))
-    x_max = float(np.max(x_finite))
+def _compute_equal_knots(x: np.ndarray, num_bins: int, binrange: np.ndarray = None) -> np.ndarray:
+    """
+    Return equally-spaced knot locations across the range of x.
+    
+    Args:
+        x: Input data array
+        num_bins: Number of bins/knots to create
+        binrange: Optional [min, max] range to use. If provided, uses this range instead of data range.
+    
+    Returns:
+        Array of equally-spaced knot locations
+    """
+    if binrange is not None:
+        x_min = float(binrange[0])
+        x_max = float(binrange[1])
+    else:
+        x_finite = x[np.isfinite(x)]
+        if x_finite.size == 0:
+            raise ValueError('Predictor has no finite values.')
+        x_min = float(np.min(x_finite))
+        x_max = float(np.max(x_finite))
+    
     if x_max <= x_min:
         # Degenerate predictor; fall back to a tiny span
         x_max = x_min + 1.0
@@ -119,6 +149,7 @@ def add_tuning_smooth_10boxcar_approx(
     num_basis: int = 10,
     order: int = 4,
     is_cyclic: bool = False,
+    binrange: np.ndarray = None,
 ) -> None:
     """
     Paper: f tuning = 10 boxcars.
@@ -126,9 +157,19 @@ def add_tuning_smooth_10boxcar_approx(
 
     For many GAM implementations, #basis ~ (#internal_knots + order).
     You can adjust order/knots if you want it tighter/looser.
+    
+    Args:
+        sm_handler: Smooths handler object
+        name: Name of the smooth
+        x: Input covariate data
+        trial_ids: Trial IDs for each data point
+        num_basis: Number of basis functions (default: 10)
+        order: Spline order (default: 4)
+        is_cyclic: Whether the covariate is cyclic (default: False)
+        binrange: Optional [min, max] range for knot placement from parameters
     """
     # Use num_basis equally spaced knots over x-range; many libs interpret "knots" as positions.
-    knots = _compute_equal_knots(x, num_basis)
+    knots = _compute_equal_knots(x, num_basis, binrange=binrange)
 
     sm_handler.add_smooth(
         name,
@@ -147,10 +188,11 @@ def add_event_temporal_filter(
     event_impulse: np.ndarray,
     trial_ids: np.ndarray,
     dt_ms: float,
-    kernel_ms: float,
+    kernel_ms: float = None,
     num_filters: int = 10,
     order: int = 4,
     kernel_direction: int = 0,
+    binrange: np.ndarray = None,
 ) -> None:
     """
     Paper: g temporal filters = 10 raised cos, span 600ms (causal or acausal).
@@ -160,13 +202,45 @@ def add_event_temporal_filter(
       1  -> causal kernel over [0, kernel_ms]
       0  -> acausal kernel over [-kernel_ms/2, +kernel_ms/2] (your handler’s "Acausal")
      -1  -> anti-causal (rare)
+     
+    Args:
+        sm_handler: Smooths handler object
+        name: Name of the smooth
+        event_impulse: Event impulse array
+        trial_ids: Trial IDs for each data point
+        dt_ms: Time bin width in milliseconds
+        kernel_ms: Kernel length in milliseconds
+        num_filters: Number of basis functions (default: 10)
+        order: Spline order (default: 4)
+        kernel_direction: 1=causal, 0=acausal, -1=anti-causal
+        binrange: Optional [min, max] temporal range in seconds from parameters.
+                  If provided, overrides kernel_ms based on the range.
     """
+    # If binrange is provided (in seconds), compute kernel_ms from it
+    if binrange is not None:
+        binrange_ms = binrange * 1000.0  # Convert to milliseconds
+        if kernel_direction == 1:  # Causal: use positive extent
+            kernel_ms = float(max(abs(binrange_ms[1]), abs(binrange_ms[0])))
+        else:  # Acausal or anti-causal: use full range
+            kernel_ms = float(binrange_ms[1] - binrange_ms[0])
+            
+    if kernel_ms is None:
+        raise ValueError('Either kernel_ms or binrange is required for event temporal filters.')
+    
     kernel_h_length = int(np.round(kernel_ms / dt_ms))
     if kernel_h_length <= 1:
         raise ValueError('kernel_h_length too small; check dt_ms/kernel_ms.')
 
     # Choose internal knots so that (order + internal_knots) ~= num_filters
     num_int_knots = max(1, int(num_filters - order))
+    
+    print('--------------------------------')
+    print('event name:', name)
+    print('kernel_ms:', kernel_ms)
+    print('dt_ms:', dt_ms)
+    print('kernel_h_length:', kernel_h_length)
+    print('--------------------------------')
+    print('--------------------------------')
 
     sm_handler.add_smooth(
         name,
@@ -253,6 +327,9 @@ def build_smooth_handler_for_unit(
     use_cyclic: set[str] | None = None,
     order: int = 4,
     add_coupling: bool = False,
+    binrange_dict: dict[str, np.ndarray] | None = None,
+    hist_ms=350.0,
+    coupling_ms=1375.0,
 ):
     """
     Build a smooths_handler for a *single* unit.
@@ -268,7 +345,6 @@ def build_smooth_handler_for_unit(
     if use_cyclic is None:
         use_cyclic = set()
 
-    event_kernel_ms = 600.0
     n_time, n_units = Y_binned.shape
 
     if unit_idx < 0 or unit_idx >= n_units:
@@ -284,6 +360,11 @@ def build_smooth_handler_for_unit(
                 f'Covariate "{cov_name}" not found in covariates_concat.')
 
         x = covariates_concat[cov_name]  # shape (T,)
+        
+        # Get binrange for this covariate if available
+        binrange = None
+        if binrange_dict is not None and cov_name in binrange_dict:
+            binrange = binrange_dict[cov_name]
 
         add_tuning_smooth_10boxcar_approx(
             sm_handler=sm_handler,
@@ -293,34 +374,52 @@ def build_smooth_handler_for_unit(
             num_basis=10,
             order=order,
             is_cyclic=(cov_name in use_cyclic),
+            binrange=binrange,
         )
 
     # ---- g(·): event temporal filters
     if 't_targ' in all_events:
+        # Get binrange for t_targ if available
+        binrange_t_targ = None
+        if binrange_dict is not None and 't_targ' in binrange_dict:
+            binrange_t_targ = binrange_dict['t_targ']
+        
+        print('event name:', 'g_t_targ')
+        print('binrange:', binrange_t_targ)
+        
         add_event_temporal_filter(
             sm_handler=sm_handler,
             name='g_t_targ',
             event_impulse=all_events['t_targ'],
             trial_ids=trial_id_vec,
             dt_ms=dt_ms,
-            kernel_ms=event_kernel_ms,
             num_filters=10,
             order=order,
             kernel_direction=1,  # causal
+            binrange=binrange_t_targ,
         )
 
     for evt in ['t_move', 't_rew', 't_stop']:
         if evt in all_events:
+            # Get binrange for this event if available
+            binrange_evt = None
+            if binrange_dict is not None and evt in binrange_dict:
+                binrange_evt = binrange_dict[evt]
+                
+            print('event:', evt)
+            print('binrange:', binrange_evt)
+
+            
             add_event_temporal_filter(
                 sm_handler=sm_handler,
                 name=f'g_{evt}',
                 event_impulse=all_events[evt],
                 trial_ids=trial_id_vec,
                 dt_ms=dt_ms,
-                kernel_ms=event_kernel_ms,
                 num_filters=10,
                 order=order,
                 kernel_direction=0,  # acausal
+                binrange=binrange_evt,
             )
 
     # ---- h(·): spike history (this unit)
@@ -330,7 +429,7 @@ def build_smooth_handler_for_unit(
         y_binned=Y_binned[:, unit_idx],
         trial_ids=trial_id_vec,
         dt_ms=dt_ms,
-        hist_ms=350.0,
+        hist_ms=hist_ms,
         num_filters=10,
         order=order,
     )
@@ -347,7 +446,7 @@ def build_smooth_handler_for_unit(
             other_units_binned=Y_other,
             trial_ids=trial_id_vec,
             dt_ms=dt_ms,
-            coupling_ms=1375.0,
+            coupling_ms=coupling_ms,
             num_filters=10,
             order=order,
         )
@@ -367,6 +466,7 @@ def build_smooth_handlers_for_population(
     use_cyclic: set[str] | None = None,
     order: int = 4,
     add_coupling: bool = False,
+    binrange_dict: dict[str, np.ndarray] | None = None,
 ) -> list:
     """
     Returns:
@@ -387,6 +487,7 @@ def build_smooth_handlers_for_population(
             use_cyclic=use_cyclic,
             order=order,
             add_coupling=add_coupling,
+            binrange_dict=binrange_dict,
         )
         for k in range(n_units)
     ]

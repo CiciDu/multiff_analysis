@@ -15,6 +15,7 @@ def build_continuous_tuning_block(
     angular_vars: Sequence[str],
     n_bins: int = 10,
     center: bool = True,
+    binrange_dict: Optional[Dict[str, np.ndarray]] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Paper-faithful tuning functions for continuous covariates.
@@ -24,6 +25,22 @@ def build_continuous_tuning_block(
         - smoothness enforced later via GAM penalty
     Angular variables:
         - treated as circular boxcar (smoothness via 1Dcirc penalty)
+
+    Parameters
+    ----------
+    data : DataFrame
+        Input data with covariates
+    linear_vars : Sequence[str]
+        Names of linear variables
+    angular_vars : Sequence[str]
+        Names of angular variables (circular)
+    n_bins : int
+        Number of bins (default: 10)
+    center : bool
+        Whether to center the design matrix (default: True)
+    binrange_dict : Optional[Dict[str, np.ndarray]]
+        Optional dictionary mapping variable names to [min, max] ranges.
+        If provided, these ranges are used for binning instead of data percentiles.
 
     Returns
     -------
@@ -36,13 +53,26 @@ def build_continuous_tuning_block(
     colnames = []
     groups = {}
 
+    # Store bin edges for each variable
+    bin_edges = {}
+    
     # ---------- linear variables ----------
     for var in linear_vars:
         if var not in data.columns:
             raise KeyError(f'missing column {var!r}')
 
         x = data[var].to_numpy()
-        X, edges = spatial_feats.boxcar_design(x, n_bins=n_bins)
+        
+        # Get binrange limits if available
+        limits = None
+        if binrange_dict is not None and var in binrange_dict:
+            binrange = binrange_dict[var]
+            limits = (float(binrange[0]), float(binrange[1]))
+            
+        print(f'{var} limits: {limits}')
+        
+        X, edges = spatial_feats.boxcar_design(x, n_bins=n_bins, limits=limits)
+        bin_edges[var] = edges
 
         if center and X.size:
             X = X - X.mean(axis=0, keepdims=True)
@@ -62,11 +92,21 @@ def build_continuous_tuning_block(
         # Wrap to [-pi, pi) for safety (or [0, 2pi), just be consistent)
         th = np.mod(th + np.pi, 2 * np.pi) - np.pi
 
+        # Get binrange limits if available (assuming they're in degrees, convert to radians)
+        limits = (-np.pi, np.pi)  # default
+        if binrange_dict is not None and var in binrange_dict:
+            binrange_deg = binrange_dict[var]
+            limits = (np.deg2rad(float(binrange_deg[0])), np.deg2rad(float(binrange_deg[1])))
+        
         X, edges = spatial_feats.boxcar_design(
             th,
             n_bins=n_bins,
-            limits=(-np.pi, np.pi),
+            limits=limits,
         )
+        bin_edges[var] = edges
+        
+        # print limits
+        print(f'{var} limits: {limits}')
 
         if center and X.size:
             X = X - X.mean(axis=0, keepdims=True)
@@ -86,5 +126,6 @@ def build_continuous_tuning_block(
         'n_bins': int(n_bins),
         'centered': bool(center),
         'groups': groups,
+        'bin_edges': bin_edges,
     }
     return X_df, meta
