@@ -31,7 +31,7 @@ EOF
 # Defaults
 # ------------------------------
 N_UNITS=128
-MAX_PARALLEL=3
+MAX_PARALLEL=5
 FORWARD_ARGS=()
 
 # ------------------------------

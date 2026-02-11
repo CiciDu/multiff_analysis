@@ -24,25 +24,37 @@ cd "$PROJECT_ROOT"
 
 # Early status print (helps diagnose delays)
 echo "[SLURM][START] Job started at $(date)" >&2
+echo "[SLURM][DEBUG] SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID:-unset}" >&2
 
 # --------------------------------------------------
-# Conda setup
+# Conda setup - FAST PATH (bypass conda activate)
 # --------------------------------------------------
-CONDA_SH="$HOME/miniconda3/etc/profile.d/conda.sh"
+# Direct path to pgam environment's Python (much faster than conda activate)
+PGAM_PYTHON="$HOME/miniconda3/envs/pgam/bin/python"
 
-if [[ -f "$CONDA_SH" ]]; then
-  source "$CONDA_SH"
-else
-  echo '[SLURM][ERROR] conda.sh not found' >&2
-  exit 1
+echo "[SLURM][DEBUG] Checking for pgam Python at: $PGAM_PYTHON" >&2
+if [[ ! -f "$PGAM_PYTHON" ]]; then
+  echo "[SLURM][ERROR] pgam Python not found at $PGAM_PYTHON" >&2
+  echo "[SLURM][ERROR] Falling back to conda activate..." >&2
+  
+  # Fallback to traditional conda activate
+  CONDA_SH="$HOME/miniconda3/etc/profile.d/conda.sh"
+  if [[ -f "$CONDA_SH" ]]; then
+    source "$CONDA_SH"
+    conda activate pgam || {
+      echo '[SLURM][ERROR] Conda activation failed' >&2
+      exit 1
+    }
+    PGAM_PYTHON="python"
+  else
+    echo '[SLURM][ERROR] conda.sh not found' >&2
+    exit 1
+  fi
 fi
 
-conda activate pgam || {
-  echo '[SLURM][ERROR] Conda activation failed' >&2
-  exit 1
-}
-
-echo "[SLURM][CONDA] Environment activated at $(date)" >&2
+echo "[SLURM][CONDA] Environment ready at $(date)" >&2
+echo "[SLURM][DEBUG] Python path: $PGAM_PYTHON" >&2
+echo "[SLURM][DEBUG] Python version: $($PGAM_PYTHON --version 2>&1)" >&2
 
 # --------------------------------------------------
 # Now enable nounset
@@ -65,7 +77,10 @@ exec 1>&1 2>&2
 # --------------------------------------------------
 # Run PGAM
 # --------------------------------------------------
-stdbuf -oL -eL python -u "$SCRIPT_PATH" \
+echo "[SLURM][DEBUG] About to run Python script: $SCRIPT_PATH" >&2
+echo "[SLURM][DEBUG] With unit_idx: $UNIT_IDX" >&2
+
+stdbuf -oL -eL "$PGAM_PYTHON" -u "$SCRIPT_PATH" \
   --unit_idx "$UNIT_IDX"
 
 echo '[SLURM] Done'
