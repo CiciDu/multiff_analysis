@@ -740,6 +740,7 @@ def postprocess_results(
     # main loop
     # -----------------------
     for cc, var in enumerate(full_fit.var_list):
+        print(f'Processing variable: {var}')
         results['variable'][cc] = var
         results['penalization'][cc] = sm_handler[var].lam
 
@@ -776,6 +777,7 @@ def postprocess_results(
 
         # ---------- MARGINAL TUNING (FULL, train) ----------
         try:
+            print('Computing full marginal tuning (train)...')
             mx, my = compute_marginal_tuning(
                 full_fit, exog_full, var, train_bool,
                 dt=full_fit.time_bin
@@ -827,6 +829,7 @@ def postprocess_results(
 
         # ---------- MARGINAL TUNING (FULL, eval) ----------
         try:
+            print('Computing full marginal tuning (eval)...')
             mx, my = compute_marginal_tuning(
                 full_fit,
                 exog_full,
@@ -915,6 +918,7 @@ def postprocess_results(
             # >>> INSERTED: REDUCED MARGINAL TUNING (TRAIN)
             # ============================================================
             try:
+                print('Computing reduced marginal tuning...')
                 mx, my = compute_marginal_tuning(
                     reduced_fit,
                     exog_reduced,

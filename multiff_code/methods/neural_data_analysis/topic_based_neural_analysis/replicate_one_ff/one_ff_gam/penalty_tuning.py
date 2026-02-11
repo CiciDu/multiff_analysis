@@ -140,7 +140,6 @@ def cv_score_gam(
             y=y_train,
             groups=groups,
             l1_groups=l1_groups,
-            max_iter=200,
             tol=1e-6,
             verbose=False,
         )

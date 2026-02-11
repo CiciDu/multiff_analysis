@@ -5,15 +5,24 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import PGAM.gam_data_handlers as gdh
 from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
 from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
     plot_modeling_result
 )
+
+PGAM_PATH = Path(
+    'multiff_analysis/external/pgam/src'
+).expanduser().resolve()
+
+if str(PGAM_PATH) not in sys.path:
+    sys.path.append(str(PGAM_PATH))
+
+
+
 from PGAM.GAM_library import *
 from post_processing import postprocess_results
 from sklearn.preprocessing import StandardScaler
-
+import PGAM.gam_data_handlers as gdh
 
 def find_project_root(marker="multiff_analysis"):
     """Search upward until we find a folder containing `marker`."""
@@ -123,6 +132,7 @@ class PGAMclass():
                      'subject': 'monkey_001'
                      }
 
+        print('Post-processing results...')
         # assume that we used 90% of the trials for training, 10% for evaluation
         self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, self.train_trials, self.sm_handler, self.poissFam, self.trial_ids,
                                        var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)

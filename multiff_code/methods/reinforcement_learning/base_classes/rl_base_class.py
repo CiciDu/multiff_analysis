@@ -132,7 +132,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # Roots
         self.curr_dir = os.path.join(self.model_folder_name, 'curr')
         self.post_dir = os.path.join(self.model_folder_name, 'post')
-        self.ft_dir = os.path.join(self.model_folder_name, 'ft')
         self.ln_dir = os.path.join(self.model_folder_name, 'ln')
         self.meta_dir = os.path.join(self.model_folder_name, 'meta')
         # Best subdirs (curr/post)
@@ -141,7 +140,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.post_dir, 'best')
 
         # Ensure directories exist
-        for d in [self.curr_dir, self.post_dir, self.ft_dir, self.ln_dir, self.meta_dir,
+        for d in [self.curr_dir, self.post_dir, self.ln_dir, self.meta_dir,
                   self.best_model_in_curriculum_dir, self.best_model_postcurriculum_dir]:
             try:
                 os.makedirs(d, exist_ok=True)

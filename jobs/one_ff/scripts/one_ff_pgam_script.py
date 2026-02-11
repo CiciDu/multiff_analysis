@@ -8,6 +8,15 @@ import os
 import sys
 from pathlib import Path
 
+
+
+for p in [Path.cwd()] + list(Path.cwd().parents):
+    if p.name == 'Multifirefly-Project':
+        os.chdir(p)
+        sys.path.insert(0, str(p / 'multiff_analysis/multiff_code/methods'))
+        break
+
+
 from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_class
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
     one_ff_pipeline
@@ -18,31 +27,6 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.parameters import (
     default_prs
 )
-
-for p in [Path.cwd()] + list(Path.cwd().parents):
-    if p.name == 'Multifirefly-Project':
-        os.chdir(p)
-        sys.path.insert(0, str(p / 'multiff_analysis/multiff_code/methods'))
-        break
-
-
-# -------------------------------------------------------
-# Repo path bootstrap
-# -------------------------------------------------------
-def bootstrap_repo(repo_name='Multifirefly-Project'):
-    """
-    Find repo root and add multiff methods to PYTHONPATH.
-    """
-    for p in [Path.cwd()] + list(Path.cwd().parents):
-        if p.name == repo_name:
-            os.chdir(p)
-            methods_path = p / 'multiff_analysis/multiff_code/methods'
-            sys.path.insert(0, str(methods_path))
-            return
-    raise RuntimeError(f'Could not find repo root "{repo_name}"')
-
-
-bootstrap_repo()
 
 # -------------------------------------------------------
 # Core imports

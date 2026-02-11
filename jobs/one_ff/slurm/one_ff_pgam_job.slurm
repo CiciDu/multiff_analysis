@@ -22,6 +22,9 @@ SCRIPT_PATH="$PROJECT_ROOT/multiff_analysis/jobs/one_ff/scripts/one_ff_pgam_scri
 
 cd "$PROJECT_ROOT"
 
+# Early status print (helps diagnose delays)
+echo "[SLURM][START] Job started at $(date)" >&2
+
 # --------------------------------------------------
 # Conda setup
 # --------------------------------------------------
@@ -39,6 +42,8 @@ conda activate pgam || {
   exit 1
 }
 
+echo "[SLURM][CONDA] Environment activated at $(date)" >&2
+
 # --------------------------------------------------
 # Now enable nounset
 # --------------------------------------------------
@@ -54,10 +59,13 @@ echo "[SLURM] Unit index: $UNIT_IDX"
 echo "[SLURM] Host: $(hostname)"
 echo "[SLURM] Start time: $(date)"
 
+# Force flush to log files
+exec 1>&1 2>&2
+
 # --------------------------------------------------
 # Run PGAM
 # --------------------------------------------------
-python -u "$SCRIPT_PATH" \
+stdbuf -oL -eL python -u "$SCRIPT_PATH" \
   --unit_idx "$UNIT_IDX"
 
 echo '[SLURM] Done'

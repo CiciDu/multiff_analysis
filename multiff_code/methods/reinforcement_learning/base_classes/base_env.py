@@ -142,6 +142,9 @@ class MultiFF(gymnasium.Env):
         self.num_obs_ff = num_obs_ff
         self.max_in_memory_time = max_in_memory_time
 
+
+        self._parse_identity_slot_strategy()
+
         # Observation spec (per slot)
         # [valid, d_log, sinθ, cosθ, t_start_seen, t_last_seen, visible, pose_unreliable, ff_about_to_fade, new_ff]
         self.slot_fields = slot_fields or [
@@ -222,8 +225,6 @@ class MultiFF(gymnasium.Env):
 
         # print('current dw_cost_factor: ', self.dw_cost_factor)
         # print('current w_cost_factor: ', self.w_cost_factor)
-
-        self._parse_identity_slot_strategy()
 
         # randomly generate the information of the fireflies
         if use_random_ff is True:

@@ -7,11 +7,7 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit,
-    backward_elimination
-)
+
 
 # ---------------------------------------------------------------------
 # Locate project root
@@ -27,7 +23,11 @@ else:
 # ---------------------------------------------------------------------
 # Project-specific imports
 # ---------------------------------------------------------------------
-
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    one_ff_gam_fit,
+    backward_elimination
+)
 
 # ---------------------------------------------------------------------
 # Global config (kept minimal)

@@ -582,7 +582,7 @@ def fit_poisson_gam_map(
     groups: List[GroupSpec],
     l1_groups: Optional[List[GroupSpec]] = None,
     l1_smooth_eps: float = 1e-6,
-    max_iter: int = 200,
+    max_iter: int = 1000,
     tol: float = 1e-6,
     optimizer: str = 'L-BFGS-B',
     verbose: bool = True,
@@ -694,6 +694,9 @@ def fit_poisson_gam_map(
         fun=float(res.fun),
         grad_norm=grad_norm,
     )
+    
+    # print message
+    print(f'fit_result.message: {fit_result.message}')
 
     # ------------------------------------------------------------------
     # 6) Save results

@@ -7,10 +7,6 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit
-)
 
 # ---------------------------------------------------------------------
 # Locate project root
@@ -26,6 +22,10 @@ else:
 # ---------------------------------------------------------------------
 # Project-specific imports
 # ---------------------------------------------------------------------
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    one_ff_gam_fit
+)
 
 
 # ---------------------------------------------------------------------
@@ -71,7 +71,6 @@ def main(unit_idx: int):
         y=y,
         groups=groups,
         l1_groups=[],
-        max_iter=200,
         tol=1e-6,
         verbose=True,
         save_path=str(save_path),

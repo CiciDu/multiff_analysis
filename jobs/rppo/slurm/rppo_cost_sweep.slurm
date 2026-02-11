@@ -104,13 +104,11 @@ echo "  stderr -> $ERR_FILE"
 # ---------------------
 # Train agent
 # ---------------------
-INIT_FROM="${BASE_RUN}/post/best"
-PARENT_AGENT_DIR="${BASE_RUN}"
-FT_DIR="${PARENT_AGENT_DIR}/ft"
-mkdir -p "$FT_DIR"
+INIT_FROM="${BASE_RUN}"
+MODEL_FOLDER_NAME="${BASE_RUN}/${COST_TAG}"
 
 srun python -u multiff_analysis/jobs/rppo/scripts/rppo_script.py \
-  --overall-folder "$FT_DIR" \
+  --overall-folder "$MODEL_FOLDER_NAME" \
   --init-from "$INIT_FROM" \
   --model-folder-name "$COST_TAG" \
   --n-envs 1 \
