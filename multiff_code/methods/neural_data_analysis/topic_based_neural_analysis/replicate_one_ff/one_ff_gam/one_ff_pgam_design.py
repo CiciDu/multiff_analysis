@@ -219,10 +219,11 @@ def add_event_temporal_filter(
     # If binrange is provided (in seconds), compute kernel_ms from it
     if binrange is not None:
         binrange_ms = binrange * 1000.0  # Convert to milliseconds
-        if kernel_direction == 1:  # Causal: use positive extent
-            kernel_ms = float(max(abs(binrange_ms[1]), abs(binrange_ms[0])))
-        else:  # Acausal or anti-causal: use full range
+        if kernel_direction == 0:  # Acausal: use full range
             kernel_ms = float(binrange_ms[1] - binrange_ms[0])
+        else:  # Causal or anti-causal: double the extent since library uses half
+            kernel_extent = float(max(abs(binrange_ms[1]), abs(binrange_ms[0])))
+            kernel_ms = kernel_extent * 2.0
             
     if kernel_ms is None:
         raise ValueError('Either kernel_ms or binrange is required for event temporal filters.')
@@ -268,13 +269,14 @@ def add_spike_history_filter(
     Paper: h spike-history = 10 causal raised-cos on log time, span 350ms.
     Here: causal temporal-kernel smooth over y_binned (binned spikes).
     """
+    kernel_ms = hist_ms * 2.0
     add_event_temporal_filter(
         sm_handler=sm_handler,
         name=name,
         event_impulse=y_binned,
         trial_ids=trial_ids,
         dt_ms=dt_ms,
-        kernel_ms=hist_ms,
+        kernel_ms=kernel_ms,
         num_filters=num_filters,
         order=order,
         kernel_direction=1,  # causal
