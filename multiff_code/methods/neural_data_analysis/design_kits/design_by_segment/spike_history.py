@@ -173,6 +173,8 @@ def compute_spike_history_designs(
             design_pad[col].to_numpy(),
             basis,
             trial_ids,
+            dt=dt,
+            t_min=t_min,
             edge=edge,
         )
 

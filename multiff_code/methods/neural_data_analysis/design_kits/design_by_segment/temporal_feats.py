@@ -19,6 +19,8 @@ class PredictorSpec:
     signal: np.ndarray                  # (T,)
     bases: list[np.ndarray] = field(
         default_factory=list)  # each: (L, K), causal
+    dt: float = 1.0                     # time step for lagging
+    t_min: float = 0.0                  # minimum lag time
 
 
 # =============================
@@ -97,11 +99,13 @@ def specs_to_design_df(
                     if respect_trial_boundaries:
                         Phi, mask = lag_fn(
                             sig, B, trial_ids,
+                            dt=ps.dt, t_min=ps.t_min,
                             edge=edge, return_edge_mask=True
                         )
                     else:
                         Phi, mask = lag_fn(
                             sig, B,
+                            dt=ps.dt, t_min=ps.t_min,
                             edge=edge, return_edge_mask=True
                         )
 
@@ -115,9 +119,9 @@ def specs_to_design_df(
 
                 else:
                     if respect_trial_boundaries:
-                        Phi = lag_fn(sig, B, trial_ids, edge=edge)
+                        Phi = lag_fn(sig, B, trial_ids, dt=ps.dt, t_min=ps.t_min, edge=edge)
                     else:
-                        Phi = lag_fn(sig, B, edge=edge)
+                        Phi = lag_fn(sig, B, dt=ps.dt, t_min=ps.t_min, edge=edge)
 
                     if drop_all_zero and np.allclose(Phi, 0.0, atol=zero_atol):
                         L, K = B.shape
@@ -174,127 +178,6 @@ def specs_to_design_df(
 
     return design_df, meta
 
-
-def lagged_design_from_signal(
-    x: np.ndarray,
-    basis: np.ndarray,
-    *,
-    edge: str = 'zero',   # 'zero' | 'drop' | 'renorm'
-    return_edge_mask: bool = False
-):
-    """
-    Continuous causal design: Phi[t,k] = sum_{ℓ>=0} basis[ℓ,k] * x[t-ℓ],
-    with NO trial boundaries.
-    """
-    x = np.asarray(x, float).ravel()
-    B = np.asarray(basis, float)
-    if B.ndim != 2:
-        raise ValueError('basis must be 2D (L, K)')
-
-    L, K = B.shape
-    T = x.shape[0]
-    out = np.zeros((T, K), float)
-    edge_mask = np.zeros(T, dtype=bool)
-
-    if edge == 'renorm':
-        cum = np.cumsum(B, axis=0)   # (L, K)
-        full = cum[-1, :]            # (K,)
-
-    if edge in ('zero', 'renorm'):
-        for k in range(K):
-            h = B[:, k]
-            y = signal.lfilter(h, [1.0], x)
-            if edge == 'renorm':
-                last = np.minimum(np.arange(T), L - 1)
-                avail = cum[last, k]
-                scale = full[k] / np.clip(avail, 1e-12, None)
-                y = y * scale
-            out[:, k] = y
-        edge_mask[:] = True
-
-    elif edge == 'drop':
-        if T >= L:
-            W = np.lib.stride_tricks.sliding_window_view(x, L)  # (T-L+1, L)
-            Brev = B[::-1, :]                                  # (L, K)
-            Y = W @ Brev
-            out[L - 1:, :] = Y
-            edge_mask[L - 1:] = True
-    else:
-        raise ValueError("edge must be one of {'zero','drop','renorm'}")
-
-    return (out, edge_mask) if return_edge_mask else out
-
-
-def lagged_design_from_signal_trials(
-    x: np.ndarray,
-    basis: np.ndarray,
-    trial_ids: np.ndarray,
-    *,
-    edge: str = 'zero',   # 'zero' | 'drop' | 'renorm'
-    return_edge_mask: bool = False
-):
-    """
-    Trial-local causal design: Phi[t,k] = sum_{ℓ>=0} basis[ℓ,k] * x[t-ℓ], with NO cross-trial leakage.
-
-    edge='zero'  : zero-pad at trial starts.
-    edge='drop'  : only rows with a full L-length window set; first L-1 bins per trial invalid.
-    edge='renorm': like 'zero' but rescales early rows so kernel mass matches full sum.
-    """
-    x = np.asarray(x, float).ravel()
-    B = np.asarray(basis, float)
-    trial_ids = np.asarray(trial_ids)
-    if x.shape[0] != trial_ids.shape[0]:
-        raise ValueError('x and trial_ids must have same length')
-    if B.ndim != 2:
-        raise ValueError('basis must be 2D (L, K)')
-
-    L, K = B.shape
-    T = x.shape[0]
-    out = np.zeros((T, K), float)
-    edge_mask = np.zeros(T, dtype=bool)
-
-    # pre for renorm
-    if edge == 'renorm':
-        cum = np.cumsum(B, axis=0)  # (L, K)
-        full = cum[-1, :]           # (K,)
-
-    # stable unique in first-appearance order
-    _, first_idx = np.unique(trial_ids, return_index=True)
-    uniq = trial_ids[np.sort(first_idx)]
-
-    for tr in uniq:
-        idx = np.flatnonzero(trial_ids == tr)
-        xt = x[idx]
-        Tt = idx.size
-        if Tt == 0:
-            continue
-
-        if edge in ('zero', 'renorm'):
-            # causal FIR via lfilter (fast, stable)
-            for k in range(K):
-                h = B[:, k]
-                y = signal.lfilter(h, [1.0], xt)
-                if edge == 'renorm':
-                    last = np.minimum(np.arange(Tt), L - 1)
-                    avail = cum[last, k]
-                    scale = full[k] / np.clip(avail, 1e-12, None)
-                    y = y * scale
-                out[idx, k] = y
-            edge_mask[idx] = True
-
-        elif edge == 'drop':
-            if Tt >= L:
-                W = np.lib.stride_tricks.sliding_window_view(
-                    xt, L)  # (Tt-L+1, L)
-                # multiply by reversed basis columns
-                Brev = B[::-1, :]  # (L, K)
-                Y = W @ Brev
-                out[idx[L - 1:], :] = Y
-                edge_mask[idx[L - 1:]] = True
-        else:
-            raise ValueError("edge must be one of {'zero','drop','renorm'}")
-
-    return (out, edge_mask) if return_edge_mask else out
 
 
 def _a1d(x):
@@ -409,6 +292,7 @@ def add_state_predictors(
     basis_family_state: str = 'rc',
     n_basis_state: int = 5,
     tmax_state: float = 0.30,
+    tmin_state: float = 0.0,
     center_states: bool = False,
 ):
 
@@ -423,6 +307,7 @@ def add_state_predictors(
             n_basis_state,
             t_max=tmax_state,
             dt=meta['dt'],
+            t_min=tmin_state,
         )
         if state_mode == 'short'
         else None
@@ -434,7 +319,7 @@ def add_state_predictors(
             x -= np.nanmean(x)
 
         bases = [] if state_mode == 'passthrough' else [B_state]
-        specs[name] = PredictorSpec(signal=x, bases=bases)
+        specs[name] = PredictorSpec(signal=x, bases=bases, dt=meta['dt'], t_min=tmin_state)
 
         meta['raw_predictors'][name] = x
         meta['bases_by_predictor'][name] = bases
@@ -457,6 +342,7 @@ def add_event_predictors(
     basis_family_event: str = 'rc',
     n_basis_event: int = 6,
     tmax_event: float = 0.60,
+    tmin_event: float = 0.0,
 ):
 
     for event in events_to_include:
@@ -468,11 +354,12 @@ def add_event_predictors(
         n_basis_event,
         t_max=tmax_event,
         dt=meta['dt'],
+        t_min=tmin_event,
     )
 
     for event in events_to_include:
         x = _a1d(data[event]).astype(float, copy=False)
-        specs[event] = PredictorSpec(signal=x, bases=[B_event])
+        specs[event] = PredictorSpec(signal=x, bases=[B_event], dt=meta['dt'], t_min=tmin_event)
 
         meta['raw_predictors'][event] = x
         meta['bases_by_predictor'][event] = [B_event]
@@ -486,3 +373,146 @@ def add_event_predictors(
 
     return specs, meta
 
+
+import numpy as np
+from scipy import signal
+
+
+def _shift_non_circular(arr: np.ndarray, shift: int) -> np.ndarray:
+    """
+    Shift along axis 0 without circular wrap-around.
+    Positive shift moves signal forward in time.
+    """
+    out = np.zeros_like(arr)
+
+    if shift > 0:
+        out[shift:] = arr[:-shift]
+    elif shift < 0:
+        out[:shift] = arr[-shift:]
+    else:
+        out = arr.copy()
+
+    return out
+
+
+def lagged_design_from_signal(
+    x: np.ndarray,
+    basis: np.ndarray,
+    *,
+    dt: float,
+    t_min: float,
+    edge: str = 'zero',   # 'zero' | 'drop' | 'renorm'
+    return_edge_mask: bool = False
+):
+    """
+    Time-aligned lagged design that correctly handles arbitrary t_min.
+
+    Matches MATLAB: conv + crop + circshift,
+    but uses stable FIR implementation.
+    """
+
+    x = np.asarray(x, float).ravel()
+    B = np.asarray(basis, float)
+
+    if B.ndim != 2:
+        raise ValueError('basis must be 2D (L, K)')
+
+    L, K = B.shape
+    T = x.shape[0]
+
+    out = np.zeros((T, K), float)
+    edge_mask = np.zeros(T, dtype=bool)
+
+    # Compute shift required to align lag=0 correctly
+    shift_bins = int(round(t_min / dt))
+
+    if edge == 'renorm':
+        cum = np.cumsum(B, axis=0)
+        full = cum[-1, :]
+
+    for k in range(K):
+        h = B[:, k]
+
+        # Causal FIR
+        y = signal.lfilter(h, [1.0], x)
+
+        if edge == 'renorm':
+            last = np.minimum(np.arange(T), L - 1)
+            avail = cum[last, k]
+            scale = full[k] / np.clip(avail, 1e-12, None)
+            y *= scale
+
+        # Apply non-circular alignment shift
+        y = _shift_non_circular(y[:, None], shift_bins).ravel()
+
+        out[:, k] = y
+
+    edge_mask[:] = True
+
+    return (out, edge_mask) if return_edge_mask else out
+
+def lagged_design_from_signal_trials(
+    x: np.ndarray,
+    basis: np.ndarray,
+    trial_ids: np.ndarray,
+    *,
+    dt: float,
+    t_min: float,
+    edge: str = 'zero',   # 'zero' | 'drop' | 'renorm'
+    return_edge_mask: bool = False
+):
+    """
+    Trial-local version with correct time alignment.
+    No cross-trial leakage.
+    """
+
+    x = np.asarray(x, float).ravel()
+    B = np.asarray(basis, float)
+    trial_ids = np.asarray(trial_ids)
+
+    if x.shape[0] != trial_ids.shape[0]:
+        raise ValueError('x and trial_ids must have same length')
+
+    if B.ndim != 2:
+        raise ValueError('basis must be 2D (L, K)')
+
+    L, K = B.shape
+    T = x.shape[0]
+
+    out = np.zeros((T, K), float)
+    edge_mask = np.zeros(T, dtype=bool)
+
+    shift_bins = int(round(t_min / dt))
+
+    if edge == 'renorm':
+        cum = np.cumsum(B, axis=0)
+        full = cum[-1, :]
+
+    unique_trials = np.unique(trial_ids)
+
+    for tr in unique_trials:
+        idx = np.flatnonzero(trial_ids == tr)
+        xt = x[idx]
+        Tt = xt.size
+
+        if Tt == 0:
+            continue
+
+        for k in range(K):
+            h = B[:, k]
+            y = signal.lfilter(h, [1.0], xt)
+
+            if edge == 'renorm':
+                last = np.minimum(np.arange(Tt), L - 1)
+                avail = cum[last, k]
+                scale = full[k] / np.clip(avail, 1e-12, None)
+                y *= scale
+
+            # Apply alignment shift inside trial
+            y = _shift_non_circular(y[:, None], shift_bins).ravel()
+
+            out[idx, k] = y
+
+        edge_mask[idx] = True
+
+    return (out, edge_mask) if return_edge_mask else out

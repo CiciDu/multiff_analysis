@@ -273,3 +273,56 @@ def plot_tuning_heatmap(
     plt.tight_layout()
     
     return fig, ax
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def plot_fraction_tuned(tuning_stats):
+    """
+    Plot fraction of tuned neurons for each variable.
+
+    Parameters
+    ----------
+    tuning_stats : dict
+        Dictionary containing:
+            - 'variables'
+            - 'fraction_tuned'
+            - 'n_total'
+    """
+
+    variables = tuning_stats['variables']
+    fraction_tuned = np.array(tuning_stats['fraction_tuned'])
+    n_total = tuning_stats['n_total']
+
+    # Binomial standard error
+    sem = np.sqrt(fraction_tuned * (1 - fraction_tuned) / n_total)
+
+    # Clean variable labels (remove f_ / g_ prefixes)
+    def clean_label(v):
+        if v.startswith('f_') or v.startswith('g_'):
+            return v[2:]
+        return v
+
+    x_labels = [clean_label(v) for v in variables]
+    x = np.arange(len(x_labels))
+
+    # Plot
+    plt.figure(figsize=(10, 5))
+
+    plt.errorbar(
+        x,
+        fraction_tuned,
+        yerr=sem,
+        fmt='o',
+        capsize=3
+    )
+
+    plt.xticks(x, x_labels)
+    plt.ylim(0, 1)
+    plt.ylabel('Fraction of tuned neurons')
+    plt.xlabel('Task variable')
+
+    plt.tight_layout()
+    plt.show()

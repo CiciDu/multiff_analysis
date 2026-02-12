@@ -42,7 +42,7 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
 - Changed return value from `hist_meta` to `all_meta`
 - `all_meta` combines all metadata: `{'tuning': tuning_meta, 'temporal': temporal_meta, 'hist': hist_meta}`
 
-#### `finalize_one_ff_pgam_design()`:
+#### `finalize_one_ff_gam_design()`:
 - Returns `all_meta` instead of just `tuning_meta`
 
 **Result:** All temporal basis lags are now saved and accessible through `all_meta`
@@ -119,7 +119,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 import pickle
 
 # Build design
-design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_pgam_design(
+design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
     unit_idx=0, session_num=0
 )
 

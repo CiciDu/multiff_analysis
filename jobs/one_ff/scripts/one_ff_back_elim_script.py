@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    backward_elimination,
+    one_ff_gam_fit
+)
+import pandas as pd
+import numpy as np
+import matplotlib
+from pathlib import Path
+import sys
+import os
 print("[PYTHON][DEBUG] Script started, beginning imports...", flush=True)
 
-import os
-import sys
-from pathlib import Path
 
 print("[PYTHON][DEBUG] Basic imports done, importing matplotlib/numpy/pandas...", flush=True)
-import matplotlib
-import numpy as np
-import pandas as pd
+
 print("[PYTHON][DEBUG] Core scientific packages imported", flush=True)
 
 
@@ -30,11 +36,7 @@ else:
 # Project-specific imports
 # ---------------------------------------------------------------------
 print("[PYTHON][DEBUG] Importing project-specific modules...", flush=True)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit,
-    backward_elimination
-)
+
 print("[PYTHON][DEBUG] Project-specific imports complete", flush=True)
 
 # ---------------------------------------------------------------------
@@ -62,12 +64,14 @@ print("[PYTHON][DEBUG] Global configuration complete, all imports finished!", fl
 def main(unit_idx: int):
     print(f"[PYTHON][DEBUG] main() called for unit_idx={unit_idx}", flush=True)
 
-    print(f"[PYTHON][DEBUG] Finalizing PGAM design for unit {unit_idx}...", flush=True)
-    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_pgam_design(
+    print(
+        f"[PYTHON][DEBUG] Finalizing PGAM design for unit {unit_idx}...", flush=True)
+    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )
-    print(f"[PYTHON][DEBUG] Design finalized, shape: {design_df.shape}", flush=True)
+    print(
+        f"[PYTHON][DEBUG] Design finalized, shape: {design_df.shape}", flush=True)
 
     # Setup output directory and paths
     outdir = Path(
@@ -80,7 +84,8 @@ def main(unit_idx: int):
     save_path = outdir / 'backward_elimination' / f'{lam_suffix}.pkl'
     print(f"[PYTHON][DEBUG] Save path: {save_path}", flush=True)
 
-    print(f"[PYTHON][INFO] Starting backward elimination for unit {unit_idx}...", flush=True)
+    print(
+        f"[PYTHON][INFO] Starting backward elimination for unit {unit_idx}...", flush=True)
     kept, history = backward_elimination.backward_elimination_gam(
         design_df=design_df,
         y=y,
@@ -100,8 +105,9 @@ def main(unit_idx: int):
     if history:
         pd.DataFrame(history).to_csv(outdir / 'history.csv', index=False)
         print(f'\n✓ History exported to {outdir / "history.csv"}')
-    
-    print(f"[PYTHON][INFO] Unit {unit_idx} completed successfully!", flush=True)
+
+    print(
+        f"[PYTHON][INFO] Unit {unit_idx} completed successfully!", flush=True)
 
 
 # ---------------------------------------------------------------------
@@ -116,6 +122,7 @@ if __name__ == '__main__':
 
     print("[PYTHON][DEBUG] Parsing arguments...", flush=True)
     args = parser.parse_args()
-    print(f"[PYTHON][DEBUG] Arguments parsed: unit_idx={args.unit_idx}", flush=True)
-    
+    print(
+        f"[PYTHON][DEBUG] Arguments parsed: unit_idx={args.unit_idx}", flush=True)
+
     main(args.unit_idx)

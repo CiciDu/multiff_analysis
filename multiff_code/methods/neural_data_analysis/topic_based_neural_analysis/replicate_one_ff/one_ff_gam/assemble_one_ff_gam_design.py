@@ -47,7 +47,7 @@ def build_tuning_design(
         linear_vars=linear_vars,
         angular_vars=angular_vars,
         n_bins=n_bins,
-        center=True,
+        center=False,
         binrange_dict=binrange_dict,
     )
 
@@ -56,6 +56,7 @@ def build_tuning_design(
 
 def build_temporal_design_base(
     data_obj,
+    n_basis=20,
 ):
     """
     Build temporal design matrix that is reusable across units.
@@ -83,7 +84,7 @@ def build_temporal_design_base(
         t_move_min, t_move_max = -0.3, 0.3
 
     lags_move, B_move = glm_bases.raised_cosine_basis(
-        n_basis=10,
+        n_basis=n_basis,
         t_min=t_move_min,
         t_max=t_move_max,
         dt=specs_meta['dt'],
@@ -98,7 +99,7 @@ def build_temporal_design_base(
         t_targ_min, t_targ_max = 0.0, 0.6
 
     lags_targ, B_targ = glm_bases.raised_cosine_basis(
-        n_basis=10,
+        n_basis=n_basis,
         t_min=t_targ_min,
         t_max=t_targ_max,
         dt=specs_meta['dt'],
@@ -108,10 +109,14 @@ def build_temporal_design_base(
     specs['t_targ'] = temporal_feats.PredictorSpec(
         signal=data_obj.events['t_targ'],
         bases=[B_targ],
+        dt=specs_meta['dt'],
+        t_min=t_targ_min,
     )
     specs['t_move'] = temporal_feats.PredictorSpec(
         signal=data_obj.events['t_move'],
         bases=[B_move],
+        dt=specs_meta['dt'],
+        t_min=t_move_min,
     )
 
     # t_rew: use binrange if available and different from t_move
@@ -119,7 +124,7 @@ def build_temporal_design_base(
         t_rew_min = float(binrange['t_rew'][0])
         t_rew_max = float(binrange['t_rew'][1])
         lags_rew, B_rew = glm_bases.raised_cosine_basis(
-            n_basis=10,
+            n_basis=n_basis,
             t_min=t_rew_min,
             t_max=t_rew_max,
             dt=specs_meta['dt'],
@@ -127,19 +132,22 @@ def build_temporal_design_base(
         basis_info['t_rew'] = {'lags': lags_rew, 'basis': B_rew}
     else:
         B_rew = B_move  # reuse B_move if no specific binrange
+        t_rew_min = t_move_min
         basis_info['t_rew'] = basis_info['t_move']
-    
+
     specs['t_rew'] = temporal_feats.PredictorSpec(
         signal=data_obj.events['t_rew'],
         bases=[B_rew],
+        dt=specs_meta['dt'],
+        t_min=t_rew_min,
     )
-    
+
     # t_stop: use binrange if available and different from t_move
     if 't_stop' in binrange and not np.array_equal(binrange.get('t_stop'), binrange.get('t_move')):
         t_stop_min = float(binrange['t_stop'][0])
         t_stop_max = float(binrange['t_stop'][1])
         lags_stop, B_stop = glm_bases.raised_cosine_basis(
-            n_basis=10,
+            n_basis=n_basis,
             t_min=t_stop_min,
             t_max=t_stop_max,
             dt=specs_meta['dt'],
@@ -147,21 +155,24 @@ def build_temporal_design_base(
         basis_info['t_stop'] = {'lags': lags_stop, 'basis': B_stop}
     else:
         B_stop = B_move  # reuse B_move if no specific binrange
+        t_stop_min = t_move_min
         basis_info['t_stop'] = basis_info['t_move']
 
     specs['t_stop'] = temporal_feats.PredictorSpec(
         signal=data_obj.events['t_stop'],
         bases=[B_stop],
+        dt=specs_meta['dt'],
+        t_min=t_stop_min,
     )
 
     temporal_df, temporal_meta = temporal_feats.specs_to_design_df(
         specs,
         data_obj.covariate_trial_ids,
         edge='zero',
-        add_intercept=True,
+        add_intercept=False,
         respect_trial_boundaries=False,
     )
-    
+
     # Add basis info to metadata
     temporal_meta['basis_info'] = basis_info
 
@@ -177,6 +188,7 @@ def build_design_df(
     tuning_meta,
     specs_meta,
     coupling_units=None,
+    n_basis=20,
 ):
     """
     Assemble the full design matrix for one unit.
@@ -189,7 +201,7 @@ def build_design_df(
     basis_info = {}
 
     lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
-        n_basis=10,
+        n_basis=n_basis,
         t_min=0.0,
         t_max=0.35,
         dt=specs_meta['dt'],
@@ -200,11 +212,13 @@ def build_design_df(
     specs['spike_hist'] = temporal_feats.PredictorSpec(
         signal=data_obj.Y[:, unit_idx],
         bases=[B_hist],
+        dt=specs_meta['dt'],
+        t_min=0.0,
     )
 
     if coupling_units is not None:
         lags_coup, B_coup = glm_bases.raised_log_cosine_basis(
-            n_basis=10,
+            n_basis=n_basis,
             t_min=0.0,
             t_max=1.375,
             dt=specs_meta['dt'],
@@ -214,6 +228,8 @@ def build_design_df(
             specs[f'cpl_{j}'] = temporal_feats.PredictorSpec(
                 signal=data_obj.Y[:, j],
                 bases=[B_coup],
+                dt=specs_meta['dt'],
+                t_min=0.0,
             )
             basis_info[f'cpl_{j}'] = {'lags': lags_coup, 'basis': B_coup}
 
@@ -224,7 +240,7 @@ def build_design_df(
         add_intercept=False,
         respect_trial_boundaries=False,
     )
-    
+
     # Add basis info to metadata
     hist_meta['basis_info'] = basis_info
 
@@ -371,13 +387,6 @@ def process_unit_design_and_groups(
         coupling_units=coupling_units,
     )
 
-    y = extract_response(
-        unit_idx=unit_idx,
-        data_obj=data_obj,
-        design_df=design_df,
-        temporal_meta=temporal_meta,
-    )
-
     groups = build_group_specs(
         temporal_meta=temporal_meta,
         tuning_meta=tuning_meta,
@@ -396,10 +405,10 @@ def process_unit_design_and_groups(
         'hist': hist_meta,
     }
 
-    return design_df, y, groups, all_meta
+    return design_df, groups, all_meta
 
 
-def finalize_one_ff_pgam_design(unit_idx, session_num=0):
+def finalize_one_ff_gam_design(unit_idx, session_num=0):
     # -------------------------------
     # Covariates
     # -------------------------------
@@ -456,7 +465,7 @@ def finalize_one_ff_pgam_design(unit_idx, session_num=0):
     # -------------------------------
     # Per-unit GAM design
     # -------------------------------
-    design_df, y, groups, all_meta = (
+    design_df, groups, all_meta = (
         process_unit_design_and_groups(
             unit_idx=unit_idx,
             data_obj=data_obj,
@@ -466,6 +475,13 @@ def finalize_one_ff_pgam_design(unit_idx, session_num=0):
             tuning_meta=tuning_meta,
             specs_meta=specs_meta,
         )
+    )
+
+    y = extract_response(
+        unit_idx=unit_idx,
+        data_obj=data_obj,
+        design_df=design_df,
+        temporal_meta=temporal_meta,
     )
 
     return design_df, y, groups, all_meta

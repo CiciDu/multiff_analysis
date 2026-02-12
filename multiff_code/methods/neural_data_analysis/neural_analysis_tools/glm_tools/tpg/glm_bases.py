@@ -99,7 +99,7 @@ def raised_cosine_basis(
 
     dbcenter = nbins / (3 + K)
     width = 4 * dbcenter
-    centers = 2 * dbcenter + dbcenter * np.arange(K)
+    centers = 2 * dbcenter + dbcenter * np.arange(K) - 1
 
     B = np.zeros((nbins, K))
     grid = np.arange(nbins)

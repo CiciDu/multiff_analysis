@@ -140,7 +140,7 @@ def main(args):
     
     print(f"[PYTHON][DEBUG] Post-processing results...", flush=True)
     pgam_runner.kernel_h_length = 100
-    pgam_runner.post_processing_results()
+    pgam_runner.post_processing_results(neural_cluster_number=args.unit_idx)
     print(f"[PYTHON][DEBUG] Saving results...", flush=True)
     pgam_runner.save_results()
     print(f"[PYTHON][INFO] Unit {args.unit_idx} completed successfully!", flush=True)

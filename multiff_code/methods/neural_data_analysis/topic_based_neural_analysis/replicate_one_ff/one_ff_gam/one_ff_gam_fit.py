@@ -84,27 +84,38 @@ def _softclip(u: np.ndarray, lo: float, hi: float, k: float) -> Tuple[np.ndarray
 def _dd1_matrix(n: int, circ: bool) -> sparse.csr_matrix:
     """
     Construct DD1 = D1.T @ D1 where D1 is first-difference operator.
-    Matches MATLAB: D1 = spdiags([-1, 1], [0, 1], n-1, n)
 
-    For circ=True, emulate wrap correction by adjusting first/last rows.
+    For circ=True, use circular first differences.
     """
     if n <= 1:
         return sparse.csr_matrix((n, n))
 
-    diags = np.vstack([-np.ones(n - 1), np.ones(n - 1)])
-    D1 = sparse.diags(diagonals=diags, offsets=[0, 1], shape=(n - 1, n), format='csr')
-    DD1 = (D1.T @ D1).tocsr()
+    if circ:
+        # Circular first-difference:
+        # Row i computes x_{i+1} - x_i, with wrap at last index
+        rows = np.repeat(np.arange(n), 2)
+        cols = np.concatenate([
+            np.arange(n),
+            (np.arange(n) + 1) % n
+        ])
+        data = np.concatenate([
+            -np.ones(n),
+            np.ones(n)
+        ])
 
-    if circ and n >= 2:
-        DD1 = DD1.tolil()
-        row2 = DD1[1, :].toarray().ravel()
-        row_endm1 = DD1[-2, :].toarray().ravel()
-        DD1[0, :] = np.roll(row2, -1)
-        DD1[-1, :] = np.roll(row_endm1, 1)
-        DD1 = DD1.tocsr()
+        D1 = sparse.coo_matrix((data, (rows, cols)), shape=(n, n)).tocsr()
+        return (D1.T @ D1).tocsr()
 
-    return DD1
-
+    else:
+        diags = np.vstack([-np.ones(n - 1), np.ones(n - 1)])
+        D1 = sparse.diags(
+            diagonals=diags,
+            offsets=[0, 1],
+            shape=(n - 1, n),
+            format='csr'
+        )
+        return (D1.T @ D1).tocsr()
+    
 
 def _laplacian_2d_matrix(n: int) -> sparse.csr_matrix:
     """
@@ -250,8 +261,14 @@ def poisson_loglik(y, rate):
 
 
 def compute_likelihoods(design_df, beta, y):
+    # --- Ensure beta aligns with design_df columns ---
+    if isinstance(beta, pd.Series):
+        beta = beta.reindex(design_df.columns).fillna(0).to_numpy()
+    else:
+        beta = np.asarray(beta)
+
     X = design_df.to_numpy()
-    u = X @ beta.to_numpy()
+    u = X @ beta
     rate = np.exp(u)
 
     # model
@@ -272,8 +289,14 @@ def pseudo_r2(design_df, beta, y):
     return (ll_mean - ll_model) / (ll_mean - ll_sat)
 
 def bits_per_spike(design_df, beta, y):
+    # --- Ensure beta aligns with design_df columns ---
+    if isinstance(beta, pd.Series):
+        beta = beta.reindex(design_df.columns).fillna(0).to_numpy()
+    else:
+        beta = np.asarray(beta)
+
     X = design_df.to_numpy()
-    u = X @ beta.to_numpy()
+    u = X @ beta
     rate = np.exp(u)
 
     ll_model = poisson_loglik(y, rate)

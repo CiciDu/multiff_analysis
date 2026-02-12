@@ -409,9 +409,9 @@ def add_visibility_transition_kernels(
 
         on, off = _on_off(data[stem], tid)
         specs[f'{stem}_on'] = temporal_feats.PredictorSpec(
-            signal=on,  bases=[B])
+            signal=on,  bases=[B], dt=dt, t_min=t_min)
         specs[f'{stem}_off'] = temporal_feats.PredictorSpec(
-            signal=off, bases=[B])
+            signal=off, bases=[B], dt=dt, t_min=t_min)
 
     return specs
 

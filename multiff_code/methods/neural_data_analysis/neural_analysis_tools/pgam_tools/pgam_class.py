@@ -82,7 +82,7 @@ class PGAMclass():
         self._add_temporal_features_to_model(plot_each_feature=False)
         self._add_spatial_features_to_model(plot_each_feature=False)
         self.run_pgam(neural_cluster_number=neural_cluster_number)
-        self.post_processing_results()
+        self.post_processing_results(neural_cluster_number=neural_cluster_number)
         self.save_results()
 
     def prepare_for_pgam(self, temporal_vars=None, num_total_trials=10):
@@ -122,9 +122,12 @@ class PGAMclass():
         except Exception as e:
             print(f"Error occurred while printing reduced variable list: {e}")
 
-    def post_processing_results(self):
+    def post_processing_results(self, neural_cluster_number=None):
         # string with the neuron identifier
-        neuron_id = 'neuron_000_session_1_monkey_001'
+        if neural_cluster_number is None:
+            neuron_id = 'neuron_000_session_1_monkey_001'
+        else:
+            neuron_id = f'neuron_{neural_cluster_number}'
         # dictionary containing some information about the neuron, keys must be strings and values can be anything since are stored with type object.
         info_save = {'x': 100,
                      'y': 801.2,

@@ -8,124 +8,142 @@ from neural_data_analysis.design_kits.design_by_segment import temporal_feats, s
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from scipy.interpolate import BSpline
 
+
 def build_continuous_tuning_block(
     data: pd.DataFrame,
     *,
     linear_vars: Sequence[str],
     angular_vars: Sequence[str],
     n_bins: int = 10,
-    center: bool = True,
+    center: bool = False,
     binrange_dict: Optional[Dict[str, np.ndarray]] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
-    Paper-faithful tuning functions for continuous covariates.
+    Continuous boxcar tuning block.
 
-    ALL continuous variables:
-        - boxcar bins
-        - smoothness enforced later via GAM penalty
-    Angular variables:
-        - treated as circular boxcar (smoothness via 1Dcirc penalty)
-
-    Parameters
-    ----------
-    data : DataFrame
-        Input data with covariates
-    linear_vars : Sequence[str]
-        Names of linear variables
-    angular_vars : Sequence[str]
-        Names of angular variables (circular)
-    n_bins : int
-        Number of bins (default: 10)
-    center : bool
-        Whether to center the design matrix (default: True)
-    binrange_dict : Optional[Dict[str, np.ndarray]]
-        Optional dictionary mapping variable names to [min, max] ranges.
-        If provided, these ranges are used for binning instead of data percentiles.
-
-    Returns
-    -------
-    X_df : DataFrame
-        Design-matrix block for continuous tunings.
-    meta : dict
-        Metadata describing columns per variable.
+    - Keeps ALL n_bins (no dropped reference column)
+    - No intercept
+    - NaNs -> first bin
+    - Values outside limits -> assigned to nearest bin
     """
+
     X_blocks = []
     colnames = []
     groups = {}
-
-    # Store bin edges for each variable
     bin_edges = {}
-    
-    # ---------- linear variables ----------
+
+    # -------------------------------------------------
+    # Helper: deterministic boxcar assignment
+    # -------------------------------------------------
+    def make_boxcar_design(x, limits):
+        """
+        Deterministic binning:
+        - outside values clipped to nearest bin
+        - NaNs handled separately
+        """
+        x = x.copy()
+
+        # Build edges
+        edges = np.linspace(limits[0], limits[1], n_bins + 1)
+
+        # Digitize
+        inds = np.digitize(x, edges) - 1
+
+        # Clip to nearest valid bin
+        inds = np.clip(inds, 0, n_bins - 1)
+
+        # Build one-hot
+        X = np.zeros((len(x), n_bins), dtype=float)
+        valid_mask = ~np.isnan(x)
+        X[np.arange(len(x))[valid_mask], inds[valid_mask]] = 1.0
+
+        return X, edges
+
+    # -------------------------------------------------
+    # Linear variables
+    # -------------------------------------------------
     for var in linear_vars:
         if var not in data.columns:
             raise KeyError(f'missing column {var!r}')
 
-        x = data[var].to_numpy()
-        
-        # Get binrange limits if available
-        limits = None
+        x_raw = data[var].to_numpy()
+        nan_mask = np.isnan(x_raw)
+
+        # Limits
         if binrange_dict is not None and var in binrange_dict:
-            binrange = binrange_dict[var]
-            limits = (float(binrange[0]), float(binrange[1]))
-            
-        print(f'{var} limits: {limits}')
-        
-        X, edges = spatial_feats.boxcar_design(x, n_bins=n_bins, limits=limits)
+            br = binrange_dict[var]
+            limits = (float(br[0]), float(br[1]))
+        else:
+            limits = (np.nanmin(x_raw), np.nanmax(x_raw))
+
+        X, edges = make_boxcar_design(x_raw, limits)
+
+        # Force NaNs -> first bin
+        if np.any(nan_mask):
+            X[nan_mask, :] = 0.0
+            X[nan_mask, 0] = 1.0
+
         bin_edges[var] = edges
 
-        if center and X.size:
-            X = X - X.mean(axis=0, keepdims=True)
-
-        names = [f'{var}:bin{k}' for k in range(X.shape[1])]
+        names = [f'{var}:bin{k}' for k in range(n_bins)]
         X_blocks.append(X)
         colnames.extend(names)
         groups[var] = names
 
-    # ---------- angular variables (CIRCULAR BOXCARS) ----------
+    # -------------------------------------------------
+    # Angular variables
+    # -------------------------------------------------
     for var in angular_vars:
         if var not in data.columns:
             raise KeyError(f'missing column {var!r}')
 
-        th = data[var].to_numpy()
+        th_raw = data[var].to_numpy()
+        nan_mask = np.isnan(th_raw)
 
-        # Wrap to [-pi, pi) for safety (or [0, 2pi), just be consistent)
-        th = np.mod(th + np.pi, 2 * np.pi) - np.pi
+        # Wrap safely to [-pi, pi)
+        th = np.mod(th_raw + np.pi, 2 * np.pi) - np.pi
 
-        # Get binrange limits if available (assuming they're in degrees, convert to radians)
-        limits = (-np.pi, np.pi)  # default
         if binrange_dict is not None and var in binrange_dict:
-            binrange_deg = binrange_dict[var]
-            limits = (np.deg2rad(float(binrange_deg[0])), np.deg2rad(float(binrange_deg[1])))
-        
-        X, edges = spatial_feats.boxcar_design(
-            th,
-            n_bins=n_bins,
-            limits=limits,
-        )
+            br = binrange_dict[var]
+            limits = (
+                np.deg2rad(float(br[0])),
+                np.deg2rad(float(br[1])),
+            )
+        else:
+            limits = (-np.pi, np.pi)
+
+        X, edges = make_boxcar_design(th, limits)
+
+        # Force NaNs -> first bin
+        if np.any(nan_mask):
+            X[nan_mask, :] = 0.0
+            X[nan_mask, 0] = 1.0
+
         bin_edges[var] = edges
-        
-        # print limits
-        print(f'{var} limits: {limits}')
 
-        if center and X.size:
-            X = X - X.mean(axis=0, keepdims=True)
-
-        names = [f'{var}:bin{k}' for k in range(X.shape[1])]
+        names = [f'{var}:bin{k}' for k in range(n_bins)]
         X_blocks.append(X)
         colnames.extend(names)
         groups[var] = names
 
-    # ---------- assemble ----------
+    # -------------------------------------------------
+    # Assemble
+    # -------------------------------------------------
     X_all = np.column_stack(X_blocks) if X_blocks else np.empty((len(data), 0))
-    X_df = pd.DataFrame(X_all, columns=colnames, index=data.index)
+
+    X_df = pd.DataFrame(
+        X_all,
+        columns=colnames,
+        index=data.index,
+    )
 
     meta = {
         'linear_vars': list(linear_vars),
         'angular_vars': list(angular_vars),
         'n_bins': int(n_bins),
-        'centered': bool(center),
+        'centered': False,
         'groups': groups,
         'bin_edges': bin_edges,
     }
+
     return X_df, meta

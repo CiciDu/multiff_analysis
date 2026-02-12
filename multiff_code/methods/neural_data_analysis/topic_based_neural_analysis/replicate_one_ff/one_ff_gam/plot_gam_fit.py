@@ -1,6 +1,31 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+plot_var_order = [
+    # egocentric / motion state
+    'v',
+    'w',
+    'd',
+    'phi',
+
+    # target-related
+    'r_targ',
+    'theta_targ',
+
+    # eye position
+    'eye_ver',
+    'eye_hor',
+    
+
+    # behavior / action
+    't_move',
+    't_targ',
+    't_stop',
+    't_rew',
+
+    # history
+    'spike_hist',
+]
 
 def plot_spike_history(beta, hist_meta):
     """
@@ -221,6 +246,57 @@ def plot_variable(var, beta, all_meta):
     print(f"Variable '{var}' not found in metadata")
 
 
+def plot_variables(beta, all_meta, var_list=None, plot_var_order=None):
+    """
+    Plot any set of variables with optional ordering.
+    
+    Parameters
+    ----------
+    beta : Series or DataFrame
+        Fitted coefficients
+    all_meta : dict
+        Combined metadata
+    var_list : list of str, optional
+        List of variable names to plot. If None, plots all available variables.
+    plot_var_order : list of str, optional
+        Order in which to plot variables. Variables not in this list will be
+        plotted afterward in the order they appear in var_list. If None, uses
+        the order from var_list or the default discovery order.
+    """
+    # Collect all available variables if var_list not specified
+    if var_list is None:
+        var_list = []
+        
+        # Add tuning variables
+        if 'tuning' in all_meta:
+            tuning_meta = all_meta['tuning']
+            var_list.extend(tuning_meta.get('linear_vars', []))
+            var_list.extend(tuning_meta.get('angular_vars', []))
+        
+        # Add temporal/event variables
+        if 'temporal' in all_meta:
+            temporal_meta = all_meta['temporal']
+            var_list.extend(temporal_meta.get('groups', {}).keys())
+        
+        # Add history variables
+        if 'hist' in all_meta:
+            hist_meta = all_meta['hist']
+            var_list.extend(hist_meta.get('groups', {}).keys())
+    
+    # Apply ordering if specified
+    if plot_var_order is not None:
+        # Variables in specified order first
+        ordered_vars = [v for v in plot_var_order if v in var_list]
+        # Then variables not in plot_var_order
+        remaining_vars = [v for v in var_list if v not in plot_var_order]
+        var_list = ordered_vars + remaining_vars
+    
+    # Plot each variable
+    for var in var_list:
+        plot_variable(var, beta, all_meta)
+
+
+
 def plot_all_tuning_curves(beta, all_meta):
     """
     Plot all tuning curves (linear and angular variables).
@@ -231,23 +307,20 @@ def plot_all_tuning_curves(beta, all_meta):
         Fitted coefficients
     all_meta : dict
         Combined metadata
+    plot_var_order : list of str, optional
+        Order in which to plot variables
     """
     if 'tuning' not in all_meta:
         print("No tuning metadata found")
         return
     
     tuning_meta = all_meta['tuning']
+    var_list = tuning_meta.get('linear_vars', []) + tuning_meta.get('angular_vars', [])
     
-    # Plot linear variables
-    for var in tuning_meta.get('linear_vars', []):
-        plot_linear_tuning(var, beta, tuning_meta)
-    
-    # Plot angular variables
-    for var in tuning_meta.get('angular_vars', []):
-        plot_angular_tuning(var, beta, tuning_meta)
+    plot_variables(beta, all_meta, var_list=var_list, plot_var_order=plot_var_order)
 
 
-def plot_all_temporal_filters(beta, all_meta):
+def plot_all_temporal_filters(beta, all_meta, plot_var_order=None):
     """
     Plot all temporal filters (events and spike history).
     
@@ -257,17 +330,21 @@ def plot_all_temporal_filters(beta, all_meta):
         Fitted coefficients
     all_meta : dict
         Combined metadata
+    plot_var_order : list of str, optional
+        Order in which to plot variables
     """
-    # Plot event kernels
+    var_list = []
+    
+    # Add event kernels
     if 'temporal' in all_meta:
         temporal_meta = all_meta['temporal']
         event_vars = ['t_targ', 't_move', 't_rew', 't_stop']
-        for var in event_vars:
-            if var in temporal_meta.get('groups', {}):
-                plot_event_kernel(var, beta, temporal_meta)
+        var_list.extend([v for v in event_vars if v in temporal_meta.get('groups', {})])
     
-    # Plot spike history
+    # Add spike history
     if 'hist' in all_meta:
         hist_meta = all_meta['hist']
         if 'spike_hist' in hist_meta.get('groups', {}):
-            plot_spike_history(beta, hist_meta)
+            var_list.append('spike_hist')
+    
+    plot_variables(beta, all_meta, var_list=var_list, plot_var_order=plot_var_order)

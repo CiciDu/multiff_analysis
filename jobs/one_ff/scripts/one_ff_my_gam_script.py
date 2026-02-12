@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    one_ff_gam_fit
+)
 import os
 import sys
 from pathlib import Path
@@ -22,11 +26,6 @@ else:
 # ---------------------------------------------------------------------
 # Project-specific imports
 # ---------------------------------------------------------------------
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit
-)
-
 
 # ---------------------------------------------------------------------
 # Global config
@@ -53,7 +52,7 @@ def main(unit_idx: int):
     # -------------------------------
     # Per-unit design
     # -------------------------------
-    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_pgam_design(
+    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )
