@@ -149,24 +149,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         passed = bool(best_mean_reward >= reward_threshold)
         print(
             f'[rppo] Stage complete — best_mean={best_mean_reward:.2f}, passed={passed}')
-        # Update ln/best_curr symlink
-        try:
-            ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
-                self.model_folder_name, 'ln')
-            os.makedirs(ln_dir, exist_ok=True)
-            link_path = os.path.join(ln_dir, 'best_curr')
-            target = self.best_model_in_curriculum_dir
-            if os.path.islink(link_path) or os.path.exists(link_path):
-                try:
-                    os.remove(link_path)
-                except IsADirectoryError:
-                    os.rmdir(link_path)
-                except Exception:
-                    pass
-            os.symlink(target, link_path)
-        except Exception:
-            pass
-        # Update global best tracker for run_end logging
+
         try:
             if self.best_avg_reward is None:
                 self.best_avg_reward = best_mean_reward
@@ -230,24 +213,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             self.rl_agent.save(model_path)
             print('[rppo] Saved model at', model_path)
         self.write_checkpoint_manifest(dir_name)
-        # Refresh meta manifest links if saving into standardized best dirs
-        try:
-            ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
-                self.model_folder_name, 'ln')
-            os.makedirs(ln_dir, exist_ok=True)
-            if os.path.abspath(dir_name) == os.path.abspath(getattr(self, 'best_model_postcurriculum_dir', '')):
-                link_path = os.path.join(ln_dir, 'best_post')
-                target = dir_name
-                if os.path.islink(link_path) or os.path.exists(link_path):
-                    try:
-                        os.remove(link_path)
-                    except IsADirectoryError:
-                        os.rmdir(link_path)
-                    except Exception:
-                        pass
-                os.symlink(target, link_path)
-        except Exception:
-            pass
+
 
     def load_agent(self, load_replay_buffer=True, dir_name=None, restore_env_from_checkpoint=True):
         """Load PPO model from directory."""
@@ -320,24 +286,6 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         except Exception as e:
             print('[rppo] Warning: failed to load best model after training:', e)
 
-        # Update ln symlink if we trained into standardized post/best
-        try:
-            ln_dir = getattr(self, 'ln_dir', None) or os.path.join(
-                self.model_folder_name, 'ln')
-            os.makedirs(ln_dir, exist_ok=True)
-            if os.path.abspath(best_model_save_path) == os.path.abspath(getattr(self, 'best_model_postcurriculum_dir', '')):
-                link_path = os.path.join(ln_dir, 'best_post')
-                target = best_model_save_path
-                if os.path.islink(link_path) or os.path.exists(link_path):
-                    try:
-                        os.remove(link_path)
-                    except IsADirectoryError:
-                        os.rmdir(link_path)
-                    except Exception:
-                        pass
-                os.symlink(target, link_path)
-        except Exception:
-            pass
 
     # -------------------------------------------------------------------------
     # Explicitly skip replay buffer for rppo when loading best models

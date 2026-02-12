@@ -104,7 +104,6 @@ def migrate_agent_dir(agent_root: str) -> Tuple[bool, List[str]]:
     # New layout paths
     curr_dir = os.path.join(agent_root, 'curr')
     post_dir = os.path.join(agent_root, 'post')
-    ln_dir = os.path.join(agent_root, 'ln')
     meta_dir = os.path.join(agent_root, 'meta')
     best_curr = os.path.join(curr_dir, 'best')
     best_post = os.path.join(post_dir, 'best')
@@ -114,7 +113,7 @@ def migrate_agent_dir(agent_root: str) -> Tuple[bool, List[str]]:
     legacy_post = os.path.join(agent_root, 'best_model_postcurriculum')
 
     # Create base dirs
-    for d in [curr_dir, post_dir, ln_dir, meta_dir, best_curr, best_post]:
+    for d in [curr_dir, post_dir, meta_dir, best_curr, best_post]:
         _ensure_dir(d)
 
     # Move legacy -> new layout
@@ -145,10 +144,6 @@ def migrate_agent_dir(agent_root: str) -> Tuple[bool, List[str]]:
             changed = True
         except Exception:
             pass
-
-    # Symlinks
-    _safe_symlink(best_curr, os.path.join(ln_dir, 'best_curr'))
-    _safe_symlink(best_post, os.path.join(ln_dir, 'best_post'))
 
     # Meta files
     env_params = None

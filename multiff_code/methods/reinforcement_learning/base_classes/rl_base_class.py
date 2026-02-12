@@ -132,7 +132,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         # Roots
         self.curr_dir = os.path.join(self.model_folder_name, 'curr')
         self.post_dir = os.path.join(self.model_folder_name, 'post')
-        self.ln_dir = os.path.join(self.model_folder_name, 'ln')
         self.meta_dir = os.path.join(self.model_folder_name, 'meta')
         # Best subdirs (curr/post)
         self.best_model_in_curriculum_dir = os.path.join(self.curr_dir, 'best')
@@ -140,7 +139,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.post_dir, 'best')
 
         # Ensure directories exist
-        for d in [self.curr_dir, self.post_dir, self.ln_dir, self.meta_dir,
+        for d in [self.curr_dir, self.post_dir, self.meta_dir,
                   self.best_model_in_curriculum_dir, self.best_model_postcurriculum_dir]:
             try:
                 os.makedirs(d, exist_ok=True)
@@ -162,15 +161,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             except Exception:
                 # Symlinks may fail on some filesystems; ignore
                 pass
-
-        # Initialize ln symlinks (best_curr, best_post)
-        try:
-            _safe_symlink(self.best_model_in_curriculum_dir,
-                          os.path.join(self.ln_dir, 'best_curr'))
-            _safe_symlink(self.best_model_postcurriculum_dir,
-                          os.path.join(self.ln_dir, 'best_post'))
-        except Exception:
-            pass
 
         # Minimal meta files
         try:
