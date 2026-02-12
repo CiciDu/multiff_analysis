@@ -65,7 +65,7 @@ def build_temporal_design_base(
 
     specs, specs_meta = temporal_feats._init_predictor_specs(
         data_obj.prs.dt,
-        data_obj.trial_ids,
+        data_obj.sel_trial_ids,
     )
 
     # Get binrange for temporal filters if available

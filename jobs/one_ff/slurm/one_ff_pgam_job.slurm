@@ -30,13 +30,18 @@ echo "[SLURM][DEBUG] SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID:-unset}" >&2
 # Conda setup - FAST PATH (bypass conda activate)
 # --------------------------------------------------
 # Direct path to pgam environment's Python (much faster than conda activate)
-PGAM_PYTHON="$HOME/miniconda3/envs/pgam/bin/python"
+# --------------------------------------------------
+# Conda setup - FAST PATH (bypass conda activate)
+# --------------------------------------------------
+# Direct path to pgam environment's Python (much faster than conda activate)
+CONDA_PREFIX="$HOME/miniconda3/envs/pgam"
+PGAM_PYTHON="$CONDA_PREFIX/bin/python"
 
 echo "[SLURM][DEBUG] Checking for pgam Python at: $PGAM_PYTHON" >&2
 if [[ ! -f "$PGAM_PYTHON" ]]; then
   echo "[SLURM][ERROR] pgam Python not found at $PGAM_PYTHON" >&2
   echo "[SLURM][ERROR] Falling back to conda activate..." >&2
-  
+
   # Fallback to traditional conda activate
   CONDA_SH="$HOME/miniconda3/etc/profile.d/conda.sh"
   if [[ -f "$CONDA_SH" ]]; then
@@ -45,12 +50,28 @@ if [[ ! -f "$PGAM_PYTHON" ]]; then
       echo '[SLURM][ERROR] Conda activation failed' >&2
       exit 1
     }
-    PGAM_PYTHON="python"
+    PGAM_PYTHON='python'
+
+    # In the activated case, CONDA_PREFIX is set by conda, but keep it explicit/robust:
+    CONDA_PREFIX="${CONDA_PREFIX:-$HOME/miniconda3/envs/pgam}"
   else
     echo '[SLURM][ERROR] conda.sh not found' >&2
     exit 1
   fi
 fi
+
+# --------------------------------------------------
+# Force R from conda (DO THIS IN BOTH PATHS)
+# --------------------------------------------------
+export R_HOME="$CONDA_PREFIX/lib/R"
+export LD_LIBRARY_PATH="$R_HOME/lib:$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Optional debug prints (keep these until you confirm it works on SLURM)
+echo "[SLURM][DEBUG] CONDA_PREFIX=$CONDA_PREFIX" >&2
+echo "[SLURM][DEBUG] R_HOME=$R_HOME" >&2
+echo "[SLURM][DEBUG] which R: $(command -v R || echo 'not found')" >&2
+echo "[SLURM][DEBUG] R --version: $(R --version 2>/dev/null | head -n 1 || echo 'failed')" >&2
 
 echo "[SLURM][CONDA] Environment ready at $(date)" >&2
 echo "[SLURM][DEBUG] Python path: $PGAM_PYTHON" >&2

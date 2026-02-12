@@ -35,7 +35,6 @@ class StopDecodingRunner:
         self.stop_binned_feats = None
         
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
-
     # ------------------------------------------------------------------
     # Data collection
     # ------------------------------------------------------------------
@@ -147,18 +146,19 @@ class StopDecodingRunner:
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True):
+    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None):
         """
         Run stop-event decoding.
         """
+        self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
         self._collect_data(exists_ok=design_matrices_exists_ok)
 
         if save_dir is None:
             save_dir = self._get_save_dir()
 
         all_results = []
-
-        for model_name, spec in pn_decoding_model_specs.MODEL_SPECS.items():
+        
+        for model_name, spec in self.model_specs.items():
             config = cv_decoding.DecodingRunConfig(
                 # regression
                 regression_model_class=spec.get(
@@ -190,6 +190,7 @@ class StopDecodingRunner:
                 config=config,
                 context_label='pooled',
                 save_dir=save_dir,
+                model_name=model_name,
             )
 
             results_df['model_name'] = model_name

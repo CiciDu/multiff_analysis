@@ -43,10 +43,11 @@ class OneFFSessionData:
     def _load_session(self):
         self.session = self.sessions[self.session_num]
         self.behaviour = self.session.behaviour
+        self.trlindx = self.session.trlindx
+        self.sel_trial_ids = self.trlindx.nonzero()[0]
 
         self.all_trials = self.behaviour.trials
         self.all_stats = self.behaviour.stats
-        self.trial_ids = np.arange(len(self.all_trials))
 
         self.units = self.session.units
         self.n_units = len(self.units)
@@ -99,7 +100,7 @@ class OneFFSessionData:
         covariates_concat, trial_id_vec = (
             population_analysis_utils.concatenate_covariates_with_trial_id(
                 trials=self.all_trials,
-                trial_indices=self.trial_ids,
+                trial_indices=self.sel_trial_ids,
                 covariate_fn=lambda tr: one_ff_data_processing.compute_all_covariates(
                     tr, self.prs.dt
                 ),
@@ -121,7 +122,7 @@ class OneFFSessionData:
         for k in range(self.n_units):
             spk_counts, _ = population_analysis_utils.concatenate_trials_with_trial_id(
                 self.all_trials,
-                self.trial_ids,
+                self.sel_trial_ids,
                 lambda tr, tid: population_analysis_utils.bin_spikes(
                     self.units[k].trials[tid].tspk,
                     tr.continuous.ts
@@ -154,7 +155,7 @@ class OneFFSessionData:
         for event in event_names:
             events_concat, _ = population_analysis_utils.concatenate_trials_with_trial_id(
                 self.all_trials,
-                self.trial_ids,
+                self.sel_trial_ids,
                 lambda tr, tid: population_analysis_utils.event_impulse(
                     tr, tid, event
                 ),

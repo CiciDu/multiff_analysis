@@ -11,7 +11,6 @@
 set -e
 set -o pipefail
 
-
 # ------------------------------
 # Paths
 # ------------------------------
@@ -20,44 +19,65 @@ SCRIPT_PATH=$PROJECT_ROOT/multiff_analysis/jobs/one_ff/scripts/one_ff_back_elim_
 
 cd "$PROJECT_ROOT"
 
-
+echo "[SLURM][START] Job started at $(date)" >&2
+echo "[SLURM][DEBUG] SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID:-unset}" >&2
 
 # ------------------------------
-# Conda
+# Conda setup - FAST PATH (bypass conda activate)
 # ------------------------------
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-else
-    echo "[SLURM][ERROR] conda.sh not found" >&2
+# Direct path to multiff_clean environment's Python (much faster than conda activate)
+MULTIFF_PYTHON="$HOME/miniconda3/envs/multiff_clean/bin/python"
+
+echo "[SLURM][DEBUG] Checking for multiff_clean Python at: $MULTIFF_PYTHON" >&2
+if [[ ! -f "$MULTIFF_PYTHON" ]]; then
+  echo "[SLURM][ERROR] multiff_clean Python not found at $MULTIFF_PYTHON" >&2
+  echo "[SLURM][ERROR] Falling back to conda activate..." >&2
+  
+  # Fallback to traditional conda activate
+  CONDA_SH="$HOME/miniconda3/etc/profile.d/conda.sh"
+  if [[ -f "$CONDA_SH" ]]; then
+    source "$CONDA_SH"
+    conda activate multiff_clean || {
+      echo '[SLURM][ERROR] Conda activation failed' >&2
+      exit 1
+    }
+    MULTIFF_PYTHON="python"
+  else
+    echo '[SLURM][ERROR] conda.sh not found' >&2
     exit 1
+  fi
 fi
 
-conda activate multiff_clean || {
-    echo "[SLURM][ERROR] Conda activation failed"
-    exit 1
-}
+echo "[SLURM][CONDA] Environment ready at $(date)" >&2
+echo "[SLURM][DEBUG] Python path: $MULTIFF_PYTHON" >&2
+echo "[SLURM][DEBUG] Python version: $($MULTIFF_PYTHON --version 2>&1)" >&2
 
 # ------------------------------
 # Now enable nounset
 # ------------------------------
 set -u
 
-
 # ------------------------------
 # Unit index
 # ------------------------------
 UNIT_IDX=${SLURM_ARRAY_TASK_ID}
 
-echo "[SLURM] Running one-FF backward elimination"
-echo "[SLURM] Unit index: ${UNIT_IDX}"
-echo "[SLURM] Host: $(hostname)"
-echo "[SLURM] Start time: $(date)"
+echo "[SLURM] Running one-FF backward elimination" >&2
+echo "[SLURM] Unit index: ${UNIT_IDX}" >&2
+echo "[SLURM] Host: $(hostname)" >&2
+echo "[SLURM] Start time: $(date)" >&2
+
+# Force flush to log files
+exec 1>&1 2>&2
 
 # ------------------------------
 # Run backward elimination
 # ------------------------------
-python -u "$SCRIPT_PATH" \
+echo "[SLURM][DEBUG] About to run Python script: $SCRIPT_PATH" >&2
+echo "[SLURM][DEBUG] With unit_idx: $UNIT_IDX" >&2
+
+stdbuf -oL -eL "$MULTIFF_PYTHON" -u "$SCRIPT_PATH" \
     --unit_idx "${UNIT_IDX}"
 
-echo "[SLURM] Done"
-echo "[SLURM] End time: $(date)"
+echo "[SLURM] Done" >&2
+echo "[SLURM] End time: $(date)" >&2

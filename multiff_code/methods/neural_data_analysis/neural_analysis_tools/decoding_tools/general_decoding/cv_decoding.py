@@ -4,10 +4,9 @@
 
 import json
 import hashlib
-from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Any, Optional, Type
+from typing import Optional, Type
 from tqdm import tqdm
 
 import numpy as np
@@ -108,6 +107,73 @@ def get_feature_csv_path(out_dir, feature, mode, params_hash):
     out_dir = Path(out_dir)  # Ensure out_dir is a Path object
     tag = ''.join(c if c.isalnum() else '_' for c in feature)[:24]
     return out_dir / f'{tag}_{mode}_{params_hash}.csv'
+
+
+def make_mode_hash(mode, n_splits, shuffle_y, context, config):
+    """Create a hash based on mode and parameters (excluding feature)."""
+    params_hash = hashlib.sha1(
+        json.dumps(
+            dict(
+                mode=mode,
+                n_splits=n_splits,
+                shuffle_y=shuffle_y,
+                context=context,
+                config=serialize_decoding_config(config),
+            ),
+            sort_keys=True,
+            default=str,
+        ).encode('utf-8')
+    ).hexdigest()[:10]
+    return params_hash
+
+
+def get_mode_csv_path(out_dir, mode, params_hash):
+    """Get the path for a mode-level results file."""
+    if out_dir is None:
+        return None
+    out_dir = Path(out_dir)
+    return out_dir / f'{mode}_{params_hash}.csv'
+
+
+def get_model_name(mode, config):
+    """Get the model name for a given mode and config."""
+    if mode == 'regression':
+        model_class = config.regression_model_class or CatBoostRegressor
+    else:
+        model_class = config.classification_model_class or LogisticRegression
+    return model_class.__name__
+
+
+def get_model_csv_path(out_dir, model_name):
+    """Get the path for a model-level results file (by model name key)."""
+    if out_dir is None:
+        return None
+    out_dir = Path(out_dir)
+    return out_dir / f'{model_name}.csv'
+
+
+def config_matches(row, n_splits, shuffle_y, context_label, config, model_name=None):
+    """Check if a result row matches the given configuration."""
+    # Check basic parameters
+    if row.get('n_splits') != n_splits:
+        return False
+    if row.get('shuffle_y') != shuffle_y:
+        return False
+    if row.get('context') != context_label:
+        return False
+    
+    # Check model_name if provided
+    if model_name is not None:
+        if row.get('model_name') != model_name:
+            return False
+    else:
+        # Fallback: infer expected model_name from config
+        mode = row.get('mode')
+        expected_model_name = get_model_name(mode, config)
+        if row.get('model_name') != expected_model_name:
+            return False
+    
+    return True
 
 
 # ============================================================
@@ -242,6 +308,384 @@ def try_load_existing_result(
 
 
 
+def convert_old_to_new_format(
+    results_dir: str | Path,
+    delete_old_files: bool = False,
+    verbosity: int = 1,
+):
+    """
+    Convert old decoding results to new format (one file per model name).
+    
+    Old format: featuretag_mode_hash.csv (one file per feature × config)
+    New format: ModelName.csv (one file per model, with config params as columns)
+    
+    The function automatically detects all configurations from existing files
+    and groups features by model name, adding config parameters as columns.
+    
+    Parameters
+    ----------
+    results_dir : str or Path
+        Directory containing old-format result files.
+    delete_old_files : bool
+        If True, delete old format files after successful conversion.
+    verbosity : int
+        Verbosity level.
+    
+    Returns
+    -------
+    dict
+        Dictionary mapping model names to number of features converted.
+    """
+    results_dir = Path(results_dir)
+    if not results_dir.exists():
+        raise ValueError(f"Results directory does not exist: {results_dir}")
+    
+    # Group results by model name
+    # Key: model_name, Value: list of DataFrames
+    results_by_model = {}
+    old_files_by_model = {}
+    
+    # Scan for old format files (pattern: featuretag_mode_hash.csv)
+    for csv_file in results_dir.glob('*.csv'):
+        # Skip files that look like new format (model name only)
+        name_parts = csv_file.stem.split('_')
+        if len(name_parts) < 3:
+            # Could be new format, skip
+            continue
+            
+        # Try to identify if this is an old format file
+        # Old format: tag_mode_hash.csv where mode is 'regression' or 'classification'
+        potential_mode = name_parts[-2]
+        if potential_mode not in ['regression', 'classification']:
+            continue
+        
+        try:
+            df = pd.read_csv(csv_file)
+            if 'behav_feature' not in df.columns or 'mode' not in df.columns:
+                continue
+            
+            # Get or infer model name
+            if 'model_name' in df.columns:
+                model_name = df['model_name'].iloc[0]
+            elif 'model_class' in df.columns:
+                # Use model_class as model_name for backward compatibility
+                model_name = df['model_class'].iloc[0]
+            else:
+                # Infer from mode - use default models
+                mode = df['mode'].iloc[0]
+                if mode == 'regression':
+                    model_name = 'CatBoostRegressor'
+                else:
+                    model_name = 'LogisticRegression'
+            
+            # Add model_name column if it doesn't exist
+            if 'model_name' not in df.columns:
+                df['model_name'] = model_name
+            
+            # Remove model_class column if it exists (we only use model_name now)
+            if 'model_class' in df.columns:
+                df = df.drop(columns=['model_class'])
+            
+            # Add missing config columns if they don't exist
+            if 'n_splits' not in df.columns:
+                df['n_splits'] = 5  # default value
+            if 'shuffle_y' not in df.columns:
+                df['shuffle_y'] = False  # default value
+            
+            if model_name not in results_by_model:
+                results_by_model[model_name] = []
+                old_files_by_model[model_name] = []
+            
+            results_by_model[model_name].append(df)
+            old_files_by_model[model_name].append(csv_file)
+            
+            if verbosity > 1:
+                print(f"Found old format file: {csv_file.name} -> model: {model_name}")
+        except Exception as e:
+            if verbosity > 1:
+                print(f"Skipping {csv_file.name}: {e}")
+            continue
+    
+    # Combine and save by model
+    conversion_stats = {}
+    saved_files = []
+    
+    for model_name, dfs in results_by_model.items():
+        if not dfs:
+            continue
+        
+        # Combine all results for this model
+        combined_df = pd.concat(dfs, ignore_index=True)
+        
+        # Remove duplicates based on feature and config params
+        dedup_cols = ['behav_feature', 'model_name', 'n_splits', 'shuffle_y', 'context']
+        # Only use columns that exist
+        dedup_cols = [col for col in dedup_cols if col in combined_df.columns]
+        combined_df = combined_df.drop_duplicates(subset=dedup_cols, keep='first')
+        
+        if verbosity > 1:
+            print(f"\nProcessing model: {model_name}")
+            print(f"  Combined {len(dfs)} old files into {len(combined_df)} unique entries")
+        
+        # New filename is just the model name
+        new_csv_path = results_dir / f"{model_name}.csv"
+        
+        # Check if new file already exists
+        if new_csv_path.exists():
+            if verbosity > 0:
+                print(f"  Warning: {new_csv_path.name} already exists. Merging with existing results.")
+            existing_df = pd.read_csv(new_csv_path)
+            # Combine and remove duplicates (prefer existing)
+            combined_df = pd.concat([existing_df, combined_df], ignore_index=True)
+            combined_df = combined_df.drop_duplicates(subset=dedup_cols, keep='first')
+        
+        # Save new format file
+        combined_df.to_csv(new_csv_path, index=False)
+        
+        # Verify the file was saved
+        if not new_csv_path.exists():
+            raise IOError(f"Failed to save {new_csv_path}")
+        
+        conversion_stats[model_name] = len(combined_df)
+        saved_files.append(new_csv_path)
+        
+        if verbosity > 0:
+            print(f"✓ Saved {len(combined_df)} entries to {new_csv_path.name}")
+        
+        # Optionally delete old files (only after successful save)
+        if delete_old_files:
+            for old_file in old_files_by_model[model_name]:
+                old_file.unlink()
+                if verbosity > 1:
+                    print(f"    Deleted old file: {old_file.name}")
+            if verbosity > 1:
+                print(f"    Deleted {len(old_files_by_model[model_name])} old files for this model")
+    
+    if verbosity > 0 and saved_files:
+        print(f"\n{'='*60}")
+        print(f"✓ Conversion complete! Saved {len(saved_files)} new format file(s):")
+        for f in saved_files:
+            # Try to load and show info
+            try:
+                df = pd.read_csv(f)
+                print(f"  - {f.name} ({len(df)} entries)")
+            except Exception:
+                print(f"  - {f.name}")
+        print(f"{'='*60}")
+    
+    return conversion_stats
+
+# ============================================================
+# CV Decoding Orchestration (Refactored)
+# ============================================================
+
+def _prepare_inputs(X, groups, shuffle_seed, save_dir):
+    X = np.asarray(X)
+    groups = np.asarray(groups)
+    rng = np.random.default_rng(shuffle_seed)
+
+    out_dir = Path(save_dir) if save_dir is not None else None
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    return X, groups, rng, out_dir
+
+
+def _load_existing_results(
+    out_dir,
+    config,
+    n_splits,
+    shuffle_y,
+    context_label,
+    verbosity,
+    model_name=None,
+):
+    """
+    Load existing results matching current configuration.
+    Returns dict keyed by (feature, model_name).
+    """
+    existing_lookup = {}
+
+    if out_dir is None:
+        return existing_lookup
+
+    # If model_name is provided, only check that one file
+    # Otherwise check both regression and classification
+    if model_name is not None:
+        csv_path = get_model_csv_path(out_dir, model_name)
+        
+        if verbosity >= 1:
+            print(f'Checking for existing results in {csv_path}')
+        
+        if csv_path.exists():
+            df = pd.read_csv(csv_path)
+            
+            for _, row in df.iterrows():
+                if config_matches(row, n_splits, shuffle_y, context_label, config, model_name):
+                    key = (row['behav_feature'], row['model_name'])
+                    existing_lookup[key] = row.to_dict()
+            
+            if verbosity >= 1:
+                print(f'Loaded {len(existing_lookup)} matching rows')
+    else:
+        # Fallback: scan for files by inferring model_name from config
+        for mode in ['regression', 'classification']:
+            inferred_model_name = get_model_name(mode, config)
+            csv_path = get_model_csv_path(out_dir, inferred_model_name)
+
+            if verbosity >= 1:
+                print(f'Checking for existing results in {csv_path}')
+
+            if not csv_path.exists():
+                continue
+
+            df = pd.read_csv(csv_path)
+
+            for _, row in df.iterrows():
+                if config_matches(row, n_splits, shuffle_y, context_label, config, None):
+                    # Use model_name from the row, or fall back to inferred name
+                    mname = row.get('model_name', inferred_model_name)
+                    key = (row['behav_feature'], mname)
+                    existing_lookup[key] = row.to_dict()
+
+            if verbosity >= 1:
+                print(f'Loaded {len(existing_lookup)} matching rows')
+
+    return existing_lookup
+
+
+def _compute_single_feature(
+    feature,
+    X,
+    y_df,
+    groups,
+    config,
+    n_splits,
+    shuffle_y,
+    context_label,
+    rng,
+    model_name=None,
+):
+    """
+    Compute decoding for a single feature.
+    Returns (row_dict, model_name, mode) or None.
+    
+    Parameters
+    ----------
+    model_name : str, optional
+        The model name key (from model_specs). If None, uses the model class name.
+    """
+    y = y_df[feature].to_numpy().ravel()
+    X_ok, y_ok, g_ok = filter_valid_rows(X, y, groups)
+
+    mode = infer_decoding_type(y_ok)
+    if mode == 'skip':
+        return None
+
+    # Use provided model_name or fall back to class name
+    if model_name is None:
+        model_name = get_model_name(mode, config)
+
+    if shuffle_y:
+        y_ok = shuffle_y_groupwise(y_ok, g_ok, rng)
+
+    splits = build_group_kfold_splits(X_ok, g_ok, n_splits)
+
+    if mode == 'regression':
+        metrics = run_regression_cv(
+            X_ok, y_ok, g_ok, splits, config, rng
+        )
+    else:
+        metrics = run_classification_cv(
+            X_ok, y_ok, splits, config
+        )
+
+    row = dict(
+        behav_feature=feature,
+        mode=mode,
+        model_name=model_name,
+        n_splits=n_splits,
+        shuffle_y=shuffle_y,
+        context=context_label,
+        n_samples=len(y_ok),
+        **metrics,
+    )
+
+    return row, model_name, mode
+
+
+def _aggregate_results(results_by_model, row, model_name, mode):
+    results_by_model.setdefault(model_name, {
+        'mode': mode,
+        'rows': [],
+    })['rows'].append(row)
+
+
+def _save_results(
+    out_dir,
+    results_by_model,
+    verbosity,
+):
+    if out_dir is None:
+        return
+
+    dedup_cols = [
+        'behav_feature',
+        'model_name',
+        'n_splits',
+        'shuffle_y',
+        'context',
+    ]
+
+    for model_name, data in results_by_model.items():
+        rows = data['rows']
+        if not rows:
+            continue
+
+        csv_path = get_model_csv_path(out_dir, model_name)
+
+        new_df = pd.DataFrame(rows)
+
+        if csv_path.exists():
+            existing_df = pd.read_csv(csv_path)
+            existing_len = len(existing_df)
+
+            combined_df = pd.concat(
+                [existing_df, new_df],
+                ignore_index=True,
+            )
+
+            # Only use dedup columns that exist in the DataFrame
+            actual_dedup_cols = [col for col in dedup_cols if col in combined_df.columns]
+            combined_df = combined_df.drop_duplicates(
+                subset=actual_dedup_cols,
+                keep='first',
+            )
+
+            if len(combined_df) > existing_len:
+                combined_df.to_csv(csv_path, index=False)
+                if verbosity > 0:
+                    print(
+                        f'Saved {len(combined_df) - existing_len} '
+                        f'new rows to {csv_path.name} '
+                        f'({len(combined_df)} total)'
+                    )
+            elif verbosity > 1:
+                print(f'No new rows to save for {csv_path.name}')
+
+        else:
+            new_df.to_csv(csv_path, index=False)
+            if verbosity > 0:
+                print(
+                    f'Saved {len(new_df)} new results '
+                    f'to {csv_path.name}'
+                )
+
+
+# ============================================================
+# Main Entry Point
+# ============================================================
+
 def run_cv_decoding(
     X,
     y_df,
@@ -256,82 +700,82 @@ def run_cv_decoding(
     save_dir: Optional[str | Path] = None,
     load_existing_only=False,
     exists_ok=True,
+    model_name: Optional[str] = None,
 ):
+    """
+    Cross-validated decoding over multiple behavioral features.
+    """
+
     if config is None:
         config = DecodingRunConfig()
 
-    X = np.asarray(X)
-    groups = np.asarray(groups)
-    rng = np.random.default_rng(shuffle_seed)
-
-    out_dir = Path(save_dir) if save_dir is not None else None
-    if out_dir is not None:
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-    results = []
+    X, groups, rng, out_dir = _prepare_inputs(
+        X, groups, shuffle_seed, save_dir
+    )
 
     if behav_features is None:
         behav_features = y_df.columns.tolist()
 
-    for feature in tqdm(behav_features, desc='Decoding features'):
-        y = y_df[feature].to_numpy().ravel()
-        X_ok, y_ok, g_ok = filter_valid_rows(X, y, groups)
+    existing_lookup = (
+        _load_existing_results(
+            out_dir,
+            config,
+            n_splits,
+            shuffle_y,
+            context_label,
+            verbosity,
+            model_name,
+        )
+        if exists_ok
+        else {}
+    )
 
+    results = []
+    results_by_model = {}
+
+    for feature in tqdm(behav_features, desc='Decoding features'):
+
+        # Determine mode first for lookup
+        y = y_df[feature].to_numpy().ravel()
+        X_ok, y_ok, _ = filter_valid_rows(X, y, groups)
         mode = infer_decoding_type(y_ok)
         if mode == 'skip':
             continue
 
-        if shuffle_y:
-            y_ok = shuffle_y_groupwise(y_ok, g_ok, rng)
+        # Determine lookup model name
+        # Use provided model_name or fall back to class name
+        lookup_model_name = model_name if model_name is not None else get_model_name(mode, config)
+        lookup_key = (feature, lookup_model_name)
 
-        if exists_ok:
-            loaded_row = try_load_existing_result(
-                out_dir=out_dir,
-                feature=feature,
-                mode=mode,
-                n_splits=n_splits,
-                shuffle_y=shuffle_y,
-                context_label=context_label,
-                config=config,
-                verbosity=verbosity,
-            )
-            if loaded_row is not None:
-                results.append(loaded_row)
-                continue
+        if lookup_key in existing_lookup:
+            row = existing_lookup[lookup_key]
+            results.append(row)
+            _aggregate_results(results_by_model, row, lookup_model_name, mode)
+            continue
 
         if load_existing_only:
             continue
 
-        splits = build_group_kfold_splits(X_ok, g_ok, n_splits)
-
-        if mode == 'regression':
-            metrics = run_regression_cv(
-                X_ok, y_ok, g_ok, splits, config, rng
-            )
-        else:
-            metrics = run_classification_cv(
-                X_ok, y_ok, splits, config
-            )
-
-        row = dict(
-            behav_feature=feature,
-            mode=mode,
-            n_samples=len(y_ok),
-            context=context_label,
-            **metrics,
+        computed = _compute_single_feature(
+            feature,
+            X,
+            y_df,
+            groups,
+            config,
+            n_splits,
+            shuffle_y,
+            context_label,
+            rng,
+            model_name,
         )
 
-        results.append(row)
+        if computed is None:
+            continue
 
-        if out_dir is not None:
-            params_hash = make_feature_hash(
-                feature, mode, n_splits, shuffle_y, context_label, config
-            )
-            csv_path = get_feature_csv_path(
-                out_dir, feature, mode, params_hash
-            )
-            pd.DataFrame([row]).to_csv(csv_path, index=False)
-            if verbosity > 0:
-                print(f'Saved results to {csv_path}')
+        row, result_model_name, mode = computed
+        results.append(row)
+        _aggregate_results(results_by_model, row, result_model_name, mode)
+
+    _save_results(out_dir, results_by_model, verbosity)
 
     return pd.DataFrame(results)

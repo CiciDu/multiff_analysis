@@ -21,16 +21,35 @@ import numpy as np
 # Spike binning
 # =========================
 
+import numpy as np
+
+
 def bin_spikes(spike_times, ts):
     """
-    Bin spike times into a per-sample spike count vector.
-    """
-    counts = np.zeros(len(ts), dtype=float)
-    idx = np.searchsorted(ts, spike_times)
-    idx = idx[(idx >= 0) & (idx < len(ts))]
-    np.add.at(counts, idx, 1)
-    return counts
+    MATLAB-compatible spike binning equivalent to:
+    hist(spike_times, ts)
 
+    Parameters
+    ----------
+    spike_times : (S,)
+    ts          : (T,)  bin centers
+
+    Returns
+    -------
+    counts : (T,)
+    """
+    if len(ts) < 2:
+        return np.zeros(len(ts))
+
+    # Construct bin edges from bin centers (MATLAB hist behavior)
+    dt = np.median(np.diff(ts))
+    edges = np.concatenate([
+        [ts[0] - dt / 2],
+        ts + dt / 2
+    ])
+
+    counts, _ = np.histogram(spike_times, bins=edges)
+    return counts.astype(float)
 
 # =========================
 # Smoothing
@@ -67,38 +86,6 @@ def smooth_signal(x, width):
         arr=x
     )
 
-
-# =========================
-# Trial concatenation
-# =========================
-
-def concatenate_trials_with_trial_id(trials, trial_indices, signal_fn, time_window_fn):
-    """
-    Concatenate trial-wise signals into a single vector,
-    while keeping an explicit trial-id vector.
-
-    Returns:
-    signal_concat   : (T,)
-    trial_id_vec    : (T,)
-    """
-    signal_list = []
-    trial_id_list = []
-
-    for trial_index in trial_indices:
-        trial = trials[trial_index]
-        mask = time_window_fn(trial)
-
-        signal = signal_fn(trial, trial_index)[mask]
-        signal_list.append(signal)
-
-        trial_id_list.append(
-            np.full(len(signal), trial_index, dtype=int)
-        )
-
-    return (
-        np.concatenate(signal_list),
-        np.concatenate(trial_id_list)
-    )
 
 
 def deconcatenate_trials(signal_concat, trial_lengths):
@@ -161,68 +148,173 @@ def event_impulse(tr, tid, event_name):
     return ev
 
 
+def concatenate_trials_with_trial_id(
+    trials,
+    trial_indices,
+    signal_fn,
+    time_window_fn
+):
+    """
+    MATLAB-compatible trial concatenation.
+
+    Replicates:
+    - Remove first and last bin (2:end-1)
+    - Strict windowing using trimmed time vector
+    """
+
+    signal_list = []
+    trial_id_list = []
+
+    for tid in trial_indices:
+        tr = trials[tid]
+
+        ts = tr.continuous.ts
+        signal = signal_fn(tr, tid)
+
+        # -----------------------------------------
+        # 1) Remove first and last bin
+        # -----------------------------------------
+        ts_trim = ts[1:-1]
+        signal_trim = signal[1:-1]
+
+        # -----------------------------------------
+        # 2) Compute strict time window on trimmed ts
+        # -----------------------------------------
+        t_start, t_stop = time_window_fn(tr)
+
+        mask = (ts_trim > t_start) & (ts_trim < t_stop)
+
+        signal_final = signal_trim[mask]
+
+        signal_list.append(signal_final)
+        trial_id_list.append(
+            np.full(len(signal_final), tid, dtype=int)
+        )
+
+    return (
+        np.concatenate(signal_list),
+        np.concatenate(trial_id_list)
+    )
+    
+    
+def full_time_window(tr, pretrial=0.5, posttrial=0.5):
+    """
+    MATLAB-compatible full time window.
+
+    Returns
+    -------
+    (t_start, t_stop)
+    """
+
+    t_start = min(tr.events.t_move, tr.events.t_targ) - pretrial
+    t_stop  = tr.events.t_end + posttrial
+
+    return t_start, t_stop
+
+
+import numpy as np
+
+
 def concatenate_covariates_with_trial_id(
     trials,
     trial_indices,
     covariate_fn,
     time_window_fn,
-    covariate_names
+    covariate_names,
+    duration_zeropad=None,
+    duration_nanpad=None
 ):
     """
-    Concatenate multiple covariates across trials using a shared trial_id_vec.
+    MATLAB-equivalent concatenation with optional padding.
 
-    Parameters
-    ----------
-    covariate_fn : function(trial) -> dict
-        Returns a dict of covariates for ONE trial.
-    covariate_names : list of str
-        Keys to extract and concatenate.
-
-    Returns
-    -------
-    covariates_concat : dict[str, np.ndarray]
-    trial_id_vec      : np.ndarray
+    Replicates ConcatenateTrials.m behavior:
+    - Remove first and last bin (2:end-1)
+    - Strict windowing (> and <)
+    - Optional zero OR NaN padding per trial
     """
+
+    if duration_zeropad is not None and duration_nanpad is not None:
+        raise ValueError("Use either zero padding OR NaN padding, not both.")
+
     covariates_concat = {name: [] for name in covariate_names}
-    trial_id_vec = []
+    trial_id_list = []
 
     for tid in trial_indices:
         tr = trials[tid]
-        mask = time_window_fn(tr)
+
+        ts = tr.continuous.ts
+        dt = np.median(np.diff(ts))
+
+        t_start, t_stop = time_window_fn(tr)
+
+        # --------------------------------------------------
+        # 1) Remove first and last bin (2:end-1)
+        # --------------------------------------------------
+        ts_trim = ts[1:-1]
+        mask = (ts_trim > t_start) & (ts_trim < t_stop)
 
         covs = covariate_fn(tr)
 
-        for name in covariate_names:
-            covariates_concat[name].append(covs[name][mask])
+        # --------------------------------------------------
+        # 2) Compute padding (in samples)
+        # --------------------------------------------------
+        if duration_zeropad is not None:
+            pad_len = int(round(duration_zeropad / dt))
+            pad_value = 0.0
+        elif duration_nanpad is not None:
+            pad_len = int(round(duration_nanpad / dt))
+            pad_value = np.nan
+        else:
+            pad_len = 0
 
-        trial_id_vec.append(
-            np.full(np.sum(mask), tid, dtype=int)
+        # --------------------------------------------------
+        # 3) Process each covariate
+        # --------------------------------------------------
+        trial_length_after_mask = None
+
+        for name in covariate_names:
+            signal = covs[name]
+
+            signal_trim = signal[1:-1]
+            signal_final = signal_trim[mask]
+
+            if pad_len > 0:
+                padding = np.full(pad_len, pad_value)
+                signal_final = np.concatenate([padding, signal_final])
+
+            covariates_concat[name].append(signal_final)
+
+            if trial_length_after_mask is None:
+                trial_length_after_mask = len(signal_final)
+
+        trial_id_list.append(
+            np.full(trial_length_after_mask, tid, dtype=int)
         )
 
+    # --------------------------------------------------
+    # 4) Concatenate across trials
+    # --------------------------------------------------
     for name in covariate_names:
-        covariates_concat[name] = np.concatenate(covariates_concat[name])
+        covariates_concat[name] = np.concatenate(
+            covariates_concat[name]
+        )
 
-    trial_id_vec = np.concatenate(trial_id_vec)
+    trial_id_vec = np.concatenate(trial_id_list)
+
+    # --------------------------------------------------
+    # 5) MATLAB NaN-padding adds trailing NaNs once
+    # --------------------------------------------------
+    if duration_nanpad is not None:
+        pad_len = int(round(duration_nanpad / dt))
+        padding = np.full(pad_len, np.nan)
+
+        for name in covariate_names:
+            covariates_concat[name] = np.concatenate(
+                [covariates_concat[name], padding]
+            )
+
+        trial_id_vec = np.concatenate(
+            [trial_id_vec, np.full(pad_len, -1)]
+        )
 
     return covariates_concat, trial_id_vec
-
-
-def full_time_window(tr, pretrial=0.5, posttrial=0.5):
-    """
-    Time window for concatenating trial data.
-
-    Includes:
-    - pretrial buffer before target onset or movement onset (whichever is earlier)
-    - posttrial buffer after end of trial
-
-    Matches AnalysePopulation.m:
-    timewindow_full = [
-        min(t_move, t_targ) - pretrial,
-        t_end + posttrial
-    ]
-    """
-    t_start = min(tr.events.t_move, tr.events.t_targ) - pretrial
-    t_stop  = tr.events.t_end + posttrial
-
-    ts = tr.continuous.ts
-    return (ts >= t_start) & (ts <= t_stop)

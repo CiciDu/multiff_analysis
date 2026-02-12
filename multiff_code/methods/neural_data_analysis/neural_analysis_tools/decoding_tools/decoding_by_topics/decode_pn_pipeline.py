@@ -193,7 +193,8 @@ class PNDecodingRunner:
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True):
+    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None):
+        self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
         self._collect_data(exists_ok=design_matrices_exists_ok)
 
         if save_dir is None:
@@ -201,7 +202,7 @@ class PNDecodingRunner:
 
         all_results = []
 
-        for model_name, spec in pn_decoding_model_specs.MODEL_SPECS.items():
+        for model_name, spec in self.model_specs.items():
             config = cv_decoding.DecodingRunConfig(
                 regression_model_class=spec.get(
                     'regression_model_class', None
@@ -230,6 +231,7 @@ class PNDecodingRunner:
                 config=config,
                 context_label='pooled',
                 save_dir=save_dir,
+                model_name=model_name,
             )
 
             results_df['model_name'] = model_name
