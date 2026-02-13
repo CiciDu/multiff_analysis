@@ -227,8 +227,10 @@ def build_spike_history_design(
         t_max=t_max_hist,
         dt=specs_meta['dt'],
         log_spaced=True,
+        hard_start_zero=True,
     )
     basis_info['spike_hist'] = {'lags': lags_hist, 'basis': B_hist}
+
 
     specs['spike_hist'] = temporal_feats.PredictorSpec(
         signal=data_obj.Y[:, unit_idx],
@@ -243,6 +245,7 @@ def build_spike_history_design(
             t_min=0.0,
             t_max=1.375,
             dt=specs_meta['dt'],
+            hard_start_zero=True,
         )
 
         for j in coupling_units:
@@ -254,6 +257,7 @@ def build_spike_history_design(
             )
             basis_info[f'cpl_{j}'] = {'lags': lags_coup, 'basis': B_coup}
 
+    print('getting spike_hist predictor spec')
     hist_df, hist_meta = temporal_feats.specs_to_design_df(
         specs,
         data_obj.covariate_trial_ids,

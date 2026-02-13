@@ -441,6 +441,9 @@ def lagged_design_from_signal(
             avail = cum[last, k]
             scale = full[k] / np.clip(avail, 1e-12, None)
             y *= scale
+            
+            
+        print('num shift_bins', shift_bins)
 
         # Apply non-circular alignment shift
         y = _shift_non_circular(y[:, None], shift_bins).ravel()

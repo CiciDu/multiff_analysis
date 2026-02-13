@@ -154,6 +154,7 @@ def compute_spike_history_designs(
         dt=dt,
         t_min=t_min,
         log_spaced=True,
+        hard_start_zero=True,
     )
 
     trial_ids = design_pad['new_segment'].to_numpy()

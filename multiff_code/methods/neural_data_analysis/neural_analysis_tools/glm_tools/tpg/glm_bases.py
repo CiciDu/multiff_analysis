@@ -117,73 +117,91 @@ def raised_cosine_basis(
 import numpy as np
 from typing import Tuple
 
+import numpy as np
 
 def raised_log_cosine_basis(
-    n_bases: int,
-    end_points: Tuple[float, float],
-    bin_size: float,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    n_basis: int,
+    t_min: float,
+    t_max: float,
+    dt: float,
+    log_spaced: bool = True,
+    hard_start_zero: bool = False,
+):
     """
-    Exact Python replication of the provided MATLAB log raised cosine basis code.
+    Raised cosine basis for temporal kernels, commonly used for
+    spike-history filters in point-process GLMs.
 
     Parameters
     ----------
-    n_bases : int
+    n_basis : int
         Number of basis functions.
-    end_points : (float, float)
-        Time range for basis placement (same as MATLAB `endPoints`).
-    bin_size : float
-        Time bin size (same as MATLAB `binSize`).
+    t_min : float
+        Minimum time lag. Ignored if hard_start_zero=True.
+    t_max : float
+        Maximum time lag.
+    dt : float
+        Time bin size.
+    log_spaced : bool, default=True
+        If True, use logarithmic warping to provide higher resolution
+        at short lags (useful for refractory effects).
+        If False, use linearly spaced raised cosines.
+    hard_start_zero : bool, default=False
+        If True, construct a strictly causal spike-history basis:
+        - Time support starts at 0.
+        - Time support is extended so the last basis function
+          smoothly decays to zero.
 
     Returns
     -------
-    iht : (T,) array
-        Time bins.
-    ihbasis : (T, n_bases) array
-        Basis matrix.
-    ihctrs : (n_bases,) array
-        Basis centers in original (unwarped) time.
+    lags_hist : (T,) array
+        Time lag bins.
+    B_hist : (T, n_basis) array
+        Basis matrix evaluated at lags_hist.
     """
 
-    # --- nonlinearity and its inverse (exact epsilon) ---
-    eps = 1e-10
-    nlin = lambda x: np.log(x + eps)
-    invnl = lambda x: np.exp(x) - eps
+    if log_spaced:
+        eps = 1e-10
+        nlin = lambda x: np.log(x + eps)
+        invnl = lambda x: np.exp(x) - eps
 
-    # --- warped range ---
-    yrnge = nlin(np.array(end_points) + bin_size / 3.0)
+        # warped endpoints (MATLAB shift)
+        yrnge = nlin(np.array([t_min, t_max]) + dt / 3.0)
+        db = (yrnge[1] - yrnge[0]) / (n_basis - 1)
+        ctrs = np.linspace(yrnge[0], yrnge[1], n_basis)
 
-    # spacing between raised cosine peaks
-    db = (yrnge[1] - yrnge[0]) / (n_bases - 1)
+        if hard_start_zero:
+            # MATLAB exact behavior
+            mxt = invnl(yrnge[1] + 2 * db) - dt / 3.0
+            lags_hist = np.arange(0.0, mxt + 1e-12, dt)
+        else:
+            # Respect provided t_min / t_max
+            lags_hist = np.arange(t_min, t_max + 1e-12, dt)
 
-    # centers in warped space
-    ctrs = np.arange(yrnge[0], yrnge[1] + 1e-12, db)
+        warped_time = nlin(lags_hist + dt / 3.0)
 
-    # extend maximum time so last basis decays to zero
-    mxt = invnl(yrnge[1] + 2 * db) - bin_size / 3.0
+        arg = (warped_time[:, None] - ctrs[None, :]) * np.pi / (2.0 * db)
+        arg = np.clip(arg, -np.pi, np.pi)
 
-    # time bins
-    iht = np.arange(0.0, mxt + 1e-12, bin_size)
+        B_hist = (np.cos(arg) + 1.0) / 2.0
 
-    # --- compute basis ---
-    warped_time = nlin(iht + bin_size / 3.0)
+    else:
+        # Linear raised cosine
+        if hard_start_zero:
+            lags_hist = np.arange(0.0, t_max + 1e-12, dt)
+            t_min_eff = 0.0
+        else:
+            lags_hist = np.arange(t_min, t_max + 1e-12, dt)
+            t_min_eff = t_min
 
-    # replicate MATLAB repmat behavior
-    X = np.tile(warped_time[:, None], (1, n_bases))
-    C = np.tile(ctrs[None, :], (len(iht), 1))
+        ctrs = np.linspace(t_min_eff, t_max, n_basis)
+        db = ctrs[1] - ctrs[0]
 
-    # cosine argument (exact MATLAB scaling)
-    arg = (X - C) * np.pi / (2.0 * db)
+        arg = (lags_hist[:, None] - ctrs[None, :]) * np.pi / (2.0 * db)
+        arg = np.clip(arg, -np.pi, np.pi)
 
-    # hard clipping to [-pi, pi]
-    arg = np.maximum(-np.pi, np.minimum(np.pi, arg))
+        B_hist = (np.cos(arg) + 1.0) / 2.0
 
-    ihbasis = (np.cos(arg) + 1.0) / 2.0
-
-    # centers in original time
-    ihctrs = invnl(ctrs)
-
-    return iht, ihbasis, ihctrs
+    return lags_hist, B_hist
 
 
 def spline_basis(
