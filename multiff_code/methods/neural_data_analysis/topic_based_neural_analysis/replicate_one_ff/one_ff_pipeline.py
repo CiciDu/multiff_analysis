@@ -44,7 +44,7 @@ class OneFFSessionData:
         self.session = self.sessions[self.session_num]
         self.behaviour = self.session.behaviour
         self.trlindx = self.session.trlindx
-        self.sel_trial_ids = self.trlindx.nonzero()[0]
+        self.sel_trials = self.trlindx.nonzero()[0]
 
         self.all_trials = self.behaviour.trials
         self.all_stats = self.behaviour.stats
@@ -57,7 +57,7 @@ class OneFFSessionData:
         Infer dt from the first trial.
         """
         t = self.all_trials[0].continuous.ts
-        self.prs.dt = round(np.mean(np.diff(t)), 5)
+        self.prs.dt = round(np.mean(np.diff(t)), 3)
 
     # ------------------
     # Trial-level access
@@ -100,7 +100,7 @@ class OneFFSessionData:
         covariates_concat, trial_id_vec = (
             population_analysis_utils.concatenate_covariates_with_trial_id(
                 trials=self.all_trials,
-                trial_indices=self.sel_trial_ids,
+                trial_indices=self.sel_trials,
                 covariate_fn=lambda tr: one_ff_data_processing.compute_all_covariates(
                     tr, self.prs.dt
                 ),
@@ -122,7 +122,7 @@ class OneFFSessionData:
         for k in range(self.n_units):
             spk_counts, _ = population_analysis_utils.concatenate_trials_with_trial_id(
                 self.all_trials,
-                self.sel_trial_ids,
+                self.sel_trials,
                 lambda tr, tid: population_analysis_utils.bin_spikes(
                     self.units[k].trials[tid].tspk,
                     tr.continuous.ts
@@ -149,15 +149,19 @@ class OneFFSessionData:
     def compute_events(self, event_names=('t_move', 't_stop', 't_targ', 't_rew')):
         """
         Concatenate event impulse vectors across trials.
+        For t_targ, adds prs.fly_ONduration to mark target offset time.
         """
         all_events = {}
 
         for event in event_names:
+            # Add fly_ONduration offset for t_targ events
+            offset = self.prs.fly_ONduration if event == 't_targ' else 0.0
+            
             events_concat, _ = population_analysis_utils.concatenate_trials_with_trial_id(
                 self.all_trials,
-                self.sel_trial_ids,
-                lambda tr, tid: population_analysis_utils.event_impulse(
-                    tr, tid, event
+                self.sel_trials,
+                lambda tr, tid, ev=event, off=offset: population_analysis_utils.event_impulse(
+                    tr, tid, ev, offset=off
                 ),
                 population_analysis_utils.full_time_window
             )

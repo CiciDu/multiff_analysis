@@ -332,6 +332,9 @@ def build_smooth_handler_for_unit(
     binrange_dict: dict[str, np.ndarray] | None = None,
     hist_ms=350.0,
     coupling_ms=1375.0,
+    num_tuning_filters=10,
+    num_temporal_filters=20,
+    num_spike_history_filters=20,
 ):
     """
     Build a smooths_handler for a *single* unit.
@@ -373,35 +376,15 @@ def build_smooth_handler_for_unit(
             name=f'f_{cov_name}',
             x=x,
             trial_ids=trial_id_vec,
-            num_basis=10,
+            num_basis=num_tuning_filters,
             order=order,
             is_cyclic=(cov_name in use_cyclic),
             binrange=binrange,
         )
 
-    # ---- g(·): event temporal filters
-    if 't_targ' in all_events:
-        # Get binrange for t_targ if available
-        binrange_t_targ = None
-        if binrange_dict is not None and 't_targ' in binrange_dict:
-            binrange_t_targ = binrange_dict['t_targ']
-        
-        print('event name:', 'g_t_targ')
-        print('binrange:', binrange_t_targ)
-        
-        add_event_temporal_filter(
-            sm_handler=sm_handler,
-            name='g_t_targ',
-            event_impulse=all_events['t_targ'],
-            trial_ids=trial_id_vec,
-            dt_ms=dt_ms,
-            num_filters=10,
-            order=order,
-            kernel_direction=1,  # causal
-            binrange=binrange_t_targ,
-        )
 
-    for evt in ['t_move', 't_rew', 't_stop']:
+
+    for evt in ['t_targ', 't_move', 't_rew', 't_stop']:
         if evt in all_events:
             # Get binrange for this event if available
             binrange_evt = None
@@ -418,7 +401,7 @@ def build_smooth_handler_for_unit(
                 event_impulse=all_events[evt],
                 trial_ids=trial_id_vec,
                 dt_ms=dt_ms,
-                num_filters=10,
+                num_filters=num_temporal_filters,
                 order=order,
                 kernel_direction=0,  # acausal
                 binrange=binrange_evt,
@@ -432,7 +415,7 @@ def build_smooth_handler_for_unit(
         trial_ids=trial_id_vec,
         dt_ms=dt_ms,
         hist_ms=hist_ms,
-        num_filters=10,
+        num_filters=num_spike_history_filters,
         order=order,
     )
 

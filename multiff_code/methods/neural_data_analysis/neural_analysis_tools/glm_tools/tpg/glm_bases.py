@@ -114,52 +114,76 @@ def raised_cosine_basis(
     return lags, B
 
 
+import numpy as np
+from typing import Tuple
+
+
 def raised_log_cosine_basis(
-    n_basis: int,
-    t_max: float,
-    dt: float,
-    *,
-    t_min: float = 0.0,
-    log_spaced: bool = True,
-    eps: float = 1e-3,
-    normalize: Optional[str] = None,
-) -> Tuple[np.ndarray, np.ndarray]:
+    n_bases: int,
+    end_points: Tuple[float, float],
+    bin_size: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Causal log-raised-cosine basis.
+    Exact Python replication of the provided MATLAB log raised cosine basis code.
 
     Parameters
     ----------
-    normalize : {None, 'area', 'l2', 'peak'}
-        Column normalization type.
+    n_bases : int
+        Number of basis functions.
+    end_points : (float, float)
+        Time range for basis placement (same as MATLAB `endPoints`).
+    bin_size : float
+        Time bin size (same as MATLAB `binSize`).
+
+    Returns
+    -------
+    iht : (T,) array
+        Time bins.
+    ihbasis : (T, n_bases) array
+        Basis matrix.
+    ihctrs : (n_bases,) array
+        Basis centers in original (unwarped) time.
     """
 
-    lags = np.arange(0.0, t_max + 1e-12, dt)
-    K = int(n_basis)
+    # --- nonlinearity and its inverse (exact epsilon) ---
+    eps = 1e-10
+    nlin = lambda x: np.log(x + eps)
+    invnl = lambda x: np.exp(x) - eps
 
-    if K < 1:
-        return lags, np.zeros((lags.size, 0))
+    # --- warped range ---
+    yrnge = nlin(np.array(end_points) + bin_size / 3.0)
 
-    def warp(x):
-        return np.log(x + eps) if log_spaced else x
+    # spacing between raised cosine peaks
+    db = (yrnge[1] - yrnge[0]) / (n_bases - 1)
 
-    W = warp(lags)
-    W_min, W_max = warp(t_min), warp(t_max)
+    # centers in warped space
+    ctrs = np.arange(yrnge[0], yrnge[1] + 1e-12, db)
 
-    centers = np.linspace(W_min, W_max, K)
-    delta = centers[1] - centers[0] if K > 1 else (W_max - W_min + 1e-12)
-    width = delta * 1.5
+    # extend maximum time so last basis decays to zero
+    mxt = invnl(yrnge[1] + 2 * db) - bin_size / 3.0
 
-    B = np.zeros((lags.size, K))
+    # time bins
+    iht = np.arange(0.0, mxt + 1e-12, bin_size)
 
-    for k, c in enumerate(centers):
-        arg = (W - c) / width
-        mask = np.abs(arg) < np.pi
-        B[mask, k] = 0.5 * (np.cos(arg[mask]) + 1.0)
-        B[lags < t_min, k] = 0.0  # enforce causality
+    # --- compute basis ---
+    warped_time = nlin(iht + bin_size / 3.0)
 
-    B = _normalize_columns(B, dt, normalize)
+    # replicate MATLAB repmat behavior
+    X = np.tile(warped_time[:, None], (1, n_bases))
+    C = np.tile(ctrs[None, :], (len(iht), 1))
 
-    return lags, B
+    # cosine argument (exact MATLAB scaling)
+    arg = (X - C) * np.pi / (2.0 * db)
+
+    # hard clipping to [-pi, pi]
+    arg = np.maximum(-np.pi, np.minimum(np.pi, arg))
+
+    ihbasis = (np.cos(arg) + 1.0) / 2.0
+
+    # centers in original time
+    ihctrs = invnl(ctrs)
+
+    return iht, ihbasis, ihctrs
 
 
 def spline_basis(

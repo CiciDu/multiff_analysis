@@ -106,11 +106,14 @@ class Params:
         'eye_ver': np.array([-25, 0]),
         'eye_hor': np.array([-40, 40]),
         #'t_targ': np.array([-0.24, 0.48]),
-        't_targ': np.array([0, 0.6]),
+        't_targ': np.array([-0.36, 0.36]),
         't_move': np.array([-0.36, 0.36]),
         't_rew': np.array([-0.36, 0.36]),
         't_stop': np.array([-0.36, 0.36]),
+        'spike_hist': np.array([0.006, 0.246]), # note, this is causal
     })
+    
+    fly_ONduration: float = 0.3
 
 
 def default_prs():

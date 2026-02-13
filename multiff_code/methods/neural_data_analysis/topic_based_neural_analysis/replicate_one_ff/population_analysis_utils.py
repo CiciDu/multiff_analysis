@@ -137,14 +137,45 @@ def reconstruct_trajectory(w, v, dt):
     return x, y
 
 
-def event_impulse(tr, tid, event_name):
+def event_impulse(tr, tid, event_name, offset=0.0):
+    """
+    Create an impulse at the bin containing the event.
+    Uses the same binning logic as bin_spikes() to ensure consistency.
+    
+    Parameters
+    ----------
+    tr : trial object
+    tid : trial id
+    event_name : str, name of event attribute in tr.events
+    offset : float, optional (default=0.0)
+        Time offset to add to the event time (in seconds)
+    
+    Returns
+    -------
+    ev : (T,) array with 1.0 at the bin containing the event, 0.0 elsewhere
+    """
     ts = tr.continuous.ts
-    evt_t = getattr(tr.events, event_name)
+    evt_t = getattr(tr.events, event_name) + offset
 
     ev = np.zeros_like(ts)
-    idx = np.searchsorted(ts, evt_t)
-    if 0 <= idx < len(ts):
-        ev[idx] = 1.0
+    
+    if len(ts) >= 2:
+        # Use same edge construction as bin_spikes for consistency
+        dt = np.median(np.diff(ts))
+        edges = np.concatenate([
+            [ts[0] - dt / 2],
+            ts + dt / 2
+        ])
+        
+        # Find which bin the event falls into
+        idx = np.searchsorted(edges, evt_t) - 1
+        
+        if 0 <= idx < len(ts):
+            ev[idx] = 1.0
+    elif len(ts) == 1:
+        # Single bin case - just check if event is close enough
+        ev[0] = 1.0
+        
     return ev
 
 

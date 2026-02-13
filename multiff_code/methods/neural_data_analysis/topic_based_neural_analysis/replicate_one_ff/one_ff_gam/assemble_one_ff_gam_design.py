@@ -66,7 +66,7 @@ def build_temporal_design_base(
 
     specs, specs_meta = temporal_feats._init_predictor_specs(
         data_obj.prs.dt,
-        data_obj.sel_trial_ids,
+        data_obj.sel_trials,
     )
 
     # Get binrange for temporal filters if available
@@ -90,14 +90,9 @@ def build_temporal_design_base(
         dt=specs_meta['dt'],
     )
     basis_info['t_move'] = {'lags': lags_move, 'basis': B_move}
-
-    # t_targ: use binrange if available, otherwise default [0.0, 0.6]
-    if 't_targ' in binrange:
-        t_targ_min = float(binrange['t_targ'][0])
-        t_targ_max = float(binrange['t_targ'][1])
-    else:
-        t_targ_min, t_targ_max = 0.0, 0.6
-
+    t_targ_min = float(binrange['t_targ'][0])
+    t_targ_max = float(binrange['t_targ'][1])
+    
     lags_targ, B_targ = glm_bases.raised_cosine_basis(
         n_basis=n_basis,
         t_min=t_targ_min,
@@ -179,19 +174,36 @@ def build_temporal_design_base(
     return temporal_df, temporal_meta, specs_meta
 
 
-def build_design_df(
+def build_spike_history_design(
     unit_idx,
     data_obj,
-    temporal_df,
-    temporal_meta,
-    X_tuning,
-    tuning_meta,
     specs_meta,
     coupling_units=None,
     n_basis=20,
 ):
     """
-    Assemble the full design matrix for one unit.
+    Build spike history design matrix for one unit.
+    Uses binrange from data_obj.prs for spike history bounds.
+
+    Parameters
+    ----------
+    unit_idx : int
+        Unit index
+    data_obj : OneFFSessionData
+        Data object with spike trains
+    specs_meta : dict
+        Metadata with 'dt' field
+    coupling_units : list, optional
+        List of unit indices for coupling terms
+    n_basis : int
+        Number of basis functions (default: 20)
+
+    Returns
+    -------
+    hist_df : DataFrame
+        Spike history design matrix
+    hist_meta : dict
+        Metadata with groups and basis_info
     """
 
     # ----------------------------
@@ -200,10 +212,19 @@ def build_design_df(
     specs = {}
     basis_info = {}
 
+    # Get binrange for spike history if available
+    binrange = data_obj.prs.binrange if hasattr(
+        data_obj.prs, 'binrange') else {}
+
+    # Note: spike_hist binrange is negative (e.g., [-0.246, -0.006])
+    spike_hist_range = binrange['spike_hist']
+    t_min_hist = spike_hist_range[0]
+    t_max_hist = spike_hist_range[1]
+
     lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
         n_basis=n_basis,
-        t_min=0.0,
-        t_max=0.35,
+        t_min=t_min_hist,
+        t_max=t_max_hist,
         dt=specs_meta['dt'],
         log_spaced=True,
     )
@@ -213,7 +234,7 @@ def build_design_df(
         signal=data_obj.Y[:, unit_idx],
         bases=[B_hist],
         dt=specs_meta['dt'],
-        t_min=0.0,
+        t_min=t_min_hist,
     )
 
     if coupling_units is not None:
@@ -244,6 +265,23 @@ def build_design_df(
     # Add basis info to metadata
     hist_meta['basis_info'] = basis_info
 
+    return hist_df, hist_meta
+
+
+def build_design_df(
+    unit_idx,
+    data_obj,
+    temporal_df,
+    temporal_meta,
+    X_tuning,
+    tuning_meta,
+    hist_df,
+    hist_meta,
+):
+    """
+    Assemble the full design matrix for one unit.
+    """
+
     # ----------------------------
     # Concatenate all components
     # ----------------------------
@@ -260,7 +298,7 @@ def build_design_df(
     if rows_mask is not None:
         design_df = design_df.loc[rows_mask]
 
-    return design_df, hist_meta
+    return design_df
 
 
 def extract_response(
@@ -376,15 +414,24 @@ def process_unit_design_and_groups(
         Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
     """
 
-    design_df, hist_meta = build_design_df(
+    # Build spike history design
+    hist_df, hist_meta = build_spike_history_design(
+        unit_idx=unit_idx,
+        data_obj=data_obj,
+        specs_meta=specs_meta,
+        coupling_units=coupling_units,
+    )
+
+    # Assemble full design
+    design_df = build_design_df(
         unit_idx=unit_idx,
         data_obj=data_obj,
         temporal_df=temporal_df,
         temporal_meta=temporal_meta,
         X_tuning=X_tuning,
         tuning_meta=tuning_meta,
-        specs_meta=specs_meta,
-        coupling_units=coupling_units,
+        hist_df=hist_df,
+        hist_meta=hist_meta,
     )
 
     groups = build_group_specs(
