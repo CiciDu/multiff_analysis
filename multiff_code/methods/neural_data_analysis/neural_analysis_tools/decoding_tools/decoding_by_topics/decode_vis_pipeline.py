@@ -194,7 +194,7 @@ class FFVisDecodingRunner:
             print(f'[_load_design_matrices] WARNING: could not load design matrices: {type(e).__name__}: {e}')
             return False
 
-    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None):
+    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_y=False):
         """
         Run the FF visibility decoding pipeline.
         
@@ -210,6 +210,10 @@ class FFVisDecodingRunner:
             self.save_dir = self._get_save_dir()
         else:
             self.save_dir = Path(save_dir)
+            
+        if shuffle_y:
+            self.save_dir = Path(self.save_dir) / 'shuffle_y'
+            self.save_dir.mkdir(parents=True, exist_ok=True)
 
         all_results = []
 
@@ -247,6 +251,7 @@ class FFVisDecodingRunner:
                 context_label='pooled',
                 save_dir=self.save_dir,
                 model_name=model_name,
+                shuffle_y=shuffle_y,
             )
 
             results_df['model_name'] = model_name

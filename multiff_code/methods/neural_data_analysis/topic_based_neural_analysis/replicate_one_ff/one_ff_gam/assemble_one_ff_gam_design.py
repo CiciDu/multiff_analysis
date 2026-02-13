@@ -40,7 +40,7 @@ def build_tuning_design(
     X_tuning : DataFrame
         Tuning design matrix
     tuning_meta : dict
-        Metadata
+        Metadata (includes bin_info with edges and centers)
     """
     X_tuning, tuning_meta = one_ff_glm_design.build_continuous_tuning_block(
         data=data_df,
@@ -50,6 +50,21 @@ def build_tuning_design(
         center=False,
         binrange_dict=binrange_dict,
     )
+
+    # Add bin_info with centers for each variable
+    bin_info = {}
+    all_vars = list(linear_vars) + list(angular_vars)
+    for var in all_vars:
+        if var in tuning_meta['bin_edges']:
+            edges = tuning_meta['bin_edges'][var]
+            centers = (edges[:-1] + edges[1:]) / 2
+            bin_info[var] = {
+                'edges': edges,
+                'centers': centers,
+                'n_bins': n_bins,
+            }
+    
+    tuning_meta['bin_info'] = bin_info
 
     return X_tuning, tuning_meta
 

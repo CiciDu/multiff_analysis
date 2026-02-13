@@ -37,6 +37,13 @@ def main():
     results_df = runner.run(
         n_splits=args.n_splits,
         save_dir=args.save_dir,
+        shuffle_y=True,
+    )
+
+    results_df = runner.run(
+        n_splits=args.n_splits,
+        save_dir=args.save_dir,
+        shuffle_y=False,
     )
 
     print(results_df.head())

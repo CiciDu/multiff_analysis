@@ -227,6 +227,9 @@ def run_classification_cv(X, y, splits, config):
     model_kwargs = config.classification_model_kwargs or {}
 
     for tr, te in splits:
+        if np.unique(y[tr]).size < 2 or np.unique(y[te]).size < 2:
+            continue
+                
         scaler = StandardScaler()
         X_tr = scaler.fit_transform(X[tr])
         X_te = scaler.transform(X[te])
@@ -267,46 +270,6 @@ def serialize_decoding_config(config):
         ),
         classification_model_kwargs=config.classification_model_kwargs,
     )
-
-def try_load_existing_result(
-    out_dir,
-    feature,
-    mode,
-    n_splits,
-    shuffle_y,
-    context_label,
-    config,
-    verbosity: int = 1,
-):
-    """
-    Try to load an existing decoding result for a feature.
-
-    Returns
-    -------
-    row_dict : dict or None
-        Loaded result row if found, otherwise None.
-    """
-    if out_dir is None:
-        print('out_dir is None')
-        return None
-
-    params_hash = make_feature_hash(
-        feature, mode, n_splits, shuffle_y, context_label, config
-    )
-    csv_path = get_feature_csv_path(
-        out_dir, feature, mode, params_hash
-    )
-
-    if csv_path.exists():
-        if verbosity > 1:
-            print(f'Loaded results from {csv_path}')
-        return pd.read_csv(csv_path).iloc[0].to_dict()
-    else:
-        if verbosity > 0:
-            print(f'No results found for {csv_path}')
-        return None
-
-
 
 # ============================================================
 # CV Decoding Orchestration (Refactored)

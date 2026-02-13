@@ -193,13 +193,15 @@ class PNDecodingRunner:
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None):
+    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_y=False):
         self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
         self._collect_data(exists_ok=design_matrices_exists_ok)
 
         if save_dir is None:
             save_dir = self._get_save_dir()
-
+        if shuffle_y:
+            save_dir = Path(save_dir) / 'shuffle_y'
+            save_dir.mkdir(parents=True, exist_ok=True)
         all_results = []
 
         for model_name, spec in self.model_specs.items():
@@ -232,6 +234,7 @@ class PNDecodingRunner:
                 context_label='pooled',
                 save_dir=save_dir,
                 model_name=model_name,
+                shuffle_y=shuffle_y,
             )
 
             results_df['model_name'] = model_name

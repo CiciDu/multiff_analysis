@@ -59,7 +59,7 @@ class BaseProcessing:
             raw_data_folder_path)
         # robustly parse monkey and data folder names regardless of absolute path prefix
         path_norm = os.path.normpath(raw_data_folder_path)
-        print('Normalized monkey raw data folder path: ', path_norm)
+        #print('Normalized monkey raw data folder path: ', path_norm)
         parts = path_norm.split(os.sep)
 
         monkey_name, data_name = None, None

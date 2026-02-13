@@ -28,7 +28,6 @@ def main():
     parser.add_argument('--t_max', type=float, default=0.20)
     parser.add_argument('--n_splits', type=int, default=5)
     parser.add_argument('--save_dir', default=None)
-
     args = parser.parse_args()
 
     runner = decode_pn_pipeline.PNDecodingRunner(
@@ -40,6 +39,13 @@ def main():
     results_df = runner.run(
         n_splits=args.n_splits,
         save_dir=args.save_dir,
+        shuffle_y=True,
+    )
+    
+    results_df = runner.run(
+        n_splits=args.n_splits,
+        save_dir=args.save_dir,
+        shuffle_y=False,
     )
 
     print(results_df.head())
