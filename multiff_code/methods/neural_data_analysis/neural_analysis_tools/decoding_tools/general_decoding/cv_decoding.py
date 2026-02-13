@@ -312,16 +312,12 @@ def try_load_existing_result(
 # CV Decoding Orchestration (Refactored)
 # ============================================================
 
-def _prepare_inputs(X, groups, shuffle_seed, save_dir):
+def _prepare_inputs(X, groups, shuffle_seed):
     X = np.asarray(X)
     groups = np.asarray(groups)
     rng = np.random.default_rng(shuffle_seed)
 
-    out_dir = Path(save_dir) if save_dir is not None else None
-    if out_dir is not None:
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-    return X, groups, rng, out_dir
+    return X, groups, rng
 
 
 def _load_existing_results(
@@ -518,15 +514,170 @@ def _save_results(
                 )
 
 
+def load_consolidated_results(
+    out_dir,
+    filename='all_models_results.csv',
+):
+    """
+    Load the consolidated results CSV file.
+    
+    Parameters
+    ----------
+    out_dir : str or Path
+        Directory containing the consolidated results file.
+    filename : str, optional
+        Name of the consolidated results CSV file. Default is 'all_models_results.csv'.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Consolidated results DataFrame, or empty DataFrame if file doesn't exist.
+    """
+    out_dir = Path(out_dir)
+    csv_path = out_dir / filename
+    
+    if not csv_path.exists():
+        print(f'Consolidated results file not found: {csv_path}')
+        print('Run consolidate_results_across_models() first to create it.')
+        return pd.DataFrame()
+    
+    df = pd.read_csv(csv_path)
+    print(f'Loaded {len(df)} rows from {csv_path.name}')
+    
+    return df
+
+
+def consolidate_results_across_models(
+    out_dir,
+    output_filename='all_models_results.csv',
+    model_names=None,
+    verbosity=1,
+    save_output=False,
+):
+    """
+    Consolidate all results from different model CSV files into one combined CSV.
+    
+    Parameters
+    ----------
+    out_dir : str or Path
+        Directory containing individual model CSV files.
+    output_filename : str, optional
+        Name of the consolidated output CSV file. Default is 'all_models_results.csv'.
+        Only used if save_output=True.
+    model_names : list of str, optional
+        List of specific model names to consolidate. If None, will scan for all CSV files
+        in the directory and attempt to consolidate all of them.
+    verbosity : int, optional
+        Verbosity level. 0 = silent, 1 = basic info, 2 = detailed info.
+    save_output : bool, optional
+        Whether to save the consolidated results to a CSV file. Default is True.
+        If False, only returns the DataFrame without saving.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Consolidated DataFrame with all results from all models.
+    """
+    out_dir = Path(out_dir)
+    
+    if not out_dir.exists():
+        if verbosity > 0:
+            print(f'Directory does not exist: {out_dir}')
+        return pd.DataFrame()
+    
+    all_dfs = []
+    
+    if model_names is not None:
+        # Load specific model files
+        csv_paths = [get_model_csv_path(out_dir, model_name) for model_name in model_names]
+    else:
+        # Scan directory for all CSV files, excluding:
+        # 1. The consolidated output file itself (to avoid circular inclusion)
+        # 2. Any other non-model result files
+        csv_paths = [
+            p for p in out_dir.glob('*.csv') 
+            if p.name != output_filename  # Exclude the consolidated file
+        ]
+    
+    if verbosity > 0:
+        print(f'Found {len(csv_paths)} CSV files to consolidate')
+    
+    for csv_path in csv_paths:
+        if not csv_path.exists():
+            if verbosity > 1:
+                print(f'Skipping non-existent file: {csv_path}')
+            continue
+        
+        try:
+            df = pd.read_csv(csv_path)
+            if len(df) > 0:
+                all_dfs.append(df)
+                if verbosity > 1:
+                    print(f'Loaded {len(df)} rows from {csv_path.name}')
+        except Exception as e:
+            if verbosity > 0:
+                print(f'Error loading {csv_path.name}: {e}')
+    
+    if not all_dfs:
+        if verbosity > 0:
+            print('No data found to consolidate')
+        return pd.DataFrame()
+    
+    # Concatenate all dataframes
+    consolidated_df = pd.concat(all_dfs, ignore_index=True)
+    
+    # Remove duplicates based on key columns
+    dedup_cols = [
+        'behav_feature',
+        'model_name',
+        'n_splits',
+        'shuffle_y',
+        'context',
+    ]
+    actual_dedup_cols = [col for col in dedup_cols if col in consolidated_df.columns]
+    
+    if actual_dedup_cols:
+        before_dedup = len(consolidated_df)
+        consolidated_df = consolidated_df.drop_duplicates(
+            subset=actual_dedup_cols,
+            keep='first',
+        )
+        if verbosity > 1:
+            print(f'Removed {before_dedup - len(consolidated_df)} duplicate rows')
+    
+    # Sort by model_name and behav_feature for cleaner output
+    sort_cols = []
+    if 'model_name' in consolidated_df.columns:
+        sort_cols.append('model_name')
+    if 'behav_feature' in consolidated_df.columns:
+        sort_cols.append('behav_feature')
+    
+    if sort_cols:
+        consolidated_df = consolidated_df.sort_values(sort_cols).reset_index(drop=True)
+    
+    # Save consolidated results (optional)
+    if save_output:
+        output_path = out_dir / output_filename
+        consolidated_df.to_csv(output_path, index=False)
+        
+        if verbosity > 0:
+            print(f'Saved {len(consolidated_df)} total rows to {output_path.name}')
+    else:
+        if verbosity > 0:
+            print(f'Consolidated {len(consolidated_df)} total rows (not saved to file)')
+    
+    return consolidated_df
+
+
 # ============================================================
 # Main Entry Point
 # ============================================================
 
 def run_cv_decoding(
-    X,
-    y_df,
-    behav_features,
-    groups,
+    X=None,
+    y_df=None,
+    behav_features=None,
+    groups=None,
     n_splits=5,
     config: Optional[DecodingRunConfig] = None,
     context_label=None,
@@ -540,15 +691,45 @@ def run_cv_decoding(
 ):
     """
     Cross-validated decoding over multiple behavioral features.
+    
+    Parameters
+    ----------
+    load_existing_only : bool, optional
+        If True, only loads existing results using consolidate_results_across_models.
+        Does not compute any new results. Default is False.
     """
 
     if config is None:
         config = DecodingRunConfig()
 
-    X, groups, rng, out_dir = _prepare_inputs(
-        X, groups, shuffle_seed, save_dir
-    )
+    out_dir = Path(save_dir) if save_dir is not None else None
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # If only loading existing results, use consolidate_results_across_models
+    if load_existing_only:
+        if out_dir is None:
+            if verbosity > 0:
+                print('Cannot load existing results: save_dir is None')
+            return pd.DataFrame()
+        
+        if verbosity > 0:
+            print('Loading existing results only...')
+        
+        # Consolidate all results across models
+        all_results = consolidate_results_across_models(
+            out_dir=out_dir,
+            model_names=[model_name] if model_name is not None else None,
+            verbosity=verbosity,
+            save_output=False,  # Don't save, just return
+        )
 
+        return all_results
+
+    X, groups, rng = _prepare_inputs(
+        X, groups, shuffle_seed
+    )
+    
     if behav_features is None:
         behav_features = y_df.columns.tolist()
 
