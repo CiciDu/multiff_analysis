@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from os.path import exists
 import math
 import json
+from pathlib import Path
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000
@@ -224,3 +225,31 @@ def write_checkpoint(checkpoint_dir, current_env_kwargs):
             json.dump(payload, f, indent=2, default=str)
     except Exception as e:
         print(f"Warning: failed to write manifest at {manifest_path}: {e}")
+
+
+def extract_config_name_from_post_best(path_str):
+    """
+    Extract the configuration folder name from a path that ends with 'post/best'.
+
+    Parameters
+    ----------
+    path_str : str or Path
+        Full path to the model directory.
+
+    Returns
+    -------
+    str
+        The configuration folder name.
+
+    Raises
+    ------
+    ValueError
+        If the path does not end with 'post/best'.
+    """
+    path = Path(path_str)
+    parts = path.parts
+
+    if len(parts) < 3 or parts[-2:] != ('post', 'best'):
+        raise ValueError("Path must end with 'post/best'")
+
+    return parts[-3]

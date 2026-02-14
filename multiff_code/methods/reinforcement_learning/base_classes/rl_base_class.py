@@ -707,10 +707,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 msg = f"There was an error retrieving agent or replay_buffer in {d}. Error message {e}"
             raise ValueError(msg)
 
-    def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=True, load_replay_buffer=False):
+    def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=True, load_replay_buffer=False, retrieve_ff_flash_sorted=False):
         if exists_ok:
             try:
-                self.retrieve_monkey_data()
+                self.retrieve_monkey_data(retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.make_or_retrieve_ff_dataframe_for_agent(
                     exists_ok=exists_ok, save_data=save_data)
                 return

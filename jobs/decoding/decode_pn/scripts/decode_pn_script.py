@@ -1,7 +1,8 @@
-import sys
-import os
-from pathlib import Path
+
 import argparse
+import os
+import sys
+from pathlib import Path
 
 # -------------------------------------------------------
 # Repo path bootstrap
@@ -15,7 +16,6 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
     decode_pn_pipeline
 )
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -39,13 +39,13 @@ def main():
     results_df = runner.run(
         n_splits=args.n_splits,
         save_dir=args.save_dir,
-        shuffle_y=True,
+        shuffle_mode='timeshift_fold',
     )
-    
+
     results_df = runner.run(
         n_splits=args.n_splits,
         save_dir=args.save_dir,
-        shuffle_y=False,
+        shuffle_mode='none',
     )
 
     print(results_df.head())

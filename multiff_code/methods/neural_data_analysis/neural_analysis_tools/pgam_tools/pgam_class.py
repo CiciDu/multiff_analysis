@@ -45,6 +45,13 @@ for path in [pgam_src, pgam_src_pg]:
         sys.path.append(str(path))
 
 
+class LoadedModelData:
+    """Simple class to hold loaded model data as attributes."""
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 class PGAMclass():
 
     # temporal_vars = ['catching_ff', 'log1p_num_ff_visible', 'monkey_speeddummy',
@@ -190,10 +197,26 @@ class PGAMclass():
         
         
     def load_pgam_results(self, neural_cluster_number):
-        self.cluster_name = self.x_var.columns[neural_cluster_number]
+        self.cluster_name = neural_cluster_number
 
-        self.res, self.reduced_vars, self.meta = pgam_utils.load_full_results_npz(self.save_dir,
-                                                                                  self.cluster_name)
+        self.res, self.reduced_vars, self.meta, self.full_model_data = pgam_utils.load_full_results_npz(self.save_dir,
+                                                                                                         self.cluster_name)
+        
+        # Reconstruct self.full with loaded attributes
+        full_attributes = {
+            'var_list': self.full_model_data.get('var_list'),
+            'beta': self.full_model_data.get('beta'),
+            'time_bin': self.full_model_data.get('time_bin'),
+            'AIC': self.meta.get('full_AIC', np.nan),
+        }
+        self.full = LoadedModelData(**full_attributes)
+        
+        # Reconstruct self.reduced with loaded attributes
+        reduced_attributes = {
+            'var_list': self.reduced_vars,
+            'AIC': self.meta.get('reduced_AIC', np.nan),
+        }
+        self.reduced = LoadedModelData(**reduced_attributes)
 
     def save_results(self, save_dir=None):
         # after you compute self.res = postprocess_results(...):
@@ -211,11 +234,19 @@ class PGAMclass():
         # make sure the save directory exists
         os.makedirs(save_dir, exist_ok=True)
         
+        # Extract full model data if available
+        full_time_bin = getattr(self.full, "time_bin", None) if hasattr(self, "full") else None
+        full_var_list = getattr(self.full, "var_list", None) if hasattr(self, "full") else None
+        full_beta = getattr(self.full, "beta", None) if hasattr(self, "full") else None
+        
         pgam_utils.save_full_results_npz(save_dir,
                                          self.cluster_name,
                                          self.res,                       # the structured array
                                          getattr(self.reduced, "var_list", []),
-                                         extra_meta)
+                                         extra_meta,
+                                         full_time_bin=full_time_bin,
+                                         full_var_list=full_var_list,
+                                         full_beta=full_beta)
 
     def _scale_features(self):
         # since temporal variables are all dummy variables, we only need to scale the spatial variables
@@ -321,3 +352,238 @@ class PGAMclass():
         variable[variable ==
                  'target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (final time)'
         self.res['variable'] = variable
+
+
+    def compute_variance_explained(self, use_train=True, filtwidth=2):
+        """
+        Reproduce MATLAB-style variance explained:
+        - smooth spikes
+        - smooth model prediction
+        - compute 1 - SSE/SST
+        """
+
+        import numpy as np
+
+        # --- Select train or eval ---
+        if use_train:
+            use_mask = self.train_trials
+        else:
+            use_mask = ~self.train_trials
+
+        # --- Get spike counts ---
+        spikes = self.spk_counts[use_mask]
+
+        # --- Build design matrix ---
+        exog = self.sm_handler.get_exog_mat_fast(self.full.var_list)
+        exog = exog[use_mask]
+
+        # --- Model prediction (counts per bin) ---
+        eta = exog @ self.full.beta
+        mu = self.poissFam.fitted(eta)   # expected spike count per bin
+
+        dt = self.full.time_bin
+
+        # Convert to firing rate (Hz)
+        fr_hat = mu / dt
+        fr = spikes / dt
+
+        # --- Gaussian smoothing (MATLAB style) ---
+        t = np.linspace(-2*filtwidth, 2*filtwidth, 4*filtwidth + 1)
+        h = np.exp(-t**2 / (2*filtwidth**2))
+        h = h / np.sum(h)
+
+        smooth_fr = np.convolve(fr, h, mode='same')
+        smooth_fr_hat = np.convolve(fr_hat, h, mode='same')
+
+        # --- Variance explained ---
+        sse = np.sum((smooth_fr_hat - smooth_fr)**2)
+        sst = np.sum((smooth_fr - np.mean(smooth_fr))**2)
+
+        r2 = 1 - (sse / sst)
+
+        return r2
+        
+    def _make_gaussian_kernel(self, filtwidth=2):
+        import numpy as np
+        t = np.linspace(-2 * filtwidth, 2 * filtwidth, 4 * filtwidth + 1)
+        h = np.exp(-t**2 / (2 * filtwidth**2))
+        h = h / np.sum(h)
+        return h
+
+    def _variance_explained_smoothed(self, counts, mu_counts, time_bin, filtwidth=2, use_mask=None):
+        import numpy as np
+        from scipy.signal import fftconvolve
+
+        counts = np.asarray(counts)
+        mu_counts = np.asarray(mu_counts)
+
+        if use_mask is not None:
+            counts = counts[use_mask]
+            mu_counts = mu_counts[use_mask]
+
+        # counts/bin -> Hz
+        fr_obs = counts / time_bin
+        fr_hat = mu_counts / time_bin
+
+        h = self._make_gaussian_kernel(filtwidth=filtwidth)
+
+        smooth_obs = fftconvolve(fr_obs, h, mode='same')
+        smooth_hat = fftconvolve(fr_hat, h, mode='same')
+
+        sse = np.nansum((smooth_hat - smooth_obs) ** 2)
+        sst = np.nansum((smooth_obs - np.nanmean(smooth_obs)) ** 2)
+
+        if sst == 0:
+            return np.nan
+        return 1.0 - (sse / sst)
+
+    def _make_cv_train_mask_list(self, n_splits=5, random_state=0):
+        """
+        Returns a list of boolean masks (length = n_splits).
+        Each mask is True for TRAIN bins and False for TEST bins.
+        Split is done by trial_id to avoid leakage across time bins.
+        """
+        import numpy as np
+        from sklearn.model_selection import KFold
+
+        trial_ids = np.asarray(self.trial_ids)
+        unique_trials = np.unique(trial_ids)
+
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+        train_mask_list = []
+        for train_trial_idx, test_trial_idx in kf.split(unique_trials):
+            train_trials = unique_trials[train_trial_idx]
+            train_mask = np.isin(trial_ids, train_trials)
+            train_mask_list.append(train_mask)
+
+        return train_mask_list
+
+
+    def _get_cv_filename(self, neural_cluster_number, n_splits, filtwidth):
+        import os
+        fname = f'cv_var_explained/neuron_{neural_cluster_number}_folds_{n_splits}_fw_{filtwidth}.npz'
+        filename = os.path.join(self.save_dir, fname)
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        return filename
+    
+    def _save_cv_results(self, filename, result_dict):
+        import numpy as np
+        np.savez_compressed(
+            filename,
+            fold_r2_eval=result_dict['fold_r2_eval'],
+            mean_r2_eval=result_dict['mean_r2_eval'],
+            std_r2_eval=result_dict['std_r2_eval']
+        )
+        
+    def _load_cv_results(self, filename):
+        import numpy as np
+        data = np.load(filename, allow_pickle=True)
+        return {
+            'fold_r2_eval': data['fold_r2_eval'],
+            'mean_r2_eval': float(data['mean_r2_eval']),
+            'std_r2_eval': float(data['std_r2_eval'])
+        }
+                
+    def _run_pgam_cv_compute_only(self,
+                                neural_cluster_number=5,
+                                n_splits=5,
+                                filtwidth=2,
+                                random_state=0):
+
+        import numpy as np
+        import statsmodels.api as sm
+
+        self.neural_cluster_number = neural_cluster_number
+
+        link = sm.genmod.families.links.log()
+        self.poissFam = sm.genmod.families.family.Poisson(link=link)
+
+        self.spk_counts = self.x_var.iloc[:, neural_cluster_number].values
+        self.cluster_name = self.x_var.columns[neural_cluster_number]
+
+        self.pgam = general_additive_model(
+            self.sm_handler,
+            self.sm_handler.smooths_var,
+            self.spk_counts,
+            self.poissFam
+        )
+
+        train_mask_list = self._make_cv_train_mask_list(
+            n_splits=n_splits,
+            random_state=random_state
+        )
+
+        fold_r2_eval = []
+
+        for train_mask in train_mask_list:
+
+            full_fit, _ = self.pgam.fit_full_and_reduced(
+                self.sm_handler.smooths_var,
+                th_pval=0.001,
+                max_iter=10 ** 2,
+                use_dgcv=True,
+                trial_num_vec=self.trial_ids,
+                filter_trials=train_mask
+            )
+
+            exog_full = self.sm_handler.get_exog_mat_fast(full_fit.var_list)
+            eta = exog_full @ full_fit.beta
+            mu_counts = self.poissFam.fitted(eta)
+
+            test_mask = ~train_mask
+
+            r2_eval = self._variance_explained_smoothed(
+                counts=self.spk_counts,
+                mu_counts=mu_counts,
+                time_bin=full_fit.time_bin,
+                filtwidth=filtwidth,
+                use_mask=test_mask
+            )
+
+            fold_r2_eval.append(r2_eval)
+
+        fold_r2_eval = np.asarray(fold_r2_eval)
+
+        return {
+            'neuron': self.cluster_name,
+            'neural_cluster_number': neural_cluster_number,
+            'fold_r2_eval': fold_r2_eval,
+            'mean_r2_eval': np.nanmean(fold_r2_eval),
+            'std_r2_eval': np.nanstd(fold_r2_eval)
+        }
+            
+    def run_pgam_cv(self,
+                    neural_cluster_number=5,
+                    n_splits=5,
+                    filtwidth=2,
+                    random_state=0,
+                    force_recompute=False):
+
+        import os
+
+        filename = self._get_cv_filename(
+            neural_cluster_number,
+            n_splits,
+            filtwidth
+        )
+
+        # Load if exists
+        if os.path.exists(filename) and not force_recompute:
+            print(f'Loading cached CV results for neuron {neural_cluster_number}')
+            return self._load_cv_results(filename)
+
+        print(f'Computing CV for neuron {neural_cluster_number}')
+
+        # Compute
+        out = self._run_pgam_cv_compute_only(
+            neural_cluster_number=neural_cluster_number,
+            n_splits=n_splits,
+            filtwidth=filtwidth,
+            random_state=random_state
+        )
+
+        # Save
+        self._save_cv_results(filename, out)
+
+        return out

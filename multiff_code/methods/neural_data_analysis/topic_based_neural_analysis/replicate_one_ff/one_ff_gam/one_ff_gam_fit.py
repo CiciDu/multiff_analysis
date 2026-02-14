@@ -8,7 +8,6 @@ import pandas as pd
 from scipy import sparse
 from scipy.optimize import minimize
 from scipy.special import gammaln
-from scipy.stats import ttest_1samp
 
 
 @dataclass
@@ -334,7 +333,7 @@ def cross_validated_ll(
         X_test = design_df.iloc[test_idx]
         y_test = y[test_idx]
 
-        fit = fit_poisson_gam_map(
+        fit = fit_poisson_gam(
             design_df=X_train,
             y=y_train,
             groups=groups,
@@ -463,7 +462,7 @@ def _maybe_load_saved_fit(save_path, load_if_exists, verbose):
     fit_result = FitResult(**saved)
 
     if verbose:
-        print(f'✓ Loaded saved fit result:')
+        print('✓ Loaded saved fit result:')
         print(f'  Success: {fit_result.success}')
         print(f'  Iterations: {fit_result.n_iter}')
         print(f'  Final objective: {fit_result.fun:.6e}')
@@ -598,7 +597,7 @@ def _save_fit_results(
         print(f'\nResults saved to: {save_path}')
         
 
-def fit_poisson_gam_map(
+def fit_poisson_gam(
     design_df: pd.DataFrame,
     y: np.ndarray,
     *,

@@ -7,4 +7,3 @@ line_length = 88
 
 [tool.ruff]
 target-version = "py39"
-extend-select = ["I"]   # import rules

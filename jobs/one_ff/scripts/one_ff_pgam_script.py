@@ -145,7 +145,13 @@ def main(args):
     pgam_runner.save_results()
     print(f"[PYTHON][INFO] Unit {args.unit_idx} completed successfully!", flush=True)
 
-
+    all_mean_r2 = []
+    num_neurons = pgam_runner.x_var.shape[1]
+    for n in range(num_neurons):
+        out = pgam_runner.run_pgam_cv(n, n_splits=5, filtwidth=2)
+        all_mean_r2.append(out['mean_r2_eval'])
+        
+    
 # -------------------------------------------------------
 # CLI
 # -------------------------------------------------------

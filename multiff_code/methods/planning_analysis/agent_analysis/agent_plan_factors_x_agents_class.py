@@ -65,13 +65,9 @@ class PlanFactorsAcrossAgents():
                     print(f'Error making overall all median info for agent {folder}: {e}. Will continue to the next agent.')
                     continue
 
-                # Extract model name after all_agents
-                model_dir = Path(folder).name
+
                 # Remove job ID suffix
-                if '_job' in model_dir:
-                    agent_id = model_dir.split('_job')[0]
-                else:
-                    agent_id = model_dir
+                agent_id = rl_base_utils.extract_config_name_from_post_best(folder)
 
                 agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.all_ref_pooled_median_info, params)

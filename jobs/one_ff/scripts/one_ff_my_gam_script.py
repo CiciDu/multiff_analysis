@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    one_ff_gam_fit,
+    gam_variance_explained,
+    parameters,
+)
 import os
 import sys
 from pathlib import Path
@@ -20,10 +26,6 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit
-)
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -67,7 +69,7 @@ def main(unit_idx: int):
     lam_suffix = one_ff_gam_fit.generate_lambda_suffix(groups)
     save_path = outdir / 'fit_results' / f'{lam_suffix}.pkl'
 
-    fit_res = one_ff_gam_fit.fit_poisson_gam_map(
+    fit_res = one_ff_gam_fit.fit_poisson_gam(
         design_df=design_df,
         y=y,
         groups=groups,
@@ -84,6 +86,29 @@ def main(unit_idx: int):
     print('final objective:', fit_res.fun)
     print('grad_norm:', fit_res.grad_norm)
 
+
+    # also get variance explained
+    save_path = outdir / 'cv_var_explained' / f'{lam_suffix}.pkl'
+    prs = parameters.default_prs()
+    cv_res = gam_variance_explained.crossval_variance_explained(
+        fit_function=one_ff_gam_fit.fit_poisson_gam,
+        design_df=design_df,
+        y=y,
+        groups=groups,
+        dt=prs.dt,
+        n_folds=5,
+        fit_kwargs=dict(
+            l1_groups=[],
+            max_iter=200,
+            tol=1e-6,
+            verbose=False,
+            save_path=None,
+        ),
+        save_path=save_path
+    )
+
+    print(cv_res["mean_classical_r2"])
+    print(cv_res["mean_pseudo_r2"])
 
 # ---------------------------------------------------------------------
 # CLI entry point

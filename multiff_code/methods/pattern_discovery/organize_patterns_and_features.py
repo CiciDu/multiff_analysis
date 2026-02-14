@@ -447,7 +447,15 @@ def _add_dates_based_on_data_names(df):
 
 def add_dates_and_sessions(df):
     # organize_patterns_and_features._add_dates_based_on_data_names(combd_feature_statistics)
-    _add_dates_based_on_data_names(df)
+    try:
+        _add_dates_based_on_data_names(df)
+    except Exception as e:
+        # try to strip the number at the end of the data_name
+        try:
+            df['data'] = df['data_name'].apply(lambda x: x.split('_')[-1]).astype(int)
+        except Exception as e:
+            print(f'Error adding dates: {e}. Will assign date to be 0')
+            df['date'] = 0
 
     # Create a mapping of unique data_name to unique sessions
     unique_sessions = {name: i for i, name in enumerate(df['date'].unique())}

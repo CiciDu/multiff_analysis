@@ -24,7 +24,7 @@ from neural_data_analysis.design_kits.design_by_segment import (
 )
 
 
-class PNDecodingRunner:
+class PNEncodingRunner:
     def __init__(
         self,
         raw_data_folder_path,
@@ -48,10 +48,10 @@ class PNDecodingRunner:
 
     def _collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
-            print('[PNDecodingRunner] Using cached design matrices')
+            print('[PNEncodingRunner] Using cached design matrices')
             return
 
-        print('[PNDecodingRunner] Computing design matrices from scratch')
+        print('[PNEncodingRunner] Computing design matrices from scratch')
 
         pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,
@@ -133,7 +133,7 @@ class PNDecodingRunner:
     def _get_save_dir(self):
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
-            'decoding_outputs/pn_decoder_outputs',
+            'encoding_outputs/pn_encoder_outputs',
         )
 
     def _get_design_matrix_paths(self):
@@ -159,10 +159,10 @@ class PNDecodingRunner:
             try:
                 with open(paths[key], 'wb') as f:
                     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
-                print(f'[PNDecodingRunner] Saved {key} → {paths[key]}')
+                print(f'[PNEncodingRunner] Saved {key} → {paths[key]}')
             except Exception as e:
                 print(
-                    f'[PNDecodingRunner] WARNING: could not save {key}: '
+                    f'[PNEncodingRunner] WARNING: could not save {key}: '
                     f'{type(e).__name__}: {e}'
                 )
 
@@ -182,64 +182,64 @@ class PNDecodingRunner:
             with open(paths['trial_ids'], 'rb') as f:
                 self.trial_ids = pickle.load(f)
 
-            print('[PNDecodingRunner] Loaded cached design matrices')
+            print('[PNEncodingRunner] Loaded cached design matrices')
             return True
 
         except Exception as e:
             print(
-                f'[PNDecodingRunner] WARNING: could not load design matrices: '
+                f'[PNEncodingRunner] WARNING: could not load design matrices: '
                 f'{type(e).__name__}: {e}'
             )
             return False
 
-    # ------------------------------------------------------------------
-    # Main entry point
-    # ------------------------------------------------------------------
-    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_mode='none'):
-        self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
-        self._collect_data(exists_ok=design_matrices_exists_ok)
+    # # ------------------------------------------------------------------
+    # # Main entry point
+    # # ------------------------------------------------------------------
+    # def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_mode='none'):
+    #     self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
+    #     self._collect_data(exists_ok=design_matrices_exists_ok)
 
-        if save_dir is None:
-            save_dir = self._get_save_dir()
-        if shuffle_mode != 'none':
-            save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
-            save_dir.mkdir(parents=True, exist_ok=True)
-        all_results = []
+    #     if save_dir is None:
+    #         save_dir = self._get_save_dir()
+    #     if shuffle_mode != 'none':
+    #         save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
+    #         save_dir.mkdir(parents=True, exist_ok=True)
+    #     all_results = []
 
-        for model_name, spec in self.model_specs.items():
-            config = cv_decoding.DecodingRunConfig(
-                regression_model_class=spec.get(
-                    'regression_model_class', None
-                ),
-                regression_model_kwargs=spec.get(
-                    'regression_model_kwargs', {}
-                ),
-                classification_model_class=spec.get(
-                    'classification_model_class', None
-                ),
-                classification_model_kwargs=spec.get(
-                    'classification_model_kwargs', {}
-                ),
-                use_early_stopping=False,
-            )
+    #     for model_name, spec in self.model_specs.items():
+    #         config = cv_decoding.DecodingRunConfig(
+    #             regression_model_class=spec.get(
+    #                 'regression_model_class', None
+    #             ),
+    #             regression_model_kwargs=spec.get(
+    #                 'regression_model_kwargs', {}
+    #             ),
+    #             classification_model_class=spec.get(
+    #                 'classification_model_class', None
+    #             ),
+    #             classification_model_kwargs=spec.get(
+    #                 'classification_model_kwargs', {}
+    #             ),
+    #             use_early_stopping=False,
+    #         )
 
-            print('model_name:', model_name)
-            print('config:', config)
+    #         print('model_name:', model_name)
+    #         print('config:', config)
 
-            results_df = cv_decoding.run_cv_decoding(
-                X=self.spike_data_w_history,
-                y_df=self.design_df,
-                behav_features=None,
-                groups=self.trial_ids,
-                n_splits=n_splits,
-                config=config,
-                context_label='pooled',
-                save_dir=save_dir,
-                model_name=model_name,
-                shuffle_mode=shuffle_mode,
-            )
+    #         results_df = cv_decoding.run_cv_decoding(
+    #             X=self.spike_data_w_history,
+    #             y_df=self.design_df,
+    #             behav_features=None,
+    #             groups=self.trial_ids,
+    #             n_splits=n_splits,
+    #             config=config,
+    #             context_label='pooled',
+    #             save_dir=save_dir,
+    #             model_name=model_name,
+    #             shuffle_mode=shuffle_mode,
+    #         )
 
-            results_df['model_name'] = model_name
-            all_results.append(results_df)
+    #         results_df['model_name'] = model_name
+    #         all_results.append(results_df)
 
-        return pd.concat(all_results, ignore_index=True)
+    #     return pd.concat(all_results, ignore_index=True)

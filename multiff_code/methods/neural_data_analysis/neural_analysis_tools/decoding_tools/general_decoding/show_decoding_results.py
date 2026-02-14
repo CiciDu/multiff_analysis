@@ -11,7 +11,7 @@ def collect_all_session_decoding_results(
     monkey_name,
     decode_runner_class,
     verbose=False,
-    shuffle_y=False,
+    shuffle_mode='none',
 ):
     """
     Collect existing CV decoding results across all sessions for one monkey.
@@ -26,6 +26,9 @@ def collect_all_session_decoding_results(
         Runner class (e.g., decode_stops_pipeline.StopDecodingRunner).
     verbose : bool, optional
         If True, print progress information. Default is True.
+    shuffle_mode : str, optional
+        Shuffle mode ('none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group').
+        Default is 'none'.
 
     Returns
     -------
@@ -57,8 +60,8 @@ def collect_all_session_decoding_results(
         )
 
         save_dir = runner._get_save_dir()
-        if shuffle_y:
-            save_dir = Path(save_dir) / 'shuffle_y'
+        if shuffle_mode != 'none':
+            save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
 
         session_results_df = cv_decoding.run_cv_decoding(
             save_dir=save_dir,
@@ -121,7 +124,7 @@ def visualize_decoding_results(
 
         reg_summary = (
             reg_df
-            .groupby(['behav_feature', 'shuffle_y'])
+            .groupby(['behav_feature', 'shuffle_mode'])
             .agg(
                 mean_r2=('r2_cv', 'mean'),
                 sem_r2=('r2_cv', lambda x: x.std() / np.sqrt(len(x))),
@@ -141,7 +144,7 @@ def visualize_decoding_results(
 
             pivot = sub.pivot_table(
                 index='data_name',
-                columns='shuffle_y',
+                columns='shuffle_mode',
                 values='r2_cv'
             )
 
@@ -173,8 +176,8 @@ def visualize_decoding_results(
 
         if show_plots:
 
-            sort_df = reg_summary.query("shuffle_y == False") \
-                if False in reg_summary['shuffle_y'].values \
+            sort_df = reg_summary.query("shuffle_mode == 'none'") \
+                if 'none' in reg_summary['shuffle_mode'].values \
                 else reg_summary.copy()
 
             feature_order = (
@@ -196,13 +199,13 @@ def visualize_decoding_results(
                 figsize=(6, height)
             )
 
-            hue_levels = reg_summary['shuffle_y'].unique()
+            hue_levels = reg_summary['shuffle_mode'].unique()
             n_hue_levels = len(hue_levels)
 
             for i, hue_val in enumerate(hue_levels):
 
                 sub = reg_summary.query(
-                    "shuffle_y == @hue_val"
+                    "shuffle_mode == @hue_val"
                 ).sort_values('behav_feature')
 
                 y_positions = np.arange(len(sub))
@@ -254,7 +257,7 @@ def visualize_decoding_results(
 
         clf_summary = (
             clf_df
-            .groupby(['behav_feature', 'shuffle_y'])
+            .groupby(['behav_feature', 'shuffle_mode'])
             .agg(
                 mean_auc=('auc_mean', 'mean'),
                 sem_auc=('auc_mean', lambda x: x.std() / np.sqrt(len(x))),
@@ -272,7 +275,7 @@ def visualize_decoding_results(
 
             pivot = sub.pivot_table(
                 index='data_name',
-                columns='shuffle_y',
+                columns='shuffle_mode',
                 values='auc_mean'
             )
 
@@ -304,8 +307,8 @@ def visualize_decoding_results(
 
         if show_plots:
 
-            sort_df = clf_summary.query("shuffle_y == False") \
-                if False in clf_summary['shuffle_y'].values \
+            sort_df = clf_summary.query("shuffle_mode == 'none'") \
+                if 'none' in clf_summary['shuffle_mode'].values \
                 else clf_summary.copy()
 
             feature_order = (
@@ -326,13 +329,13 @@ def visualize_decoding_results(
             fig, ax = plt.subplots(
                 figsize=(6, height)
             )
-            hue_levels = clf_summary['shuffle_y'].unique()
+            hue_levels = clf_summary['shuffle_mode'].unique()
             n_hue_levels = len(hue_levels)
 
             for i, hue_val in enumerate(hue_levels):
 
                 sub = clf_summary.query(
-                    "shuffle_y == @hue_val"
+                    "shuffle_mode == @hue_val"
                 ).sort_values('behav_feature')
 
                 y_positions = np.arange(len(sub))

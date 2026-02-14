@@ -12,6 +12,33 @@ from typing import List, Dict
 import numpy as np
 
 
+plot_var_order = [
+    # egocentric / motion state
+    'f_v',
+    'f_w',
+    'f_d',
+    'f_phi',
+
+    # target-related
+    'f_r_targ',
+    'f_theta_targ',
+
+    # eye position
+    'f_eye_ver',
+    'f_eye_hor',
+    
+
+    # behavior / action
+    'g_t_move',
+    'g_t_targ',
+    'g_t_stop',
+    'g_t_rew',
+
+    # history
+    'h_spike_history',
+]
+
+    
 @dataclass
 class Params:
     # =========================
@@ -114,6 +141,9 @@ class Params:
     })
     
     fly_ONduration: float = 0.3
+
+
+
 
 
 def default_prs():

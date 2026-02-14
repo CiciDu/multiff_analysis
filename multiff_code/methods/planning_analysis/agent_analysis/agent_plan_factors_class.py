@@ -32,7 +32,7 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                                                   overall_folder='',
                                                   **env_kwargs)
         self.agent.streamline_getting_data_from_agent(
-            n_steps=n_steps, exists_ok=exists_ok, save_data=save_data)
+            n_steps=n_steps, exists_ok=exists_ok, save_data=save_data, retrieve_ff_flash_sorted=True)
 
     def make_animation(self, currentTrial=None, num_trials=None, duration=[10, 20], video_dir=None):
         self.agent.set_animation_parameters(

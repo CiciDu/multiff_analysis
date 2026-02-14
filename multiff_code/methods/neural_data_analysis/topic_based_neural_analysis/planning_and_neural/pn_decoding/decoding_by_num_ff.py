@@ -33,7 +33,7 @@ def _run_decoding_pass(
     config,
     context_label,
     verbosity,
-    shuffle_y,
+    shuffle_mode,
     shuffle_seed,
 ):
     return cv_decoding.run_cv_decoding(
@@ -45,7 +45,7 @@ def _run_decoding_pass(
         config=config,
         context_label=context_label,
         verbosity=verbosity,
-        shuffle_y=shuffle_y,
+        shuffle_mode=shuffle_mode,
         shuffle_seed=shuffle_seed,
     )
 
@@ -67,7 +67,7 @@ def decode_by_num_ff_visible_or_in_memory(
     load_if_exists=True,
     overwrite=False,
     verbosity: int = 1,
-    shuffle_y: bool = False,
+    shuffle_mode: str = 'none',
     shuffle_seed: int = 0,
 ):
     if config is None:
@@ -121,7 +121,7 @@ def decode_by_num_ff_visible_or_in_memory(
             config=config,
             context_label=f'num_ff={num_ff}',
             verbosity=verbosity,
-            shuffle_y=shuffle_y,
+            shuffle_mode=shuffle_mode,
             shuffle_seed=shuffle_seed,
         )
 
@@ -142,7 +142,7 @@ def decode_by_num_ff_visible_or_in_memory(
             config=config,
             context_label='num_ff=any',
             verbosity=verbosity,
-            shuffle_y=shuffle_y,
+            shuffle_mode=shuffle_mode,
             shuffle_seed=shuffle_seed,
         )
 
@@ -161,7 +161,7 @@ def decode_by_num_ff_visible_or_in_memory(
                     behav_features=list(behav_features),
                     n_splits=n_splits,
                     include_pooled=include_pooled,
-                    shuffle_y=shuffle_y,
+                    shuffle_mode=shuffle_mode,
                     timestamp=datetime.now().isoformat(),
                 ),
                 f,
@@ -215,7 +215,7 @@ def decode_cur_ff_only(
         config=config,
         context_label=context,
         verbosity=verbosity,
-        shuffle_y=False,
+        shuffle_mode='none',
         shuffle_seed=0,
     )
 

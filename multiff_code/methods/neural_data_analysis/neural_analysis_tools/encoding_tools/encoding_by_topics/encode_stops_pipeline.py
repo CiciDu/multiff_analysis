@@ -19,7 +19,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_dec
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 
 
-class StopDecodingRunner:
+class StopEncodingRunner:
     def __init__(
         self,
         raw_data_folder_path,
@@ -44,7 +44,7 @@ class StopDecodingRunner:
 
     def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_mode='none'):
         """
-        Run stop-event decoding.
+        Run stop-event encoding.
         """
         self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
         self._collect_data(exists_ok=design_matrices_exists_ok)
@@ -106,10 +106,10 @@ class StopDecodingRunner:
         Collect and prepare data for stop decoding.
         """
         if exists_ok and self._load_design_matrices():
-            print('[StopDecodingRunner] Using cached design matrices')
+            print('[StopEncodingRunner] Using cached design matrices')
             return
 
-        print('[StopDecodingRunner] Computing design matrices from scratch')
+        print('[StopEncodingRunner] Computing design matrices from scratch')
 
         (
             self.pn,
@@ -147,7 +147,7 @@ class StopDecodingRunner:
     def _get_save_dir(self):
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
-            'decoding_outputs/stop_decoder_outputs',
+            'encoding_outputs/stop_encoder_outputs',
         )
 
     def _get_design_matrix_paths(self):
@@ -173,10 +173,10 @@ class StopDecodingRunner:
             try:
                 with open(paths[key], 'wb') as f:
                     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
-                print(f'[StopDecodingRunner] Saved {key} → {paths[key]}')
+                print(f'[StopEncodingRunner] Saved {key} → {paths[key]}')
             except Exception as e:
                 print(
-                    f'[StopDecodingRunner] WARNING: could not save {key}: '
+                    f'[StopEncodingRunner] WARNING: could not save {key}: '
                     f'{type(e).__name__}: {e}'
                 )
 
@@ -196,12 +196,12 @@ class StopDecodingRunner:
             with open(paths['stop_meta_used'], 'rb') as f:
                 self.stop_meta_used = pickle.load(f)
 
-            print('[StopDecodingRunner] Loaded cached design matrices')
+            print('[StopEncodingRunner] Loaded cached design matrices')
             return True
 
         except Exception as e:
             print(
-                f'[StopDecodingRunner] WARNING: could not load design matrices: '
+                f'[StopEncodingRunner] WARNING: could not load design matrices: '
                 f'{type(e).__name__}: {e}'
             )
             return False
