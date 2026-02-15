@@ -1,7 +1,6 @@
 # --- Standard library
 from typing import Tuple, Dict, List
 import os
-from pathlib import Path
 
 # --- Core scientific stack
 import numpy as np
@@ -47,7 +46,8 @@ def build_stop_design(
     add_ff_visible_info: bool = True,
     add_retries_info: bool = True,
     datasets: dict = None,
-    global_bins_2d: np.ndarray = None, # optional global bins_2d to restrict to
+    global_bins_2d: np.ndarray = None,  # optional global bins_2d to restrict to
+    for_decoding: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build a stop-aligned, bin-level design matrix and offset for GLM/decoding.
@@ -114,7 +114,7 @@ def build_stop_design(
     pos = used_bins[mask_used]
 
     binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
-    
+
     print('meta.shape', meta.shape)
 
     meta_used = (
@@ -139,17 +139,6 @@ def build_stop_design(
     # -------------------------------------------------------------------------
     # 6) Event- and cluster-level features
     # -------------------------------------------------------------------------
-    X_event_df = stop_design.build_event_design_from_meta(
-        meta=meta,
-        pos=pos,
-        new_seg_info=new_seg_info,
-        speed_used=binned_feats['speed'].values,
-        include_columns=(
-            'basis', 'prepost', 'prepost*speed',
-            'captured', 'basis*captured',
-            'time_since_prev_event', 'time_to_next_event',
-        )
-    )
 
     cluster_df = cluster_design.build_cluster_features_workflow(
         meta_used[['event_id', 'rel_center']],
@@ -161,21 +150,46 @@ def build_stop_design(
         zscore_rel_time=True,
     )
 
-    CLUSTER_FEATS = [
+    SHARED_CLUSTER_FEATS = [
         'is_clustered',
         'event_is_first_in_cluster',
         'prev_gap_s_z',
         'next_gap_s_z',
         'cluster_duration_s_z',
         'cluster_progress_c',
-        'cluster_progress_c2',
-        'cluster_rel_time_s_z',
+        'bin_t_from_cluster_start_s_z',
+        'log_n_events_in_cluster_z',
     ]
 
-    def _safe_add_columns(target_df, source_df, cols):
-        cols = [c for c in cols if c not in target_df.columns]
-        if cols:
-            target_df.loc[:, cols] = source_df[cols].to_numpy()
+    if not for_decoding:
+        X_event_df = stop_design.build_event_design_from_meta(
+            meta=meta,
+            pos=pos,
+            new_seg_info=new_seg_info,
+            speed_used=binned_feats['speed'].values,
+            include_columns=(
+                'basis', 'prepost', 'prepost*speed',
+                'captured', 'basis*captured',
+                'time_since_prev_event', 'time_to_next_event',
+            )
+        )
+
+        CLUSTER_FEATS = SHARED_CLUSTER_FEATS + [
+            'cluster_progress_c2',
+            'event_t_from_cluster_start_s',
+        ]
+
+    else:
+        X_event_df = stop_design.build_event_design_for_decoding(
+            meta=meta,
+            pos=pos,
+            new_seg_info=new_seg_info,
+            include_columns=(
+                'prepost', 'time_since_prev_event', 'cond_dummies', 'captured'
+            )
+        )
+
+        CLUSTER_FEATS = SHARED_CLUSTER_FEATS + []
 
     _safe_add_columns(binned_feats, X_event_df, X_event_df.columns)
     _safe_add_columns(binned_feats, cluster_df, CLUSTER_FEATS)
@@ -209,6 +223,33 @@ def build_stop_design(
     # -------------------------------------------------------------------------
     # 10) Feature groups
     # -------------------------------------------------------------------------
+    groups = _build_feature_groups(binned_feats, KINEMATIC_COLS)
+
+    return binned_spikes, binned_feats, offset_log, meta_used, groups
+
+
+def _safe_add_columns(target_df, source_df, cols):
+    cols = [c for c in cols if c not in target_df.columns]
+    if cols:
+        target_df.loc[:, cols] = source_df[cols].to_numpy()
+
+
+def _build_feature_groups(binned_feats: pd.DataFrame, kinematic_cols: List[str]) -> Dict[str, List[str]]:
+    """
+    Build semantic feature groups from binned features.
+
+    Parameters
+    ----------
+    binned_feats : pd.DataFrame
+        DataFrame containing all binned features
+    kinematic_cols : List[str]
+        List of kinematic column names
+
+    Returns
+    -------
+    Dict[str, List[str]]
+        Dictionary mapping group names to lists of feature column names
+    """
     groups: Dict[str, List[str]] = {}
 
     def _add_group(name: str, cols: List[str]):
@@ -216,33 +257,42 @@ def build_stop_design(
         if cols:
             groups[name] = cols
 
-    for c in KINEMATIC_COLS:
+    # Individual kinematic columns
+    for c in kinematic_cols:
         _add_group(c, [c])
 
+    # Basis functions
     _add_group(
         'basis',
-        [c for c in binned_feats.columns if c.startswith('rcos_') and '*captured' not in c]
+        [c for c in binned_feats.columns if c.startswith(
+            'rcos_') and '*captured' not in c]
     )
     _add_group(
         'basis*captured',
-        [c for c in binned_feats.columns if c.startswith('rcos_') and c.endswith('*captured')]
+        [c for c in binned_feats.columns if c.startswith(
+            'rcos_') and c.endswith('*captured')]
     )
 
+    # Pre/post and interaction terms
     _add_group('prepost', ['prepost'])
     _add_group('prepost*speed', ['prepost*speed'])
     _add_group('captured', ['captured'])
     _add_group('time_since_prev_event', ['time_since_prev_event'])
     _add_group('time_to_next_event', ['time_to_next_event'])
 
+    # Cluster features
     _add_group('cluster_flags', ['event_is_first_in_cluster'])
     _add_group('cluster_gaps', ['prev_gap_s_z', 'next_gap_s_z'])
     _add_group('cluster_duration', ['cluster_duration_s_z'])
-    _add_group('cluster_progress', ['cluster_progress_c', 'cluster_progress_c2'])
-    _add_group('cluster_rel_time', ['cluster_rel_time_s_z'])
+    _add_group('cluster_progress', [
+               'cluster_progress_c', 'cluster_progress_c2'])
+    _add_group('cluster_rel_time', ['bin_t_from_cluster_start_s_z'])
 
+    # Firefly features
     _add_group('ff_visible', ['log1p_num_ff_visible', 'k_ff_visible'])
     _add_group('ff_in_memory', ['log1p_num_ff_in_memory', 'k_ff_in_memory'])
 
+    # Retry features
     _add_group(
         'retries',
         [
@@ -255,14 +305,10 @@ def build_stop_design(
         ],
     )
 
+    # Timing
     _add_group('time_rel_to_event_start', ['time_rel_to_event_start'])
 
-    return binned_spikes, binned_feats, offset_log, meta_used, groups
-
-
-# =============================================================================
-# Retry features
-# =============================================================================
+    return groups
 
 
 def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_used):
@@ -338,7 +384,8 @@ def add_ff_visible_and_in_memory_info(
             ff_df_sub, bins_2d, vis_col=state
         )
         binned_feats[f'num_ff_{state}'] = k_ff[used_bins]
-        binned_feats[f'log1p_num_ff_{state}'] = np.log1p(binned_feats[f'num_ff_{state}'])
+        binned_feats[f'log1p_num_ff_{state}'] = np.log1p(
+            binned_feats[f'num_ff_{state}'])
 
     return binned_feats
 
@@ -356,6 +403,7 @@ def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_used, mask)
         meta_used.loc[mask].reset_index(drop=True),
     )
 
+
 def add_interaction_columns(binned_feats):
     # list of variables you want to interact with 'whether_in_retry_series'
     excluded_exact = {'intercept', 'const', 'miss', 'next_gap_s_z'}
@@ -369,8 +417,9 @@ def add_interaction_columns(binned_feats):
 
     for c in vars_to_interact:
         new_col = f'{c}*retry'
-        binned_feats[new_col] = binned_feats[c] * binned_feats['whether_in_retry_series']  
-        
+        binned_feats[new_col] = binned_feats[c] * \
+            binned_feats['whether_in_retry_series']
+
     return binned_feats
 
 
@@ -380,8 +429,8 @@ def scale_binned_feats(binned_feats):
     print('Scaled columns:', scaled_cols)
 
     # drop columns that are constant
-    const_cols = [c for c in binned_feats_sc.columns 
-                if binned_feats_sc[c].nunique(dropna=False) <= 1 and c not in ['intercept', 'const']]
+    const_cols = [c for c in binned_feats_sc.columns
+                  if binned_feats_sc[c].nunique(dropna=False) <= 1 and c not in ['intercept', 'const']]
     print("Constant columns:", const_cols)
 
     binned_feats_sc = binned_feats_sc.drop(columns=const_cols)

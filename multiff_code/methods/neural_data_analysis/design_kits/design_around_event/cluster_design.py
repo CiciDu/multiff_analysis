@@ -73,7 +73,7 @@ def extract_cluster_meta_per_event(
       - prev_gap_s / next_gap_s:     gaps to neighboring events (within the cluster)
       - event_is_first_in_cluster:    0/1 indicator (first event)
       - event_is_last_in_cluster:     0/1 indicator (last event)
-      - time_from_cluster_start_s:   time from cluster start to THIS event's center
+      - event_t_from_cluster_start_s:   time from cluster start to THIS event's center
       - time_until_cluster_end_s:    time from THIS event's center to cluster end
     """
 
@@ -125,7 +125,7 @@ def extract_cluster_meta_per_event(
         'event_cluster_size', 'event_idx_in_cluster', 'cluster_progress',
         'cluster_start_time', 'cluster_end_time', 'cluster_duration_s',
         'prev_event_end_time', 'prev_gap_s', 'next_event_start_time', 'next_gap_s',
-        'time_from_cluster_start_s', 'time_until_cluster_end_s'
+        'event_t_from_cluster_start_s', 'time_until_cluster_end_s'
     ]
     for col in float_cols:
         sws[col] = np.nan
@@ -184,7 +184,7 @@ def extract_cluster_meta_per_event(
     dsub.loc[m_last,  ['next_event_start_time', 'next_gap_s']] = np.nan
 
     # ----- timing relative to cluster bounds at the event center -----
-    dsub['time_from_cluster_start_s'] = dsub['event_center_time'] - \
+    dsub['event_t_from_cluster_start_s'] = dsub['event_center_time'] - \
         dsub['cluster_start_time']
     dsub['time_until_cluster_end_s'] = dsub['cluster_end_time'] - \
         dsub['event_center_time']
@@ -316,8 +316,8 @@ def merge_cluster_meta_into_design_last(
     Merge event-level features into the per-bin design by 'event_id'.
 
     Adds per-bin:
-      - cluster_rel_time_s:   time since cluster start at each bin (= time_from_cluster_start_s + rel_time)
-      - cluster_rel_time_s_z: z-scored version (on clustered bins; else 0)
+      - bin_t_from_cluster_start_s:   time since cluster start at each bin (= event_t_from_cluster_start_s + rel_time)
+      - bin_t_from_cluster_start_s_z: z-scored version (on clustered bins; else 0)
 
     Returns design_df with all cluster features attached.
     """
@@ -334,7 +334,7 @@ def merge_cluster_meta_into_design_last(
         'prev_gap_s', 'next_gap_s',
         'prev_gap_s_z', 'next_gap_s_z',
         'cluster_start_time', 'cluster_end_time', 'cluster_duration_s', 'cluster_duration_s_z',
-        'time_from_cluster_start_s', 'time_until_cluster_end_s'
+        'event_t_from_cluster_start_s', 'time_until_cluster_end_s'
     ]
 
     if 'log_n_events_in_cluster_z' in event_level_scaled.columns:
@@ -347,16 +347,16 @@ def merge_cluster_meta_into_design_last(
 
     # ---- bin-level within-cluster time ----
     if rel_time_col in out.columns:
-        # cluster_rel_time_s: per-bin location within the cluster episode (seconds)
-        out['cluster_rel_time_s'] = out['time_from_cluster_start_s'] + \
+        # bin_t_from_cluster_start_s: per-bin location within the cluster episode (seconds)
+        out['bin_t_from_cluster_start_s'] = out['event_t_from_cluster_start_s'] + \
             out[rel_time_col]
         if zscore_rel_time:
-            # cluster_rel_time_s_z: z-scored on clustered bins; 0 off-cluster
+            # bin_t_from_cluster_start_s_z: z-scored on clustered bins; 0 off-cluster
             mask = out['is_clustered'] == 1
-            s = _to_float(out['cluster_rel_time_s'])
+            s = _to_float(out['bin_t_from_cluster_start_s'])
             z = _z_on_mask(pd.Series(_winsorize(
                 s.to_numpy(), winsor_p), index=out.index), mask)
-            out['cluster_rel_time_s_z'] = z.where(mask, 0.0)
+            out['bin_t_from_cluster_start_s_z'] = z.where(mask, 0.0)
 
     return out
 
@@ -378,7 +378,7 @@ def build_cluster_features_workflow(
       1) extract per-event meta (sizes, order, progress, timing, gaps)
       2) add presence flags (is_clustered, has_prev/has_next, first/last)
       3) center/z-score event-level features (build *_c, *_z as described)
-      4) merge LAST into design_df and add bin-level 'cluster_rel_time_s[_z]'
+      4) merge LAST into design_df and add bin-level 'bin_t_from_cluster_start_s[_z]'
     """
     meta_raw = extract_cluster_meta_per_event(
         events_with_stats, use_midbin_progress=use_midbin_progress)
@@ -403,7 +403,7 @@ def best_cluster_features(df):
       - cluster_duration_s_z:            overall length of the cluster episode
       - cluster_progress_c + _c2:        linear & U/∩-shape across the cluster
       - log_n_events_in_cluster_z:        (optional) capacity/load via size
-      - cluster_rel_time_s_z:            (optional, bin-level) drift within cluster
+      - bin_t_from_cluster_start_s_z:            (optional, bin-level) drift within cluster
     """
     wanted = [
         'is_clustered', 'event_cluster_size',
@@ -413,7 +413,7 @@ def best_cluster_features(df):
         'cluster_duration_s_z',
         'cluster_progress_c', 'cluster_progress_c2',
         'log_n_events_in_cluster_z',      # optional
-        'cluster_rel_time_s_z',          # optional (bin-level)
+        'bin_t_from_cluster_start_s_z',          # optional (bin-level)
     ]
     feats = [c for c in wanted if c in df.columns]
     missing = [c for c in wanted if c not in df.columns]

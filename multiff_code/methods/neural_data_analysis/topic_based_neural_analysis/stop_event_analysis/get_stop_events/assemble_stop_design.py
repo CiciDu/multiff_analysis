@@ -55,7 +55,7 @@ from decision_making_analysis.data_compilation import (
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 
-def assemble_stop_design_func(raw_data_folder_path, bin_width, global_bins_2d=None):
+def assemble_stop_design_func(raw_data_folder_path, bin_width, global_bins_2d=None, for_decoding=False):
     pn, datasets, _ = collect_stop_data.collect_stop_data_func(
         raw_data_folder_path,
         bin_width=bin_width,
@@ -104,12 +104,14 @@ def assemble_stop_design_func(raw_data_folder_path, bin_width, global_bins_2d=No
             datasets=datasets,
             add_ff_visible_info=True,
             global_bins_2d=global_bins_2d,
+            for_decoding=for_decoding,
         )
     )
 
-    stop_binned_feats = prepare_stop_design.add_interaction_columns(
-        stop_binned_feats
-    )
+    if not for_decoding:
+        stop_binned_feats = prepare_stop_design.add_interaction_columns(
+            stop_binned_feats
+        )
     stop_binned_feats = prepare_stop_design.scale_binned_feats(
         stop_binned_feats
     )

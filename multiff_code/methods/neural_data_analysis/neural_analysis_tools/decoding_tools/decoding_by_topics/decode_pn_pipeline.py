@@ -36,7 +36,7 @@ class PNDecodingRunner:
         self.t_max = t_max
 
         # Filled during setup
-        self.design_df = None
+        self.behav_df = None
         self.trial_ids = None
         self.spike_data_w_history = None
 
@@ -75,18 +75,10 @@ class PNDecodingRunner:
         trial_ids = data['new_segment']
         dt = pn.bin_width
 
-        data = temporal_feats.add_stop_and_capture_columns(
+        pn_feats_to_decode = temporal_feats.add_stop_and_capture_columns(
             data,
             trial_ids,
             pn.ff_caught_T_new,
-        )
-
-        design_df, meta0, meta = (
-            create_pn_design_df.get_initial_design_df(
-                data,
-                dt,
-                trial_ids,
-            )
         )
 
         cluster_cols = [
@@ -121,10 +113,9 @@ class PNDecodingRunner:
         )
 
         self.pn = pn
-        self.design_df = design_df
+        self.behav_df = pn_feats_to_decode
         self.trial_ids = trial_ids
         self.spike_data_w_history = spike_data_w_history
-
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
@@ -140,7 +131,7 @@ class PNDecodingRunner:
         save_dir = Path(self._get_save_dir())
         return {
             'spike_data_w_history': save_dir / 'spike_data_w_history.pkl',
-            'design_df': save_dir / 'design_df.pkl',
+            'pn_feats_to_decode': save_dir / 'pn_feats_to_decode.pkl',
             'trial_ids': save_dir / 'trial_ids.pkl',
         }
 
@@ -151,7 +142,7 @@ class PNDecodingRunner:
 
         data_to_save = {
             'spike_data_w_history': self.spike_data_w_history,
-            'design_df': self.design_df,
+            'pn_feats_to_decode': self.behav_df,
             'trial_ids': self.trial_ids,
         }
 
@@ -176,8 +167,8 @@ class PNDecodingRunner:
             with open(paths['spike_data_w_history'], 'rb') as f:
                 self.spike_data_w_history = pickle.load(f)
 
-            with open(paths['design_df'], 'rb') as f:
-                self.design_df = pickle.load(f)
+            with open(paths['pn_feats_to_decode'], 'rb') as f:
+                self.behav_df = pickle.load(f)
 
             with open(paths['trial_ids'], 'rb') as f:
                 self.trial_ids = pickle.load(f)
@@ -228,7 +219,7 @@ class PNDecodingRunner:
 
             results_df = cv_decoding.run_cv_decoding(
                 X=self.spike_data_w_history,
-                y_df=self.design_df,
+                y_df=self.behav_df,
                 behav_features=None,
                 groups=self.trial_ids,
                 n_splits=n_splits,

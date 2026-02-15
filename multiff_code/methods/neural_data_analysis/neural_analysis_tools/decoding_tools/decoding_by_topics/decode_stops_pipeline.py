@@ -33,7 +33,7 @@ class StopDecodingRunner:
         # will be filled during setup
         self.stop_meta_used = None
         self.spike_data_w_history = None
-        self.stop_binned_feats = None
+        self.stop_feats_to_decode = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
@@ -81,7 +81,7 @@ class StopDecodingRunner:
 
             results_df = cv_decoding.run_cv_decoding(
                 X=self.spike_data_w_history,
-                y_df=self.stop_binned_feats,
+                y_df=self.stop_feats_to_decode,
                 behav_features=None,
                 groups=self.stop_meta_used['event_id'].values,
                 n_splits=n_splits,
@@ -114,13 +114,14 @@ class StopDecodingRunner:
         (
             self.pn,
             stop_binned_spikes,
-            self.stop_binned_feats,
+            self.stop_feats_to_decode,
             offset_log,
             self.stop_meta_used,
             stop_meta_groups,
         ) = assemble_stop_design.assemble_stop_design_func(
             self.raw_data_folder_path,
             self.bin_width,
+            for_decoding=True,
         )
 
         bin_df = spike_history.make_bin_df_from_stop_meta(self.stop_meta_used)
@@ -154,7 +155,7 @@ class StopDecodingRunner:
         save_dir = Path(self._get_save_dir())
         return {
             'spike_data_w_history': save_dir / 'spike_data_w_history.pkl',
-            'stop_binned_feats': save_dir / 'stop_binned_feats.pkl',
+            'stop_feats_to_decode': save_dir / 'stop_feats_to_decode.pkl',
             'stop_meta_used': save_dir / 'stop_meta_used.pkl',
         }
 
@@ -165,7 +166,7 @@ class StopDecodingRunner:
 
         data_to_save = {
             'spike_data_w_history': self.spike_data_w_history,
-            'stop_binned_feats': self.stop_binned_feats,
+            'stop_feats_to_decode': self.stop_feats_to_decode,
             'stop_meta_used': self.stop_meta_used,
         }
 
@@ -190,8 +191,8 @@ class StopDecodingRunner:
             with open(paths['spike_data_w_history'], 'rb') as f:
                 self.spike_data_w_history = pickle.load(f)
 
-            with open(paths['stop_binned_feats'], 'rb') as f:
-                self.stop_binned_feats = pickle.load(f)
+            with open(paths['stop_feats_to_decode'], 'rb') as f:
+                self.stop_feats_to_decode = pickle.load(f)
 
             with open(paths['stop_meta_used'], 'rb') as f:
                 self.stop_meta_used = pickle.load(f)

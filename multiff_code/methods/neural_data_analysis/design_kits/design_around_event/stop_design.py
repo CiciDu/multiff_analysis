@@ -477,3 +477,102 @@ def build_event_design_from_meta(
     return X_event_df
 
 # ------------------------- programmatic feature glossary ---------------------
+
+def build_event_design_for_decoding(
+    meta: pd.DataFrame,
+    pos: np.ndarray,
+    new_seg_info: pd.DataFrame,
+    drop_first_cond: bool = True,
+    include_columns=(
+        'prepost', 'time_since_prev_event', 'cond_dummies', 'captured'
+        # optional extras: 'straddle','k_norm','basis','prepost*speed', 'duration', 'k_norm',
+        # capture: 'basis*captured','prepost*captured',
+    )
+):
+    '''
+    Build event-aware predictors aligned to fitted rows (pos).
+
+    Available columns (no z-scoring here):
+      - prepost                  : 0=pre, 1=post
+      - straddle                 : bin spans across the event time
+      - k_norm                   : normalized within-event position [0,1]
+      - duration                 : event duration in seconds
+      - cond_dummies             : one-hot condition indicators
+      - basis                    : raised-cosine over rel time (peri-event shape)
+      - prepost*speed            : interaction (pre vs post) × (speed_used)
+      - captured                 : 0/1 capture indicator (per event)
+      - basis*captured           : capture-modulated peri-event basis
+      - prepost*captured         : interaction of prepost and captured
+      - time_since_prev_event     : seconds since previous event (NaN→0)
+      - time_to_next_event        : seconds until next event (NaN→0)
+      - time_since_prev_event_pre: post-only gated since-prev (pre bins=0)
+      - time_to_next_event_post    : pre-only gated to-next (post bins=0)
+      - isi_len                  : total inter-event interval length (seconds)
+      - mid_offset               : signed offset from midpoint (seconds)
+    '''
+    # 1) align meta → m
+    m, meta_by_bin = _align_meta_to_pos(meta, pos)
+
+    # 2) per-event table
+    event_tbl = build_per_event_table(new_seg_info)
+    m = join_event_tbl_avoid_collisions(m, event_tbl)
+
+    # 3) core event features
+    rel_t, prepost, straddle, k_norm = _compute_core_event_features(
+        m, meta_by_bin)
+
+    # 4) history vars
+    ts_prev, ts_next, ts_prev_f, ts_next_f, duration_f = _compute_history_base_vars(
+        m)
+
+    # 5) condition dummies
+    cond_mat, cond_cols = _expand_cond_dummies(
+        m, drop_first_cond=drop_first_cond)
+    
+    # 6) capture primitives
+    captured = _make_capture_block(m)
+
+
+    # 9) assemble blocks
+    blocks, names = [], []
+
+    if 'prepost' in include_columns:
+        blocks.append(prepost[:, None])
+        names.append('prepost')
+    if 'straddle' in include_columns:
+        blocks.append(straddle[:, None])
+        names.append('straddle')
+    if 'k_norm' in include_columns:
+        blocks.append(k_norm[:, None])
+        names.append('k_norm')
+    if 'duration' in include_columns:
+        blocks.append(duration_f[:, None])
+        names.append('duration')
+    if 'cond_dummies' in include_columns and cond_mat.size:
+        blocks.append(cond_mat)
+        names += cond_cols
+    if 'captured' in include_columns and captured is not None:
+        blocks.append(captured[:, None])
+        names.append('captured')
+        
+        
+    H_blocks, H_names = _make_history_block(
+        include_columns,
+        prepost, ts_prev, ts_next, ts_prev_f, ts_next_f,
+    )
+
+    if H_blocks:
+        blocks += H_blocks
+        names += H_names
+
+    # pack & sanitize
+    if not blocks:
+        X_event = np.zeros((len(m), 1), float)
+        names = ['_zeros_']
+    else:
+        X_event = np.column_stack(blocks).astype(float)
+    X_event = np.nan_to_num(X_event, nan=0.0, posinf=0.0, neginf=0.0)
+
+    X_event_df = pd.DataFrame(X_event, columns=names,
+                              index=np.arange(len(X_event)))
+    return X_event_df
