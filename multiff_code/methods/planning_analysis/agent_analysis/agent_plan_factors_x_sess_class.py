@@ -39,6 +39,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
+
     def streamline_getting_y_values(self,
                                     num_datasets_to_collect=2,
                                     num_steps_per_dataset=9000,
@@ -51,6 +52,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                     model_folder_name=None,
                                     ref_point_params_based_on_mode=None,
                                     use_stored_data_only=False,
+                                    test_or_control_filter=None,
                                     **env_kwargs
                                     ):
         
@@ -90,26 +92,36 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             print('Making overall all median info ......')
             self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode=ref_point_params_based_on_mode,
                                                             list_of_curv_traj_window_before_stop=[
-                [-25, 0]],
-                save_data=save_data,
-                exists_ok=final_products_exist_ok,
-                pooled_median_info_exists_ok=intermediate_products_exist_ok,
-                combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
-                stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                heading_info_df_exists_ok=intermediate_products_exist_ok,
-                use_stored_data_only=use_stored_data_only)
+                                                                [-25, 0]],
+                                                            save_data=save_data,
+                                                            exists_ok=final_products_exist_ok,
+                                                            pooled_median_info_exists_ok=intermediate_products_exist_ok,
+                                                            combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
+                                                            stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                                                            heading_info_df_exists_ok=intermediate_products_exist_ok,
+                                                            use_stored_data_only=use_stored_data_only,
+                                                            test_or_control_filter=test_or_control_filter)
 
             self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
-            print(' ')
-            print('Making all perc info ......')
-            self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                verbose=True,
-                                                exists_ok=final_products_exist_ok,
-                                                stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
-                                                heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                                save_data=save_data,
-                                                use_stored_data_only=use_stored_data_only)
-            self.agent_all_perc_df = self.pooled_perc_info.copy()
+            
+            # Only create perc info if not filtering (perc info requires both test and control)
+            if test_or_control_filter is None:
+                print(' ')
+                print('Making all perc info ......')
+                self.make_or_retrieve_pooled_perc_info(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
+                                                    verbose=True,
+                                                    exists_ok=final_products_exist_ok,
+                                                    stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
+                                                    heading_info_df_exists_ok=intermediate_products_exist_ok,
+                                                    save_data=save_data,
+                                                    use_stored_data_only=use_stored_data_only)
+                self.agent_all_perc_df = self.pooled_perc_info.copy()
+            else:
+                print(' ')
+                print(f'Skipping perc info creation when filtering to {test_or_control_filter} only.')
+                print('Perc info requires both test and control data for comparison.')
+                self.pooled_perc_info = pd.DataFrame()
+                self.agent_all_perc_df = pd.DataFrame()
         except Exception as e:
             print(f'Error making overall all median info: {e}')
             raise Exception(f'Error making either overall all median info or perc info: {e}')
@@ -189,16 +201,37 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 self._add_plan_features_to_combd_plan_features(data_name)
 
     def retrieve_combd_heading_df_x_sessions(self, ref_point_mode='distance', ref_point_value=-150,
-                                             curv_traj_window_before_stop=[-25, 0]):
+                                             curv_traj_window_before_stop=[-25, 0],
+                                             test_or_control_filter=None):
         df_name_dict = {'control': 'ctrl_heading_info_df',
                         'test': 'test_heading_info_df'}
-        for test_or_control in ['control', 'test']:
-            combd_heading_df_x_sessions = show_planning_class.ShowPlanning.retrieve_combd_heading_df_x_sessions(self, ref_point_mode=ref_point_mode,
-                                                                                                                ref_point_value=ref_point_value,
-                                                                                                                curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                                                                test_or_control=test_or_control)
-            setattr(self, df_name_dict[test_or_control],
-                    combd_heading_df_x_sessions)
+        
+        # Determine which types to retrieve
+        types_to_retrieve = ['control', 'test'] if test_or_control_filter is None else [test_or_control_filter]
+        
+        # Initialize both dataframes as empty
+        self.ctrl_heading_info_df = pd.DataFrame()
+        self.test_heading_info_df = pd.DataFrame()
+        
+        try:
+            for test_or_control in types_to_retrieve:
+                try:
+                    combd_heading_df_x_sessions = show_planning_class.ShowPlanning.retrieve_combd_heading_df_x_sessions(self, ref_point_mode=ref_point_mode,
+                                                                                                                        ref_point_value=ref_point_value,
+                                                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                                                                        test_or_control=test_or_control)
+                    setattr(self, df_name_dict[test_or_control],
+                            combd_heading_df_x_sessions)
+                except Exception as e:
+                    print(f'Could not retrieve {test_or_control} data: {e}')
+                    setattr(self, df_name_dict[test_or_control], pd.DataFrame())
+        finally:
+            # Always ensure both dataframes have proper column structure, even if retrieval failed
+            # Ensure both dataframes have the same columns even if one is empty
+            if len(self.test_heading_info_df) > 0 and len(self.ctrl_heading_info_df) == 0:
+                self.ctrl_heading_info_df = pd.DataFrame(columns=self.test_heading_info_df.columns)
+            elif len(self.ctrl_heading_info_df) > 0 and len(self.test_heading_info_df) == 0:
+                self.test_heading_info_df = pd.DataFrame(columns=self.ctrl_heading_info_df.columns)
 
     def make_combd_heading_df_x_sessions(self, num_datasets_to_collect=1,
                                          ref_point_mode='distance', ref_point_value=-150,
@@ -209,10 +242,12 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                          use_curv_to_ff_center=False,
                                          save_data=True,
                                          use_stored_data_only=False,
+                                         test_or_control_filter=None,
                                          **env_kwargs
                                          ):
         self.test_heading_info_df = pd.DataFrame()
         self.ctrl_heading_info_df = pd.DataFrame()
+        
         for i in range(num_datasets_to_collect):
             data_name = f'data_{i}'
             print(' ')
@@ -223,35 +258,62 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                                    opt_arc_type=self.opt_arc_type,
                                                                    )
             print(' ')
-            print('Getting test heading info control heading info ......')
-            self.pfa.get_test_and_ctrl_heading_info_df_for_one_session(ref_point_mode=ref_point_mode,
-                                                                       ref_point_value=ref_point_value,
-                                                                       curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                       heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                       stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                       curv_of_traj_mode=curv_of_traj_mode,
-                                                                       window_for_curv_of_traj=window_for_curv_of_traj,
-                                                                       use_curv_to_ff_center=use_curv_to_ff_center,
-                                                                       save_data=save_data,
-                                                                       n_steps=self.num_steps_per_dataset,
-                                                                       use_stored_data_only=use_stored_data_only,
-                                                                       **env_kwargs)
+            
+            # Get heading info for the requested data type(s)
+            filter_msg = f'{test_or_control_filter} heading info only' if test_or_control_filter else 'test and control heading info'
+            print(f'Getting {filter_msg} ......')
+            
+            try:
+                self.pfa.get_test_and_ctrl_heading_info_df_for_one_session(ref_point_mode=ref_point_mode,
+                                                                           ref_point_value=ref_point_value,
+                                                                           curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                                           heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                                           stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                                                                           curv_of_traj_mode=curv_of_traj_mode,
+                                                                           window_for_curv_of_traj=window_for_curv_of_traj,
+                                                                           use_curv_to_ff_center=use_curv_to_ff_center,
+                                                                           save_data=save_data,
+                                                                           n_steps=self.num_steps_per_dataset,
+                                                                           use_stored_data_only=use_stored_data_only,
+                                                                           test_or_control_filter=test_or_control_filter,
+                                                                           **env_kwargs)
+                self._add_heading_info_to_combd_heading_info(data_name, test_or_control_filter=test_or_control_filter)
+            except Exception as e:
+                print(f'Warning: Could not get heading info for data_{i}: {e}')
+                if test_or_control_filter:
+                    print(f'{test_or_control_filter.capitalize()} data might not exist for this session. Skipping.')
+                else:
+                    print('Data might not exist for this session. Skipping.')
 
-            self._add_heading_info_to_combd_heading_info(data_name)
-
+        # Ensure both dataframes have the same columns even if one is empty
+        # This prevents KeyErrors in downstream processing
+        if len(self.test_heading_info_df) > 0 and len(self.ctrl_heading_info_df) == 0:
+            self.ctrl_heading_info_df = pd.DataFrame(columns=self.test_heading_info_df.columns)
+        elif len(self.ctrl_heading_info_df) > 0 and len(self.test_heading_info_df) == 0:
+            self.test_heading_info_df = pd.DataFrame(columns=self.ctrl_heading_info_df.columns)
+        
         self.test_heading_info_df.reset_index(drop=True, inplace=True)
         self.ctrl_heading_info_df.reset_index(drop=True, inplace=True)
 
         if save_data:
-            for test_or_control in ['test', 'control']:
-                path = self.dict_of_combd_heading_info_folder_path[test_or_control]
-                df_name = find_cvn_utils.get_df_name_by_ref(
-                    'monkey_agent', ref_point_mode, ref_point_value)
-                df_path = os.path.join(path, df_name)
-                os.makedirs(path, exist_ok=True)
-                self.test_heading_info_df.to_csv(df_path)
-                print(
-                    f'Stored new combd_heading_df_x_sessions for {test_or_control} data in {df_path}')
+            # Determine which types to save
+            types_to_save = ['test', 'control'] if test_or_control_filter is None else [test_or_control_filter]
+            
+            for test_or_control in types_to_save:
+                df_to_save = self.test_heading_info_df if test_or_control == 'test' else self.ctrl_heading_info_df
+                
+                # Only save if the dataframe is not empty
+                if len(df_to_save) > 0:
+                    path = self.dict_of_combd_heading_info_folder_path[test_or_control]
+                    df_name = find_cvn_utils.get_df_name_by_ref(
+                        'monkey_agent', ref_point_mode, ref_point_value)
+                    df_path = os.path.join(path, df_name)
+                    os.makedirs(path, exist_ok=True)
+                    df_to_save.to_csv(df_path)
+                    print(
+                        f'Stored new combd_heading_df_x_sessions for {test_or_control} data in {df_path}')
+                else:
+                    print(f'Skipping save for {test_or_control} data - dataframe is empty')
 
     def get_test_and_ctrl_heading_info_df_across_sessions(self,
                                                           num_datasets_to_collect=1,
@@ -266,22 +328,39 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                           use_curv_to_ff_center=False,
                                                           save_data=True,
                                                           use_stored_data_only=False,
+                                                          test_or_control_filter=None,
                                                           **env_kwargs
                                                           ):
 
         try:
             if combd_heading_df_x_sessions_exists_ok:
+                print(f'Attempting to retrieve existing combd_heading_df_x_sessions (filter: {test_or_control_filter})...')
                 self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
-                                                          curv_traj_window_before_stop=curv_traj_window_before_stop)
-                if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
-                    raise Exception('Empty combd_heading_df_x_sessions.')
+                                                          curv_traj_window_before_stop=curv_traj_window_before_stop,
+                                                          test_or_control_filter=test_or_control_filter)
+                
+                print(f'Retrieved: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')
+                
+                # Only check for empty dataframes if not filtering, or check only the filtered type
+                if test_or_control_filter is None:
+                    if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
+                        raise Exception('Empty combd_heading_df_x_sessions.')
+                elif test_or_control_filter == 'control':
+                    if len(self.ctrl_heading_info_df) == 0:
+                        raise Exception('Empty combd_heading_df_x_sessions for control data.')
+                elif test_or_control_filter == 'test':
+                    if len(self.test_heading_info_df) == 0:
+                        raise Exception('Empty combd_heading_df_x_sessions for test data.')
+                
+                print('Successfully retrieved existing data.')
             else:
                 raise Exception('combd_heading_df_x_sessions_exists_ok is False.')
 
         except Exception as e:
             self.num_steps_per_dataset = num_steps_per_dataset
-            print(
-                f'Will make new combd_heading_df_x_sessions for the agent because {e}.')
+            print(f'Will make new combd_heading_df_x_sessions for the agent because: {e}')
+            print(f'Creating data from scratch with filter: {test_or_control_filter}')
+            
             self.make_combd_heading_df_x_sessions(num_steps_per_dataset=self.num_steps_per_dataset, num_datasets_to_collect=num_datasets_to_collect,
                                                   ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                   curv_traj_window_before_stop=curv_traj_window_before_stop,
@@ -291,7 +370,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                   use_curv_to_ff_center=use_curv_to_ff_center,
                                                   save_data=save_data,
                                                   use_stored_data_only=use_stored_data_only,
+                                                  test_or_control_filter=test_or_control_filter,
                                                   **env_kwargs)
+            
+            print(f'After creation: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')
 
     def _add_plan_features_to_combd_plan_features(self, data_name):
         plan_features_tc = self.pfa.plan_features_tc.copy()
@@ -299,23 +381,140 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.combd_plan_features_tc = pd.concat(
             [self.combd_plan_features_tc, plan_features_tc], axis=0)
 
-    def _add_heading_info_to_combd_heading_info(self, data_name):
-        self.test_heading_info_df = self.pfa.test_heading_info_df.copy()
-        self.ctrl_heading_info_df = self.pfa.ctrl_heading_info_df.copy()
-        self.test_heading_info_df['data_name'] = data_name
-        self.ctrl_heading_info_df['data_name'] = data_name
-        self.test_heading_info_df['whether_test'] = 1
-        self.ctrl_heading_info_df['whether_test'] = 0
+    def _add_heading_info_to_combd_heading_info(self, data_name, test_or_control_filter=None):
+        # Get dataframes from pfa, handling cases where they might not exist
+        test_df = self.pfa.test_heading_info_df.copy() if hasattr(self.pfa, 'test_heading_info_df') else pd.DataFrame()
+        ctrl_df = self.pfa.ctrl_heading_info_df.copy() if hasattr(self.pfa, 'ctrl_heading_info_df') else pd.DataFrame()
+        
+        print(f'_add_heading_info_to_combd_heading_info for {data_name}:')
+        print(f'  From pfa: test={len(test_df)} rows, ctrl={len(ctrl_df)} rows')
+        print(f'  Filter: {test_or_control_filter}')
+        
+        # Only process the requested type if filter is specified
+        if test_or_control_filter == 'test':
+            if len(test_df) > 0:
+                test_df['data_name'] = data_name
+                test_df['whether_test'] = 1
+                self.test_heading_info_df = pd.concat([self.test_heading_info_df, test_df], axis=0)
+                print(f'  Added {len(test_df)} test rows')
+            else:
+                print(f'  No test data to add')
+        elif test_or_control_filter == 'control':
+            if len(ctrl_df) > 0:
+                ctrl_df['data_name'] = data_name
+                ctrl_df['whether_test'] = 0
+                self.ctrl_heading_info_df = pd.concat([self.ctrl_heading_info_df, ctrl_df], axis=0)
+                print(f'  Added {len(ctrl_df)} control rows')
+            else:
+                print(f'  No control data to add (this may be the problem!)')
+        else:
+            # No filter - process both
+            if len(test_df) > 0:
+                test_df['data_name'] = data_name
+                test_df['whether_test'] = 1
+                self.test_heading_info_df = pd.concat([self.test_heading_info_df, test_df], axis=0)
+                print(f'  Added {len(test_df)} test rows')
+            
+            if len(ctrl_df) > 0:
+                ctrl_df['data_name'] = data_name
+                ctrl_df['whether_test'] = 0
+                self.ctrl_heading_info_df = pd.concat([self.ctrl_heading_info_df, ctrl_df], axis=0)
+                print(f'  Added {len(ctrl_df)} control rows')
+        
         ## not sure what the following is for
         # self.test_heading_info_df = pd.concat(
         #     [self.test_heading_info_df, self.test_heading_info_df], axis=0)
         # self.ctrl_heading_info_df = pd.concat(
         #     [self.ctrl_heading_info_df, self.ctrl_heading_info_df], axis=0)
 
-    def make_or_retrieve_all_ref_pooled_median_info(self, **kwargs):
-        self.all_ref_pooled_median_info = super(
-        ).make_or_retrieve_all_ref_pooled_median_info(**kwargs)
-        self.all_ref_pooled_median_info['monkey_name'] = 'agent'
+    def get_test_and_ctrl_heading_info_df_across_sessions2(self, 
+                                                           ref_point_mode='distance', 
+                                                           ref_point_value=-150,
+                                                           curv_traj_window_before_stop=[-25, 0],
+                                                           heading_info_df_exists_ok=True,
+                                                           combd_heading_df_x_sessions_exists_ok=True,
+                                                           stops_near_ff_df_exists_ok=True,
+                                                           save_data=True,
+                                                           filter_heading_info_df_across_refs=False,
+                                                           use_stored_data_only=False,
+                                                           test_or_control_filter=None,
+                                                           **kwargs):
+        """
+        Override parent method to support test_or_control_filter for agents.
+        This prevents errors when only one type of data exists.
+        """
+        # If filter not provided as parameter, check if it's stored as instance variable
+        if test_or_control_filter is None and hasattr(self, '_test_or_control_filter'):
+            test_or_control_filter = self._test_or_control_filter
+        
+        # Call the agent-specific version with filter support
+        self.get_test_and_ctrl_heading_info_df_across_sessions(
+            ref_point_mode=ref_point_mode,
+            ref_point_value=ref_point_value,
+            curv_traj_window_before_stop=curv_traj_window_before_stop,
+            heading_info_df_exists_ok=heading_info_df_exists_ok,
+            stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+            save_data=save_data,
+            combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
+            use_stored_data_only=use_stored_data_only,
+            test_or_control_filter=test_or_control_filter,
+            **kwargs
+        )
+        
+        # Double-check column structure before returning (safety net)
+        if len(self.test_heading_info_df) > 0 and len(self.ctrl_heading_info_df) == 0:
+            self.ctrl_heading_info_df = pd.DataFrame(columns=self.test_heading_info_df.columns)
+        elif len(self.ctrl_heading_info_df) > 0 and len(self.test_heading_info_df) == 0:
+            self.test_heading_info_df = pd.DataFrame(columns=self.ctrl_heading_info_df.columns)
+
+    def make_or_retrieve_all_ref_pooled_median_info(self, test_or_control_filter=None, **kwargs):
+        """
+        Make or retrieve pooled median info across all reference points.
+        
+        Parameters
+        ----------
+        test_or_control_filter : str or None, optional
+            If 'test', only returns test data. If 'control', only returns control data.
+            If None (default), returns both test and control data.
+        **kwargs : dict
+            Additional keyword arguments passed to parent method.
+            
+        Returns
+        -------
+        pd.DataFrame
+            All reference pooled median info, optionally filtered by test_or_control.
+        """
+        if test_or_control_filter is not None and test_or_control_filter not in ['test', 'control']:
+            raise ValueError("test_or_control_filter must be 'test', 'control', or None")
+        
+        # Store filter as instance variable so it can be accessed by override methods
+        self._test_or_control_filter = test_or_control_filter
+        
+        try:
+            # When filtering, we might not have all columns needed for plotting
+            # So disable plotting processing if filtering
+            if test_or_control_filter is not None:
+                kwargs['process_info_for_plotting'] = False
+            
+            self.all_ref_pooled_median_info = super(
+            ).make_or_retrieve_all_ref_pooled_median_info(**kwargs)
+            self.all_ref_pooled_median_info['monkey_name'] = 'agent'
+            
+            # Filter by test_or_control if specified
+            # Only filter if the column exists (it might not exist if data was already filtered at retrieval)
+            if test_or_control_filter is not None:
+                if 'test_or_control' in self.all_ref_pooled_median_info.columns:
+                    self.all_ref_pooled_median_info = self.all_ref_pooled_median_info[
+                        self.all_ref_pooled_median_info['test_or_control'] == test_or_control_filter
+                    ].copy()
+                    print(f'Filtered to only {test_or_control_filter} data. Shape: {self.all_ref_pooled_median_info.shape}')
+                else:
+                    print('Note: test_or_control column not found. Data was already filtered at retrieval level.')
+        finally:
+            # Clean up the instance variable
+            if hasattr(self, '_test_or_control_filter'):
+                delattr(self, '_test_or_control_filter')
+        
         return self.all_ref_pooled_median_info
 
     def make_or_retrieve_pooled_perc_info(self, use_stored_data_only=False, **kwargs):
