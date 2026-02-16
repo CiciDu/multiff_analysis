@@ -1,13 +1,13 @@
 from planning_analysis.plan_factors import plan_factors_class
 from reinforcement_learning.agents.feedforward import sb3_class
 from reinforcement_learning.base_classes import rl_base_class
-from data_wrangling import further_processing_class, retrieve_raw_data, time_calib_utils
+from data_wrangling import further_processing_class
 
 
 class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
 
     def __init__(self,
-                 # overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu',
+                 # overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise',
                  model_folder_name,
                  data_name='data_0',
                  use_curv_to_ff_center=False,
@@ -66,7 +66,8 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
             if hasattr(self.agent, attr):
                 setattr(self.pf, attr, getattr(self.agent, attr))
             else:
-                print(f'Attribute {attr} not found in agent. Will not be able to load onto pf.')
+                print(
+                    f'Attribute {attr} not found in agent. Will not be able to load onto pf.')
 
     def _initialize_pf(self, **kwargs):
 
@@ -136,13 +137,14 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                             window_for_curv_of_traj=window_for_curv_of_traj)
 
         # Determine which types to process
-        types_to_process = ['test', 'control'] if test_or_control_filter is None else [test_or_control_filter]
+        types_to_process = ['test', 'control'] if test_or_control_filter is None else [
+            test_or_control_filter]
         print(f'Processing types: {types_to_process}')
-        
+
         # Initialize both dataframes as None
         self.test_heading_info_df = None
         self.ctrl_heading_info_df = None
-        
+
         try:  # needs agent data
             print('Attempting to retrieve existing heading info...')
             for test_or_control in types_to_process:
@@ -152,12 +154,14 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                 test_or_ctrl = 'test' if test_or_control == 'test' else 'ctrl'
                 setattr(self, f'{test_or_ctrl}_heading_info_df',
                         heading_info_df)
-                print(f'Retrieved {test_or_control}: {len(heading_info_df)} rows')
+                print(
+                    f'Retrieved {test_or_control}: {len(heading_info_df)} rows')
         except Exception as e:
             if use_stored_data_only:
                 raise Exception(
                     'Data missing. Will not be able to make heading info df.')
-            print(f'Data missing. Will get agent data first. Error message: {e}')
+            print(
+                f'Data missing. Will get agent data first. Error message: {e}')
             self.get_agent_data(
                 n_steps=n_steps, exists_ok=monkey_data_exists_ok, save_data=save_data, **env_kwargs)
             self._load_agent_data_onto_pf()
@@ -178,32 +182,41 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                             heading_info_df)
                     setattr(self, f'{test_or_ctrl}_diff_in_curv_df',
                             diff_in_curv_df)
-                    print(f'Created {test_or_control}: {len(heading_info_df)} rows')
+                    print(
+                        f'Created {test_or_control}: {len(heading_info_df)} rows')
                 except Exception as creation_error:
-                    print(f'WARNING: Could not create {test_or_control} heading info: {creation_error}')
-                    print(f'This likely means there are no stops near ff for {test_or_control} condition.')
+                    print(
+                        f'WARNING: Could not create {test_or_control} heading info: {creation_error}')
+                    print(
+                        f'This likely means there are no stops near ff for {test_or_control} condition.')
                     # Set to empty dataframe instead of None
                     test_or_ctrl = 'test' if test_or_control == 'test' else 'ctrl'
                     import pandas as pd
-                    setattr(self, f'{test_or_ctrl}_heading_info_df', pd.DataFrame())
-        
+                    setattr(
+                        self, f'{test_or_ctrl}_heading_info_df', pd.DataFrame())
+
         # Ensure both dataframes exist with proper structure
         import pandas as pd
-        
+
         # Handle None values - convert to empty DataFrames
         if self.test_heading_info_df is None:
             self.test_heading_info_df = pd.DataFrame()
         if self.ctrl_heading_info_df is None:
             self.ctrl_heading_info_df = pd.DataFrame()
-        
+
         # Synchronize column structure
         if len(self.test_heading_info_df) > 0 and len(self.ctrl_heading_info_df) == 0:
             # Create empty ctrl with same columns as test
-            self.ctrl_heading_info_df = pd.DataFrame(columns=self.test_heading_info_df.columns)
-            print(f'Created empty ctrl_heading_info_df with {len(self.ctrl_heading_info_df.columns)} columns from test')
+            self.ctrl_heading_info_df = pd.DataFrame(
+                columns=self.test_heading_info_df.columns)
+            print(
+                f'Created empty ctrl_heading_info_df with {len(self.ctrl_heading_info_df.columns)} columns from test')
         elif len(self.ctrl_heading_info_df) > 0 and len(self.test_heading_info_df) == 0:
             # Create empty test with same columns as ctrl
-            self.test_heading_info_df = pd.DataFrame(columns=self.ctrl_heading_info_df.columns)
-            print(f'Created empty test_heading_info_df with {len(self.test_heading_info_df.columns)} columns from ctrl')
-        
-        print(f'Final: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')
+            self.test_heading_info_df = pd.DataFrame(
+                columns=self.ctrl_heading_info_df.columns)
+            print(
+                f'Created empty test_heading_info_df with {len(self.test_heading_info_df.columns)} columns from ctrl')
+
+        print(
+            f'Final: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')

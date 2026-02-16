@@ -42,7 +42,7 @@ IDENTITY_SLOT_STRATEGY=${IDENTITY_SLOT_STRATEGY_LIST[$STRAT_IDX]}
 # ---------------------
 # Create a unique folder name
 # ---------------------
-BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents"
+BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise"
 SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
 RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
 OVERALL_FOLDER="${BASE_DIR}/${RUN_NAME}"

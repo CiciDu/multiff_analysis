@@ -251,9 +251,6 @@ class BaseProcessing:
 
         print('Note: ff_caught_T_sorted is replaced with ff_caught_T_new')
 
-        self.monkey_information['trial'] = np.searchsorted(
-            self.ff_caught_T_new, self.monkey_information['time'])
-
         assert len(self.ff_caught_T_new) == len(self.ff_caught_T_sorted)
 
     def make_or_retrieve_target_clust_last_vis_df(self, exists_ok=True, max_distance_to_target_in_cluster=50):
@@ -304,10 +301,14 @@ class BaseProcessing:
             self.make_or_retrieve_closest_stop_to_capture_df()
             self.make_ff_caught_T_new()
 
+            self.monkey_information['trial'] = np.searchsorted(
+                self.ff_caught_T_new, self.monkey_information['time'])
+
+
     def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):
         self.interocular_dist = 4 if self.monkey_name == 'monkey_Bruno' else 3
         self.monkey_information = process_monkey_information.make_or_retrieve_monkey_information(self.raw_data_folder_path, self.interocular_dist, min_distance_to_calculate_angle=min_distance_to_calculate_angle,
-                                                                                                 exists_ok=exists_ok, save_data=save_data, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+                                                                                                 exists_ok=exists_ok, save_data=save_data)
 
         self.monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
             self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)

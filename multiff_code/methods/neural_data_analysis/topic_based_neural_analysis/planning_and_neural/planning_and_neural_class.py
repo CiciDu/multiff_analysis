@@ -39,7 +39,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
     def prep_data_to_analyze_planning(self,
                                       ref_point_mode='distance',
-                                      ref_point_value=0.1,
+                                      ref_point_value=-100,
                                       eliminate_outliers=False,
                                       use_curv_to_ff_center=False,
                                       curv_of_traj_mode='distance',

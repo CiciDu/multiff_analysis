@@ -3,8 +3,7 @@ from planning_analysis.factors_vs_indicators import process_variations_utils
 from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils, agent_plan_factors_x_sess_class
 from reinforcement_learning.base_classes import rl_base_utils
-from pathlib import Path
-from reinforcement_learning.agents.feedforward import sb3_class, sb3_utils
+from reinforcement_learning.agents.feedforward import sb3_class
 
 import pandas as pd
 import os
@@ -15,7 +14,7 @@ class PlanFactorsAcrossAgents():
     def __init__(self,
                  # this is the monkey whose data will be used for comparison
                  monkey_name='monkey_Bruno',
-                 overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu',
+                 overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise',
                  agent_folders=None):
         self.monkey_name = monkey_name
         self.overall_folder_name = overall_folder_name
@@ -27,10 +26,8 @@ class PlanFactorsAcrossAgents():
             if len(self.agent_folders) == 0:
                 raise Exception('No folders with params found.')
 
-
-
-    def make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(self, exists_ok=True, 
-                                                                     intermediate_products_exist_ok=True, 
+    def make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(self, exists_ok=True,
+                                                                     intermediate_products_exist_ok=True,
                                                                      agent_data_exists_ok=True,
                                                                      num_steps_per_dataset=9000,
                                                                      num_datasets_to_collect=2,
@@ -58,19 +55,20 @@ class PlanFactorsAcrossAgents():
 
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
                     model_folder_name=folder)
-                
+
                 try:
                     self.pfas.streamline_getting_y_values(
                         model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok,
                         num_datasets_to_collect=num_datasets_to_collect, num_steps_per_dataset=num_steps_per_dataset, use_stored_data_only=use_stored_data_only,
-                        )
+                    )
                 except Exception as e:
-                    print(f'Error making overall all median info for agent {folder}: {e}. Will continue to the next agent.')
+                    print(
+                        f'Error making overall all median info for agent {folder}: {e}. Will continue to the next agent.')
                     continue
 
-
                 # Remove job ID suffix
-                agent_id = rl_base_utils.extract_config_name_from_post_best(folder)
+                agent_id = rl_base_utils.extract_config_name_from_post_best(
+                    folder)
                 params = self.get_agent_params(folder)
                 agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.all_ref_pooled_median_info, params)
@@ -99,14 +97,10 @@ class PlanFactorsAcrossAgents():
 
         return self.all_ref_pooled_median_x_agents, self.pooled_perc_x_agents
 
-
     def get_agent_params(self, model_folder_name):
         rl = sb3_class.SB3forMultifirefly(overall_folder=model_folder_name)
         rl.load_latest_agent(load_replay_buffer=False, load_manifest_only=True)
         return rl.manifest['env_params']
-        
-
-
 
     def get_monkey_median_df(self):
         ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(

@@ -99,23 +99,44 @@ def find_visible_pos_indices(current_ff_index, ff_flash_sorted, ff_caught_T_new,
     return visible_pos_indices
 
 
-def find_visible_pos_indices_for_agent(current_ff_index, obs_ff_indices_in_ff_dataframe):
-    # We'll only consider the points of time when the ff of interest was in obs space
-    whether_in_obs = []
-    # iterate through every point (step taken by the agent)
-    for obs_ff_indices in obs_ff_indices_in_ff_dataframe:
-        # if the ff of interest was in the obs space
-        if current_ff_index in obs_ff_indices:
-            whether_in_obs.append(True)
-        else:
-            whether_in_obs.append(False)
-    # find the point indices where the ff of interest was in the obs space
-    cum_pos_index = np.array(whether_in_obs).nonzero()[0]
-    if len(cum_pos_index) == 0:
-        # The ff of interest has never been in the obs space, so we move on to the next ff
-        visible_pos_indices = np.array([])
-    else:
-        visible_pos_indices = cum_pos_index
+def find_visible_pos_indices_for_agent(current_ff_index, obs_ff_indices_in_ff_dataframe, valid_index=None):
+    """
+    Find timestep indices where a specific firefly was visible to the agent.
+    
+    Note: obs_ff_indices_in_ff_dataframe should contain only truly visible fireflies
+    (not in-memory ones with unreliable poses), as filtered in process_agent_data.py
+    
+    Parameters
+    ----------
+    current_ff_index : int
+        Index of the firefly in ff_information to check visibility for
+    obs_ff_indices_in_ff_dataframe : list of arrays
+        For each timestep, array of ff_information indices that were visible
+    valid_index : array-like, optional
+        Valid point indices to consider. If None, all indices are valid.
+    
+    Returns
+    -------
+    visible_pos_indices : np.ndarray
+        Array of timestep indices where the firefly was visible
+    """
+    # Vectorized approach: check membership at each timestep
+    whether_in_obs = np.array([
+        current_ff_index in obs_ff_indices 
+        for obs_ff_indices in obs_ff_indices_in_ff_dataframe
+    ], dtype=bool)
+    
+    # Find timestep indices where the firefly was visible
+    visible_pos_indices = np.nonzero(whether_in_obs)[0]
+    
+    # Filter by valid_index if provided
+    if valid_index is not None and len(visible_pos_indices) > 0:
+        # Only keep indices that are in valid_index
+        valid_set = set(valid_index)
+        visible_pos_indices = visible_pos_indices[
+            np.array([idx in valid_set for idx in visible_pos_indices], dtype=bool)
+        ]
+    
     return visible_pos_indices
 
 

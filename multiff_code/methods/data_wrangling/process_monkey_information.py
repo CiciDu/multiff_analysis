@@ -3,17 +3,14 @@ from data_wrangling import time_calib_utils, retrieve_raw_data, general_utils
 import os
 import math
 from math import pi
-import os
 import os.path
 import pandas as pd
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
-import pandas as pd
 from os.path import exists
 from eye_position_analysis import eye_positions
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
 
 plt.rcParams["animation.html"] = "html5"
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -24,7 +21,7 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
 
-def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1,
+def make_or_retrieve_monkey_information(raw_data_folder_path, interocular_dist, min_distance_to_calculate_angle=5, 
                                         exists_ok=True, save_data=True):
     processed_data_folder_path = raw_data_folder_path.replace(
         'raw_monkey_data', 'processed_data')
@@ -105,8 +102,24 @@ def process_monkey_speed(monkey_information: pd.DataFrame,
 def _process_monkey_information_after_retrieval(monkey_information, speed_threshold_for_distinct_stop=1):
     monkey_information.index = monkey_information.point_index.values
     monkey_information = add_more_columns_to_monkey_information(
-        monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+        monkey_information)
+    if 'whether_new_distinct_stop' not in monkey_information.columns:
+        monkey_information = add_whether_new_distinct_stop_and_stop_id(
+            monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
     monkey_information = take_out_suspicious_information_from_monkey_information(
+        monkey_information)
+    return monkey_information
+
+def _process_monkey_information_for_agent(monkey_information):
+    monkey_information.index = monkey_information.point_index.values
+    monkey_information = add_more_columns_to_monkey_information(
+        monkey_information)
+    if 'whether_new_distinct_stop' not in monkey_information.columns:
+        monkey_information['whether_new_distinct_stop'] = monkey_information['monkey_speeddummy'].diff().fillna(0) == -1
+        monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum() - 1
+        monkey_information.loc[monkey_information['monkey_speeddummy']
+                                == 1, 'stop_id'] = np.nan
+    monkey_information = add_stop_id_duration_from_existing_ids(
         monkey_information)
     return monkey_information
 
@@ -628,21 +641,13 @@ def build_bad_transition_masks(t, x, y, v_max=200.0, overshoot_factor=1.5, windo
     return bad_step_mask, contam_mask
 
 
-def add_more_columns_to_monkey_information(monkey_information, speed_threshold_for_distinct_stop=1):
+def add_more_columns_to_monkey_information(monkey_information):
     monkey_information = add_monkey_speeddummy_column(monkey_information)
     add_crossing_boundary_column(monkey_information)
     add_delta_distance_and_cum_distance_to_monkey_information(
         monkey_information)
     monkey_information['dt'] = (
         monkey_information['time'].shift(-1) - monkey_information['time']).ffill()
-    monkey_information = add_whether_new_distinct_stop_and_stop_id(
-        monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
-    # # assign "stop_id" to each stop, with each whether_new_distinct_stop==True marking a new stop id
-    # monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum(
-    # ) - 1
-    # monkey_information.loc[monkey_information['monkey_speeddummy']
-    #                        == 1, 'stop_id'] = np.nan
-    # add turning right column
     monkey_information['turning_right'] = 0
     monkey_information.loc[monkey_information['ang_speed']
                            < 0, 'turning_right'] = 1
@@ -790,5 +795,29 @@ def add_whether_new_distinct_stop_and_stop_id(
         df.iloc[i0:i1+1, df.columns.get_loc('stop_id_duration')] = dur_sec
         df.iloc[i0:i1+1, df.columns.get_loc('stop_id_start_time')] = st
         df.iloc[i0:i1+1, df.columns.get_loc('stop_id_end_time')] = et
+
+    return df
+
+
+def add_stop_id_duration_from_existing_ids(
+    monkey_information: pd.DataFrame,
+) -> pd.DataFrame:
+
+    df = monkey_information.copy()
+
+    df['stop_id_duration'] = (
+        df.groupby('stop_id')['dt']
+          .transform('sum')
+    )
+
+    df['stop_id_start_time'] = (
+        df.groupby('stop_id')['time']
+          .transform(lambda x: x.iloc[0] - df.loc[x.index[0], 'dt'])
+    )
+
+    df['stop_id_end_time'] = (
+        df.groupby('stop_id')['time']
+          .transform('last')
+    )
 
     return df

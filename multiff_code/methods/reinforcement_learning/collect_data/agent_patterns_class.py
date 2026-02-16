@@ -111,7 +111,7 @@ class AgentPatterns(variations_base_class._VariationsBase, patterns_and_features
 
         self.agg_pattern_frequencies = self._make_agg_pattern_frequency()
         self.agg_feature_statistics = organize_patterns_and_features.make_feature_statistics(self.combd_all_trial_features.drop(
-            columns=['data_name', 'data', 'date']), data_folder_name=None)
+            columns=['data_name', 'data']), data_folder_name=None)
 
         if save_data:
             self._save_processed_data()

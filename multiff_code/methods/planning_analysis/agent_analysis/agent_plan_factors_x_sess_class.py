@@ -38,6 +38,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
+
     def streamline_getting_y_values(self,
                                     num_datasets_to_collect=2,
                                     num_steps_per_dataset=9000,

@@ -12,116 +12,78 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-def make_point_vs_cluster(ff_dataframe, max_ff_distance_from_monkey=500, max_cluster_distance=50, max_time_past=1,
-                          print_progress=True, data_folder_name=None, duration_per_step=None):
-    """
-    Find trials where the target has disappeared the latest among all visible fireflies during a trial
+
+import numpy as np
+import pandas as pd
+import os
+from scipy.spatial.distance import pdist, squareform
+from scipy.sparse.csgraph import connected_components
 
 
-    Parameters
-    ----------
-    ff_dataframe: pd.dataframe
-        containing various information about all visible or "in-memory" fireflies at each time point
-        max_ff_distance_from_monkey: numeric
-                the maximum distance a firefly can be from the monkey to be included in the consideration of whether it belongs to a cluster 
-        max_cluster_distance: numeric
-                the maximum distance a firefly can be from the closest firefly in a cluster to be considered as part of that same cluster
-        max_time_past: numeric
-                how long a firefly can be stored in memomry after it becomes invisible for it to be included in the consideration of whether it belongs to a cluster
-        print_progress: bool
-                whether to print the progress of making point_vs_cluster
+def make_point_vs_cluster(
+    ff_dataframe,
+    max_ff_distance_from_monkey=500,
+    max_cluster_distance=50,
+    max_time_past=1,
+    print_progress=True,
+    data_folder_name=None,
+):
 
-    Returns
-    -------
-    point_vs_cluster: array 
-        contains indices of fireflies belonging to a cluster at each time point
-        structure: [[point_index, ff_index, cluster_label], [point_index, ff_index, cluster_label], ...]
+    # Pre-filter once
+    ff_dataframe_subset = ff_dataframe[
+        (ff_dataframe['time_since_last_vis'] <= max_time_past) &
+        (ff_dataframe['ff_distance'] <= max_ff_distance_from_monkey)
+    ][['point_index', 'ff_x', 'ff_y', 'ff_index', 'target_index']]
 
-
-    """
-
-    # Find the beginning and ending of the indices of all steps
-    min_point_index = np.min(np.array(ff_dataframe['point_index']))
-    max_point_index = np.max(np.array(ff_dataframe['point_index']))
-
-    # Convert max_time_past to max_steps_past
-    if duration_per_step is None:
-        duration_per_step = ff_dataframe['time'].iloc[100] - \
-            ff_dataframe['time'].iloc[99]
-
-    # Initiate a list to store the result
-    # Structure: [[point_index, ff_index, cluster_label], [point_index, ff_index, cluster_label], ...]
     point_vs_cluster = []
 
-    ff_dataframe_subset = ff_dataframe[(ff_dataframe['time_since_last_vis'] <= (max_time_past)) & (
-        ff_dataframe['ff_distance'] <= max_ff_distance_from_monkey)][['point_index', 'ff_x', 'ff_y', 'ff_index', 'target_index']]
+    grouped = ff_dataframe_subset.groupby('point_index')
 
-    for i in range(min_point_index, max_point_index+1):
-        # Take out fireflies that meet the criteria
-        selected_ff = ff_dataframe_subset[ff_dataframe_subset['point_index'] == i]
-        # Put their x, y coordinates into an array
-        ffxy_array = selected_ff[['ff_x', 'ff_y']].to_numpy()
+    max_point_index = ff_dataframe_subset['point_index'].max()
 
-        if ffxy_array.shape[0] == 2:
-            if np.linalg.norm(ffxy_array[0, :]-ffxy_array[1, :]) <= max_cluster_distance:
-                ff_indices = selected_ff[['ff_index']].to_numpy()
-                trial = selected_ff[['target_index']].iloc[0].item()
-                for index in ff_indices:
-                    # Store the firefly index with its cluster label along with the point index i and trial number
-                    point_vs_cluster.append([i, int(index[0]), 0, trial])
+    for point_index, selected_ff in grouped:
 
-        elif ffxy_array.shape[0] > 2:
-            # Find their indices
-            ff_indices = selected_ff[['ff_index']].to_numpy()
+        n_ff = len(selected_ff)
 
-            # Use the function scipy.cluster.hierarchy.linkage
-            # method = "single" means that we're using the Nearest Point Algorithm
-            # In the returned array, each row is a procedure of combining two components into one cluster (the closer two components are, the sooner they'll be combined);
-            # there are n-1 rows in total in the returned variable
-            linked = linkage(ffxy_array, method='single')
+        if n_ff < 2:
+            continue
 
-            # In order to find the number of clusters that satisfy our requirements, we'll first find the number of rows from linked
-            # where the two components of the cluster are greater than max_cluster_distance (50 cm as default).
-            # If this number is n, then it means that at one point in the procedure, there are n+1 clusters that all satisfy our requirements,
-            # and then these clusters are condensed into 1 big cluster through combining two clusters into one and repearting the procedure;
-            # However, these final steps of combining are invalid for our use since all the n+1 clusters are further apart than max_cluster_distance;
-            # Thus, we know that we can separate the fireflies into at most n+1 clusters that satisfy our requirement
-            # that each firefly is within 50 cm of its nearest firefly in the cluster.
-            num_clusters = sum(linked[:, 2] > max_cluster_distance)+1
+        ffxy_array = selected_ff[['ff_x', 'ff_y']].values
+        ff_indices = selected_ff['ff_index'].values
+        trial = selected_ff['target_index'].values[0]
 
-            # If the number of clusters is smaller than the number of fireflies, then there is at least one cluster that has two or more fireflies
-            if num_clusters < len(ff_indices):
-                # This time, we assign the fireflies into the number of clusters we just found, so that we know which cluster each firefly belongs to.
-                # The variable "cluster_labels" contains the cluster label for each firefly
-                cluster_labels = AgglomerativeClustering(
-                    n_clusters=num_clusters, metric='euclidean', linkage='single').fit_predict(ffxy_array)
-                # Find the clusters that have more than one firefly
-                unique_cluster_labels, ff_counts = np.unique(
-                    cluster_labels, return_counts=True)
-                clusters_w_more_than_1_ff = unique_cluster_labels[ff_counts > 1]
-                # Find the indices of the fireflies belonging to those clusters
-                for index in np.isin(cluster_labels, clusters_w_more_than_1_ff).nonzero()[0]:
-                    # Store the firefly index with its cluster label along with the point index i and trial number
-                    trial = selected_ff[['target_index']].iloc[0].item()
-                    point_vs_cluster.append(
-                        [i, ff_indices[index].item(), cluster_labels[index], trial])
+        # Fast pairwise distances
+        dists = squareform(pdist(ffxy_array))
+        adjacency = dists <= max_cluster_distance
 
-        if i % 1000 == 0:
-            if print_progress == True:
-                print("Progress of making point_vs_cluster: ",
-                      i, " out of ", max_point_index)
+        n_components, labels = connected_components(adjacency)
 
-    point_vs_cluster = np.array(point_vs_cluster)
+        # Find clusters with >1 member
+        unique_labels, counts = np.unique(labels, return_counts=True)
+        valid_clusters = unique_labels[counts > 1]
 
-    point_vs_cluster = pd.DataFrame(point_vs_cluster, columns=[
-                                    'point_index', 'ff_index', 'cluster_label', 'target_index'])
+        if len(valid_clusters) > 0:
+            mask = np.isin(labels, valid_clusters)
+            for idx in np.where(mask)[0]:
+                point_vs_cluster.append(
+                    [point_index, ff_indices[idx], labels[idx], trial]
+                )
+
+        if print_progress and point_index % 1000 == 0:
+            print(f'Progress: {point_index} / {max_point_index}')
+
+    point_vs_cluster = pd.DataFrame(
+        point_vs_cluster,
+        columns=['point_index', 'ff_index', 'cluster_label', 'target_index']
+    )
 
     if data_folder_name is not None:
-        filepath = os.path.join(data_folder_name, 'point_vs_cluster.csv')
         os.makedirs(data_folder_name, exist_ok=True)
-        np.savetxt(filepath, point_vs_cluster, delimiter=',')
+        filepath = os.path.join(data_folder_name, 'point_vs_cluster.csv')
+        point_vs_cluster.to_csv(filepath, index=False)
 
     return point_vs_cluster
+
 
 
 def clusters_of_ffs_func(point_vs_cluster, monkey_information, ff_caught_T_new):

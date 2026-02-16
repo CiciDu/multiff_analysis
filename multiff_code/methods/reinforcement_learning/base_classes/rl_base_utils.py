@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from os.path import exists
-import math
 import json
 from pathlib import Path
 plt.rcParams["animation.html"] = "html5"
@@ -148,9 +147,6 @@ def retrieve_params(model_folder_name):
     return params
 
 
-import os
-
-
 def _strip_training_suffix(path_string):
     '''
     Remove all trailing training subfolders if present.
@@ -170,7 +166,7 @@ def _strip_training_suffix(path_string):
     return path_string
 
 
-def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
+def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise'):
     '''
     Walk through directories and return unique agent folders
     that contain checkpoint_manifest.json.
@@ -191,7 +187,7 @@ def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_age
     return agent_folders
 
 
-# def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
+# def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise'):
 
 #     dirs = [f for f in os.listdir(
 #         path) if os.path.isdir(os.path.join(path, f))]
@@ -257,7 +253,6 @@ def write_checkpoint(checkpoint_dir, current_env_kwargs):
     except Exception as e:
         print(f"Warning: failed to write manifest at {manifest_path}: {e}")
 
-from pathlib import Path
 
 def extract_config_name_from_post_best(path_str):
     """
@@ -289,6 +284,7 @@ def extract_config_name_from_post_best(path_str):
         path = path.parent
 
     if path.name == '':
-        raise ValueError('No configuration folder found after stripping suffixes')
+        raise ValueError(
+            'No configuration folder found after stripping suffixes')
 
     return path.name

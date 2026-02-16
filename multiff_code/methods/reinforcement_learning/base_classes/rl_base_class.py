@@ -1,6 +1,6 @@
-from data_wrangling import general_utils, retrieve_raw_data, process_monkey_information
+from data_wrangling import retrieve_raw_data, process_monkey_information
 from pattern_discovery import organize_patterns_and_features, make_ff_dataframe
-from visualization.matplotlib_tools import additional_plots, plot_statistics
+from visualization.matplotlib_tools import plot_statistics
 from visualization.animation import animation_class, animation_utils
 from reinforcement_learning.agents.rnn import rnn_env
 from reinforcement_learning.agents.feedforward import sb3_env
@@ -8,7 +8,6 @@ from reinforcement_learning.collect_data import collect_agent_data, process_agen
 from reinforcement_learning.agents.feedforward import interpret_neural_network, sb3_utils
 from reinforcement_learning.base_classes import rl_base_utils
 from reinforcement_learning.base_classes import run_logger
-from decision_making_analysis.event_detection import detect_rsw_and_rcap
 from reinforcement_learning.base_classes import base_env
 from reinforcement_learning.base_classes import env_utils
 
@@ -21,7 +20,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from os.path import exists
-import time as time_package
 import copy
 import torch
 plt.rcParams["animation.html"] = "html5"
@@ -501,10 +499,17 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         stage_summary = {'before': before, 'after': after, 'targets': targets}
         print('Stage summary:', stage_summary)
 
+    def retrieve_or_make_monkey_data(self, n_steps=8000, exists_ok=True, save_data=True, retrieve_ff_flash_sorted=True,
+                                     **kwargs):
+        self.collect_data(n_steps=n_steps, exists_ok=exists_ok, save_data=save_data,
+                          retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
+        return
+
     def collect_data(self, n_steps=8000, exists_ok=False, save_data=True, retrieve_ff_flash_sorted=False):
         if exists_ok:
             try:
-                self.retrieve_monkey_data(retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
+                self.retrieve_monkey_data(
+                    retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.ff_caught_T_new = self.ff_caught_T_sorted
                 self.make_or_retrieve_ff_dataframe_for_agent(
                     exists_ok=exists_ok, save_data=save_data)
@@ -587,6 +592,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.ff_caught_T_new = self.ff_caught_T_sorted
 
+        self.monkey_information = process_monkey_information._process_monkey_information_for_agent(
+            self.monkey_information)
+
         if save_data:
             self.save_ff_info_into_npz()
             self.monkey_information_path = os.path.join(
@@ -599,7 +607,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         return
 
-    def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1, retrieve_ff_flash_sorted=False):
+    def retrieve_monkey_data(self, retrieve_ff_flash_sorted=False):
         self.npz_file_pathway = os.path.join(
             self.processed_data_folder_path, 'ff_basic_info.npz')
         if not hasattr(self, 'ff_caught_T_sorted'):
@@ -616,13 +624,16 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.processed_data_folder_path, 'monkey_information.csv')
             self.monkey_information = pd.read_csv(
                 self.monkey_information_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
-            self.monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
-                self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+            self.monkey_information = process_monkey_information._process_monkey_information_for_agent(
+                self.monkey_information)
 
         if not hasattr(self, 'closest_stop_to_capture_df'):
             self.make_or_retrieve_closest_stop_to_capture_df()
         if not hasattr(self, 'ff_caught_T_new'):
             self.make_ff_caught_T_new()
+
+        self.monkey_information['trial'] = np.searchsorted(
+            self.ff_caught_T_new, self.monkey_information['time'])
 
         return
 
@@ -661,6 +672,12 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             if save_data:
                 self.ff_dataframe.to_csv(self.ff_dataframe_path)
                 print("saved ff_dataframe at", self.ff_dataframe_path)
+
+        make_ff_dataframe.add_essential_columns_to_ff_dataframe(
+            self.ff_dataframe, self.monkey_information, self.ff_real_position_sorted, 10, 25)
+        self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
+                                                                   self.ff_caught_T_new, self.ff_life_sorted)
+
         return
 
     def make_ff_dataframe_from_ff_in_obs_df(self):
@@ -693,7 +710,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.loaded_agent_dir = None
         for d, name in zip(candidates, candidate_names):
             if name == 'post/best':
-                print(f'Loading best model from post/best')
+                print('Loading best model from post/best')
             try:
                 self.load_agent(
                     load_replay_buffer=load_replay_buffer, dir_name=d, restore_env_from_checkpoint=True, load_manifest_only=load_manifest_only)
@@ -715,7 +732,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     def streamline_getting_data_from_agent(self, n_steps=8000, exists_ok=False, save_data=True, load_replay_buffer=False, retrieve_ff_flash_sorted=False):
         if exists_ok:
             try:
-                self.retrieve_monkey_data(retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
+                self.retrieve_monkey_data(
+                    retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.make_or_retrieve_ff_dataframe_for_agent(
                     exists_ok=exists_ok, save_data=save_data)
                 return
@@ -742,7 +760,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
                                     data_exists_ok=False, save_video=True, save_format='html', display_inline=False, **animate_kwargs):
-        self.collect_data(n_steps=n_steps, exists_ok=data_exists_ok, retrieve_ff_flash_sorted=True)
+        self.collect_data(
+            n_steps=n_steps, exists_ok=data_exists_ok, retrieve_ff_flash_sorted=True)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                             duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline,
@@ -1357,11 +1376,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
     #         for currentTrial in [12, 69, 138, 221, 235]:
     #             # more: 259, 263, 265, 299, 393, 496, 523, 556, 601, 666, 698, 760, 805, 808, 930, 946, 955, 1002, 1003
-    #             info_of_agent, plot_whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = process_agent_data.find_corresponding_info_of_agent(
+    #             info_of_agent, whole_duration, rotation_matrix, num_imitation_steps_monkey, num_imitation_steps_agent = process_agent_data.find_corresponding_info_of_agent(
     #                 self.info_of_monkey, currentTrial, num_trials, self.rl_agent, self.agent_dt, env_kwargs=self.current_env_kwargs, agent_type=getattr(self, 'agent_type', None))
 
     #             with general_utils.initiate_plot(20, 20, 400):
-    #                 additional_plots.PlotSidebySide(plot_whole_duration=plot_whole_duration,
+    #                 additional_plots.PlotSidebySide(whole_duration=whole_duration,
     #                                                 info_of_monkey=self.info_of_monkey,
     #                                                 info_of_agent=info_of_agent,
     #                                                 num_imitation_steps_monkey=num_imitation_steps_monkey,

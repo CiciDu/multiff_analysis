@@ -92,6 +92,10 @@ class MultiFF(gymnasium.Env):
                  obs_noise: Optional[Union[ObsNoiseCfg, dict]] = None,
                  # can be drop_fill_visible_only or drop_fill_visible_and_memory or rank_keep_visible_only or rank_keep_visible_and_memory
                  identity_slot_strategy: str = 'drop_fill_visible_only',
+                 arena_radius=2000,
+                 num_alive_ff=800,
+                 recentering_trigger_radius=None,
+                 
                  **kwargs
                  ):
 
@@ -172,9 +176,11 @@ class MultiFF(gymnasium.Env):
             low=-1., high=1., shape=(2,), dtype=np.float32)
         self.vgain = 200
         self.wgain = pi / 2
-        self.arena_radius = 2000
-        self.num_alive_ff = 800
-        self.recentering_trigger_radius = self.arena_radius - (self.invisible_distance + 100)
+        self.arena_radius = arena_radius
+        self.num_alive_ff = num_alive_ff
+        self.recentering_trigger_radius = recentering_trigger_radius
+        if recentering_trigger_radius is None:
+            self.recentering_trigger_radius = self.arena_radius - (self.invisible_distance + 100)
         self.ff_radius = 10
         self.invisible_angle = 2 * pi / 9
         self.epi_num = 0
@@ -184,6 +190,7 @@ class MultiFF(gymnasium.Env):
 
         # world state buffers (contiguous, float32)
         self.ffxy = np.zeros((self.num_alive_ff, 2), dtype=np.float32)
+        print('ffxy shape: ', self.ffxy.shape)
         self.ffxy_noisy = np.zeros((self.num_alive_ff, 2), dtype=np.float32)
         # last-seen feature buffers removed in favor of prev-obs snapshot approach
         self.ffr = np.zeros(self.num_alive_ff, dtype=np.float32)
@@ -365,7 +372,7 @@ class MultiFF(gymnasium.Env):
         self.reward = reward
         return reward
 
-    def step(self, action):
+    def step(self, action, respawn_on_capture=True):
         '''
         take a step; the function involves calling the function _update_agent_pos in the middle
         '''
@@ -404,7 +411,7 @@ class MultiFF(gymnasium.Env):
             print('Recentered and respawned fireflies')
 
         # update the observation
-        self.obs = self.beliefs()
+        self.obs = self.beliefs(respawn_on_capture=respawn_on_capture)
 
         terminated = False
         truncated = self.time >= self.episode_len * self.dt
@@ -547,6 +554,13 @@ class MultiFF(gymnasium.Env):
         self.ffxy[ff_index, 1] = self.ffr[ff_index] * \
             np.sin(self.fftheta[ff_index])
         self.ffxy_noisy[ff_index, :] = self.ffxy[ff_index, :]
+
+    def _fill_ff_positions_with_na(self, ff_index):
+        self.ffr[ff_index] = np.nan
+        self.fftheta[ff_index] = np.nan
+        self.ffxy[ff_index, :] = np.nan
+        self.ffxy_noisy[ff_index, :] = np.nan
+
 
     def _make_observation_space(self):
         base = self.num_obs_ff * self.num_elem_per_ff
@@ -1146,7 +1160,7 @@ class MultiFF(gymnasium.Env):
 
         return slots
 
-    def beliefs(self):
+    def beliefs(self, respawn_on_capture=True):
 
         self._get_ff_pos()
         self._update_visible_ff_indices()
@@ -1210,7 +1224,10 @@ class MultiFF(gymnasium.Env):
                         if int(self.slot_ids[s]) in cap_set:
                             self.slot_ids[s] = -1
                 # respawn captured FFs for next step
-                self._random_ff_positions(self._deferred_captured_ff)
+                if respawn_on_capture:
+                    self._random_ff_positions(self._deferred_captured_ff)
+                else:
+                    self._fill_ff_positions_with_na(self._deferred_captured_ff)
             # clear flags
             self._deferred_captured_ff = np.array([], dtype=np.int32)
             self._pending_unbind_after_obs = False

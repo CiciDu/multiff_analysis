@@ -1,5 +1,4 @@
 import os
-import copy
 import json
 from reinforcement_learning.base_classes import rl_base_class, rl_base_utils, env_utils, base_env
 from reinforcement_learning.agents.rppo import rppo_env
@@ -8,7 +7,6 @@ from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewar
 from stable_baselines3.common.vec_env import VecMonitor
 from sb3_contrib import RecurrentPPO
 from sb3_contrib.ppo_recurrent import MultiInputLstmPolicy
-from sb3_contrib import RecurrentPPO
 
 
 class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
@@ -22,7 +20,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     """
 
     def __init__(self,
-                 overall_folder='multiff_analysis/RL_models/rppo_stored_models/all_agents/env1/',
+                 overall_folder='multiff_analysis/RL_models/rppo_stored_models/all_agents/agents_without_noise/',
                  add_date_to_model_folder_name=False,
                  dict_obs=True,
                  n_envs=1,
@@ -214,7 +212,6 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
             print('[rppo] Saved model at', model_path)
         self.write_checkpoint_manifest(dir_name)
 
-
     def load_agent(self, load_replay_buffer=True, dir_name=None, restore_env_from_checkpoint=True):
         """Load PPO model from directory."""
         if dir_name is None:
@@ -286,10 +283,10 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
         except Exception as e:
             print('[rppo] Warning: failed to load best model after training:', e)
 
-
     # -------------------------------------------------------------------------
     # Explicitly skip replay buffer for rppo when loading best models
     # -------------------------------------------------------------------------
+
     def load_best_model_postcurriculum(self, load_replay_buffer=False, restore_env_from_checkpoint=True):
         """Load best post-curriculum model without replay buffer for rppo."""
         # Intentionally ignore load_replay_buffer for rppo

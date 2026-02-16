@@ -9,11 +9,7 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import SAC
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
-from os.path import exists
 import torch.nn as nn
-import gc
-import math
-import copy
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000
@@ -23,7 +19,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
     def __init__(self,
-                 overall_folder='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu/',
+                 overall_folder='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise/',
                  add_date_to_model_folder_name=False,
                  **kwargs):
 
@@ -110,7 +106,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
                                               **kwargs):
         monitor_dir = self.best_model_postcurriculum_dir
         os.makedirs(monitor_dir, exist_ok=True)
-        print(f'Making initial env for curriculum training...')
+        print('Making initial env for curriculum training...')
         self.make_env(monitor_dir=monitor_dir, **self.input_env_kwargs)
         self._make_init_env_for_curriculum_training(initial_flash_on_interval=initial_flash_on_interval,
                                                     **kwargs)
@@ -151,7 +147,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
     def write_checkpoint_manifest(self, dir_name):
         rl_base_utils.write_checkpoint(dir_name, {
             'algorithm': 'sb3_sac',
-            'model_file': f'best_model.zip',
+            'model_file': 'best_model.zip',
             'replay_buffer': 'buffer',
             'num_timesteps': getattr(self.rl_agent, 'num_timesteps', None),
             'env_params_path': 'env_params.txt',
@@ -164,7 +160,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             self.manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
             print('loaded manifest only')
             return self.manifest
-        
+
         self.manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
         model_file = self.manifest.get('model_file') if isinstance(
             self.manifest, dict) else None

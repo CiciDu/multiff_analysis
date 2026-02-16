@@ -453,6 +453,7 @@ def add_dates_and_sessions(df):
         # try to strip the number at the end of the data_name
         try:
             df['data'] = df['data_name'].apply(lambda x: x.split('_')[-1]).astype(int)
+            df['date'] = df['data']
         except Exception as e:
             print(f'Error adding dates: {e}. Will assign date to be 0')
             df['date'] = 0

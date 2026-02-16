@@ -167,7 +167,13 @@ def collect_agent_data_func(env, rl_agent, n_steps=15000,
 
     process_monkey_information.add_more_columns_to_monkey_information(
         monkey_information)
+    monkey_information['whether_new_distinct_stop'] = monkey_information['monkey_speeddummy'].diff().fillna(0) == -1
+    monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum(
+    ) - 1
 
+    monkey_information.loc[monkey_information['monkey_speeddummy']
+                            == 1, 'stop_id'] = np.nan
+    
     # Get information about fireflies
     ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, \
         ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(

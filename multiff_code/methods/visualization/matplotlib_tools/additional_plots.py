@@ -244,7 +244,7 @@ def PlotPoints(point,
         plt.savefig(f"{images_dir}/{filename}.png")
 
 
-def PlotSidebySide(plot_whole_duration,
+def PlotSidebySide(whole_duration,
                    info_of_monkey,
                    info_of_agent,
                    num_imitation_steps_monkey,
@@ -261,7 +261,7 @@ def PlotSidebySide(plot_whole_duration,
 
     Parameters
     ----------
-    plot_whole_duration: list of 2 elements
+    whole_duration: list of 2 elements
         containing the start time and the end time in respect to the monkey data
     info_of_monkey: dict
         contains various important arrays, dataframes, or lists derived from the real monkey data
@@ -288,7 +288,7 @@ def PlotSidebySide(plot_whole_duration,
     fig = plt.figure(figsize=(17, 12), dpi=125)
     axes = fig.add_subplot(121)
 
-    plot_trials.PlotTrials(plot_whole_duration,
+    plot_trials.PlotTrials(whole_duration,
                            info_of_monkey['monkey_information'],
                            info_of_monkey['ff_dataframe'],
                            info_of_monkey['ff_life_sorted'],
@@ -312,7 +312,7 @@ def PlotSidebySide(plot_whole_duration,
     axes2 = fig.add_subplot(122)
     # Agent duration needs to start from 0, unlike the duration for the monkey, because the
     # RL environment starts from 0
-    agent_duration = [0, plot_whole_duration[1]-plot_whole_duration[0]]
+    agent_duration = [0, whole_duration[1]-whole_duration[0]]
 
     plot_trials.PlotTrials(agent_duration,
                            info_of_agent['monkey_information'],
