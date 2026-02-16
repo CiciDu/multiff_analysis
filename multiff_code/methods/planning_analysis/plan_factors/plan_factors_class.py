@@ -5,7 +5,6 @@ from data_wrangling import base_processing_class, general_utils
 from planning_analysis.plan_factors import plan_factors_helper_class
 import pandas as pd
 import os
-import pandas as pd
 import numpy as np
 
 
@@ -44,7 +43,7 @@ class PlanFactors(cvn_from_ref_class.CurVsNxtFfFromRefClass):
                 window_for_curv_of_traj=self.window_for_curv_of_traj)
 
     def make_plan_features_df_both_test_and_ctrl(self, already_made_ok=True, plan_features_exists_ok=True,
-                                                 ref_point_mode='time after cur ff visible',
+                                                 ref_point_mode='distance',
                                                  ref_point_value=0.0, curv_traj_window_before_stop=[-25, 0],
                                                  use_curv_to_ff_center=False, heading_info_df_exists_ok=True, stops_near_ff_df_exists_ok=True,
                                                  use_eye_data=True, save_data=True):

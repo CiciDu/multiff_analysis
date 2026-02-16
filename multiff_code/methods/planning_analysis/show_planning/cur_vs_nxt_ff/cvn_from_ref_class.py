@@ -98,7 +98,7 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
         self.heading_info_df, self.diff_in_curv_df = self.retrieve_or_make_heading_info_df(
             test_or_control, heading_info_df_exists_ok)
 
-    def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='time after cur ff visible', ref_point_value=0.0,
+    def make_heading_info_df_without_long_process(self, test_or_control='test', ref_point_mode='distance', ref_point_value=0.0,
                                                   curv_traj_window_before_stop=[
                                                       -25, 0],
                                                   use_curv_to_ff_center=False,
@@ -118,9 +118,10 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
         self.make_stops_near_ff_and_ff_comparison_dfs(
             test_or_control=test_or_control, exists_ok=stops_near_ff_df_exists_ok, save_data=True)
-        
+
         if len(self.stops_near_ff_df) == 0:
-            raise Exception(f'No stops near ff found for {test_or_control} data. Will not be able to make heading info df.')
+            raise Exception(
+                f'No stops near ff found for {test_or_control} data. Will not be able to make heading info df.')
 
         self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref = self.find_nxt_ff_df_and_cur_ff_df_from_ref(
             ref_point_value, ref_point_mode)
@@ -154,7 +155,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
             ref_point_mode, ref_point_value, curv_traj_window_before_stop)
         df_path = os.path.join(folder_path, df_name)
         if exists_ok & os.path.exists(df_path):
-            self.diff_in_curv_df = pd.read_csv(df_path).drop(columns=['Unnamed: 0'], errors='ignore')
+            self.diff_in_curv_df = pd.read_csv(df_path).drop(
+                columns=['Unnamed: 0'], errors='ignore')
             print(f'Successfully retrieved diff_in_curv_df from {df_path}')
         else:
             if not only_try_retrieving:
@@ -178,11 +180,11 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
 
     def make_diff_in_curv_df(self, curv_traj_window_before_stop=[-25, 0]):
         self.cur_end_to_next_ff_curv, self.null_arc_curv_df = diff_in_curv_utils.compute_cur_end_to_next_ff_curv(self.nxt_ff_df_modified, self.heading_info_df,
-                                                                                          use_curv_to_ff_center=False)
+                                                                                                                 use_curv_to_ff_center=False)
         self.prev_stop_to_next_ff_curv, self.monkey_curv_df = diff_in_curv_utils.compute_prev_stop_to_next_ff_curv(self.heading_info_df['nxt_ff_index'].values, self.heading_info_df['point_index_before_stop'].values,
-                                                                                              self.monkey_information,
-                                                                                              self.ff_real_position_sorted, self.ff_caught_T_new,
-                                                                                              curv_traj_window_before_stop=curv_traj_window_before_stop)
+                                                                                                                   self.monkey_information,
+                                                                                                                   self.ff_real_position_sorted, self.ff_caught_T_new,
+                                                                                                                   curv_traj_window_before_stop=curv_traj_window_before_stop)
         self.monkey_curv_df['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.prev_stop_to_next_ff_curv['ref_point_index'] = self.heading_info_df['ref_point_index'].values
         self.diff_in_curv_df = diff_in_curv_utils.make_diff_in_curv_df(
@@ -209,7 +211,8 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                               ):
 
         # first get the description labels
-        self.ref_point_descr, self.ref_point_column, self.used_points_n_seconds_or_cm_ago = find_cvn_utils.get_ref_point_descr_and_column(ref_point_mode, ref_point_value)
+        self.ref_point_descr, self.ref_point_column, self.used_points_n_seconds_or_cm_ago = find_cvn_utils.get_ref_point_descr_and_column(
+            ref_point_mode, ref_point_value)
 
         # then get the actual nxt_ff_df_from_ref and cur_ff_df_from_ref
         self.nxt_ff_df_from_ref = find_cvn_utils.find_ff_info_based_on_ref_point(self.nxt_ff_df, self.monkey_information, self.ff_real_position_sorted,
@@ -219,7 +222,6 @@ class CurVsNxtFfFromRefClass(cvn_helper_class._FindCurVsNxtFF, plot_cvn_class._P
                                                                                  ref_point_mode=ref_point_mode, ref_point_value=ref_point_value)
 
         return self.nxt_ff_df_from_ref, self.cur_ff_df_from_ref
-
 
     def find_relative_curvature(self):
 

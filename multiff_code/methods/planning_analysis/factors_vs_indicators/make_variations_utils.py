@@ -28,9 +28,19 @@ def make_regrouped_info(test_df,
                         ctrl_flash_compared_to_test_choices=[
                             'same', 'flexible'],
                         max_curv_range_choices=[75, 100, 125, 150, 200],
-                        verbose=False
+                        verbose=False,
+                        allow_single_condition=False
                         ):
 
+    # Check if only one condition has data
+    test_only = (len(test_df) > 0) and (len(ctrl_df) == 0)
+    ctrl_only = (len(ctrl_df) > 0) and (len(test_df) == 0)
+    single_condition = test_only or ctrl_only
+    
+    if single_condition and not allow_single_condition:
+        print('Warning: Only one condition has data, but allow_single_condition=False. Returning empty DataFrame.')
+        return pd.DataFrame()
+    
     test_and_ctrl_df = pd.concat([test_df, ctrl_df], axis=0)
 
     regrouped_info = pd.DataFrame()
@@ -76,31 +86,52 @@ def make_regrouped_info(test_df,
                             else:
                                 if_ctrl_nxt_ff_group_appear_after_stop = 'flexible'
                             for max_curv_range in max_curv_range_choices:
-                                ctrl_df = test_and_ctrl_df[test_and_ctrl_df[column_for_split].isnull()].copy(
-                                )
-                                test_df = test_and_ctrl_df[~test_and_ctrl_df[column_for_split].isnull()].copy(
-                                )
-
-                                if (len(test_df) == 0) | (len(ctrl_df) == 0):
-                                    continue
-
-                                if whether_filter_info:
-                                    test_df, ctrl_df = test_vs_control_utils.filter_both_df(test_df, ctrl_df, max_curv_range=max_curv_range, verbose=verbose,
-                                                                                            whether_even_out_distribution=whether_even_out_distribution,
-                                                                                            whether_limit_cur_ff_cluster_50_size=whether_limit_cur_ff_cluster_50_size,
-                                                                                            if_test_nxt_ff_group_appear_after_stop=if_test_nxt_ff_group_appear_after_stop,
-                                                                                            if_ctrl_nxt_ff_group_appear_after_stop=if_ctrl_nxt_ff_group_appear_after_stop)
-                                elif whether_even_out_distribution:  # if not filtering, then only even out the distribution
-                                    test_df, ctrl_df = test_vs_control_utils.make_the_distributions_of_distance_more_similar_in_df(
-                                        test_df, ctrl_df, verbose=verbose)
-                                    test_df, ctrl_df = test_vs_control_utils.make_the_distributions_of_angle_more_similar_in_df(
-                                        test_df, ctrl_df, verbose=verbose)
-
-                                if (len(test_df) > 0) & (len(ctrl_df) > 0):
-                                    temp_regrouped_info = agg_regrouped_info_func(
-                                        test_df, ctrl_df, **agg_regrouped_info_kwargs)
+                                # If single condition mode, skip the splitting logic
+                                if single_condition:
+                                    # Use the available data without splitting
+                                    if test_only:
+                                        test_df = test_and_ctrl_df.copy()
+                                        ctrl_df = pd.DataFrame()
+                                    else:  # ctrl_only
+                                        ctrl_df = test_and_ctrl_df.copy()
+                                        test_df = pd.DataFrame()
                                 else:
-                                    temp_regrouped_info = pd.DataFrame()
+                                    # Normal mode: split by column_for_split
+                                    ctrl_df = test_and_ctrl_df[test_and_ctrl_df[column_for_split].isnull()].copy()
+                                    test_df = test_and_ctrl_df[~test_and_ctrl_df[column_for_split].isnull()].copy()
+
+                                    if (len(test_df) == 0) | (len(ctrl_df) == 0):
+                                        continue
+
+                                # Only apply filtering/distribution adjustment if we have both conditions
+                                if not single_condition:
+                                    if whether_filter_info:
+                                        test_df, ctrl_df = test_vs_control_utils.filter_both_df(test_df, ctrl_df, max_curv_range=max_curv_range, verbose=verbose,
+                                                                                                whether_even_out_distribution=whether_even_out_distribution,
+                                                                                                whether_limit_cur_ff_cluster_50_size=whether_limit_cur_ff_cluster_50_size,
+                                                                                                if_test_nxt_ff_group_appear_after_stop=if_test_nxt_ff_group_appear_after_stop,
+                                                                                                if_ctrl_nxt_ff_group_appear_after_stop=if_ctrl_nxt_ff_group_appear_after_stop)
+                                    elif whether_even_out_distribution:  # if not filtering, then only even out the distribution
+                                        test_df, ctrl_df = test_vs_control_utils.make_the_distributions_of_distance_more_similar_in_df(
+                                            test_df, ctrl_df, verbose=verbose)
+                                        test_df, ctrl_df = test_vs_control_utils.make_the_distributions_of_angle_more_similar_in_df(
+                                            test_df, ctrl_df, verbose=verbose)
+
+                                # Call aggregation function if we have data
+                                if single_condition:
+                                    # For single condition, just aggregate the available data
+                                    if (len(test_df) > 0) or (len(ctrl_df) > 0):
+                                        temp_regrouped_info = agg_regrouped_info_func(
+                                            test_df, ctrl_df, **agg_regrouped_info_kwargs)
+                                    else:
+                                        temp_regrouped_info = pd.DataFrame()
+                                else:
+                                    # For both conditions, require both to be non-empty
+                                    if (len(test_df) > 0) & (len(ctrl_df) > 0):
+                                        temp_regrouped_info = agg_regrouped_info_func(
+                                            test_df, ctrl_df, **agg_regrouped_info_kwargs)
+                                    else:
+                                        temp_regrouped_info = pd.DataFrame()
 
                                 temp_regrouped_info['key_for_split'] = key_for_split
                                 temp_regrouped_info['whether_filter_info'] = whether_filter_info
@@ -139,6 +170,7 @@ def make_pooled_median_info_from_test_and_ctrl_heading_info_df(test_heading_info
                                                                    'flexible'],
                                                                max_curv_range_choices=[
                                                                    200],
+                                                               allow_single_condition=True,
                                                                ):
 
     test_heading_info_df = build_factor_comp.process_heading_info_df(
@@ -158,7 +190,8 @@ def make_pooled_median_info_from_test_and_ctrl_heading_info_df(test_heading_info
                                              whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
                                              ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
                                              max_curv_range_choices=max_curv_range_choices,
-                                             verbose=verbose)
+                                             verbose=verbose,
+                                             allow_single_condition=allow_single_condition)
 
     return pooled_median_info
 
@@ -181,6 +214,7 @@ def make_per_sess_median_info_from_test_and_ctrl_heading_info_df(test_heading_in
                                                                      'flexible'],
                                                                  max_curv_range_choices=[
                                                                      200],
+                                                                 allow_single_condition=True,
                                                                  ):
 
     per_sess_median_info = pd.DataFrame()
@@ -201,6 +235,7 @@ def make_per_sess_median_info_from_test_and_ctrl_heading_info_df(test_heading_in
                                                                                          whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
                                                                                          ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
                                                                                          max_curv_range_choices=max_curv_range_choices,
+                                                                                         allow_single_condition=allow_single_condition,
                                                                                          )
 
         session_median_info['data_name'] = data_name
@@ -233,6 +268,7 @@ def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_d
                                                                  'flexible'],
                                                              max_curv_range_choices=[
                                                                  200],
+                                                             allow_single_condition=False,
                                                              ):
 
     test_heading_info_df = build_factor_comp.process_heading_info_df(
@@ -253,7 +289,8 @@ def make_pooled_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info_d
                                            whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
                                            ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
                                            max_curv_range_choices=max_curv_range_choices,
-                                           verbose=verbose)
+                                           verbose=verbose,
+                                           allow_single_condition=allow_single_condition)
 
     return pooled_perc_info
 
@@ -275,6 +312,7 @@ def make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info
                                                                    'flexible'],
                                                                max_curv_range_choices=[
                                                                    200],
+                                                               allow_single_condition=False,
                                                                ):
 
     per_sess_perc_info = pd.DataFrame()
@@ -295,6 +333,7 @@ def make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info
                                                                                      whether_limit_cur_ff_cluster_50_size_choices=whether_limit_cur_ff_cluster_50_size_choices,
                                                                                      ctrl_flash_compared_to_test_choices=ctrl_flash_compared_to_test_choices,
                                                                                      max_curv_range_choices=max_curv_range_choices,
+                                                                                     allow_single_condition=allow_single_condition,
                                                                                      )
 
         session_perc_info['data_name'] = data_name
@@ -307,10 +346,26 @@ def make_per_sess_perc_info_from_test_and_ctrl_heading_info_df(test_heading_info
 
 
 def add_dir_from_cur_ff(df):
-    df['dir_from_cur_ff_to_stop'] = np.sign(
-        df['angle_from_cur_ff_to_stop'])
-    df['dir_from_cur_ff_to_nxt_ff'] = np.sign(
-        df['angle_from_cur_ff_to_nxt_ff'])
+    """Add direction columns from current firefly, handling empty dataframes and missing columns."""
+    if len(df) == 0:
+        # For empty dataframes, just add the columns if they don't exist
+        if 'dir_from_cur_ff_to_stop' not in df.columns:
+            df['dir_from_cur_ff_to_stop'] = pd.Series(dtype=float)
+        if 'dir_from_cur_ff_to_nxt_ff' not in df.columns:
+            df['dir_from_cur_ff_to_nxt_ff'] = pd.Series(dtype=float)
+        return df
+    
+    # For non-empty dataframes, add columns if source columns exist
+    if 'angle_from_cur_ff_to_stop' in df.columns:
+        df['dir_from_cur_ff_to_stop'] = np.sign(df['angle_from_cur_ff_to_stop'])
+    else:
+        df['dir_from_cur_ff_to_stop'] = np.nan
+    
+    if 'angle_from_cur_ff_to_nxt_ff' in df.columns:
+        df['dir_from_cur_ff_to_nxt_ff'] = np.sign(df['angle_from_cur_ff_to_nxt_ff'])
+    else:
+        df['dir_from_cur_ff_to_nxt_ff'] = np.nan
+    
     return df
 
 
@@ -330,10 +385,43 @@ def get_medians_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df,
                                    metrics=['median'],
                                    ):
 
-    test_stat = test_heading_info_df[columns_to_get_metrics].describe().rename(
-        index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
-    ctrl_stat = ctrl_heading_info_df[columns_to_get_metrics].describe().rename(
-        index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    # Filter to only columns that exist in the dataframes
+    if len(test_heading_info_df) > 0:
+        test_cols_available = [col for col in columns_to_get_metrics if col in test_heading_info_df.columns]
+    else:
+        test_cols_available = []
+    
+    if len(ctrl_heading_info_df) > 0:
+        ctrl_cols_available = [col for col in columns_to_get_metrics if col in ctrl_heading_info_df.columns]
+    else:
+        ctrl_cols_available = []
+    
+    # Handle empty dataframes
+    if len(test_heading_info_df) == 0 or len(test_cols_available) == 0:
+        # Create empty statistics with NaN values
+        test_stat = pd.DataFrame({col: [np.nan] * 8 for col in columns_to_get_metrics},
+                                 index=['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'])
+        test_stat = test_stat.rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    else:
+        test_stat = test_heading_info_df[test_cols_available].describe().rename(
+            index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+        # Add NaN for missing columns
+        for col in columns_to_get_metrics:
+            if col not in test_cols_available:
+                test_stat[col] = np.nan
+    
+    if len(ctrl_heading_info_df) == 0 or len(ctrl_cols_available) == 0:
+        # Create empty statistics with NaN values
+        ctrl_stat = pd.DataFrame({col: [np.nan] * 8 for col in columns_to_get_metrics},
+                                 index=['count', 'mean', 'std', 'min', '25%', '50%', '75%', 'max'])
+        ctrl_stat = ctrl_stat.rename(index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+    else:
+        ctrl_stat = ctrl_heading_info_df[ctrl_cols_available].describe().rename(
+            index={'25%': 'Q1', '50%': 'median', '75%': 'Q3'})
+        # Add NaN for missing columns
+        for col in columns_to_get_metrics:
+            if col not in ctrl_cols_available:
+                ctrl_stat[col] = np.nan
 
     test_row = extract_key_info_from_stat_df(test_stat, metrics=metrics)
     ctrl_row = extract_key_info_from_stat_df(ctrl_stat, metrics=metrics)
@@ -345,10 +433,17 @@ def get_medians_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df,
     ctrl_row['sample_size'] = len(ctrl_heading_info_df)
 
     if 'diff_in_abs_d_curv' in columns_to_get_metrics:
-        test_row['sample_size_for_curv'] = len(
-            test_heading_info_df[~test_heading_info_df['diff_in_abs_d_curv'].isna()])
-        ctrl_row['sample_size_for_curv'] = len(
-            ctrl_heading_info_df[~ctrl_heading_info_df['diff_in_abs_d_curv'].isna()])
+        if len(test_heading_info_df) > 0 and 'diff_in_abs_d_curv' in test_heading_info_df.columns:
+            test_row['sample_size_for_curv'] = len(
+                test_heading_info_df[~test_heading_info_df['diff_in_abs_d_curv'].isna()])
+        else:
+            test_row['sample_size_for_curv'] = 0
+            
+        if len(ctrl_heading_info_df) > 0 and 'diff_in_abs_d_curv' in ctrl_heading_info_df.columns:
+            ctrl_row['sample_size_for_curv'] = len(
+                ctrl_heading_info_df[~ctrl_heading_info_df['diff_in_abs_d_curv'].isna()])
+        else:
+            ctrl_row['sample_size_for_curv'] = 0
 
     return test_row, ctrl_row
 
@@ -500,27 +595,52 @@ def add_bootstrap_bca_ci_to_df(
     ctrl_row = ctrl_row.copy()
     ci_tag = int(confidence_level * 100)
 
-    for column in columns:
-        series = test_heading_info_df[column].dropna().values
-        ci_low, ci_high = bootstrap_bca_ci(
-            series,
-            stat_fn=stat_fn,
-            confidence_level=confidence_level,
-            random_state=random_state
-        )
-        test_row[f'{column}_ci_low_{ci_tag}'] = ci_low
-        test_row[f'{column}_ci_high_{ci_tag}'] = ci_high
+    # Only compute CIs if dataframe has data
+    if len(test_heading_info_df) > 0:
+        for column in columns:
+            if column in test_heading_info_df.columns:
+                series = test_heading_info_df[column].dropna().values
+                if len(series) > 0:
+                    ci_low, ci_high = bootstrap_bca_ci(
+                        series,
+                        stat_fn=stat_fn,
+                        confidence_level=confidence_level,
+                        random_state=random_state
+                    )
+                else:
+                    ci_low, ci_high = np.nan, np.nan
+            else:
+                ci_low, ci_high = np.nan, np.nan
+            test_row[f'{column}_ci_low_{ci_tag}'] = ci_low
+            test_row[f'{column}_ci_high_{ci_tag}'] = ci_high
+    else:
+        # Empty dataframe - set NaN for all CIs
+        for column in columns:
+            test_row[f'{column}_ci_low_{ci_tag}'] = np.nan
+            test_row[f'{column}_ci_high_{ci_tag}'] = np.nan
 
-    for column in columns:
-        series = ctrl_heading_info_df[column].dropna().values
-        ci_low, ci_high = bootstrap_bca_ci(
-            series,
-            stat_fn=stat_fn,
-            confidence_level=confidence_level,
-            random_state=random_state
-        )
-        ctrl_row[f'{column}_ci_low_{ci_tag}'] = ci_low
-        ctrl_row[f'{column}_ci_high_{ci_tag}'] = ci_high
+    if len(ctrl_heading_info_df) > 0:
+        for column in columns:
+            if column in ctrl_heading_info_df.columns:
+                series = ctrl_heading_info_df[column].dropna().values
+                if len(series) > 0:
+                    ci_low, ci_high = bootstrap_bca_ci(
+                        series,
+                        stat_fn=stat_fn,
+                        confidence_level=confidence_level,
+                        random_state=random_state
+                    )
+                else:
+                    ci_low, ci_high = np.nan, np.nan
+            else:
+                ci_low, ci_high = np.nan, np.nan
+            ctrl_row[f'{column}_ci_low_{ci_tag}'] = ci_low
+            ctrl_row[f'{column}_ci_high_{ci_tag}'] = ci_high
+    else:
+        # Empty dataframe - set NaN for all CIs
+        for column in columns:
+            ctrl_row[f'{column}_ci_low_{ci_tag}'] = np.nan
+            ctrl_row[f'{column}_ci_high_{ci_tag}'] = np.nan
 
     return test_row, ctrl_row
 
@@ -675,6 +795,17 @@ def calculate_difference_with_bca_ci(
     tag = int(confidence_level * 100)
 
     for col in columns:
+        # Check if column exists in both dataframes before accessing
+        col_in_test = col in test_heading_info_df.columns if len(test_heading_info_df) > 0 else False
+        col_in_ctrl = col in ctrl_heading_info_df.columns if len(ctrl_heading_info_df) > 0 else False
+        
+        if not col_in_test or not col_in_ctrl:
+            # Column doesn't exist - set NaN
+            out[f'{col}_median'] = np.nan
+            out[f'{col}_ci_low_{tag}'] = np.nan
+            out[f'{col}_ci_high_{tag}'] = np.nan
+            continue
+        
         x = test_heading_info_df[col].dropna().to_numpy()
         y = ctrl_heading_info_df[col].dropna().to_numpy()
 
@@ -744,8 +875,15 @@ def make_temp_median_info_func(test_heading_info_df, ctrl_heading_info_df, confi
     )
     # Add test_or_control identifier for difference
     difference_row['test_or_control'] = 'difference'
-    difference_row['sample_size'] = min(test_row['sample_size'].item(), ctrl_row['sample_size'].item())
-    difference_row['sample_size_for_curv'] = min(test_row['sample_size_for_curv'].item(), ctrl_row['sample_size_for_curv'].item())
+    
+    # Handle sample sizes safely
+    test_sample = test_row['sample_size'].item() if 'sample_size' in test_row.columns else 0
+    ctrl_sample = ctrl_row['sample_size'].item() if 'sample_size' in ctrl_row.columns else 0
+    difference_row['sample_size'] = min(test_sample, ctrl_sample) if test_sample > 0 and ctrl_sample > 0 else 0
+    
+    test_sample_curv = test_row['sample_size_for_curv'].item() if 'sample_size_for_curv' in test_row.columns else 0
+    ctrl_sample_curv = ctrl_row['sample_size_for_curv'].item() if 'sample_size_for_curv' in ctrl_row.columns else 0
+    difference_row['sample_size_for_curv'] = min(test_sample_curv, ctrl_sample_curv) if test_sample_curv > 0 and ctrl_sample_curv > 0 else 0
 
     # Convert to DataFrame and create two identical difference rows
     difference_row = pd.DataFrame([difference_row])
@@ -779,10 +917,13 @@ def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df, confide
     )
     
     difference_row['test_or_control'] = 'difference'
-    difference_row['sample_size'] = min(test_row['sample_size'].item(), ctrl_row['sample_size'].item())
+    # Handle case where one or both might be 0
+    test_sample = test_row['sample_size'].item() if 'sample_size' in test_row.columns else 0
+    ctrl_sample = ctrl_row['sample_size'].item() if 'sample_size' in ctrl_row.columns else 0
+    difference_row['sample_size'] = min(test_sample, ctrl_sample) if test_sample > 0 and ctrl_sample > 0 else 0
     
     difference_row = pd.DataFrame([difference_row])
-    difference_row.rename(columns={'perc_mean': 'perc'}, inplace=True)
+    difference_row.rename(columns={'perc_mean': 'perc'}, inplace=True, errors='ignore')
 
     temp_regrouped_info = pd.concat(
         [test_row, ctrl_row, difference_row], axis=0)
@@ -792,17 +933,27 @@ def make_temp_perc_info_func(test_heading_info_df, ctrl_heading_info_df, confide
 
 
 def get_perc_from_test_and_ctrl(test_heading_info_df, ctrl_heading_info_df):
-    test_heading_info_df['perc'] = test_heading_info_df[
-        'dir_from_cur_ff_to_stop'] == test_heading_info_df['dir_from_cur_ff_to_nxt_ff']
-    ctrl_heading_info_df['perc'] = ctrl_heading_info_df[
-        'dir_from_cur_ff_to_stop'] == ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff']
-    test_perc = (test_heading_info_df['perc']).sum(
-    )/len(test_heading_info_df)
-    ctrl_perc = (ctrl_heading_info_df['perc']).sum(
-    )/len(ctrl_heading_info_df)
+    """Calculate percentage info, handling empty dataframes and missing columns."""
+    
+    # Handle test dataframe
+    if len(test_heading_info_df) > 0 and 'dir_from_cur_ff_to_stop' in test_heading_info_df.columns and 'dir_from_cur_ff_to_nxt_ff' in test_heading_info_df.columns:
+        test_heading_info_df['perc'] = test_heading_info_df[
+            'dir_from_cur_ff_to_stop'] == test_heading_info_df['dir_from_cur_ff_to_nxt_ff']
+        test_perc = (test_heading_info_df['perc']).sum() / len(test_heading_info_df)
+        test_sample_size = len(test_heading_info_df)
+    else:
+        test_perc = np.nan
+        test_sample_size = 0
 
-    test_sample_size = len(test_heading_info_df)
-    ctrl_sample_size = len(ctrl_heading_info_df)
+    # Handle control dataframe
+    if len(ctrl_heading_info_df) > 0 and 'dir_from_cur_ff_to_stop' in ctrl_heading_info_df.columns and 'dir_from_cur_ff_to_nxt_ff' in ctrl_heading_info_df.columns:
+        ctrl_heading_info_df['perc'] = ctrl_heading_info_df[
+            'dir_from_cur_ff_to_stop'] == ctrl_heading_info_df['dir_from_cur_ff_to_nxt_ff']
+        ctrl_perc = (ctrl_heading_info_df['perc']).sum() / len(ctrl_heading_info_df)
+        ctrl_sample_size = len(ctrl_heading_info_df)
+    else:
+        ctrl_perc = np.nan
+        ctrl_sample_size = 0
 
     test_row = pd.DataFrame(
         {'perc': test_perc, 'sample_size': test_sample_size, 'test_or_control': 'test'}, index=[0])

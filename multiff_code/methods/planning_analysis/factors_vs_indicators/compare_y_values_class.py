@@ -166,14 +166,24 @@ class _CompareYValues:
         self.all_ref_pooled_median_info_heading = process_variations_utils.make_new_df_for_plotly_comparison(
             self.all_ref_pooled_median_info)
         self.all_ref_pooled_median_info_curv = self.all_ref_pooled_median_info_heading.copy()
-        self.all_ref_pooled_median_info_curv['sample_size'] = self.all_ref_pooled_median_info_curv['sample_size_for_curv']
+        # Only set sample_size from sample_size_for_curv if that column exists
+        if 'sample_size_for_curv' in self.all_ref_pooled_median_info_curv.columns:
+            self.all_ref_pooled_median_info_curv['sample_size'] = self.all_ref_pooled_median_info_curv['sample_size_for_curv']
+        elif 'sample_size' not in self.all_ref_pooled_median_info_curv.columns:
+            # If neither exists, add a sample_size column with 0
+            self.all_ref_pooled_median_info_curv['sample_size'] = 0
 
     def process_all_ref_per_sess_median_info_to_plot_heading_and_curv(self):
         self.all_ref_per_sess_median_info_heading = process_variations_utils.make_new_df_for_plotly_comparison(
             self.all_ref_per_sess_median_info)
         self.all_ref_per_sess_median_info_curv = self.all_ref_per_sess_median_info_heading.copy()
-        self.all_ref_per_sess_median_info_curv[
-            'sample_size'] = self.all_ref_per_sess_median_info_curv['sample_size_for_curv']
+        # Only set sample_size from sample_size_for_curv if that column exists
+        if 'sample_size_for_curv' in self.all_ref_per_sess_median_info_curv.columns:
+            self.all_ref_per_sess_median_info_curv[
+                'sample_size'] = self.all_ref_per_sess_median_info_curv['sample_size_for_curv']
+        elif 'sample_size' not in self.all_ref_per_sess_median_info_curv.columns:
+            # If neither exists, add a sample_size column with 0
+            self.all_ref_per_sess_median_info_curv['sample_size'] = 0
 
     def _make_median_info(self,
                           kind: str = "pooled",
@@ -302,8 +312,8 @@ class _CompareYValues:
     # --- Thin wrappers for backward compatibility ---
 
     def make_pooled_median_info(self,
-                                ref_point_mode='time after cur ff visible',
-                                ref_point_value=0.1,
+                                ref_point_mode='distance',
+                                ref_point_value=-100,
                                 curv_traj_window_before_stop=(-25, 0),
                                 pooled_median_info_exists_ok=True,
                                 combd_heading_df_x_sessions_exists_ok=True,
@@ -328,8 +338,8 @@ class _CompareYValues:
         )
 
     def make_per_sess_median_info(self,
-                                  ref_point_mode='time after cur ff visible',
-                                  ref_point_value=0.1,
+                                  ref_point_mode='distance',
+                                  ref_point_value=-100,
                                   curv_traj_window_before_stop=(-25, 0),
                                   per_sess_median_info_exists_ok=True,
                                   combd_heading_df_x_sessions_exists_ok=True,

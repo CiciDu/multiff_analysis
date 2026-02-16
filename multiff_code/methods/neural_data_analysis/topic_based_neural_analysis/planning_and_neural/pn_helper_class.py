@@ -6,7 +6,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 from neural_data_analysis.neural_analysis_tools.model_neural_data import base_neural_class
 from planning_analysis.plan_factors import build_factor_comp
 from planning_analysis.show_planning import show_planning_utils
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
 from eye_position_analysis import eye_positions
 import numpy as np
 import pandas as pd
@@ -25,8 +25,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         os.makedirs(self.target_decoder_folder_path, exist_ok=True)
 
     def prep_behav_data_to_analyze_planning(self,
-                                            ref_point_mode='time after cur ff visible',
-                                            ref_point_value=0.1,
+                                            ref_point_mode='distance',
+                                            ref_point_value=-100,
                                             eliminate_outliers=False,
                                             use_curv_to_ff_center=False,
                                             curv_of_traj_mode='distance',
@@ -89,7 +89,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.both_ff_across_time_df = self.get_both_ff_across_time_df()
         self.planning_data_by_point = self.both_ff_across_time_df
         self.add_heading_info_to_planning_data_by_point()
-        
+
         self.add_cur_and_nxt_ff_eye_positions_to_planning_data_by_point()
 
         # Ensure that each segment maps to exactly one target_index
@@ -99,7 +99,6 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         ), "Each segment must map to exactly one target_index"
 
         return self.planning_data_by_point
-
 
     def add_cur_and_nxt_ff_eye_positions_to_planning_data_by_point(self, *, wrap='pm_pi'):
         """
@@ -120,7 +119,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         # small helper to cut repetition
         def compute(angle_key, dist_key, eye):
             return eye_fn(pdp[angle_key], pdp[dist_key],
-                        left_or_right_eye=eye, **shared)
+                          left_or_right_eye=eye, **shared)
 
         for eye, suffix in (('left', 'l'), ('right', 'r')):
             cur_h, cur_v = compute('cur_ff_angle', 'cur_ff_distance', eye)
@@ -130,7 +129,6 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
             pdp[f'cur_eye_ver_{suffix}'] = cur_v
             pdp[f'nxt_eye_hor_{suffix}'] = nxt_h
             pdp[f'nxt_eye_ver_{suffix}'] = nxt_v
-
 
     def _only_make_stops_near_ff_df(self):
         self.load_raw_data()
@@ -168,8 +166,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.add_rel_time_info_to_heading_info_df()
 
         base_cols = ['stop_point_index',
-                    'angle_from_m_before_stop_to_cur_ff',
-                    'angle_from_stop_to_nxt_ff']
+                     'angle_from_m_before_stop_to_cur_ff',
+                     'angle_from_stop_to_nxt_ff']
 
         more_cols = [
             'dir_from_cur_ff_to_stop', 'dir_from_cur_ff_to_nxt_ff', 'dir_from_cur_ff_same_side',
@@ -185,17 +183,21 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         build_factor_comp.add_dir_from_cur_ff_same_side(self.heading_info_df)
 
         # 1) only request columns that actually exist in heading_info_df
-        requested = list({*base_cols, *more_cols} & set(self.heading_info_df.columns))
+        requested = list({*base_cols, *more_cols} &
+                         set(self.heading_info_df.columns))
 
         # 2) make sure 'stop_point_index' is first and NOT duplicated
-        cols_right = ['stop_point_index'] + [c for c in requested if c != 'stop_point_index']
+        cols_right = ['stop_point_index'] + \
+            [c for c in requested if c != 'stop_point_index']
 
         # 3) avoid bringing in columns that already exist on the left (except the key)
         existing_left = set(self.planning_data_by_point.columns)
-        cols_right = ['stop_point_index'] + [c for c in cols_right[1:] if c not in existing_left]
+        cols_right = ['stop_point_index'] + \
+            [c for c in cols_right[1:] if c not in existing_left]
 
         # 4) guard against accidental duplicate names in the right slice
-        right_slice = self.heading_info_df[cols_right].loc[:, ~self.heading_info_df[cols_right].columns.duplicated()]
+        right_slice = self.heading_info_df[cols_right].loc[:, ~
+                                                           self.heading_info_df[cols_right].columns.duplicated()]
 
         # Optional: sanity checks to catch shape issues early
         # - key uniqueness on both sides (change to 'one_to_many' if appropriate)
@@ -205,7 +207,6 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.planning_data_by_point = self.planning_data_by_point.merge(
             right_slice, on='stop_point_index', how='left', validate='many_to_one'
         )
-
 
     def get_both_ff_across_time_df(self, n_seconds_before_stop=2.5):
 
@@ -261,7 +262,8 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         self.both_ff_across_time_df = pn_utils.add_ff_visible_or_in_memory_info_by_point(
             self.both_ff_across_time_df, self.ff_dataframe)
 
-        self.both_ff_across_time_df = prep_target_data.add_capture_target(self.both_ff_across_time_df, self.ff_caught_T_new)
+        self.both_ff_across_time_df = prep_target_data.add_capture_target(
+            self.both_ff_across_time_df, self.ff_caught_T_new)
 
         self.both_ff_across_time_df.reset_index(drop=True, inplace=True)
 
@@ -413,7 +415,7 @@ class PlanningAndNeuralHelper(plan_factors_class.PlanFactors):
         # self.stops_near_ff_df['point_index_in_the_past'] = np.searchsorted(
         #     self.monkey_information['time'].values, self.stops_near_ff_df['some_time_before_stop'].values) - 1
         idx = np.searchsorted(self.monkey_information['time'].values,
-                            self.stops_near_ff_df['some_time_before_stop'].values) - 1
+                              self.stops_near_ff_df['some_time_before_stop'].values) - 1
         idx = np.clip(idx, 0, len(self.monkey_information) - 1)
         self.stops_near_ff_df['point_index_in_the_past'] = idx
 

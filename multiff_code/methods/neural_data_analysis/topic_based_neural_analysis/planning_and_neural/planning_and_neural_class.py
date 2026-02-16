@@ -1,6 +1,5 @@
 from neural_data_analysis.topic_based_neural_analysis.target_decoder import target_decoder_class
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_utils, pn_helper_class
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding import pn_decoding_utils
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data
 from neural_data_analysis.neural_analysis_tools.model_neural_data import base_neural_class
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_feature_selection
@@ -39,7 +38,7 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
             0).gt(0).astype('uint8')
 
     def prep_data_to_analyze_planning(self,
-                                      ref_point_mode='time after cur ff visible',
+                                      ref_point_mode='distance',
                                       ref_point_value=0.1,
                                       eliminate_outliers=False,
                                       use_curv_to_ff_center=False,
