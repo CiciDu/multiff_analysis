@@ -47,6 +47,7 @@ class Params:
     temporal_binwidth: float = 0.02       # seconds
     pretrial: float = 0.5                 # seconds
     posttrial: float = 0.5                # seconds
+    dt = 0.006
 
     # =========================
     # Neural preprocessing

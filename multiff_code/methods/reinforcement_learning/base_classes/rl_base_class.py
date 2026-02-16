@@ -602,22 +602,27 @@ class _RLforMultifirefly(animation_class.AnimationClass):
     def retrieve_monkey_data(self, speed_threshold_for_distinct_stop=1, retrieve_ff_flash_sorted=False):
         self.npz_file_pathway = os.path.join(
             self.processed_data_folder_path, 'ff_basic_info.npz')
-        self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
-            self.ff_flash_end_sorted = retrieve_raw_data._retrieve_ff_info_in_npz_from_txt_data(
-                self.processed_data_folder_path)
+        if not hasattr(self, 'ff_caught_T_sorted'):
+            self.ff_caught_T_sorted, self.ff_index_sorted, self.ff_real_position_sorted, self.ff_believed_position_sorted, self.ff_life_sorted, \
+                self.ff_flash_end_sorted = retrieve_raw_data._retrieve_ff_info_in_npz_from_txt_data(
+                    self.processed_data_folder_path)
         if retrieve_ff_flash_sorted:
-            self.ff_flash_sorted = retrieve_raw_data._retrieve_ff_flash_sorted_in_npz(
-                self.processed_data_folder_path)
+            if not hasattr(self, 'ff_flash_sorted'):
+                self.ff_flash_sorted = retrieve_raw_data._retrieve_ff_flash_sorted_in_npz(
+                    self.processed_data_folder_path)
 
-        self.monkey_information_path = os.path.join(
-            self.processed_data_folder_path, 'monkey_information.csv')
-        self.monkey_information = pd.read_csv(
-            self.monkey_information_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
-        self.monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
-            self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
+        if not hasattr(self, 'monkey_information'):
+            self.monkey_information_path = os.path.join(
+                self.processed_data_folder_path, 'monkey_information.csv')
+            self.monkey_information = pd.read_csv(
+                self.monkey_information_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
+            self.monkey_information = process_monkey_information._process_monkey_information_after_retrieval(
+                self.monkey_information, speed_threshold_for_distinct_stop=speed_threshold_for_distinct_stop)
 
-        self.make_or_retrieve_closest_stop_to_capture_df()
-        self.make_ff_caught_T_new()
+        if not hasattr(self, 'closest_stop_to_capture_df'):
+            self.make_or_retrieve_closest_stop_to_capture_df()
+        if not hasattr(self, 'ff_caught_T_new'):
+            self.make_ff_caught_T_new()
 
         return
 
@@ -666,7 +671,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.ff_dataframe = make_ff_dataframe.process_ff_dataframe(
             self.ff_dataframe, max_distance=None, max_time_since_last_vis=3)
 
-    def load_latest_agent(self, load_replay_buffer=True, dir_name=None):
+    def load_latest_agent(self, load_replay_buffer=True, dir_name=None, load_manifest_only=False):
         # model_name is not really used here, but put here to be consistent with the SB3 version
         if dir_name is None:
             dir_name = self.model_folder_name
@@ -691,7 +696,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 print(f'Loading best model from post/best')
             try:
                 self.load_agent(
-                    load_replay_buffer=load_replay_buffer, dir_name=d, restore_env_from_checkpoint=True)
+                    load_replay_buffer=load_replay_buffer, dir_name=d, restore_env_from_checkpoint=True, load_manifest_only=load_manifest_only)
                 self.loaded_agent_name = name
                 if name in ('curr/best', 'ln/best_curr'):
                     self.curriculum_env_kwargs = self.current_env_kwargs.copy()

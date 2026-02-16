@@ -151,6 +151,7 @@ MODEL_SPECS = {
         'regression_model_kwargs': dict(
             epsilon=1.35,
             alpha=0.0001,
+            max_iter=1000,
         ),
 
         'classification_model_class': None,

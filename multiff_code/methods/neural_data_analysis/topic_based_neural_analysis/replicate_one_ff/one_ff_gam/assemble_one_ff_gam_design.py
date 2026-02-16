@@ -5,7 +5,7 @@ from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
     one_ff_glm_design,
     one_ff_pipeline,
-    parameters
+    one_ff_parameters
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     one_ff_gam_fit
@@ -63,7 +63,7 @@ def build_tuning_design(
                 'centers': centers,
                 'n_bins': n_bins,
             }
-    
+
     tuning_meta['bin_info'] = bin_info
 
     return X_tuning, tuning_meta
@@ -107,7 +107,7 @@ def build_temporal_design_base(
     basis_info['t_move'] = {'lags': lags_move, 'basis': B_move}
     t_targ_min = float(binrange['t_targ'][0])
     t_targ_max = float(binrange['t_targ'][1])
-    
+
     lags_targ, B_targ = glm_bases.raised_cosine_basis(
         n_basis=n_basis,
         t_min=t_targ_min,
@@ -245,7 +245,6 @@ def build_spike_history_design(
         hard_start_zero=True,
     )
     basis_info['spike_hist'] = {'lags': lags_hist, 'basis': B_hist}
-
 
     specs['spike_hist'] = temporal_feats.PredictorSpec(
         signal=data_obj.Y[:, unit_idx],
@@ -496,7 +495,7 @@ def finalize_one_ff_gam_design(unit_idx, session_num=0):
     # -------------------------------
     # Load data
     # -------------------------------
-    prs = parameters.default_prs()
+    prs = one_ff_parameters.default_prs()
 
     data_obj = one_ff_pipeline.OneFFSessionData(
         mat_path='all_monkey_data/one_ff_data/sessions_python.mat',

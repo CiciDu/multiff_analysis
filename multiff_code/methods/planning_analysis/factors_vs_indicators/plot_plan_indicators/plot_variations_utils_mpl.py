@@ -2,15 +2,15 @@
 # Matplotlib versions (same interface, no hover)
 # ============================================================
 
+import warnings
+from matplotlib.ticker import PercentFormatter
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 from planning_analysis.factors_vs_indicators import process_variations_utils
-from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_class, plot_variations_utils
+from planning_analysis.factors_vs_indicators.plot_plan_indicators import plot_variations_utils
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import matplotlib.colors as mcolors
-
 
 
 LINESTYLE_MAP = {
@@ -121,7 +121,8 @@ def _add_line_type_legends_mpl(ax, sub_df, row_number=None, col_number=None):
     if not showlegend:
         return
 
-    legend_entries = sub_df[['line_type', 'unique_combination_for_line']].drop_duplicates()
+    legend_entries = sub_df[['line_type',
+                             'unique_combination_for_line']].drop_duplicates()
     if len(legend_entries) <= 1:
         return
 
@@ -129,7 +130,8 @@ def _add_line_type_legends_mpl(ax, sub_df, row_number=None, col_number=None):
     labels = []
     for _, row in legend_entries.iterrows():
         linestyle = LINESTYLE_MAP.get(row['line_type'], 'solid')
-        handles.append(Line2D([0], [0], color='black', linestyle=linestyle, lw=2))
+        handles.append(Line2D([0], [0], color='black',
+                       linestyle=linestyle, lw=2))
         labels.append(row['unique_combination_for_line'])
 
     existing = ax.get_legend_handles_labels()
@@ -199,7 +201,8 @@ def plot_markers_for_data_comparison_mpl(fig,
             sizes = np.full(len(d), marker_size)
         else:
             sizes = np.clip(
-                d['sample_size'].fillna(max_n).astype(float).to_numpy() * scale,
+                d['sample_size'].fillna(max_n).astype(
+                    float).to_numpy() * scale,
                 min_size,
                 max_size
             )
@@ -254,8 +257,10 @@ def connect_every_pair_mpl(fig,
         )
 
     if show_combo_legends:
-        _add_color_legends_mpl(ax, sub_df, row_number=row_number, col_number=col_number)
-        _add_line_type_legends_mpl(ax, sub_df, row_number=row_number, col_number=col_number)
+        _add_color_legends_mpl(
+            ax, sub_df, row_number=row_number, col_number=col_number)
+        _add_line_type_legends_mpl(
+            ax, sub_df, row_number=row_number, col_number=col_number)
 
     return fig
 
@@ -272,7 +277,8 @@ def _add_grouped_bars_mpl(ax, d, grp_col, y_col):
         d[y_col].to_numpy(),
         width=0.6,
         align='center',
-        color=[{'control': '#F58518', 'test': '#4C78A8'}.get(g, 'gray') for g in d[grp_col]],
+        color=[{'control': '#F58518', 'test': '#4C78A8'}.get(
+            g, 'gray') for g in d[grp_col]],
     )
 
     if plot_variations_utils._has_bounds(d):
@@ -315,7 +321,8 @@ def _single_bin_path_mpl(fig, sub_df, x_var_column, y_var_column,
     d = plot_variations_utils._first_per_group(sub_df, grp_col, y_var_column)
 
     # attach sample sizes if you want them later (not displayed by default)
-    d['_n'] = d.apply(lambda r: plot_variations_utils._infer_group_n(r, grp_col, sub_df), axis=1)
+    d['_n'] = d.apply(lambda r: plot_variations_utils._infer_group_n(
+        r, grp_col, sub_df), axis=1)
 
     if plot_variations_utils._has_bounds(d):
         d = plot_variations_utils._attach_error_arrays(d, y_var_column)
@@ -327,12 +334,14 @@ def _single_bin_path_mpl(fig, sub_df, x_var_column, y_var_column,
 
     _add_grouped_bars_mpl(ax, d, grp_col, y_var_column)
 
-    base_title = title or f'{y_var_column} (bar' + (' ± 95% CI' if plot_variations_utils._has_bounds(d) else '') + ')'
+    base_title = title or f'{y_var_column} (bar' + (
+        ' ± 95% CI' if plot_variations_utils._has_bounds(d) else '') + ')'
     if title is None:
         single_x_label = next(iter(x_labels_to_values_map.keys()), '')
         base_title = f'{base_title} — {x_var_column}: {single_x_label}'
 
-    _apply_single_bin_layout_mpl(ax, base_title, grp_col, y_var_column, float(y_lo), float(y_hi))
+    _apply_single_bin_layout_mpl(
+        ax, base_title, grp_col, y_var_column, float(y_lo), float(y_hi))
     return fig
 
 
@@ -362,7 +371,9 @@ def make_matplotlib_plot_to_compare_two_sets_of_data(
     columns_to_find_unique_combinations_for_line = columns_to_find_unique_combinations_for_line or []
 
     if fig is None:
-        fig, _ = plt.subplots()
+        # Increase height if x_var_column is 'id'
+        figsize = (10, 7) if x_var_column == 'id' else (10, 7)
+        fig, _ = plt.subplots(figsize=figsize)
 
     # --- preprocessing (colors/lines) ---
     rest_hover = plot_variations_utils._find_rest_of_x_for_hoverdata(
@@ -380,7 +391,8 @@ def make_matplotlib_plot_to_compare_two_sets_of_data(
     )
 
     # numeric x + offset
-    x_labels_to_values_map = plot_variations_utils._find_x_labels_to_values_map(sub_df, x_var_column)
+    x_labels_to_values_map = plot_variations_utils._find_x_labels_to_values_map(
+        sub_df, x_var_column)
     sub_df = plot_variations_utils._add_x_value_numeric_to_sub_df(
         sub_df, x_var_column, x_labels_to_values_map, x_offset
     )
@@ -462,12 +474,15 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
         first_dim, second_dim = plot_variations_utils._find_first_and_second_dim(
             original_df, changeable_variables, combinations
         )
-        all_subplot_titles = plot_variations_utils._get_all_subplot_titles(combinations)
+        all_subplot_titles = plot_variations_utils._get_all_subplot_titles(
+            combinations)
 
+        # Increase height if 'id' is in x_var_column_list
+        height_per_row = 6 if 'id' in x_var_column_list else 5
         fig, axes = plt.subplots(
             first_dim,
             second_dim,
-            figsize=(7 * second_dim, 5 * first_dim),
+            figsize=(7 * second_dim, height_per_row * first_dim),
             squeeze=False
         )
         # stash axes grid for _get_mpl_ax
@@ -489,15 +504,19 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
     for combo, filtered_df in zip(combinations, list_of_smaller_dfs):
         for x_var_column in x_var_column_list:
             if 'y_var_column' in combo.keys():
-                title = str.upper(x_var_column) + ' vs ' + str.upper(combo['y_var_column'])
+                title = str.upper(x_var_column) + ' vs ' + \
+                    str.upper(combo['y_var_column'])
             else:
-                title = str.upper(x_var_column) + ' vs ' + str.upper(y_var_column)
+                title = str.upper(x_var_column) + ' vs ' + \
+                    str.upper(y_var_column)
 
             if title_prefix is not None:
                 title = title_prefix + ' ' + title
 
             if not use_subplots_based_on_changeable_variables:
-                fig, _ = plt.subplots()
+                # Increase height if x_var_column is 'id'
+                figsize = (10, 7) if x_var_column == 'id' else (10, 7)
+                fig, _ = plt.subplots(figsize=figsize)
                 print(' ')
                 print('=========================================================')
                 print('Current combination of changeable variables:', combo)
@@ -526,19 +545,11 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
                 plt.show()
 
     fig._combinations = combinations
-    
+
     if show_fig and use_subplots_based_on_changeable_variables:
         plt.show()
-    
-    
+
     return fig
-
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter
-import warnings
 
 
 def plot_grouped_percent_bars(
@@ -567,13 +578,14 @@ def plot_grouped_percent_bars(
 
     d = df.copy()
     d = d[d['test_or_control'].isin(group_order)]
-    
+
     if 'ci_lower' not in d.columns:
         try:
             d['ci_lower'] = d['perc_ci_low_95']
             d['ci_upper'] = d['perc_ci_high_95']
         except:
-            raise ValueError('ci_lower and ci_upper columns not found in dataframe, and perc_ci_low_95 and perc_ci_high_95 columns not found either')
+            raise ValueError(
+                'ci_lower and ci_upper columns not found in dataframe, and perc_ci_low_95 and perc_ci_high_95 columns not found either')
 
     # ------------------------------------------------------------------
     # Auto-detect and convert 0–100 percentages → [0, 1]

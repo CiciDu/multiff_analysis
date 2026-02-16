@@ -223,7 +223,7 @@ def _build_folds(
 
             folds.append((train_idx, test_idx))
 
-        print('cv_splitter = blocked_time_buffered: Split into contiguous blocks with buffer region')
+        #print('cv_splitter = blocked_time_buffered: Split into contiguous blocks with buffer region')
         return folds
 
     # -------- FORWARD-CHAINING (causal CV) --------

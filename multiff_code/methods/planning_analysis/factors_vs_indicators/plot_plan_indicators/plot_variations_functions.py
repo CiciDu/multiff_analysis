@@ -141,9 +141,11 @@ def _set_heading_labels_mpl(fig, x_var_column_list, is_difference):
     axes[0].set_ylabel(y_label)
     # bottom row: x label
     bottom_y = max(ax.get_subplotspec().rowspan.stop for ax in axes)
+    # Check if 'id' is in x_var_column_list to determine font size
+    xlabel_fontsize = 9 if 'id' in x_var_column_list else None
     for ax in axes:
         if ax.get_subplotspec().rowspan.stop == bottom_y:
-            ax.set_xlabel("Reference Distance (cm)")
+            ax.set_xlabel("Reference Distance (cm)", fontsize=xlabel_fontsize)
 
 
 def _apply_same_side_ylim_plotly(fig, y_min, y_max):

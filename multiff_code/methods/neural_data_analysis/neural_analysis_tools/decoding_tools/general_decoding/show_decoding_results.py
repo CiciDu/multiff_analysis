@@ -99,6 +99,10 @@ def visualize_decoding_results(
     model_name,
     show_plots=True,
 ):
+    
+    if len(decoding_results_df) == 0:
+        print(f"No decoding results found for model: {model_name}")
+        return None, None
 
     sns.set_theme(style='whitegrid', context='talk', font_scale=0.85)
 
@@ -115,7 +119,7 @@ def visualize_decoding_results(
     reg_summary = None
     clf_summary = None
     
-    max_height = 15
+    max_height = 20
 
     # ==========================================================
     # REGRESSION
@@ -196,7 +200,7 @@ def visualize_decoding_results(
             height = min(0.25 * len(feature_order) + 1.5, max_height)
 
             fig, ax = plt.subplots(
-                figsize=(6, height)
+                figsize=(10, height)
             )
 
             hue_levels = reg_summary['shuffle_mode'].unique()

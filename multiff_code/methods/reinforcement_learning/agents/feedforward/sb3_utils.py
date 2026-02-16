@@ -8,6 +8,7 @@ from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoMod
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import LoadMonitorResultsError
+
 plt.rcParams["animation.html"] = "html5"
 retrieve_buffer = False
 n_steps = 1000

@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import parameters
 
 
 def plot_spike_history(beta, hist_meta):
@@ -297,7 +296,7 @@ def plot_all_tuning_curves(beta, all_meta):
         tuning_meta.get('angular_vars', [])
 
     plot_variables(beta, all_meta, var_list=var_list,
-                   plot_var_order=parameters.plot_var_order)
+                   plot_var_order=one_ff_parameters.plot_var_order)
 
 
 def plot_all_temporal_filters(beta, all_meta, plot_var_order=None):
@@ -329,4 +328,4 @@ def plot_all_temporal_filters(beta, all_meta, plot_var_order=None):
             var_list.append('spike_hist')
 
     plot_variables(beta, all_meta, var_list=var_list,
-                   plot_var_order=parameters.plot_var_order)
+                   plot_var_order=one_ff_parameters.plot_var_order)

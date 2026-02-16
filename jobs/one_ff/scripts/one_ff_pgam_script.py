@@ -26,7 +26,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     one_ff_pgam_design
 )
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.parameters import (
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_parameters import (
     default_prs
 )
 
@@ -97,6 +97,7 @@ def main(args):
     print(f"[PYTHON][DEBUG] Checking for existing results for unit {args.unit_idx}...", flush=True)
     try:
         pgam_runner.load_pgam_results(args.unit_idx)
+        out = pgam_runner.run_pgam_cv(neural_cluster_number=args.unit_idx, n_splits=5, filtwidth=2, load_only=True)
         print(f"[PYTHON][INFO] Loaded existing PGAM results for unit {args.unit_idx}")
         return
     except FileNotFoundError:
@@ -134,22 +135,25 @@ def main(args):
     # ------------------
     # Run PGAM
     # ------------------
-    print(f"[PYTHON][DEBUG] Running PGAM optimization for unit {args.unit_idx}...", flush=True)
-    pgam_runner.run_pgam(neural_cluster_number=args.unit_idx)
-    print(f"[PYTHON][DEBUG] PGAM optimization complete", flush=True)
+    try:
+        pgam_runner.load_pgam_results(args.unit_idx)
+        print(f"[PYTHON][INFO] Loaded existing PGAM results for unit {args.unit_idx}")
     
-    print(f"[PYTHON][DEBUG] Post-processing results...", flush=True)
-    pgam_runner.kernel_h_length = 100
-    pgam_runner.post_processing_results(neural_cluster_number=args.unit_idx)
-    print(f"[PYTHON][DEBUG] Saving results...", flush=True)
-    pgam_runner.save_results()
-    print(f"[PYTHON][INFO] Unit {args.unit_idx} completed successfully!", flush=True)
+    except FileNotFoundError:
+        print(f"[PYTHON][INFO] No existing results found, running PGAM for unit {args.unit_idx}")
+        pgam_runner.run_pgam(neural_cluster_number=args.unit_idx)
+        pgam_runner.kernel_h_length = 100
+        pgam_runner.post_processing_results(neural_cluster_number=args.unit_idx)
+        pgam_runner.save_results()
 
-    all_mean_r2 = []
-    num_neurons = pgam_runner.x_var.shape[1]
-    for n in range(num_neurons):
-        out = pgam_runner.run_pgam_cv(n, n_splits=5, filtwidth=2)
-        all_mean_r2.append(out['mean_r2_eval'])
+    out = pgam_runner.run_pgam_cv(neural_cluster_number=args.unit_idx, n_splits=5, filtwidth=2)
+
+
+    # all_mean_r2 = []
+    # num_neurons = pgam_runner.x_var.shape[1]
+    # for n in range(num_neurons):
+    #     out = pgam_runner.run_pgam_cv(n, n_splits=5, filtwidth=2)
+    #     all_mean_r2.append(out['mean_r2_eval'])
         
     
 # -------------------------------------------------------

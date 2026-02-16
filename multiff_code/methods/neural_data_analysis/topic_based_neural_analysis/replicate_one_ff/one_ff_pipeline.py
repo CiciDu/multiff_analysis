@@ -57,7 +57,14 @@ class OneFFSessionData:
         Infer dt from the first trial.
         """
         t = self.all_trials[0].continuous.ts
-        self.prs.dt = round(np.mean(np.diff(t)), 3)
+        dt = round(np.mean(np.diff(t)), 3)
+
+        # make sure this is very close to parameters.dt
+        if not np.isclose(dt, self.prs.dt, rtol=1e-3, atol=1e-3):
+            print(f'Inferred dt from data: {dt}')
+            print(f'dt from parameters: {self.prs.dt}')
+            raise ValueError('Mismatch between inferred dt and parameters.dt')
+
 
     # ------------------
     # Trial-level access

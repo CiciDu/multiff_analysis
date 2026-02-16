@@ -374,7 +374,7 @@ class PGAMclass():
         spikes = self.spk_counts[use_mask]
 
         # --- Build design matrix ---
-        exog = self.sm_handler.get_exog_mat_fast(self.full.var_list)
+        exog, _ = self.sm_handler.get_exog_mat_fast(self.full.var_list)
         exog = exog[use_mask]
 
         # --- Model prediction (counts per bin) ---
@@ -475,6 +475,7 @@ class PGAMclass():
             mean_r2_eval=result_dict['mean_r2_eval'],
             std_r2_eval=result_dict['std_r2_eval']
         )
+        print(f'Saved CV results for neuron {self.cluster_name} at {filename}')
         
     def _load_cv_results(self, filename):
         import numpy as np
@@ -527,7 +528,7 @@ class PGAMclass():
                 filter_trials=train_mask
             )
 
-            exog_full = self.sm_handler.get_exog_mat_fast(full_fit.var_list)
+            exog_full, _ = self.sm_handler.get_exog_mat_fast(full_fit.var_list)
             eta = exog_full @ full_fit.beta
             mu_counts = self.poissFam.fitted(eta)
 
@@ -558,7 +559,9 @@ class PGAMclass():
                     n_splits=5,
                     filtwidth=2,
                     random_state=0,
-                    force_recompute=False):
+                    force_recompute=False,
+                    load_only=False,
+                    ):
 
         import os
 
@@ -569,11 +572,14 @@ class PGAMclass():
         )
 
         # Load if exists
-        if os.path.exists(filename) and not force_recompute:
-            print(f'Loading cached CV results for neuron {neural_cluster_number}')
-            return self._load_cv_results(filename)
-
-        print(f'Computing CV for neuron {neural_cluster_number}')
+        if not force_recompute:
+            if os.path.exists(filename):
+                print(f'Loading cached CV results for neuron {neural_cluster_number} at {filename}')
+                return self._load_cv_results(filename)
+            else:
+                print(f'No cached CV results found for neuron {neural_cluster_number} at {filename}, computing...')
+                if load_only:
+                    raise FileNotFoundError(f'No cached CV results found for neuron {neural_cluster_number} at {filename}')
 
         # Compute
         out = self._run_pgam_cv_compute_only(

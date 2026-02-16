@@ -148,14 +148,45 @@ def retrieve_params(model_folder_name):
     return params
 
 
+import os
+
+
+def _strip_training_suffix(path_string):
+    '''
+    Remove all trailing training subfolders if present.
+    Strips any combination of:
+    'post', 'curr', 'best'
+    '''
+    path_string = os.path.normpath(path_string)
+
+    while True:
+        folder_name = os.path.basename(path_string)
+
+        if folder_name in {'post', 'curr', 'best'}:
+            path_string = os.path.dirname(path_string)
+        else:
+            break
+
+    return path_string
+
+
 def get_agent_folders(path='multiff_analysis/RL_models/SB3_stored_models/all_agents/env1_relu'):
+    '''
+    Walk through directories and return unique agent folders
+    that contain checkpoint_manifest.json.
+
+    If a discovered folder ends with any combination of
+    'post', 'curr', or 'best', those suffixes are removed.
+    '''
     agent_folders = []
 
-    # Walk through all directories and subdirectories
     for root, dirs, files in os.walk(path):
-        # Check if this folder contains checkpoint_manifest.json
         if 'checkpoint_manifest.json' in files:
-            agent_folders.append(root)
+            clean_root = _strip_training_suffix(root)
+            agent_folders.append(clean_root)
+
+    # Remove duplicates while preserving order
+    agent_folders = list(dict.fromkeys(agent_folders))
 
     return agent_folders
 
@@ -226,10 +257,15 @@ def write_checkpoint(checkpoint_dir, current_env_kwargs):
     except Exception as e:
         print(f"Warning: failed to write manifest at {manifest_path}: {e}")
 
+from pathlib import Path
 
 def extract_config_name_from_post_best(path_str):
     """
-    Extract the configuration folder name from a path that ends with 'post/best'.
+    Extract the configuration folder name from a path that may end with
+    any combination of 'post', 'curr', or 'best'.
+
+    All trailing occurrences of these folder names are stripped before
+    extracting the configuration name.
 
     Parameters
     ----------
@@ -244,12 +280,15 @@ def extract_config_name_from_post_best(path_str):
     Raises
     ------
     ValueError
-        If the path does not end with 'post/best'.
+        If no valid configuration folder remains after stripping.
     """
     path = Path(path_str)
-    parts = path.parts
 
-    if len(parts) < 3 or parts[-2:] != ('post', 'best'):
-        raise ValueError("Path must end with 'post/best'")
+    # Strip all trailing training suffixes
+    while path.name in {'post', 'curr', 'best'}:
+        path = path.parent
 
-    return parts[-3]
+    if path.name == '':
+        raise ValueError('No configuration folder found after stripping suffixes')
+
+    return path.name

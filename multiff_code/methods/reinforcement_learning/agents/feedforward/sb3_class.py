@@ -158,10 +158,16 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             'env_params': self.current_env_kwargs,
         })
 
-    def load_agent(self, load_replay_buffer=True, keep_current_agent_params=True, dir_name=None, model_name='best_model', restore_env_from_checkpoint=True):
-        manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
-        model_file = manifest.get('model_file') if isinstance(
-            manifest, dict) else None
+    def load_agent(self, load_replay_buffer=True, keep_current_agent_params=True, dir_name=None, model_name='best_model', restore_env_from_checkpoint=True,
+                   load_manifest_only=False):
+        if load_manifest_only:
+            self.manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
+            print('loaded manifest only')
+            return self.manifest
+        
+        self.manifest = rl_base_utils.read_checkpoint_manifest(dir_name)
+        model_file = self.manifest.get('model_file') if isinstance(
+            self.manifest, dict) else None
         path = os.path.join(dir_name, model_file) if model_file else os.path.join(
             dir_name, model_name + '.zip')
 
@@ -169,14 +175,14 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
             raise FileNotFoundError(f"Model file not found at {path}")
 
         if restore_env_from_checkpoint:
-            self.make_env(**manifest['env_params'])
+            self.make_env(**self.manifest['env_params'])
         self.make_agent()
         self.rl_agent = self.rl_agent.load(path, env=self.env)
         print("Loaded existing agent:", path)
 
         if load_replay_buffer:
-            buffer_name = manifest.get('replay_buffer') if isinstance(
-                manifest, dict) else 'buffer'
+            buffer_name = self.manifest.get('replay_buffer') if isinstance(
+                self.manifest, dict) else 'buffer'
             path2 = os.path.join(dir_name, buffer_name)
             if os.path.exists(path2):
                 self.rl_agent.load_replay_buffer(path2)

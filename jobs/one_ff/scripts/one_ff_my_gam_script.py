@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit,
-    gam_variance_explained,
-    parameters,
-)
 import os
 import sys
 from pathlib import Path
@@ -26,6 +18,14 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
+
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    assemble_one_ff_gam_design,
+    one_ff_gam_fit,
+    gam_variance_explained,
+)
+
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -89,7 +89,7 @@ def main(unit_idx: int):
 
     # also get variance explained
     save_path = outdir / 'cv_var_explained' / f'{lam_suffix}.pkl'
-    prs = parameters.default_prs()
+    prs = one_ff_parameters.default_prs()
     cv_res = gam_variance_explained.crossval_variance_explained(
         fit_function=one_ff_gam_fit.fit_poisson_gam,
         design_df=design_df,

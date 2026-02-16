@@ -257,18 +257,25 @@ def add_spike_history_to_design(
     Optionally updates meta['groups'] to group history columns by predictor.
     """
 
-    design_df = design_df.copy()
+    # Collect all columns to add at once to avoid DataFrame fragmentation
+    columns_to_add = []
 
     # --- self-history ---
     if include_self:
         target_cols = colnames[target_col]
-        design_df[target_cols] = X_hist[target_col][target_cols].values
+        columns_to_add.append(X_hist[target_col][target_cols])
 
     # --- cross-neuron history ---
     if cross_neurons is not None:
         for neuron in cross_neurons:
             neuron_cols = colnames[neuron]
-            design_df[neuron_cols] = X_hist[neuron][neuron_cols].values
+            columns_to_add.append(X_hist[neuron][neuron_cols])
+
+    # Concatenate all columns at once for better performance
+    if columns_to_add:
+        design_df = pd.concat([design_df] + columns_to_add, axis=1)
+    else:
+        design_df = design_df.copy()
 
     # --- optional: update meta groups ---
     if meta_groups is not None:

@@ -66,7 +66,7 @@ class FFVisDecodingRunner:
             print('[_collect_data] Computing design matrices from scratch')
             (
                 self.spike_data_w_history,
-                self.binned_feats_sc,
+                self.vis_feats_to_decode,
                 self.meta_used,
             ) = self._prepare_design_matrices()
             
@@ -97,6 +97,7 @@ class FFVisDecodingRunner:
             bin_dt=self.pn.bin_width,
             add_ff_visible_info=True,
             add_retries_info=False,
+            for_decoding=True,
         )
 
         if 'global_burst_id' not in meta_used.columns:
@@ -106,11 +107,11 @@ class FFVisDecodingRunner:
                 how='left',
             )
 
-        binned_feats_sc, scaled_cols = event_binning.selective_zscore(
+        vis_feats_to_decode, scaled_cols = event_binning.selective_zscore(
             binned_feats
         )
-        binned_feats_sc = sm.add_constant(
-            binned_feats_sc,
+        vis_feats_to_decode = sm.add_constant(
+            vis_feats_to_decode,
             has_constant='add',
         )
 
@@ -130,7 +131,7 @@ class FFVisDecodingRunner:
             t_max=self.t_max,
         )
 
-        return spike_data_w_history, binned_feats_sc, meta_used
+        return spike_data_w_history, vis_feats_to_decode, meta_used
 
     def _get_save_dir(self):
         return os.path.join(
@@ -143,7 +144,7 @@ class FFVisDecodingRunner:
         save_dir = Path(self._get_save_dir())
         return {
             'spike_data_w_history': save_dir / 'spike_data_w_history.pkl',
-            'binned_feats_sc': save_dir / 'binned_feats_sc.pkl',
+            'vis_feats_to_decode': save_dir / 'vis_feats_to_decode.pkl',
             'meta_used': save_dir / 'meta_used.pkl',
         }
     
@@ -155,7 +156,7 @@ class FFVisDecodingRunner:
         
         data_to_save = {
             'spike_data_w_history': self.spike_data_w_history,
-            'binned_feats_sc': self.binned_feats_sc,
+            'vis_feats_to_decode': self.vis_feats_to_decode,
             'meta_used': self.meta_used,
         }
         
@@ -181,9 +182,9 @@ class FFVisDecodingRunner:
                 self.spike_data_w_history = pickle.load(f)
             print(f'[_load_design_matrices] Loaded spike_data_w_history from {paths["spike_data_w_history"]}')
             
-            with open(paths['binned_feats_sc'], 'rb') as f:
-                self.binned_feats_sc = pickle.load(f)
-            print(f'[_load_design_matrices] Loaded binned_feats_sc from {paths["binned_feats_sc"]}')
+            with open(paths['vis_feats_to_decode'], 'rb') as f:
+                self.vis_feats_to_decode = pickle.load(f)
+            print(f'[_load_design_matrices] Loaded vis_feats_to_decode from {paths["vis_feats_to_decode"]}')
             
             with open(paths['meta_used'], 'rb') as f:
                 self.meta_used = pickle.load(f)
@@ -244,7 +245,7 @@ class FFVisDecodingRunner:
 
             results_df = cv_decoding.run_cv_decoding(
                 X=self.spike_data_w_history,
-                y_df=self.binned_feats_sc,
+                y_df=self.vis_feats_to_decode,
                 behav_features=None,
                 groups=self.meta_used['event_id'].values,
                 n_splits=n_splits,
