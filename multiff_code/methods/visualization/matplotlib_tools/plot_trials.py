@@ -295,8 +295,12 @@ def PlotTrials(duration,
     # if show_only_ff_that_monkey_has_passed_by_closely:
     #     ff_dataframe_in_duration = ff_dataframe_utils.keep_only_ff_that_monkey_has_passed_by_closely(ff_dataframe_in_duration, max_distance_to_ff=100)
     print('duration:', duration)
-    ff_dataframe_in_duration_in_memory = ff_dataframe_in_duration.loc[(ff_dataframe_in_duration['visible'] == 0) &
-                                                                      (ff_dataframe_in_duration['ff_distance'] <= 400)]  # this condition can make the plot cleaner, and it's also believeable that when the ff is more than 400 cm away, monkey wouldn't care to remember it
+    
+    if player == 'agent':
+        ff_dataframe_in_duration_in_memory = ff_dataframe_in_duration.loc[(ff_dataframe_in_duration['visible'] == 0)] 
+    else:
+        ff_dataframe_in_duration_in_memory = ff_dataframe_in_duration.loc[(ff_dataframe_in_duration['visible'] == 0) &
+                                                                        (ff_dataframe_in_duration['ff_distance'] <= 400)]  # this condition can make the plot cleaner, and it's also believeable that when the ff is more than 400 cm away, monkey wouldn't care to remember it
     ff_dataframe_in_duration_visible = ff_dataframe_in_duration.loc[
         ff_dataframe_in_duration['visible'] == 1]
 

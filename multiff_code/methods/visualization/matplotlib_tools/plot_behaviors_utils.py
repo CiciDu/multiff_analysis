@@ -22,8 +22,8 @@ from matplotlib.legend_handler import HandlerTuple
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-connection_linewidth = {"agent": 0.25, "monkey": 0.5, "combined": 0.3}
-connection_alpha = {"agent": 0.6, "monkey": 0.7, "combined": 0.8}
+connection_linewidth = {"agent": 0.5, "monkey": 0.5, "combined": 1}
+connection_alpha = {"agent": 0.4, "monkey": 0.7, "combined": 0.8}
 
 
 def get_varying_colors_for_ff():

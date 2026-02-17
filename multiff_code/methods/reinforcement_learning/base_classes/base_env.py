@@ -190,7 +190,6 @@ class MultiFF(gymnasium.Env):
 
         # world state buffers (contiguous, float32)
         self.ffxy = np.zeros((self.num_alive_ff, 2), dtype=np.float32)
-        print('ffxy shape: ', self.ffxy.shape)
         self.ffxy_noisy = np.zeros((self.num_alive_ff, 2), dtype=np.float32)
         # last-seen feature buffers removed in favor of prev-obs snapshot approach
         self.ffr = np.zeros(self.num_alive_ff, dtype=np.float32)
@@ -382,14 +381,12 @@ class MultiFF(gymnasium.Env):
         # work on a copy and keep dtype consistent
         action = np.asarray(action, dtype=np.float32).copy()
         self.action = self._process_action(action)
-        print('self.action: ', self.action)
         # if action[1] < 1:
         #     print('time: ', round(self.time, 2), 'action: ', action)
 
         self.time += self.dt
         # update the position of the agent
         self._update_agent_pos()
-        print('self.agentxy: ', self.agentxy)
 
         self._get_ff_pos()
         self._check_for_captured_ff()
@@ -454,13 +451,10 @@ class MultiFF(gymnasium.Env):
         # calculate the change in the agent's position in one time step
         ah = self.agentheading
         v = self.v
-        # print('v: ', v)
+
         self.dx = np.cos(ah) * v
         self.dy = np.sin(ah) * v
-        # update the position and direction of the agent
-        print('self.dx: ', self.dx)
-        print('self.dy: ', self.dy)
-        print('self.dt: ', self.dt)
+
         self.agentxy[0] = self.agentxy[0] + self.dx * self.dt
         self.agentxy[1] = self.agentxy[1] + self.dy * self.dt
         r2 = self.agentxy[0] * self.agentxy[0] + \
@@ -723,8 +717,6 @@ class MultiFF(gymnasium.Env):
             ffids = self.slot_ids[valid_slots].astype(np.int32)
             # choose pose source for content features
             ffxy = self.ffxy_noisy[ffids]
-            # print('obs_ffxy:')
-            # print(ffxy)
 
             theta_center, _ = env_utils.calculate_angles_to_ff(
                 ffxy, self.agentxy[0], self.agentxy[1], self.agentheading, self.ff_radius

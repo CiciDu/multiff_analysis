@@ -5,6 +5,7 @@ from reinforcement_learning.collect_data import collect_agent_data
 import os
 import shutil
 import numpy as np
+import pandas as pd
 
 
 def find_flash_time_for_one_ff(ff_flash, lifetime):
@@ -285,20 +286,20 @@ def _get_visible_ff_indices(env):
     Return indices in ff_information corresponding to
     currently visible (flashing) fireflies.
     """
-    
+
     # Use slot_ids to get valid slots
     if not hasattr(env, 'slot_ids') or env.slot_ids is None:
         return []
-    
+
     # Get valid slots (those with firefly IDs >= 0)
     valid_slot_mask = env.slot_ids >= 0
-    
+
     if not np.any(valid_slot_mask):
         return []
-    
+
     # Get firefly IDs from valid slots
     valid_ff_ids = env.slot_ids[valid_slot_mask]
-    
+
     # Filter by visibility if available
     if hasattr(env, 'visible') and len(env.visible) > 0:
         # env.visible corresponds to valid slots
@@ -310,7 +311,7 @@ def _get_visible_ff_indices(env):
             visible_ff_ids = valid_ff_ids
     else:
         visible_ff_ids = valid_ff_ids
-    
+
     # Find these IDs in ff_information
     indices = [
         np.where(env.ff_information['index_in_ff_flash'] == idx)[0][-1]
@@ -404,7 +405,7 @@ def _run_agent_rollout(env,
         )
 
         print('env.time: ', env.time)
-        #print('obs: ', obs)
+        # print('obs: ', obs)
         print('visible ff indices: ', _get_visible_ff_indices(env))
         print('env.agentxy: ', env.agentxy)
         print('env.agentheading: ', env.agentheading)
@@ -414,12 +415,11 @@ def _run_agent_rollout(env,
 
         # Override state
         env.agentheading = np.array([imitation_states['angle'][step]])
-        agentx = np.array([imitation_states['x'][step]])
-        agenty = np.array([imitation_states['y'][step]])
-        env.agentxy = np.array([agentx, agenty])
+        agentxy = np.array([imitation_states['x'][step], imitation_states['y'][step]])
+        env.agentxy = agentxy
 
-        monkey_x.append(agentx[0])
-        monkey_y.append(agenty[0])
+        monkey_x.append(agentxy[0])
+        monkey_y.append(agentxy[1])
         monkey_speed.append(float(env.v))
         monkey_dw.append(float(env.w))
         monkey_angles.append(env.agentheading[0])
@@ -472,21 +472,145 @@ def _run_agent_rollout(env,
     )
 
 
-def find_corresponding_info_of_agent(env,
-                                     sac_model,
-                                     info_of_monkey,
-                                     start_time,
-                                     whole_plot_duration,
-                                     imitation_duration,
-                                     ):
+def _append_ff_obs_rows(ff_obs_rows, env, point_index):
     """
-    Run the agent in a replicated environment around a monkey trial segment.
+    Append per-(step,slot) firefly observation rows to ff_obs_rows.
+
+    This is the unified, observation-level logging used to build ff_in_obs_df,
+    matching the collect_agent_data_func pipeline exactly.
+
+    Uses the same data access methods as _collect_firefly_data in collect_agent_data.py:
+    - env.sel_ff_indices: firefly identifiers
+    - env.ff_t_since_last_seen[sel_ff_indices]: time since last visibility
+    - env.ffxy_slot_noisy: noisy positions with arena_center_global offset
+    - env.visible: visibility flags (slot-sized)
+    - env.pose_unreliable: pose reliability flags (slot-sized)
+    """
+
+    if not hasattr(env, 'sel_ff_indices') or env.sel_ff_indices is None:
+        return
+
+    sel_ff_indices = env.sel_ff_indices.astype(int)
+    n_slots = len(sel_ff_indices)
+    
+    if n_slots == 0:
+        return
+
+    # Get time_since_last_vis using ff_t_since_last_seen (same as collect_agent_data.py)
+    if hasattr(env, 'ff_t_since_last_seen') and env.ff_t_since_last_seen is not None:
+        tslv_arr = env.ff_t_since_last_seen[sel_ff_indices]
+
+    # Get noisy positions using ffxy_slot_noisy (same as collect_agent_data.py)
+    if hasattr(env, 'ffxy_slot_noisy') and len(env.ffxy_slot_noisy) > 0:
+        if env.ffxy_slot_noisy.shape[0] != n_slots:
+            return
+        
+        # Add arena center offset (same as collect_agent_data.py)
+        arena_offset = env.arena_center_global if hasattr(env, 'arena_center_global') else np.array([0.0, 0.0])
+        ff_x_noisy_arr = env.ffxy_slot_noisy[:, 0] + arena_offset[0]
+        ff_y_noisy_arr = env.ffxy_slot_noisy[:, 1] + arena_offset[1]
+
+    # Get visible and pose_unreliable (same as collect_agent_data.py)
+    if hasattr(env, 'visible') and len(env.visible) == n_slots:
+        visible_arr = np.asarray(env.visible)
+    else:
+        visible_arr = np.ones(n_slots, dtype=float)
+
+    if hasattr(env, 'pose_unreliable') and len(env.pose_unreliable) == n_slots:
+        pose_unrel_arr = np.asarray(env.pose_unreliable)
+    else:
+        pose_unrel_arr = np.zeros(n_slots, dtype=float)
+
+    # Append rows for each slot
+    for i in range(n_slots):
+        index_in_ff_flash = int(sel_ff_indices[i])
+        
+        ff_obs_rows.append({
+            'index_in_ff_flash': index_in_ff_flash,
+            'time': float(env.time),
+            'point_index': int(point_index),
+            'ff_x_noisy': float(ff_x_noisy_arr[i]),
+            'ff_y_noisy': float(ff_y_noisy_arr[i]),
+            'pose_unreliable': float(pose_unrel_arr[i]),
+            'visible': float(visible_arr[i]),
+            'time_since_last_vis': float(tslv_arr[i]) if np.isfinite(tslv_arr[i]) else tslv_arr[i]
+        })
+
+
+def _build_ff_in_obs_df_from_rows(env, ff_obs_rows):
+    """
+    Convert accumulated ff_obs_rows into ff_in_obs_df with the same merge/filter/cap checks
+    as collect_agent_data_func.
+    """
+    ff_in_obs_df = pd.DataFrame(ff_obs_rows)
+
+    if len(ff_in_obs_df) == 0:
+        # Create an empty dataframe with the expected columns so downstream code doesn't crash
+        return pd.DataFrame(columns=[
+            'index_in_ff_flash', 'time', 'point_index', 'ff_x_noisy', 'ff_y_noisy',
+            'pose_unreliable', 'visible', 'time_since_last_vis',
+            't_spawn', 't_despawn', 't_capture', 'index_in_ff_information'
+        ])
+
+    ff_information_temp = env.ff_information.copy()
+    ff_information_temp['index_in_ff_information'] = range(
+        len(ff_information_temp))
+
+    ff_information_temp.loc[ff_information_temp['t_capture']
+                            < 0, 't_capture'] = env.time + 10
+    ff_information_temp.loc[ff_information_temp['t_despawn']
+                            < 0, 't_despawn'] = env.time + 10
+
+    ff_in_obs_df = ff_in_obs_df.merge(
+        ff_information_temp,
+        on='index_in_ff_flash',
+        how='left'
+    )
+
+    # Keep only rows that are within that firefly's lifetime window
+    ff_in_obs_df = ff_in_obs_df[
+        ff_in_obs_df['time'].between(
+            ff_in_obs_df['t_spawn'],
+            ff_in_obs_df['t_despawn'],
+            inclusive='left'
+        )
+    ].copy()
+
+    ff_in_obs_df.sort_values(
+        ['point_index', 'index_in_ff_flash', 'time'], inplace=True)
+
+    # Enforce environment cap per observation step defensively
+    try:
+        max_per_step = ff_in_obs_df.groupby(
+            'point_index')['index_in_ff_flash'].nunique().max()
+    except Exception:
+        max_per_step = None
+
+    if max_per_step is not None and max_per_step > env.num_obs_ff:
+        raise ValueError(
+            "The number of fireflies in the observation exceeds the number in the environment."
+        )
+
+    return ff_in_obs_df
+
+
+def find_corresponding_info_of_agent(env, sac_model, info_of_monkey, start_time,
+                                     whole_plot_duration, monkey_acting_duration):
+    """
+    Unified architecture version:
+
+    - Rollout agent in replicated env around monkey segment
+    - Log observation-level firefly rows into ff_in_obs_df (like collect_agent_data_func)
+    - Use _postprocess_ff_dataframe to produce (ff_in_obs_df, obs_ff_indices_in_ff_dataframe)
+    - Build ff_dataframe from ff_in_obs_df via:
+        add_essential_columns_to_ff_dataframe + process_ff_dataframe
+      (i.e., same method you described for collect_agent_data_func)
     """
 
     agent_dt = env.dt
 
     # -------------------------------------------------
-    # Select alive fireflies
+    # Select alive fireflies (vectorized)
     # -------------------------------------------------
     alive_ffs = np.where(
         (info_of_monkey['ff_life_sorted'][:, 1] >= whole_plot_duration[0]) &
@@ -494,19 +618,27 @@ def find_corresponding_info_of_agent(env,
     )[0]
 
     # -------------------------------------------------
-    # Extract monkey segment
+    # Slice monkey trajectory segment and resample to agent dt
     # -------------------------------------------------
-    (A_cum_t, A_cum_mx, A_cum_my,
-     A_cum_speed, A_cum_angle, A_cum_dw), mask = \
-        _extract_agent_dt_monkey_segment(
-            info_of_monkey['monkey_information'],
-            imitation_duration,
-            agent_dt
+    monkey_df = info_of_monkey['monkey_information']
+    mask = (
+        (monkey_df['time'] >= monkey_acting_duration[0]) &
+        (monkey_df['time'] <= monkey_acting_duration[1])
     )
+
+    A_cum_t, A_cum_mx, A_cum_my, A_cum_speed, A_cum_angle, A_cum_dw = \
+        increase_dt_for_monkey_information(
+            monkey_df.loc[mask, 'time'].to_numpy(),
+            monkey_df.loc[mask, 'monkey_x'].to_numpy(),
+            monkey_df.loc[mask, 'monkey_y'].to_numpy(),
+            agent_dt
+        )
 
     num_imitation_steps_agent = len(A_cum_t)
 
-    # Rotation matrix
+    # -------------------------------------------------
+    # Rotation matrix (same as before)
+    # -------------------------------------------------
     dx = A_cum_mx[-1] - A_cum_mx[0]
     dy = A_cum_my[-1] - A_cum_my[0]
     theta = np.pi / 2 - np.arctan2(dy, dx)
@@ -514,14 +646,27 @@ def find_corresponding_info_of_agent(env,
     rotation_matrix = np.array([[c, -s], [s, c]])
 
     # -------------------------------------------------
-    # Configure environment
+    # Environment configuration (same as before)
     # -------------------------------------------------
-    obs = _configure_env_from_monkey_data(
-        env,
-        info_of_monkey,
+    env.flash_on_interval = 0.3
+    env.distance2center_cost = 0
+
+    env.ff_flash = make_env_ff_flash_from_real_data(
+        info_of_monkey['ff_flash_sorted'],
         alive_ffs,
         whole_plot_duration
     )
+
+    env_ffxy = np.asarray(
+        info_of_monkey['ff_real_position_sorted'][alive_ffs],
+        dtype=np.float32
+    )
+
+    env.ffxy = env.ffxy_noisy = env_ffxy
+    env.ffx = env.ffx_noisy = env_ffxy[:, 0]
+    env.ffy = env.ffy_noisy = env_ffxy[:, 1]
+
+    obs, _ = env.reset(use_random_ff=False)
 
     # Convert monkey actions
     monkey_actions = np.column_stack((
@@ -529,49 +674,97 @@ def find_corresponding_info_of_agent(env,
         (A_cum_speed / env.vgain - 0.5) * 2
     ))
 
-    # Initialize state
+    # -------------------------------------------------
+    # Initialize state to match monkey start
+    # -------------------------------------------------
     env.time = A_cum_t[0] - start_time
     env.agentheading = np.array([A_cum_angle[0]])
-    env.agentxy = np.array([A_cum_mx[0], A_cum_my[0]])
+    env.agentx = np.array([A_cum_mx[0]])
 
     # -------------------------------------------------
-    # Rollout
+    # Rollout storage (monkey trajectory + ff_in_obs_df rows)
+    # -------------------------------------------------
+    monkey_x, monkey_y = [], []
+    monkey_speed, monkey_dw = [], []
+    monkey_angles, time = [], []
+    ff_obs_rows = []
+
+    # -------------------------------------------------
+    # Disable noise temporarily (same as before)
+    # -------------------------------------------------
+    original_v_noise_std = env.v_noise_std
+    original_w_noise_std = env.w_noise_std
+    env.v_noise_std = 0
+    env.w_noise_std = 0
+
+    # -------------------------------------------------
+    # Imitation phase
+    # -------------------------------------------------
+    for step in range(1, num_imitation_steps_agent):
+
+        obs, _, _, _, _ = env.step(
+            monkey_actions[step],
+            respawn_on_capture=False
+        )
+
+        # Override state to match monkey trajectory
+        env.agentheading = np.array([A_cum_angle[step]])
+        env.agentxy = np.array([A_cum_mx[step], A_cum_my[step]])
+
+        monkey_x.append(env.agentxy[0])
+        monkey_y.append(env.agentxy[1])
+        monkey_speed.append(float(env.v))
+        monkey_dw.append(float(env.w))
+        monkey_angles.append(env.agentheading[0])
+        time.append(env.time)
+
+        point_index = len(time) - 1
+        _append_ff_obs_rows(ff_obs_rows, env, point_index)
+
+    # -------------------------------------------------
+    # Autonomous SAC phase
     # -------------------------------------------------
     num_total_steps = int(
         np.ceil((whole_plot_duration[1] - whole_plot_duration[0]) / agent_dt)
     )
 
-    rollout_results = _run_agent_rollout(
-        env,
-        obs,
-        monkey_actions,
-        {'x': A_cum_mx, 'y': A_cum_my, 'angle': A_cum_angle},
-        num_imitation_steps_agent,
-        num_total_steps,
-        sac_model
-    )
+    for idx, _ in enumerate(range(num_imitation_steps_agent, num_total_steps + 10)):
 
-    (monkey_x, monkey_y,
-     monkey_speed, monkey_dw,
-     monkey_angles, time,
-     obs_ff_unique_identifiers) = rollout_results
+        action, _ = sac_model.predict(obs, deterministic=True)
+        obs, _, _, _, _ = env.step(action)
+
+        monkey_x.append(env.agentxy[0])
+        monkey_y.append(env.agentxy[1])
+        monkey_speed.append(float(env.v))
+        monkey_dw.append(float(env.w))
+        # env.agentheading can be array; store scalar angle for consistency
+        monkey_angles.append(float(np.asarray(env.agentheading).ravel()[0]))
+        time.append(env.time)
+
+        point_index = len(time) - 1
+        _append_ff_obs_rows(ff_obs_rows, env, point_index)
+
+    # Restore noise
+    env.v_noise_std = original_v_noise_std
+    env.w_noise_std = original_w_noise_std
 
     # -------------------------------------------------
-    # Build monkey_information (reuse previous helper)
+    # Build monkey_information (reuse your shared helper)
     # -------------------------------------------------
+    # We don't have an explicit stop flag here; keep it as zeros (same shape).
     monkey_information = collect_agent_data._build_monkey_information(
         np.asarray(time),
         np.asarray(monkey_x),
         np.asarray(monkey_y),
         np.asarray(monkey_speed),
         np.asarray(monkey_dw),
-        np.zeros(len(time)),   # no explicit stop flag here
+        np.zeros(len(time)),
         np.remainder(np.asarray(monkey_angles), 2 * np.pi),
         env.dt
     )
 
     # -------------------------------------------------
-    # Unpack FF info
+    # Unpack FF information (same as before)
     # -------------------------------------------------
     (
         ff_caught_T_new,
@@ -587,27 +780,39 @@ def find_corresponding_info_of_agent(env,
         env.time
     )
 
-    reversed_sorting = reverse_value_and_position(sorted_indices_all)
-
-    obs_ff_indices_in_ff_dataframe = [
-        reversed_sorting[indices]
-        for indices in obs_ff_unique_identifiers
-    ]
-
     # -------------------------------------------------
-    # Build ff_dataframe (reuse existing pipeline)
+    # Build ff_in_obs_df (unified) + postprocess (reuse shared helper)
     # -------------------------------------------------
-    ff_dataframe = make_ff_dataframe.make_ff_dataframe_func(
-        monkey_information,
-        ff_caught_T_new,
-        ff_flash_sorted,
-        ff_real_position_sorted,
-        ff_life_sorted,
-        max_distance=400,
-        player="agent",
-        obs_ff_indices_in_ff_dataframe=obs_ff_indices_in_ff_dataframe
+    ff_in_obs_df = _build_ff_in_obs_df_from_rows(env, ff_obs_rows)
+
+    ff_in_obs_df, obs_ff_indices_in_ff_dataframe = collect_agent_data._postprocess_ff_dataframe(
+        env,
+        ff_in_obs_df,
+        sorted_indices_all,
+        n_steps=len(monkey_information)
     )
 
+    # -------------------------------------------------
+    # Build ff_dataframe from ff_in_obs_df (the method you want to standardize on)
+    # -------------------------------------------------
+    ff_dataframe = ff_in_obs_df.copy()
+
+    make_ff_dataframe.add_essential_columns_to_ff_dataframe(
+        ff_dataframe,
+        monkey_information,
+        ff_real_position_sorted
+    )
+
+    ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(ff_dataframe, ff_real_position_sorted,
+                                                                ff_caught_T_new, ff_life_sorted)
+
+    ff_dataframe = make_ff_dataframe.process_ff_dataframe(
+        ff_dataframe,
+        max_distance=None,
+        max_time_since_last_vis=3
+    )
+
+    # Match previous trimming behavior
     if len(ff_dataframe) > 0:
         ff_dataframe = ff_dataframe[
             ff_dataframe['time'] <= whole_plot_duration[1] -
@@ -624,16 +829,22 @@ def find_corresponding_info_of_agent(env,
     else:
         cluster_around_target_indices = []
 
+    # -------------------------------------------------
+    # Final output (same keys as before + include ff_in_obs_df if you want)
+    # -------------------------------------------------
     info_of_agent = {
-        "monkey_information": monkey_information,
-        "ff_dataframe": ff_dataframe,
-        "ff_caught_T_new": ff_caught_T_new,
-        "ff_real_position_sorted": ff_real_position_sorted,
-        "ff_believed_position_sorted": ff_believed_position_sorted,
-        "ff_life_sorted": ff_life_sorted,
-        "ff_flash_sorted": ff_flash_sorted,
-        "ff_flash_end_sorted": ff_flash_end_sorted,
-        "cluster_around_target_indices": cluster_around_target_indices
+        'monkey_information': monkey_information,
+        'ff_dataframe': ff_dataframe,
+        'ff_in_obs_df': ff_in_obs_df,
+        'ff_caught_T_new': ff_caught_T_new,
+        'ff_real_position_sorted': ff_real_position_sorted,
+        'ff_believed_position_sorted': ff_believed_position_sorted,
+        'ff_life_sorted': ff_life_sorted,
+        'ff_flash_sorted': ff_flash_sorted,
+        'ff_flash_end_sorted': ff_flash_end_sorted,
+        'cluster_around_target_indices': cluster_around_target_indices,
+        'obs_ff_indices_in_ff_dataframe': obs_ff_indices_in_ff_dataframe,
+        'sorted_indices_all': sorted_indices_all
     }
 
     return (

@@ -303,6 +303,8 @@ def PlotSidebySide(whole_duration,
                            rotation_matrix=rotation_matrix,
                            player="monkey",
                            steps_to_be_marked=num_imitation_steps_monkey,
+                           show_connect_path_ff=True,
+                           show_connect_path_ff_memory=False,
                            **plotting_params
                            )
     axes.set_title(f"Monkey: Trial {currentTrial}", fontsize=22)
@@ -329,6 +331,9 @@ def PlotSidebySide(whole_duration,
                            rotation_matrix=rotation_matrix,
                            player="agent",
                            steps_to_be_marked=num_imitation_steps_agent,
+                           show_connect_path_ff=True,
+                           show_connect_path_ff_memory=True,
+                           connect_path_ff_max_distance=2000,
                            **plotting_params
                            )
     axes2.set_title(f"Agent: Trial {currentTrial}", fontsize=22)
