@@ -225,10 +225,13 @@ def find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial=No
                 else:
                     currentTrial_2 = 1
                 currentTrial = max(currentTrial, currentTrial_2)
+            else:
+                currentTrial = 1
+                print('Since ff_caught_T_new is empty, currentTrial is set to 1')
         except Exception as e:
             print('Finding currentTrial failed:',
-                  e, 'currentTrial is set to None')
-            currentTrial = None
+                  e, 'currentTrial is set to 1')
+            currentTrial = 1
     if num_trials is None:
         try:
             if len(ff_caught_T_new) > 0:
@@ -239,8 +242,11 @@ def find_currentTrial_or_num_trials_or_duration(ff_caught_T_new, currentTrial=No
                         1, currentTrial-trials_after_first_capture[-1])
                 else:
                     num_trials = 1
+            else:
+                num_trials = 1
+                print('Since ff_caught_T_new is empty, num_trials is set to 1')
         except Exception as e:
-            num_trials = None
+            num_trials = 1
 
     return currentTrial, num_trials, duration
 

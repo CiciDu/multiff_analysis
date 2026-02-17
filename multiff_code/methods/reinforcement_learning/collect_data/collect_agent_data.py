@@ -83,152 +83,6 @@ def _initialize_agent_state(env, rl_agent, hidden_dim=128, first_obs=None, seed=
         return obs, None, None
 
 
-def collect_agent_data_func(env, rl_agent, n_steps=15000,
-                            hidden_dim=128, deterministic=True, first_obs=None, seed=42, agent_type=None):
-    """
-    Extract data points from monkey's behavior by increasing the interval between the points.
-    """
-
-    # Initialize
-    state_or_obs, last_action, hidden_out = _initialize_agent_state(
-        env, rl_agent, hidden_dim, first_obs, seed, agent_type
-    )
-
-    # Collect environment data
-    results = _collect_monkey_and_ff_data(
-        env, rl_agent, n_steps, hidden_dim, deterministic,
-        state_or_obs, last_action, hidden_out, agent_type
-    )
-
-    (monkey_x, monkey_y, speed, ang_speed, monkey_angle, is_stop, time,
-     indexes_in_ff_flash, corresponding_time, ff_x_noisy, ff_y_noisy,
-     pose_unreliable, visible, time_since_last_vis_list, all_steps) = results
-
-    # -----------------------------------------------------------------
-    # ↓ Your downstream firefly + monkey data processing section ↓
-    # -----------------------------------------------------------------
-    ff_in_obs_df = pd.DataFrame({
-        'index_in_ff_flash': indexes_in_ff_flash,
-        'time': corresponding_time,
-        'point_index': all_steps,
-        'ff_x_noisy': ff_x_noisy,
-        'ff_y_noisy': ff_y_noisy,
-        'pose_unreliable': pose_unreliable,
-        'visible': visible,
-        'time_since_last_vis': time_since_last_vis_list
-    })
-
-    ff_information_temp = env.ff_information.copy()
-    ff_information_temp['index_in_ff_information'] = range(
-        len(ff_information_temp))
-    ff_information_temp.loc[ff_information_temp['t_capture']
-                            < 0, 't_capture'] = env.time + 10
-    ff_information_temp.loc[ff_information_temp['t_despawn']
-                            < 0, 't_despawn'] = env.time + 10
-
-    ff_in_obs_df = ff_in_obs_df.merge(
-        ff_information_temp, on='index_in_ff_flash', how='left'
-    )
-    ff_in_obs_df = ff_in_obs_df[ff_in_obs_df['time'].between(
-        ff_in_obs_df['t_spawn'], ff_in_obs_df['t_despawn'], inclusive='left'
-    )].copy()
-    # Deduplicate any accidental duplicates per time step and firefly id after merge
-    ff_in_obs_df.sort_values(
-        ['point_index', 'index_in_ff_flash', 'time'], inplace=True)
-    # ff_in_obs_df = ff_in_obs_df.drop_duplicates(
-    #     subset=['point_index', 'index_in_ff_flash'], keep='last')
-
-    # Enforce environment cap per observation step defensively
-    try:
-        max_per_step = ff_in_obs_df.groupby(
-            'point_index')['index_in_ff_flash'].nunique().max()
-    except Exception:
-        max_per_step = None
-
-    if max_per_step > env.num_obs_ff:
-        raise ValueError(
-            "The number of fireflies in the observation exceeds the number in the environment."
-        )
-
-    # if pd.notna(max_per_step) and int(max_per_step) > int(env.num_obs_ff):
-    #     # Keep at most env.num_obs_ff rows per step deterministically
-    #     ff_in_obs_df = (
-    #         ff_in_obs_df
-    #         .groupby('point_index', group_keys=False)
-    #         .apply(lambda g: g.head(int(env.num_obs_ff)))
-    #         .reset_index(drop=True)
-    #     )
-
-    # Collect all monkey data
-    monkey_information = pack_monkey_information(
-        time, monkey_x, monkey_y, speed, ang_speed, is_stop, monkey_angle, env.dt
-    )
-    monkey_information['point_index'] = range(len(monkey_information))
-
-    process_monkey_information.add_more_columns_to_monkey_information(
-        monkey_information)
-    monkey_information['whether_new_distinct_stop'] = monkey_information['monkey_speeddummy'].diff().fillna(0) == -1
-    monkey_information['stop_id'] = monkey_information['whether_new_distinct_stop'].cumsum(
-    ) - 1
-
-    monkey_information.loc[monkey_information['monkey_speeddummy']
-                            == 1, 'stop_id'] = np.nan
-    
-    # Get information about fireflies
-    ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, ff_life_sorted, \
-        ff_flash_sorted, ff_flash_end_sorted, sorted_indices_all = unpack_ff_information_of_agent(
-            env.ff_information, env.ff_flash, env.time
-        )
-
-    caught_ff_num = len(ff_caught_T_new)
-    total_ff_num = len(ff_life_sorted)
-
-    reversed_sorting = reverse_value_and_position(sorted_indices_all)
-    ff_in_obs_df['index_in_ff_dataframe'] = reversed_sorting[ff_in_obs_df['index_in_ff_information'].values]
-    ff_in_obs_df = ff_in_obs_df.astype({
-        'index_in_ff_information': 'int', 'index_in_ff_dataframe': 'int', 'point_index': 'int'
-    })
-    num_decimals_of_dt = find_decimals(env.dt)
-    ff_in_obs_df['time_since_last_vis'] = np.round(
-        ff_in_obs_df['time_since_last_vis'], num_decimals_of_dt)
-    ff_in_obs_df.reset_index(drop=True, inplace=True)
-
-    ff_in_obs_df = ff_in_obs_df[
-        ['index_in_ff_dataframe', 'index_in_ff_information', 'index_in_ff_flash', 'point_index',
-         'ff_x_noisy', 'ff_y_noisy', 'time_since_last_vis', 'visible', 'pose_unreliable']
-    ].copy()
-    ff_in_obs_df.rename(
-        columns={'index_in_ff_dataframe': 'ff_index'}, inplace=True)
-
-    obs_ff_indices_in_ff_dataframe = pd.DataFrame(
-        ff_in_obs_df.groupby('point_index')['ff_index'].apply(list)
-    )
-    obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe.merge(
-        pd.DataFrame(pd.Series(range(n_steps), name='point_index')),
-        on='point_index', how='right'
-    )
-
-    obs_ff_indices_in_ff_dataframe = obs_ff_indices_in_ff_dataframe['ff_index'].tolist(
-    )
-    obs_ff_indices_in_ff_dataframe = [
-        np.array(x) if isinstance(x, list) else np.array([]) for x in obs_ff_indices_in_ff_dataframe
-    ]
-
-    # Capture rate
-    if monkey_information['time'].max() > 0:
-        ff_capture_rate = len(set(ff_caught_T_new)) / \
-            monkey_information['time'].max()
-        logging.info(f"Firefly capture rate: {ff_capture_rate:.4f}")
-    else:
-        logging.warning("Monkey time max is 0; capture rate undefined.")
-
-    # -----------------------------------------------------------------
-    # Return final results (same as original)
-    # -----------------------------------------------------------------
-    return (monkey_information, ff_flash_sorted, ff_caught_T_new, ff_believed_position_sorted,
-            ff_real_position_sorted, ff_life_sorted, ff_flash_end_sorted, caught_ff_num,
-            total_ff_num, obs_ff_indices_in_ff_dataframe, sorted_indices_all, ff_in_obs_df)
-
 
 def find_decimals(x):
     if x == 0:
@@ -476,5 +330,327 @@ def _collect_firefly_data(env, step, idxs, times, ff_x_noisy, ff_y_noisy,
             (env.ffxy_slot_noisy[:, 0] + env.arena_center_global[0]).tolist())
         ff_y_noisy.extend(
             (env.ffxy_slot_noisy[:, 1] + env.arena_center_global[1]).tolist())
-        pose_unreliable.extend(env.pose_unreliable.tolist())
-        visible.extend(env.visible.tolist())
+        
+        # env.visible and env.pose_unreliable are already sized for valid slots only
+        # They should match the length of sel_ff_indices
+        if hasattr(env, 'pose_unreliable') and len(env.pose_unreliable) == len(sel_ff_indices):
+            pose_unreliable.extend(env.pose_unreliable.tolist())
+        else:
+            # Fallback if lengths don't match
+            print('lengths of pose_unreliable and sel_ff_indices do not match')
+            pose_unreliable.extend([0.0] * len(sel_ff_indices))
+        
+        if hasattr(env, 'visible') and len(env.visible) == len(sel_ff_indices):
+            visible.extend(env.visible.tolist())
+        else:
+            # Fallback if lengths don't match
+            print('lengths of visible and sel_ff_indices do not match')
+            visible.extend([1.0] * len(sel_ff_indices))
+
+
+def _build_ff_in_obs_df(env,
+                        indexes_in_ff_flash,
+                        corresponding_time,
+                        all_steps,
+                        ff_x_noisy,
+                        ff_y_noisy,
+                        pose_unreliable,
+                        visible,
+                        time_since_last_vis_list):
+    """
+    Build merged and filtered firefly observation dataframe.
+    """
+
+    ff_in_obs_df = pd.DataFrame({
+        'index_in_ff_flash': indexes_in_ff_flash,
+        'time': corresponding_time,
+        'point_index': all_steps,
+        'ff_x_noisy': ff_x_noisy,
+        'ff_y_noisy': ff_y_noisy,
+        'pose_unreliable': pose_unreliable,
+        'visible': visible,
+        'time_since_last_vis': time_since_last_vis_list
+    })
+
+    ff_information_temp = env.ff_information.copy()
+    ff_information_temp['index_in_ff_information'] = range(len(ff_information_temp))
+
+    ff_information_temp.loc[ff_information_temp['t_capture'] < 0, 't_capture'] = env.time + 10
+    ff_information_temp.loc[ff_information_temp['t_despawn'] < 0, 't_despawn'] = env.time + 10
+
+    ff_in_obs_df = ff_in_obs_df.merge(
+        ff_information_temp,
+        on='index_in_ff_flash',
+        how='left'
+    )
+
+    ff_in_obs_df = ff_in_obs_df[
+        ff_in_obs_df['time'].between(
+            ff_in_obs_df['t_spawn'],
+            ff_in_obs_df['t_despawn'],
+            inclusive='left'
+        )
+    ].copy()
+
+    ff_in_obs_df.sort_values(
+        ['point_index', 'index_in_ff_flash', 'time'],
+        inplace=True
+    )
+
+    # Defensive cap check
+    try:
+        max_per_step = (
+            ff_in_obs_df
+            .groupby('point_index')['index_in_ff_flash']
+            .nunique()
+            .max()
+        )
+    except Exception:
+        max_per_step = None
+
+    if max_per_step is not None and max_per_step > env.num_obs_ff:
+        raise ValueError(
+            "The number of fireflies in the observation exceeds the number in the environment."
+        )
+
+    return ff_in_obs_df
+
+
+def _build_monkey_information(time,
+                              monkey_x,
+                              monkey_y,
+                              speed,
+                              ang_speed,
+                              is_stop,
+                              monkey_angle,
+                              dt):
+    """
+    Build and enrich monkey_information dataframe.
+    """
+
+    monkey_information = pack_monkey_information(
+        time,
+        monkey_x,
+        monkey_y,
+        speed,
+        ang_speed,
+        is_stop,
+        monkey_angle,
+        dt
+    )
+
+    monkey_information['point_index'] = range(len(monkey_information))
+
+    process_monkey_information.add_more_columns_to_monkey_information(
+        monkey_information
+    )
+
+    monkey_information['whether_new_distinct_stop'] = (
+        monkey_information['monkey_speeddummy']
+        .diff()
+        .fillna(0) == -1
+    )
+
+    monkey_information['stop_id'] = (
+        monkey_information['whether_new_distinct_stop']
+        .cumsum() - 1
+    )
+
+    monkey_information.loc[
+        monkey_information['monkey_speeddummy'] == 1,
+        'stop_id'
+    ] = np.nan
+
+    return monkey_information
+
+def _postprocess_ff_dataframe(env,
+                              ff_in_obs_df,
+                              sorted_indices_all,
+                              n_steps):
+    """
+    Add ff_index, clean columns, and compute observation index lists.
+    """
+
+    reversed_sorting = reverse_value_and_position(sorted_indices_all)
+
+    ff_in_obs_df['index_in_ff_dataframe'] = (
+        reversed_sorting[
+            ff_in_obs_df['index_in_ff_information'].values
+        ]
+    )
+
+    ff_in_obs_df = ff_in_obs_df.astype({
+        'index_in_ff_information': 'int',
+        'index_in_ff_dataframe': 'int',
+        'point_index': 'int'
+    })
+
+    num_decimals_of_dt = find_decimals(env.dt)
+
+    ff_in_obs_df['time_since_last_vis'] = np.round(
+        ff_in_obs_df['time_since_last_vis'],
+        num_decimals_of_dt
+    )
+
+    ff_in_obs_df.reset_index(drop=True, inplace=True)
+
+    ff_in_obs_df = ff_in_obs_df[
+        [
+            'index_in_ff_dataframe',
+            'index_in_ff_information',
+            'index_in_ff_flash',
+            'point_index',
+            'ff_x_noisy',
+            'ff_y_noisy',
+            'time_since_last_vis',
+            'visible',
+            'pose_unreliable'
+        ]
+    ].copy()
+
+    ff_in_obs_df.rename(
+        columns={'index_in_ff_dataframe': 'ff_index'},
+        inplace=True
+    )
+
+    # Build observation index lists
+    obs_ff_indices = (
+        ff_in_obs_df
+        .groupby('point_index')['ff_index']
+        .apply(list)
+    )
+
+    obs_ff_indices = (
+        obs_ff_indices
+        .to_frame()
+        .merge(
+            pd.DataFrame({'point_index': range(n_steps)}),
+            on='point_index',
+            how='right'
+        )
+    )
+
+    obs_ff_indices = obs_ff_indices['ff_index'].tolist()
+
+    obs_ff_indices = [
+        np.array(x) if isinstance(x, list) else np.array([])
+        for x in obs_ff_indices
+    ]
+
+    return ff_in_obs_df, obs_ff_indices
+
+
+def _compute_capture_rate(monkey_information, ff_caught_T_new):
+    """
+    Log capture rate.
+    """
+
+    if monkey_information['time'].max() > 0:
+        ff_capture_rate = (
+            len(set(ff_caught_T_new)) /
+            monkey_information['time'].max()
+        )
+        logging.info(f"Firefly capture rate: {ff_capture_rate:.4f}")
+    else:
+        logging.warning("Monkey time max is 0; capture rate undefined.")
+        
+        
+def collect_agent_data_func(env, rl_agent, n_steps=15000,
+                            hidden_dim=128, deterministic=True,
+                            first_obs=None, seed=42, agent_type=None):
+    """
+    Extract data points from monkey's behavior by increasing the interval between the points.
+    """
+
+    # --------------------------------------------------
+    # Initialize
+    # --------------------------------------------------
+    state_or_obs, last_action, hidden_out = _initialize_agent_state(
+        env, rl_agent, hidden_dim, first_obs, seed, agent_type
+    )
+
+    # --------------------------------------------------
+    # Collect raw rollout data
+    # --------------------------------------------------
+    results = _collect_monkey_and_ff_data(
+        env, rl_agent, n_steps, hidden_dim, deterministic,
+        state_or_obs, last_action, hidden_out, agent_type
+    )
+
+    (monkey_x, monkey_y, speed, ang_speed, monkey_angle, is_stop, time,
+     indexes_in_ff_flash, corresponding_time, ff_x_noisy, ff_y_noisy,
+     pose_unreliable, visible, time_since_last_vis_list, all_steps) = results
+
+    # --------------------------------------------------
+    # Build firefly observation dataframe
+    # --------------------------------------------------
+    ff_in_obs_df = _build_ff_in_obs_df(
+        env,
+        indexes_in_ff_flash,
+        corresponding_time,
+        all_steps,
+        ff_x_noisy,
+        ff_y_noisy,
+        pose_unreliable,
+        visible,
+        time_since_last_vis_list
+    )
+
+    # --------------------------------------------------
+    # Build monkey information
+    # --------------------------------------------------
+    monkey_information = _build_monkey_information(
+        time,
+        monkey_x,
+        monkey_y,
+        speed,
+        ang_speed,
+        is_stop,
+        monkey_angle,
+        env.dt
+    )
+
+    # --------------------------------------------------
+    # Unpack firefly info
+    # --------------------------------------------------
+    ff_caught_T_new, ff_believed_position_sorted, ff_real_position_sorted, \
+        ff_life_sorted, ff_flash_sorted, ff_flash_end_sorted, \
+        sorted_indices_all = unpack_ff_information_of_agent(
+            env.ff_information, env.ff_flash, env.time
+        )
+
+    caught_ff_num = len(ff_caught_T_new)
+    total_ff_num = len(ff_life_sorted)
+
+    # --------------------------------------------------
+    # Final firefly dataframe processing
+    # --------------------------------------------------
+    ff_in_obs_df, obs_ff_indices_in_ff_dataframe = _postprocess_ff_dataframe(
+        env,
+        ff_in_obs_df,
+        sorted_indices_all,
+        n_steps
+    )
+
+    # --------------------------------------------------
+    # Capture rate
+    # --------------------------------------------------
+    _compute_capture_rate(monkey_information, ff_caught_T_new)
+
+    # --------------------------------------------------
+    # Return (unchanged signature)
+    # --------------------------------------------------
+    return (
+        monkey_information,
+        ff_flash_sorted,
+        ff_caught_T_new,
+        ff_believed_position_sorted,
+        ff_real_position_sorted,
+        ff_life_sorted,
+        ff_flash_end_sorted,
+        caught_ff_num,
+        total_ff_num,
+        obs_ff_indices_in_ff_dataframe,
+        sorted_indices_all,
+        ff_in_obs_df
+    )

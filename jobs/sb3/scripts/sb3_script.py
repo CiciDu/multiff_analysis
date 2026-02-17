@@ -162,7 +162,6 @@ if __name__ == "__main__":
         overall_folder=overall_folder,
         model_folder_name=model_folder_name,
         n_envs=args.n_envs,
-        dict_obs=True,
         zero_invisible_ff_features=False,
         **env_kwargs,
     )

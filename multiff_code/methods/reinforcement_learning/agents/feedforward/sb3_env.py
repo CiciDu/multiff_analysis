@@ -11,9 +11,11 @@ class EnvForSB3(base_env.MultiFF):
 
     def __init__(self,
                  obs_visible_only=False,
+                 zero_invisible_ff_features=False,
                  **kwargs):
 
         super().__init__(obs_visible_only=obs_visible_only,
+                         zero_invisible_ff_features=zero_invisible_ff_features,
                          **kwargs)
 
 

@@ -25,6 +25,7 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
         super().__init__(overall_folder=overall_folder,
                          add_date_to_model_folder_name=add_date_to_model_folder_name,
+                         zero_invisible_ff_features=False,
                          **kwargs)
 
         self.agent_type = 'sb3'

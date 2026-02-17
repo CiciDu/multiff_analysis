@@ -86,8 +86,8 @@ class MultiFF(gymnasium.Env):
                  add_action_to_obs=True,
                  noise_mode='linear',
                  slot_fields: Optional[List[str]] = None,
-                 obs_visible_only: bool = False,
-                 zero_invisible_ff_features: bool = True,
+                 obs_visible_only: bool = False, 
+                 zero_invisible_ff_features: bool = False,
                  use_prev_obs_for_invisible_pose: bool = False,
                  obs_noise: Optional[Union[ObsNoiseCfg, dict]] = None,
                  # can be drop_fill_visible_only or drop_fill_visible_and_memory or rank_keep_visible_only or rank_keep_visible_and_memory
@@ -382,12 +382,14 @@ class MultiFF(gymnasium.Env):
         # work on a copy and keep dtype consistent
         action = np.asarray(action, dtype=np.float32).copy()
         self.action = self._process_action(action)
+        print('self.action: ', self.action)
         # if action[1] < 1:
         #     print('time: ', round(self.time, 2), 'action: ', action)
 
         self.time += self.dt
         # update the position of the agent
         self._update_agent_pos()
+        print('self.agentxy: ', self.agentxy)
 
         self._get_ff_pos()
         self._check_for_captured_ff()
@@ -415,6 +417,7 @@ class MultiFF(gymnasium.Env):
 
         terminated = False
         truncated = self.time >= self.episode_len * self.dt
+        #print('obs: ', self.obs)
         return self.obs, reward, terminated, truncated, {}
 
     def _process_action(self, action):
@@ -455,6 +458,9 @@ class MultiFF(gymnasium.Env):
         self.dx = np.cos(ah) * v
         self.dy = np.sin(ah) * v
         # update the position and direction of the agent
+        print('self.dx: ', self.dx)
+        print('self.dy: ', self.dy)
+        print('self.dt: ', self.dt)
         self.agentxy[0] = self.agentxy[0] + self.dx * self.dt
         self.agentxy[1] = self.agentxy[1] + self.dy * self.dt
         r2 = self.agentxy[0] * self.agentxy[0] + \
@@ -622,69 +628,6 @@ class MultiFF(gymnasium.Env):
         else:
             self.sel_ff_indices = np.array([], dtype=np.int32)
             self.ffxy_slot_noisy = np.empty((0, 2), dtype=np.float32)
-
-    # def _store_slot_ff_noisy_pos(self):
-    #     # Provide compatibility fields expected by data collectors
-    #     # Map current identity-bound observation slots -> indices and noisy positions
-    #     if getattr(self, 'slot_ids', None) is None:
-    #         self.sel_ff_indices = np.array([], dtype=np.int32)
-    #         self.ffxy_slot_noisy = np.empty((0, 2), dtype=np.float32)
-    #         return
-    #     valid_mask = self.slot_ids >= 0
-    #     if np.any(valid_mask):
-    #         sel_ff = self.slot_ids[valid_mask].astype(np.int32)
-    #         # restrict to slots marked valid in slots_SN (per-slot 'valid' field)
-    #         # Reconstruct slot-based positions from slots_SN: invert d_log and rotate (sin,cos)
-    #         slot_rows = np.where(valid_mask)[0]
-    #         rows = self.slots_SN[slot_rows, :] if hasattr(
-    #             self, 'slots_SN') else None
-    #         if rows is None or rows.size == 0:
-    #             self.ffxy_slot_noisy = np.empty((0, 2), dtype=np.float32)
-    #         else:
-    #             try:
-    #                 # filter rows by 'valid' field if present
-    #                 try:
-    #                     j_valid = self.slot_fields.index('valid')
-    #                     valid_rows_mask = rows[:, j_valid] > 0.5
-    #                 except ValueError:
-    #                     valid_rows_mask = np.ones(rows.shape[0], dtype=bool)
-    #                 if not np.any(valid_rows_mask):
-    #                     self.sel_ff_indices = np.array([], dtype=np.int32)
-    #                     self.ffxy_slot_noisy = np.empty(
-    #                         (0, 2), dtype=np.float32)
-    #                     return
-    #                 # apply filter
-    #                 rows = rows[valid_rows_mask]
-    #                 sel_ff = sel_ff[valid_rows_mask]
-    #                 self.sel_ff_indices = sel_ff.astype(np.int32, copy=False)
-    #                 j_dlog = self.slot_fields.index('d_log')
-    #                 j_sin = self.slot_fields.index('sin')
-    #                 j_cos = self.slot_fields.index('cos')
-    #                 d_log01 = rows[:, j_dlog].astype(np.float32)
-    #                 sin_theta = rows[:, j_sin].astype(np.float32)
-    #                 cos_theta = rows[:, j_cos].astype(np.float32)
-    #                 # Invert: d_log01 = log1p(dist/d0) / log1p(Dmax/d0)
-    #                 # = log1p(Dmax/d0)
-    #                 denom = np.float32(1.0 / self._inv_log_denom)
-    #                 dist = (self.d0 * np.expm1(d_log01 * denom)
-    #                         ).astype(np.float32)
-    #                 # Ego-frame displacement
-    #                 dx_ego = dist * cos_theta
-    #                 dy_ego = dist * sin_theta
-    #                 # Rotate by agent heading and translate by agent position to world frame
-    #                 h = float(self.agentheading)
-    #                 ch = math.cos(h)
-    #                 sh = math.sin(h)
-    #                 xw = self.agentxy[0] + dx_ego * ch - dy_ego * sh
-    #                 yw = self.agentxy[1] + dx_ego * sh + dy_ego * ch
-    #                 self.ffxy_slot_noisy = np.stack(
-    #                     [xw, yw], axis=1).astype(np.float32)
-    #             except ValueError:
-    #                 # Required fields not present in slots
-    #                 self.ffxy_slot_noisy = np.empty((0, 2), dtype=np.float32)
-    #     else:
-    #         self.sel_ff_indices = np.array([], dtype=np.int32)
-    #         self.ffxy_slot_noisy = np.empty((0, 2), dtype=np.float32)
 
     def _update_variables_when_no_ff_is_in_obs(self):
         self.ffxy_slot_noisy = np.array([])
