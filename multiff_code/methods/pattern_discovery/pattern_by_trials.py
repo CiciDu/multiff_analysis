@@ -163,7 +163,7 @@ def find_target_cluster_visible_before_last_one(target_clust_last_vis_df, ff_cau
                                              min_time_visible_before_last_capture=0.1):
 
     target_clust_last_vis_df['caught_time'] = ff_caught_T_new[target_clust_last_vis_df.target_index]
-    target_clust_last_vis_df['prev_caught_time'] = ff_caught_T_new[target_clust_last_vis_df.target_index-1]
+    target_clust_last_vis_df['prev_caught_time'] = ff_caught_T_new[target_clust_last_vis_df.target_index.astype(int)-1]
     target_clust_last_vis_df.loc[0, 'prev_caught_time'] = 0
     target_clust_last_vis_df['last_vis_time'] = target_clust_last_vis_df['caught_time'] - \
         target_clust_last_vis_df['time_since_last_vis']

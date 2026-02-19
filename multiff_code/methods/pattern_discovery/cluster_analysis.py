@@ -358,6 +358,7 @@ def get_target_clust_last_vis_df(ff_dataframe, monkey_information, ff_caught_T_n
         )
     else:
         target_clust_last_vis_df = target_clust_last_vis_df
+    target_clust_last_vis_df = target_clust_last_vis_df[target_clust_last_vis_df['target_index'] > 0].copy()
     return target_clust_last_vis_df
 
 

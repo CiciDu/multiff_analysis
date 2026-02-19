@@ -95,7 +95,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     axes.set_title("Time Since Target Last Visible", fontsize=11)
     axes.set_xlim([0, 6])
     axes.set_xlabel("Time (s)", fontsize=11)
-    plt.legend(labels=["Agent(LSTM)", 'monkey'],
+    plt.legend(labels=["agent", 'monkey'],
                fontsize=11, loc="upper right")
 
     variable_of_interest = "n_ff_in_a_row"
@@ -171,7 +171,7 @@ def plot_feature_histograms_for_monkey_and_agent(all_trial_features_valid_monkey
     plt.show()
 
 
-def plot_merged_df(merged_df, x='label', y='rate', hue=None, label_order=None, ax=None):
+def plot_merged_df(merged_df, x='label', y='rate', hue='Player', label_order=None, ax=None):
     sns.set_style(style="darkgrid")
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 7))
@@ -191,7 +191,7 @@ def plot_merged_df(merged_df, x='label', y='rate', hue=None, label_order=None, a
     return ax
 
 
-def plot_merged_df_by_category(merged_df, category_column_name, category_order=None, x="Player", y='rate', hue=None, percentage=False, subplots=True, num_columns=3):
+def plot_merged_df_by_category(merged_df, category_column_name, category_order=None, x="Player", y='rate', hue='Player', percentage=False, subplots=True, num_columns=3):
     """
     Make one barplot for each category in the merged_df (can be merged_stats_df or merged_medians_df, and can compare the monkey and the agent(s)
 

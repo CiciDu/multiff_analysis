@@ -330,6 +330,8 @@ def _is_dummy_col(s: pd.Series, tol_decimals: int = 12) -> bool:
 def selective_zscore(
     df: pd.DataFrame,
     *,
+    exclude_prefixes: tuple = (),
+    exclude_substrings: tuple = (),
     # treat centered & its square as “do not scale”
     centered_suffixes=('_c', '_c2'),
     zscored_suffixes=('_z', '_z2'),    # already standardized → skip
@@ -359,6 +361,10 @@ def selective_zscore(
 
     # Work only on numeric dtypes; strings/objects are ignored automatically.
     for col in out.select_dtypes(include='number').columns:
+        if exclude_prefixes and col.startswith(exclude_prefixes):
+            continue
+        if exclude_substrings and any(s in col for s in exclude_substrings):
+            continue
         # 1) never touch an intercept if it's already present
         if col == 'const':
             continue

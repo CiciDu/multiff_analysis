@@ -10,7 +10,6 @@ import json
 # =========================
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # =========================
 # MultiFF imports (USED ONLY)
@@ -38,11 +37,6 @@ from neural_data_analysis.design_kits.design_around_event import (
     event_binning,
 )
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    get_stops_utils,
-    prepare_stop_design,
-    collect_stop_data,
-)
 
 from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import (
     glm_runner,
@@ -52,7 +46,6 @@ from decision_making_analysis.data_compilation import (
     miss_events_class,
 )
 
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import assemble_stop_design
 
@@ -98,9 +91,9 @@ class FullSessionGLMRunner:
     def run(self, show_plots: bool = False, hyperparam_tuning: bool = True):
         self.assemble_merged_designs()
         # self._fit_glm()
-        self._fit_glm_sel_cols(show_plots=show_plots, hyperparam_tuning=hyperparam_tuning)
+        self._fit_glm_sel_cols(show_plots=show_plots,
+                               hyperparam_tuning=hyperparam_tuning)
         print('done')  # preserve original behavior
-
 
     def assemble_merged_designs(self):
         if self._try_load_cached():
@@ -444,7 +437,7 @@ class FullSessionGLMRunner:
 
     def _build_stop_design(self):
 
-        pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups = assemble_stop_design.assemble_stop_design_func(
+        pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups, _, _ = assemble_stop_design.assemble_stop_design_func(
             self.raw_data_folder_path,
             self.bin_width,
             self.global_bins_2d,

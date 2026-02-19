@@ -1,5 +1,5 @@
 # --- Standard library
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 import os
 
 # --- Core scientific stack
@@ -48,6 +48,7 @@ def build_stop_design(
     datasets: dict = None,
     global_bins_2d: np.ndarray = None,  # optional global bins_2d to restrict to
     for_decoding: bool = False,
+    extra_agg_cols: Optional[List[str]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build a stop-aligned, bin-level design matrix and offset for GLM/decoding.
@@ -101,7 +102,7 @@ def build_stop_design(
         return out
 
     # -------------------------------------------------------------------------
-    # 4) Aggregate kinematics
+    # 4) Aggregate kinematics + optional one_ff-style extra covariates
     # -------------------------------------------------------------------------
     KINEMATIC_COLS = ['accel', 'speed', 'ang_speed']
     binned_feats = (
@@ -109,6 +110,17 @@ def build_stop_design(
         .replace([np.inf, -np.inf], np.nan)
         .fillna(0.0)
     )
+    extra_cols_added: List[str] = []
+    if extra_agg_cols:
+        existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
+        if existing:
+            extra_df = (
+                pd.DataFrame({c: _agg_feat(c) for c in existing})
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(0.0)
+            )
+            binned_feats = pd.concat([binned_feats, extra_df], axis=1)
+            extra_cols_added = existing
 
     mask_used = exposure > 0
     pos = used_bins[mask_used]
@@ -223,7 +235,7 @@ def build_stop_design(
     # -------------------------------------------------------------------------
     # 10) Feature groups
     # -------------------------------------------------------------------------
-    groups = _build_feature_groups(binned_feats, KINEMATIC_COLS)
+    groups = _build_feature_groups(binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
 
     return binned_spikes, binned_feats, offset_log, meta_used, groups
 
@@ -234,7 +246,11 @@ def _safe_add_columns(target_df, source_df, cols):
         target_df.loc[:, cols] = source_df[cols].to_numpy()
 
 
-def _build_feature_groups(binned_feats: pd.DataFrame, kinematic_cols: List[str]) -> Dict[str, List[str]]:
+def _build_feature_groups(
+    binned_feats: pd.DataFrame,
+    kinematic_cols: List[str],
+    extra_cols: Optional[List[str]] = None,
+) -> Dict[str, List[str]]:
     """
     Build semantic feature groups from binned features.
 
@@ -244,6 +260,8 @@ def _build_feature_groups(binned_feats: pd.DataFrame, kinematic_cols: List[str])
         DataFrame containing all binned features
     kinematic_cols : List[str]
         List of kinematic column names
+    extra_cols : list, optional
+        Additional aggregated columns (e.g. one_ff-style v, w, d, phi, r_targ, theta_targ, eye_ver, eye_hor)
 
     Returns
     -------
@@ -259,6 +277,9 @@ def _build_feature_groups(binned_feats: pd.DataFrame, kinematic_cols: List[str])
 
     # Individual kinematic columns
     for c in kinematic_cols:
+        _add_group(c, [c])
+    # One_ff-style extra tuning covariates (if present)
+    for c in extra_cols or []:
         _add_group(c, [c])
 
     # Basis functions
@@ -407,30 +428,43 @@ def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_used, mask)
 def add_interaction_columns(binned_feats):
     # list of variables you want to interact with 'whether_in_retry_series'
     excluded_exact = {'intercept', 'const', 'miss', 'next_gap_s_z'}
-    excluded_substrings = {'rsw', 'rcap', 'retry'}
+    excluded_substrings = {'rsw', 'rcap', 'retry', ':bin'}
 
     vars_to_interact = [
         c for c in binned_feats.columns
         if c not in excluded_exact
+        and not c.startswith('rcos_')
         and not any(s in c for s in excluded_substrings)
     ]
 
-    for c in vars_to_interact:
-        new_col = f'{c}*retry'
-        binned_feats[new_col] = binned_feats[c] * \
-            binned_feats['whether_in_retry_series']
+    retry = binned_feats['whether_in_retry_series']
+    interaction_df = pd.DataFrame(
+        {
+            f'{c}*retry': binned_feats[c].to_numpy() * retry.to_numpy()
+            for c in vars_to_interact
+        },
+        index=binned_feats.index,
+    )
+    # Concatenate once to avoid DataFrame fragmentation from repeated inserts.
+    return pd.concat([binned_feats, interaction_df], axis=1)
 
-    return binned_feats
 
-
-def scale_binned_feats(binned_feats):
-    binned_feats_sc, scaled_cols = event_binning.selective_zscore(binned_feats)
+def scale_binned_feats(binned_feats, keep_constant_tuning_terms: bool = False):
+    # No z-scoring for raised-cosine (rcos_*, rcos_stop_*), boxcar tuning (*:bin*), or binary/dummy columns.
+    exclude_prefixes = ('rcos_', 'rcos_stop_')
+    binned_feats_sc, scaled_cols = event_binning.selective_zscore(
+        binned_feats,
+        exclude_prefixes=exclude_prefixes,
+        exclude_substrings=(':bin',),
+    )
     binned_feats_sc = sm.add_constant(binned_feats_sc, has_constant='add')
     print('Scaled columns:', scaled_cols)
 
-    # drop columns that are constant
-    const_cols = [c for c in binned_feats_sc.columns
-                  if binned_feats_sc[c].nunique(dropna=False) <= 1 and c not in ['intercept', 'const']]
+    # Drop all constant columns except the model intercept 'const'
+    const_cols = [
+        c for c in binned_feats_sc.columns
+        if binned_feats_sc[c].nunique(dropna=False) <= 1 and c != 'const'
+    ]
     print("Constant columns:", const_cols)
 
     binned_feats_sc = binned_feats_sc.drop(columns=const_cols)

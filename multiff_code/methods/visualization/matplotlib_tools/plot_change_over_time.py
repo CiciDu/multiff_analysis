@@ -130,6 +130,11 @@ def plot_the_changes_over_time_in_long_df(merged_df, x="Data", y='rate', title_c
 
     for i, item in enumerate(category_order):
         one_pattern_df = merged_df[merged_df['item'] == item]
+        
+        if len(one_pattern_df) == 0:
+            print(f"No data for {item}")
+            continue
+        
         ax = axes[i]
 
         hue = 'monkey' if multiple_monkeys else None

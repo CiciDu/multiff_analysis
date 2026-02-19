@@ -2,14 +2,12 @@ from pattern_discovery import patterns_and_features_class
 from visualization.matplotlib_tools import plot_change_over_time
 
 import os
-import os
 import os.path
 import pandas as pd
 import numpy as np
 import matplotlib
 from matplotlib import rc
 import matplotlib.pyplot as plt
-import pandas as pd
 import plotly.express as px
 
 
@@ -69,8 +67,8 @@ class CompareTwoMonkeys():
             self, multiple_monkeys=True)
 
     def plot_the_changes_in_scatter_around_target_over_time(self):
-        for y_column_list in [['distance_mean', 'distance_50%'],
-                              ['abs_angle_mean', 'abs_angle_50%'],
+        for y_column_list in [['distance_mean', 'distance_median'],
+                              ['abs_angle_mean', 'abs_angle_median'],
                               # ['distance_mean', 'distance_Q1', 'distance_median', 'distance_Q3']
                               ]:
             plot_change_over_time.plot_the_changes_over_time_in_wide_df(self.combd_scatter_around_target_df, x='session',
@@ -107,7 +105,8 @@ class CompareTwoMonkeys():
 
     def make_plot_to_compare_success_rates(self):
         fig = px.bar(self.success_rate_df, x='statistic', y='value', color='monkey', barmode='group',
-                     text='value', title='FF Capture Rate and Stop Success Rate', width=500)  # Adjust the width as needed
+                     # Adjust the width as needed
+                     text='value', title='FF Capture Rate and Stop Success Rate', width=500)
         # make the text only 3 decimal
         fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
         # increase y lim a little bit to make sure no text is blocked

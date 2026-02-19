@@ -66,7 +66,7 @@ def main(unit_idx: int):
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / 'fit_results').mkdir(parents=True, exist_ok=True)
 
-    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(groups)
+    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=all_meta['lambda_config'])
     save_path = outdir / 'fit_results' / f'{lam_suffix}.pkl'
 
     fit_res = one_ff_gam_fit.fit_poisson_gam(

@@ -1,38 +1,4 @@
-# =========================
-# Standard library
-# =========================
-import os
-import math
-import json
-
-# =========================
-# Third-party
-# =========================
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-# =========================
-# MultiFF imports (USED ONLY)
-# =========================
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
-    pn_utils,
-    pn_aligned_by_event,
-)
-
-from neural_data_analysis.design_kits.design_by_segment import (
-    rebin_segments,
-    temporal_feats,
-    create_pn_design_df,
-)
-
-from neural_data_analysis.topic_based_neural_analysis.full_session import (
-    create_full_session_design,
-    selected_pn_design_features,
-    selected_stop_design_features,
-    create_best_arc_design,
-    select_fs_features,
-)
 
 from neural_data_analysis.design_kits.design_around_event import (
     event_binning,
@@ -40,22 +6,34 @@ from neural_data_analysis.design_kits.design_around_event import (
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     get_stops_utils,
-    prepare_stop_design,
+    stop_design_for_decoding,
     collect_stop_data,
+    stop_design_for_encoding,
 )
 
-from neural_data_analysis.neural_analysis_tools.glm_tools.glm_fit import (
-    glm_runner,
-)
 
-from decision_making_analysis.data_compilation import (
-    miss_events_class,
-)
+def assemble_stop_design_func(
+    raw_data_folder_path,
+    bin_width,
+    global_bins_2d=None,
+    for_decoding=False,
+    use_encoding_design=False,
+    # Optional: one_ff-style encoding design (build_stop_design_for_encoding)
+    use_tuning_design=False,
+    tuning_feature_mode='boxcar_only', # can be 'raw_only', 'boxcar_only', 'raw_plus_boxcar'
+    binrange_dict=None,
+    n_basis=20,
+    t_min=-0.3,
+    t_max=0.3,
+    tuning_n_bins=10,
+    linear_vars=None,
+    angular_vars=None,
+):
+    
+    if use_encoding_design and for_decoding:
+        raise ValueError("Encoding design cannot be used with for_decoding=True")
 
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
-
-def assemble_stop_design_func(raw_data_folder_path, bin_width, global_bins_2d=None, for_decoding=False):
     pn, datasets, _ = collect_stop_data.collect_stop_data_func(
         raw_data_folder_path,
         bin_width=bin_width,
@@ -94,26 +72,77 @@ def assemble_stop_design_func(raw_data_folder_path, bin_width, global_bins_2d=No
         'stop_id_end_time': 'event_id_end_time',
     })
 
-    stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups = (
-        prepare_stop_design.build_stop_design(
-            new_seg_info,
-            events_with_stats,
-            pn.monkey_information,
-            pn.spikes_df,
-            pn.ff_dataframe,
-            datasets=datasets,
-            add_ff_visible_info=True,
-            global_bins_2d=global_bins_2d,
-            for_decoding=for_decoding,
-        )
+    build_fn = (
+        stop_design_for_encoding.build_stop_design_for_encoding
+        if use_encoding_design
+        else stop_design_for_decoding.build_stop_design
     )
-
-    if not for_decoding:
-        stop_binned_feats = prepare_stop_design.add_interaction_columns(
-            stop_binned_feats
-        )
-    stop_binned_feats = prepare_stop_design.scale_binned_feats(
-        stop_binned_feats
+    build_kw = dict(
+        new_seg_info=new_seg_info,
+        events_with_stats=events_with_stats,
+        monkey_information=pn.monkey_information,
+        spikes_df=pn.spikes_df,
+        ff_dataframe=pn.ff_dataframe,
+        bin_dt=bin_width,
+        datasets=datasets,
+        add_ff_visible_info=True,
+        global_bins_2d=global_bins_2d,
+        for_decoding=for_decoding,
     )
+    if use_encoding_design:
+        build_kw.update(
+            {
+                'n_basis': n_basis,
+                't_min': t_min,
+                't_max': t_max,
+                'use_tuning_design': use_tuning_design,
+                'tuning_feature_mode': tuning_feature_mode,
+                'binrange_dict': binrange_dict,
+                'tuning_n_bins': tuning_n_bins,
+                'linear_vars': linear_vars,
+                'angular_vars': angular_vars,
+                'add_temporal_and_tuning_after_scale': True,
+            }
+        )
+    build_result = build_fn(**build_kw)
+    if use_encoding_design:
+        (stop_binned_spikes, init_stop_binned_feats, offset_log, stop_meta_used,
+         stop_meta_groups, deferred) = build_result
+    else:
+        (stop_binned_spikes, init_stop_binned_feats, offset_log, stop_meta_used,
+         stop_meta_groups) = build_result
+        deferred = None
 
-    return pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups
+    # For decoding we skip interactions. For stop_gam (encoding) we also skip:
+    # no retry interactions, and no scaling of rcos_stop_* / *:bin* / binary (handled in scale_binned_feats).
+    if not for_decoding and not use_encoding_design:
+        init_stop_binned_feats = stop_design_for_decoding.add_interaction_columns(
+            init_stop_binned_feats
+        )
+
+
+    # For stop_gam: add temporal (rcos_stop_*) and spatial tuning (*:bin*) after scaling.
+    if use_encoding_design and deferred is not None:
+        stop_binned_feats = pd.concat(
+            [init_stop_binned_feats, deferred['temporal_df']], axis=1
+        )
+        if deferred['tuning_df'] is not None:
+            if len(deferred['tuning_df']) != len(stop_binned_feats):
+                raise ValueError('Tuning df length mismatch')
+            deferred['tuning_df'].index = stop_binned_feats.index
+            stop_binned_feats = pd.concat(
+                [stop_binned_feats, deferred['tuning_df']], axis=1
+            )
+        stop_meta_groups = stop_design_for_encoding.rebuild_encoding_groups_after_blocks(
+            stop_binned_feats, deferred
+        )
+        binrange_dict = deferred.get('binrange_dict')
+    else:
+        stop_binned_feats = stop_design_for_decoding.scale_binned_feats(
+            init_stop_binned_feats,
+        )
+            
+    if use_encoding_design:
+        return pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups, init_stop_binned_feats, binrange_dict
+    else:
+        return pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups, None, None

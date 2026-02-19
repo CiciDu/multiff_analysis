@@ -759,14 +759,14 @@ def add_num_stops_to_target_last_vis_df(target_last_vis_df, ff_caught_T_new, num
     - Updated target_last_vis_df with the number of stops information.
     """
     all_trial_df = pd.DataFrame(
-        {'target_index': np.arange(len(ff_caught_T_new))})
+        {'target_index': np.arange(len(ff_caught_T_new)),
+         'num_stops': num_stops,
+         'num_stops_since_last_vis': num_stops_since_last_vis,
+         })
     target_last_vis_df = target_last_vis_df.merge(
-        all_trial_df, on='target_index', how='right')
+        all_trial_df, on='target_index', how='left')
 
     target_last_vis_df.sort_values(by='target_index', inplace=True)
-    target_last_vis_df['num_stops'] = num_stops
-    target_last_vis_df['num_stops_since_last_vis'] = num_stops_since_last_vis
-    target_last_vis_df.dropna(inplace=True)
     target_last_vis_df = target_last_vis_df[target_last_vis_df['last_vis_dist'] != 9999]
     return target_last_vis_df
 

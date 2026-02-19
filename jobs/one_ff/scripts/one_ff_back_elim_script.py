@@ -82,7 +82,7 @@ def main(unit_idx: int):
     print(f"[PYTHON][DEBUG] Output directory: {outdir}", flush=True)
 
     # Generate descriptive filename with lambda configuration
-    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(groups)
+    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=all_meta['lambda_config'])
     save_path = outdir / 'backward_elimination' / f'{lam_suffix}.pkl'
     print(f"[PYTHON][DEBUG] Save path: {save_path}", flush=True)
 

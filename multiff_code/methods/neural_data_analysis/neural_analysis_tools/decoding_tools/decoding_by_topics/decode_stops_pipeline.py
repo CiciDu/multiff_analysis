@@ -118,6 +118,8 @@ class StopDecodingRunner:
             offset_log,
             self.stop_meta_used,
             stop_meta_groups,
+            _,
+            _
         ) = assemble_stop_design.assemble_stop_design_func(
             self.raw_data_folder_path,
             self.bin_width,

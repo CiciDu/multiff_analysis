@@ -17,7 +17,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_dec
 )
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     collect_stop_data,
-    prepare_stop_design
+    stop_design_for_decoding
 )
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import decode_vis_utils
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
@@ -85,7 +85,7 @@ class FFVisEncodingRunner:
             offset_log,
             meta_used,
             meta_groups,
-        ) = prepare_stop_design.build_stop_design(
+        ) = stop_design_for_decoding.build_stop_design(
             new_seg_info,
             events_with_stats,
             self.pn.monkey_information,

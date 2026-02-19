@@ -167,3 +167,4 @@ def load_full_results_npz(base_dir: Path, cluster_name: str):
             "Field 'variable' missing inside the structured results array.")
 
     return results_struct, reduced_vars, meta, full_model_data
+

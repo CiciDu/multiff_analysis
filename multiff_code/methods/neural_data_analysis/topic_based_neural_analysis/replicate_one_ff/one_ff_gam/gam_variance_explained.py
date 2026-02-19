@@ -325,65 +325,72 @@ def crossval_variance_explained(
 
     return cv_results
 
-def plot_cdf_with_dkw(
-    r2_dict,
-    alpha=0.05,
-    xlim=(0, 0.2),
-    show_median=True,
-    show_half_line=True,
-):
+def plot_variance_explained_cdf(all_mean_r2,
+                                alpha=0.05,
+                                label='Uncoupled model',
+                                figsize=(6, 6),
+                                x_max=0.2,
+                                log_x=False,
+                                clip_min=None):
     """
-    Plot empirical CDF(s) of variance explained with DKW confidence bands.
-
-    Parameters
-    ----------
-    r2_dict : dict
-        {'Model name': array_of_r2_values}
-    alpha : float
-        Confidence level (0.05 → 95% band)
-    xlim : tuple
-        x-axis limits
-    show_median : bool
-        Whether to mark median R²
-    show_half_line : bool
-        Whether to draw horizontal 0.5 reference line
+    Plot empirical CDF of variance explained with DKW confidence band.
     """
 
-    plt.figure(figsize=(6, 5))
+    import numpy as np
+    import matplotlib.pyplot as plt
 
-    for label, r2_values in r2_dict.items():
+    # Convert to array and remove NaNs
+    r2 = np.asarray(all_mean_r2)
+    r2 = r2[np.isfinite(r2)]
 
-        r2_values = np.asarray(r2_values)
-        r2_values = r2_values[~np.isnan(r2_values)]
+    if len(r2) == 0:
+        raise ValueError("No valid variance explained values to plot.")
 
-        n = len(r2_values)
-        if n == 0:
-            continue
+    # Optional clipping for visualization
+    if clip_min is not None:
+        r2_plot = np.clip(r2, clip_min, None)
+    else:
+        r2_plot = r2.copy()
 
-        # Empirical CDF
-        x = np.sort(r2_values)
-        y = np.arange(1, n + 1) / n
+    # Sort
+    r2_sorted = np.sort(r2_plot)
+    n = len(r2_sorted)
 
-        # DKW epsilon
-        epsilon = np.sqrt((1 / (2 * n)) * np.log(2 / alpha))
-        lower = np.clip(y - epsilon, 0, 1)
-        upper = np.clip(y + epsilon, 0, 1)
+    # Empirical CDF
+    cdf = np.arange(1, n + 1) / n
 
-        # Plot
-        line, = plt.plot(x, y, linewidth=2, label=label)
-        plt.fill_between(x, lower, upper, alpha=0.25)
+    # DKW band
+    epsilon = np.sqrt(np.log(2 / alpha) / (2 * n))
+    lower = np.maximum(cdf - epsilon, 0)
+    upper = np.minimum(cdf + epsilon, 1)
 
-        # Median marker
-        if show_median:
-            median_r2 = np.median(r2_values)
-            plt.axvline(median_r2, linestyle='--', linewidth=1)
+    # Plot
+    plt.figure(figsize=figsize)
 
-    if show_half_line:
-        plt.axhline(0.5, linestyle='--', color='black', linewidth=1)
+    plt.plot(r2_sorted, cdf, linewidth=2, label=label)
+    plt.fill_between(r2_sorted, lower, upper, alpha=0.25)
 
-    plt.xlabel('Variance explained')
-    plt.ylabel('Cumulative fraction of neurons')
-    plt.xlim(xlim)
-    plt.ylim(0, 1)
-    plt.legend(frameon=False)
+    plt.axhline(0.5, linestyle='--', color='gray', linewidth=1)
+    plt.axvline(0.1, linestyle='--', color='gray', linewidth=1)
+
+    plt.xlabel('Variance explained', fontsize=16)
+    plt.ylabel('Cumulative fraction of neurons', fontsize=16)
+
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.ylim([0, 1])
+
+    if log_x:
+        # Prevent zero issues
+        min_positive = np.min(r2_sorted[r2_sorted > 0])
+        lower_limit = max(min_positive, clip_min if clip_min else min_positive)
+        plt.xscale('log')
+        plt.xlim([lower_limit, x_max])
+    else:
+        plt.xlim([0, x_max])
+
+    plt.legend(fontsize=14, frameon=True)
     plt.tight_layout()
+    plt.show()
+
+    print('Median variance explained:', np.median(r2))

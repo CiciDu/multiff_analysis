@@ -17,7 +17,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_dec
 )
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     collect_stop_data,
-    prepare_stop_design
+    stop_design_for_decoding
 )
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import decode_vis_utils
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
@@ -41,14 +41,14 @@ class FFVisDecodingRunner:
         # will be filled during setup
         self.datasets = None
         self.comparisons = None
-        
-        self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
 
+        self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
+            raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
 
     def _collect_data(self, exists_ok=True):
         """
         Collect and prepare data for decoding.
-        
+
         Args:
             exists_ok: If True, load cached design matrices if they exist.
         """
@@ -69,11 +69,9 @@ class FFVisDecodingRunner:
                 self.vis_feats_to_decode,
                 self.meta_used,
             ) = self._prepare_design_matrices()
-            
+
             # Save the computed design matrices for future use
             self._save_design_matrices()
-
-
 
     def _prepare_design_matrices(self):
         new_seg_info, events_with_stats = decode_vis_utils.prepare_new_seg_info(
@@ -87,7 +85,7 @@ class FFVisDecodingRunner:
             offset_log,
             meta_used,
             meta_groups,
-        ) = prepare_stop_design.build_stop_design(
+        ) = stop_design_for_decoding.build_stop_design(
             new_seg_info,
             events_with_stats,
             self.pn.monkey_information,
@@ -138,7 +136,7 @@ class FFVisDecodingRunner:
             self.pn.planning_and_neural_folder_path,
             'decoding_outputs/vis_decoder_outputs',
         )
-    
+
     def _get_design_matrix_paths(self):
         """Get file paths for cached design matrices."""
         save_dir = Path(self._get_save_dir())
@@ -147,58 +145,62 @@ class FFVisDecodingRunner:
             'vis_feats_to_decode': save_dir / 'vis_feats_to_decode.pkl',
             'meta_used': save_dir / 'meta_used.pkl',
         }
-    
+
     def _save_design_matrices(self):
         """Save design matrices to disk."""
         paths = self._get_design_matrix_paths()
         save_dir = Path(self._get_save_dir())
         save_dir.mkdir(parents=True, exist_ok=True)
-        
+
         data_to_save = {
             'spike_data_w_history': self.spike_data_w_history,
             'vis_feats_to_decode': self.vis_feats_to_decode,
             'meta_used': self.meta_used,
         }
-        
+
         for key, data in data_to_save.items():
             try:
                 with open(paths[key], 'wb') as f:
                     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
                 print(f'[_save_design_matrices] Saved {key} to {paths[key]}')
             except Exception as e:
-                print(f'[_save_design_matrices] WARNING: could not save {key}: {type(e).__name__}: {e}')
-    
-    
+                print(
+                    f'[_save_design_matrices] WARNING: could not save {key}: {type(e).__name__}: {e}')
+
     def _load_design_matrices(self):
         """Load design matrices from disk. Returns True if successful, False otherwise."""
         paths = self._get_design_matrix_paths()
-        
+
         # Check if all files exist
         if not all(path.exists() for path in paths.values()):
             return False
-        
+
         try:
             with open(paths['spike_data_w_history'], 'rb') as f:
                 self.spike_data_w_history = pickle.load(f)
-            print(f'[_load_design_matrices] Loaded spike_data_w_history from {paths["spike_data_w_history"]}')
-            
+            print(
+                f'[_load_design_matrices] Loaded spike_data_w_history from {paths["spike_data_w_history"]}')
+
             with open(paths['vis_feats_to_decode'], 'rb') as f:
                 self.vis_feats_to_decode = pickle.load(f)
-            print(f'[_load_design_matrices] Loaded vis_feats_to_decode from {paths["vis_feats_to_decode"]}')
-            
+            print(
+                f'[_load_design_matrices] Loaded vis_feats_to_decode from {paths["vis_feats_to_decode"]}')
+
             with open(paths['meta_used'], 'rb') as f:
                 self.meta_used = pickle.load(f)
-            print(f'[_load_design_matrices] Loaded meta_used from {paths["meta_used"]}')
-            
+            print(
+                f'[_load_design_matrices] Loaded meta_used from {paths["meta_used"]}')
+
             return True
         except Exception as e:
-            print(f'[_load_design_matrices] WARNING: could not load design matrices: {type(e).__name__}: {e}')
+            print(
+                f'[_load_design_matrices] WARNING: could not load design matrices: {type(e).__name__}: {e}')
             return False
 
     def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_mode='none'):
         """
         Run the FF visibility decoding pipeline.
-        
+
         Args:
             n_splits: Number of cross-validation splits.
             save_dir: Directory to save results. If None, uses default.
@@ -212,7 +214,7 @@ class FFVisDecodingRunner:
             self.save_dir = self._get_save_dir()
         else:
             self.save_dir = Path(save_dir)
-            
+
         if shuffle_mode != 'none':
             self.save_dir = Path(self.save_dir) / f'shuffle_{shuffle_mode}'
             self.save_dir.mkdir(parents=True, exist_ok=True)
@@ -238,7 +240,6 @@ class FFVisDecodingRunner:
                 # shared
                 use_early_stopping=False,
             )
-
 
             print('model_name:', model_name)
             print('config:', config)

@@ -360,47 +360,52 @@ def _format_lambda(lam):
         return f'{lam:.2e}'
 
 
-def generate_lambda_suffix(groups, delimiter='_'):
+def generate_lambda_suffix(
+    groups: Optional[List[GroupSpec]] = None,
+    *,
+    lambda_config: Optional[Dict[str, float]] = None,
+    delimiter: str = '_',
+) -> str:
     """
     Generate a filename suffix based on the 4 main lambda parameters.
-    
+
+    Prefer passing lambda_config (e.g. from build_group_specs / build_stop_gam_groups)
+    so the suffix matches the lambdas used. If only groups are available, lambdas are
+    inferred via _extract_lambda_config (group names must follow t_*, spike_hist, cpl_*).
+
     Parameters
     ----------
-    groups : List[GroupSpec]
-        Groups with lambda values
+    groups : List[GroupSpec], optional
+        Groups with lambda values (used if lambda_config is None).
+    lambda_config : dict, optional
+        Explicit dict e.g. {'lam_f': 100, 'lam_g': 10, 'lam_h': 10, 'lam_p': 10}.
+        Takes precedence over groups when both are provided.
     delimiter : str, optional
         Delimiter between lambda pairs, by default '_'
-    
+
     Returns
     -------
     str
         Filename suffix like 'lamF-100_lamG-10_lamH-10_lamP-10'
-        
+
     Examples
     --------
-    >>> groups = [
-    ...     GroupSpec('t_targ', cols, 'event', lam=10.0),
-    ...     GroupSpec('spike_hist', cols, 'event', lam=10.0),
-    ...     GroupSpec('position', cols, '1D', lam=100.0)
-    ... ]
-    >>> generate_lambda_suffix(groups)
-    'lamF-100_lamG-10_lamH-10'
-    
-    Notes
-    -----
-    Extracts the 4 main lambda parameters:
-    - lam_f: firefly features (tuning curves)
-    - lam_g: temporal event kernels (t_*)
-    - lam_h: spike history
-    - lam_p: coupling (cpl_*)
+    >>> groups, lambda_config = build_stop_gam_groups(design_df)
+    >>> generate_lambda_suffix(lambda_config=lambda_config)
+    >>> generate_lambda_suffix(groups)  # backward compatible: infer from groups
     """
-    lambda_config = _extract_lambda_config(groups)
+    if lambda_config is not None:
+        config = dict(lambda_config)
+    elif groups is not None:
+        config = _extract_lambda_config(groups)
+    else:
+        raise ValueError('Provide either groups or lambda_config')
     
     parts = []
     # Order: F, G, H, P for consistency
     for key in ['lam_f', 'lam_g', 'lam_h', 'lam_p']:
-        if key in lambda_config:
-            lam_str = _format_lambda(lambda_config[key]).replace('.', 'p')
+        if key in config:
+            lam_str = _format_lambda(config[key]).replace('.', 'p')
             # Use capitalized short names: lamF, lamG, lamH, lamP
             short_name = key.replace('lam_', 'lam').upper()
             parts.append(f'{short_name}-{lam_str}')
@@ -418,6 +423,9 @@ def _extract_lambda_config(groups):
     lambda_config = {}
     
     for g in groups:
+        # Skip unpenalized groups (e.g. const); they don't affect the suffix
+        if g.lam is None or (isinstance(g.lam, (int, float)) and float(g.lam) == 0.0):
+            continue
         # Determine which lambda type this group uses
         if g.name.startswith('t_'):
             # lam_g: temporal event kernels

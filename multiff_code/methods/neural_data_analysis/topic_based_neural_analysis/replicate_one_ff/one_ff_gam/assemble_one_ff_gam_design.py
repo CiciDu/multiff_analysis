@@ -400,7 +400,13 @@ def build_group_specs(
             lam_f,
         ))
 
-    return groups
+    lambda_config = {
+        'lam_f': lam_f,
+        'lam_g': lam_g,
+        'lam_h': lam_h,
+        'lam_p': lam_p,
+    }
+    return groups, lambda_config
 
 
 def process_unit_design_and_groups(
@@ -452,7 +458,7 @@ def process_unit_design_and_groups(
         hist_meta=hist_meta,
     )
 
-    groups = build_group_specs(
+    groups, lambda_config = build_group_specs(
         temporal_meta=temporal_meta,
         tuning_meta=tuning_meta,
         hist_meta=hist_meta,
@@ -468,6 +474,7 @@ def process_unit_design_and_groups(
         'tuning': tuning_meta,
         'temporal': temporal_meta,
         'hist': hist_meta,
+        'lambda_config': lambda_config,
     }
 
     return design_df, groups, all_meta

@@ -29,7 +29,7 @@ class PatternsAndFeatures():
 
     pattern_order = ['ff_capture_rate', 'stop_success_rate',
                      'two_in_a_row', 'waste_cluster_around_target', 'visible_before_last_one', 'disappear_latest',
-                     'retry_switch', 'retry_capture', 'ignore_sudden_flash']
+                     'ignore_sudden_flash']
 
     feature_order = ['t', 't_last_vis', 'd_last_vis', 'abs_angle_last_vis',
                      'num_stops', 'num_stops_since_last_vis']
