@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     one_ff_gam_design,
     penalty_tuning
@@ -22,6 +23,7 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         break
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
+
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -52,7 +54,7 @@ def main(unit_idx: int):
     # -------------------------------
     # Per-unit design
     # -------------------------------
-    design_df, y, groups, structured_meta_groups = one_ff_gam_design.finalize_one_ff_gam_design(
+    design_df, y, groups, structured_meta_groups, data_obj = one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )

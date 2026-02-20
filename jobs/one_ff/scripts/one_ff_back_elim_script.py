@@ -67,7 +67,7 @@ def main(unit_idx: int):
 
     print(
         f"[PYTHON][DEBUG] Finalizing PGAM design for unit {unit_idx}...", flush=True)
-    design_df, y, groups, structured_meta_groups = one_ff_gam_design.finalize_one_ff_gam_design(
+    design_df, y, groups, structured_meta_groups, data_obj = one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )

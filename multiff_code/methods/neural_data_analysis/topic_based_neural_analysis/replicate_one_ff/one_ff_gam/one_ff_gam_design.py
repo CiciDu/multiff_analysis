@@ -11,6 +11,139 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     one_ff_gam_fit
 )
 
+DEFAULT_VAR_CATEGORIES = {
+    'sensory_vars': ['v', 'w'],
+    'latent_vars': ['r_targ', 'theta_targ'],
+    'position_vars': ['d', 'phi'],
+    'eye_position_vars': ['eye_ver', 'eye_hor'],
+    'event_vars': ['t_move', 't_targ', 't_stop', 't_rew'],
+    'spike_hist_vars': ['spike_hist'],
+}
+
+
+def _ordered_unique(values):
+    seen = set()
+    out = []
+    for v in values:
+        if v not in seen:
+            out.append(v)
+            seen.add(v)
+    return out
+
+
+def _all_vars_from_categories(var_categories):
+    ordered = []
+    for vars_in_cat in var_categories.values():
+        ordered.extend(vars_in_cat)
+    return _ordered_unique(ordered)
+
+
+def resolve_selected_vars(
+    *,
+    selected_categories=None,
+    selected_vars=None,
+    var_categories=None,
+):
+    """
+    Resolve final variable list from category + explicit variable selection.
+
+    If both selected_categories and selected_vars are None, all variables are used.
+    """
+    if var_categories is None:
+        var_categories = DEFAULT_VAR_CATEGORIES
+
+    all_vars = _all_vars_from_categories(var_categories)
+    all_var_set = set(all_vars)
+
+    if selected_categories is None and selected_vars is None:
+        return all_vars, list(var_categories.keys())
+
+    resolved = []
+    used_categories = []
+
+    if selected_categories is not None:
+        unknown_categories = [
+            c for c in selected_categories if c not in var_categories
+        ]
+        if unknown_categories:
+            raise ValueError(
+                f'Unknown selected_categories: {unknown_categories}. '
+                f'Available categories: {list(var_categories.keys())}'
+            )
+        for cat in selected_categories:
+            used_categories.append(cat)
+            resolved.extend(var_categories[cat])
+
+    if selected_vars is not None:
+        unknown_vars = [v for v in selected_vars if v not in all_var_set]
+        if unknown_vars:
+            raise ValueError(
+                f'Unknown selected_vars: {unknown_vars}. '
+                f'Available variables: {all_vars}'
+            )
+        resolved.extend(selected_vars)
+
+    resolved = _ordered_unique(resolved)
+    return resolved, used_categories
+
+
+def subset_design_and_groups_by_vars(design_df, groups, selected_vars):
+    """
+    Keep only selected variable groups and their columns.
+    """
+    selected_set = set(selected_vars)
+    filtered_groups = [g for g in groups if g.name in selected_set]
+
+    keep_cols = []
+    for g in filtered_groups:
+        keep_cols.extend(g.cols)
+    keep_cols = set(keep_cols)
+
+    cols_in_order = [
+        c for c in design_df.columns
+        if (c in keep_cols) or (c == 'const')
+    ]
+    filtered_design_df = design_df.loc[:, cols_in_order]
+
+    return filtered_design_df, filtered_groups
+
+
+def apply_variable_selection_and_update_meta(
+    *,
+    design_df,
+    groups,
+    structured_meta_groups,
+    selected_categories=None,
+    selected_vars=None,
+    var_categories=None,
+):
+    """
+    Apply variable/category selection to design/groups and update metadata.
+    """
+    resolved_vars, used_categories = resolve_selected_vars(
+        selected_categories=selected_categories,
+        selected_vars=selected_vars,
+        var_categories=var_categories,
+    )
+    design_df_subset, groups = subset_design_and_groups_by_vars(
+        design_df=design_df,
+        groups=groups,
+        selected_vars=resolved_vars,
+    )
+    if len(groups) == 0:
+        raise ValueError(
+            'No groups selected after applying selected_categories/selected_vars.'
+        )
+
+    selected_var_categories = (
+        var_categories if var_categories is not None else DEFAULT_VAR_CATEGORIES
+    )
+    structured_meta_groups['var_categories'] = selected_var_categories
+    structured_meta_groups['selected_categories'] = used_categories
+    structured_meta_groups['selected_vars'] = resolved_vars
+
+    return design_df_subset, groups, structured_meta_groups
+
 
 def build_tuning_design(
     data_df,
@@ -492,7 +625,11 @@ def process_unit_design_and_groups(
     return design_df, groups, structured_meta_groups
 
 
-def finalize_one_ff_gam_design(unit_idx, session_num=0, lambda_config=None):
+def finalize_one_ff_gam_design(
+    unit_idx,
+    session_num=0,
+    lambda_config=None,
+):
     # -------------------------------
     # Covariates
     # -------------------------------
@@ -569,4 +706,4 @@ def finalize_one_ff_gam_design(unit_idx, session_num=0, lambda_config=None):
         temporal_meta=temporal_meta,
     )
 
-    return design_df, y, groups, structured_meta_groups
+    return design_df, y, groups, structured_meta_groups, data_obj
