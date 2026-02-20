@@ -1,6 +1,6 @@
 
 import warnings
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_d
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
     GroupSpec,
 )
+from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 
 
 # Radians to degrees; monkey_information stores angles/angular rates in rad.
@@ -549,7 +550,9 @@ def build_stop_gam_groups(
         if i == 0:
             groups.append(GroupSpec('spike_hist', hist_cols, 'event', lam_h))
         else:
-            groups.append(GroupSpec(f'cpl_{i - 1}', hist_cols, 'event', lam_p))
+            neuron_match = re.match(r'^cluster_(\d+)$', neuron)
+            cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
+            groups.append(GroupSpec(f'cpl_{cpl_suffix}', hist_cols, 'event', lam_p))
 
     lambda_config = {
         'lam_f': lam_f,
@@ -559,3 +562,61 @@ def build_stop_gam_groups(
     }
     return groups, lambda_config
 
+
+
+def build_structured_meta_groups(
+    colnames: Dict[str, List[str]],
+    temporal_meta: Optional[Dict[str, Any]],
+    tuning_meta: Optional[Dict[str, Any]],
+    *,
+    target_col: Optional[str] = None,
+    dt: float,
+    t_max: float,
+    n_basis: int = 20,
+) -> Dict[str, Any]:
+    """
+    Restructure flat meta_groups into one_ff_gam-style categories.
+
+    Returns dict with 'tuning', 'temporal', 'hist', 'lambda_config' keys.
+    """
+    # Hist: build from colnames (all clusters), map to spike_hist / cpl_J for plot compatibility
+    hist_groups: Dict[str, List[str]] = {}
+    hist_basis_info: Dict[str, Dict] = {}
+    if colnames:
+        t_min = dt
+        lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
+            n_basis=n_basis,
+            t_min=t_min,
+            t_max=t_max,
+            dt=dt,
+            log_spaced=True,
+            hard_start_zero=True,
+        )
+        basis_info_entry = {'lags': lags_hist, 'basis': B_hist}
+        neuron_order = sorted(colnames.keys())
+        if target_col is not None:
+            if target_col not in colnames:
+                raise KeyError(f'target_col {target_col!r} not in colnames')
+            neuron_order = [target_col] + [n for n in neuron_order if n != target_col]
+        for i, neuron in enumerate(neuron_order):
+            cols = colnames[neuron]
+            if i == 0:
+                hist_groups['spike_hist'] = cols
+                hist_basis_info['spike_hist'] = basis_info_entry
+            else:
+                neuron_match = re.match(r'^cluster_(\d+)$', neuron)
+                cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
+                hist_groups[f'cpl_{cpl_suffix}'] = cols
+                hist_basis_info[f'cpl_{cpl_suffix}'] = basis_info_entry
+
+    hist_meta: Dict[str, Any] = {
+        'groups': hist_groups,
+        'basis_info': hist_basis_info,
+    } if hist_groups else {}
+
+    return {
+        'tuning': tuning_meta if tuning_meta else {},
+        'temporal': temporal_meta if temporal_meta else {},
+        'hist': hist_meta,
+        'lambda_config': {},
+    }

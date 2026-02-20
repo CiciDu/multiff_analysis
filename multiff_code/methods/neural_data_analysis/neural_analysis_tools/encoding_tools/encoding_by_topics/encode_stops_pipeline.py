@@ -1,14 +1,12 @@
 import os
 import pickle
-import re
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Union
 
 # Third-party imports
 import numpy as np
 import pandas as pd
 
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 
 # Neuroscience-specific imports
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
@@ -29,67 +27,14 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 )
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    collect_stop_data,
-    decode_stops_design
+    collect_stop_data
 )
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    decode_stops_design,
     encode_stops_utils,
 )
-
-
-def _build_structured_meta_groups(
-    colnames: Dict[str, List[str]],
-    temporal_meta: Optional[Dict[str, Any]],
-    tuning_meta: Optional[Dict[str, Any]],
-    *,
-    dt: float,
-    t_max: float,
-    n_basis: int = 20,
-) -> Dict[str, Any]:
-    """
-    Restructure flat meta_groups into one_ff_gam-style categories.
-
-    Returns dict with 'tuning', 'temporal', 'hist', 'lambda_config' keys.
-    """
-    # Hist: build from colnames (all clusters), map to spike_hist / cpl_J for plot compatibility
-    hist_groups: Dict[str, List[str]] = {}
-    hist_basis_info: Dict[str, Dict] = {}
-    if colnames:
-        t_min = dt
-        lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
-            n_basis=n_basis,
-            t_min=t_min,
-            t_max=t_max,
-            dt=dt,
-            log_spaced=True,
-            hard_start_zero=True,
-        )
-        basis_info_entry = {'lags': lags_hist, 'basis': B_hist}
-        neuron_order = sorted(colnames.keys())
-        for i, neuron in enumerate(neuron_order):
-            cols = colnames[neuron]
-            if i == 0:
-                hist_groups['spike_hist'] = cols
-                hist_basis_info['spike_hist'] = basis_info_entry
-            else:
-                hist_groups[f'cpl_{i - 1}'] = cols
-                hist_basis_info[f'cpl_{i - 1}'] = basis_info_entry
-
-    hist_meta: Dict[str, Any] = {
-        'groups': hist_groups,
-        'basis_info': hist_basis_info,
-    } if hist_groups else {}
-
-    return {
-        'tuning': tuning_meta if tuning_meta else {},
-        'temporal': temporal_meta if temporal_meta else {},
-        'hist': hist_meta,
-        'lambda_config': {},
-    }
 
 
 class StopEncodingRunner:
@@ -119,11 +64,14 @@ class StopEncodingRunner:
         self._spike_cols = None
         # tuning bin ranges (from prs or estimated); inspect after run
         self.binrange_dict = self.stop_prs.binrange if self.stop_prs is not None else None
-        
+
         self.structured_meta_groups = {}
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
+
+        self.num_neurons = neural_data_processing.find_num_neurons(
+            self.raw_data_folder_path)
 
     # ------------------------------------------------------------------
     # Data collection
@@ -205,10 +153,11 @@ class StopEncodingRunner:
         self._spike_cols = list(self._colnames.keys())
 
         # Restructure meta_groups into one_ff_gam-style categories
-        self.structured_meta_groups = _build_structured_meta_groups(
+        self.structured_meta_groups = encode_stops_utils.build_structured_meta_groups(
             colnames=self._colnames,
             temporal_meta=temporal_meta,
             tuning_meta=tuning_meta,
+            target_col=self._spike_cols[0] if self._spike_cols else None,
             dt=self.bin_width,
             t_max=self.t_max,
             n_basis=n_basis_hist,
@@ -226,9 +175,10 @@ class StopEncodingRunner:
             raise RuntimeError(
                 'Run _collect_data first since self.stop_binned_feats or self.stop_meta_used is None')
         bin_df = spike_history.make_bin_df_from_stop_meta(self.stop_meta_used)
-        
+
         if not hasattr(self.pn, 'spikes_df'):
-            self.pn = collect_stop_data.init_pn_to_collect_stop_data(self.raw_data_folder_path, bin_width=0.04)
+            self.pn = collect_stop_data.init_pn_to_collect_stop_data(
+                self.raw_data_folder_path, bin_width=0.04)
 
         _, self._basis, self._colnames, _, self._X_hist = (
             spike_history.build_design_with_spike_history_from_bins(
@@ -256,6 +206,7 @@ class StopEncodingRunner:
                 f'unit_idx {unit_idx} out of range [0, {len(self._spike_cols)})'
             )
         target_col = self._spike_cols[unit_idx]
+        self._refresh_structured_meta_groups_for_unit(target_col)
         design_df, _ = spike_history.add_spike_history_to_design(
             design_df=self.stop_binned_feats.reset_index(drop=True),
             colnames=self._colnames,
@@ -272,6 +223,62 @@ class StopEncodingRunner:
         ]
         design_df = design_df.drop(columns=const_cols_to_drop)
         return design_df
+
+    def _refresh_structured_meta_groups_for_unit(
+        self, unit_ref: Union[int, str]
+    ) -> None:
+        """
+        Rebuild structured_meta_groups for a target neuron.
+
+        unit_ref can be either:
+        - unit_idx (int): index into self._spike_cols
+        - target_col (str): explicit spike column name, e.g. 'cluster_15'
+
+        Ensures the first history group is spike_hist for the target neuron and
+        each coupling group name cpl_K matches columns from cluster_K.
+        """
+        if isinstance(unit_ref, int):
+            if self._spike_cols is None:
+                raise RuntimeError('Spike columns not initialized')
+            if unit_ref < 0 or unit_ref >= len(self._spike_cols):
+                raise IndexError(
+                    f'unit_idx {unit_ref} out of range [0, {len(self._spike_cols)})'
+                )
+            target_col = self._spike_cols[unit_ref]
+        elif isinstance(unit_ref, str):
+            target_col = unit_ref
+        else:
+            raise TypeError(
+                f'unit_ref must be int (unit_idx) or str (target_col), got {type(unit_ref)}'
+            )
+
+        if self._colnames is None:
+            raise RuntimeError('Spike history colnames not initialized')
+        if target_col not in self._colnames:
+            raise KeyError(f'target_col {target_col!r} not in spike-history colnames')
+
+        self.structured_meta_groups = encode_stops_utils.build_structured_meta_groups(
+            colnames=self._colnames,
+            temporal_meta=self.structured_meta_groups.get('temporal', {}),
+            tuning_meta=self.structured_meta_groups.get('tuning', {}),
+            target_col=target_col,
+            dt=self.bin_width,
+            t_max=self.t_max,
+            n_basis=self._basis.shape[1],
+        )
+
+        hist_groups = self.structured_meta_groups.get(
+            'hist', {}).get('groups', {})
+        for group_name, cols in hist_groups.items():
+            if not group_name.startswith('cpl_') or not cols:
+                continue
+            suffix = group_name.split('cpl_', 1)[1]
+            expected_prefix = f'cluster_{suffix}:'
+            if any(not c.startswith(expected_prefix) for c in cols):
+                raise ValueError(
+                    f'Coupling group mismatch for {group_name}: '
+                    f'expected columns from {expected_prefix}'
+                )
 
     @staticmethod
     def _has_one_ff_like_terms(df: Optional[pd.DataFrame]) -> bool:
@@ -340,7 +347,7 @@ class StopEncodingRunner:
                 with open(paths[key], 'wb') as f:
                     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
                 print(f'[StopEncodingRunner] Saved {key} → {paths[key]}')
-            except Exception as e:
+            except Exception:
                 print(
                     f'[StopEncodingRunner] WARNING: could not save {key}: '
                 )
@@ -348,7 +355,7 @@ class StopEncodingRunner:
     def _load_design_matrices(self):
         paths = self._get_design_matrix_paths()
         required = ['stop_binned_feats',
-                    'stop_binned_spikes', 'stop_meta_used']
+                    'stop_binned_spikes', 'stop_meta_used', 'structured_meta_groups']
         if not all(paths[k].exists() for k in required):
             return False
 
@@ -413,7 +420,6 @@ class StopEncodingRunner:
     # ------------------------------------------------------------------
     # Poisson GAM fit (stop encoding: design_df_w_history + stop_binned_spikes)
     # ------------------------------------------------------------------
-
     def fit_stop_poisson_gam(
         self,
         unit_idx: int,
@@ -471,9 +477,9 @@ class StopEncodingRunner:
             self.stop_binned_spikes.iloc[:, unit_idx].to_numpy(),
             dtype=float,
         ).ravel()
-        
-            
-        groups, lambda_config = self.get_stop_gam_groups(unit_idx=unit_idx, lam_f=100.0, lam_g=10.0, lam_h=10.0, lam_p=10.0)
+
+        groups, lambda_config = self.get_stop_gam_groups(
+            unit_idx=unit_idx, lam_f=100.0, lam_g=10.0, lam_h=10.0, lam_p=10.0)
 
         if save_path is None:
             paths = self.get_stop_gam_save_paths(
@@ -481,7 +487,6 @@ class StopEncodingRunner:
                 lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
             )
             save_path = paths['fit_save_path']
-            
 
         return one_ff_gam_fit.fit_poisson_gam(
             design_df=self.design_df_w_history,
@@ -613,7 +618,7 @@ class StopEncodingRunner:
         lam_p: float = 10.0,
         n_folds: int = 5,
         load_if_exists: bool = True,
-        load_only = False,
+        load_only=False,
         fit_kwargs: Optional[Dict] = None,
         cv_mode: Optional[str] = 'blocked_time_buffered',
         buffer_samples: int = 20,
@@ -664,10 +669,11 @@ class StopEncodingRunner:
             )
             if all_neuron_r2 is not None:
                 print('Number of neurons with cached cross-validation results retrieved: ',
-                    len(all_neuron_r2))
+                      len(all_neuron_r2))
                 return all_neuron_r2
             else:
-                print('No cached cross-validation variance explained results found for all neurons')
+                print(
+                    'No cached cross-validation variance explained results found for all neurons')
 
         if load_only:
             print('Load only mode is enabled, returning None')
@@ -697,7 +703,7 @@ class StopEncodingRunner:
                 unit_idx=unit_idx,
                 lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
             )
-        
+
             outdir = base / f'neuron_{unit_idx}'
             (outdir / 'cv_var_explained').mkdir(parents=True, exist_ok=True)
             cv_save_path = str(
@@ -734,8 +740,7 @@ class StopEncodingRunner:
         """
         Try to load variance explained for all neurons.
         """
-        
-        self.num_neurons = neural_data_processing.find_num_neurons(self.raw_data_folder_path)
+
         all_neuron_r2 = []
         for unit_idx in range(self.num_neurons):
             try:
@@ -767,6 +772,7 @@ class StopEncodingRunner:
                 print(
                     f'Try to load variance explained for unit {unit_idx} failed: {e}')
                 return None
+        return all_neuron_r2
 
     def crossval_stop_variance_explained(
         self,
@@ -863,3 +869,229 @@ class StopEncodingRunner:
             buffer_samples=buffer_samples,
             cv_groups=cv_groups,
         )
+
+    def crossval_stop_tuning_curve_coef(
+        self,
+        unit_idx: int,
+        groups: List[GroupSpec],
+        *,
+        n_folds: int = 10,
+        random_state: int = 0,
+        fit_kwargs: Optional[Dict] = None,
+        save_path: Optional[str] = None,
+        load_if_exists: bool = True,
+        save_metadata: Optional[Dict] = None,
+        verbose: bool = True,
+        cv_mode: Optional[str] = 'blocked_time_buffered',
+        buffer_samples: int = 20,
+        cv_groups=None,
+    ) -> Dict:
+        """
+        Perform n-fold (default 10) cross-validation for tuning curve coefficients.
+
+        Fits model on training folds and extracts fit_result.coef for each fold
+        to analyze stability and consistency of tuning curve estimates.
+
+        Uses gam_variance_explained.crossval_variance_explained wrapper with
+        design_df from get_design_for_unit(unit_idx) and y from self.stop_binned_spikes.
+
+        Parameters
+        ----------
+        unit_idx : int
+            Column index into self.stop_binned_spikes.
+        groups : list of GroupSpec
+            Penalty groups for the design matrix (e.g. from get_stop_gam_groups()).
+        n_folds : int
+            Number of cross-validation folds (default: 10).
+        random_state : int
+            Random seed for fold splitting.
+        fit_kwargs : dict, optional
+            Additional kwargs passed to fit_poisson_gam (max_iter, tol, l1_groups, etc).
+        save_path : str, optional
+            Path to save CV tuning curve results (fold coefficients, metadata).
+        load_if_exists : bool
+            If True, load cached results from save_path when available.
+        save_metadata : dict, optional
+            Additional metadata to save with results.
+        verbose : bool
+            Print progress and results.
+        cv_mode : str, optional
+            Cross-validation mode: 'blocked_time_buffered', 'blocked_time',
+            'group_kfold', or None (shuffled KFold). Default: 'blocked_time_buffered'.
+        buffer_samples : int
+            Buffer for 'blocked_time_buffered' mode (default: 20).
+        cv_groups : array-like, optional
+            Sample-level group labels for 'group_kfold'. Required when cv_mode='group_kfold'.
+
+        Returns
+        -------
+        dict with keys:
+            fold_coef : list of np.ndarray
+                Coefficients from fit_result.coef for each fold.
+            fold_design_columns : list of str
+                Column names from design_df (same for all folds).
+            coef_shape : tuple
+                Shape of each fold's coefficient array.
+            mean_coef : np.ndarray
+                Mean of fold_coef across folds.
+            std_coef : np.ndarray
+                Std dev of fold_coef across folds.
+            unit_idx : int
+                Target neuron index.
+            cv_mode : str
+                Cross-validation mode used.
+            n_folds : int
+                Number of folds.
+            save_path : str
+                Path where results were saved (if applicable).
+        """
+
+        self._refresh_structured_meta_groups_for_unit(unit_idx)
+
+        if save_path is None:
+            paths = self.get_stop_gam_save_paths(
+                unit_idx=unit_idx,
+                ensure_dirs=False,
+            )
+            outdir = paths['outdir']
+            lam_suffix = paths['lam_suffix']
+            cv_tuning_dir = outdir / 'cv_tuning_coef'
+            cv_tuning_dir.mkdir(parents=True, exist_ok=True)
+            save_path = str(cv_tuning_dir / f'{lam_suffix}.pkl')
+
+        # Try to load cached results
+        if load_if_exists and os.path.exists(save_path):
+            try:
+                with open(save_path, 'rb') as f:
+                    cached_result = pickle.load(f)
+                if verbose:
+                    print(
+                        f'Loaded cached tuning curve CV results from: {save_path}')
+                return cached_result
+            except Exception as e:
+                if verbose:
+                    print(
+                        f'Could not load cached results from {save_path}: {e}')
+
+        # Get design matrix and response for the target neuron
+        self.design_df_w_history = self.get_design_for_unit(unit_idx)
+        n_rows = len(self.design_df_w_history)
+        if n_rows != len(self.stop_binned_spikes):
+            raise ValueError(
+                f'design and stop_binned_spikes row count mismatch: '
+                f'{n_rows} vs {len(self.stop_binned_spikes)}'
+            )
+        y = np.asarray(
+            self.stop_binned_spikes.iloc[:, unit_idx].to_numpy(),
+            dtype=float,
+        ).ravel()
+
+        if fit_kwargs is None:
+            fit_kwargs = {'max_iter': 1000, 'tol': 1e-6, 'verbose': False}
+
+        # Auto-generate save_path if not provided
+
+        # Build cross-validation fold indices
+        from sklearn.model_selection import KFold, TimeSeriesSplit, GroupKFold
+
+        if cv_mode is None:
+            splitter = KFold(n_splits=n_folds, shuffle=True,
+                             random_state=random_state)
+        elif cv_mode == 'blocked_time':
+            splitter = TimeSeriesSplit(n_splits=n_folds)
+        elif cv_mode == 'blocked_time_buffered':
+            # Time series split with buffer
+            splitter = TimeSeriesSplit(n_splits=n_folds)
+        elif cv_mode == 'group_kfold':
+            if cv_groups is None:
+                raise ValueError('cv_groups required for group_kfold mode')
+            splitter = GroupKFold(n_splits=n_folds)
+        else:
+            raise ValueError(f'Unknown cv_mode: {cv_mode}')
+
+        fold_coef_list = []
+        fold_indices = []
+
+        if cv_mode == 'group_kfold':
+            fold_iter = splitter.split(y, groups=cv_groups)
+        else:
+            fold_iter = splitter.split(y)
+
+        for fold_idx, (train_idx, test_idx) in enumerate(fold_iter):
+            # Apply buffer for blocked_time_buffered
+            if cv_mode == 'blocked_time_buffered' and buffer_samples > 0:
+                # Remove samples near fold boundary from training set
+                if len(test_idx) > 0:
+                    min_test = test_idx.min()
+                    train_idx = train_idx[train_idx <
+                                          (min_test - buffer_samples)]
+
+            # Fit on training fold
+            X_train = self.design_df_w_history.iloc[train_idx, :]
+            y_train = y[train_idx]
+
+            if verbose:
+                print(
+                    f'Fold {fold_idx + 1}/{n_folds}: fitting {len(train_idx)} samples')
+
+            fit_result = one_ff_gam_fit.fit_poisson_gam(
+                design_df=X_train,
+                y=y_train,
+                groups=groups,
+                save_path=None,
+                save_design=False,
+                load_if_exists=False,
+                **fit_kwargs,
+            )
+
+            # Extract coefficient vector
+            if hasattr(fit_result, 'coef') and fit_result.coef is not None:
+                fold_coef_list.append(np.asarray(fit_result.coef).copy())
+            else:
+                raise RuntimeError(
+                    f'Fold {fold_idx}: fit_result does not have valid coef attribute'
+                )
+            fold_indices.append((train_idx, test_idx))
+
+        # Aggregate coefficient statistics
+        fold_coef_array = np.array(fold_coef_list)  # (n_folds, n_coef)
+        mean_coef = np.mean(fold_coef_array, axis=0)
+        std_coef = np.std(fold_coef_array, axis=0)
+
+        result = {
+            'fold_coef': fold_coef_list,
+            'fold_design_columns': list(self.design_df_w_history.columns),
+            'coef_shape': fold_coef_array[0].shape if len(fold_coef_list) > 0 else None,
+            'mean_coef': mean_coef,
+            'std_coef': std_coef,
+            'fold_indices': fold_indices,
+            'unit_idx': unit_idx,
+            'cv_mode': cv_mode,
+            'n_folds': n_folds,
+            'random_state': random_state,
+        }
+
+        if save_metadata is not None:
+            result['metadata'] = save_metadata
+
+        try:
+            save_dir = os.path.dirname(save_path)
+            if save_dir:
+                os.makedirs(save_dir, exist_ok=True)
+            with open(save_path, 'wb') as f:
+                pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
+            if verbose:
+                print(f'Saved tuning curve CV results to: {save_path}')
+        except Exception as e:
+            print(
+                f'WARNING: could not save tuning curve CV results to {save_path}: {e}')
+
+        result['save_path'] = save_path
+
+        if verbose:
+            print(f'Completed {n_folds}-fold CV for unit {unit_idx}')
+            print(f'  Mean coef shape: {mean_coef.shape}')
+            print(
+                f'  Coef mean ± std: {np.mean(mean_coef):.4f} ± {np.mean(std_coef):.4f}')
+
+        return result

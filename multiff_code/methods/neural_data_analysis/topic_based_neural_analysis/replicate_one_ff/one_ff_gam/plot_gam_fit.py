@@ -2,6 +2,7 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
 
 def _cols_in_beta(cols, beta):
     """
@@ -9,7 +10,21 @@ def _cols_in_beta(cols, beta):
     When NA rows are dropped during fitting, some design columns may be
     absent from the fitted coefficients.
     """
-    beta_index = beta.index if hasattr(beta, 'index') else getattr(beta, 'columns', None)
+    beta_index = None
+
+    # pandas Series/DataFrame paths
+    idx_attr = getattr(beta, 'index', None)
+    if idx_attr is not None and not callable(idx_attr):
+        beta_index = idx_attr
+    else:
+        col_attr = getattr(beta, 'columns', None)
+        if col_attr is not None and not callable(col_attr):
+            beta_index = col_attr
+
+    # list/tuple/ndarray/index-like path
+    if beta_index is None and isinstance(beta, (list, tuple, np.ndarray)):
+        beta_index = beta
+
     if beta_index is None:
         return list(cols)
     return [c for c in cols if c in beta_index]
@@ -434,7 +449,7 @@ def plot_all_tuning_curves(beta, structured_meta_groups):
                    plot_var_order=one_ff_parameters.plot_var_order)
 
 
-def plot_all_temporal_filters(beta, structured_meta_groups, plot_var_order=None):
+def plot_all_temporal_filters(beta, structured_meta_groups):
     """
     Plot all temporal filters (events and spike history).
 
@@ -464,3 +479,237 @@ def plot_all_temporal_filters(beta, structured_meta_groups, plot_var_order=None)
 
     plot_variables(beta, structured_meta_groups, var_list=var_list,
                    plot_var_order=one_ff_parameters.plot_var_order)
+
+
+def plot_fold_coefficients(
+    cv_result,
+    structured_meta_groups,
+    use_sem=True,
+    plot_all_vars=True,
+    label_step=1,
+):
+    """
+    Plot cross-validated tuning curves, one figure per tuning variable.
+
+    Parameters
+    ----------
+    cv_result : dict
+        Result from crossval_stop_tuning_curve_coef with keys:
+        'mean_coef', 'std_coef', 'fold_design_columns', 'fold_coef', 'n_folds'
+    structured_meta_groups : dict
+        Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
+    use_sem : bool
+        If True, use standard error of the mean (std / sqrt(n_folds)).
+        If False, use standard deviation.
+    plot_all_vars : bool
+        Kept for backward compatibility. Not used in this mode.
+    label_step : int
+        Kept for backward compatibility. Not used in this mode.
+    """
+    mean_coef = cv_result.get('mean_coef')
+    std_coef = cv_result.get('std_coef')
+    col_names = cv_result.get('fold_design_columns')
+    n_folds = cv_result.get('n_folds', 1)
+
+    if mean_coef is None or std_coef is None or col_names is None:
+        raise ValueError('cv_result must contain mean_coef, std_coef, and fold_design_columns')
+
+    mean_coef = np.asarray(mean_coef, dtype=float)
+    std_coef = np.asarray(std_coef, dtype=float)
+    col_names = list(col_names)
+
+    # Compute uncertainty in log-rate space
+    if use_sem:
+        error = std_coef / np.sqrt(n_folds)
+    else:
+        error = std_coef
+    if 'tuning' not in structured_meta_groups:
+        raise ValueError("structured_meta_groups must contain 'tuning' metadata")
+
+    tuning_meta = structured_meta_groups['tuning']
+    linear_vars = tuning_meta.get('linear_vars', [])
+    angular_vars = tuning_meta.get('angular_vars', [])
+    var_list = list(linear_vars) + list(angular_vars)
+    if not var_list:
+        raise ValueError("No tuning variables found in structured_meta_groups['tuning']")
+
+    ordered_vars = [v for v in one_ff_parameters.plot_var_order if v in var_list]
+    ordered_vars += [v for v in var_list if v not in ordered_vars]
+
+    col_to_idx = {name: idx for idx, name in enumerate(col_names)}
+    figs, axes = [], []
+
+    for var in ordered_vars:
+        group_cols = tuning_meta.get('groups', {}).get(var, [])
+        var_cols = [c for c in group_cols if c in col_to_idx]
+        if not var_cols:
+            continue
+
+        idx = [col_to_idx[c] for c in var_cols]
+        y_log = mean_coef[idx]
+        e_log = error[idx]
+
+        gain = np.exp(y_log)
+        lower = np.exp(y_log - e_log)
+        upper = np.exp(y_log + e_log)
+        yerr = np.vstack([gain - lower, upper - gain])
+
+        is_angular = var in angular_vars
+        if 'bin_edges' in tuning_meta and var in tuning_meta['bin_edges']:
+            edges = np.asarray(tuning_meta['bin_edges'][var], dtype=float)
+            centers = (edges[:-1] + edges[1:]) / 2
+            bin_indices = _parse_bin_indices(var_cols, var)
+            if (bin_indices is not None and len(bin_indices) == len(gain) and
+                    np.all((bin_indices >= 0) & (bin_indices < len(centers)))):
+                x = centers[bin_indices]
+            else:
+                x = centers[:len(gain)]
+        else:
+            if is_angular:
+                x = np.linspace(-np.pi, np.pi, len(gain))
+            else:
+                x = np.arange(len(gain))
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.errorbar(
+            x, gain, yerr=yerr, fmt='o-' if len(gain) <= 20 else '-',
+            capsize=4, linewidth=2, markersize=5,
+            label='Mean ± SEM' if use_sem else 'Mean ± Std'
+        )
+        ax.axhline(1.0, color='k', ls='--', lw=1)
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Tuning: {var} (n_folds={n_folds})')
+        ax.set_xlabel(f'{var} (rad)' if is_angular else var)
+        ax.set_ylabel('Gain (× baseline)')
+        ax.legend()
+        fig.tight_layout()
+        plt.show()
+
+        figs.append(fig)
+        axes.append(ax)
+
+
+def plot_fold_coefficient_by_variable(cv_result, structured_meta_groups, var_list=None, use_sem=True):
+    """
+    Plot cross-validation fold coefficients grouped by variable type.
+
+    Decomposes coefficients by variable type (tuning, temporal, history) and plots
+    each variable's coefficients with error bars on separate panels.
+
+    Parameters
+    ----------
+    cv_result : dict
+        Result from crossval_stop_tuning_curve_coef with keys:
+        'mean_coef', 'std_coef', 'fold_design_columns', 'fold_coef', 'n_folds'
+    structured_meta_groups : dict
+        Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
+    var_list : list of str, optional
+        List of specific variables to plot. If None, plots all available variables.
+    use_sem : bool
+        If True, use standard error of the mean. If False, use standard deviation.
+    """
+    mean_coef = cv_result.get('mean_coef')
+    std_coef = cv_result.get('std_coef')
+    col_names = cv_result.get('fold_design_columns')
+    n_folds = cv_result.get('n_folds', 1)
+
+    if mean_coef is None or std_coef is None or col_names is None:
+        raise ValueError('cv_result must contain mean_coef, std_coef, and fold_design_columns')
+
+    # Build variable mapping from column names
+    var_col_map = {}
+
+    # Map tuning variables
+    if 'tuning' in structured_meta_groups:
+        tuning_meta = structured_meta_groups['tuning']
+        for var in tuning_meta.get('linear_vars', []) + tuning_meta.get('angular_vars', []):
+            var_col_map[var] = _cols_in_beta(
+                tuning_meta['groups'].get(var, []),
+                col_names
+            )
+
+    # Map temporal variables
+    if 'temporal' in structured_meta_groups:
+        temporal_meta = structured_meta_groups['temporal']
+        for var in temporal_meta.get('groups', {}).keys():
+            var_col_map[var] = _cols_in_beta(
+                temporal_meta['groups'].get(var, []),
+                col_names
+            )
+
+    # Map history variables
+    if 'hist' in structured_meta_groups:
+        hist_meta = structured_meta_groups['hist']
+        for var in hist_meta.get('groups', {}).keys():
+            var_col_map[var] = _cols_in_beta(
+                hist_meta['groups'].get(var, []),
+                col_names
+            )
+
+    # Determine which variables to plot
+    if var_list is None:
+        var_list = list(var_col_map.keys())
+    else:
+        var_list = [v for v in var_list if v in var_col_map]
+
+    # Compute error bars
+    if use_sem:
+        error = std_coef / np.sqrt(n_folds)
+    else:
+        error = std_coef
+
+    # Create subplots
+    n_vars = len(var_list)
+    n_cols = 3
+    n_rows = (n_vars + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, 4 * n_rows))
+    axes = np.atleast_1d(axes).flatten()
+
+    for idx, var in enumerate(var_list):
+        ax = axes[idx]
+        col_indices = []
+
+        # Find column indices for this variable
+        for col_idx, col_name in enumerate(col_names):
+            if col_name in var_col_map[var]:
+                col_indices.append(col_idx)
+
+        if not col_indices:
+            ax.text(0.5, 0.5, f'{var}\n(no coefficients)',
+                    ha='center', va='center', transform=ax.transAxes)
+            ax.set_title(var)
+            continue
+
+        # Extract coefficients for this variable
+        x_pos = np.arange(len(col_indices))
+        var_mean = mean_coef[col_indices]
+        var_error = error[col_indices]
+        var_cols = [col_names[i] for i in col_indices]
+
+        # Plot
+        ax.errorbar(x_pos, var_mean, yerr=var_error, fmt='o-', capsize=5, capthick=2,
+                    markersize=6, linewidth=2)
+        ax.axhline(0.0, color='k', ls='--', lw=1, alpha=0.5)
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'{var}')
+        ax.set_ylabel('Coefficient Value')
+
+        # Set x-tick labels
+        if len(var_cols) <= 10:
+            ax.set_xticks(x_pos)
+            ax.set_xticklabels(var_cols, rotation=45, ha='right', fontsize=8)
+        else:
+            step = max(1, len(var_cols) // 5)
+            ax.set_xticks(x_pos[::step])
+            ax.set_xticklabels([var_cols[i] for i in x_pos[::step]],
+                               rotation=45, ha='right', fontsize=8)
+
+    # Hide unused axes
+    for idx in range(n_vars, len(axes)):
+        axes[idx].set_visible(False)
+
+    fig.suptitle(f'Cross-validation Tuning Curve by Variable (n_folds={n_folds}, SEM={use_sem})',
+                 fontsize=14, y=1.00)
+    fig.tight_layout()
+    plt.show()
+
