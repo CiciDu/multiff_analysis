@@ -28,7 +28,7 @@ class StopParams:
     -----
     - `bin_width` should match the binning used when assembling the stop design
       (e.g. `bin_width` argument to `StopEncodingRunner` and
-      `assemble_stop_design_func`).
+      `assemble_stop_encoding_design`).
     - `binrange` is passed as `binrange_dict` to `build_tuning_design_stop`
       so that tuning boxcars for v/w/d/phi/... match one_ff.
     - `lam_*` match the semantics in `one_ff_gam.build_group_specs`:
@@ -67,7 +67,7 @@ class StopParams:
             # Kinematics / integrated motion (copied from one_ff_parameters)
             "v": np.array([0, 200]),            # cm/s
             "w": np.array([-90, 90]),           # deg/s
-            "d": np.array([0, 400]),            # cm
+            #"d": np.array([0, 400]),            # cm
             "phi": np.array([-180, 180]),         # deg
             "accel": np.array([-1000, 1000]),  # cm/s^2
             "ang_accel_deg": np.array([-600, 600]),  # rad/s^2

@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Type
+from typing import Optional, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -60,9 +60,10 @@ def run_cv_decoding(
     config: Optional[DecodingRunConfig] = None,
     context_label=None,
     verbosity: int = 1,
-    shuffle_mode: str = 'none', # can be 'none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group'
+    # can be 'none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group'
+    shuffle_mode: str = 'none',
     shuffle_seed: int = 0,
-    save_dir: Optional[str | Path] = None,
+    save_dir: Optional[Union[str, Path]] = None,
     load_existing_only=False,
     exists_ok=True,
     model_name: Optional[str] = None,
@@ -74,7 +75,8 @@ def run_cv_decoding(
     # If load_existing_only is True, just load and return consolidated results
     if load_existing_only:
         if save_dir is None:
-            raise ValueError("save_dir must be provided when load_existing_only=True")
+            raise ValueError(
+                "save_dir must be provided when load_existing_only=True")
         return load_consolidated_results(save_dir)
 
     out_dir = Path(save_dir) if save_dir is not None else None
@@ -183,7 +185,7 @@ def _build_folds(
     groups=None,
     cv_splitter=None,
     random_state=0,
-    buffer_samples=0
+    buffer_samples=20
 ):
     """
     Return a list of (train_idx, valid_idx) pairs.
@@ -223,7 +225,7 @@ def _build_folds(
 
             folds.append((train_idx, test_idx))
 
-        #print('cv_splitter = blocked_time_buffered: Split into contiguous blocks with buffer region')
+        # print('cv_splitter = blocked_time_buffered: Split into contiguous blocks with buffer region')
         return folds
 
     # -------- FORWARD-CHAINING (causal CV) --------
@@ -341,6 +343,8 @@ def config_matches(row, n_splits, shuffle_mode, context_label, config, model_nam
 # ============================================================
 # Main (slim orchestration)
 # ============================================================
+
+
 def serialize_decoding_config(config):
     return dict(
         cv_mode=config.cv_mode,
@@ -629,7 +633,7 @@ def consolidate_results_across_models(
         'buffer_samples',
         'context',
     ]
-    
+
     actual_dedup_cols = [
         col for col in dedup_cols if col in consolidated_df.columns]
 
@@ -790,7 +794,8 @@ def run_regression_cv(
     config,
     rng,
     *,
-    shuffle_mode='none', # can be 'none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group'
+    # can be 'none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group'
+    shuffle_mode='none',
 ):
 
     y_pred = np.full_like(y, np.nan, float)
@@ -859,8 +864,8 @@ def run_regression_cv(
         rmse_cv=np.sqrt(mean_squared_error(y, y_pred)),
         r_cv=np.corrcoef(y, y_pred)[0, 1],
     )
-    
-    
+
+
 def run_classification_cv(
     X,
     y,

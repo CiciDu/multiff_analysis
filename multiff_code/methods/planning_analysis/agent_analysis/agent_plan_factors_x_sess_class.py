@@ -6,6 +6,7 @@ from planning_analysis.agent_analysis import agent_plan_factors_class
 from planning_analysis.factors_vs_indicators import variations_base_class
 from planning_analysis.factors_vs_indicators import make_variations_utils
 from reinforcement_learning.base_classes import rl_base_class
+from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
 
 import pandas as pd
 import os
@@ -38,6 +39,12 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
+        self.num_obs_ff, self.max_in_memory_time = compare_monkey_and_agent_utils.extract_ff_num(
+            model_folder_name)
+        if self.num_obs_ff == 1:
+            self.test_or_control_filter = 'control'
+        else:
+            self.test_or_control_filter = None
 
     def streamline_getting_y_values(self,
                                     num_datasets_to_collect=2,
@@ -51,7 +58,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                     model_folder_name=None,
                                     ref_point_params_based_on_mode=None,
                                     use_stored_data_only=False,
-                                    test_or_control_filter=None,
                                     **env_kwargs
                                     ):
 
@@ -97,8 +103,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                              combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
                                                              stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
                                                              heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                                             use_stored_data_only=use_stored_data_only,
-                                                             test_or_control_filter=test_or_control_filter)
+                                                             use_stored_data_only=use_stored_data_only)
 
             self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
 
@@ -110,8 +115,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                    stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
                                                    heading_info_df_exists_ok=intermediate_products_exist_ok,
                                                    save_data=save_data,
-                                                   use_stored_data_only=use_stored_data_only,
-                                                   test_or_control_filter=test_or_control_filter)
+                                                   use_stored_data_only=use_stored_data_only)
             self.agent_all_perc_df = self.pooled_perc_info.copy()
         except Exception as e:
             print(f'Error making overall all median info: {e}')
@@ -239,7 +243,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                          use_curv_to_ff_center=False,
                                          save_data=True,
                                          use_stored_data_only=False,
-                                         test_or_control_filter=None,
                                          **env_kwargs
                                          ):
         self.test_heading_info_df = pd.DataFrame()
@@ -257,30 +260,36 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             print(' ')
 
             # Get heading info for the requested data type(s)
-            filter_msg = f'{test_or_control_filter} heading info only' if test_or_control_filter else 'test and control heading info'
+            filter_msg = f'{self.test_or_control_filter} heading info only' if self.test_or_control_filter else 'test and control heading info'
             print(f'Getting {filter_msg} ......')
 
             try:
-                self.pfa.get_test_and_ctrl_heading_info_df_for_one_session(ref_point_mode=ref_point_mode,
-                                                                           ref_point_value=ref_point_value,
-                                                                           curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                                           heading_info_df_exists_ok=heading_info_df_exists_ok,
-                                                                           stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                           curv_of_traj_mode=curv_of_traj_mode,
-                                                                           window_for_curv_of_traj=window_for_curv_of_traj,
-                                                                           use_curv_to_ff_center=use_curv_to_ff_center,
-                                                                           save_data=save_data,
-                                                                           n_steps=self.num_steps_per_dataset,
-                                                                           use_stored_data_only=use_stored_data_only,
-                                                                           test_or_control_filter=test_or_control_filter,
-                                                                           **env_kwargs)
+                # Exclude test_or_control_filter from env_kwargs - it is planning-specific and
+                # causes KeyError if passed to agent/env code
+                if self.test_or_control_filter in env_kwargs.keys():
+                    env_kwargs.pop(self.test_or_control_filter)
+                    print('test_or_control_filter removed from env_kwargs')
+                self.pfa.get_test_and_ctrl_heading_info_df_for_one_session(
+                    ref_point_mode=ref_point_mode,
+                    ref_point_value=ref_point_value,
+                    curv_traj_window_before_stop=curv_traj_window_before_stop,
+                    heading_info_df_exists_ok=heading_info_df_exists_ok,
+                    stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
+                    curv_of_traj_mode=curv_of_traj_mode,
+                    window_for_curv_of_traj=window_for_curv_of_traj,
+                    use_curv_to_ff_center=use_curv_to_ff_center,
+                    save_data=save_data,
+                    n_steps=self.num_steps_per_dataset,
+                    use_stored_data_only=use_stored_data_only,
+                    test_or_control_filter=self.test_or_control_filter,
+                    **env_kwargs)
                 self._add_heading_info_to_combd_heading_info(
-                    data_name, test_or_control_filter=test_or_control_filter)
+                    data_name)
             except Exception as e:
                 print(f'Warning: Could not get heading info for data_{i}: {e}')
-                if test_or_control_filter:
+                if self.test_or_control_filter:
                     print(
-                        f'{test_or_control_filter.capitalize()} data might not exist for this session. Skipping.')
+                        f'{self.test_or_control_filter.capitalize()} data might not exist for this session. Skipping.')
                 else:
                     print('Data might not exist for this session. Skipping.')
 
@@ -298,8 +307,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
         if save_data:
             # Determine which types to save
-            types_to_save = ['test', 'control'] if test_or_control_filter is None else [
-                test_or_control_filter]
+            types_to_save = ['test', 'control'] if self.test_or_control_filter is None else [
+                self.test_or_control_filter]
 
             for test_or_control in types_to_save:
                 df_to_save = self.test_heading_info_df if test_or_control == 'test' else self.ctrl_heading_info_df
@@ -331,30 +340,29 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                           use_curv_to_ff_center=False,
                                                           save_data=True,
                                                           use_stored_data_only=False,
-                                                          test_or_control_filter=None,
                                                           **env_kwargs
                                                           ):
 
         try:
             if combd_heading_df_x_sessions_exists_ok:
                 print(
-                    f'Attempting to retrieve existing combd_heading_df_x_sessions (filter: {test_or_control_filter})...')
+                    f'Attempting to retrieve existing combd_heading_df_x_sessions (filter: {self.test_or_control_filter})...')
                 self.retrieve_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                           curv_traj_window_before_stop=curv_traj_window_before_stop,
-                                                          test_or_control_filter=test_or_control_filter)
+                                                          test_or_control_filter=self.test_or_control_filter)
 
                 print(
                     f'Retrieved: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')
 
                 # Only check for empty dataframes if not filtering, or check only the filtered type
-                if test_or_control_filter is None:
+                if self.test_or_control_filter is None:
                     if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
                         raise Exception('Empty combd_heading_df_x_sessions.')
-                elif test_or_control_filter == 'control':
+                elif self.test_or_control_filter == 'control':
                     if len(self.ctrl_heading_info_df) == 0:
                         raise Exception(
                             'Empty combd_heading_df_x_sessions for control data.')
-                elif test_or_control_filter == 'test':
+                elif self.test_or_control_filter == 'test':
                     if len(self.test_heading_info_df) == 0:
                         raise Exception(
                             'Empty combd_heading_df_x_sessions for test data.')
@@ -369,7 +377,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             print(
                 f'Will make new combd_heading_df_x_sessions for the agent because: {e}')
             print(
-                f'Creating data from scratch with filter: {test_or_control_filter}')
+                f'Creating data from scratch with filter: {self.test_or_control_filter}')
 
             self.make_combd_heading_df_x_sessions(num_steps_per_dataset=self.num_steps_per_dataset, num_datasets_to_collect=num_datasets_to_collect,
                                                   ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
@@ -380,7 +388,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                   use_curv_to_ff_center=use_curv_to_ff_center,
                                                   save_data=save_data,
                                                   use_stored_data_only=use_stored_data_only,
-                                                  test_or_control_filter=test_or_control_filter,
                                                   **env_kwargs)
 
             print(
@@ -392,7 +399,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         self.combd_plan_features_tc = pd.concat(
             [self.combd_plan_features_tc, plan_features_tc], axis=0)
 
-    def _add_heading_info_to_combd_heading_info(self, data_name, test_or_control_filter=None):
+    def _add_heading_info_to_combd_heading_info(self, data_name):
         # Get dataframes from pfa, handling cases where they might not exist
         test_df = self.pfa.test_heading_info_df.copy() if hasattr(
             self.pfa, 'test_heading_info_df') else pd.DataFrame()
@@ -402,10 +409,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         print(f'_add_heading_info_to_combd_heading_info for {data_name}:')
         print(
             f'  From pfa: test={len(test_df)} rows, ctrl={len(ctrl_df)} rows')
-        print(f'  Filter: {test_or_control_filter}')
+        print(f'  Filter: {self.test_or_control_filter}')
 
         # Only process the requested type if filter is specified
-        if test_or_control_filter == 'test':
+        if self.test_or_control_filter == 'test':
             if len(test_df) > 0:
                 test_df['data_name'] = data_name
                 test_df['whether_test'] = 1
@@ -414,7 +421,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 print(f'  Added {len(test_df)} test rows')
             else:
                 print('  No test data to add')
-        elif test_or_control_filter == 'control':
+        elif self.test_or_control_filter == 'control':
             if len(ctrl_df) > 0:
                 ctrl_df['data_name'] = data_name
                 ctrl_df['whether_test'] = 0
@@ -456,15 +463,11 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                            save_data=True,
                                                            filter_heading_info_df_across_refs=False,
                                                            use_stored_data_only=False,
-                                                           test_or_control_filter=None,
                                                            **kwargs):
         """
         Override parent method to support test_or_control_filter for agents.
         This prevents errors when only one type of data exists.
         """
-        # If filter not provided as parameter, check if it's stored as instance variable
-        if test_or_control_filter is None and hasattr(self, '_test_or_control_filter'):
-            test_or_control_filter = self._test_or_control_filter
 
         # Call the agent-specific version with filter support
         self.get_test_and_ctrl_heading_info_df_across_sessions(
@@ -476,7 +479,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             save_data=save_data,
             combd_heading_df_x_sessions_exists_ok=combd_heading_df_x_sessions_exists_ok,
             use_stored_data_only=use_stored_data_only,
-            test_or_control_filter=test_or_control_filter,
             **kwargs
         )
 
@@ -488,15 +490,12 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self.test_heading_info_df = pd.DataFrame(
                 columns=self.ctrl_heading_info_df.columns)
 
-    def make_or_retrieve_all_ref_pooled_median_info(self, test_or_control_filter=None, **kwargs):
+    def make_or_retrieve_all_ref_pooled_median_info(self, **kwargs):
         """
         Make or retrieve pooled median info across all reference points.
 
         Parameters
         ----------
-        test_or_control_filter : str or None, optional
-            If 'test', only returns test data. If 'control', only returns control data.
-            If None (default), returns both test and control data.
         **kwargs : dict
             Additional keyword arguments passed to parent method.
 
@@ -505,12 +504,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         pd.DataFrame
             All reference pooled median info, optionally filtered by test_or_control.
         """
-        if test_or_control_filter is not None and test_or_control_filter not in ['test', 'control']:
-            raise ValueError(
-                "test_or_control_filter must be 'test', 'control', or None")
-
-        # Store filter as instance variable so it can be accessed by override methods
-        self._test_or_control_filter = test_or_control_filter
 
         try:
             # Enable plotting processing - it's now robust to handle missing columns
@@ -523,24 +516,22 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
             # Filter by test_or_control if specified
             # Only filter if the column exists (it might not exist if data was already filtered at retrieval)
-            if test_or_control_filter is not None:
+            if self.test_or_control_filter is not None:
                 if 'test_or_control' in self.all_ref_pooled_median_info.columns:
                     self.all_ref_pooled_median_info = self.all_ref_pooled_median_info[
-                        self.all_ref_pooled_median_info['test_or_control'] == test_or_control_filter
+                        self.all_ref_pooled_median_info['test_or_control'] == self.test_or_control_filter
                     ].copy()
                     print(
-                        f'Filtered to only {test_or_control_filter} data. Shape: {self.all_ref_pooled_median_info.shape}')
+                        f'Filtered to only {self.test_or_control_filter} data. Shape: {self.all_ref_pooled_median_info.shape}')
                 else:
                     print(
                         'Note: test_or_control column not found. Data was already filtered at retrieval level.')
         finally:
-            # Clean up the instance variable
-            if hasattr(self, '_test_or_control_filter'):
-                delattr(self, '_test_or_control_filter')
+            pass
 
         return self.all_ref_pooled_median_info
 
-    def make_or_retrieve_pooled_perc_info(self, use_stored_data_only=False, test_or_control_filter=None,
+    def make_or_retrieve_pooled_perc_info(self, use_stored_data_only=False,
                                           exists_ok=True, stops_near_ff_df_exists_ok=True,
                                           heading_info_df_exists_ok=True, ref_point_mode='distance',
                                           ref_point_value=-50, verbose=False, save_data=True,
@@ -550,9 +541,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
         Parameters
         ----------
-        test_or_control_filter : str or None, optional
-            If 'test' or 'control', creates perc info with single condition support.
-            If None (default), creates perc info with both conditions.
         **kwargs : dict
             Additional keyword arguments.
 
@@ -561,9 +549,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         pd.DataFrame
             Pooled percentage info.
         """
-        # Store filter as instance variable for override methods
-        if test_or_control_filter is not None:
-            self._test_or_control_filter = test_or_control_filter
 
         try:
             if exists_ok & exists(self.pooled_perc_info_path):
@@ -578,7 +563,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     use_stored_data_only=use_stored_data_only)
 
                 # Enable single condition support when filtering
-                allow_single = test_or_control_filter is not None
+                allow_single = self.test_or_control_filter is not None
 
                 self.pooled_perc_info = make_variations_utils.make_pooled_perc_info_from_test_and_ctrl_heading_info_df(
                     self.test_heading_info_df,
@@ -595,7 +580,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self.pooled_perc_info['opt_arc_type'] = self.opt_arc_type
         finally:
             # Clean up instance variable
-            if hasattr(self, '_test_or_control_filter'):
-                delattr(self, '_test_or_control_filter')
+            pass
 
         return self.pooled_perc_info

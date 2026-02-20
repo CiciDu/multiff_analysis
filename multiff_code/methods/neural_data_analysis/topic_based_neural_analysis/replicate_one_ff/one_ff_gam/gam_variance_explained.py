@@ -2,6 +2,8 @@
 import numpy as np
 from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
+
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import _build_folds
 import pickle
 from pathlib import Path
 from typing import Optional, Dict
@@ -105,20 +107,28 @@ def _save_crossval_results(
     fit_kwargs,
     save_metadata,
     verbose,
+    cv_mode='blocked_time_buffered',
+    buffer_samples=20,
 ):
     """Save cross-validation variance explained results to pickle file."""
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
+    hyperparams = {
+        'dt': dt,
+        'n_folds': n_folds,
+        'random_state': random_state,
+        'fit_kwargs': fit_kwargs,
+    }
+    if cv_mode is not None:
+        hyperparams['cv_mode'] = cv_mode
+    if buffer_samples != 0:
+        hyperparams['buffer_samples'] = buffer_samples
+
     save_dict = {
         'cv_results': cv_results,
         'groups': [asdict(g) for g in groups],
-        'hyperparameters': {
-            'dt': dt,
-            'n_folds': n_folds,
-            'random_state': random_state,
-            'fit_kwargs': fit_kwargs,
-        },
+        'hyperparameters': hyperparams,
     }
 
     if save_metadata is not None:
@@ -147,7 +157,7 @@ def _maybe_load_saved_crossval(save_path, load_if_exists, verbose):
 
     with open(save_path, 'rb') as f:
         saved = pickle.load(f)
-    
+
     cv_results = saved['cv_results']
 
     if verbose:
@@ -163,12 +173,12 @@ def _maybe_load_saved_crossval(save_path, load_if_exists, verbose):
 def load_crossval_results(save_path: str) -> Dict:
     """
     Load saved cross-validation variance explained results from pickle file.
-    
+
     Parameters
     ----------
     save_path : str
         Path to the saved pickle file
-    
+
     Returns
     -------
     Dict
@@ -196,6 +206,9 @@ def crossval_variance_explained(
     load_if_exists: bool = True,
     save_metadata: Optional[Dict] = None,
     verbose: bool = True,
+    cv_mode: Optional[str] = 'blocked_time_buffered',
+    buffer_samples: int = 20,
+    cv_groups=None,
 ):
     """
     5-fold cross-validation for Poisson GAM model.
@@ -225,6 +238,16 @@ def crossval_variance_explained(
         Additional metadata to save with results
     verbose : bool
         Print progress and diagnostic information (default: True)
+    cv_mode : str, optional
+        Cross-validation mode. Options (same as cv_decoding):
+        - 'blocked_time_buffered': contiguous time blocks with buffer exclusion
+        - 'blocked_time': forward-chaining (past → future)
+        - 'group_kfold': GroupKFold (requires cv_groups)
+        - None: shuffled KFold (default)
+    buffer_samples : int
+        Number of samples to exclude as buffer in 'blocked_time_buffered' (default: 0)
+    cv_groups : array-like, optional
+        Sample-level group labels for 'group_kfold'. Required when cv_mode='group_kfold'.
 
     Returns
     -------
@@ -252,14 +275,26 @@ def crossval_variance_explained(
     if fit_kwargs is None:
         fit_kwargs = {}
 
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    y = np.asarray(y)
+    n = len(design_df)
+
+    if cv_mode is not None:
+        splits = _build_folds(
+            n,
+            n_splits=n_folds,
+            groups=cv_groups,
+            cv_splitter=cv_mode,
+            buffer_samples=buffer_samples,
+            random_state=random_state,
+        )
+    else:
+        kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+        splits = list(kf.split(np.arange(n)))
 
     fold_classical_r2 = []
     fold_pseudo_r2 = []
 
-    y = np.asarray(y)
-
-    for fold_idx, (train_idx, test_idx) in enumerate(kf.split(design_df)):
+    for fold_idx, (train_idx, test_idx) in enumerate(splits):
 
         # ----------------------
         # Split data
@@ -321,9 +356,12 @@ def crossval_variance_explained(
             fit_kwargs=fit_kwargs,
             save_metadata=save_metadata,
             verbose=verbose,
+            cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
         )
 
     return cv_results
+
 
 def plot_variance_explained_cdf(all_mean_r2,
                                 alpha=0.05,
@@ -337,7 +375,6 @@ def plot_variance_explained_cdf(all_mean_r2,
     """
 
     import numpy as np
-    import matplotlib.pyplot as plt
 
     # Convert to array and remove NaNs
     r2 = np.asarray(all_mean_r2)

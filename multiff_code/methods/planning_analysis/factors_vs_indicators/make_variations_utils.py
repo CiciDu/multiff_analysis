@@ -32,11 +32,15 @@ def make_regrouped_info(test_df,
                         allow_single_condition=False
                         ):
 
-    # Check if only one condition has data
+    # Check if only one condition has data, or both are empty
     test_only = (len(test_df) > 0) and (len(ctrl_df) == 0)
     ctrl_only = (len(ctrl_df) > 0) and (len(test_df) == 0)
+    both_empty = (len(test_df) == 0) and (len(ctrl_df) == 0)
     single_condition = test_only or ctrl_only
-    
+
+    if both_empty:
+        return pd.DataFrame()
+
     if single_condition and not allow_single_condition:
         print('Warning: Only one condition has data, but allow_single_condition=False. Returning empty DataFrame.')
         return pd.DataFrame()

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    one_ff_gam_design,
+    one_ff_gam_fit,
+    gam_variance_explained,
+)
 import os
 import sys
 from pathlib import Path
@@ -18,14 +24,6 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    one_ff_gam_fit,
-    gam_variance_explained,
-)
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -56,7 +54,7 @@ def main(unit_idx: int):
     # -------------------------------
     # Per-unit design
     # -------------------------------
-    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
+    design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )
@@ -66,7 +64,8 @@ def main(unit_idx: int):
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / 'fit_results').mkdir(parents=True, exist_ok=True)
 
-    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=all_meta['lambda_config'])
+    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
+        lambda_config=all_meta['lambda_config'])
     save_path = outdir / 'fit_results' / f'{lam_suffix}.pkl'
 
     fit_res = one_ff_gam_fit.fit_poisson_gam(
@@ -86,7 +85,6 @@ def main(unit_idx: int):
     print('final objective:', fit_res.fun)
     print('grad_norm:', fit_res.grad_norm)
 
-
     # also get variance explained
     save_path = outdir / 'cv_var_explained' / f'{lam_suffix}.pkl'
     prs = one_ff_parameters.default_prs()
@@ -99,16 +97,19 @@ def main(unit_idx: int):
         n_folds=5,
         fit_kwargs=dict(
             l1_groups=[],
-            max_iter=200,
+            max_iter=1000,
             tol=1e-6,
             verbose=False,
             save_path=None,
         ),
-        save_path=save_path
+        save_path=save_path,
+        cv_mode='blocked_time_buffered',
+        buffer_samples=20,
     )
 
     print(cv_res["mean_classical_r2"])
     print(cv_res["mean_pseudo_r2"])
+
 
 # ---------------------------------------------------------------------
 # CLI entry point

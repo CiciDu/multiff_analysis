@@ -162,8 +162,11 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                     'Data missing. Will not be able to make heading info df.')
             print(
                 f'Data missing. Will get agent data first. Error message: {e}')
+            # Exclude planning-specific kwargs that the env/agent does not expect
+            env_only_kwargs = {k: v for k, v in env_kwargs.items()
+                              if k not in ('test_or_control_filter',)}
             self.get_agent_data(
-                n_steps=n_steps, exists_ok=monkey_data_exists_ok, save_data=save_data, **env_kwargs)
+                n_steps=n_steps, exists_ok=monkey_data_exists_ok, save_data=save_data, **env_only_kwargs)
             self._load_agent_data_onto_pf()
             print('Creating heading info from agent data...')
             for test_or_control in types_to_process:

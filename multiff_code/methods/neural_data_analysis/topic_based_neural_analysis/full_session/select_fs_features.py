@@ -91,8 +91,8 @@ REGRESSORS = {
     # Current vs next target state
     # ------------------------------------------------------------------
     'current_next_state': [
-        'cur_vis', 
-        #'cur_in_memory', 
+        'cur_vis',
+        # 'cur_in_memory',
         # 'nxt_vis', 'nxt_in_memory',
         # 'cur_vis_on:b0:0', 'cur_vis_on:b0:1', 'cur_vis_on:b0:2',
         # 'cur_vis_off:b0:0', 'cur_vis_off:b0:1', 'cur_vis_off:b0:2',
@@ -156,8 +156,8 @@ REGRESSORS = {
     # Cluster / sequence structure
     # ------------------------------------------------------------------
     'clusters': [
-        # 'prev_gap_s_z',
-        # 'next_gap_s_z',
+        # 'gap_since_prev_event_in_cluster_z',
+        # 'gap_till_next_event_in_cluster_z',
         'cluster_duration_s_z',
         'cluster_progress_c',
         'cluster_progress_c2',

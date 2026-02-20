@@ -16,6 +16,12 @@ from neural_data_analysis.design_kits.design_around_event import (
 )
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_design
 
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
+    get_stops_utils,
+    collect_stop_data,
+)
+
+
 # =============================================================================
 # Global environment & plotting defaults
 # =============================================================================
@@ -47,7 +53,6 @@ def build_stop_design(
     add_retries_info: bool = True,
     datasets: dict = None,
     global_bins_2d: np.ndarray = None,  # optional global bins_2d to restrict to
-    for_decoding: bool = False,
     extra_agg_cols: Optional[List[str]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
@@ -165,43 +170,30 @@ def build_stop_design(
     SHARED_CLUSTER_FEATS = [
         'is_clustered',
         'event_is_first_in_cluster',
-        'prev_gap_s_z',
-        'next_gap_s_z',
+        'gap_since_prev_event_in_cluster_z',
+        'gap_till_next_event_in_cluster_z',
         'cluster_duration_s_z',
         'cluster_progress_c',
         'bin_t_from_cluster_start_s_z',
         'log_n_events_in_cluster_z',
     ]
 
-    if not for_decoding:
-        X_event_df = stop_design.build_event_design_from_meta(
-            meta=meta,
-            pos=pos,
-            new_seg_info=new_seg_info,
-            speed_used=binned_feats['speed'].values,
-            include_columns=(
-                'basis', 'prepost', 'prepost*speed',
-                'captured', 'basis*captured',
-                'time_since_prev_event', 'time_to_next_event',
-            )
+    X_event_df = stop_design.build_event_design_from_meta(
+        meta=meta,
+        pos=pos,
+        new_seg_info=new_seg_info,
+        speed_used=binned_feats['speed'].values,
+        include_columns=(
+            'basis', 'prepost', 'prepost*speed',
+            'captured', 'basis*captured',
+            'time_since_prev_event', 'time_to_next_event',
         )
+    )
 
-        CLUSTER_FEATS = SHARED_CLUSTER_FEATS + [
-            'cluster_progress_c2',
-            'event_t_from_cluster_start_s',
-        ]
-
-    else:
-        X_event_df = stop_design.build_event_design_for_decoding(
-            meta=meta,
-            pos=pos,
-            new_seg_info=new_seg_info,
-            include_columns=(
-                'prepost', 'time_since_prev_event', 'cond_dummies', 'captured'
-            )
-        )
-
-        CLUSTER_FEATS = SHARED_CLUSTER_FEATS + []
+    CLUSTER_FEATS = SHARED_CLUSTER_FEATS + [
+        'cluster_progress_c2',
+        'event_t_from_cluster_start_s',
+    ]
 
     _safe_add_columns(binned_feats, X_event_df, X_event_df.columns)
     _safe_add_columns(binned_feats, cluster_df, CLUSTER_FEATS)
@@ -235,7 +227,140 @@ def build_stop_design(
     # -------------------------------------------------------------------------
     # 10) Feature groups
     # -------------------------------------------------------------------------
-    groups = _build_feature_groups(binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
+    groups = _build_feature_groups(
+        binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
+
+    return binned_spikes, binned_feats, offset_log, meta_used, groups
+
+
+def build_stop_design_decoding(
+    new_seg_info: pd.DataFrame,
+    events_with_stats: pd.DataFrame,
+    monkey_information: pd.DataFrame,
+    spikes_df: pd.DataFrame,
+    ff_dataframe: pd.DataFrame,
+    bin_dt: float = 0.04,
+    add_ff_visible_info: bool = True,
+    add_retries_info: bool = True,
+    datasets: dict = None,
+    global_bins_2d: np.ndarray = None,
+    extra_agg_cols: Optional[List[str]] = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
+    """
+    Build stop design for decoding (minimal event design, no interaction columns).
+    Same interface as build_stop_design but uses build_event_design_for_decoding.
+    """
+    bins_2d, meta = event_binning.event_windows_to_bins2d(
+        new_seg_info, bin_dt=bin_dt, only_ok=False, global_bins_2d=global_bins_2d
+    )
+    sample_idx, bin_idx_arr, dt_arr, _ = event_binning.build_bin_assignments(
+        monkey_information['time'].to_numpy(), bins_2d
+    )
+    monkey_sub = monkey_information.iloc[sample_idx].copy()
+    _, exposure, used_bins = event_binning.bin_timeseries_weighted(
+        monkey_sub['time'].to_numpy(), dt_arr, bin_idx_arr, how='mean'
+    )
+
+    def _agg_feat(col: str) -> np.ndarray:
+        vals = monkey_sub[col].to_numpy()
+        out, exp_chk, used_bins_chk = event_binning.bin_timeseries_weighted(
+            vals, dt_arr, bin_idx_arr, how='mean'
+        )
+        if not np.allclose(exp_chk, exposure):
+            raise ValueError(f'Exposure mismatch while aggregating "{col}"')
+        if not np.array_equal(used_bins_chk, used_bins):
+            raise ValueError(f'used_bins mismatch while aggregating "{col}"')
+        return out
+
+    KINEMATIC_COLS = ['accel', 'speed', 'ang_speed']
+    binned_feats = (
+        pd.DataFrame({c: _agg_feat(c) for c in KINEMATIC_COLS})
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+    )
+    extra_cols_added: List[str] = []
+    if extra_agg_cols:
+        existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
+        if existing:
+            extra_df = (
+                pd.DataFrame({c: _agg_feat(c) for c in existing})
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(0.0)
+            )
+            binned_feats = pd.concat([binned_feats, extra_df], axis=1)
+            extra_cols_added = existing
+
+    mask_used = exposure > 0
+    pos = used_bins[mask_used]
+    binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
+    meta_used = (
+        meta.set_index('bin')
+        .sort_index()
+        .loc[pos]
+        .reset_index()
+    )
+
+    spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
+        spikes_df, bins_2d, time_col='time', cluster_col='cluster'
+    )
+    binned_spikes = (
+        pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
+        .reset_index(drop=True)
+    )
+
+    cluster_df = cluster_design.build_cluster_features_workflow(
+        meta_used[['event_id', 'rel_center']],
+        events_with_stats,
+        rel_time_col='rel_center',
+        winsor_p=0.5,
+        use_midbin_progress=True,
+        zscore_progress=False,
+        zscore_rel_time=True,
+    )
+
+    SHARED_CLUSTER_FEATS = [
+        'is_clustered',
+        'event_is_first_in_cluster',
+        'gap_since_prev_event_in_cluster_z',
+        'gap_till_next_event_in_cluster_z',
+        'cluster_duration_s_z',
+        'cluster_progress_c',
+        'bin_t_from_cluster_start_s_z',
+        'log_n_events_in_cluster_z',
+    ]
+
+    X_event_df = stop_design.build_event_design_for_decoding(
+        meta=meta,
+        pos=pos,
+        new_seg_info=new_seg_info,
+        include_columns=(
+            'prepost', 'time_since_prev_event', 'cond_dummies', 'captured'
+        )
+    )
+    CLUSTER_FEATS = SHARED_CLUSTER_FEATS
+
+    _safe_add_columns(binned_feats, X_event_df, X_event_df.columns)
+    _safe_add_columns(binned_feats, cluster_df, CLUSTER_FEATS)
+
+    offset_log = np.log(np.clip(exposure[mask_used], 1e-12, None))
+    binned_feats['time_rel_to_event_start'] = meta_used['rel_center'].to_numpy()
+
+    if add_ff_visible_info:
+        binned_feats = add_ff_visible_and_in_memory_info(
+            binned_feats,
+            bins_2d,
+            ff_dataframe,
+            used_bins,
+            max_in_memory_time_since_seen=2,
+        )
+
+    if add_retries_info:
+        binned_feats, meta_used = add_retries_info_to_binned_feats(
+            binned_feats, new_seg_info, datasets, meta_used
+        )
+
+    groups = _build_feature_groups(
+        binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
 
     return binned_spikes, binned_feats, offset_log, meta_used, groups
 
@@ -303,7 +428,8 @@ def _build_feature_groups(
 
     # Cluster features
     _add_group('cluster_flags', ['event_is_first_in_cluster'])
-    _add_group('cluster_gaps', ['prev_gap_s_z', 'next_gap_s_z'])
+    _add_group('cluster_gaps', [
+               'gap_since_prev_event_in_cluster_z', 'gap_till_next_event_in_cluster_z'])
     _add_group('cluster_duration', ['cluster_duration_s_z'])
     _add_group('cluster_progress', [
                'cluster_progress_c', 'cluster_progress_c2'])
@@ -427,7 +553,8 @@ def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_used, mask)
 
 def add_interaction_columns(binned_feats):
     # list of variables you want to interact with 'whether_in_retry_series'
-    excluded_exact = {'intercept', 'const', 'miss', 'next_gap_s_z'}
+    excluded_exact = {'intercept', 'const',
+                      'miss', 'gap_till_next_event_in_cluster_z'}
     excluded_substrings = {'rsw', 'rcap', 'retry', ':bin'}
 
     vars_to_interact = [
@@ -469,3 +596,104 @@ def scale_binned_feats(binned_feats, keep_constant_tuning_terms: bool = False):
 
     binned_feats_sc = binned_feats_sc.drop(columns=const_cols)
     return binned_feats_sc
+
+
+def _prepare_stop_design_inputs(raw_data_folder_path, bin_width):
+    """
+    Shared data loading + stop preprocessing for both
+    decoding and encoding designs.
+    """
+    pn, datasets, _ = collect_stop_data.collect_stop_data_func(
+        raw_data_folder_path,
+        bin_width=bin_width,
+    )
+
+    captures_df, valid_captures_df, filtered_no_capture_stops_df, stops_with_stats = (
+        get_stops_utils.prepare_no_capture_and_captures(
+            monkey_information=pn.monkey_information,
+            closest_stop_to_capture_df=pn.closest_stop_to_capture_df,
+            ff_caught_T_new=pn.ff_caught_T_new,
+            distance_col='distance_from_ff_to_stop',
+        )
+    )
+
+    # Add neighbor timing info
+    stops_with_stats['stop_time'] = stops_with_stats['stop_id_start_time']
+    stops_with_stats['prev_time'] = stops_with_stats['stop_id_end_time'].shift(
+        1)
+    stops_with_stats['next_time'] = stops_with_stats['stop_id_start_time'].shift(
+        -1)
+
+    new_seg_info = event_binning.make_new_seg_info_for_stop_design(
+        stops_with_stats,
+        pn.closest_stop_to_capture_df,
+        pn.monkey_information,
+    )
+
+    events_with_stats = stops_with_stats[
+        [
+            'stop_id',
+            'stop_cluster_id',
+            'stop_id_start_time',
+            'stop_id_end_time',
+        ]
+    ].rename(
+        columns={
+            'stop_id': 'event_id',
+            'stop_cluster_id': 'event_cluster_id',
+            'stop_id_start_time': 'event_id_start_time',
+            'stop_id_end_time': 'event_id_end_time',
+        }
+    )
+
+    return pn, datasets, new_seg_info, events_with_stats
+
+
+# ============================================================
+# Decoding
+# ============================================================
+
+def assemble_stop_decoding_design(
+    raw_data_folder_path,
+    bin_width,
+    global_bins_2d=None,
+):
+    """
+    Assemble stop design for decoding.
+    """
+
+    pn, datasets, new_seg_info, events_with_stats = \
+        _prepare_stop_design_inputs(raw_data_folder_path, bin_width)
+
+    build_result = build_stop_design_decoding(
+        new_seg_info=new_seg_info,
+        events_with_stats=events_with_stats,
+        monkey_information=pn.monkey_information,
+        spikes_df=pn.spikes_df,
+        ff_dataframe=pn.ff_dataframe,
+        bin_dt=bin_width,
+        datasets=datasets,
+        add_ff_visible_info=True,
+        global_bins_2d=global_bins_2d,
+    )
+
+    (
+        stop_binned_spikes,
+        init_stop_binned_feats,
+        offset_log,
+        stop_meta_used,
+        stop_meta_groups,
+    ) = build_result
+
+    stop_binned_feats = scale_binned_feats(
+        init_stop_binned_feats,
+    )
+
+    return (
+        pn,
+        stop_binned_spikes,
+        stop_binned_feats,
+        offset_log,
+        stop_meta_used,
+        stop_meta_groups,
+    )

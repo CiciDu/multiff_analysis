@@ -10,7 +10,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding 
     cv_decoding
 )
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    assemble_stop_design
+    decode_stops_design
 )
 from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding import (
@@ -118,12 +118,9 @@ class StopDecodingRunner:
             offset_log,
             self.stop_meta_used,
             stop_meta_groups,
-            _,
-            _
-        ) = assemble_stop_design.assemble_stop_design_func(
+        ) = decode_stops_design.assemble_stop_decoding_design(
             self.raw_data_folder_path,
             self.bin_width,
-            for_decoding=True,
         )
 
         bin_df = spike_history.make_bin_df_from_stop_meta(self.stop_meta_used)

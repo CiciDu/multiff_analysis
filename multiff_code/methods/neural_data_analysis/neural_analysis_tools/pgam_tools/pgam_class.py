@@ -1,3 +1,4 @@
+from sklearn.preprocessing import StandardScaler
 import math
 import os
 import sys
@@ -5,10 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
-from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
-    plot_modeling_result
-)
+
 
 PGAM_PATH = Path(
     'multiff_analysis/external/pgam/src'
@@ -17,12 +15,6 @@ PGAM_PATH = Path(
 if str(PGAM_PATH) not in sys.path:
     sys.path.append(str(PGAM_PATH))
 
-
-
-from PGAM.GAM_library import *
-from post_processing import postprocess_results
-from sklearn.preprocessing import StandardScaler
-import PGAM.gam_data_handlers as gdh
 
 def find_project_root(marker="multiff_analysis"):
     """Search upward until we find a folder containing `marker`."""
@@ -44,9 +36,20 @@ for path in [pgam_src, pgam_src_pg]:
     if str(path) not in sys.path:
         sys.path.append(str(path))
 
+from neural_data_analysis.neural_analysis_tools.pgam_tools import pgam_utils
+from neural_data_analysis.neural_analysis_tools.visualize_neural_data import (
+    plot_modeling_result
+)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import _build_folds
+import PGAM.gam_data_handlers as gdh
+from PGAM.GAM_library import *
+from post_processing import postprocess_results
+
+
 
 class LoadedModelData:
     """Simple class to hold loaded model data as attributes."""
+
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -89,7 +92,8 @@ class PGAMclass():
         self._add_temporal_features_to_model(plot_each_feature=False)
         self._add_spatial_features_to_model(plot_each_feature=False)
         self.run_pgam(neural_cluster_number=neural_cluster_number)
-        self.post_processing_results(neural_cluster_number=neural_cluster_number)
+        self.post_processing_results(
+            neural_cluster_number=neural_cluster_number)
         self.save_results()
 
     def prepare_for_pgam(self, temporal_vars=None, num_total_trials=10):
@@ -98,7 +102,6 @@ class PGAMclass():
         self._categorize_features(temporal_vars)
         self._scale_features()
         self._get_mock_trials_df(num_total_trials)
-        
 
     def run_pgam(self, neural_cluster_number=5):
         self.neural_cluster_number = neural_cluster_number
@@ -147,7 +150,6 @@ class PGAMclass():
         self.res = postprocess_results(neuron_id, self.spk_counts, self.full, self.reduced, self.train_trials, self.sm_handler, self.poissFam, self.trial_ids,
                                        var_zscore_par=None, info_save=info_save, bins=self.kernel_h_length)
 
-
     def plot_results(
         self,
         plot_vars_in_reduced_list_only=False,
@@ -194,14 +196,13 @@ class PGAMclass():
             self.res,
             indices_of_vars_to_plot=indices_of_vars_to_plot,
         )
-        
-        
+
     def load_pgam_results(self, neural_cluster_number):
         self.cluster_name = neural_cluster_number
 
         self.res, self.reduced_vars, self.meta, self.full_model_data = pgam_utils.load_full_results_npz(self.save_dir,
-                                                                                                         self.cluster_name)
-        
+                                                                                                        self.cluster_name)
+
         # Reconstruct self.full with loaded attributes
         full_attributes = {
             'var_list': self.full_model_data.get('var_list'),
@@ -210,7 +211,7 @@ class PGAMclass():
             'AIC': self.meta.get('full_AIC', np.nan),
         }
         self.full = LoadedModelData(**full_attributes)
-        
+
         # Reconstruct self.reduced with loaded attributes
         reduced_attributes = {
             'var_list': self.reduced_vars,
@@ -227,18 +228,21 @@ class PGAMclass():
             "reduced_AIC": float(getattr(self.reduced, "AIC", np.nan)) if hasattr(self.reduced, "AIC") else np.nan,
             "full_AIC": float(getattr(self.full, "AIC", np.nan)) if hasattr(self.full, "AIC") else np.nan,
         }
-        
+
         if save_dir is None:
             save_dir = self.save_dir
-            
+
         # make sure the save directory exists
         os.makedirs(save_dir, exist_ok=True)
-        
+
         # Extract full model data if available
-        full_time_bin = getattr(self.full, "time_bin", None) if hasattr(self, "full") else None
-        full_var_list = getattr(self.full, "var_list", None) if hasattr(self, "full") else None
-        full_beta = getattr(self.full, "beta", None) if hasattr(self, "full") else None
-        
+        full_time_bin = getattr(self.full, "time_bin", None) if hasattr(
+            self, "full") else None
+        full_var_list = getattr(self.full, "var_list", None) if hasattr(
+            self, "full") else None
+        full_beta = getattr(self.full, "beta", None) if hasattr(
+            self, "full") else None
+
         pgam_utils.save_full_results_npz(save_dir,
                                          self.cluster_name,
                                          self.res,                       # the structured array
@@ -332,7 +336,6 @@ class PGAMclass():
                 plot_modeling_result.plot_smoothed_spatial_feature(
                     self.spatial_sub, column, self.sm_handler)
 
-
     def _rename_variables_in_results(self):
         variable = self.res['variable']
         # rename each variable to the corresponding label
@@ -352,7 +355,6 @@ class PGAMclass():
         variable[variable ==
                  'target_cluster_has_disappeared_for_last_time_dummy'] = 'target cluster disappeared (final time)'
         self.res['variable'] = variable
-
 
     def compute_variance_explained(self, use_train=True, filtwidth=2):
         """
@@ -402,7 +404,7 @@ class PGAMclass():
         r2 = 1 - (sse / sst)
 
         return r2
-        
+
     def _make_gaussian_kernel(self, filtwidth=2):
         import numpy as np
         t = np.linspace(-2 * filtwidth, 2 * filtwidth, 4 * filtwidth + 1)
@@ -437,36 +439,63 @@ class PGAMclass():
             return np.nan
         return 1.0 - (sse / sst)
 
-    def _make_cv_train_mask_list(self, n_splits=5, random_state=0):
+    def _make_cv_train_mask_list(self, n_splits=5, random_state=0,
+                                 cv_mode='blocked_time_buffered', buffer_samples=20, cv_groups=None):
         """
         Returns a list of boolean masks (length = n_splits).
         Each mask is True for TRAIN bins and False for TEST bins.
-        Split is done by trial_id to avoid leakage across time bins.
+
+        cv_mode: None (trial-level KFold, default), 'group_kfold', 'blocked_time_buffered', 'blocked_time'
+        buffer_samples: buffer for 'blocked_time_buffered'
+        cv_groups: sample-level groups for 'group_kfold'; defaults to trial_ids
         """
         import numpy as np
         from sklearn.model_selection import KFold
 
+        n = len(self.trial_ids)
         trial_ids = np.asarray(self.trial_ids)
+
+        if cv_mode is not None:
+            groups_for_build = (cv_groups if cv_groups is not None else trial_ids
+                                ) if cv_mode == 'group_kfold' else None
+            splits = _build_folds(
+                n,
+                n_splits=n_splits,
+                groups=groups_for_build,
+                cv_splitter=cv_mode,
+                buffer_samples=buffer_samples,
+                random_state=random_state,
+            )
+            train_mask_list = []
+            for train_idx, _ in splits:
+                train_mask = np.zeros(n, dtype=bool)
+                train_mask[train_idx] = True
+                train_mask_list.append(train_mask)
+            return train_mask_list
+
+        # Default: trial-level KFold (original behavior)
         unique_trials = np.unique(trial_ids)
-
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-
         train_mask_list = []
-        for train_trial_idx, test_trial_idx in kf.split(unique_trials):
+        for train_trial_idx, _ in kf.split(unique_trials):
             train_trials = unique_trials[train_trial_idx]
             train_mask = np.isin(trial_ids, train_trials)
             train_mask_list.append(train_mask)
-
         return train_mask_list
 
-
-    def _get_cv_filename(self, neural_cluster_number, n_splits, filtwidth):
+    def _get_cv_filename(self, neural_cluster_number, n_splits, filtwidth,
+                         cv_mode='blocked_time_buffered', buffer_samples=20):
         import os
-        fname = f'cv_var_explained/neuron_{neural_cluster_number}_folds_{n_splits}_fw_{filtwidth}.npz'
+        fname = f'cv_var_explained/neuron_{neural_cluster_number}_folds_{n_splits}_fw_{filtwidth}'
+        if cv_mode is not None:
+            fname += f'_cv_{cv_mode}'
+        if buffer_samples != 0:
+            fname += f'_buf_{buffer_samples}'
+        fname += '.npz'
         filename = os.path.join(self.save_dir, fname)
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         return filename
-    
+
     def _save_cv_results(self, filename, result_dict):
         import numpy as np
         np.savez_compressed(
@@ -476,7 +505,7 @@ class PGAMclass():
             std_r2_eval=result_dict['std_r2_eval']
         )
         print(f'Saved CV results for neuron {self.cluster_name} at {filename}')
-        
+
     def _load_cv_results(self, filename):
         import numpy as np
         data = np.load(filename, allow_pickle=True)
@@ -485,12 +514,15 @@ class PGAMclass():
             'mean_r2_eval': float(data['mean_r2_eval']),
             'std_r2_eval': float(data['std_r2_eval'])
         }
-                
+
     def _run_pgam_cv_compute_only(self,
-                                neural_cluster_number=5,
-                                n_splits=5,
-                                filtwidth=2,
-                                random_state=0):
+                                  neural_cluster_number=5,
+                                  n_splits=5,
+                                  filtwidth=2,
+                                  random_state=0,
+                                  cv_mode='blocked_time_buffered',
+                                  buffer_samples=20,
+                                  cv_groups=None):
 
         import numpy as np
         import statsmodels.api as sm
@@ -512,7 +544,10 @@ class PGAMclass():
 
         train_mask_list = self._make_cv_train_mask_list(
             n_splits=n_splits,
-            random_state=random_state
+            random_state=random_state,
+            cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
+            cv_groups=cv_groups,
         )
 
         fold_r2_eval = []
@@ -553,7 +588,7 @@ class PGAMclass():
             'mean_r2_eval': np.nanmean(fold_r2_eval),
             'std_r2_eval': np.nanstd(fold_r2_eval)
         }
-            
+
     def run_pgam_cv(self,
                     neural_cluster_number=5,
                     n_splits=5,
@@ -561,32 +596,48 @@ class PGAMclass():
                     random_state=0,
                     force_recompute=False,
                     load_only=False,
+                    cv_mode='blocked_time_buffered',
+                    buffer_samples=20,
+                    cv_groups=None,
                     ):
+        """
+        cv_mode: None (trial-level KFold, default), 'group_kfold', 'blocked_time_buffered', 'blocked_time'
+        buffer_samples: buffer for 'blocked_time_buffered'
+        cv_groups: sample-level groups for 'group_kfold'; defaults to trial_ids
+        """
 
         import os
 
         filename = self._get_cv_filename(
             neural_cluster_number,
             n_splits,
-            filtwidth
+            filtwidth,
+            cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
         )
 
         # Load if exists
         if not force_recompute:
             if os.path.exists(filename):
-                print(f'Loading cached CV results for neuron {neural_cluster_number} at {filename}')
+                print(
+                    f'Loading cached CV results for neuron {neural_cluster_number} at {filename}')
                 return self._load_cv_results(filename)
             else:
-                print(f'No cached CV results found for neuron {neural_cluster_number} at {filename}, computing...')
+                print(
+                    f'No cached CV results found for neuron {neural_cluster_number} at {filename}, computing...')
                 if load_only:
-                    raise FileNotFoundError(f'No cached CV results found for neuron {neural_cluster_number} at {filename}')
+                    raise FileNotFoundError(
+                        f'No cached CV results found for neuron {neural_cluster_number} at {filename}')
 
         # Compute
         out = self._run_pgam_cv_compute_only(
             neural_cluster_number=neural_cluster_number,
             n_splits=n_splits,
             filtwidth=filtwidth,
-            random_state=random_state
+            random_state=random_state,
+            cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
+            cv_groups=cv_groups,
         )
 
         # Save

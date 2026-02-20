@@ -197,7 +197,8 @@ class ShowPlanning(base_processing_class.BaseProcessing):
         self.combd_heading_df_x_sessions, self.combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                                                              curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                                              stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                                                             show_printed_output=show_printed_output, test_or_control=test_or_control, sessions_df_for_one_monkey=sessions_df_for_one_monkey)
+                                                                                                             show_printed_output=show_printed_output, test_or_control=test_or_control, 
+                                                                                                             sessions_df_for_one_monkey=sessions_df_for_one_monkey)
         print('Made new and combd_heading_df_x_sessions and stored it in the folder: ',
               self.dict_of_combd_heading_info_folder_path[test_or_control])
         if 'Unnamed: 0' in self.combd_heading_df_x_sessions.columns:
@@ -357,7 +358,8 @@ class ShowPlanning(base_processing_class.BaseProcessing):
             combd_heading_df_x_sessions, combd_diff_in_curv_df = self.make_combd_heading_df_x_sessions(ref_point_mode=ref_point_mode, ref_point_value=ref_point_value,
                                                                                                        curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                                                                        stops_near_ff_df_exists_ok=stops_near_ff_df_exists_ok,
-                                                                                                       show_printed_output=show_output, test_or_control=test_or_control, heading_info_df_exists_ok=heading_info_df_exists_ok,
+                                                                                                       show_printed_output=show_output, test_or_control=test_or_control, 
+                                                                                                       heading_info_df_exists_ok=heading_info_df_exists_ok,
                                                                                                        use_curv_to_ff_center=use_curv_to_ff_center, save_data=save_data,
                                                                                                        merge_diff_in_curv_df_to_heading_info=True)
             setattr(self, df_name, combd_heading_df_x_sessions)

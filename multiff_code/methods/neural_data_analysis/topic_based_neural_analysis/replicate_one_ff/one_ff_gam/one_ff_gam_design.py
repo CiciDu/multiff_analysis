@@ -340,19 +340,36 @@ def extract_response(
     return y
 
 
+_DEFAULT_LAMBDA_CONFIG = {
+    'lam_f': 100.0,  # firefly features (tuning curves)
+    'lam_g': 10.0,   # temporal event kernels (t_*)
+    'lam_h': 10.0,   # spike history
+    'lam_p': 10.0,   # coupling
+}
+
+
 def build_group_specs(
     temporal_meta,
     tuning_meta,
     hist_meta,
-    lam_f=100.0,  # firefly features (tuning curves)
-    lam_g=10.0,  # temporal event kernels (t_*)
-    lam_h=10.0,  # spike history
-    lam_p=10.0,  # coupling
+    lambda_config=None,
     coupling_units=None,
 ):
     """
     Construct GroupSpec list for GAM fitting.
+
+    Parameters
+    ----------
+    lambda_config : dict, optional
+        Dict with keys 'lam_f', 'lam_g', 'lam_h', 'lam_p'. If None, uses defaults.
     """
+    if lambda_config is None:
+        lambda_config = _DEFAULT_LAMBDA_CONFIG.copy()
+    lam_f = lambda_config['lam_f']
+    lam_g = lambda_config['lam_g']
+    lam_h = lambda_config['lam_h']
+    lam_p = lambda_config['lam_p']
+
     groups = []
 
     # ----------------------------
@@ -400,12 +417,6 @@ def build_group_specs(
             lam_f,
         ))
 
-    lambda_config = {
-        'lam_f': lam_f,
-        'lam_g': lam_g,
-        'lam_h': lam_h,
-        'lam_p': lam_p,
-    }
     return groups, lambda_config
 
 
@@ -417,14 +428,16 @@ def process_unit_design_and_groups(
     X_tuning,
     tuning_meta,
     specs_meta,
-    lam_f=100.0,
-    lam_g=10.0,
-    lam_h=10.0,
-    lam_p=10.0,
+    lambda_config=None,
     coupling_units=None,
 ):
     """
     Assemble full design matrix, response, and GroupSpecs for one unit.
+
+    Parameters
+    ----------
+    lambda_config : dict, optional
+        Dict with keys 'lam_f', 'lam_g', 'lam_h', 'lam_p'. If None, uses defaults.
 
     Returns
     -------
@@ -437,6 +450,8 @@ def process_unit_design_and_groups(
     all_meta : dict
         Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
     """
+    if lambda_config is None:
+        lambda_config = _DEFAULT_LAMBDA_CONFIG.copy()
 
     # Build spike history design
     hist_df, hist_meta = build_spike_history_design(
@@ -462,10 +477,7 @@ def process_unit_design_and_groups(
         temporal_meta=temporal_meta,
         tuning_meta=tuning_meta,
         hist_meta=hist_meta,
-        lam_f=lam_f,
-        lam_g=lam_g,
-        lam_h=lam_h,
-        lam_p=lam_p,
+        lambda_config=lambda_config,
         coupling_units=coupling_units,
     )
 
@@ -480,7 +492,7 @@ def process_unit_design_and_groups(
     return design_df, groups, all_meta
 
 
-def finalize_one_ff_gam_design(unit_idx, session_num=0):
+def finalize_one_ff_gam_design(unit_idx, session_num=0, lambda_config=None):
     # -------------------------------
     # Covariates
     # -------------------------------
@@ -546,6 +558,7 @@ def finalize_one_ff_gam_design(unit_idx, session_num=0):
             X_tuning=X_tuning,
             tuning_meta=tuning_meta,
             specs_meta=specs_meta,
+            lambda_config=lambda_config,
         )
     )
 

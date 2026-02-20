@@ -10,7 +10,7 @@ import pickle
 from pathlib import Path
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
+    one_ff_gam_design,
     plot_gam_fit
 )
 
@@ -22,7 +22,7 @@ session_num = 0
 
 # Build design to get metadata
 print(f"Building design for unit {unit_idx}...")
-design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
+design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
     unit_idx=unit_idx,
     session_num=session_num,
 )

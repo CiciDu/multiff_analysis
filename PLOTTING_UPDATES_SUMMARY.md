@@ -19,7 +19,7 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
 
 ---
 
-### 2. **`assemble_one_ff_gam_design.py`** - Store temporal basis lags
+### 2. **`one_ff_gam_design.py`** - Store temporal basis lags
 
 **Changes:**
 
@@ -113,13 +113,13 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
 ### Example 1: Plot a single variable (automatic type detection)
 ```python
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
+    one_ff_gam_design,
     plot_gam_fit
 )
 import pickle
 
 # Build design
-design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
+design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
     unit_idx=0, session_num=0
 )
 

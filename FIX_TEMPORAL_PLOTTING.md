@@ -65,7 +65,7 @@ plt.plot(lags * 1000, kernel)
 
 ## Files Modified
 
-1. **`assemble_one_ff_gam_design.py`**
+1. **`one_ff_gam_design.py`**
    - `build_temporal_design_base()`: Store `basis_info` instead of `basis_lags`
    - `build_design_df()`: Store `basis_info` for spike history
 

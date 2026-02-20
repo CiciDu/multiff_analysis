@@ -2,7 +2,7 @@
 # Pruned GLM predictor set
 # =========================
 
-stop_design_predictors = [ 
+stop_design_predictors = [
     # --- Event-aligned temporal kernel ---
     'prepost',
     'rcos_-0.24s',
@@ -29,8 +29,8 @@ stop_design_predictors = [
     'rcos_+0.24s*captured',
 
     # --- Cluster / episode structure (slow variables) ---
-    'prev_gap_s_z',
-    'next_gap_s_z',
+    'gap_since_prev_event_in_cluster_z',
+    'gap_till_next_event_in_cluster_z',
     'cluster_duration_s_z',
     'cluster_progress_c',
     'cluster_progress_c2',

@@ -22,10 +22,11 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
                  overall_folder='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise/',
                  add_date_to_model_folder_name=False,
                  **kwargs):
+        
+        kwargs['zero_invisible_ff_features'] = False
 
         super().__init__(overall_folder=overall_folder,
                          add_date_to_model_folder_name=add_date_to_model_folder_name,
-                         zero_invisible_ff_features=False,
                          **kwargs)
 
         self.agent_type = 'sb3'

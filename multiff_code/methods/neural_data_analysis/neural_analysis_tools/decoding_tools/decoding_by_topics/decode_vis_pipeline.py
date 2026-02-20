@@ -17,7 +17,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_dec
 )
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     collect_stop_data,
-    stop_design_for_decoding
+    decode_stops_design
 )
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import decode_vis_utils
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
@@ -85,7 +85,7 @@ class FFVisDecodingRunner:
             offset_log,
             meta_used,
             meta_groups,
-        ) = stop_design_for_decoding.build_stop_design(
+        ) = decode_stops_design.build_stop_design_decoding(
             new_seg_info,
             events_with_stats,
             self.pn.monkey_information,
@@ -95,7 +95,6 @@ class FFVisDecodingRunner:
             bin_dt=self.pn.bin_width,
             add_ff_visible_info=True,
             add_retries_info=False,
-            for_decoding=True,
         )
 
         if 'global_burst_id' not in meta_used.columns:

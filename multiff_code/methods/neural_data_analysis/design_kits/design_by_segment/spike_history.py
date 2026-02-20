@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -109,7 +109,7 @@ def compute_spike_history_designs(
     bin_df: pd.DataFrame,
     dt: float,
     t_max: float,
-    n_basis: int = 5,
+    n_basis: int = 20,
     t_min: Optional[float] = None,
     edge: str = 'zero',
 ):
@@ -211,6 +211,111 @@ def compute_spike_history_designs(
 
     return X_hist, basis, colnames
 
+def compute_coupling_designs(
+    *,
+    spikes_df: pd.DataFrame,
+    bin_df: pd.DataFrame,
+    dt: float,
+    t_max: float = 1.375,
+    t_min: float = 0.0,
+    n_basis: int = 20,
+    edge: str = 'zero',
+):
+    """
+    Build coupling (cross-neuron) spike-history design matrices.
+
+    This is a thin wrapper around compute_spike_history_designs,
+    using different defaults and renaming columns to indicate coupling.
+    """
+
+    # --------------------------------------------------
+    # 1) Reuse spike-history builder
+    # --------------------------------------------------
+    X_hist, basis, colnames = compute_spike_history_designs(
+        spikes_df=spikes_df,
+        bin_df=bin_df,
+        dt=dt,
+        t_max=t_max,
+        n_basis=n_basis,
+        t_min=t_min,
+        edge=edge,
+    )
+
+    # --------------------------------------------------
+    # 2) Rename columns from ':b0:' → ':cpl:'
+    # --------------------------------------------------
+    X_hist_cpl = {}
+    colnames_cpl = {}
+
+    for col, df in X_hist.items():
+
+        old_cols = colnames[col]
+        new_cols = [c.replace(':b0:', ':cpl:') for c in old_cols]
+
+        # rename feature columns only
+        rename_map = dict(zip(old_cols, new_cols))
+        df = df.rename(columns=rename_map)
+
+        X_hist_cpl[col] = df
+        colnames_cpl[col] = new_cols
+
+    return X_hist_cpl, basis, colnames_cpl
+
+
+def add_coupling_to_design(
+    design_df: pd.DataFrame,
+    colnames: dict[str, list[str]],
+    X_hist: dict,
+    coupling_units: list[str],
+    *,
+    meta_groups: Optional[dict] = None,
+) -> Tuple[pd.DataFrame, Optional[dict]]:
+    """
+    Add coupling (cross-neuron) spike-history regressors to a design matrix.
+
+    Parameters
+    ----------
+    design_df : DataFrame
+        Design matrix with ['new_segment', 'new_bin']
+    colnames : dict
+        From compute_coupling_designs, maps cluster names to column lists
+    X_hist : dict
+        From compute_coupling_designs, coupling designs per neuron
+    coupling_units : list of str
+        Cluster column names (e.g. ['cluster_1', 'cluster_2']) to include
+    meta_groups : dict, optional
+        Updated in-place to group columns by predictor
+
+    Returns
+    -------
+    design_df : DataFrame
+        Design with coupling columns appended
+    meta_groups : dict or None
+        Updated meta_groups if provided
+    """
+    columns_to_add = []
+
+    for neuron in coupling_units:
+        if neuron not in X_hist:
+            raise KeyError(
+                f'Coupling unit {neuron} not in X_hist. '
+                f'Available: {list(X_hist.keys())}'
+            )
+        neuron_cols = colnames[neuron]
+        columns_to_add.append(X_hist[neuron][neuron_cols])
+
+    if columns_to_add:
+        design_df = pd.concat([design_df] + columns_to_add, axis=1)
+    else:
+        design_df = design_df.copy()
+
+    if meta_groups is not None:
+        for neuron in coupling_units:
+            meta_groups.setdefault(neuron, []).extend(colnames[neuron])
+        return design_df, meta_groups
+
+    return design_df, None
+
 
 def _assert_dt_matches_bins(bin_df, dt, *, tol=1e-9):
     widths = (bin_df['bin_right'] - bin_df['bin_left']).to_numpy(dtype=float)
@@ -279,7 +384,6 @@ def add_spike_history_to_design(
 
     # --- optional: update meta groups ---
     if meta_groups is not None:
-
         if include_self:
             meta_groups.setdefault(target_col, []).extend(colnames[target_col])
 
@@ -300,7 +404,9 @@ def build_design_with_spike_history_from_bins(
     meta_groups,
     dt,
     t_max,
-    n_basis=5,
+    n_basis=20,
+    target_col: Optional[str] = None,
+    return_X_hist: bool = False,
 ):
     """
     Compute spike-history regressors from an explicit bin table and
@@ -320,6 +426,12 @@ def build_design_with_spike_history_from_bins(
         Bin width.
     t_max : float
         Maximum history length.
+    target_col : str, optional
+        Cluster column for self spike-history (e.g. 'cluster_0').
+        Defaults to first spike column. Must match the target neuron when
+        predicting each unit's spikes.
+    return_X_hist : bool
+        If True, also return X_hist for per-unit design reuse.
     """
 
     # --------------------------------------------------
@@ -340,10 +452,14 @@ def build_design_with_spike_history_from_bins(
     if len(spike_cols) == 0:
         raise ValueError('No spike columns found in colnames')
 
-    # It is sufficient to do this once
-    target_col = spike_cols[0]
-    cross_neurons = [c for c in spike_cols if c != target_col]
-
+    if target_col is None:
+        target_col = spike_cols[0]
+    elif target_col not in colnames:
+        raise KeyError(
+            f'target_col {target_col!r} not in colnames. '
+            f'Available: {spike_cols}'
+        )
+    cross_neurons = None
     # --------------------------------------------------
     # 3) Add history to design
     # --------------------------------------------------
@@ -357,7 +473,138 @@ def build_design_with_spike_history_from_bins(
         meta_groups=meta_groups,
     )
 
+    if return_X_hist:
+        return design_w_history, basis, colnames, meta_groups, X_hist
     return design_w_history, basis, colnames, meta_groups
+
+
+def build_design_with_spike_history_and_coupling_from_bins(
+    *,
+    spikes_df,
+    bin_df,
+    X_pruned,
+    meta_groups,
+    dt,
+    t_max,
+    t_max_coupling: float = 1.375,
+    n_basis: int = 20,
+    n_basis_coupling: Optional[int] = None,
+    target_col: Optional[str] = None,
+    coupling_units: Optional[list[str]] = None,
+):
+    """
+    Compute spike-history (self + coupling) regressors and add to design matrix.
+
+    Self-history uses t_max (e.g. 350ms); coupling uses t_max_coupling (e.g. 1.375s).
+
+    Parameters
+    ----------
+    spikes_df : DataFrame
+        Must contain ['time', 'cluster'].
+    bin_df : DataFrame
+        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right'].
+    X_pruned : DataFrame
+        Base design matrix with ['new_segment', 'new_bin'].
+    meta_groups : dict
+        Meta groups dict to be updated in-place.
+    dt : float
+        Bin width in seconds.
+    t_max : float
+        Maximum self spike-history length in seconds.
+    t_max_coupling : float
+        Maximum coupling history length in seconds (default: 1.375).
+    n_basis : int
+        Number of basis functions for self-history (default: 5).
+    n_basis_coupling : int, optional
+        Number of basis functions for coupling. Defaults to n_basis.
+    target_col : str, optional
+        Target cluster column (e.g. 'cluster_0'). Defaults to first spike column.
+    coupling_units : list of str, optional
+        Cluster columns for coupling. Defaults to all except target.
+
+    Returns
+    -------
+    design_df : DataFrame
+        Design with self-history and coupling columns.
+    basis : ndarray
+        Self-history basis (for reference).
+    basis_coupling : ndarray
+        Coupling basis (for reference).
+    colnames : dict
+        Self-history colnames.
+    colnames_coupling : dict
+        Coupling colnames.
+    meta_groups : dict
+        Updated meta_groups.
+    """
+    if n_basis_coupling is None:
+        n_basis_coupling = n_basis
+
+    # Ensure X_pruned aligns with bin_df (same row order, contiguous index)
+    n_bins = len(bin_df)
+    if len(X_pruned) != n_bins:
+        raise ValueError(
+            f'X_pruned has {len(X_pruned)} rows but bin_df has {n_bins}. '
+            'Row counts must match.'
+        )
+    X_pruned = X_pruned.reset_index(drop=True)
+
+    # Self spike-history
+    X_hist, basis, colnames = compute_spike_history_designs(
+        spikes_df=spikes_df,
+        bin_df=bin_df,
+        dt=dt,
+        t_max=t_max,
+        n_basis=n_basis,
+    )
+
+    spike_cols = list(colnames.keys())
+    if len(spike_cols) == 0:
+        raise ValueError('No spike columns found in colnames')
+
+    if target_col is None:
+        target_col = spike_cols[0]
+    if coupling_units is None:
+        coupling_units = [c for c in spike_cols if c != target_col]
+
+    design_df, meta_groups = add_spike_history_to_design(
+        design_df=X_pruned,
+        colnames=colnames,
+        X_hist=X_hist,
+        target_col=target_col,
+        include_self=True,
+        cross_neurons=None,
+        meta_groups=meta_groups,
+    )
+
+    if not coupling_units:
+        return design_df, basis, None, colnames, {}, meta_groups
+
+    # Coupling (longer time window)
+    X_hist_coup, basis_coup, colnames_coup = compute_coupling_designs(
+        spikes_df=spikes_df,
+        bin_df=bin_df,
+        dt=dt,
+        t_max=t_max_coupling,
+        n_basis=n_basis_coupling,
+    )
+
+    design_df, meta_groups = add_coupling_to_design(
+        design_df=design_df,
+        colnames=colnames_coup,
+        X_hist=X_hist_coup,
+        coupling_units=coupling_units,
+        meta_groups=meta_groups,
+    )
+
+    return (
+        design_df,
+        basis,
+        basis_coup,
+        colnames,
+        colnames_coup,
+        meta_groups,
+    )
 
 
 def make_bin_df_from_stop_meta(meta_used):

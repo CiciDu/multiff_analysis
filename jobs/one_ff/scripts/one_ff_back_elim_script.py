@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    one_ff_gam_design,
+    backward_elimination,
+    one_ff_gam_fit
+)
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -27,12 +32,6 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    assemble_one_ff_gam_design,
-    backward_elimination,
-    one_ff_gam_fit
-)
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -68,7 +67,7 @@ def main(unit_idx: int):
 
     print(
         f"[PYTHON][DEBUG] Finalizing PGAM design for unit {unit_idx}...", flush=True)
-    design_df, y, groups, all_meta = assemble_one_ff_gam_design.finalize_one_ff_gam_design(
+    design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )
@@ -82,7 +81,8 @@ def main(unit_idx: int):
     print(f"[PYTHON][DEBUG] Output directory: {outdir}", flush=True)
 
     # Generate descriptive filename with lambda configuration
-    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=all_meta['lambda_config'])
+    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
+        lambda_config=all_meta['lambda_config'])
     save_path = outdir / 'backward_elimination' / f'{lam_suffix}.pkl'
     print(f"[PYTHON][DEBUG] Save path: {save_path}", flush=True)
 

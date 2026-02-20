@@ -1,5 +1,7 @@
 from planning_analysis.factors_vs_indicators import process_variations_utils
 import pandas as pd
+import os
+import re
 
 
 def examine_and_compare_columns_between_two_df(df1, df2, verbose=True,
@@ -113,3 +115,11 @@ def make_both_players_df(monkey_df, agent_df,
               columns_not_in_both_players)
 
     return both_players_df
+
+
+def extract_ff_num(folder):
+    basename = os.path.basename(folder)
+    match = re.search(r'^ff(\d+)_mem(\d+)_', basename)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return float('inf'), float('inf')

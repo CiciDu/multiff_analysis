@@ -359,7 +359,7 @@ def _expand_trials(events_df: pd.DataFrame,
     # If stop_cluster_id is not already present, map it too (if exists in MI)
     if "stop_cluster_id" not in df.columns and "stop_cluster_id" in monkey_information.columns:
         mi_cluster = monkey_information["stop_cluster_id"].to_numpy()
-        df["stop_cluster_id"] = mi_cluster[idx]
+        df['stop_cluster_id'] = mi_cluster[idx]
 
     return df
 

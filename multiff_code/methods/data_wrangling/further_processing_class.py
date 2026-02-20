@@ -512,6 +512,9 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             temp_rcap_events_df = detect_rsw_and_rcap.make_temp_rcap_events_df(
                 monkey_information, self.ff_caught_T_new, self.ff_real_position_sorted)
 
+            if not hasattr(self, 'ff_dataframe'):
+                self.make_or_retrieve_ff_dataframe()
+
             self.stop_category_df = assign_attempts.make_stop_category_df(monkey_information, self.ff_caught_T_new,
                                                                           self.closest_stop_to_capture_df, temp_rcap_events_df, self.ff_dataframe,
                                                                           self.ff_real_position_sorted)
@@ -526,3 +529,6 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             columns=cols_to_add, inplace=True, errors='ignore')
         self.monkey_information = self.monkey_information.merge(
             self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')
+        
+        self.stop_category_df = self.stop_category_df[self.stop_category_df['time'].between(
+            self.ff_caught_T_new[0], self.ff_caught_T_new[-1])]

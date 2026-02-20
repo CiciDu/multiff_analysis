@@ -1,4 +1,3 @@
-from pandas.api import types as pdt
 import numpy as np
 import pandas as pd
 
@@ -70,7 +69,7 @@ def extract_cluster_meta_per_event(
       - cluster_progress:            relative position in [~0, 1] (uses mid-bin if enabled)
       - cluster_start_time / end_time: earliest start / latest end within cluster
       - cluster_duration_s:          duration of the cluster episode
-      - prev_gap_s / next_gap_s:     gaps to neighboring events (within the cluster)
+      - gap_since_prev_event_in_cluster / gap_till_next_event_in_cluster:     gaps to neighboring events (within the cluster)
       - event_is_first_in_cluster:    0/1 indicator (first event)
       - event_is_last_in_cluster:     0/1 indicator (last event)
       - event_t_from_cluster_start_s:   time from cluster start to THIS event's center
@@ -79,22 +78,46 @@ def extract_cluster_meta_per_event(
 
     def _to_seconds_float(s: pd.Series) -> pd.Series:
         """
-        Coerce datetime/timedelta/strings/numerics to float seconds.
-        Ensures all downstream arithmetic stays in float64 seconds (not object).
+        Coerce datetime / timedelta / strings / numerics to float64 seconds.
+
+        Rules:
+        - Timedelta → total seconds
+        - Datetime  → seconds since epoch (preserves magnitude correctly)
+        - Strings   → try timedelta first, then numeric
+        - Numeric   → assumed already in seconds
+        - Always returns float64
         """
-        if pdt.is_timedelta64_dtype(s):
+
+        # 1️⃣ Already numeric → just cast
+        if pd.api.types.is_numeric_dtype(s):
+            return pd.to_numeric(s, errors='coerce').astype('float64')
+
+        # 2️⃣ Timedelta → total seconds
+        if pd.api.types.is_timedelta64_dtype(s):
             return s.dt.total_seconds().astype('float64')
-        if pdt.is_datetime64_any_dtype(s):
-            return (s.view('int64') / 1e9).astype('float64')
+
+        # 3️⃣ Datetime → convert safely to seconds since epoch
+        if pd.api.types.is_datetime64_any_dtype(s):
+            # Use astype instead of view (safer, future-proof)
+            return (s.astype('int64') / 1e9).astype('float64')
+
+        # 4️⃣ Try parsing as timedelta (for strings like "00:00:01.5")
         td = pd.to_timedelta(s, errors='coerce')
+
         out = pd.Series(np.nan, index=s.index, dtype='float64')
         have_td = td.notna()
+
         if have_td.any():
             out.loc[have_td] = td.loc[have_td].dt.total_seconds().astype(
                 'float64')
+
+            # For the rest, try numeric conversion
             num = pd.to_numeric(s.loc[~have_td], errors='coerce')
             out.loc[~have_td] = num.astype('float64')
+
             return out
+
+        # 5️⃣ Fallback → numeric
         return pd.to_numeric(s, errors='coerce').astype('float64')
 
     # --- checks & copies ---
@@ -124,7 +147,7 @@ def extract_cluster_meta_per_event(
     float_cols = [
         'event_cluster_size', 'event_idx_in_cluster', 'cluster_progress',
         'cluster_start_time', 'cluster_end_time', 'cluster_duration_s',
-        'prev_event_end_time', 'prev_gap_s', 'next_event_start_time', 'next_gap_s',
+        'prev_event_in_cluster_end_time', 'gap_since_prev_event_in_cluster', 'next_event_in_cluster_start_time', 'gap_till_next_event_in_cluster',
         'event_t_from_cluster_start_s', 'time_until_cluster_end_s'
     ]
     for col in float_cols:
@@ -135,10 +158,14 @@ def extract_cluster_meta_per_event(
     for col in flag_cols:
         sws[col] = np.int8(0)
 
-    # Compute only for rows that actually belong to a cluster
-    idx = sws['event_cluster_id'].notna()
-    g = sws.loc[idx].groupby('event_cluster_id', sort=False)
-    dsub = sws.loc[idx].copy()
+    if sws['event_cluster_id'].isna().any():
+        n_na = sws['event_cluster_id'].isna().sum()
+        raise ValueError(
+            f"event_cluster_id must not contain NA. Found {n_na} rows with NA. "
+            "All events must be assigned to a cluster."
+        )
+    g = sws.groupby('event_cluster_id', sort=False)
+    dsub = sws.copy()
 
     # ----- size & order within cluster -----
     dsub['event_cluster_size'] = g['event_id'].transform(
@@ -163,12 +190,13 @@ def extract_cluster_meta_per_event(
         dsub['cluster_start_time']
 
     # ----- neighbor gaps within cluster -----
-    # prev_gap_s is undefined for the first event; next_gap_s for the last event.
-    dsub['prev_event_end_time'] = g['event_id_end_time'].shift(1)
-    dsub['prev_gap_s'] = dsub['event_id_start_time'] - \
-        dsub['prev_event_end_time']
-    dsub['next_event_start_time'] = g['event_id_start_time'].shift(-1)
-    dsub['next_gap_s'] = dsub['next_event_start_time'] - \
+    # gap_since_prev_event_in_cluster is undefined for the first event; gap_till_next_event_in_cluster for the last event.
+    dsub['prev_event_in_cluster_end_time'] = g['event_id_end_time'].shift(1)
+    dsub['gap_since_prev_event_in_cluster'] = dsub['event_id_start_time'] - \
+        dsub['prev_event_in_cluster_end_time']
+    dsub['next_event_in_cluster_start_time'] = g['event_id_start_time'].shift(
+        -1)
+    dsub['gap_till_next_event_in_cluster'] = dsub['next_event_in_cluster_start_time'] - \
         dsub['event_id_end_time']
 
     # ----- boundary flags -----
@@ -180,8 +208,10 @@ def extract_cluster_meta_per_event(
     # Clean gaps at the boundaries (leave them as NaN so presence flags can be built later)
     m_first = dsub['event_is_first_in_cluster'] == 1
     m_last = dsub['event_is_last_in_cluster'] == 1
-    dsub.loc[m_first, ['prev_event_end_time', 'prev_gap_s']] = np.nan
-    dsub.loc[m_last,  ['next_event_start_time', 'next_gap_s']] = np.nan
+    dsub.loc[m_first, ['prev_event_in_cluster_end_time',
+                       'gap_since_prev_event_in_cluster']] = np.nan
+    dsub.loc[m_last,  ['next_event_in_cluster_start_time',
+                       'gap_till_next_event_in_cluster']] = np.nan
 
     # ----- timing relative to cluster bounds at the event center -----
     dsub['event_t_from_cluster_start_s'] = dsub['event_center_time'] - \
@@ -190,7 +220,7 @@ def extract_cluster_meta_per_event(
         dsub['event_center_time']
 
     # Write back and enforce dtypes
-    sws.loc[idx, dsub.columns] = dsub[dsub.columns]
+    sws[dsub.columns] = dsub[dsub.columns]
     sws[float_cols] = sws[float_cols].astype('float64')
     sws[flag_cols] = sws[flag_cols].astype('int8')
 
@@ -210,8 +240,10 @@ def prepare_cluster_meta_missingness(meta: pd.DataFrame) -> pd.DataFrame:
     out['is_clustered'] = (out['event_cluster_size'] > 1).astype(int)
 
     # Presence flags based on FINITE numerics (safer than .notna())
-    out['has_prev'] = _is_finite(out['prev_gap_s']).astype(int)
-    out['has_next'] = _is_finite(out['next_gap_s']).astype(int)
+    out['has_prev'] = _is_finite(
+        out['gap_since_prev_event_in_cluster']).astype(int)
+    out['has_next'] = _is_finite(
+        out['gap_till_next_event_in_cluster']).astype(int)
 
     # Ensure flags are numeric 0/1 (not boolean/object)
     out['event_is_first_in_cluster'] = out['event_is_first_in_cluster'].astype(
@@ -239,8 +271,8 @@ def scale_center_cluster_meta(
       - [optional] cluster_progress_z:    z-scored version of cluster_progress_c (on clustered rows; 0 off)
       - [optional] cluster_progress_z2:   raw square of cluster_progress_z (≥0 on clustered rows; 0 off)
       - [optional] cluster_progress_z2c:  cluster-mean-centered quadratic of the z term
-      - prev_gap_s_z:           z-scored previous-gap (on rows with has_prev==1; 0 otherwise)
-      - next_gap_s_z:           z-scored next-gap (on rows with has_next==1; 0 otherwise)
+      - gap_since_prev_event_in_cluster_z:           z-scored previous-gap (on rows with has_prev==1; 0 otherwise)
+      - gap_till_next_event_in_cluster_z:           z-scored next-gap (on rows with has_next==1; 0 otherwise)
       - cluster_duration_s_z:   z-scored cluster duration (on clustered rows; 0 otherwise)
       - [optional] log_n_events_in_cluster_z: z-scored log1p(size) (on clustered rows; 0 otherwise)
     """
@@ -277,8 +309,8 @@ def scale_center_cluster_meta(
 
     # ---- gaps & duration: winsorize + z-score on valid rows; 0 where undefined ----
     for col, mask_flag in [
-        ('prev_gap_s', 'has_prev'),
-        ('next_gap_s', 'has_next'),
+        ('gap_since_prev_event_in_cluster', 'has_prev'),
+        ('gap_till_next_event_in_cluster', 'has_next'),
         ('cluster_duration_s', 'is_clustered')
     ]:
         if col in m:
@@ -331,8 +363,8 @@ def merge_cluster_meta_into_design_last(
         'event_is_first_in_cluster', 'event_is_last_in_cluster',
         'cluster_progress', 'cluster_progress_c', 'cluster_progress_c2',
         'has_prev', 'has_next',
-        'prev_gap_s', 'next_gap_s',
-        'prev_gap_s_z', 'next_gap_s_z',
+        'gap_since_prev_event_in_cluster', 'gap_till_next_event_in_cluster',
+        'gap_since_prev_event_in_cluster_z', 'gap_till_next_event_in_cluster_z',
         'cluster_start_time', 'cluster_end_time', 'cluster_duration_s', 'cluster_duration_s_z',
         'event_t_from_cluster_start_s', 'time_until_cluster_end_s'
     ]
@@ -398,8 +430,8 @@ def best_cluster_features(df):
       - is_clustered:                    cluster membership (0/1)
       - event_is_first_in_cluster:        entry effect (0/1)
       - event_is_last_in_cluster:         exit effect (0/1)
-      - has_prev + prev_gap_s_z:         presence & magnitude of previous gap
-      - has_next + next_gap_s_z:         presence & magnitude of next gap
+      - has_prev + gap_since_prev_event_in_cluster_z:         presence & magnitude of previous gap
+      - has_next + gap_till_next_event_in_cluster_z:         presence & magnitude of next gap
       - cluster_duration_s_z:            overall length of the cluster episode
       - cluster_progress_c + _c2:        linear & U/∩-shape across the cluster
       - log_n_events_in_cluster_z:        (optional) capacity/load via size
@@ -408,8 +440,8 @@ def best_cluster_features(df):
     wanted = [
         'is_clustered', 'event_cluster_size',
         'event_is_first_in_cluster', 'event_is_last_in_cluster',
-        'prev_gap_s_z',
-        'next_gap_s_z',
+        'gap_since_prev_event_in_cluster_z',
+        'gap_till_next_event_in_cluster_z',
         'cluster_duration_s_z',
         'cluster_progress_c', 'cluster_progress_c2',
         'log_n_events_in_cluster_z',      # optional

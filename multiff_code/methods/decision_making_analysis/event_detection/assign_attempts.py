@@ -40,8 +40,8 @@ def init_stop_category_df(monkey_information, ff_caught_T_new):
          'monkey_x', 'monkey_y', 'trial']
     ].reset_index(drop=True)
 
-    stop_category_df = stop_category_df[stop_category_df['time'].between(
-        ff_caught_T_new[0], ff_caught_T_new[-1])]
+    # stop_category_df = stop_category_df[stop_category_df['time'].between(
+    #     ff_caught_T_new[0], ff_caught_T_new[-1])]
 
     stop_category_df['target_index'] = stop_category_df['trial']
 
