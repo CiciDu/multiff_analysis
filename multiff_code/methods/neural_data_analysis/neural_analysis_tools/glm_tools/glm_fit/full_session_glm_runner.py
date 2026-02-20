@@ -438,7 +438,7 @@ class FullSessionGLMRunner:
 
     def _build_stop_design(self):
 
-        pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups, _, _ = encode_stops_design.assemble_stop_encoding_design(
+        pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups, _, _, _, _ = encode_stops_design.assemble_stop_encoding_design(
             self.raw_data_folder_path,
             self.bin_width,
             self.global_bins_2d,

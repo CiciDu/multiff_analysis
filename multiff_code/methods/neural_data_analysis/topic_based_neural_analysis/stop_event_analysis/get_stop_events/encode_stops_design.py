@@ -431,6 +431,8 @@ def build_tuning_design_stop(
         'bin_edges': raw_meta.get('bin_edges', {}),
         'groups': raw_meta.get('groups', {}),
         'bin_info': bin_info,
+        'linear_vars': linear_vars,
+        'angular_vars': angular_vars,
     }
     return X_tuning, tuning_meta
 
@@ -671,7 +673,7 @@ def build_stop_design_for_encoding(
         kwargs['used_bin_indices'] = meta_used['global_bin'].to_numpy(
             dtype=int)
 
-    temporal_df, _temporal_meta = build_temporal_design_summed_stops(**kwargs)
+    temporal_df, temporal_meta = build_temporal_design_summed_stops(**kwargs)
     rcos_names = list(temporal_df.columns)
     defer_blocks = add_temporal_and_tuning_after_scale
     if not defer_blocks:
@@ -735,6 +737,7 @@ def build_stop_design_for_encoding(
         )
         deferred = {
             'temporal_df': temporal_df,
+            'temporal_meta': temporal_meta,
             'rcos_names': rcos_names,
             'tuning_df': X_tuning,
             'tuning_meta': tuning_meta,
@@ -842,6 +845,8 @@ def assemble_stop_encoding_design(
     )
 
     binrange_dict = deferred.get('binrange_dict')
+    temporal_meta = deferred.get('temporal_meta')
+    tuning_meta = deferred.get('tuning_meta')
 
     return (
         pn,
@@ -852,4 +857,6 @@ def assemble_stop_encoding_design(
         stop_meta_groups,
         init_stop_binned_feats,
         binrange_dict,
+        temporal_meta,
+        tuning_meta,
     )

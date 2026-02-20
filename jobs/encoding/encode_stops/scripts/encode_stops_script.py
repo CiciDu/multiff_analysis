@@ -35,7 +35,8 @@ def main():
     raw_data_dir_name = 'all_monkey_data/raw_monkey_data'
     monkey_names = ['monkey_Bruno', 'monkey_Schro']
     tuning_feature_mode = 'boxcar_only'
-    load_if_exists = False
+    
+    load_if_exists = True
 
     all_session_results = {}
 

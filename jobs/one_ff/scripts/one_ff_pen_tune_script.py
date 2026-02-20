@@ -52,7 +52,7 @@ def main(unit_idx: int):
     # -------------------------------
     # Per-unit design
     # -------------------------------
-    design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
+    design_df, y, groups, structured_meta_groups = one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )
@@ -69,7 +69,7 @@ def main(unit_idx: int):
     }
 
     group_name_map = {
-        'lam_f': list(all_meta['tuning']['groups'].keys()),
+        'lam_f': list(structured_meta_groups['tuning']['groups'].keys()),
         'lam_g': ['t_targ', 't_move', 't_rew'],
         'lam_h': ['spike_hist'],
     }
@@ -87,7 +87,7 @@ def main(unit_idx: int):
         group_name_map=group_name_map,
         n_folds=5,
         save_path=outdir / 'penalty_tuning.pkl',
-        save_metadata={'all_meta': all_meta},
+        save_metadata={'structured_meta_groups': structured_meta_groups},
     )
 
     if best_lams is not None:

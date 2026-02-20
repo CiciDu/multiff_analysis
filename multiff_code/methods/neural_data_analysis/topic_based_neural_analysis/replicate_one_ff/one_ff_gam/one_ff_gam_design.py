@@ -447,7 +447,7 @@ def process_unit_design_and_groups(
         Response variable
     groups : List[GroupSpec]
         Group specifications
-    all_meta : dict
+    structured_meta_groups : dict
         Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
     """
     if lambda_config is None:
@@ -482,14 +482,14 @@ def process_unit_design_and_groups(
     )
 
     # Combine all metadata for easy access
-    all_meta = {
+    structured_meta_groups = {
         'tuning': tuning_meta,
         'temporal': temporal_meta,
         'hist': hist_meta,
         'lambda_config': lambda_config,
     }
 
-    return design_df, groups, all_meta
+    return design_df, groups, structured_meta_groups
 
 
 def finalize_one_ff_gam_design(unit_idx, session_num=0, lambda_config=None):
@@ -549,7 +549,7 @@ def finalize_one_ff_gam_design(unit_idx, session_num=0, lambda_config=None):
     # -------------------------------
     # Per-unit GAM design
     # -------------------------------
-    design_df, groups, all_meta = (
+    design_df, groups, structured_meta_groups = (
         process_unit_design_and_groups(
             unit_idx=unit_idx,
             data_obj=data_obj,
@@ -569,4 +569,4 @@ def finalize_one_ff_gam_design(unit_idx, session_num=0, lambda_config=None):
         temporal_meta=temporal_meta,
     )
 
-    return design_df, y, groups, all_meta
+    return design_df, y, groups, structured_meta_groups

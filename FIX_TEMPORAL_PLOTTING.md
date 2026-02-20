@@ -85,8 +85,8 @@ The plotting should now work correctly:
 
 ```python
 # This should now work without errors
-plot_gam_fit.plot_variable('t_move', beta, all_meta)      # Event kernel
-plot_gam_fit.plot_variable('spike_hist', beta, all_meta)  # Spike history
+plot_gam_fit.plot_variable('t_move', beta, structured_meta_groups)      # Event kernel
+plot_gam_fit.plot_variable('spike_hist', beta, structured_meta_groups)  # Spike history
 ```
 
 ## Note

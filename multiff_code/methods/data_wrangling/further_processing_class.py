@@ -529,6 +529,3 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             columns=cols_to_add, inplace=True, errors='ignore')
         self.monkey_information = self.monkey_information.merge(
             self.stop_category_df[cols_to_add + ['stop_id']], on='stop_id', how='left')
-        
-        self.stop_category_df = self.stop_category_df[self.stop_category_df['time'].between(
-            self.ff_caught_T_new[0], self.ff_caught_T_new[-1])]

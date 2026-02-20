@@ -141,7 +141,7 @@ def _save_crossval_results(
         print(f'\nCross-validation results saved to: {save_path}')
 
 
-def _maybe_load_saved_crossval(save_path, load_if_exists, verbose):
+def maybe_load_saved_crossval(save_path, load_if_exists, verbose):
     """Load saved cross-validation results if they exist."""
     if save_path is None or not load_if_exists:
         return None
@@ -261,7 +261,7 @@ def crossval_variance_explained(
     # ------------------------------------------------------------------
     # 1) Load cached result if requested
     # ------------------------------------------------------------------
-    maybe_loaded = _maybe_load_saved_crossval(
+    maybe_loaded = maybe_load_saved_crossval(
         save_path=save_path,
         load_if_exists=load_if_exists,
         verbose=verbose,

@@ -39,13 +39,13 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
 - Added `hist_meta['basis_info'] = basis_info`
 
 #### `process_unit_design_and_groups()`:
-- Changed return value from `hist_meta` to `all_meta`
-- `all_meta` combines all metadata: `{'tuning': tuning_meta, 'temporal': temporal_meta, 'hist': hist_meta}`
+- Changed return value from `hist_meta` to `structured_meta_groups`
+- `structured_meta_groups` combines all metadata: `{'tuning': tuning_meta, 'temporal': temporal_meta, 'hist': hist_meta}`
 
 #### `finalize_one_ff_gam_design()`:
-- Returns `all_meta` instead of just `tuning_meta`
+- Returns `structured_meta_groups` instead of just `tuning_meta`
 
-**Result:** All temporal basis lags are now saved and accessible through `all_meta`
+**Result:** All temporal basis lags are now saved and accessible through `structured_meta_groups`
 
 ---
 
@@ -65,7 +65,7 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
 - Shows reconstructed kernel vs time relative to event (in milliseconds)
 - Includes zero reference line, event time marker (red line), and grid
 
-#### `plot_variable(var, beta, all_meta)`
+#### `plot_variable(var, beta, structured_meta_groups)`
 - Automatically determines variable type and calls appropriate plotting function
 - Handles:
   - Linear tuning variables
@@ -74,10 +74,10 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
   - Spike history
   - Coupling filters
 
-#### `plot_all_tuning_curves(beta, all_meta)`
+#### `plot_all_tuning_curves(beta, structured_meta_groups)`
 - Plots all linear and angular tuning curves in sequence
 
-#### `plot_all_temporal_filters(beta, all_meta)`
+#### `plot_all_temporal_filters(beta, structured_meta_groups)`
 - Plots all event kernels and spike history in sequence
 
 **Updated Functions:**
@@ -102,9 +102,9 @@ Extended the GAM analysis plotting functionality to include proper x-axis labels
 - `one_ff_pen_tune_script.py`
 
 **Changes:**
-- Changed from `tuning_meta` to `all_meta`
-- Updated `save_metadata` parameter: `{'all_meta': all_meta}` instead of `{'tuning_meta': tuning_meta}`
-- Updated penalty tuning to access: `all_meta['tuning']['groups']`
+- Changed from `tuning_meta` to `structured_meta_groups`
+- Updated `save_metadata` parameter: `{'structured_meta_groups': structured_meta_groups}` instead of `{'tuning_meta': tuning_meta}`
+- Updated penalty tuning to access: `structured_meta_groups['tuning']['groups']`
 
 ---
 
@@ -119,7 +119,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 import pickle
 
 # Build design
-design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
+design_df, y, groups, structured_meta_groups = one_ff_gam_design.finalize_one_ff_gam_design(
     unit_idx=0, session_num=0
 )
 
@@ -129,38 +129,38 @@ with open('path/to/fit_result.pkl', 'rb') as f:
     beta = result['beta']
 
 # Plot any variable automatically
-plot_gam_fit.plot_variable('v', beta, all_meta)           # Linear tuning
-plot_gam_fit.plot_variable('phi', beta, all_meta)         # Angular tuning
-plot_gam_fit.plot_variable('t_move', beta, all_meta)      # Event kernel
-plot_gam_fit.plot_variable('spike_hist', beta, all_meta)  # Spike history
+plot_gam_fit.plot_variable('v', beta, structured_meta_groups)           # Linear tuning
+plot_gam_fit.plot_variable('phi', beta, structured_meta_groups)         # Angular tuning
+plot_gam_fit.plot_variable('t_move', beta, structured_meta_groups)      # Event kernel
+plot_gam_fit.plot_variable('spike_hist', beta, structured_meta_groups)  # Spike history
 ```
 
 ### Example 2: Plot all tuning curves
 ```python
-plot_gam_fit.plot_all_tuning_curves(beta, all_meta)
+plot_gam_fit.plot_all_tuning_curves(beta, structured_meta_groups)
 ```
 
 ### Example 3: Plot all temporal filters
 ```python
-plot_gam_fit.plot_all_temporal_filters(beta, all_meta)
+plot_gam_fit.plot_all_temporal_filters(beta, structured_meta_groups)
 ```
 
 ### Example 4: Plot specific types using individual functions
 ```python
 # Tuning curves
-plot_gam_fit.plot_linear_tuning('v', beta, all_meta['tuning'])
-plot_gam_fit.plot_angular_tuning('phi', beta, all_meta['tuning'])
+plot_gam_fit.plot_linear_tuning('v', beta, structured_meta_groups['tuning'])
+plot_gam_fit.plot_angular_tuning('phi', beta, structured_meta_groups['tuning'])
 
 # Temporal filters
-plot_gam_fit.plot_event_kernel('t_move', beta, all_meta['temporal'])
-plot_gam_fit.plot_spike_history(beta, all_meta['hist'])
+plot_gam_fit.plot_event_kernel('t_move', beta, structured_meta_groups['temporal'])
+plot_gam_fit.plot_spike_history(beta, structured_meta_groups['hist'])
 ```
 
 ---
 
 ## Metadata Structure
 
-### `all_meta` dictionary structure:
+### `structured_meta_groups` dictionary structure:
 ```python
 {
     'tuning': {

@@ -67,7 +67,7 @@ def main(unit_idx: int):
 
     print(
         f"[PYTHON][DEBUG] Finalizing PGAM design for unit {unit_idx}...", flush=True)
-    design_df, y, groups, all_meta = one_ff_gam_design.finalize_one_ff_gam_design(
+    design_df, y, groups, structured_meta_groups = one_ff_gam_design.finalize_one_ff_gam_design(
         unit_idx=unit_idx,
         session_num=0,
     )
@@ -82,7 +82,7 @@ def main(unit_idx: int):
 
     # Generate descriptive filename with lambda configuration
     lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
-        lambda_config=all_meta['lambda_config'])
+        lambda_config=structured_meta_groups['lambda_config'])
     save_path = outdir / 'backward_elimination' / f'{lam_suffix}.pkl'
     print(f"[PYTHON][DEBUG] Save path: {save_path}", flush=True)
 
@@ -96,7 +96,7 @@ def main(unit_idx: int):
         n_folds=10,
         verbose=True,
         save_path=str(save_path),
-        save_metadata={'all_meta': all_meta},
+        save_metadata={'structured_meta_groups': structured_meta_groups},
     )
 
     print('\nFinal retained variables:')

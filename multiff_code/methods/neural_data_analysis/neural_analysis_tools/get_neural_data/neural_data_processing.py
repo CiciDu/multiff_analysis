@@ -53,6 +53,16 @@ def make_spikes_df(raw_data_folder_path, ff_caught_T_sorted,
     return spikes_df
 
 
+def find_num_neurons(raw_data_folder_path):
+    neural_data_path = raw_data_folder_path.replace(
+        'raw_monkey_data', 'neural_data')
+    sorted_neural_data_name = os.path.join(neural_data_path, "Sorted")
+
+    spike_clusters = _load_spike_clusters(sorted_neural_data_name)
+
+    return len(np.unique(spike_clusters))
+
+
 def _load_spike_times(sorted_neural_data_path):
     """Load and process spike times."""
     spike_times = np.load(os.path.join(

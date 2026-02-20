@@ -84,7 +84,7 @@ pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 50)
 
 
-def collect_stop_data_func(raw_data_folder_path, bin_width=0.04):
+def init_pn_to_collect_stop_data(raw_data_folder_path, bin_width=0.04):
     pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
         raw_data_folder_path=raw_data_folder_path, bin_width=bin_width)
     pn.retrieve_neural_data()
@@ -95,7 +95,12 @@ def collect_stop_data_func(raw_data_folder_path, bin_width=0.04):
                                                              pn.monkey_information, sampling_rate=pn.sampling_rate)
 
     pn.make_or_retrieve_stop_category_df()
+    return pn
 
+
+def collect_stop_data_func(raw_data_folder_path, bin_width=0.04):
+    pn = init_pn_to_collect_stop_data(raw_data_folder_path, bin_width)
+    
     captures_df, valid_captures_df, filtered_no_capture_stops_df, stops_with_stats = get_stops_utils.prepare_no_capture_and_captures(
         monkey_information=pn.monkey_information,
         closest_stop_to_capture_df=pn.closest_stop_to_capture_df,
@@ -114,7 +119,7 @@ def collect_stop_data_func(raw_data_folder_path, bin_width=0.04):
     one_stop_miss[columns_to_add] = pn.monkey_information.loc[one_stop_miss['stop_point_index'],
                                                               columns_to_add].values
 
-    pn.make_or_retrieve_stop_category_df()
+    
     pn.get_retry_capture_info()
     pn.get_retry_switch_info()
 
