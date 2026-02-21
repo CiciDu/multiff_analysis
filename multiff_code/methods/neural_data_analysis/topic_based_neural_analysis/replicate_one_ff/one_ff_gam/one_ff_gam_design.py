@@ -625,85 +625,111 @@ def process_unit_design_and_groups(
     return design_df, groups, structured_meta_groups
 
 
+class OneFFGAMDesignBuilder:
+    """
+    Reusable one-FF GAM design builder.
+
+    Shared preprocessing and shared design blocks are prepared once, then
+    reused for multiple unit_idx calls.
+    """
+
+    def __init__(
+        self,
+        *,
+        session_num=0,
+        prs=None,
+        mat_path='all_monkey_data/one_ff_data/sessions_python.mat',
+        covariate_names=None,
+        linear_vars=None,
+        angular_vars=None,
+    ):
+        self.session_num = session_num
+        self.prs = prs if prs is not None else one_ff_parameters.default_prs()
+        self.mat_path = mat_path
+        self.covariate_names = covariate_names or [
+            'v', 'w', 'd', 'phi',
+            'r_targ', 'theta_targ',
+            'eye_ver', 'eye_hor',
+        ]
+        self.linear_vars = linear_vars or [
+            'v', 'w', 'd', 'r_targ',
+            'eye_ver', 'eye_hor',
+        ]
+        self.angular_vars = angular_vars or [
+            'phi', 'theta_targ',
+        ]
+
+        self.data_obj = None
+        self.temporal_df = None
+        self.temporal_meta = None
+        self.specs_meta = None
+        self.X_tuning = None
+        self.tuning_meta = None
+        self._shared_ready = False
+
+    def prepare_shared_design(self, force_rebuild=False):
+        if self._shared_ready and not force_rebuild:
+            return
+
+        data_obj = one_ff_pipeline.OneFFSessionData(
+            mat_path=self.mat_path,
+            prs=self.prs,
+            session_num=self.session_num,
+        )
+
+        data_obj.compute_covariates(self.covariate_names)
+        data_obj.compute_spike_counts()
+        data_obj.smooth_spikes()
+        data_obj.compute_events()
+
+        temporal_df, temporal_meta, specs_meta = build_temporal_design_base(data_obj)
+        X_tuning, tuning_meta = build_tuning_design(
+            data_obj.data_df,
+            self.linear_vars,
+            self.angular_vars,
+            binrange_dict=self.prs.binrange,
+        )
+
+        self.data_obj = data_obj
+        self.temporal_df = temporal_df
+        self.temporal_meta = temporal_meta
+        self.specs_meta = specs_meta
+        self.X_tuning = X_tuning
+        self.tuning_meta = tuning_meta
+        self._shared_ready = True
+
+    def build_unit_design(self, unit_idx, lambda_config=None, coupling_units=None):
+        self.prepare_shared_design(force_rebuild=False)
+
+        design_df, groups, structured_meta_groups = process_unit_design_and_groups(
+            unit_idx=unit_idx,
+            data_obj=self.data_obj,
+            temporal_df=self.temporal_df,
+            temporal_meta=self.temporal_meta,
+            X_tuning=self.X_tuning,
+            tuning_meta=self.tuning_meta,
+            specs_meta=self.specs_meta,
+            lambda_config=lambda_config,
+            coupling_units=coupling_units,
+        )
+
+        y = extract_response(
+            unit_idx=unit_idx,
+            data_obj=self.data_obj,
+            design_df=design_df,
+            temporal_meta=self.temporal_meta,
+        )
+
+        return design_df, y, groups, structured_meta_groups, self.data_obj
+
+
 def finalize_one_ff_gam_design(
     unit_idx,
     session_num=0,
     lambda_config=None,
 ):
-    # -------------------------------
-    # Covariates
-    # -------------------------------
-    covariate_names = [
-        'v', 'w', 'd', 'phi',
-        'r_targ', 'theta_targ',
-        'eye_ver', 'eye_hor',
-    ]
-
-    linear_vars = [
-        'v', 'w', 'd', 'r_targ',
-        'eye_ver', 'eye_hor',
-    ]
-
-    angular_vars = [
-        'phi', 'theta_targ',
-    ]
-
-    # -------------------------------
-    # Load data
-    # -------------------------------
-    prs = one_ff_parameters.default_prs()
-
-    data_obj = one_ff_pipeline.OneFFSessionData(
-        mat_path='all_monkey_data/one_ff_data/sessions_python.mat',
-        prs=prs,
-        session_num=session_num,
-    )
-
-    # -------------------------------
-    # Preprocessing
-    # -------------------------------
-    data_obj.compute_covariates(covariate_names)
-    data_obj.compute_spike_counts()
-    data_obj.smooth_spikes()
-    data_obj.compute_events()
-
-    # -------------------------------
-    # Build shared design
-    # -------------------------------
-    temporal_df, temporal_meta, specs_meta = (
-        build_temporal_design_base(data_obj)
-    )
-
-    X_tuning, tuning_meta = (
-        build_tuning_design(
-            data_obj.data_df,
-            linear_vars,
-            angular_vars,
-            binrange_dict=prs.binrange,
-        )
-    )
-
-    # -------------------------------
-    # Per-unit GAM design
-    # -------------------------------
-    design_df, groups, structured_meta_groups = (
-        process_unit_design_and_groups(
-            unit_idx=unit_idx,
-            data_obj=data_obj,
-            temporal_df=temporal_df,
-            temporal_meta=temporal_meta,
-            X_tuning=X_tuning,
-            tuning_meta=tuning_meta,
-            specs_meta=specs_meta,
-            lambda_config=lambda_config,
-        )
-    )
-
-    y = extract_response(
+    builder = OneFFGAMDesignBuilder(session_num=session_num)
+    return builder.build_unit_design(
         unit_idx=unit_idx,
-        data_obj=data_obj,
-        design_df=design_df,
-        temporal_meta=temporal_meta,
+        lambda_config=lambda_config,
     )
-
-    return design_df, y, groups, structured_meta_groups, data_obj

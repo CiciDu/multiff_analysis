@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_design,
-    penalty_tuning
-)
 import os
 import sys
 from pathlib import Path
@@ -24,6 +19,11 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
+
+
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    one_ff_gam_pipeline,
+)
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -51,53 +51,15 @@ np.set_printoptions(suppress=True)
 
 def main(unit_idx: int):
     print(f'Running GAM penalty tuning for unit {unit_idx}')
-    # -------------------------------
-    # Per-unit design
-    # -------------------------------
-    design_df, y, groups, structured_meta_groups, data_obj = one_ff_gam_design.finalize_one_ff_gam_design(
-        unit_idx=unit_idx,
-        session_num=0,
-    )
-
-    # -------------------------------
-    # Penalty tuning
-    # -------------------------------
-    l1_groups = []  # coupling Laplace prior can go here later
-
-    lam_grid = {
-        'lam_f': [10, 50, 100, 300],
-        'lam_g': [1, 5, 10, 30],
-        'lam_h': [1, 5, 10],
-    }
-
-    group_name_map = {
-        'lam_f': list(structured_meta_groups['tuning']['groups'].keys()),
-        'lam_g': ['t_targ', 't_move', 't_rew'],
-        'lam_h': ['spike_hist'],
-    }
-
-    outdir = Path(
-        f'all_monkey_data/one_ff_data/my_gam_results/neuron_{unit_idx}')
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    best_lams, cv_results = penalty_tuning.tune_penalties(
-        design_df=design_df,
-        y=y,
-        base_groups=groups,
-        l1_groups=l1_groups,
-        lam_grid=lam_grid,
-        group_name_map=group_name_map,
-        n_folds=5,
-        save_path=outdir / 'penalty_tuning.pkl',
-        save_metadata={'structured_meta_groups': structured_meta_groups},
-    )
+    runner = one_ff_gam_pipeline.OneFFGAMRunner(session_num=0)
+    result = runner.run_penalty_tuning(unit_idx=unit_idx, n_folds=5)
+    best_lams = result['best_lams']
 
     if best_lams is not None:
         print('Best lambdas:')
         for k, v in best_lams.items():
             print(f'  {k}: {v}')
-        print(
-            f'Saved penalty tuning results to {outdir / "penalty_tuning.pkl"}')
+        print(f'Saved penalty tuning results to {result["save_path"]}')
     else:
         print('ERROR: Penalty tuning failed - no valid model fits found.')
         print('Check the output above for details.')

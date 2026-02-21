@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_design,
-    backward_elimination,
-    one_ff_gam_fit
-)
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -32,6 +27,10 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
 else:
     raise RuntimeError('Could not find Multifirefly-Project root')
 
+
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    one_ff_gam_pipeline,
+)
 
 # ---------------------------------------------------------------------
 # Project-specific imports
@@ -65,48 +64,30 @@ print("[PYTHON][DEBUG] Global configuration complete, all imports finished!", fl
 def main(unit_idx: int):
     print(f"[PYTHON][DEBUG] main() called for unit_idx={unit_idx}", flush=True)
 
+    runner = one_ff_gam_pipeline.OneFFGAMRunner(session_num=0)
+    runner.prepare_unit(unit_idx=unit_idx)
     print(
-        f"[PYTHON][DEBUG] Finalizing PGAM design for unit {unit_idx}...", flush=True)
-    design_df, y, groups, structured_meta_groups, data_obj = one_ff_gam_design.finalize_one_ff_gam_design(
-        unit_idx=unit_idx,
-        session_num=0,
-    )
-    print(
-        f"[PYTHON][DEBUG] Design finalized, shape: {design_df.shape}", flush=True)
-
-    # Setup output directory and paths
-    outdir = Path(
-        f'all_monkey_data/one_ff_data/my_gam_results/neuron_{unit_idx}')
-    outdir.mkdir(parents=True, exist_ok=True)
+        f"[PYTHON][DEBUG] Design finalized, shape: {runner.design_df.shape}", flush=True)
+    outdir = runner._unit_outdir(unit_idx)
     print(f"[PYTHON][DEBUG] Output directory: {outdir}", flush=True)
-
-    # Generate descriptive filename with lambda configuration
-    lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
-        lambda_config=structured_meta_groups['lambda_config'])
-    save_path = outdir / 'backward_elimination' / f'{lam_suffix}.pkl'
-    print(f"[PYTHON][DEBUG] Save path: {save_path}", flush=True)
 
     print(
         f"[PYTHON][INFO] Starting backward elimination for unit {unit_idx}...", flush=True)
-    kept, history = backward_elimination.backward_elimination_gam(
-        design_df=design_df,
-        y=y,
-        groups=groups,
+    result = runner.run_backward_elimination(
+        unit_idx=unit_idx,
         alpha=0.05,
         n_folds=10,
-        verbose=True,
-        save_path=str(save_path),
-        save_metadata={'structured_meta_groups': structured_meta_groups},
     )
+    kept = result['kept_groups']
+    print(f"[PYTHON][DEBUG] Save path: {result['save_path']}", flush=True)
 
     print('\nFinal retained variables:')
     for g in kept:
         print(' ', g.name)
 
     # Export history to CSV for easy viewing
-    if history:
-        pd.DataFrame(history).to_csv(outdir / 'history.csv', index=False)
-        print(f'\n✓ History exported to {outdir / "history.csv"}')
+    if result['history_csv'] is not None:
+        print(f'\n✓ History exported to {result["history_csv"]}')
 
     print(
         f"[PYTHON][INFO] Unit {unit_idx} completed successfully!", flush=True)
