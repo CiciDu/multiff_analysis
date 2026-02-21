@@ -11,6 +11,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     gam_variance_explained,
     one_ff_gam_design,
     one_ff_gam_fit,
+    plot_gam_fit,
     penalty_tuning,
 )
 
@@ -22,6 +23,12 @@ DEFAULT_VAR_CATEGORIES = {
     "eye_position_vars": ["eye_ver", "eye_hor"],
     "event_vars": ["t_move", "t_targ", "t_stop", "t_rew"],
     "spike_hist_vars": ["spike_hist"],
+}
+DEFAULT_LAMBDA_CONFIG = {
+    "lam_f": 100.0,
+    "lam_g": 10.0,
+    "lam_h": 10.0,
+    "lam_p": 10.0,
 }
 
 
@@ -351,12 +358,89 @@ class OneFFGAMRunner:
         """
         Run or retrieve leave-one-category-out variance contribution analysis.
         """
+        if category_names is None:
+            category_names = list(self.var_categories.keys())
+        else:
+            unknown = [c for c in category_names if c not in self.var_categories]
+            if unknown:
+                raise ValueError(
+                    f"Unknown category_names: {unknown}. "
+                    f"Available: {list(self.var_categories.keys())}"
+                )
+
+        # Fast path: load saved CV results directly without preparing design/state.
+        outdir = self._unit_outdir(unit_idx)
+        (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
+        full_path = self._full_model_cv_path(outdir)
+
+        full_cv_loaded = None
+        if retrieve_only or load_if_exists:
+            full_cv_loaded = gam_variance_explained.maybe_load_saved_crossval(
+                save_path=full_path,
+                load_if_exists=True,
+                verbose=False,
+            )
+
+        if full_cv_loaded is not None:
+            category_contrib_loaded = {}
+            missing_category = None
+            for category_name in category_names:
+                loo_path = self._category_cv_path(outdir, category_name)
+                reduced_cv = gam_variance_explained.maybe_load_saved_crossval(
+                    save_path=loo_path,
+                    load_if_exists=True,
+                    verbose=False,
+                )
+                if reduced_cv is None:
+                    missing_category = category_name
+                    break
+
+                category_vars = self.var_categories[category_name]
+                category_contrib_loaded[category_name] = {
+                    "vars": category_vars,
+                    "full_mean_classical_r2": full_cv_loaded["mean_classical_r2"],
+                    "full_mean_pseudo_r2": full_cv_loaded["mean_pseudo_r2"],
+                    "leave_out_mean_classical_r2": reduced_cv["mean_classical_r2"],
+                    "leave_out_mean_pseudo_r2": reduced_cv["mean_pseudo_r2"],
+                    "delta_classical_r2": (
+                        full_cv_loaded["mean_classical_r2"] - reduced_cv["mean_classical_r2"]
+                    ),
+                    "delta_pseudo_r2": (
+                        full_cv_loaded["mean_pseudo_r2"] - reduced_cv["mean_pseudo_r2"]
+                    ),
+                }
+
+            if missing_category is None:
+                contrib_df = pd.DataFrame.from_dict(
+                    category_contrib_loaded, orient="index"
+                )
+                contrib_df.index.name = "category"
+                contrib_csv = outdir / "cv_var_explained" / "category_contributions.csv"
+                contrib_df.to_csv(contrib_csv)
+
+                self.outdir = outdir
+                return {
+                    "full_cv_result": full_cv_loaded,
+                    "category_contributions": category_contrib_loaded,
+                    "category_contributions_csv": contrib_csv,
+                    "outdir": outdir,
+                }
+
+            if retrieve_only:
+                missing_path = self._category_cv_path(outdir, missing_category)
+                raise FileNotFoundError(
+                    f"No saved category CV result found for '{missing_category}' at: {missing_path}"
+                )
+        elif retrieve_only:
+            raise FileNotFoundError(f"No saved full-model CV result found at: {full_path}")
+
+        # Fallback: compute using prepared design/state.
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
-        outdir, lam_suffix = self._unit_context(
+        self.outdir = outdir
+        _, lam_suffix = self._unit_context(
             unit_idx=unit_idx,
             ensure_dirs=["cv_var_explained"],
         )
-        self.outdir = outdir
         self.lam_suffix = lam_suffix
 
         full_cv, category_contrib = self._compute_category_variance_contributions(
@@ -382,6 +466,29 @@ class OneFFGAMRunner:
             "category_contributions_csv": contrib_csv,
             "outdir": outdir,
         }
+
+    @staticmethod
+    def category_contributions_to_df(category_contributions: Dict) -> pd.DataFrame:
+        """
+        Convert category_contributions dict to a sorted DataFrame.
+        """
+        return plot_gam_fit.category_contributions_to_df(category_contributions)
+
+    def plot_category_variance_contributions(
+        self,
+        result: Dict,
+        *,
+        sort_by: str = "delta_pseudo_r2",
+        figsize: Tuple[int, int] = (8, 4),
+    ) -> pd.DataFrame:
+        """
+        Plot category contribution results from run_category_variance_contributions().
+        """
+        return plot_gam_fit.plot_category_variance_contributions(
+            result,
+            sort_by=sort_by,
+            figsize=figsize,
+        )
 
     def load_category_variance_result(
         self,
@@ -430,6 +537,40 @@ class OneFFGAMRunner:
         """
         Run backward elimination for one unit.
         """
+        # Fast path: load saved elimination results without preparing design.
+        outdir = self._unit_outdir(unit_idx)
+        (outdir / "backward_elimination").mkdir(parents=True, exist_ok=True)
+        lambda_for_path = lambda_config or DEFAULT_LAMBDA_CONFIG
+        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
+            lambda_config=lambda_for_path
+        )
+        save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
+        if save_path.exists():
+            loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
+            kept = [
+                one_ff_gam_fit.GroupSpec(
+                    name=g["name"],
+                    cols=g["cols"],
+                    vartype=g["vartype"],
+                    lam=g["lam"],
+                )
+                for g in loaded.get("kept_groups", [])
+            ]
+            history = loaded.get("history", [])
+            history_csv = None
+            if history:
+                history_csv = outdir / "history.csv"
+                pd.DataFrame(history).to_csv(history_csv, index=False)
+            self.outdir = outdir
+            self.lam_suffix = lam_suffix
+            return {
+                "kept_groups": kept,
+                "history": history,
+                "history_csv": history_csv,
+                "save_path": save_path,
+                "outdir": outdir,
+            }
+
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
         outdir, lam_suffix = self._unit_context(
             unit_idx=unit_idx,
@@ -475,6 +616,20 @@ class OneFFGAMRunner:
         """
         Run penalty tuning for one unit.
         """
+        # Fast path: load saved tuning results without preparing design.
+        outdir = self._unit_outdir(unit_idx)
+        outdir.mkdir(parents=True, exist_ok=True)
+        save_path = outdir / "penalty_tuning.pkl"
+        if save_path.exists():
+            loaded = penalty_tuning.load_tuning_results(str(save_path))
+            self.outdir = outdir
+            return {
+                "best_lams": loaded.get("best_lams"),
+                "cv_results": loaded.get("results"),
+                "save_path": save_path,
+                "outdir": outdir,
+            }
+
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
 
         if lam_grid is None:
@@ -494,7 +649,6 @@ class OneFFGAMRunner:
         outdir, lam_suffix = self._unit_context(unit_idx=unit_idx)
         self.outdir = outdir
         self.lam_suffix = lam_suffix
-
         save_path = outdir / "penalty_tuning.pkl"
         best_lams, cv_results = penalty_tuning.tune_penalties(
             design_df=self.design_df,

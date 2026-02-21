@@ -1,9 +1,192 @@
 import re
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
 
+
+def category_contributions_to_df(category_contributions):
+    """
+    Convert category_contributions dict to a DataFrame.
+    """
+    contrib_df = pd.DataFrame.from_dict(category_contributions, orient='index')
+    contrib_df.index.name = 'category'
+    return contrib_df.reset_index()
+
+
+def plot_category_variance_contributions(
+    result,
+    *,
+    sort_by='delta_pseudo_r2',
+    figsize=(8, 4),
+):
+    """
+    Plot category contribution results from run_category_variance_contributions().
+
+    Parameters
+    ----------
+    result : dict
+        Output of OneFFGAMRunner.run_category_variance_contributions().
+    sort_by : str
+        'delta_pseudo_r2' or 'delta_classical_r2'.
+    figsize : tuple
+        Figure size for each panel.
+
+    Returns
+    -------
+    pd.DataFrame
+        Sorted plotting dataframe.
+    """
+    if sort_by not in {'delta_pseudo_r2', 'delta_classical_r2'}:
+        raise ValueError(
+            "sort_by must be 'delta_pseudo_r2' or 'delta_classical_r2'"
+        )
+
+    df = category_contributions_to_df(result['category_contributions'])
+    df = df.sort_values(sort_by, ascending=False).reset_index(drop=True)
+
+    full_cv = result['full_cv_result']
+    full_classical = full_cv['mean_classical_r2']
+    full_pseudo = full_cv['mean_pseudo_r2']
+
+    # Delta bars
+    plt.figure(figsize=figsize)
+    plt.bar(df['category'], df[sort_by])
+    plt.axhline(0.0, color='black', linewidth=1.0)
+    plt.xticks(rotation=30, ha='right')
+    plt.ylabel(sort_by)
+    plt.title(f'Category Contributions ({sort_by})')
+    plt.tight_layout()
+    plt.show()
+
+    # Full vs leave-out pseudo R2
+    plt.figure(figsize=figsize)
+    plt.plot(
+        df['category'],
+        [full_pseudo] * len(df),
+        marker='o',
+        label='full model pseudo R2',
+    )
+    plt.plot(
+        df['category'],
+        df['leave_out_mean_pseudo_r2'],
+        marker='o',
+        label='leave-out pseudo R2',
+    )
+    plt.xticks(rotation=30, ha='right')
+    plt.ylabel('mean pseudo R2')
+    plt.title('Full vs Leave-One-Category-Out (Pseudo R2)')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # Full vs leave-out classical R2
+    plt.figure(figsize=figsize)
+    plt.plot(
+        df['category'],
+        [full_classical] * len(df),
+        marker='o',
+        label='full model classical R2',
+    )
+    plt.plot(
+        df['category'],
+        df['leave_out_mean_classical_r2'],
+        marker='o',
+        label='leave-out classical R2',
+    )
+    plt.xticks(rotation=30, ha='right')
+    plt.ylabel('mean classical R2')
+    plt.title('Full vs Leave-One-Category-Out (Classical R2)')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    return df
+
+
+def _ecdf(vals, eps=1e-6, clip_for_log=True):
+    x = np.asarray(vals, dtype=float)
+    x = x[np.isfinite(x)]
+    if clip_for_log:
+        x = np.clip(x, eps, None)  # needed for log-scale
+    x = np.sort(x)
+    y = np.arange(1, len(x) + 1) / len(x)
+    return x, y
+
+def plot_category_ecdf(all_results, *, log_x=True):
+    """
+    all_results: list of dicts from
+      runner.run_category_variance_contributions(unit_idx=..., retrieve_only=True/False)
+    log_x: if True use log-scaled x-axis; if False use linear x-axis.
+    """
+    # collect per-neuron metrics
+    total = []
+    sensory = []
+    latent = []
+    motor = []
+    other = []
+
+    # map your category names -> legend buckets
+    cat_map = {
+        "sensory_vars": sensory,
+        "latent_vars": latent,
+        "event_vars": motor,  # rename if you want "Motor" in legend
+        "position_vars": other,  # adjust mapping as needed
+        # you can also merge eye_position/spike_hist into "other"
+        "eye_position_vars": other,
+        "spike_hist_vars": other,
+    }
+
+    for res in all_results:
+        total.append(res["full_cv_result"]["mean_pseudo_r2"])
+        cc = res["category_contributions"]
+        for k, bucket in cat_map.items():
+            if k in cc:
+                bucket.append(cc[k]["delta_pseudo_r2"])
+
+    # colors close to your example
+    curves = [
+        ("Sensory", sensory, "#8CBF26"),
+        ("Latent",  latent,  "#E6550D"),
+        ("Motor",   motor,   "#00A6D6"),
+        ("Other",   other,   "#A9A9A9"),
+        ("Total",   total,   "#111111"),
+    ]
+
+    fig, ax = plt.subplots(figsize=(4.1, 3.0), dpi=180)
+
+    if log_x:
+        # shaded log bands (optional, like your figure)
+        ax.axvspan(1e-3, 1e-2, color="0.9", zorder=0)
+        ax.axvspan(1e-2, 1e-1, color="0.95", zorder=0)
+
+    for label, vals, color in curves:
+        if len(vals) == 0:
+            continue
+        x, y = _ecdf(vals, clip_for_log=log_x)
+        ax.plot(x, y, lw=1.6, color=color, label=label)
+
+    if log_x:
+        ax.set_xscale("log")
+        ax.set_xlim(1e-3, 1.0)
+    else:
+        all_vals = np.concatenate(
+            [np.asarray(v, dtype=float) for _, v, _ in curves if len(v) > 0]
+        )
+        finite_vals = all_vals[np.isfinite(all_vals)]
+        if finite_vals.size > 0:
+            x_max = float(np.max(finite_vals))
+            pad = 0.05 * max(1e-9, x_max)
+            ax.set_xlim(0.0, x_max + pad)
+    ax.set_ylim(0, 1.0)
+    ax.set_xlabel("Variance explained")
+    ax.set_ylabel("Cumulative prob.")
+    ax.legend(frameon=False, loc="lower right")
+    plt.tight_layout()
+    plt.show()
+    
+    
 def _cols_in_beta(cols, beta):
     """
     Filter column names to only those present in beta.

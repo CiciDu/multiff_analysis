@@ -19,10 +19,6 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         break
 
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_pgam_pipeline,
-)
-
 # -------------------------------------------------------
 # Core imports
 # -------------------------------------------------------
@@ -33,6 +29,9 @@ print("[PYTHON][DEBUG] All imports completed successfully", flush=True)
 # Main
 # -------------------------------------------------------
 def main(args):
+    from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+        one_ff_pgam_pipeline,
+    )
 
 
     print(f"[PYTHON][DEBUG] main() called for unit_idx={args.unit_idx}", flush=True)
@@ -64,6 +63,34 @@ def main(args):
             flush=True,
         )
     print(f"[PYTHON][INFO] PGAM CV complete for unit {args.unit_idx}", flush=True)
+
+    print(
+        f"[PYTHON][DEBUG] Running PGAM category contributions for unit {args.unit_idx}...",
+        flush=True,
+    )
+    cat_result = runner.run_category_variance_contributions(
+        unit_idx=args.unit_idx,
+        n_splits=5,
+        filtwidth=2,
+        category_names=None,
+        retrieve_only=False,
+        load_if_exists=True,
+    )
+    full_cv = cat_result["full_cv_result"]
+    category_contrib = cat_result["category_contributions"]
+    contrib_csv = cat_result["category_contributions_csv"]
+
+    print("\nCategory contributions (leave-one-category-out):", flush=True)
+    print(
+        f"  full model mean r2 eval = {full_cv['mean_r2_eval']:.6f}",
+        flush=True,
+    )
+    for cat_name, res in category_contrib.items():
+        print(
+            f"  {cat_name}: delta r2 eval = {res['delta_r2_eval']:.6f}",
+            flush=True,
+        )
+    print(f"\nSaved category contributions to: {contrib_csv}", flush=True)
 
 
 # -------------------------------------------------------
