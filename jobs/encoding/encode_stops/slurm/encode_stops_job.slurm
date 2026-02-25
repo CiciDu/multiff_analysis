@@ -4,7 +4,7 @@
 #SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_stops/logs/run_stdout/encode_stops_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=10G
+#SBATCH --mem=5G
 #SBATCH --time=48:00:00
 #SBATCH --mail-type=END,FAIL
 

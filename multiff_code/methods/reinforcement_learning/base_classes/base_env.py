@@ -23,12 +23,12 @@ TMAX_DEFAULT = 5.0     # seconds cap for t_seen normalization
 @dataclass
 class ObsNoiseCfg:
     # perception (visible): instantaneous noise
-    perc_r: float = 0.02     # Weber radial (std_r = perc_r * r)
-    perc_th: float = 0.01   # angular base (std_th = perc_th)
+    perc_r: float = 2     # Weber radial (std_r = perc_r * r)
+    perc_th: float = 1   # angular base (std_th = perc_th)
 
     # memory (invisible): per-step diffusion
-    mem_r: float = 0.02      # Weber radial step
-    mem_th: float = 0.01    # angular step base (std_th = mem_th)
+    mem_r: float = 2      # Weber radial step
+    mem_th: float = 1    # angular step base (std_th = mem_th)
 
     seed: Optional[int] = None
 
@@ -892,8 +892,8 @@ class MultiFF(gymnasium.Env):
         th = np.arctan2(dy, dx).astype(np.float32) - self.agentheading
         th = self._wrap_pi(th)
 
-        k_r = self.obs_noise.mem_r
-        k_th = self.obs_noise.mem_th
+        k_r = self.obs_noise.mem_r / 100 # scale by 1/100 to make the numbers more readable
+        k_th = self.obs_noise.mem_th / 100
 
         r_i = r
         std_r = step_scale * (k_r * np.maximum(r_i, 0.0))
@@ -930,8 +930,8 @@ class MultiFF(gymnasium.Env):
         th_true = np.arctan2(dy, dx).astype(np.float32) - self.agentheading
         th_true = self._wrap_pi(th_true)
 
-        std_r = self.obs_noise.perc_r * r_v
-        std_th = np.full_like(r_v, self.obs_noise.perc_th)
+        std_r = self.obs_noise.perc_r * r_v / 100 # scale by 1/100 to make the numbers more readable
+        std_th = np.full_like(r_v, self.obs_noise.perc_th / 100)
 
         dr = self.rng.normal(0.0, std_r)
         dth = self.rng.normal(0.0, std_th)

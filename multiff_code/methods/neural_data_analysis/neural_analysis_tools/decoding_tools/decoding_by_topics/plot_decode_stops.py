@@ -47,7 +47,10 @@ def plot_decoder_parity(
         reverse=True,
     )
     if len(varnames) == 0:
-        raise ValueError("No decodable variables found in readout block.")
+        raise ValueError(
+            "No decodable variables with true/pred found. "
+            "Re-run regress_popreadout with save_predictions=True to enable parity plots."
+        )
 
     n_panels = len(varnames)
     n_cols = max(1, int(n_cols))
@@ -133,7 +136,10 @@ def plot_single_trial_decoding_panel(
 ):
     varnames = [k for k, v in readout_block.items() if isinstance(v, dict) and ("trials" in v)]
     if len(varnames) == 0:
-        raise ValueError("No decoded trial series found in readout block.")
+        raise ValueError(
+            "No decoded trial series found. "
+            "Re-run regress_popreadout with save_predictions=True to enable trial plots."
+        )
 
     first_var = varnames[0]
     n_total_trials = len(readout_block[first_var]["trials"]["true"])

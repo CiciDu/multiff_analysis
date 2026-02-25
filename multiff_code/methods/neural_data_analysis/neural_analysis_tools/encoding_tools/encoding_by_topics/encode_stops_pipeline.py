@@ -1161,6 +1161,7 @@ class StopEncodingRunner:
         alpha: float = 0.05,
         n_folds: int = 10,
         load_if_exists: bool = True,
+        retrieve_only: bool = False,
     ) -> Dict:
         """
         Run backward elimination over stop GAM groups.
@@ -1175,4 +1176,5 @@ class StopEncodingRunner:
             alpha=alpha,
             n_folds=n_folds,
             load_if_exists=load_if_exists,
+            retrieve_only=retrieve_only,
         )

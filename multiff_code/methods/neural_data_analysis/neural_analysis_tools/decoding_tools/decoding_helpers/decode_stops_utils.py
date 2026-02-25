@@ -76,6 +76,7 @@ def tune_linear_decoder(
     candidate_widths: Sequence[int],
 ) -> Dict:
     best = None
+    print(f"Tuning linear decoder with candidate widths: {candidate_widths}")
     for w in candidate_widths:
         cur = fit_linear_decoder(y_neural, x_true, int(w))
         if (best is None) or (cur["error"] < best["error"]):

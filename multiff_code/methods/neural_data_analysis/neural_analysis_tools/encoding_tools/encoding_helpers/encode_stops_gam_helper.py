@@ -28,6 +28,7 @@ DEFAULT_VAR_CATEGORIES = {
     "event_vars": ["basis", "basis*captured", "prepost", "captured"],
     "spike_hist_vars": ["spike_hist"],
 }
+
 DEFAULT_LAMBDA_CONFIG = {
     "lam_f": 100.0,
     "lam_g": 10.0,
@@ -188,26 +189,51 @@ class StopEncodingGAMAnalysisHelper:
         outdir = self._neuron_outdir(unit_idx, ensure_dirs=["cv_var_explained"])
         full_path = self._full_model_cv_path(outdir)
 
-        design_df = None
-        y = None
-        groups = None
-        if not retrieve_only:
+        # Try loading everything first; skip design_df if we can load all
+        load_ok = load_if_exists or retrieve_only
+        full_cv = gam_variance_explained.maybe_load_saved_crossval(
+            save_path=full_path,
+            load_if_exists=load_ok,
+            verbose=False,
+        )
+        category_loads = {}
+        for cat in category_names:
+            cv = gam_variance_explained.maybe_load_saved_crossval(
+                save_path=self._category_cv_path(outdir, cat),
+                load_if_exists=load_ok,
+                verbose=False,
+            )
+            if cv is not None:
+                category_loads[cat] = cv
+
+        all_categories_missing = all(
+            cat not in category_loads for cat in category_names
+        )
+        need_compute = full_cv is None or all_categories_missing
+        if need_compute:
+            if retrieve_only:
+                if full_cv is None:
+                    raise FileNotFoundError(
+                        f"No saved full-model CV result found at: {full_path}"
+                    )
+                missing = [c for c in category_names if c not in category_loads]
+                if missing:
+                    raise FileNotFoundError(
+                        "No saved category CV result found for: "
+                        f"{missing}"
+                    )
             design_df, y, groups, _ = self._unit_context(
                 unit_idx=unit_idx,
                 lambda_config=lambda_config,
             )
-            
-        print(f'Full model CV path: {full_path}')
-
-        if retrieve_only:
-            full_cv = gam_variance_explained.maybe_load_saved_crossval(
-                save_path=full_path,
-                load_if_exists=True,
-                verbose=False,
-            )
-            if full_cv is None:
-                raise FileNotFoundError(f"No saved full-model CV result found at: {full_path}")
+            available_group_names = [g.name for g in groups]
         else:
+            design_df = None
+            y = None
+            groups = None
+            available_group_names = []
+
+        if full_cv is None:
             full_cv = self._run_crossval(
                 design_df=design_df,
                 y=y,
@@ -219,29 +245,22 @@ class StopEncodingGAMAnalysisHelper:
                 load_if_exists=load_if_exists,
             )
 
-        available_group_names = [g.name for g in groups] if groups is not None else []
         contributions = {}
-
-        for category_name in category_names:
+        categories_to_process = (
+            category_names if need_compute else list(category_loads.keys())
+        )
+        for category_name in categories_to_process:
             category_aliases = self.var_categories[category_name]
-            if retrieve_only:
-                reduced_cv = gam_variance_explained.maybe_load_saved_crossval(
-                    save_path=self._category_cv_path(outdir, category_name),
-                    load_if_exists=True,
-                    verbose=False,
-                )
-                if reduced_cv is None:
-                    raise FileNotFoundError(
-                        "No saved category CV result found for "
-                        f"'{category_name}' at: {self._category_cv_path(outdir, category_name)}"
-                    )
+            if category_name in category_loads:
+                reduced_cv = category_loads[category_name]
             else:
                 drop_group_names = self._expand_aliases_to_group_names(
                     aliases=category_aliases,
                     available_group_names=available_group_names,
                 )
                 keep_group_names = [
-                    gname for gname in available_group_names if gname not in set(drop_group_names)
+                    gname for gname in available_group_names
+                    if gname not in set(drop_group_names)
                 ]
                 reduced_df, reduced_groups = self._subset_design_and_groups(
                     design_df=design_df,
@@ -258,7 +277,6 @@ class StopEncodingGAMAnalysisHelper:
                     buffer_samples=buffer_samples,
                     load_if_exists=load_if_exists,
                 )
-
             contributions[category_name] = {
                 "vars": category_aliases,
                 "full_mean_classical_r2": full_cv["mean_classical_r2"],
@@ -278,7 +296,7 @@ class StopEncodingGAMAnalysisHelper:
         contrib_csv = outdir / "cv_var_explained" / "category_contributions.csv"
         contrib_df.to_csv(contrib_csv)
         
-        print('Saved category contributions to: {contrib_csv}')
+        # print(f'Saved category contributions to: {contrib_csv}')
 
         return {
             "full_cv_result": full_cv,
@@ -299,12 +317,44 @@ class StopEncodingGAMAnalysisHelper:
         retrieve_only: bool = False,
         load_if_exists: bool = True,
     ) -> Dict:
+        outdir = self._neuron_outdir(unit_idx)
+        save_path = outdir / "penalty_tuning.pkl"
+
+        if retrieve_only and not save_path.exists():
+            raise FileNotFoundError(f"No tuning results file found at: {save_path}")
+
+        can_load = (load_if_exists or retrieve_only) and save_path.exists()
+        if can_load:
+            lam_grid_load = lam_grid or {
+                "lam_f": [10, 50, 100, 300],
+                "lam_g": [1, 5, 10, 30],
+                "lam_h": [1, 5, 10],
+                "lam_p": [1, 5, 10],
+            }
+            best_lams, cv_results = penalty_tuning.tune_penalties(
+                design_df=None,
+                y=None,
+                base_groups=None,
+                l1_groups=[],
+                lam_grid=lam_grid_load,
+                group_name_map=group_name_map or {},
+                n_folds=n_folds,
+                save_path=str(save_path),
+                load_if_exists=load_if_exists,
+                retrieve_only=True,
+                save_metadata={"structured_meta_groups": self.runner.structured_meta_groups},
+            )
+            return {
+                "best_lams": best_lams,
+                "cv_results": cv_results,
+                "save_path": save_path,
+                "outdir": outdir,
+            }
+
         design_df, y, groups, _ = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
         )
-        outdir = self._neuron_outdir(unit_idx)
-        save_path = outdir / "penalty_tuning.pkl"
 
         if lam_grid is None:
             lam_grid = {
@@ -337,9 +387,6 @@ class StopEncodingGAMAnalysisHelper:
         if len(lam_grid) == 0:
             raise ValueError("No valid lambda groups found for tuning in this design.")
 
-        if retrieve_only and not save_path.exists():
-            raise FileNotFoundError(f"No tuning results file found at: {save_path}")
-
         best_lams, cv_results = penalty_tuning.tune_penalties(
             design_df=design_df,
             y=y,
@@ -368,14 +415,49 @@ class StopEncodingGAMAnalysisHelper:
         alpha: float = 0.05,
         n_folds: int = 10,
         load_if_exists: bool = True,
+        retrieve_only: bool = False,
     ) -> Dict:
+        outdir = self._neuron_outdir(unit_idx, ensure_dirs=["backward_elimination"])
+        lam_cfg = self._resolve_lambda_config(lambda_config)
+        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lam_cfg)
+        save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
+
+        if retrieve_only and not save_path.exists():
+            raise FileNotFoundError(
+                f"No backward elimination result found at: {save_path}"
+            )
+
+        can_load = (load_if_exists or retrieve_only) and save_path.exists()
+        if can_load:
+            loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
+            kept = [
+                GroupSpec(
+                    name=g["name"],
+                    cols=g["cols"],
+                    vartype=g["vartype"],
+                    lam=g["lam"],
+                )
+                for g in loaded.get("kept_groups", [])
+            ]
+            history = loaded.get("history", [])
+            history_csv = outdir / "backward_elimination" / "history.csv"
+            if history:
+                pd.DataFrame(history).to_csv(history_csv, index=False)
+            else:
+                history_csv = None
+            print(f"  Loaded backward elimination from {save_path}")
+            return {
+                "kept_groups": kept,
+                "history": history,
+                "history_csv": history_csv,
+                "save_path": save_path,
+                "outdir": outdir,
+            }
+
         design_df, y, groups, lam_cfg = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
         )
-        outdir = self._neuron_outdir(unit_idx, ensure_dirs=["backward_elimination"])
-        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lam_cfg)
-        save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
 
         if load_if_exists and save_path.exists():
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))

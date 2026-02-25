@@ -1,21 +1,19 @@
 import os
-import pickle
 from pathlib import Path
+from typing import List
 
 # Third-party imports
+import numpy as np
 import pandas as pd
 
 # Decoding
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
-    cv_decoding
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics.base_decoding_runner import (
+    BaseOneFFStyleDecodingRunner,
 )
 
 # PN-specific imports
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
-    pn_aligned_by_event
-)
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding import (
-    pn_decoding_model_specs
+    pn_aligned_by_event,
 )
 from neural_data_analysis.design_kits.design_by_segment import (
     spike_history,
@@ -24,15 +22,20 @@ from neural_data_analysis.design_kits.design_by_segment import (
 )
 
 
-class PNDecodingRunner:
+class PNDecodingRunner(BaseOneFFStyleDecodingRunner):
+    """
+    PN decoding runner. CV model-spec decoding via run(); one-FF style
+    population decoding (CCA + linear readout) via run_one_ff_style().
+    """
+
     def __init__(
         self,
         raw_data_folder_path,
         bin_width=0.04,
         t_max=0.20,
     ):
+        super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
-        self.bin_width = bin_width
         self.t_max = t_max
 
         # Filled during setup
@@ -41,7 +44,30 @@ class PNDecodingRunner:
         self.spike_data_w_history = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
-            raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
+            raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
+        )
+
+    # ------------------------------------------------------------------
+    # BaseOneFFStyleDecodingRunner override points
+    # ------------------------------------------------------------------
+    def _get_target_df(self) -> pd.DataFrame:
+        return self.behav_df
+
+    def _get_groups(self):
+        return self.trial_ids
+
+    def _get_neural_matrix(self, use_spike_history=None) -> np.ndarray:
+        return np.asarray(self.spike_data_w_history, dtype=float)
+
+    def _default_canoncorr_varnames(self) -> List[str]:
+        y_df = self._get_numeric_target_df()
+        return list(y_df.columns[: min(6, y_df.shape[1])])
+
+    def _default_readout_varnames(self) -> List[str]:
+        return list(self._get_numeric_target_df().columns)
+
+    def _target_df_error_msg(self) -> str:
+        return "pn_feats_to_decode"
     # ------------------------------------------------------------------
     # Data collection
     # ------------------------------------------------------------------
@@ -73,7 +99,6 @@ class PNDecodingRunner:
 
         data = pn.rebinned_y_var.copy()
         trial_ids = data['new_segment']
-        dt = pn.bin_width
 
         pn_feats_to_decode = temporal_feats.add_stop_and_capture_columns(
             data,
@@ -119,7 +144,7 @@ class PNDecodingRunner:
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
-    # Caching utilities
+    # Caching utilities (BaseOneFFStyleDecodingRunner interface)
     # ------------------------------------------------------------------
     def _get_save_dir(self):
         return os.path.join(
@@ -135,102 +160,16 @@ class PNDecodingRunner:
             'trial_ids': save_dir / 'trial_ids.pkl',
         }
 
-    def _save_design_matrices(self):
-        save_dir = Path(self._get_save_dir())
-        save_dir.mkdir(parents=True, exist_ok=True)
-        paths = self._get_design_matrix_paths()
-
-        data_to_save = {
+    def _get_design_matrix_data(self):
+        return {
             'spike_data_w_history': self.spike_data_w_history,
             'pn_feats_to_decode': self.behav_df,
             'trial_ids': self.trial_ids,
         }
 
-        for key, data in data_to_save.items():
-            try:
-                with open(paths[key], 'wb') as f:
-                    pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
-                print(f'[PNDecodingRunner] Saved {key} → {paths[key]}')
-            except Exception as e:
-                print(
-                    f'[PNDecodingRunner] WARNING: could not save {key}: '
-                    f'{type(e).__name__}: {e}'
-                )
-
-    def _load_design_matrices(self):
-        paths = self._get_design_matrix_paths()
-
-        if not all(p.exists() for p in paths.values()):
-            return False
-
-        try:
-            with open(paths['spike_data_w_history'], 'rb') as f:
-                self.spike_data_w_history = pickle.load(f)
-
-            with open(paths['pn_feats_to_decode'], 'rb') as f:
-                self.behav_df = pickle.load(f)
-
-            with open(paths['trial_ids'], 'rb') as f:
-                self.trial_ids = pickle.load(f)
-
-            print('[PNDecodingRunner] Loaded cached design matrices')
-            return True
-
-        except Exception as e:
-            print(
-                f'[PNDecodingRunner] WARNING: could not load design matrices: '
-                f'{type(e).__name__}: {e}'
-            )
-            return False
-
-    # ------------------------------------------------------------------
-    # Main entry point
-    # ------------------------------------------------------------------
-    def run(self, n_splits=5, save_dir=None, design_matrices_exists_ok=True, model_specs=None, shuffle_mode='none'):
-        self.model_specs = model_specs if model_specs is not None else pn_decoding_model_specs.MODEL_SPECS
-        self._collect_data(exists_ok=design_matrices_exists_ok)
-
-        if save_dir is None:
-            save_dir = self._get_save_dir()
-        if shuffle_mode != 'none':
-            save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
-            save_dir.mkdir(parents=True, exist_ok=True)
-        all_results = []
-
-        for model_name, spec in self.model_specs.items():
-            config = cv_decoding.DecodingRunConfig(
-                regression_model_class=spec.get(
-                    'regression_model_class', None
-                ),
-                regression_model_kwargs=spec.get(
-                    'regression_model_kwargs', {}
-                ),
-                classification_model_class=spec.get(
-                    'classification_model_class', None
-                ),
-                classification_model_kwargs=spec.get(
-                    'classification_model_kwargs', {}
-                ),
-                use_early_stopping=False,
-            )
-
-            print('model_name:', model_name)
-            print('config:', config)
-
-            results_df = cv_decoding.run_cv_decoding(
-                X=self.spike_data_w_history,
-                y_df=self.behav_df,
-                behav_features=None,
-                groups=self.trial_ids,
-                n_splits=n_splits,
-                config=config,
-                context_label='pooled',
-                save_dir=save_dir,
-                model_name=model_name,
-                shuffle_mode=shuffle_mode,
-            )
-
-            results_df['model_name'] = model_name
-            all_results.append(results_df)
-
-        return pd.concat(all_results, ignore_index=True)
+    def _get_design_matrix_key_to_attr(self):
+        return {
+            'spike_data_w_history': 'spike_data_w_history',
+            'pn_feats_to_decode': 'behav_df',
+            'trial_ids': 'trial_ids',
+        }

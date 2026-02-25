@@ -25,10 +25,10 @@ RANDOM_SEED=12345
 # ---------------------
 declare -a V_NOISE_STDS=(0.0)
 declare -a W_NOISE_STDS=(0.0)
-declare -a PERC_R_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
-declare -a PERC_TH_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
-declare -a MEM_R_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
-declare -a MEM_TH_LIST=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
+declare -a PERC_R_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
+declare -a PERC_TH_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
+declare -a MEM_R_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
+declare -a MEM_TH_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
 
 N_ENVS=1
 
@@ -117,7 +117,8 @@ SAFE_MR=$(sanitize_zero "$SAFE_MR")
 SAFE_MT=$(sanitize_zero "$SAFE_MT")
 
 SUB_RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
-AGENT_RUN_NAME="vn${SAFE_VN}_wn${SAFE_WN}_pr${SAFE_PR}_pt${SAFE_PT}_mr${SAFE_MR}_mt${SAFE_MT}"
+# AGENT_RUN_NAME="vn${SAFE_VN}_wn${SAFE_WN}_pr${SAFE_PR}_pt${SAFE_PT}_mr${SAFE_MR}_mt${SAFE_MT}"
+AGENT_RUN_NAME="pr${SAFE_PR}_pt${SAFE_PT}_mr${SAFE_MR}_mt${SAFE_MT}"
 OVERALL_FOLDER="${BASE_DIR}/${SUB_RUN_NAME}/${AGENT_RUN_NAME}"
 
 mkdir -p "$OVERALL_FOLDER"

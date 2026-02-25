@@ -41,17 +41,20 @@ def main():
     results_df = runner.run(
         n_splits=args.n_splits,
         save_dir=args.save_dir,
-        shuffle_mode='timeshift_fold',
-    )
-
-    results_df = runner.run(
-        n_splits=args.n_splits,
-        save_dir=args.save_dir,
         shuffle_mode='none',
     )
 
+    results_df_shuffled = runner.run(
+        n_splits=args.n_splits,
+        save_dir=args.save_dir,
+        shuffle_mode='timeshift_fold',
+    )
+    
+    results_one_ff_style = runner.run_one_ff_style()
+
     print(results_df.head())
-    return results_df
+    return results_df, results_df_shuffled, results_one_ff_style
+
 
 
 if __name__ == '__main__':

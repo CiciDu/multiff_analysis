@@ -563,6 +563,57 @@ def build_stop_gam_groups(
     return groups, lambda_config
 
 
+def build_simple_gam_groups(
+    design_df: pd.DataFrame,
+    *,
+    lam_f: float = 100.0,
+    lam_g: float = 10.0,
+    lam_h: float = 10.0,
+    lam_p: float = 10.0,
+):
+    """
+    Build GroupSpec list for any design (PN, Vis, etc.) with spike-history columns.
+
+    - Const: unpenalized (0D).
+    - Spike history: cluster_<id>:b0:<k> -> spike_hist (target) / cpl_J (coupling).
+    - All other columns: single "behavioral" group with lam_f.
+
+    Use when build_stop_gam_groups does not apply (different column semantics).
+    """
+    cols_all = list(design_df.columns)
+    spike_hist_pattern = re.compile(r'^(cluster_\d+):b0:\d+$')
+    spike_hist_cols_by_neuron: Dict[str, List[str]] = {}
+    behavioral_candidates: List[str] = []
+    for c in cols_all:
+        m = spike_hist_pattern.match(c)
+        if m:
+            neuron = m.group(1)
+            spike_hist_cols_by_neuron.setdefault(neuron, []).append(c)
+        elif c == 'const':
+            continue
+        else:
+            behavioral_candidates.append(c)
+
+    groups: List[GroupSpec] = []
+    if 'const' in cols_all:
+        groups.append(GroupSpec('const', ['const'], '0D', 0.0))
+    if behavioral_candidates:
+        groups.append(GroupSpec('behavioral', behavioral_candidates, 'event', lam_f))
+
+    neuron_order = sorted(spike_hist_cols_by_neuron.keys())
+    for i, neuron in enumerate(neuron_order):
+        hist_cols = spike_hist_cols_by_neuron[neuron]
+        hist_cols.sort(key=lambda s: int(s.split(':b0:')[1]))
+        if i == 0:
+            groups.append(GroupSpec('spike_hist', hist_cols, 'event', lam_h))
+        else:
+            neuron_match = re.match(r'^cluster_(\d+)$', neuron)
+            cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
+            groups.append(GroupSpec(f'cpl_{cpl_suffix}', hist_cols, 'event', lam_p))
+
+    lambda_config = {'lam_f': lam_f, 'lam_g': lam_g, 'lam_h': lam_h, 'lam_p': lam_p}
+    return groups, lambda_config
+
 
 def build_structured_meta_groups(
     colnames: Dict[str, List[str]],

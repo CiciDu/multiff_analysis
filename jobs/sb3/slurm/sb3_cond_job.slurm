@@ -3,9 +3,9 @@
 #SBATCH --partition=gpu,xaqq
 #SBATCH -c 1
 #SBATCH --gres=gpu:1
-#SBATCH --mem=5G
+#SBATCH --mem=2G
 #SBATCH -t 24:00:00
-#SBATCH --array=0-7
+#SBATCH --array=0-23
 #SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/cond/sb3_cond-%A_%a.out
 #SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/cond/sb3_cond-%A_%a.err
 
@@ -20,10 +20,16 @@ conda activate multiff_clean
 # ---------------------------------------
 : "${SWEEP_PARAM:?Must set SWEEP_PARAM=perc_r|perc_th|mem_r|mem_th}"
 
-# 8 discrete levels
-LEVELS=(0.0 0.0005 0.001 0.002 0.005 0.01 0.02 0.04)
+# 8 discrete levels, 3 seeds per level
+LEVELS=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 3.0 4.0 5.0)
+SEEDS=(0 1 2 3 4)
+NUM_LEVELS=${#LEVELS[@]}
+NUM_SEEDS=${#SEEDS[@]}
 
-SWEEP_VALUE=${LEVELS[$SLURM_ARRAY_TASK_ID]}
+LEVEL_IDX=$((SLURM_ARRAY_TASK_ID / NUM_SEEDS))
+SEED_IDX=$((SLURM_ARRAY_TASK_ID % NUM_SEEDS))
+SWEEP_VALUE=${LEVELS[$LEVEL_IDX]}
+SEED=${SEEDS[$SEED_IDX]}
 
 # ---------------------------------------
 # Fix all other params to zero
@@ -53,7 +59,7 @@ case "$SWEEP_PARAM" in
         ;;
 esac
 
-echo "[info] Sweeping $SWEEP_PARAM = $SWEEP_VALUE"
+echo "[info] Sweeping $SWEEP_PARAM = $SWEEP_VALUE (seed=$SEED)"
 echo "[info] perc_r=$PERC_R perc_th=$PERC_TH mem_r=$MEM_R mem_th=$MEM_TH"
 
 # ---------------------------------------
@@ -75,7 +81,7 @@ SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
 
 BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents/sb3_conditional"
 SUB_RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
-RUN_NAME="${SWEEP_PARAM}_${SWEEP_VALUE//./p}"
+RUN_NAME="${SWEEP_PARAM}_${SWEEP_VALUE//./p}_seed${SEED}"
 OVERALL_FOLDER="${BASE_DIR}/${SUB_RUN_NAME}/${RUN_NAME}"
 
 mkdir -p "$OVERALL_FOLDER"
@@ -86,6 +92,7 @@ mkdir -p "$OVERALL_FOLDER"
 
 srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --overall-folder "$OVERALL_FOLDER" \
+  --seed "$SEED" \
   --obs-perc-r "$PERC_R" \
   --obs-perc-th "$PERC_TH" \
   --obs-mem-r "$MEM_R" \

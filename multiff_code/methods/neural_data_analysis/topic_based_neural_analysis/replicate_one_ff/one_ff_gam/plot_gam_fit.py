@@ -20,6 +20,7 @@ def plot_category_variance_contributions(
     *,
     sort_by='delta_pseudo_r2',
     figsize=(8, 4),
+    print_vars=True,
 ):
     """
     Plot category contribution results from run_category_variance_contributions().
@@ -32,6 +33,8 @@ def plot_category_variance_contributions(
         'delta_pseudo_r2' or 'delta_classical_r2'.
     figsize : tuple
         Figure size for each panel.
+    print_vars : bool
+        If True, print the variable/column names in each category group.
 
     Returns
     -------
@@ -45,6 +48,17 @@ def plot_category_variance_contributions(
 
     df = category_contributions_to_df(result['category_contributions'])
     df = df.sort_values(sort_by, ascending=False).reset_index(drop=True)
+
+    if print_vars and 'vars' in df.columns:
+        print("Variables per category:")
+        for _, row in df.iterrows():
+            cat = row['category']
+            vars_ = row['vars']
+            if isinstance(vars_, (list, tuple)):
+                vars_str = ', '.join(str(v) for v in vars_)
+            else:
+                vars_str = str(vars_)
+            print(f"  {cat}: [{vars_str}]")
 
     full_cv = result['full_cv_result']
     full_classical = full_cv['mean_classical_r2']
@@ -114,78 +128,188 @@ def _ecdf(vals, eps=1e-6, clip_for_log=True):
     y = np.arange(1, len(x) + 1) / len(x)
     return x, y
 
-def plot_category_ecdf(all_results, *, log_x=True):
-    """
-    all_results: list of dicts from
-      runner.run_category_variance_contributions(unit_idx=..., retrieve_only=True/False)
-    log_x: if True use log-scaled x-axis; if False use linear x-axis.
-    """
-    # collect per-neuron metrics
-    total = []
-    sensory = []
-    latent = []
-    motor = []
-    other = []
 
-    # map your category names -> legend buckets
-    cat_map = {
-        "sensory_vars": sensory,
-        "latent_vars": latent,
-        "event_vars": motor,  # rename if you want "Motor" in legend
-        "position_vars": other,  # adjust mapping as needed
-        # you can also merge eye_position/spike_hist into "other"
-        "eye_position_vars": other,
-        "spike_hist_vars": other,
-    }
+def add_clipped_leave_delta_metric(
+    all_results,
+    *,
+    full_key='mean_pseudo_r2',
+    leave_key='leave_out_mean_pseudo_r2',
+    new_key='delta_pseudo_r2_clip_leave',
+):
+    """
+    Add clipped delta metric to all_results:
+
+        delta = full - max(0, leave_out)
+
+    Adds new_key inside each category_contributions entry.
+
+    Returns
+    -------
+    all_results (modified in-place)
+    """
 
     for res in all_results:
-        total.append(res["full_cv_result"]["mean_pseudo_r2"])
-        cc = res["category_contributions"]
-        for k, bucket in cat_map.items():
-            if k in cc:
-                bucket.append(cc[k]["delta_pseudo_r2"])
 
-    # colors close to your example
-    curves = [
-        ("Sensory", sensory, "#8CBF26"),
-        ("Latent",  latent,  "#E6550D"),
-        ("Motor",   motor,   "#00A6D6"),
-        ("Other",   other,   "#A9A9A9"),
-        ("Total",   total,   "#111111"),
-    ]
+        if 'full_cv_result' not in res:
+            continue
 
-    fig, ax = plt.subplots(figsize=(4.1, 3.0), dpi=180)
+        full_val = res['full_cv_result'].get(full_key, None)
+        if full_val is None:
+            continue
+
+        cc = res.get('category_contributions', {})
+
+        for cat_name, cat_dict in cc.items():
+
+            leave_val = cat_dict.get(leave_key, None)
+            if leave_val is None:
+                continue
+
+            clipped_leave = max(0.0, float(leave_val))
+            delta_clip = float(full_val) - clipped_leave
+
+            cat_dict[new_key] = delta_clip
+
+    return all_results
+
+
+def plot_category_ecdf(
+    all_results,
+    *,
+    metric_key='delta_pseudo_r2',
+    include_total=True,
+    category_groups=None,
+    log_x=True,
+):
+    """
+    General ECDF plot for category contributions.
+
+    Parameters
+    ----------
+    all_results : list of dict
+        Output from runner.run_category_variance_contributions(...)
+
+    metric_key : str
+        Which metric inside category_contributions to plot
+        (e.g. 'delta_pseudo_r2', 'delta_classical_r2').
+
+    include_total : bool
+        If True, include full model mean_pseudo_r2 as 'Total'.
+
+    category_groups : dict or None
+        Optional mapping:
+            { 'Legend Name': ['cat1', 'cat2', ...], ... }
+
+        If None, each category is plotted separately.
+
+    log_x : bool
+        Use log-scaled x-axis.
+    """
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # --------------------------------------------------
+    # 1) Collect all categories present across neurons
+    # --------------------------------------------------
+
+    all_categories = set()
+    for res in all_results:
+        if 'category_contributions' in res:
+            all_categories.update(res['category_contributions'].keys())
+
+    all_categories = sorted(all_categories)
+
+    # --------------------------------------------------
+    # 2) Initialize storage
+    # --------------------------------------------------
+
+    # If grouping requested
+    if category_groups is not None:
+        data_dict = {group_name: [] for group_name in category_groups}
+    else:
+        data_dict = {cat: [] for cat in all_categories}
+
+    total_vals = []
+
+    # --------------------------------------------------
+    # 3) Collect values
+    # --------------------------------------------------
+
+    for res in all_results:
+
+        if 'full_cv_result' not in res:
+            continue
+
+        # Full model
+        if include_total:
+            total_vals.append(res['full_cv_result']['mean_pseudo_r2'])
+
+        cc = res.get('category_contributions', {})
+
+        if category_groups is None:
+            # plot each category separately
+            for cat in all_categories:
+                if cat in cc and metric_key in cc[cat]:
+                    data_dict[cat].append(cc[cat][metric_key])
+        else:
+            # grouped categories
+            for group_name, cat_list in category_groups.items():
+                vals = [
+                    cc[cat][metric_key]
+                    for cat in cat_list
+                    if cat in cc and metric_key in cc[cat]
+                ]
+                if len(vals) > 0:
+                    data_dict[group_name].append(np.sum(vals))
+
+    # --------------------------------------------------
+    # 4) Plot
+    # --------------------------------------------------
+
+    fig, ax = plt.subplots(figsize=(4.2, 3.0), dpi=180)
 
     if log_x:
-        # shaded log bands (optional, like your figure)
-        ax.axvspan(1e-3, 1e-2, color="0.9", zorder=0)
-        ax.axvspan(1e-2, 1e-1, color="0.95", zorder=0)
+        ax.axvspan(1e-3, 1e-2, color='0.9', zorder=0)
+        ax.axvspan(1e-2, 1e-1, color='0.95', zorder=0)
 
-    for label, vals, color in curves:
+    # Automatic color cycle
+    for label, vals in data_dict.items():
+
         if len(vals) == 0:
             continue
-        x, y = _ecdf(vals, clip_for_log=log_x)
-        ax.plot(x, y, lw=1.6, color=color, label=label)
 
+        x, y = _ecdf(vals, clip_for_log=log_x)
+        ax.plot(x, y, lw=1.6, label=label)
+
+    # Plot total last (black)
+    if include_total and len(total_vals) > 0:
+        x, y = _ecdf(total_vals, clip_for_log=log_x)
+        ax.plot(x, y, lw=2.0, color='black', label='Total')
+
+    # Axis formatting
     if log_x:
-        ax.set_xscale("log")
+        ax.set_xscale('log')
         ax.set_xlim(1e-3, 1.0)
     else:
         all_vals = np.concatenate(
-            [np.asarray(v, dtype=float) for _, v, _ in curves if len(v) > 0]
+            [np.asarray(v, dtype=float) for v in data_dict.values() if len(v) > 0]
         )
+        if include_total and len(total_vals) > 0:
+            all_vals = np.concatenate([all_vals, np.asarray(total_vals)])
+
         finite_vals = all_vals[np.isfinite(all_vals)]
         if finite_vals.size > 0:
             x_max = float(np.max(finite_vals))
             pad = 0.05 * max(1e-9, x_max)
             ax.set_xlim(0.0, x_max + pad)
+
     ax.set_ylim(0, 1.0)
-    ax.set_xlabel("Variance explained")
-    ax.set_ylabel("Cumulative prob.")
-    ax.legend(frameon=False, loc="lower right")
+    ax.set_xlabel('Variance explained')
+    ax.set_ylabel('Cumulative prob.')
+    ax.legend(frameon=False)
     plt.tight_layout()
     plt.show()
-    
     
 def _cols_in_beta(cols, beta):
     """

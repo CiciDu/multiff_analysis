@@ -786,11 +786,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         self.family_of_agents_log = rl_base_utils.retrieve_or_make_family_of_agents_log(
             self.overall_folder)
-        # to_load_latest_agent, to_train_agent = self.check_with_family_of_agents_log()
-        # if (not to_load_latest_agent) & (not to_train_agent):
-        #     print("The set of parameters has failed to produce a well-trained agent in the past. \
-        #            Skip to the next set of parameters")
-        #     return
 
         self.use_curriculum_training = use_curriculum_training
 
@@ -821,18 +816,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             if make_animation:
                 self.streamline_loading_and_making_animation(currentTrial_for_animation=currentTrial_for_animation, duration=duration,
                                                              num_trials_for_animation=num_trials_for_animation, n_steps=n_steps)
-
-        # to_update_record, to_make_plots = self.whether_to_update_record_and_make_plots()
-        # if to_make_plots or to_update_record:
-        #     try:
-        #         self._evaluate_model_and_retrain_if_necessary()
-        #     except ValueError as e:
-        #         return
-
-        #     if to_make_plots:
-        #         self._make_plots_for_the_model(currentTrial_for_animation, num_trials_for_animation)
-        # else:
-        #     print("Plots and record already exist. No need to make new ones.")
 
         return
 
@@ -883,6 +866,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         if not use_curriculum_training:
             print('Starting regular training')
             self.regular_training(timesteps=timesteps)
+            self.successful_training = True
         else:
             self.curriculum_training(best_model_in_curriculum_exists_ok=best_model_in_curriculum_exists_ok,
                                      best_model_postcurriculum_exists_ok=best_model_postcurriculum_exists_ok,
@@ -901,9 +885,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 0)
         except Exception:
             pass
-        # Default to True if subclasses didn't explicitly set flag but training completed
-        if not hasattr(self, 'successful_training'):
-            self.successful_training = True
+
         self.family_of_agents_log.loc[self.current_info_condition,
                                       'finished_training'] = True
         self.family_of_agents_log.loc[self.current_info_condition,
@@ -1105,29 +1087,6 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         """
         raise NotImplementedError
 
-    def _evaluate_model_and_retrain_if_necessary(self, use_curriculum_training=False):
-
-        self.collect_data(n_steps=n_steps)
-
-        if len(self.ff_caught_T_new) < 1:
-            print("No firefly was caught by the agent during testing. Re-train agent.")
-            self.train_agent(use_curriculum_training=use_curriculum_training)
-            if not self.successful_training:
-                print("The set of parameters has failed to produce a well-trained agent in the past. \
-                        Skip to the next set of parameters")
-                raise ValueError(
-                    "The set of parameters has failed to produce a well-trained agent in the past. Skip to the next set of parameters")
-            if len(self.ff_caught_T_new) < 1:
-                print("No firefly was caught by the agent during testing again. Abort: ")
-                raise ValueError(
-                    "Still no firefly was caught by the agent during testing after retraining. Abort: ")
-
-        super().make_or_retrieve_ff_dataframe(
-            exists_ok=False, data_folder_name=None, save_into_h5=False)
-        super().find_patterns()
-        self.calculate_pattern_frequencies_and_feature_statistics()
-
-        return
 
     def _make_plots_for_the_model(self, currentTrial_for_animation, num_trials_for_animation, duration=None):
         if currentTrial_for_animation >= len(self.ff_caught_T_new):

@@ -68,8 +68,8 @@ def plot_pairwise_interactions(
 
         plt.tight_layout()
         plt.show()
-        
-
+       
+       
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -80,23 +80,12 @@ def plot_conditional(
     fixed_values=None,
     y_key='num_caught_ff',
     reference_row_index=0,
+    ax=None,
     verbose=True
 ):
     """
     Plot Y vs X while holding all other variables fixed.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-    x_key : str
-        Variable to sweep on x-axis
-    fixed_values : dict or None
-        Explicit conditioning values.
-        If None, uses reference_row_index to auto-fix others.
-    y_key : str
-        Dependent variable
-    reference_row_index : int
-        Row used for automatic conditioning if fixed_values is None
+    Shows boxplot + scatter (no jitter).
     """
 
     if x_key not in df.columns:
@@ -131,40 +120,98 @@ def plot_conditional(
     subset = df[mask]
 
     if verbose:
-        print('Conditioning on:')
+        print('\nConditioning on:')
         for k, v in fixed_values.items():
             print(f'  {k} = {v}')
-        print(f'\nRemaining rows: {len(subset)}')
+        print(f'Remaining rows: {len(subset)}')
 
     if len(subset) == 0:
         print('⚠️ No rows match this full conditioning.')
-        return
+        return None
 
     # ---------------------------------------
     # Plot
     # ---------------------------------------
 
-    x = subset[x_key].values
-    y = subset[y_key].values
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(5, 4))
 
-    # if np.nanstd(x) > 0:
-    #     x_jitter = x + np.random.randn(len(x)) * 0.02 * np.nanstd(x)
-    # else:
-    #     x_jitter = x
-    
-    x_jitter = x
+    # Sort by x for clean ordering
+    subset = subset.sort_values(x_key)
 
-    y_jitter = y + np.random.randn(len(y)) * 0.5
+    # --- Boxplot ---
+    subset.boxplot(
+        column=y_key,
+        by=x_key,
+        ax=ax,
+        grid=False,
+        showfliers=False
+    )
 
-    plt.figure(figsize=(5, 4))
-    plt.scatter(x_jitter, y_jitter, alpha=0.7)
+    # --- Scatter overlay (no jitter) ---
+    x_vals = subset[x_key].values
+    y_vals = subset[y_key].values
 
-    plt.xlabel(x_key)
-    plt.ylabel(y_key)
-    plt.title(f'{y_key} vs {x_key}\n(all other params fixed)')
+    unique_x = np.sort(subset[x_key].unique())
+    x_positions = np.array([np.where(unique_x == v)[0][0] + 1 for v in x_vals])
+
+    ax.scatter(x_positions, y_vals, alpha=0.5)
+
+    ax.set_title(f'{y_key} vs {x_key}')
+    ax.set_xlabel(x_key)
+    ax.set_ylabel(y_key)
+
+    if ax.figure:
+        ax.figure.suptitle('')
+
+    if ax is None:
+        plt.tight_layout()
+        plt.show()
+
+    return subset
+
+
+def plot_all_single_param_conditionals(
+    df,
+    sweep_keys=('obs_perc_r', 'obs_perc_th', 'obs_mem_r', 'obs_mem_th'),
+    y_key='num_caught_ff',
+    base_fixed=None,
+    verbose=False
+):
+    """
+    Create 2x2 subplot grid showing conditional distributions
+    for all sweep parameters.
+    """
+
+    if base_fixed is None:
+        base_fixed = {}
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8), sharey=True)
+    axes = axes.flatten()
+
+    subsets = {}
+
+    for i, x_key in enumerate(sweep_keys):
+
+        fixed_values = base_fixed.copy()
+
+        # Hold other sweep params at zero
+        for other_key in sweep_keys:
+            if other_key != x_key:
+                fixed_values[other_key] = 0.0
+
+        subset = plot_conditional(
+            df,
+            x_key=x_key,
+            fixed_values=fixed_values,
+            y_key=y_key,
+            ax=axes[i],
+            verbose=verbose
+        )
+
+        subsets[x_key] = subset
+
     plt.tight_layout()
     plt.show()
-    
-    return subset
-    
-    
+
+    return subsets
