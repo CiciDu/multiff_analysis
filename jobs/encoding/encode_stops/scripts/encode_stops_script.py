@@ -84,11 +84,18 @@ def main():
                 tuning_feature_mode=tuning_feature_mode,
             )
 
+            lambda_config = {
+                'lam_f': 100.0,
+                'lam_g': 10.0,
+                'lam_h': 10.0,
+                'lam_p': 10.0,
+            }
+
             all_neuron_r2 = runner.crossval_stop_variance_explained_all_neurons(
-                lam_f=100.0,
-                lam_g=10.0,
-                lam_h=10.0,
-                lam_p=10.0,
+                lam_f=lambda_config['lam_f'],
+                lam_g=lambda_config['lam_g'],
+                lam_h=lambda_config['lam_h'],
+                lam_p=lambda_config['lam_p'],
                 n_folds=args.n_splits,
                 load_if_exists=load_if_exists,
                 cv_mode='blocked_time_buffered',
@@ -99,6 +106,33 @@ def main():
             )
 
             all_session_results[raw_data_folder_path] = all_neuron_r2
+
+            # Category contribution, penalty tuning, and backward elimination per neuron
+            for unit_idx in range(runner.num_neurons):
+                print(f'  [neuron {unit_idx}] Running category contributions, penalty tuning, backward elimination')
+                try:
+                    runner.run_category_variance_contributions(
+                        unit_idx,
+                        lambda_config=lambda_config,
+                        n_folds=args.n_splits,
+                        buffer_samples=20,
+                        load_if_exists=load_if_exists,
+                    )
+                    runner.run_penalty_tuning(
+                        unit_idx,
+                        lambda_config=lambda_config,
+                        n_folds=args.n_splits,
+                        load_if_exists=load_if_exists,
+                    )
+                    runner.run_backward_elimination(
+                        unit_idx,
+                        lambda_config=lambda_config,
+                        n_folds=10,
+                        alpha=0.05,
+                        load_if_exists=load_if_exists,
+                    )
+                except Exception as e:
+                    print(f'  [WARN] neuron {unit_idx}: {e}')
 
         except Exception as e:
             print(f'[ERROR] Failed for {raw_data_folder_path}: {e}')

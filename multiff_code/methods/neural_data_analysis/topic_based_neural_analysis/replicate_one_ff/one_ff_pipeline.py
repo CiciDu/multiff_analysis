@@ -100,10 +100,20 @@ class OneFFSessionData:
     # ------------------
     # Population-level processing
     # ------------------
+    def _full_time_window_from_prs(self):
+        pretrial = float(getattr(self.prs, 'pretrial', 0.5))
+        posttrial = float(getattr(self.prs, 'posttrial', 0.5))
+        return lambda tr: population_analysis_utils.full_time_window(
+            tr,
+            pretrial=pretrial,
+            posttrial=posttrial,
+        )
+
     def compute_covariates(self, covariate_names):
         """
         Concatenate covariates across trials.
         """
+        time_window_fn = self._full_time_window_from_prs()
         covariates_concat, trial_id_vec = (
             population_analysis_utils.concatenate_covariates_with_trial_id(
                 trials=self.all_trials,
@@ -111,7 +121,7 @@ class OneFFSessionData:
                 covariate_fn=lambda tr: one_ff_data_processing.compute_all_covariates(
                     tr, self.prs.dt
                 ),
-                time_window_fn=population_analysis_utils.full_time_window,
+                time_window_fn=time_window_fn,
                 covariate_names=covariate_names
             )
         )
@@ -125,6 +135,7 @@ class OneFFSessionData:
         Bin spikes for all units and concatenate across trials.
         """
         Y = np.zeros((len(self.covariate_trial_ids), self.n_units))
+        time_window_fn = self._full_time_window_from_prs()
 
         for k in range(self.n_units):
             spk_counts, _ = population_analysis_utils.concatenate_trials_with_trial_id(
@@ -134,7 +145,7 @@ class OneFFSessionData:
                     self.units[k].trials[tid].tspk,
                     tr.continuous.ts
                 ),
-                population_analysis_utils.full_time_window
+                time_window_fn
             )
             Y[:, k] = spk_counts
 

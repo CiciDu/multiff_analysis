@@ -304,18 +304,41 @@ class OneFFGAMRunner:
         lambda_config: Optional[Dict[str, float]] = None,
         n_folds: int = 5,
         buffer_samples: int = 20,
+        load_if_exists: bool = True,
     ) -> Dict:
         """
-        Run fit + CV + leave-one-category-out CV for one unit.
+        Run fit + CV for one unit. If load_if_exists=True and both fit and CV
+        results exist on disk, returns them without calling prepare_unit.
         """
+        lam_cfg = lambda_config or DEFAULT_LAMBDA_CONFIG
+        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lam_cfg)
+        outdir = self._unit_outdir(unit_idx)
+        fit_save_path = outdir / "fit_results" / f"{lam_suffix}.pkl"
+        cv_save_path = outdir / "cv_var_explained" / f"{lam_suffix}.pkl"
+
+        if load_if_exists and fit_save_path.exists() and cv_save_path.exists():
+            loaded = one_ff_gam_fit.load_fit_results(str(fit_save_path))
+            fit_res = loaded.get("fit_result")
+            cv_res = gam_variance_explained.maybe_load_saved_crossval(
+                save_path=str(cv_save_path),
+                load_if_exists=True,
+                verbose=False,
+            )
+            if fit_res is not None and cv_res is not None:
+                self.outdir = outdir
+                self.lam_suffix = lam_suffix
+                return {
+                    "fit_result": fit_res,
+                    "cv_result": cv_res,
+                    "outdir": outdir,
+                }
+
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
-        outdir, lam_suffix = self._unit_context(
-            unit_idx=unit_idx,
-            ensure_dirs=["fit_results", "cv_var_explained"],
-        )
+        outdir.mkdir(parents=True, exist_ok=True)
+        (outdir / "fit_results").mkdir(exist_ok=True)
+        (outdir / "cv_var_explained").mkdir(exist_ok=True)
         self.outdir = outdir
         self.lam_suffix = lam_suffix
-        fit_save_path = outdir / "fit_results" / f"{lam_suffix}.pkl"
 
         fit_res = one_ff_gam_fit.fit_poisson_gam(
             design_df=self.design_df,
@@ -328,7 +351,6 @@ class OneFFGAMRunner:
             save_metadata={"structured_meta_groups": self.structured_meta_groups},
         )
 
-        cv_save_path = outdir / "cv_var_explained" / f"{lam_suffix}.pkl"
         cv_res = self._run_crossval(
             design_df=self.design_df,
             y=self.y,
@@ -668,3 +690,109 @@ class OneFFGAMRunner:
             "save_path": save_path,
             "outdir": outdir,
         }
+
+    def plot_tuning_heatmaps(
+        self,
+        *,
+        unit_indices: Optional[List[int]] = None,
+        lambda_config: Optional[Dict[str, float]] = None,
+        var_list: Optional[List[str]] = None,
+        tuned_criterion: str = "gain_range",
+        gain_range_min: float = 1.5,
+        save_dir: Optional[str] = None,
+        **plot_kwargs,
+    ) -> None:
+        """
+        Plot peak-normalized tuning heatmaps (MATLAB PlotSessions style).
+
+        Loads fit results for each unit, extracts tuning curves, and calls
+        plot_gam_fit.plot_tuning_heatmaps.
+
+        Parameters
+        ----------
+        unit_indices : list of int, optional
+            Neurons to include. If None, discovers from output_root (neuron_* with
+            fit results) and falls back to design_builder.n_units.
+        lambda_config : dict, optional
+            Lambda config for fit path. Defaults to DEFAULT_LAMBDA_CONFIG.
+        var_list : list of str, optional
+            Variables to plot. If None, uses all tuning + temporal vars.
+        tuned_criterion : str
+            Passed to plot_tuning_heatmaps ('gain_range' or 'always').
+        gain_range_min : float
+            Passed to plot_tuning_heatmaps when tuned_criterion='gain_range'.
+        save_dir : str or Path, optional
+            Directory to save figures. If None, uses output_root / 'tuning_heatmaps'.
+        **plot_kwargs
+            Additional kwargs for plot_gam_fit.plot_tuning_heatmaps.
+        """
+        lam_cfg = lambda_config or DEFAULT_LAMBDA_CONFIG
+        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lam_cfg)
+
+        if unit_indices is None:
+            # Discover from output_root
+            unit_indices = []
+            for p in self.output_root.iterdir():
+                if p.is_dir() and p.name.startswith("neuron_"):
+                    try:
+                        uid = int(p.name.split("_", 1)[1])
+                    except ValueError:
+                        continue
+                    fit_path = p / "fit_results" / f"{lam_suffix}.pkl"
+                    if fit_path.exists():
+                        unit_indices.append(uid)
+            unit_indices = sorted(unit_indices)
+            if not unit_indices:
+                # Fallback: use design to get n_units
+                self.design_builder.prepare_shared_design()
+                n_units = getattr(
+                    self.design_builder.data_obj, "n_units", 0
+                )
+                unit_indices = list(range(n_units))
+
+        units_data = []
+        for unit_idx in unit_indices:
+            outdir = self._unit_outdir(unit_idx)
+            fit_path = outdir / "fit_results" / f"{lam_suffix}.pkl"
+            if not fit_path.exists():
+                continue
+            try:
+                loaded = one_ff_gam_fit.load_fit_results(str(fit_path))
+            except Exception:
+                continue
+            fr = loaded.get("fit_result")
+            meta = loaded.get("metadata", {})
+            smg = meta.get("structured_meta_groups")
+            if fr is None or smg is None:
+                continue
+            coef = getattr(fr, "coef", None) or (fr.get("coef") if isinstance(fr, dict) else None)
+            if coef is None:
+                continue
+            design_df = loaded.get("design_df")
+            col_names = (
+                list(design_df.columns)
+                if design_df is not None
+                else list(coef.index)
+                if hasattr(coef, "index")
+                else []
+            )
+            units_data.append({
+                "unit_idx": unit_idx,
+                "beta": coef,
+                "structured_meta_groups": smg,
+                "col_names": col_names,
+            })
+
+        if not units_data:
+            print("No unit fit results found for tuning heatmaps")
+            return
+
+        save_dir = save_dir or str(self.output_root / "tuning_heatmaps")
+        plot_gam_fit.plot_tuning_heatmaps(
+            units_data,
+            var_list=var_list,
+            tuned_criterion=tuned_criterion,
+            gain_range_min=gain_range_min,
+            save_dir=save_dir,
+            **plot_kwargs,
+        )

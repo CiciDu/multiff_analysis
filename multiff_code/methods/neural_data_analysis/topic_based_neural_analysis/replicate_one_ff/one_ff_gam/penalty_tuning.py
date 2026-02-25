@@ -590,3 +590,136 @@ def tune_penalties(
     )
 
     return best_lams, results
+
+
+# ============================================================
+# PGAM Penalty Tuning Analysis (Functional Version)
+# ============================================================
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+
+# ============================================================
+# 1. Convert cv_results → DataFrame
+# ============================================================
+
+def build_penalty_dataframe(cv_results):
+    rows = []
+    for params, score in cv_results:
+        rows.append({
+            'lam_f': params['lam_f'],
+            'lam_g': params['lam_g'],
+            'lam_h': params['lam_h'],
+            'cv_score': float(score)
+        })
+
+    df = pd.DataFrame(rows)
+    return df
+
+
+# ============================================================
+# 2. Rank table + delta from best
+# ============================================================
+
+def rank_penalties(df):
+    df_sorted = df.sort_values('cv_score', ascending=False).reset_index(drop=True)
+    best_score = df_sorted.loc[0, 'cv_score']
+    df_sorted['delta_from_best'] = df_sorted['cv_score'] - best_score
+    return df_sorted
+
+
+# ============================================================
+# 3. Marginal Best Line Plot
+# ============================================================
+
+def plot_marginal_best(df, var_name):
+    grouped = df.groupby(var_name)['cv_score'].max().reset_index()
+
+    plt.figure()
+    plt.plot(grouped[var_name], grouped['cv_score'], marker='o')
+    plt.xscale('log')
+    plt.xlabel(var_name)
+    plt.ylabel('Best CV score')
+    plt.title(f'Best CV Score vs {var_name}')
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================
+# 4. Pairwise Interaction Heatmap
+# ============================================================
+
+def plot_interaction_heatmap(df, var1, var2, maximize_over):
+    pivot = (
+        df.groupby([var1, var2])['cv_score']
+        .max()
+        .unstack()
+        .sort_index()
+    )
+
+    plt.figure()
+    plt.imshow(pivot.values, aspect='auto')
+    plt.xticks(range(len(pivot.columns)), pivot.columns)
+    plt.yticks(range(len(pivot.index)), pivot.index)
+    plt.xlabel(var2)
+    plt.ylabel(var1)
+    plt.title(f'Max CV over {maximize_over} ({var1} vs {var2})')
+    plt.colorbar(label='CV score')
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================
+# 5. 3D Interaction Plot (log-transformed)
+# ============================================================
+
+def plot_3d_interaction(df):
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    x = np.log10(df['lam_f'])
+    y = np.log10(df['lam_g'])
+    z = np.log10(df['lam_h'])
+
+    sc = ax.scatter(x, y, z, c=df['cv_score'])
+
+    ax.set_xlabel('log10(lam_f)')
+    ax.set_ylabel('log10(lam_g)')
+    ax.set_zlabel('log10(lam_h)')
+    ax.set_title('3D Interaction of Penalties')
+
+    fig.colorbar(sc, label='CV score')
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================
+# 6. Master function
+# ============================================================
+
+def analyze_penalty_tuning(tune_res):
+    cv_results = tune_res['cv_results']
+
+    df = build_penalty_dataframe(cv_results)
+    df_sorted = rank_penalties(df)
+
+    print('\n================ RANKED SUMMARY TABLE ================\n')
+    print(df_sorted)
+
+    # Marginals
+    plot_marginal_best(df, 'lam_f')
+    plot_marginal_best(df, 'lam_g')
+    plot_marginal_best(df, 'lam_h')
+
+    # Pairwise interactions
+    plot_interaction_heatmap(df, 'lam_f', 'lam_g', 'lam_h')
+    plot_interaction_heatmap(df, 'lam_f', 'lam_h', 'lam_g')
+    plot_interaction_heatmap(df, 'lam_g', 'lam_h', 'lam_f')
+
+    # 3D
+    plot_3d_interaction(df)
+
+    return df, df_sorted

@@ -416,6 +416,10 @@ def generate_lambda_suffix(
 def _extract_lambda_config(groups):
     """
     Extract the 4 main lambda parameters from groups for validation.
+
+    Mapping: t_* and event vartype -> lam_g; spike_hist -> lam_h; cpl_* -> lam_p;
+    else (1D tuning, etc.) -> lam_f. Event groups without t_* prefix (e.g.
+    basis, retries in encode_stops) are treated as lam_g via vartype.
     
     Returns:
         dict: {'lam_f': float, 'lam_g': float, 'lam_h': float, 'lam_p': float}
@@ -428,7 +432,7 @@ def _extract_lambda_config(groups):
             continue
         # Determine which lambda type this group uses
         if g.name.startswith('t_'):
-            # lam_g: temporal event kernels
+            # lam_g: temporal event kernels (one_ff style)
             key = 'lam_g'
         elif g.name == 'spike_hist':
             # lam_h: spike history
@@ -436,8 +440,11 @@ def _extract_lambda_config(groups):
         elif g.name.startswith('cpl_'):
             # lam_p: coupling
             key = 'lam_p'
+        elif g.vartype == 'event':
+            # lam_g: event/temporal groups without t_ prefix (e.g. basis, retries)
+            key = 'lam_g'
         else:
-            # lam_f: tuning curves (firefly features)
+            # lam_f: tuning curves (firefly features, 1D smooth)
             key = 'lam_f'
         
         # Store or verify consistency

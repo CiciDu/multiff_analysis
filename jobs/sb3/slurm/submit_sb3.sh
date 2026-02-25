@@ -6,7 +6,7 @@ mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/ru
 mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_curriculum
 mkdir -p /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_summary
 
-# Maximum number of concurrent jobs with this name
+ARRAY_MAX=40
 MAX_CONCURRENT=3
 JOB_NAME="sb3_job"
 
@@ -22,6 +22,6 @@ done
 
 # Submit the job; pass through any extra sbatch args
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sbatch "$SCRIPT_DIR/../slurm/sb3_job.slurm" "$@"
+sbatch --array=1-"$ARRAY_MAX"%$MAX_CONCURRENT "$SCRIPT_DIR/sb3_job.slurm" "$@"
 
 

@@ -32,7 +32,8 @@ from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_st
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+    encode_stops_gam_helper,
     encode_stops_utils,
 )
 
@@ -66,12 +67,20 @@ class StopEncodingRunner:
         self.binrange_dict = self.stop_prs.binrange if self.stop_prs is not None else None
 
         self.structured_meta_groups = {}
+        self._gam_analysis_helper = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
 
         self.num_neurons = neural_data_processing.find_num_neurons(
             self.raw_data_folder_path)
+
+    def _get_gam_analysis_helper(self):
+        if self._gam_analysis_helper is None:
+            self._gam_analysis_helper = (
+                encode_stops_gam_helper.StopEncodingGAMAnalysisHelper(self)
+            )
+        return self._gam_analysis_helper
 
     # ------------------------------------------------------------------
     # Data collection
@@ -1095,3 +1104,75 @@ class StopEncodingRunner:
                 f'  Coef mean ± std: {np.mean(mean_coef):.4f} ± {np.mean(std_coef):.4f}')
 
         return result
+
+    def run_category_variance_contributions(
+        self,
+        unit_idx: int,
+        *,
+        lambda_config: Optional[Dict[str, float]] = None,
+        n_folds: int = 5,
+        buffer_samples: int = 20,
+        category_names: Optional[List[str]] = None,
+        retrieve_only: bool = False,
+        load_if_exists: bool = True,
+    ) -> Dict:
+        """
+        Run leave-one-category-out CV analysis, mirroring one_ff_gam pipeline.
+        """
+        return self._get_gam_analysis_helper().run_category_variance_contributions(
+            unit_idx=unit_idx,
+            lambda_config=lambda_config,
+            n_folds=n_folds,
+            buffer_samples=buffer_samples,
+            category_names=category_names,
+            retrieve_only=retrieve_only,
+            load_if_exists=load_if_exists,
+        )
+
+    def run_penalty_tuning(
+        self,
+        unit_idx: int,
+        *,
+        lambda_config: Optional[Dict[str, float]] = None,
+        n_folds: int = 5,
+        lam_grid: Optional[Dict[str, List[float]]] = None,
+        group_name_map: Optional[Dict[str, List[str]]] = None,
+        retrieve_only: bool = False,
+        load_if_exists: bool = True,
+    ) -> Dict:
+        """
+        Run grid search over group penalties, mirroring one_ff_gam pipeline.
+        """
+        return self._get_gam_analysis_helper().run_penalty_tuning(
+            unit_idx=unit_idx,
+            lambda_config=lambda_config,
+            n_folds=n_folds,
+            lam_grid=lam_grid,
+            group_name_map=group_name_map,
+            retrieve_only=retrieve_only,
+            load_if_exists=load_if_exists,
+        )
+
+    def run_backward_elimination(
+        self,
+        unit_idx: int,
+        *,
+        lambda_config: Optional[Dict[str, float]] = None,
+        alpha: float = 0.05,
+        n_folds: int = 10,
+        load_if_exists: bool = True,
+    ) -> Dict:
+        """
+        Run backward elimination over stop GAM groups.
+
+        Results are automatically saved to:
+        - ``{save_dir}/stop_gam_results/neuron_{unit_idx}/backward_elimination/{lam_suffix}.pkl``
+        - ``{save_dir}/stop_gam_results/neuron_{unit_idx}/backward_elimination/history.csv``
+        """
+        return self._get_gam_analysis_helper().run_backward_elimination(
+            unit_idx=unit_idx,
+            lambda_config=lambda_config,
+            alpha=alpha,
+            n_folds=n_folds,
+            load_if_exists=load_if_exists,
+        )

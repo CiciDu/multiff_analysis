@@ -896,3 +896,230 @@ def plot_fold_coefficient_by_variable(cv_result, structured_meta_groups, var_lis
     fig.tight_layout()
     plt.show()
 
+
+def plot_tuning_heatmaps(
+    units_data,
+    var_list=None,
+    *,
+    tuned_criterion='gain_range',
+    gain_range_min=1.5,
+    skip_2d=True,
+    x_grid_n=80,
+    figsize=(7, 5),
+    save_dir=None,
+    varlab_map=None,
+):
+    """
+    Plot peak-normalized tuning heatmaps per variable (MATLAB PlotSessions style).
+
+    For each variable: top panel = mean ± SE of raw tuning curves; bottom panel =
+    heatmap of peak-normalized curves, neurons sorted by peak feature.
+
+    Parameters
+    ----------
+    units_data : list of dict
+        Per-neuron data with keys:
+        - unit_idx : int
+        - beta : pd.Series or np.ndarray (coefficients)
+        - structured_meta_groups : dict
+        - col_names : list (design column names, for beta alignment)
+    var_list : list of str, optional
+        Variables to plot. If None, uses all tuning + event vars from metadata.
+    tuned_criterion : str
+        'gain_range' = tuned if max(gain)/min(gain) >= gain_range_min
+        'always' = include all neurons with non-empty curve
+    gain_range_min : float
+        Minimum gain range for tuned_criterion='gain_range'.
+    skip_2d : bool
+        Skip 2D covariates (no heatmap for them).
+    x_grid_n : int
+        Number of points for common x-grid interpolation.
+    figsize : tuple
+        Figure size per variable.
+    save_dir : str or Path, optional
+        If set, save figures to this directory.
+    varlab_map : dict, optional
+        Map variable names to display labels.
+    """
+    from scipy.interpolate import interp1d
+
+    if not units_data:
+        print("No units data provided")
+        return
+
+    meta0 = units_data[0].get("structured_meta_groups", {})
+    if var_list is None:
+        var_list = []
+        if "tuning" in meta0:
+            tm = meta0["tuning"]
+            var_list.extend(tm.get("linear_vars", []))
+            var_list.extend(tm.get("angular_vars", []))
+        if "temporal" in meta0:
+            var_list.extend(meta0["temporal"].get("groups", {}).keys())
+
+    for var in var_list:
+        vartype = "1D"
+        if "temporal" in meta0 and var in meta0["temporal"].get("groups", {}):
+            vartype = "event"
+        elif "tuning" in meta0:
+            if var in meta0["tuning"].get("angular_vars", []):
+                vartype = "1D"
+            elif var in meta0["tuning"].get("linear_vars", []):
+                vartype = "1D"
+        if skip_2d and vartype == "2D":
+            continue
+
+        stim_list = []
+        rate_list = []
+        unit_idx_list = []
+
+        for ud in units_data:
+            unit_idx = ud.get("unit_idx", len(stim_list))
+            beta = ud.get("beta")
+            if beta is None:
+                continue
+            if hasattr(beta, "index"):
+                beta = beta.reindex(ud.get("col_names", []))
+                beta = beta.dropna()
+            else:
+                col_names = ud.get("col_names", [])
+                if col_names and len(beta) != len(col_names):
+                    continue
+
+            smg = ud.get("structured_meta_groups", {})
+            stim = None
+            rate = None
+
+            if "tuning" in smg and var in smg["tuning"].get("groups", {}):
+                cols = _cols_in_beta(smg["tuning"]["groups"][var], beta)
+                if not cols:
+                    continue
+                w = beta[cols].to_numpy() if hasattr(beta, "__getitem__") else np.asarray(beta)
+                rate = np.exp(w)
+                if "bin_edges" in smg["tuning"] and var in smg["tuning"]["bin_edges"]:
+                    edges = np.asarray(smg["tuning"]["bin_edges"][var])
+                    centers = (edges[:-1] + edges[1:]) / 2
+                    bin_idx = _parse_bin_indices(cols, var)
+                    if bin_idx is not None and len(bin_idx) == len(rate):
+                        stim = centers[bin_idx]
+                    else:
+                        stim = centers[: len(rate)]
+                else:
+                    stim = np.arange(len(rate))
+
+            elif "temporal" in smg and var in smg["temporal"].get("groups", {}):
+                cols = _cols_in_beta(smg["temporal"]["groups"][var], beta)
+                if not cols:
+                    continue
+                w = beta[cols].to_numpy() if hasattr(beta, "__getitem__") else np.asarray(beta)
+                if "basis_info" in smg["temporal"] and var in smg["temporal"]["basis_info"]:
+                    info = smg["temporal"]["basis_info"][var]
+                    basis = info["basis"]
+                    lags = info["lags"]
+                    bi = _parse_basis_indices(cols, var)
+                    if bi is not None and len(bi) == len(w):
+                        valid = (bi >= 0) & (bi < basis.shape[1])
+                        kernel = basis[:, bi[valid]] @ w[valid]
+                    elif basis.shape[1] == len(w):
+                        kernel = basis @ w
+                    else:
+                        kernel = w
+                    stim = lags
+                    rate = np.exp(kernel)
+                else:
+                    stim = np.arange(len(w))
+                    rate = np.exp(w)
+
+            if stim is None or rate is None or len(stim) < 2 or len(rate) < 2:
+                continue
+
+            stim = np.asarray(stim).ravel()
+            rate = np.asarray(rate).ravel()
+            if len(stim) != len(rate):
+                continue
+
+            if tuned_criterion == "gain_range":
+                g_min, g_max = np.nanmin(rate), np.nanmax(rate)
+                if g_min <= 0 or g_max / (g_min + 1e-12) < gain_range_min:
+                    continue
+            stim_list.append(stim)
+            rate_list.append(rate)
+            unit_idx_list.append(unit_idx)
+
+        if not rate_list:
+            continue
+
+        x_all = np.unique(np.concatenate([s.ravel() for s in stim_list]))
+        x_all = np.sort(x_all[~np.isnan(x_all)])
+        if len(x_all) < 2:
+            x_min = min(np.nanmin(s) for s in stim_list)
+            x_max = max(np.nanmax(s) for s in stim_list)
+            x_grid = np.linspace(x_min, x_max, x_grid_n)
+        else:
+            x_grid = np.linspace(x_all.min(), x_all.max(), x_grid_n)
+
+        n_curves = len(rate_list)
+        curves = np.full((n_curves, len(x_grid)), np.nan)
+        curves_raw = np.full((n_curves, len(x_grid)), np.nan)
+        peak_feat = np.full(n_curves, np.nan)
+
+        for k in range(n_curves):
+            xk = stim_list[k]
+            rk = rate_list[k]
+            f = interp1d(xk, rk, kind="linear", bounds_error=False, fill_value="extrap")
+            rk_interp = f(x_grid)
+            rk_max = np.nanmax(rk_interp)
+            curves_raw[k] = rk_interp
+            if rk_max > 0:
+                curves[k] = rk_interp / rk_max
+                pk = np.nanargmax(rk_interp)
+                peak_feat[k] = x_grid[pk]
+            else:
+                curves[k] = rk_interp
+                peak_feat[k] = x_grid[0]
+            peak_feat[k] = peak_feat[k] if np.isfinite(peak_feat[k]) else x_grid[0]
+
+        sort_idx = np.argsort(peak_feat)
+        curves_sorted = curves[sort_idx]
+        curves_raw_sorted = curves_raw[sort_idx]
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+        mu = np.nanmean(curves_raw_sorted, axis=0)
+        se = np.nanstd(curves_raw_sorted, axis=0) / np.sqrt(n_curves)
+        ax1.fill_between(x_grid, mu - se, mu + se, alpha=0.3, color=[0.2, 0.5, 0.8])
+        ax1.plot(x_grid, mu, "-", color=[0.2, 0.5, 0.8], lw=2)
+        if vartype == "event":
+            ax1.axvline(0, color="k", lw=1)
+        ax1.set_ylabel("Gain (× baseline)")
+        ax1.set_xticklabels([])
+        ax1.tick_params(axis="both", labelsize=10)
+        ax1.set_xlim(x_grid.min(), x_grid.max())
+
+        im = ax2.imshow(
+            curves_sorted,
+            aspect="auto",
+            cmap="viridis",
+            vmin=0,
+            vmax=1,
+            extent=[x_grid[0], x_grid[-1], n_curves - 0.5, -0.5],
+            origin="upper",
+        )
+        if vartype == "event":
+            ax2.axvline(0, color="w", lw=1)
+        varlab_map = varlab_map or {}
+        ax2.set_xlabel(varlab_map.get(var, var))
+        ax2.set_ylabel("Neurons")
+        plt.colorbar(im, ax=ax2, label="Normalized")
+        fig.suptitle(
+            f"Tuning to {varlab_map.get(var, var)} "
+            f"(peak-norm, sorted by peak, n={n_curves})"
+        )
+        fig.tight_layout()
+
+        if save_dir:
+            from pathlib import Path
+            Path(save_dir).mkdir(parents=True, exist_ok=True)
+            fpath = Path(save_dir) / f"GAM_tuning_heatmap_{var}.png"
+            fig.savefig(fpath, dpi=300, bbox_inches="tight")
+        plt.show()
+

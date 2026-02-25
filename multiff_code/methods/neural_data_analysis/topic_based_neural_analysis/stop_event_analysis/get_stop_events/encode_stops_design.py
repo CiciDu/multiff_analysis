@@ -21,8 +21,8 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import on
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import stop_parameters
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     decode_stops_design,
-    encode_stops_utils,
 )
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils
 
 
 # One_ff_gam tuning covariates (one_ff_gam_design finalize_one_ff_gam_design)

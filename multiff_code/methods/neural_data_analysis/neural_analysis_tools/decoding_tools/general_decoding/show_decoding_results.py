@@ -384,3 +384,194 @@ def visualize_decoding_results(
             plt.show()
 
     return reg_summary, clf_summary
+
+
+# show decoding results for one session
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+
+
+# ============================================================
+# Helper 1: Select metric per mode
+# ============================================================
+
+def _get_metric_column(mode, regression_metric, classification_metric):
+    if mode == 'regression':
+        return regression_metric
+    elif mode == 'classification':
+        return classification_metric
+    else:
+        raise ValueError(f'Unknown mode: {mode}')
+
+
+# ============================================================
+# Helper 2: Select rows according to model strategy
+# ============================================================
+
+def _select_rows(
+    df,
+    model_selection='best_per_feature',
+    model_name=None,
+    regression_metric='r_cv',
+    classification_metric='auc_mean'
+):
+    df = df.copy()
+
+    # Assign unified score column
+    df['score'] = np.nan
+
+    for mode in df['mode'].unique():
+        metric_col = _get_metric_column(
+            mode,
+            regression_metric,
+            classification_metric
+        )
+        mask = df['mode'] == mode
+        df.loc[mask, 'score'] = df.loc[mask, metric_col]
+
+    df = df.dropna(subset=['score'])
+
+    # -------------------------------
+    # Strategy 1: best per feature
+    # -------------------------------
+    if model_selection == 'best_per_feature':
+        idx = df.groupby(['behav_feature', 'mode'])['score'].idxmax()
+        selected_df = df.loc[idx].reset_index(drop=True)
+
+    # -------------------------------
+    # Strategy 2: single model
+    # -------------------------------
+    elif model_selection == 'single_model':
+        if model_name is None:
+            raise ValueError('You must provide model_name for single_model mode.')
+        selected_df = df[df['model_name'] == model_name].copy()
+
+    else:
+        raise ValueError("model_selection must be 'best_per_feature' or 'single_model'")
+
+    return selected_df
+
+
+# ============================================================
+# Helper 3: Plot a single mode (with auto subplot splitting)
+# ============================================================
+def _plot_mode(
+    df_mode,
+    mode,
+    max_vars_per_plot=20,
+    chance_line=True
+):
+    if df_mode.empty:
+        return
+
+    df_mode = df_mode.sort_values('score', ascending=False)
+
+    features = df_mode['behav_feature'].values
+    scores = df_mode['score'].values
+
+    n_vars = len(features)
+    n_subplots = math.ceil(n_vars / max_vars_per_plot)
+
+    # ---- Dynamic figure sizing ----
+    max_vars_this_plot = min(max_vars_per_plot, n_vars)
+    width = max(8, max_vars_this_plot * 0.6)   # scale width to number of bars
+    height = 4.5 * n_subplots                  # scale height to subplot count
+
+    fig, axes = plt.subplots(
+        n_subplots,
+        1,
+        figsize=(width, height),
+        squeeze=False
+    )
+
+    for i in range(n_subplots):
+
+        start = i * max_vars_per_plot
+        end = min((i + 1) * max_vars_per_plot, n_vars)
+
+        ax = axes[i, 0]
+
+        sub_features = features[start:end]
+        sub_scores = scores[start:end]
+
+        x = np.arange(len(sub_features))
+
+        ax.bar(x, sub_scores)
+
+        # ---- X-axis formatting ----
+        ax.set_xticks(x)
+        ax.set_xticklabels(sub_features, rotation=35, ha='right')
+        ax.margins(x=0.02)
+
+        # ---- Reference lines ----
+        if mode == 'regression':
+            ax.axhline(0, linewidth=1)
+        elif mode == 'classification' and chance_line:
+            ax.axhline(0.5, linestyle='--', linewidth=1)
+
+        ax.set_ylabel('Cross-validated score')
+
+        # Remove extra whitespace
+        ax.set_xlim(-0.6, len(sub_features) - 0.4)
+
+        # Cleaner look
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    fig.suptitle(f'{mode.capitalize()} decoder performance', y=0.995)
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================
+# Main plotting function
+# ============================================================
+
+def plot_decoder_performance(
+    all_results_df,
+    model_selection='best_per_feature', # 'best_per_feature' or 'single_model'
+    model_name=None,
+    regression_metric='r_cv',
+    classification_metric='auc_mean',
+    max_vars_per_plot=20
+):
+    """
+    Flexible decoder performance plot.
+
+    Parameters
+    ----------
+    model_selection : str
+        'best_per_feature' or 'single_model'
+
+    model_name : str
+        Required if model_selection='single_model'
+
+    regression_metric : str
+        'r_cv' or 'r2_cv'
+
+    classification_metric : str
+        'auc_mean' or 'pr_mean'
+
+    max_vars_per_plot : int
+        Number of variables per subplot before splitting.
+    """
+
+    selected_df = _select_rows(
+        all_results_df,
+        model_selection=model_selection,
+        model_name=model_name,
+        regression_metric=regression_metric,
+        classification_metric=classification_metric
+    )
+
+    # Split by mode
+    reg_df = selected_df[selected_df['mode'] == 'regression']
+    clf_df = selected_df[selected_df['mode'] == 'classification']
+
+    # Plot separately
+    _plot_mode(reg_df, 'regression', max_vars_per_plot=max_vars_per_plot)
+    _plot_mode(clf_df, 'classification', max_vars_per_plot=max_vars_per_plot)
+
+    return selected_df
