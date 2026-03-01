@@ -30,7 +30,8 @@ class _CompareYValues:
                                                     use_stored_data_only=False,
                                                     **kwargs):
         self.all_ref_pooled_median_info = self._make_or_retrieve_all_ref_median_info(
-            per_sess=False, use_stored_data_only=use_stored_data_only, **kwargs)
+            per_sess=False, use_stored_data_only=use_stored_data_only, 
+            **kwargs)
         if process_info_for_plotting:
             self.process_all_ref_pooled_median_info_to_plot_heading_and_curv()
         return self.all_ref_pooled_median_info
@@ -100,10 +101,10 @@ class _CompareYValues:
         all_info.to_csv(df_path)
         if per_sess:
             print(
-                f'Saved all_ref_per_sess_median_info_folder_path to {self.all_ref_per_sess_median_info_folder_path}')
+                f'Saved all_ref_per_sess_median_info to {self.all_ref_per_sess_median_info_folder_path}')
         else:
             print(
-                f'Saved all_ref_pooled_median_info_path to {df_path}')
+                f'Saved all_ref_pooled_median_info to {df_path}')
 
         return all_info
 

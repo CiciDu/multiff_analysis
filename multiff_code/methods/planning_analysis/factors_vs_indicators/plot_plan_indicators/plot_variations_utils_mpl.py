@@ -219,6 +219,30 @@ def plot_markers_for_data_comparison_mpl(fig,
             label=None  # legends handled separately
         )
 
+        # Annotate each plotted marker with its sample size (small text below marker).
+        try:
+            if 'sample_size' in d.columns:
+                xs = d['x_value_numeric_with_offset'].to_numpy()
+                ys = d[y_var_column].to_numpy()
+                samples = d['sample_size'].fillna('').astype(object).to_numpy()
+                for xi, yi, samp in zip(xs, ys, samples):
+                    try:
+                        if samp == '' or samp is None or (isinstance(samp, float) and np.isnan(samp)):
+                            continue
+                        ax.annotate(
+                            str(int(samp)),
+                            xy=(xi, yi),
+                            xytext=(0, -11),
+                            textcoords='offset points',
+                            fontsize=8,
+                            ha='center',
+                        )
+                    except Exception:
+                        # don't let annotation errors break plotting
+                        continue
+        except Exception:
+            pass
+
     return fig
 
 

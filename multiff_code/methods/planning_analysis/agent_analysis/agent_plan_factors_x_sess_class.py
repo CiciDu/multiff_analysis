@@ -114,7 +114,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                              combd_heading_df_x_sessions_exists_ok=intermediate_products_exist_ok,
                                                              stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
                                                              heading_info_df_exists_ok=intermediate_products_exist_ok,
-                                                             use_stored_data_only=use_stored_data_only)
+                                                             use_stored_data_only=use_stored_data_only,
+                                                             num_datasets_to_collect=num_datasets_to_collect)
 
             self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
 
@@ -126,7 +127,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                    stops_near_ff_df_exists_ok=intermediate_products_exist_ok,
                                                    heading_info_df_exists_ok=intermediate_products_exist_ok,
                                                    save_data=save_data,
-                                                   use_stored_data_only=use_stored_data_only)
+                                                   use_stored_data_only=use_stored_data_only,
+                                                   num_datasets_to_collect=num_datasets_to_collect)
             self.agent_all_perc_df = self.pooled_perc_info.copy()
         except Exception as e:
             print(f'Error making overall all median info: {e}')
@@ -488,6 +490,7 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
         # Call the agent-specific version with filter support
         self.get_test_and_ctrl_heading_info_df_across_sessions(
+            num_datasets_to_collect=self.num_datasets_to_collect,
             ref_point_mode=ref_point_mode,
             ref_point_value=ref_point_value,
             curv_traj_window_before_stop=curv_traj_window_before_stop,
@@ -507,7 +510,9 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             self.test_heading_info_df = pd.DataFrame(
                 columns=self.ctrl_heading_info_df.columns)
 
-    def make_or_retrieve_all_ref_pooled_median_info(self, **kwargs):
+    def make_or_retrieve_all_ref_pooled_median_info(self, 
+                                                    num_datasets_to_collect=1,
+                                                    **kwargs):
         """
         Make or retrieve pooled median info across all reference points.
 
@@ -522,13 +527,19 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             All reference pooled median info, optionally filtered by test_or_control.
         """
 
+        self.num_datasets_to_collect = num_datasets_to_collect
+
         try:
             # Enable plotting processing - it's now robust to handle missing columns
             if 'process_info_for_plotting' not in kwargs:
                 kwargs['process_info_for_plotting'] = True
+                
+            kwargs['exists_ok'] = False # to make sure to use the right num_datasets_to_collect
+            kwargs['pooled_median_info_exists_ok'] = False # to make sure to use the right num_datasets_to_collect
 
             self.all_ref_pooled_median_info = super(
-            ).make_or_retrieve_all_ref_pooled_median_info(**kwargs)
+            ).make_or_retrieve_all_ref_pooled_median_info(
+                **kwargs)
             self.all_ref_pooled_median_info['monkey_name'] = 'agent'
 
             # Filter by test_or_control if specified
@@ -552,7 +563,9 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                           exists_ok=True, stops_near_ff_df_exists_ok=True,
                                           heading_info_df_exists_ok=True, ref_point_mode='distance',
                                           ref_point_value=-50, verbose=False, save_data=True,
-                                          filter_heading_info_df_across_refs=False, **kwargs):
+                                          filter_heading_info_df_across_refs=False, 
+                                          num_datasets_to_collect=1,
+                                          **kwargs):
         """
         Make or retrieve pooled percentage info with single-condition support.
 
@@ -568,6 +581,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         """
 
         save_data = False if use_stored_data_only else save_data
+
+        self.num_datasets_to_collect = num_datasets_to_collect
 
         try:
             if exists_ok & exists(self.pooled_perc_info_path):
@@ -588,7 +603,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     self.test_heading_info_df,
                     self.ctrl_heading_info_df,
                     verbose=verbose,
-                    allow_single_condition=allow_single)
+                    allow_single_condition=allow_single,
+                    )
 
                 if save_data:
                     self.pooled_perc_info.to_csv(self.pooled_perc_info_path)

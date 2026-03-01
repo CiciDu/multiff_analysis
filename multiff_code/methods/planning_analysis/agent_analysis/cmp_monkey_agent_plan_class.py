@@ -19,20 +19,20 @@ class CompareMonkeyAgentPlan(variations_base_class._VariationsBase):
         super().__init__(opt_arc_type=opt_arc_type, backend=backend)
         
         
-    def get_monkey_and_agent_all_ref_pooled_median_info(self):
+    def get_monkey_and_agent_all_ref_pooled_median_info(self, num_datasets_to_collect=3):
         self.monkey_all_ref_pooled_median_info = make_variations_utils.combine_all_ref_pooled_median_info_across_monkeys_and_opt_arc_types()
         self.agent_all_ref_pooled_median_info = self.pfas.make_or_retrieve_all_ref_pooled_median_info(
-            process_info_for_plotting=False)
+            process_info_for_plotting=False, num_datasets_to_collect=num_datasets_to_collect)
 
         self.all_ref_pooled_median_info = compare_monkey_and_agent_utils.make_both_players_df(
             self.monkey_all_ref_pooled_median_info, self.agent_all_ref_pooled_median_info)
         self.process_all_ref_pooled_median_info_to_plot_heading_and_curv()
 
 
-    def get_monkey_and_agent_pooled_perc_info(self):
+    def get_monkey_and_agent_pooled_perc_info(self, num_datasets_to_collect=3):
         self.monkey_pooled_perc_info = make_variations_utils.combine_pooled_perc_info_across_monkeys()
         self.agent_pooled_perc_info = self.pfas.make_or_retrieve_pooled_perc_info(
-        )
+            num_datasets_to_collect=num_datasets_to_collect)
 
         self.pooled_perc_info = compare_monkey_and_agent_utils.make_both_players_df(
             self.monkey_pooled_perc_info, self.agent_pooled_perc_info)
