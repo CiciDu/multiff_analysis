@@ -6,35 +6,66 @@ import statsmodels.api as sm
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.stop_psth import core_stops_psth, psth_postprocessing, psth_stats
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import get_stops_utils
-import neural_data_analysis.design_kits.design_around_event.event_binning as event_binning
+from neural_data_analysis.design_kits.design_around_event import event_binning
 
-def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
+def _detect_binary_columns_np(V: np.ndarray, *, tol_decimals: int = 12) -> np.ndarray:
+    """
+    Detect which columns of V are binary (subset of {0,1}), allowing NaNs.
+
+    Parameters
+    ----------
+    V : (L, K) float array
+    tol_decimals : int
+        Rounding tolerance when checking {0,1}.
+
+    Returns
+    -------
+    is_binary : (K,) bool array
+    """
+    if V.ndim != 2:
+        raise ValueError('V must be 2D (L, K)')
+
+    K = V.shape[1]
+    is_binary = np.zeros(K, dtype=bool)
+
+    for k in range(K):
+        x = V[:, k]
+        x = x[np.isfinite(x)]
+        if x.size == 0:
+            is_binary[k] = False
+            continue
+        x = np.round(x.astype(float), tol_decimals)
+        is_binary[k] = np.isin(x, [0.0, 1.0]).all()
+
+    return is_binary
+
+
+def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean', preserve_binary=False, binary_threshold=0.5):
     """
     Sparse time-weighted aggregation into bins.
     Always returns only the bins that actually appear (sorted), plus their IDs.
 
+    If preserve_binary=True, any column that is originally binary (values subset of {0,1}, ignoring NaNs)
+    will be forced to stay binary after binning using an ANY-1 rule:
+        binned = 1 if any overlap in the bin has value==1 (over any positive dt), else 0.
+
     Parameters
     ----------
-    values : (L,) or (L, K) float
-        Value for each overlapped piece.
-    dt_array : (L,) float
-        Duration (seconds) of each piece.
-    bin_idx_array : (L,) int
-        Non-negative bin IDs for each piece (may be non-contiguous).
+    values : (L,) or (L, K)
+    dt_array : (L,)
+    bin_idx_array : (L,)
     how : {'mean','sum'}
-        'sum'  → ∑(values * dt) per used bin
-        'mean' → time-weighted mean = ∑(values * dt) / ∑dt per used bin
+    preserve_binary : bool
+    binary_threshold : float
+        Values > binary_threshold are treated as 1 for the ANY-1 rule.
 
     Returns
     -------
-    out : (M,) or (M, K) float
-        Aggregated values per used bin (M = number of unique bin IDs).
-    exposure : (M,) float
-        Per-used-bin exposure seconds (∑dt).
-    bin_ids : (M,) int
-        Sorted unique bin IDs corresponding to rows in `out`/`exposure`.
+    weighted_values : (M,) or (M, K)
+    exposure : (M,)
+    bin_ids : (M,)
     """
-    V = np.asarray(values, float)
+    V = np.asarray(values)
     dt = np.asarray(dt_array, float)
     bi = np.asarray(bin_idx_array, int)
 
@@ -42,57 +73,48 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
         V = V[:, None]
 
     if not (len(V) == len(dt) == len(bi)):
-        raise ValueError(
-            'values, dt_array, and bin_idx_array must have the same length')
+        raise ValueError('values, dt_array, and bin_idx_array must have the same length')
     if np.any(bi < 0):
         raise ValueError('bin_idx_array must be non-negative')
 
-    # # # Drop invalid rows (NaNs) and clamp negative durations to zero
-    # # valid = np.isfinite(dt) & np.all(np.isfinite(V), axis=1)
-    # # if not np.all(valid):
-    # #     V, dt, bi = V[valid], dt[valid], bi[valid]
-    
-    # # Drop rows only if dt is invalid
-    # valid_dt = np.isfinite(dt)
-    # if not np.all(valid_dt):
-    #     V, dt, bi = V[valid_dt], dt[valid_dt], bi[valid_dt]
-
-    # 1) Row is valid if dt is finite AND at least one value is finite
+    # Row valid if dt finite AND at least one value finite
     valid = np.isfinite(dt) & np.any(np.isfinite(V), axis=1)
-
     if not np.all(valid):
         V, dt, bi = V[valid], dt[valid], bi[valid]
-
-    # 2) Clamp negative durations
-    dt = np.maximum(dt, 0.0)
-
 
     # Clamp negative durations
     dt = np.maximum(dt, 0.0)
 
-    # Mask invalid values per feature (do NOT drop rows)
-    V = np.where(np.isfinite(V), V, 0.0)
-
-
     if V.size == 0:
-        # nothing to aggregate
         return np.zeros((0,)), np.zeros((0,)), np.zeros((0,), int)
-    dt = np.maximum(dt, 0.0)
 
-    # Map arbitrary bin IDs → compact positions via np.unique (fast, vectorized)
-    # used: sorted unique bin IDs; pos: position of each piece in used (0..M-1)
+    # Detect binary columns BEFORE we zero-fill NaNs (ignore NaNs in detection)
+    binary_mask = None
+    if preserve_binary:
+        binary_mask = np.zeros(V.shape[1], dtype=bool)
+        for k in range(V.shape[1]):
+            xk = V[:, k]
+            xk = xk[np.isfinite(xk)]
+            if xk.size == 0:
+                binary_mask[k] = False
+                continue
+            # allow 0/1 floats/ints
+            uniq = np.unique(xk.astype(float))
+            binary_mask[k] = np.isin(uniq, [0.0, 1.0]).all()
+
+    # Zero-fill invalid values for weighted sum/mean
+    V_float = V.astype(float)
+    V_float = np.where(np.isfinite(V_float), V_float, 0.0)
+
     used_bins, pos = np.unique(bi, return_inverse=True)
-    M, K = used_bins.size, V.shape[1]
+    M, K = used_bins.size, V_float.shape[1]
 
-    # Exposure per used bin: ∑dt
     exposure = np.bincount(pos, weights=dt, minlength=M).astype(float)
 
-    # Weighted sums per used bin: ∑(v * dt) for each feature
     out_sum = np.zeros((M, K), float)
     for k in range(K):
-        out_sum[:, k] = np.bincount(pos, weights=V[:, k] * dt, minlength=M)
+        out_sum[:, k] = np.bincount(pos, weights=V_float[:, k] * dt, minlength=M)
 
-    # Finalize
     if how == 'sum':
         out = out_sum
     elif how == 'mean':
@@ -102,9 +124,20 @@ def bin_timeseries_weighted(values, dt_array, bin_idx_array, how='mean'):
     else:
         raise ValueError("how must be 'mean' or 'sum'")
 
-    weighted_values = out.squeeze()
+    # --- Enforce binary columns AFTER aggregation (ANY-1 over dt overlap) ---
+    if preserve_binary and binary_mask is not None and np.any(binary_mask):
+        for k in np.where(binary_mask)[0]:
+            # dt-weighted "on time": add dt where V is 1-ish
+            on_dt = np.bincount(
+                pos,
+                weights=((V_float[:, k] > binary_threshold).astype(float) * dt),
+                minlength=M
+            )
+            out[:, k] = (on_dt > 0.0).astype(float)  # stays 0/1
 
+    weighted_values = out.squeeze()
     return weighted_values, exposure, used_bins
+
 
 def build_bin_assignments(time, bins, assume_sorted=True, check_nonoverlap=False):
     t = np.asarray(time, float)

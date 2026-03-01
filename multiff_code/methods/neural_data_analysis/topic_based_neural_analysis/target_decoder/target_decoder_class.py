@@ -68,7 +68,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
         # Load cached data if available and allowed
         if exists_ok and os.path.exists(behav_data_by_point_path):
             self.behav_data_by_point = pd.read_csv(behav_data_by_point_path)
-            print(f"Loaded behav_data_by_bin from {behav_data_by_point_path}")
+            print(f"Loaded behav_data_by_point from {behav_data_by_point_path}")
         else:
             if exists_ok:
                 print(

@@ -362,7 +362,7 @@ def use_advanced_model_for_classification(
             "catboost",
             CatBoostClassifier(
                 loss_function="MultiClass" if n_classes > 2 else "Logloss",
-                verbose=0, random_state=random_state
+                verbose=0, random_state=random_state, allow_writing_files=False
             )
         ))
     if len(X_train) < 10_000:

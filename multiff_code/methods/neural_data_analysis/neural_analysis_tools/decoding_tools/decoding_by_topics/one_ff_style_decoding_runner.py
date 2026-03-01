@@ -259,7 +259,7 @@ class OneFFStyleDecodingRunner:
         if verbose:
             print(f"[canoncorr] vars: {varnames}")
         x_task = y_df[varnames].to_numpy(dtype=float)
-        y_neural = self._get_neural_matrix(use_spike_history=use_spike_history)
+        y_neural = self._get_neural_matrix()
 
         out = decode_stops_utils.compute_canoncorr_block(
             x_task=x_task,
@@ -281,6 +281,7 @@ class OneFFStyleDecodingRunner:
         candidate_widths: Sequence[int] = tuple(range(1, 21, 1)),
         fixed_width: int = 25,
         n_splits: int = 5,
+        inner_cv_splits: int = 3,
         cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
         buffer_samples: int = 20,
         save_path: Optional[str] = None,
@@ -316,7 +317,7 @@ class OneFFStyleDecodingRunner:
                 f"No valid readout variables found in {self._target_df_error_msg()}."
             )
 
-        neural = self._get_neural_matrix(use_spike_history=use_spike_history)
+        neural = self._get_neural_matrix()
         groups = self._get_groups()
         groups = np.asarray(groups)
         _, lengths = decode_stops_utils.build_group_lengths(groups)
@@ -327,17 +328,82 @@ class OneFFStyleDecodingRunner:
                 print(f"[{decodertype}] fitting {v} (CV n_splits={n_splits}, cv_mode={cv_mode})")
             x_true = y_df[v].to_numpy(dtype=float)
             x_true[np.isnan(x_true)] = 0.0
-
             if fit_kernelwidth:
-                best = decode_stops_utils.tune_linear_decoder_cv(
-                    y_neural=neural,
-                    x_true=x_true,
-                    lengths=lengths,
-                    candidate_widths=candidate_widths,
-                    n_splits=n_splits,
-                    cv_mode=cv_mode,
-                    buffer_samples=buffer_samples,
+                from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
+                    _build_folds,
                 )
+
+                N = len(neural)
+                outer_splits = _build_folds(
+                    N,
+                    n_splits=n_splits,
+                    groups=groups,
+                    cv_splitter=cv_mode,
+                    random_state=0,
+                )
+
+                pred = np.full(N, np.nan)
+                widths_per_fold = []
+                wts_per_fold = []
+                fold_tuning_info = []
+
+                for fold_idx, (train_idx, test_idx) in enumerate(outer_splits):
+                    train_idx = np.asarray(train_idx, dtype=int)
+                    test_idx = np.asarray(test_idx, dtype=int)
+
+                    _, lengths_train = decode_stops_utils.build_group_lengths(groups[train_idx])
+
+                    best = decode_stops_utils.tune_linear_decoder_cv(
+                        y_neural=neural[train_idx],
+                        x_true=x_true[train_idx],
+                        lengths=lengths_train,
+                        candidate_widths=candidate_widths,
+                        n_splits=inner_cv_splits,
+                        cv_mode=cv_mode,
+                        buffer_samples=buffer_samples,
+                    )
+
+                    best_width = int(best["width"])
+                    widths_per_fold.append(best_width)
+                    fold_tuning_info.append(best.get("width_scores", {}))
+
+                    wts = np.asarray(best.get("wts"))
+                    wts_per_fold.append(wts)
+
+                    # Smooth and fit on full training set (weights from `best` were fit on training subset)
+                    X_tr = decode_stops_utils.smooth_signal(neural[train_idx], int(best_width))
+                    X_te = decode_stops_utils.smooth_signal(neural[test_idx], int(best_width))
+
+                    # Fit linear weights on training set (fallback to best['wts'] if numerical issues)
+                    try:
+                        coef, *_ = np.linalg.lstsq(X_tr, x_true[train_idx], rcond=None)
+                    except Exception:
+                        coef = wts
+
+                    coef = np.asarray(coef).reshape(-1)
+                    pred_test = X_te.dot(coef)
+                    pred[test_idx] = pred_test
+
+                widths_used = list(candidate_widths)
+                # Representative width for reporting
+                rep_width = int(np.round(float(np.nanmedian(widths_per_fold)))) if widths_per_fold else int(fixed_width)
+                entry = {
+                    "bestfiltwidth": rep_width,
+                    "candidate_widths": widths_used,
+                    "wts": wts_per_fold,
+                    "corr": decode_stops_utils.safe_corr(x_true, pred),
+                }
+                if save_predictions:
+                    entry["true"] = x_true
+                    entry["pred"] = pred
+                    entry["trials"] = {
+                        "true": decode_stops_utils.split_by_lengths(x_true, lengths),
+                        "pred": decode_stops_utils.split_by_lengths(pred, lengths),
+                    }
+                entry["fold_tuning_info"] = fold_tuning_info
+
+                out[v] = entry
+                continue
             else:
                 best = decode_stops_utils.fit_linear_decoder_cv(
                     y_neural=neural,

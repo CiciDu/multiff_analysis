@@ -201,6 +201,7 @@ class BaseEncodingGAMAnalysisHelper:
         n_folds: int,
         buffer_samples: int,
         load_if_exists: bool,
+        cv_mode: str = "blocked_time_buffered",
     ) -> Dict:
         return gam_variance_explained.crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
@@ -218,7 +219,7 @@ class BaseEncodingGAMAnalysisHelper:
             },
             save_path=str(save_path),
             load_if_exists=load_if_exists,
-            cv_mode="blocked_time_buffered",
+            cv_mode=cv_mode,
             buffer_samples=buffer_samples,
         )
 
@@ -251,6 +252,7 @@ class BaseEncodingGAMAnalysisHelper:
         category_names: Optional[List[str]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
+        cv_mode: str = "blocked_time_buffered",
     ) -> Dict:
         if category_names is None:
             category_names = list(self.var_categories.keys())
@@ -319,6 +321,7 @@ class BaseEncodingGAMAnalysisHelper:
                 n_folds=n_folds,
                 buffer_samples=buffer_samples,
                 load_if_exists=load_if_exists,
+                cv_mode=cv_mode,
             )
 
         contributions = {}

@@ -196,6 +196,7 @@ MODEL_SPECS = {
             subsample=0.8,
             verbose=False,
             random_seed=0,
+            allow_writing_files=False
         ),
 
         'classification_model_class': CatBoostClassifier,
@@ -207,6 +208,7 @@ MODEL_SPECS = {
             subsample=0.8,
             verbose=False,
             random_seed=0,
+            allow_writing_files=False
         ),
     },
 
@@ -222,6 +224,7 @@ MODEL_SPECS = {
             subsample=0.8,
             verbose=False,
             random_seed=0,
+            allow_writing_files=False
         ),
 
         'classification_model_class': CatBoostClassifier,
@@ -233,6 +236,7 @@ MODEL_SPECS = {
             subsample=0.8,
             verbose=False,
             random_seed=0,
+            allow_writing_files=False
         ),
     },
 }

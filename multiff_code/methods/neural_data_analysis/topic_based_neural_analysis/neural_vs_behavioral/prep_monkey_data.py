@@ -15,6 +15,8 @@ matplotlib.rcParams['animation.embed_limit'] = 2**128
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
+from neural_data_analysis.design_kits.design_around_event import event_binning
+from neural_data_analysis.design_kits.design_by_segment import spike_history, rebin_segments
 
 monkey_info_columns_of_interest = ['bin',
                                    'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
@@ -80,50 +82,6 @@ def _bin_behav_data_by_point(ori_df):
         how='left'
     )
     return binned_df
-
-
-def bin_behav_data_by_point(ori_df, time_bins, add_stop_time_ratio_in_bin=True, one_point_index_per_bin=True):
-    ori_df = ori_df.copy()
-    ori_df['bin'] = np.digitize(
-        ori_df['time'].values, time_bins)-1
-
-    if one_point_index_per_bin:
-        binned_df = _bin_by_one_point_index_per_bin(
-            ori_df)
-    else:
-        binned_df = _bin_behav_data_by_point(ori_df)
-        if add_stop_time_ratio_in_bin:
-            binned_df = _add_stop_time_ratio_in_bin(ori_df, binned_df)
-
-    binned_df = _make_sure_every_bin_has_info(binned_df)
-    binned_df = _add_bin_time_info(binned_df, time_bins)
-    binned_df['point_index'] = binned_df['point_index'].astype(
-        int)
-
-    return binned_df
-
-
-def bin_monkey_information(ori_df, time_bins, add_stop_time_ratio_in_bin=True, one_point_index_per_bin=True):
-    ori_df = ori_df.copy()
-    ori_df['bin'] = np.digitize(
-        ori_df['time'].values, time_bins)-1
-
-    if one_point_index_per_bin:
-        binned_df = _bin_by_one_point_index_per_bin(
-            ori_df)
-    else:
-        binned_df = ori_df.groupby(
-            'bin', as_index=False).mean()
-        if add_stop_time_ratio_in_bin:
-            binned_df = _add_stop_time_ratio_in_bin(ori_df, binned_df)
-
-    binned_df = _make_sure_every_bin_has_info(binned_df)
-    binned_df = _add_bin_time_info(binned_df, time_bins)
-    binned_df['point_index'] = binned_df['point_index'].astype(
-        int)
-
-    return binned_df
-
 
 def _bin_by_one_point_index_per_bin(monkey_information):
     median_indices = (
@@ -460,3 +418,156 @@ def _mark_bin_where_ff_is_caught(binned_features, ff_caught_T_new, time_bins):
     binned_features.loc[binned_features['bin'].isin(
         catching_target_bins), 'catching_ff'] = 1
     return binned_features
+
+def _bin_any_dataframe_with_global_bins(
+    df,
+    time_bins,
+    *,
+    time_col='time',
+    segment_col='segment',
+    one_point_index_per_bin=True,
+    how_when_not_pick_point='mean',
+    add_stop_time_ratio_in_bin=False,
+    stop_time_ratio_source_df=None,
+):
+    """
+    Shared wrapper to bin any dataframe using the global-bins rebin utilities.
+
+    Rules (via reused rebin funcs):
+      - one_point_index_per_bin=True  -> pick-point (max-overlap dt) per bin
+      - one_point_index_per_bin=False -> overlap-weighted aggregation (mean/sum)
+      - binary columns preserved as binary (ANY-1) if your rebin funcs implement it
+      - '*index*' and '*id*' columns preserved as int labels if your rebin funcs implement it
+
+    Also enforces: any output column containing 'index' or 'id' is cast to int.
+
+    Parameters
+    ----------
+    add_stop_time_ratio_in_bin : bool
+        If True, merges stop_time_ratio_in_bin computed from stop_time_ratio_source_df.
+    stop_time_ratio_source_df : pd.DataFrame or None
+        Raw frame used to compute stop_time_ratio_in_bin (must include time_col and monkey_speeddummy).
+        If None and add_stop_time_ratio_in_bin=True, uses df.
+
+    Returns
+    -------
+    binned_df : pd.DataFrame
+        Has 'bin', 'bin_start_time', 'bin_end_time', and binned features.
+    """
+    if how_when_not_pick_point not in ('mean', 'sum'):
+        raise ValueError("how_when_not_pick_point must be 'mean' or 'sum'")
+
+    df0 = df.copy()
+
+    time_bins = np.asarray(time_bins, float)
+    bins_2d = np.column_stack([time_bins[:-1], time_bins[1:]])
+    n_bins = bins_2d.shape[0]
+
+    new_seg_info = pd.DataFrame({
+        'new_segment': [0],
+        'new_seg_start_time': [float(time_bins[0])],
+        'new_seg_end_time': [float(time_bins[-1])],
+        'new_seg_duration': [float(time_bins[-1] - time_bins[0])],
+    })
+
+    if one_point_index_per_bin:
+        rebinned = rebin_segments.rebin_all_segments_global_bins_pick_point(
+            df0,
+            new_seg_info,
+            bins_2d=bins_2d,
+            time_col=time_col,
+            segment_col=segment_col,
+            respect_old_segment=False,
+            require_full_bin=False,
+            add_bin_edges=False,
+        )
+    else:
+        rebinned = rebin_segments.rebin_all_segments_global_bins(
+            df0,
+            new_seg_info,
+            bins_2d=bins_2d,
+            time_col=time_col,
+            segment_col=segment_col,
+            how=how_when_not_pick_point,
+            respect_old_segment=False,
+            require_full_bin=False,
+            add_bin_edges=False,
+            add_support_duration=False,
+        )
+
+    # Ensure all bins exist
+    all_bins = pd.DataFrame({'bin': np.arange(n_bins, dtype=int)})
+
+    if rebinned is None or rebinned.empty:
+        binned_df = all_bins.copy()
+        binned_df = _add_bin_time_info(binned_df, time_bins)
+        return binned_df
+
+    binned_df = rebinned.rename(columns={'new_bin': 'bin'}).drop(columns=['new_segment'], errors='ignore')
+    binned_df = all_bins.merge(binned_df, on='bin', how='left')
+
+    # Optional stop_time_ratio_in_bin computed from raw df (digitize is fine for this ratio helper)
+    if (not one_point_index_per_bin) and add_stop_time_ratio_in_bin:
+        src = stop_time_ratio_source_df.copy() if stop_time_ratio_source_df is not None else df.copy()
+        src['bin'] = np.digitize(src[time_col].values, time_bins) - 1
+        binned_df = _add_stop_time_ratio_in_bin(src, binned_df)
+
+    # Bin time metadata + fill to match old behavior
+    binned_df = _add_bin_time_info(binned_df, time_bins)
+    binned_df = binned_df.ffill().infer_objects(copy=False).reset_index(drop=True)
+    binned_df = binned_df.bfill().infer_objects(copy=False).reset_index(drop=True)
+
+    # Enforce int for label cols
+    label_cols = [c for c in binned_df.columns if ('index' in c) or ('id' in c)]
+    for c in label_cols:
+        if c in binned_df.columns:
+            # If missing values are possible, switch to .astype('Int64') instead of int.
+            binned_df[c] = pd.to_numeric(binned_df[c], errors='coerce').astype(int)
+
+    return binned_df
+
+
+def bin_behav_data_by_point(
+    ori_df,
+    time_bins,
+    add_stop_time_ratio_in_bin=True,
+    one_point_index_per_bin=True,
+    *,
+    how_when_not_pick_point='mean',
+):
+    """
+    Bins behavioral data using the shared global-bins rebin wrapper.
+    """
+    return _bin_any_dataframe_with_global_bins(
+        ori_df,
+        time_bins,
+        time_col='time',
+        segment_col='segment',
+        one_point_index_per_bin=one_point_index_per_bin,
+        how_when_not_pick_point=how_when_not_pick_point,
+        add_stop_time_ratio_in_bin=add_stop_time_ratio_in_bin,
+        stop_time_ratio_source_df=ori_df,
+    )
+
+
+def bin_monkey_information(
+    ori_df,
+    time_bins,
+    add_stop_time_ratio_in_bin=True,
+    one_point_index_per_bin=True,
+    *,
+    how_when_not_pick_point='mean',
+):
+    """
+    Bins monkey_information using the shared global-bins rebin wrapper.
+    """
+    return _bin_any_dataframe_with_global_bins(
+        ori_df,
+        time_bins,
+        time_col='time',
+        segment_col='segment',
+        one_point_index_per_bin=one_point_index_per_bin,
+        how_when_not_pick_point=how_when_not_pick_point,
+        add_stop_time_ratio_in_bin=add_stop_time_ratio_in_bin,
+        stop_time_ratio_source_df=ori_df,
+    )

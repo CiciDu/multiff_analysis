@@ -103,7 +103,7 @@ def ml_model_for_classification(X_train, y_train, X_test, y_test, model_names=No
         all_models.append(("lgbm", LGBMClassifier(random_state=random_state)))
     if CatBoostClassifier is not None:
         all_models.append(("catboost", CatBoostClassifier(
-            verbose=0, random_state=random_state)))
+            verbose=0, random_state=random_state, allow_writing_files=False)))
     # Add SVM only for smaller datasets (probability=True is slower)
     if len(X_train) < 10_000:
         all_models.append(

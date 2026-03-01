@@ -10,7 +10,7 @@ from typing import Optional, Type, Union
 
 import numpy as np
 import pandas as pd
-from catboost import CatBoostRegressor
+from catboost import CatBoostRegressor, CatBoostError
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
@@ -857,28 +857,36 @@ def run_regression_cv(
 
         model = model_class(**model_kwargs)
 
-        if config.use_early_stopping:
-            uniq = np.unique(groups[tr])
-            val_groups = rng.choice(
-                uniq,
-                size=max(1, int(0.2 * len(uniq))),
-                replace=False,
-            )
-            val_mask = np.isin(groups[tr], val_groups)
-
-            # Check if train or validation subset has no variance
-            if np.unique(y_tr[~val_mask]).size <= 1 or np.unique(y_tr[val_mask]).size <= 1:
-                # Fall back to fitting without early stopping
-                model.fit(X_tr, y_tr)
-            else:
-                model.fit(
-                    X_tr[~val_mask],
-                    y_tr[~val_mask],
-                    eval_set=(X_tr[val_mask], y_tr[val_mask]),
-                    use_best_model=True,
+        try:
+            if config.use_early_stopping:
+                uniq = np.unique(groups[tr])
+                val_groups = rng.choice(
+                    uniq,
+                    size=max(1, int(0.2 * len(uniq))),
+                    replace=False,
                 )
-        else:
-            model.fit(X_tr, y_tr)
+                val_mask = np.isin(groups[tr], val_groups)
+
+                # Check if train or validation subset has no variance
+                if np.unique(y_tr[~val_mask]).size <= 1 or np.unique(y_tr[val_mask]).size <= 1:
+                    # Fall back to fitting without early stopping
+                    model.fit(X_tr, y_tr)
+                else:
+                    model.fit(
+                        X_tr[~val_mask],
+                        y_tr[~val_mask],
+                        eval_set=(X_tr[val_mask], y_tr[val_mask]),
+                        use_best_model=True,
+                    )
+            else:
+                model.fit(X_tr, y_tr)
+        except CatBoostError as e:
+            msg = str(e)
+            if 'All train targets are equal' in msg or 'All targets are equal' in msg:
+                # Gracefully handle folds with no variance in targets despite checks
+                y_pred[te] = np.mean(y_tr)
+                continue
+            raise
 
         y_pred[te] = model.predict(X_te)
 
