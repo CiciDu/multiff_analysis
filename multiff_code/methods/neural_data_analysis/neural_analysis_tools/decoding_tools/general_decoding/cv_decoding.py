@@ -832,10 +832,16 @@ def run_regression_cv(
             raise ValueError(f'Unknown shuffle_mode: {shuffle_mode}')
 
         X_tr = X[tr]
+        X_te = X[te]
 
         if np.unique(y_tr).size <= 1:
             y_pred[te] = y_tr[0]
             continue
+
+        # Scale features for regression (helps L-BFGS/Huber converge; matches classification path)
+        scaler = StandardScaler()
+        X_tr = scaler.fit_transform(X_tr)
+        X_te = scaler.transform(X_te)
 
         model = model_class(**model_kwargs)
 
@@ -848,16 +854,21 @@ def run_regression_cv(
             )
             val_mask = np.isin(groups[tr], val_groups)
 
-            model.fit(
-                X_tr[~val_mask],
-                y_tr[~val_mask],
-                eval_set=(X_tr[val_mask], y_tr[val_mask]),
-                use_best_model=True,
-            )
+            # Check if train or validation subset has no variance
+            if np.unique(y_tr[~val_mask]).size <= 1 or np.unique(y_tr[val_mask]).size <= 1:
+                # Fall back to fitting without early stopping
+                model.fit(X_tr, y_tr)
+            else:
+                model.fit(
+                    X_tr[~val_mask],
+                    y_tr[~val_mask],
+                    eval_set=(X_tr[val_mask], y_tr[val_mask]),
+                    use_best_model=True,
+                )
         else:
             model.fit(X_tr, y_tr)
 
-        y_pred[te] = model.predict(X[te])
+        y_pred[te] = model.predict(X_te)
 
     return dict(
         r2_cv=r2_score(y, y_pred),

@@ -59,6 +59,7 @@ class AgentPatterns(variations_base_class._VariationsBase, patterns_and_features
                                     **env_kwargs
                                     ):
       
+        save_data = False if use_stored_data_only else save_data
 
         self.combd_pattern_frequencies = pd.DataFrame()
         self.combd_feature_statistics = pd.DataFrame()

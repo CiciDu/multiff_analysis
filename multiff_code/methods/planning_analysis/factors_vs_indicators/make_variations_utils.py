@@ -975,6 +975,8 @@ def make_variations_df_across_ref_point_values(variation_func,
                                                use_stored_data_only=False,
                                                ):
 
+    path_to_save = None if use_stored_data_only else path_to_save                                           
+
     all_variations_df = pd.DataFrame()
     variations_list = specific_utils.init_variations_list_func(ref_point_params_based_on_mode,
                                                                monkey_name=monkey_name)

@@ -41,6 +41,7 @@ def main():
         n_splits=args.n_splits,
         save_dir=args.save_dir,
         shuffle_mode='none',
+        fit_kernelwidth=True,
     )
     
 
@@ -48,6 +49,7 @@ def main():
         n_splits=args.n_splits,
         save_dir=args.save_dir,
         shuffle_mode='timeshift_fold',
+        fit_kernelwidth=True,
     )
 
     

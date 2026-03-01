@@ -211,6 +211,73 @@ def plot_median_heading(
     else:
         _set_heading_labels_mpl(fig, x_var_column_list, is_difference)
 
+    # If `sample_size` is available, annotate each plotted point with its sample size.
+    try:
+        if 'sample_size' in df.columns:
+            # choose x column (first one provided)
+            x_col = x_var_column_list[0] if x_var_column_list else None
+            if x_col not in df.columns:
+                # fallback to first df column if chosen x not present
+                x_col = df.columns[0]
+
+            if backend == 'plotly':
+                for _, row in df.iterrows():
+                    try:
+                        sample = int(row['sample_size'])
+                    except Exception:
+                        continue
+                    x = row.get(x_col)
+                    y = row.get('diff_in_abs_angle_to_nxt_ff_median')
+                    # add lightweight annotation (no arrow)
+                    fig.add_annotation(
+                        x=x,
+                        y=y,
+                        text=str(sample),
+                        showarrow=False,
+                        yshift=-12,
+                        font=dict(size=9),
+                        opacity=0.8,
+                    )
+            else:
+                axes = fig.axes
+                # simple numeric check for x-axis values
+                x_is_numeric = True
+                try:
+                    sample_val = df[x_col].dropna().iloc[0]
+                    float(sample_val)
+                except Exception:
+                    x_is_numeric = False
+
+                for ax in axes:
+                    xlim = ax.get_xlim()
+                    ylim = ax.get_ylim()
+                    for _, row in df.iterrows():
+                        try:
+                            sample = int(row['sample_size'])
+                        except Exception:
+                            continue
+                        x = row.get(x_col)
+                        y = row.get('diff_in_abs_angle_to_nxt_ff_median')
+                        if x_is_numeric:
+                            try:
+                                xx = float(x)
+                            except Exception:
+                                continue
+                            if not (xlim[0] <= xx <= xlim[1] and ylim[0] <= y <= ylim[1]):
+                                continue
+                        # place a small text label just below the marker
+                        ax.annotate(
+                            str(sample),
+                            xy=(x, y),
+                            xytext=(0, -8),
+                            textcoords='offset points',
+                            fontsize=8,
+                            ha='center',
+                        )
+    except Exception:
+        # annotation should not break plotting; silently continue on errors
+        pass
+
     return fig
 
 

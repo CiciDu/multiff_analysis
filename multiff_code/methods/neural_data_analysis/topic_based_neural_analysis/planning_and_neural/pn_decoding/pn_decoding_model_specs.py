@@ -1,4 +1,5 @@
 from sklearn.linear_model import (
+    LinearRegression,
     Ridge,
     Lasso,
     ElasticNet,
@@ -9,6 +10,27 @@ from catboost import CatBoostRegressor, CatBoostClassifier
 
 
 MODEL_SPECS = {
+
+    # ==================================================
+    # OLS linear regression — regression + classification
+    # ==================================================
+
+    'ols': {
+        'cache_tag': 'ols',
+
+        'regression_model_class': LinearRegression,
+        'regression_model_kwargs': dict(
+            fit_intercept=True,
+        ),
+
+        'classification_model_class': LogisticRegression,
+        'classification_model_kwargs': dict(
+            penalty=None,  # unregularized
+            solver='lbfgs',
+            max_iter=2000,
+            class_weight='balanced',
+        ),
+    },
 
     # ==================================================
     # Ridge (L2) — regression + classification
@@ -151,7 +173,7 @@ MODEL_SPECS = {
         'regression_model_kwargs': dict(
             epsilon=1.35,
             alpha=0.0001,
-            max_iter=1000,
+            max_iter=5000,  # L-BFGS needs more iters than default 100; scaling helps too
         ),
 
         'classification_model_class': None,

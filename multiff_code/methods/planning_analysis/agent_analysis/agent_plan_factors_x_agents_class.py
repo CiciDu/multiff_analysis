@@ -57,14 +57,17 @@ class PlanFactorsAcrossAgents():
                 self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
                     model_folder_name=folder)
 
+                save_data = False if use_stored_data_only else True
+
+
                 try:
                     self.pfas.streamline_getting_y_values(
                         model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok,
-                        num_datasets_to_collect=num_datasets_to_collect, num_steps_per_dataset=num_steps_per_dataset, use_stored_data_only=use_stored_data_only,
+                        num_datasets_to_collect=num_datasets_to_collect, num_steps_per_dataset=num_steps_per_dataset, use_stored_data_only=use_stored_data_only, save_data=save_data,
                     )
                 except Exception as e:
                     print(
-                        f'Error making overall all median info for agent {folder}: {e}. Will continue to the next agent.')
+                        f'Failed to make overall all median info for agent {folder}: {e} \nWill continue to the next agent.')
                     continue
 
                 # Remove job ID suffix
@@ -73,6 +76,8 @@ class PlanFactorsAcrossAgents():
                 params = self.get_agent_params(folder)
                 agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
                     self.pfas.all_ref_pooled_median_info, params)
+                print('id of agent to add to df:', agent_id)
+                print('shape of agent_all_ref_pooled_median_info to add to df:', agent_all_ref_pooled_median_info.shape)
                 agent_all_ref_pooled_median_info['id'] = agent_id
                 self.all_ref_pooled_median_x_agents = pd.concat(
                     [self.all_ref_pooled_median_x_agents, agent_all_ref_pooled_median_info], axis=0)

@@ -193,25 +193,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         if '/all_agents/' not in model_folder_name:
             raise ValueError('model_folder_name must contain /all_agents/')
 
-        # Split path into:
-        #   before_all_agents / all_agents / after_all_agents
-        before, after = model_folder_name.split('/all_agents/', 1)
-
-        # "after" may have 1, 2, 3, or more path levels — keep them all
-        sublevels = after.strip('/').split('/')
-
-        # Base target directory:
-        collected_base = os.path.join(before, 'all_collected_data')
-
-        # Helper to build each category path
-        def build_path(category):
-            return os.path.join(collected_base, category, *sublevels, data_name)
-
-        self.processed_data_folder_path = build_path('processed_data')
-        self.planning_data_folder_path = build_path('planning')
-        self.patterns_and_features_folder_path = build_path(
-            'patterns_and_features')
-        self.decision_making_folder_path = build_path('decision_making')
+        self.processed_data_folder_path = rl_base_utils.build_path(model_folder_name, 'processed_data', data_name)
+        self.planning_data_folder_path = rl_base_utils.build_path(model_folder_name, 'planning', data_name)
+        self.patterns_and_features_folder_path = rl_base_utils.build_path(model_folder_name, 'patterns_and_features', data_name)
+        self.decision_making_folder_path = rl_base_utils.build_path(model_folder_name, 'decision_making', data_name)
 
         # Make the directories
         for folder in [
@@ -759,9 +744,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                                          duration=duration, n_steps=n_steps, file_name=None)
 
     def streamline_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000, file_name=None, video_dir=None,
-                                    data_exists_ok=False, save_video=True, save_format='html', display_inline=False, **animate_kwargs):
+                                    data_exists_ok=False, save_video=True, save_format='html', display_inline=False, save_data=False, **animate_kwargs):
         self.collect_data(
-            n_steps=n_steps, exists_ok=data_exists_ok, retrieve_ff_flash_sorted=True)
+            n_steps=n_steps, exists_ok=data_exists_ok, retrieve_ff_flash_sorted=True, save_data=save_data)
         # if len(self.ff_caught_T_new) >= currentTrial_for_animation:
         self.make_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                             duration=duration, file_name=file_name, video_dir=video_dir, save_video=save_video, save_format=save_format, display_inline=display_inline,

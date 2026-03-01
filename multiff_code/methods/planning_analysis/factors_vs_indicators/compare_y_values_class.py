@@ -59,6 +59,8 @@ class _CompareYValues:
                                               use_stored_data_only=False,
                                               ):
 
+        save_data = False if use_stored_data_only else save_data                                      
+
         df_path = self.all_ref_pooled_median_info_path if not per_sess else self.all_ref_per_sess_median_info_folder_path
         variation_func = self.make_pooled_median_info if not per_sess else self.make_per_sess_median_info
 
@@ -142,6 +144,8 @@ class _CompareYValues:
         # These two parameters (ref_point_mode, ref_point_value) are actually not important here as long as the corresponding data can be successfully retrieved,
         # since the results are the same regardless
 
+        save_data = False if use_stored_data_only else save_data
+
         if exists_ok & exists(self.pooled_perc_info_path):
             self.pooled_perc_info = pd.read_csv(self.pooled_perc_info_path).drop(
                 ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
@@ -204,6 +208,9 @@ class _CompareYValues:
 
         kind: 'pooled' or 'per_sess'
         """
+
+        save_data = False if use_stored_data_only else save_data
+
         config = {
             "pooled": {
                 "folder_attr": "pooled_median_info_folder_path",
@@ -265,10 +272,11 @@ class _CompareYValues:
             "monkey_name": getattr(self, "monkey_name", None),
         })
 
-        Path(folder).mkdir(parents=True, exist_ok=True)
-        df.to_csv(path, index=False)
-        setattr(self, cfg["df_attr"], df)
-        print(f"Stored new {cfg['human_name']} in {folder}")
+        if save_data:
+            Path(folder).mkdir(parents=True, exist_ok=True)
+            df.to_csv(path, index=False)
+            setattr(self, cfg["df_attr"], df)
+            print(f"Stored new {cfg['human_name']} in {folder}")
         return df
 
     def get_test_and_ctrl_heading_info_df_across_sessions2(self, ref_point_mode='distance', ref_point_value=-150,
@@ -282,6 +290,9 @@ class _CompareYValues:
                                                            use_stored_data_only=False,
                                                            **kwargs
                                                            ):
+
+        save_data = False if use_stored_data_only else save_data
+
         if filter_heading_info_df_across_refs:
             self.get_test_and_ctrl_heading_info_df_across_sessions_filtered()
             self.test_heading_info_df = self.all_test_heading_info_df_filtered
@@ -323,6 +334,8 @@ class _CompareYValues:
                                 use_stored_data_only=False,
                                 **kwargs
                                 ):
+        save_data = False if use_stored_data_only else save_data
+
         return self._make_median_info(
             kind="pooled",
             ref_point_mode=ref_point_mode,

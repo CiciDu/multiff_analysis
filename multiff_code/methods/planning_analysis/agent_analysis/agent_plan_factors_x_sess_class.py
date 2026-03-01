@@ -7,6 +7,7 @@ from planning_analysis.factors_vs_indicators import variations_base_class
 from planning_analysis.factors_vs_indicators import make_variations_utils
 from reinforcement_learning.base_classes import rl_base_class
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
+from reinforcement_learning.base_classes import rl_base_utils
 
 import pandas as pd
 import os
@@ -61,14 +62,22 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                     **env_kwargs
                                     ):
 
+        save_data = False if use_stored_data_only else save_data
         self.num_steps_per_dataset = num_steps_per_dataset
+
+        if use_stored_data_only:
+            # first check if any data exists at all
+            planning_data_folder_path = rl_base_utils.build_path(model_folder_name, 'planning')
+            if not os.path.exists(planning_data_folder_path) or not os.listdir(planning_data_folder_path):
+                msg = (f'Planning data folder does not exist or is empty for model_folder_name. '
+                        f'Since use_stored_data_only is True, skipping data collection.')
+                raise Exception(msg)
 
         if ref_point_params_based_on_mode is None:
             ref_point_params_based_on_mode = self.default_ref_point_params_based_on_mode
 
         if model_folder_name is None:
             model_folder_name = self.model_folder_name
-
         if not use_stored_data_only:
             # make sure there's enough data from agent
             for i in range(num_datasets_to_collect):
@@ -88,12 +97,14 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     continue
                 print('Getting agent data ......')
                 env_kwargs['print_ff_capture_incidents'] = False
+
                 self.pfa.get_agent_data(**env_kwargs, exists_ok=agent_data_exists_ok,
                                         save_data=save_data, n_steps=self.num_steps_per_dataset)
 
         try:
             print(' ')
             print('Making overall all median info ......')
+
             self.make_or_retrieve_all_ref_pooled_median_info(ref_point_params_based_on_mode=ref_point_params_based_on_mode,
                                                              list_of_curv_traj_window_before_stop=[
                                                                  [-25, 0]],
@@ -234,6 +245,10 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 self.test_heading_info_df = pd.DataFrame(
                     columns=self.ctrl_heading_info_df.columns)
 
+            # however, if both are empty, then delete the vars to prevent downstream problems
+            if len(self.test_heading_info_df) == 0 and len(self.ctrl_heading_info_df) == 0:
+                print('No heading_info_df retrieved for either test or control.')
+
     def make_combd_heading_df_x_sessions(self, num_datasets_to_collect=1,
                                          ref_point_mode='distance', ref_point_value=-150,
                                          curv_traj_window_before_stop=[-25, 0],
@@ -247,6 +262,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                          ):
         self.test_heading_info_df = pd.DataFrame()
         self.ctrl_heading_info_df = pd.DataFrame()
+
+        save_data = False if use_stored_data_only else save_data
 
         for i in range(num_datasets_to_collect):
             data_name = f'data_{i}'
@@ -351,9 +368,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                                           curv_traj_window_before_stop=curv_traj_window_before_stop,
                                                           test_or_control_filter=self.test_or_control_filter)
 
-                print(
-                    f'Retrieved: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')
-
                 # Only check for empty dataframes if not filtering, or check only the filtered type
                 if self.test_or_control_filter is None:
                     if (len(self.ctrl_heading_info_df) == 0) or (len(self.test_heading_info_df) == 0):
@@ -366,8 +380,9 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                     if len(self.test_heading_info_df) == 0:
                         raise Exception(
                             'Empty combd_heading_df_x_sessions for test data.')
+                print(
+                    f'Retrieved: test={len(self.test_heading_info_df)} rows, ctrl={len(self.ctrl_heading_info_df)} rows')
 
-                print('Successfully retrieved existing data.')
             else:
                 raise Exception(
                     'combd_heading_df_x_sessions_exists_ok is False.')
@@ -469,6 +484,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
         This prevents errors when only one type of data exists.
         """
 
+        save_data = False if use_stored_data_only else save_data
+
         # Call the agent-specific version with filter support
         self.get_test_and_ctrl_heading_info_df_across_sessions(
             ref_point_mode=ref_point_mode,
@@ -550,6 +567,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             Pooled percentage info.
         """
 
+        save_data = False if use_stored_data_only else save_data
+
         try:
             if exists_ok & exists(self.pooled_perc_info_path):
                 self.pooled_perc_info = pd.read_csv(self.pooled_perc_info_path).drop(
@@ -573,8 +592,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
                 if save_data:
                     self.pooled_perc_info.to_csv(self.pooled_perc_info_path)
-                print('Stored new pooled_perc_info in ',
-                      self.pooled_perc_info_path)
+                    print('Stored new pooled_perc_info in ',
+                        self.pooled_perc_info_path)
 
             self.pooled_perc_info['monkey_name'] = 'agent'
             self.pooled_perc_info['opt_arc_type'] = self.opt_arc_type

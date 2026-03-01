@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=encode_vis
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_vis/logs/run_stdout/encode_vis_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_vis/logs/run_stdout/encode_vis_%A_%a.err
+#SBATCH --job-name=encode_pn
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_pn/logs/run_stdout/encode_pn_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_pn/logs/run_stdout/encode_pn_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=10G
+#SBATCH --mem=5G
 #SBATCH --time=48:00:00
 #SBATCH --mail-type=END,FAIL
 
@@ -13,7 +13,7 @@ set -euo pipefail
 # ------------------------------
 # Inputs
 # ------------------------------
-: "${1:?Usage: sbatch encode_vis_job.slurm MONKEY_NAME}"
+: "${1:?Usage: sbatch encode_pn_job.slurm MONKEY_NAME}"
 
 MONKEY_NAME="$1"
 shift
@@ -95,9 +95,9 @@ else
 fi
 
 # ------------------------------
-# Run encode_vis
+# Run encode_pn
 # ------------------------------
-python -u multiff_analysis/jobs/encoding/encode_vis/scripts/encode_vis_script.py \
+python -u multiff_analysis/jobs/encoding/encode_pn/scripts/encode_pn_script.py \
     --raw_data_folder_path "$RAW_DATA_FOLDER_PATH"
 
 echo "[SLURM] Done"

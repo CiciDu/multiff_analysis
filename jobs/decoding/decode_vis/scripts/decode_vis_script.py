@@ -42,12 +42,14 @@ def main():
         n_splits=args.n_splits,
         save_dir=args.save_dir,
         shuffle_mode='none',
+        fit_kernelwidth=True,
     )
 
     results_df_shuffled = runner.run(
         n_splits=args.n_splits,
         save_dir=args.save_dir,
         shuffle_mode='timeshift_fold',
+        fit_kernelwidth=True,
     )
     
     results_one_ff_style = runner.run_one_ff_style()

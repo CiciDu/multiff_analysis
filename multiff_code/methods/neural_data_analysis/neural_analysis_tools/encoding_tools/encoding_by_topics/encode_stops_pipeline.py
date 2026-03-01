@@ -19,7 +19,6 @@ from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     one_ff_gam_fit,
-    gam_variance_explained,
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
     FitResult,
@@ -37,8 +36,12 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
     encode_stops_utils,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics.base_encoding_runner import (
+    BaseEncodingRunner,
+)
 
-class StopEncodingRunner:
+
+class StopEncodingRunner(BaseEncodingRunner):
     def __init__(
         self,
         raw_data_folder_path,
@@ -46,6 +49,7 @@ class StopEncodingRunner:
         t_max=0.20,
         stop_prs=None,
     ):
+        super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
         self.bin_width = bin_width
         self.t_max = t_max
@@ -427,6 +431,51 @@ class StopEncodingRunner:
             return False
 
     # ------------------------------------------------------------------
+    # BaseEncodingRunner adapter methods
+    # ------------------------------------------------------------------
+    def get_binned_spikes(self):
+        return self.stop_binned_spikes
+
+    def get_gam_groups(
+        self,
+        unit_idx: int,
+        *,
+        lam_f: float = 100.0,
+        lam_g: float = 10.0,
+        lam_h: float = 10.0,
+        lam_p: float = 10.0,
+    ):
+        return self.get_stop_gam_groups(
+            unit_idx=unit_idx,
+            lam_f=lam_f,
+            lam_g=lam_g,
+            lam_h=lam_h,
+            lam_p=lam_p,
+        )
+
+    def get_gam_save_paths(
+        self,
+        unit_idx: int,
+        *,
+        lam_f: float = 100.0,
+        lam_g: float = 10.0,
+        lam_h: float = 10.0,
+        lam_p: float = 10.0,
+        ensure_dirs: bool = True,
+    ):
+        return self.get_stop_gam_save_paths(
+            unit_idx=unit_idx,
+            lam_f=lam_f,
+            lam_g=lam_g,
+            lam_h=lam_h,
+            lam_p=lam_p,
+            ensure_dirs=ensure_dirs,
+        )
+
+    def _gam_results_subdir(self) -> str:
+        return "stop_gam_results"
+
+    # ------------------------------------------------------------------
     # Poisson GAM fit (stop encoding: design_df_w_history + stop_binned_spikes)
     # ------------------------------------------------------------------
     def fit_stop_poisson_gam(
@@ -472,35 +521,12 @@ class StopEncodingRunner:
         FitResult
             Same as fit_poisson_gam.
         """
-        if self.stop_binned_feats is None or self.stop_binned_spikes is None:
-            self._collect_data(exists_ok=True)
-
-        self.design_df_w_history = self.get_design_for_unit(unit_idx)
-        n_rows = len(self.design_df_w_history)
-        if n_rows != len(self.stop_binned_spikes):
-            raise ValueError(
-                f'design and stop_binned_spikes row count mismatch: '
-                f'{n_rows} vs {len(self.stop_binned_spikes)}'
-            )
-        y = np.asarray(
-            self.stop_binned_spikes.iloc[:, unit_idx].to_numpy(),
-            dtype=float,
-        ).ravel()
-
-        groups, lambda_config = self.get_stop_gam_groups(
-            unit_idx=unit_idx, lam_f=100.0, lam_g=10.0, lam_h=10.0, lam_p=10.0)
-
-        if save_path is None:
-            paths = self.get_stop_gam_save_paths(
-                unit_idx=unit_idx,
-                lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
-            )
-            save_path = paths['fit_save_path']
-
-        return one_ff_gam_fit.fit_poisson_gam(
-            design_df=self.design_df_w_history,
-            y=y,
-            groups=groups,
+        return self.fit_poisson_gam(
+            unit_idx,
+            lam_f=lam_f,
+            lam_g=lam_g,
+            lam_h=lam_h,
+            lam_p=lam_p,
             l1_groups=l1_groups,
             l1_smooth_eps=l1_smooth_eps,
             max_iter=max_iter,
@@ -670,118 +696,42 @@ class StopEncodingRunner:
         all_neuron_r2 : List[float]
             mean_pseudo_r2 for each neuron.
         """
-
-        if load_if_exists:
-            all_neuron_r2 = self.try_load_variance_explained_for_all_neurons(
-                lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
-                verbose=verbose,
-            )
-            if all_neuron_r2 is not None:
-                print('Number of neurons with cached cross-validation results retrieved: ',
-                      len(all_neuron_r2))
-                return all_neuron_r2
-            else:
-                print(
-                    'No cached cross-validation variance explained results found for all neurons')
-
-        if load_only:
-            print('Load only mode is enabled, returning None')
-            return None
-
-        if self.stop_binned_feats is None or self.stop_binned_spikes is None:
-            self._collect_data(exists_ok=True)
-        n_neurons = self.stop_binned_spikes.shape[1]
-        if unit_indices is None:
-            unit_indices = list(range(n_neurons))
-        if fit_kwargs is None:
-            fit_kwargs = dict(
-                l1_groups=[], max_iter=1000, tol=1e-6, verbose=False, save_path=None
-            )
-
-        paths = self.get_stop_gam_save_paths(
-            unit_idx=unit_indices[0],
-            lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
+        return self.crossval_variance_explained_all_neurons(
+            lam_f=lam_f,
+            lam_g=lam_g,
+            lam_h=lam_h,
+            lam_p=lam_p,
+            n_folds=n_folds,
+            load_if_exists=load_if_exists,
+            load_only=load_only,
+            fit_kwargs=fit_kwargs,
+            cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
+            unit_indices=unit_indices,
+            verbose=verbose,
+            plot_cdf=plot_cdf,
+            log_x=log_x,
         )
-        base = paths['base']
-        lam_suffix = paths['lam_suffix']
 
-        all_neuron_r2 = []
-        for unit_idx in unit_indices:
-
-            groups, lambda_config = self.get_stop_gam_groups(
-                unit_idx=unit_idx,
-                lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
-            )
-
-            outdir = base / f'neuron_{unit_idx}'
-            (outdir / 'cv_var_explained').mkdir(parents=True, exist_ok=True)
-            cv_save_path = str(
-                outdir / 'cv_var_explained' / f'{lam_suffix}.pkl')
-            cv_res = self.crossval_stop_variance_explained(
-                unit_idx=unit_idx,
-                groups=groups,
-                n_folds=n_folds,
-                fit_kwargs=fit_kwargs,
-                save_path=cv_save_path,
-                load_if_exists=load_if_exists,
-                cv_mode=cv_mode,
-                buffer_samples=buffer_samples,
-                verbose=verbose,
-            )
-            if verbose:
-                print(cv_res['mean_classical_r2'], cv_res['mean_pseudo_r2'])
-            all_neuron_r2.append(cv_res['mean_pseudo_r2'])
-        if plot_cdf:
-            gam_variance_explained.plot_variance_explained_cdf(
-                all_neuron_r2, log_x=log_x
-            )
-        return all_neuron_r2
-
-    def try_load_variance_explained_for_all_neurons(self,
-                                                    *,
-                                                    load_if_exists: bool = True,
-                                                    verbose: bool = True,
-                                                    lam_f: float = 100.0,
-                                                    lam_g: float = 10.0,
-                                                    lam_h: float = 10.0,
-                                                    lam_p: float = 10.0,
-                                                    ) -> List[float]:
-        """
-        Try to load variance explained for all neurons.
-        """
-
-        all_neuron_r2 = []
-        for unit_idx in range(self.num_neurons):
-            try:
-                paths_i = self.get_stop_gam_save_paths(
-                    unit_idx=unit_idx,
-                    lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p,
-                )
-                base = paths_i['base']
-                outdir = base / f'neuron_{unit_idx}'
-                (outdir / 'cv_var_explained').mkdir(parents=True, exist_ok=True)
-                lam_suffix = paths_i['lam_suffix']
-                cv_save_path = str(
-                    outdir / 'cv_var_explained' / f'{lam_suffix}.pkl')
-
-                maybe_loaded = gam_variance_explained.maybe_load_saved_crossval(
-                    save_path=cv_save_path,
-                    load_if_exists=load_if_exists,
-                    verbose=verbose,
-                )
-                if maybe_loaded is not None:
-                    print(
-                        f'Loaded cached cross-validation results from: {cv_save_path}')
-                    all_neuron_r2.append(maybe_loaded['mean_pseudo_r2'])
-                    unit_idx += 1
-                else:
-                    raise RuntimeError(
-                        f'No cached cross-validation results found for {cv_save_path}')
-            except Exception as e:
-                print(
-                    f'Try to load variance explained for unit {unit_idx} failed: {e}')
-                return None
-        return all_neuron_r2
+    def try_load_variance_explained_for_all_neurons(
+        self,
+        *,
+        load_if_exists: bool = True,
+        verbose: bool = True,
+        lam_f: float = 100.0,
+        lam_g: float = 10.0,
+        lam_h: float = 10.0,
+        lam_p: float = 10.0,
+    ) -> Optional[List[float]]:
+        """Try to load variance explained for all neurons."""
+        return self._try_load_variance_explained_for_all_neurons(
+            lam_f=lam_f,
+            lam_g=lam_g,
+            lam_h=lam_h,
+            lam_p=lam_p,
+            load_if_exists=load_if_exists,
+            verbose=verbose,
+        )
 
     def crossval_stop_variance_explained(
         self,
@@ -831,49 +781,17 @@ class StopEncodingRunner:
             Same as crossval_variance_explained: fold_classical_r2, fold_pseudo_r2,
             mean_classical_r2, mean_pseudo_r2.
         """
-
-        # ------------------------------------------------------------------
-        maybe_loaded = gam_variance_explained.maybe_load_saved_crossval(
-            save_path=save_path,
-            load_if_exists=load_if_exists,
-            verbose=verbose,
-        )
-        if maybe_loaded is not None:
-            print(f'Loaded cached cross-validation results from: {save_path}')
-            return maybe_loaded
-        else:
-            print(f'No cached cross-validation results found for {save_path}')
-
-        # Get design matrix for the target neuron
-        self.design_df_w_history = self.get_design_for_unit(unit_idx)
-        n_rows = len(self.design_df_w_history)
-        if n_rows != len(self.stop_binned_spikes):
-            raise ValueError(
-                f'design and stop_binned_spikes row count mismatch: '
-                f'{n_rows} vs {len(self.stop_binned_spikes)}'
-            )
-        y = np.asarray(
-            self.stop_binned_spikes.iloc[:, unit_idx].to_numpy(),
-            dtype=float,
-        ).ravel()
-        if dt is None:
-            dt = float(self.bin_width)
-        if fit_kwargs is None:
-            fit_kwargs = {}
-        meta = dict(save_metadata or {}, unit_idx=unit_idx)
-        return gam_variance_explained.crossval_variance_explained(
-            fit_function=one_ff_gam_fit.fit_poisson_gam,
-            design_df=self.design_df_w_history,
-            y=y,
+        return self.crossval_variance_explained(
+            unit_idx=unit_idx,
             groups=groups,
-            dt=dt,
             n_folds=n_folds,
             random_state=random_state,
             fit_kwargs=fit_kwargs,
             save_path=save_path,
             load_if_exists=load_if_exists,
-            save_metadata=meta,
+            save_metadata=save_metadata,
             verbose=verbose,
+            dt=dt,
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
             cv_groups=cv_groups,

@@ -288,3 +288,18 @@ def extract_config_name_from_post_best(path_str):
             'No configuration folder found after stripping suffixes')
 
     return path.name
+
+
+def build_path(model_folder_name, category, data_name='data_0'):
+    # Split path into:
+    #   before_all_agents / all_agents / after_all_agents
+    before, after = model_folder_name.split('/all_agents/', 1)
+
+    # "after" may have 1, 2, 3, or more path levels — keep them all
+    sublevels = after.strip('/').split('/')
+
+    # Base target directory:
+    collected_base = os.path.join(before, 'all_collected_data')
+
+    # Helper to build each category path
+    return os.path.join(collected_base, category, *sublevels, data_name)

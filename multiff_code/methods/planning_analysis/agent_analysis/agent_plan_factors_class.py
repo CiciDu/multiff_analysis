@@ -133,6 +133,8 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                                                           test_or_control_filter=None,
                                                           **env_kwargs):
 
+        save_data = False if use_stored_data_only else save_data
+
         self._initialize_pf(curv_of_traj_mode=curv_of_traj_mode,
                             window_for_curv_of_traj=window_for_curv_of_traj)
 
@@ -159,7 +161,7 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
         except Exception as e:
             if use_stored_data_only:
                 raise Exception(
-                    'Data missing. Will not be able to make heading info df.')
+                    'Data missing. Since use_stored_data_only is True, will not be able to make heading info df.')
             print(
                 f'Data missing. Will get agent data first. Error message: {e}')
             # Exclude planning-specific kwargs that the env/agent does not expect
@@ -169,6 +171,8 @@ class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
                 n_steps=n_steps, exists_ok=monkey_data_exists_ok, save_data=save_data, **env_only_kwargs)
             self._load_agent_data_onto_pf()
             print('Creating heading info from agent data...')
+            # print number of ff captured in the session
+            print(f'Number of ff captured in session: {self.pf.ff_caught_T_new.shape[0]}')
             for test_or_control in types_to_process:
                 print(f'Creating {test_or_control} heading info...')
                 try:

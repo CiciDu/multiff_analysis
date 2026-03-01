@@ -414,7 +414,7 @@ class OneFFDecodingRunner:
             _get_attr(self.prs, "neuralfiltwidth", _get_attr(self.prs, "neural_filtwidth", 10))
         )
         fit_kernel = bool(_get_attr(self.prs, "lineardecoder_fitkernelwidth", True))
-        candidate_widths = np.arange(1, 101, 5) if fit_kernel else None
+        candidate_widths = np.arange(1, 21, 1) if fit_kernel else None
         fixed_width = int(max(1, 5 * filtwidth_default))
 
         # Save intermediate state

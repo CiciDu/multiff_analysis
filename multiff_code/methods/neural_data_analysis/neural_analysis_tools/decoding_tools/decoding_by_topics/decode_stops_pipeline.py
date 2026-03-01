@@ -37,17 +37,14 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
         raw_data_folder_path,
         bin_width: float = 0.04,
         t_max: float = 0.20,
-        use_spike_history_for_one_ff: bool = False,
     ):
         super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
         self.t_max = t_max
-        self.use_spike_history_for_one_ff = use_spike_history_for_one_ff
 
         self.stop_meta_used = None
         self.stop_feats_to_decode = None
         self.stop_binned_spikes = None
-        self.spike_data_w_history = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,
@@ -63,11 +60,7 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_groups(self):
         return self.stop_meta_used["event_id"].values
 
-    def _get_neural_matrix(self, use_spike_history: Optional[bool] = None) -> np.ndarray:
-        if use_spike_history is None:
-            use_spike_history = self.use_spike_history_for_one_ff
-        if use_spike_history:
-            return np.asarray(self.spike_data_w_history, dtype=float)
+    def _get_neural_matrix(self) -> np.ndarray:
         return np.asarray(self.stop_binned_spikes, dtype=float)
 
     def _default_canoncorr_varnames(self) -> List[str]:
@@ -177,20 +170,6 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
             self.bin_width,
         )
 
-        bin_df = spike_history.make_bin_df_from_stop_meta(self.stop_meta_used)
-        (
-            self.spike_data_w_history,
-            _basis,
-            _colnames,
-            _meta_groups,
-        ) = spike_history.build_design_with_spike_history_from_bins(
-            spikes_df=self.pn.spikes_df,
-            bin_df=bin_df,
-            X_pruned=self.stop_binned_spikes,
-            meta_groups={},
-            dt=self.bin_width,
-            t_max=self.t_max,
-        )
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
@@ -206,7 +185,6 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
         save_dir = Path(self._get_save_dir())
         return {
             "stop_binned_spikes": save_dir / "stop_binned_spikes.pkl",
-            "spike_data_w_history": save_dir / "spike_data_w_history.pkl",
             "stop_feats_to_decode": save_dir / "stop_feats_to_decode.pkl",
             "stop_meta_used": save_dir / "stop_meta_used.pkl",
         }
@@ -214,7 +192,6 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_design_matrix_data(self):
         return {
             "stop_binned_spikes": self.stop_binned_spikes,
-            "spike_data_w_history": self.spike_data_w_history,
             "stop_feats_to_decode": self.stop_feats_to_decode,
             "stop_meta_used": self.stop_meta_used,
         }
@@ -222,7 +199,6 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_design_matrix_key_to_attr(self):
         return {
             "stop_binned_spikes": "stop_binned_spikes",
-            "spike_data_w_history": "spike_data_w_history",
             "stop_feats_to_decode": "stop_feats_to_decode",
             "stop_meta_used": "stop_meta_used",
         }

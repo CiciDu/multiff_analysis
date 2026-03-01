@@ -13,7 +13,7 @@ set -euo pipefail
 # ------------------------------
 # Inputs
 # ------------------------------
-: "${1:?Usage: sbatch event_encoding_job.slurm MONKEY_NAME}"
+: "${1:?Usage: sbatch encode_stops_job.slurm MONKEY_NAME}"
 
 MONKEY_NAME="$1"
 shift
@@ -98,6 +98,6 @@ fi
 # Run encode_stops
 # ------------------------------
 python -u multiff_analysis/jobs/encoding/encode_stops/scripts/encode_stops_script.py \
-    --raw_data_folder_path "$RAW_DATA_FOLDER_PATH" \
+    --raw_data_folder_path "$RAW_DATA_FOLDER_PATH"
 
 echo "[SLURM] Done"

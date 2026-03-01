@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Sequence
 
 # Third-party imports
 import numpy as np
@@ -41,7 +41,7 @@ class PNDecodingRunner(BaseOneFFStyleDecodingRunner):
         # Filled during setup
         self.behav_df = None
         self.trial_ids = None
-        self.spike_data_w_history = None
+        self.pn_binned_spikes = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
@@ -56,8 +56,8 @@ class PNDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_groups(self):
         return self.trial_ids
 
-    def _get_neural_matrix(self, use_spike_history=None) -> np.ndarray:
-        return np.asarray(self.spike_data_w_history, dtype=float)
+    def _get_neural_matrix(self) -> np.ndarray:
+        return np.asarray(self.pn_binned_spikes, dtype=float)
 
     def _default_canoncorr_varnames(self) -> List[str]:
         y_df = self._get_numeric_target_df()
@@ -68,6 +68,82 @@ class PNDecodingRunner(BaseOneFFStyleDecodingRunner):
 
     def _target_df_error_msg(self) -> str:
         return "pn_feats_to_decode"
+
+    # ------------------------------------------------------------------
+    # Plotting helpers (one-FF-style outputs)
+    # ------------------------------------------------------------------
+    def plot_canoncorr_coefficients(self, **plot_kwargs):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("canoncorr")
+        if block is None:
+            raise ValueError("No canoncorr results found. Run compute_canoncorr() first.")
+        plot_decode_stops.plot_canoncorr_coefficients(block, **plot_kwargs)
+
+    def plot_decoder_parity(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("lineardecoder")
+        if block is None:
+            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
+        plot_decode_stops.plot_decoder_parity(block, varnames=varnames, **plot_kwargs)
+
+    def plot_decoder_correlation_bars(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("lineardecoder")
+        if block is None:
+            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
+        plot_decode_stops.plot_decoder_correlation_bars(block, varnames=varnames, **plot_kwargs)
+
+    def plot_single_trial_decoding_panel(
+        self,
+        *,
+        trial_indices: Optional[Sequence[int]] = None,
+        n_trials: int = 6,
+        **plot_kwargs,
+    ):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("lineardecoder")
+        if block is None:
+            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
+        plot_decode_stops.plot_single_trial_decoding_panel(
+            block,
+            trial_indices=trial_indices,
+            n_trials=n_trials,
+            **plot_kwargs,
+        )
+
+    def plot_all_decoding_results(
+        self,
+        *,
+        parity_varnames: Optional[Sequence[str]] = None,
+        bar_varnames: Optional[Sequence[str]] = None,
+        trial_indices: Optional[Sequence[int]] = None,
+        n_trials: int = 6,
+    ):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        plot_decode_stops.plot_all_decoding_results(
+            canoncorr_block=self.stats.get("canoncorr"),
+            readout_block=self.stats.get("lineardecoder"),
+            parity_varnames=parity_varnames,
+            bar_varnames=bar_varnames,
+            trial_indices=trial_indices,
+            n_trials=n_trials,
+        )
+
     # ------------------------------------------------------------------
     # Data collection
     # ------------------------------------------------------------------
@@ -118,29 +194,16 @@ class PNDecodingRunner(BaseOneFFStyleDecodingRunner):
             .astype(int)
         )
 
-        bin_df = create_pn_design_df.make_bin_df_for_pn(
-            pn.rebinned_x_var,
-            pn.bin_edges,
-        )
+        # bin_df = create_pn_design_df.make_bin_df_for_pn(
+        #     pn.rebinned_x_var,
+        #     pn.bin_edges,
+        # )
 
-        (
-            spike_data_w_history,
-            basis,
-            colnames,
-            meta_groups,
-        ) = spike_history.build_design_with_spike_history_from_bins(
-            spikes_df=pn.spikes_df,
-            bin_df=bin_df,
-            X_pruned=df_Y,
-            meta_groups={},
-            dt=self.bin_width,
-            t_max=self.t_max,
-        )
 
         self.pn = pn
         self.behav_df = pn_feats_to_decode
         self.trial_ids = trial_ids
-        self.spike_data_w_history = spike_data_w_history
+        self.pn_binned_spikes = df_Y
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
@@ -155,21 +218,21 @@ class PNDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
-            'spike_data_w_history': save_dir / 'spike_data_w_history.pkl',
+            'pn_binned_spikes': save_dir / 'pn_binned_spikes.pkl',
             'pn_feats_to_decode': save_dir / 'pn_feats_to_decode.pkl',
             'trial_ids': save_dir / 'trial_ids.pkl',
         }
 
     def _get_design_matrix_data(self):
         return {
-            'spike_data_w_history': self.spike_data_w_history,
+            'pn_binned_spikes': self.pn_binned_spikes,
             'pn_feats_to_decode': self.behav_df,
             'trial_ids': self.trial_ids,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
-            'spike_data_w_history': 'spike_data_w_history',
+            'pn_binned_spikes': 'pn_binned_spikes',
             'pn_feats_to_decode': 'behav_df',
             'trial_ids': 'trial_ids',
         }

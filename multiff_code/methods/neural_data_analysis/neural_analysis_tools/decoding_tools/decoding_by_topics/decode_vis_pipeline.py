@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Sequence
 
 # Third-party imports
 import numpy as np
@@ -55,8 +55,8 @@ class FFVisDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_groups(self):
         return self.meta_used["event_id"].values
 
-    def _get_neural_matrix(self, use_spike_history=None) -> np.ndarray:
-        return np.asarray(self.spike_data_w_history, dtype=float)
+    def _get_neural_matrix(self) -> np.ndarray:
+        return np.asarray(self.vis_binned_spikes, dtype=float)
 
     def _default_canoncorr_varnames(self) -> List[str]:
         y_df = self._get_numeric_target_df()
@@ -67,6 +67,81 @@ class FFVisDecodingRunner(BaseOneFFStyleDecodingRunner):
 
     def _target_df_error_msg(self) -> str:
         return "vis_feats_to_decode"
+
+    # ------------------------------------------------------------------
+    # Plotting helpers (one-FF-style outputs)
+    # ------------------------------------------------------------------
+    def plot_canoncorr_coefficients(self, **plot_kwargs):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("canoncorr")
+        if block is None:
+            raise ValueError("No canoncorr results found. Run compute_canoncorr() first.")
+        plot_decode_stops.plot_canoncorr_coefficients(block, **plot_kwargs)
+
+    def plot_decoder_parity(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("lineardecoder")
+        if block is None:
+            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
+        plot_decode_stops.plot_decoder_parity(block, varnames=varnames, **plot_kwargs)
+
+    def plot_decoder_correlation_bars(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("lineardecoder")
+        if block is None:
+            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
+        plot_decode_stops.plot_decoder_correlation_bars(block, varnames=varnames, **plot_kwargs)
+
+    def plot_single_trial_decoding_panel(
+        self,
+        *,
+        trial_indices: Optional[Sequence[int]] = None,
+        n_trials: int = 6,
+        **plot_kwargs,
+    ):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        block = self.stats.get("lineardecoder")
+        if block is None:
+            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
+        plot_decode_stops.plot_single_trial_decoding_panel(
+            block,
+            trial_indices=trial_indices,
+            n_trials=n_trials,
+            **plot_kwargs,
+        )
+
+    def plot_all_decoding_results(
+        self,
+        *,
+        parity_varnames: Optional[Sequence[str]] = None,
+        bar_varnames: Optional[Sequence[str]] = None,
+        trial_indices: Optional[Sequence[int]] = None,
+        n_trials: int = 6,
+    ):
+        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
+            plot_decode_stops,
+        )
+
+        plot_decode_stops.plot_all_decoding_results(
+            canoncorr_block=self.stats.get("canoncorr"),
+            readout_block=self.stats.get("lineardecoder"),
+            parity_varnames=parity_varnames,
+            bar_varnames=bar_varnames,
+            trial_indices=trial_indices,
+            n_trials=n_trials,
+        )
 
     def _collect_data(self, exists_ok=True):
         """
@@ -84,7 +159,7 @@ class FFVisDecodingRunner(BaseOneFFStyleDecodingRunner):
 
             print('[_collect_data] Computing design matrices from scratch')
             (
-                self.spike_data_w_history,
+                self.vis_binned_spikes,
                 self.vis_feats_to_decode,
                 self.meta_used,
             ) = self._prepare_design_matrices()
@@ -130,24 +205,10 @@ class FFVisDecodingRunner(BaseOneFFStyleDecodingRunner):
             vis_feats_to_decode,
             has_constant='add',
         )
+  
+        self.vis_binned_spikes = binned_spikes
 
-        bin_df = spike_history.make_bin_df_from_stop_meta(meta_used)
-
-        (
-            spike_data_w_history,
-            basis,
-            colnames,
-            meta_groups,
-        ) = spike_history.build_design_with_spike_history_from_bins(
-            spikes_df=self.pn.spikes_df,
-            bin_df=bin_df,
-            X_pruned=binned_spikes,
-            meta_groups={},
-            dt=self.bin_width,
-            t_max=self.t_max,
-        )
-
-        return spike_data_w_history, vis_feats_to_decode, meta_used
+        return binned_spikes, vis_feats_to_decode, meta_used
 
     def _get_save_dir(self):
         return os.path.join(
@@ -158,21 +219,21 @@ class FFVisDecodingRunner(BaseOneFFStyleDecodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
-            'spike_data_w_history': save_dir / 'spike_data_w_history.pkl',
+            'vis_binned_spikes': save_dir / 'vis_binned_spikes.pkl',
             'vis_feats_to_decode': save_dir / 'vis_feats_to_decode.pkl',
             'meta_used': save_dir / 'meta_used.pkl',
         }
 
     def _get_design_matrix_data(self):
         return {
-            'spike_data_w_history': self.spike_data_w_history,
+            'vis_binned_spikes': self.vis_binned_spikes,
             'vis_feats_to_decode': self.vis_feats_to_decode,
             'meta_used': self.meta_used,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
-            'spike_data_w_history': 'spike_data_w_history',
+            'vis_binned_spikes': 'vis_binned_spikes',
             'vis_feats_to_decode': 'vis_feats_to_decode',
             'meta_used': 'meta_used',
         }
