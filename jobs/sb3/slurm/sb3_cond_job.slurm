@@ -21,8 +21,8 @@ conda activate multiff_clean
 : "${SWEEP_PARAM:?Must set SWEEP_PARAM=perc_r|perc_th|mem_r|mem_th}"
 
 # 8 discrete levels, 3 seeds per level
-LEVELS=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 3.0 4.0 5.0)
-SEEDS=(0 1 2 3 4)
+LEVELS=(0.5 1.0 1.5 2.0 2.5 3.0)
+SEEDS=(0 1 2 3 4 5 6 7)
 NUM_LEVELS=${#LEVELS[@]}
 NUM_SEEDS=${#SEEDS[@]}
 
@@ -67,7 +67,7 @@ echo "[info] perc_r=$PERC_R perc_th=$PERC_TH mem_r=$MEM_R mem_th=$MEM_TH"
 # ---------------------------------------
 
 LR=3e-4
-NUM_OBS_FF=5
+NUM_OBS_FF=4
 MAX_IN_MEMORY_TIME=3
 IDENTITY_SLOT_STRATEGY="drop_fill_visible_only"
 V_NOISE_STD=0.0

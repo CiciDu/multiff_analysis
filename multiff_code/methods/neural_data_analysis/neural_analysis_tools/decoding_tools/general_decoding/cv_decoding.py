@@ -31,7 +31,7 @@ from tqdm import tqdm
 class DecodingRunConfig:
     # CV
     # 'group_kfold', 'blocked_time_buffered'
-    cv_mode: str = 'blocked_time_buffered'
+    cv_mode: str = 'blocked_time_buffered' # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
     buffer_samples: int = 20
     use_early_stopping: bool = True
 
@@ -106,6 +106,10 @@ def run_cv_decoding(
     results_by_model = {}
 
     for feature in tqdm(behav_features, desc='Decoding features'):
+
+        if verbosity >= 2:
+            print(f'\nDecoding feature: {feature}')
+            print(f'Existing results for this feature: {sum(1 for key in existing_lookup if key[0] == feature)}')
 
         y = y_df[feature].to_numpy().ravel()
         X_ok, y_ok, _ = filter_valid_rows(X, y, groups)
@@ -800,6 +804,9 @@ def run_regression_cv(
 
     y_pred = np.full_like(y, np.nan, float)
 
+    n_total_folds = len(splits)
+    n_valid_folds = 0
+
     model_class = config.regression_model_class or CatBoostRegressor
     model_kwargs = config.regression_model_kwargs or dict(verbose=False)
 
@@ -835,8 +842,13 @@ def run_regression_cv(
         X_te = X[te]
 
         if np.unique(y_tr).size <= 1:
+            # Not enough variance in this training fold to fit a model; fill with constant prediction
             y_pred[te] = y_tr[0]
+            # treat as skipped fold (no model trained)
             continue
+
+        # This fold will be used for evaluation (a model will be trained)
+        n_valid_folds += 1
 
         # Scale features for regression (helps L-BFGS/Huber converge; matches classification path)
         scaler = StandardScaler()
@@ -874,6 +886,9 @@ def run_regression_cv(
         r2_cv=r2_score(y, y_pred),
         rmse_cv=np.sqrt(mean_squared_error(y, y_pred)),
         r_cv=np.corrcoef(y, y_pred)[0, 1],
+        n_total_folds=n_total_folds,
+        n_valid_folds=n_valid_folds,
+        n_skipped_folds=n_total_folds - n_valid_folds,
     )
 
 

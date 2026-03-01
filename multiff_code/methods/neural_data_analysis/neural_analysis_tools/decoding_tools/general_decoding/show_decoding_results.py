@@ -461,7 +461,8 @@ def _plot_mode(
     df_mode,
     mode,
     max_vars_per_plot=20,
-    chance_line=True
+    chance_line=True,
+    metric_name=None,
 ):
     if df_mode.empty:
         return
@@ -511,7 +512,11 @@ def _plot_mode(
         elif mode == 'classification' and chance_line:
             ax.axhline(0.5, linestyle='--', linewidth=1)
 
-        ax.set_ylabel('Cross-validated score')
+        label = 'Cross-validated score'
+        if metric_name:
+            label = f"{label} ({metric_name})"
+
+        ax.set_ylabel(label)
 
         # Remove extra whitespace
         ax.set_xlim(-0.6, len(sub_features) - 0.4)
@@ -571,7 +576,17 @@ def plot_decoder_performance(
     clf_df = selected_df[selected_df['mode'] == 'classification']
 
     # Plot separately
-    _plot_mode(reg_df, 'regression', max_vars_per_plot=max_vars_per_plot)
-    _plot_mode(clf_df, 'classification', max_vars_per_plot=max_vars_per_plot)
+    _plot_mode(
+        reg_df,
+        'regression',
+        max_vars_per_plot=max_vars_per_plot,
+        metric_name=regression_metric,
+    )
+    _plot_mode(
+        clf_df,
+        'classification',
+        max_vars_per_plot=max_vars_per_plot,
+        metric_name=classification_metric,
+    )
 
     return selected_df

@@ -12,9 +12,10 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     decode_stops_design,
 )
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics.base_decoding_runner import (
-    BaseOneFFStyleDecodingRunner,
+    BaseDecodingRunner,
 )
 
 DEFAULT_STOP_CANONCORR_VARS = [
@@ -26,7 +27,7 @@ DEFAULT_STOP_CANONCORR_VARS = [
 ]
 
 
-class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
+class StopDecodingRunner(BaseDecodingRunner):
     """
     Stop decoding runner. CV model-spec decoding via run(); one-FF style
     population decoding (CCA + linear readout) via run_one_ff_style().
@@ -52,7 +53,7 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
         )
 
     # ------------------------------------------------------------------
-    # BaseOneFFStyleDecodingRunner override points
+    # BaseDecodingRunner override points
     # ------------------------------------------------------------------
     def _get_target_df(self) -> pd.DataFrame:
         return self.stop_feats_to_decode
@@ -73,81 +74,6 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
 
     def _target_df_error_msg(self) -> str:
         return "stop_feats_to_decode"
-
-    # ------------------------------------------------------------------
-    # Plotting helpers (one-FF-style outputs)
-    # ------------------------------------------------------------------
-    def plot_canoncorr_coefficients(self, **plot_kwargs):
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
-            plot_decode_stops,
-        )
-
-        block = self.stats.get("canoncorr")
-        if block is None:
-            raise ValueError("No canoncorr results found. Run compute_canoncorr() first.")
-        plot_decode_stops.plot_canoncorr_coefficients(block, **plot_kwargs)
-
-    def plot_decoder_parity(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
-            plot_decode_stops,
-        )
-
-        block = self.stats.get("lineardecoder")
-        if block is None:
-            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
-        plot_decode_stops.plot_decoder_parity(block, varnames=varnames, **plot_kwargs)
-
-    def plot_decoder_correlation_bars(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
-            plot_decode_stops,
-        )
-
-        block = self.stats.get("lineardecoder")
-        if block is None:
-            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
-        plot_decode_stops.plot_decoder_correlation_bars(block, varnames=varnames, **plot_kwargs)
-
-    def plot_single_trial_decoding_panel(
-        self,
-        *,
-        trial_indices: Optional[Sequence[int]] = None,
-        n_trials: int = 6,
-        **plot_kwargs,
-    ):
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
-            plot_decode_stops,
-        )
-
-        block = self.stats.get("lineardecoder")
-        if block is None:
-            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
-        plot_decode_stops.plot_single_trial_decoding_panel(
-            block,
-            trial_indices=trial_indices,
-            n_trials=n_trials,
-            **plot_kwargs,
-        )
-
-    def plot_all_decoding_results(
-        self,
-        *,
-        parity_varnames: Optional[Sequence[str]] = None,
-        bar_varnames: Optional[Sequence[str]] = None,
-        trial_indices: Optional[Sequence[int]] = None,
-        n_trials: int = 6,
-    ):
-        from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
-            plot_decode_stops,
-        )
-
-        plot_decode_stops.plot_all_decoding_results(
-            canoncorr_block=self.stats.get("canoncorr"),
-            readout_block=self.stats.get("lineardecoder"),
-            parity_varnames=parity_varnames,
-            bar_varnames=bar_varnames,
-            trial_indices=trial_indices,
-            n_trials=n_trials,
-        )
 
     # ------------------------------------------------------------------
     # Data collection
@@ -173,7 +99,7 @@ class StopDecodingRunner(BaseOneFFStyleDecodingRunner):
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
-    # Caching utilities (BaseOneFFStyleDecodingRunner interface)
+    # Caching utilities (BaseDecodingRunner interface)
     # ------------------------------------------------------------------
     def _get_save_dir(self):
         return os.path.join(

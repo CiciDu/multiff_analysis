@@ -173,16 +173,10 @@ def plot_decoder_correlation_bars(
     *,
     varnames: Optional[Sequence[str]] = None,
     sort: bool = True,
-    figsize: Tuple[float, float] = (6.5, 3.5),
+    figsize: Tuple[float, float] = (6.5, 5.5),
 ):
-    """
-    Plot decoder correlation per variable as a bar chart.
-    """
     if varnames is None:
-        varnames = [
-            k for k, v in readout_block.items()
-            if not k.startswith("_") and isinstance(v, dict) and ("corr" in v)
-        ]
+        varnames = [k for k, v in readout_block.items() if isinstance(v, dict) and ("corr" in v)]
     varnames = list(varnames)
     if len(varnames) == 0:
         raise ValueError("No decoder correlations found in readout block.")
@@ -193,16 +187,24 @@ def plot_decoder_correlation_bars(
     names = [p[0] for p in pairs]
     vals = np.array([p[1] for p in pairs], dtype=float)
 
-    fig, ax = plt.subplots(figsize=figsize)
+    # Moderate width scaling with a cap to keep plot size reasonable.
+    n = len(names)
+    fig_w = min(12.0, max(6.0, 5.0 + 0.30 * n))
+    fig_h = max(3.2, figsize[1])
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     ax.bar(names, vals)
     ax.axhline(0.0, color="k", lw=1)
     ax.set_ylim(-1.0, 1.0)
     ax.set_ylabel("corr(true, pred)")
-    ax.set_title("Decoder performance by variable" + _get_cv_config_str(readout_block))
-    ax.tick_params(axis="x", rotation=30)
+    ax.set_title("Decoder performance by variable")
+    ax.tick_params(axis="x", labelrotation=45)
+    for label in ax.get_xticklabels():
+        label.set_horizontalalignment("right")
+        label.set_fontsize(9)
     ax.grid(axis="y", alpha=0.2)
     fig.tight_layout()
-    return fig, ax
+    fig.subplots_adjust(bottom=0.25)
+    plt.show()
 
 
 def plot_all_decoding_results(

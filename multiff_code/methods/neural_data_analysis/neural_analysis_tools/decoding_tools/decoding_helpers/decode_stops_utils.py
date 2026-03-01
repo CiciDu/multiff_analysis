@@ -98,7 +98,7 @@ def fit_linear_decoder_cv(
     lengths: Sequence[int],
     width: int,
     n_splits: int = 5,
-    cv_mode: str = "group_kfold",
+    cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
     buffer_samples: int = 20,
     random_state: int = 0,
 ) -> Dict:
@@ -164,7 +164,7 @@ def tune_linear_decoder_cv(
     lengths: Sequence[int],
     candidate_widths: Sequence[int],
     n_splits: int = 5,
-    cv_mode: str = "group_kfold",
+    cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
     buffer_samples: int = 20,
     random_state: int = 0,
 ) -> Dict:

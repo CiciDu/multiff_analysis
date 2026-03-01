@@ -41,6 +41,7 @@ def main():
         save_dir=args.save_dir,
         shuffle_mode='none',
         fit_kernelwidth=True,
+        cv_decoding_verbosity=2,
     )
 
     results_df_shuffled = runner.run(
@@ -48,6 +49,7 @@ def main():
         save_dir=args.save_dir,
         shuffle_mode='timeshift_fold',
         fit_kernelwidth=True,
+        cv_decoding_verbosity=2,
     )
     
     results_one_ff_style = runner.run_one_ff_style()

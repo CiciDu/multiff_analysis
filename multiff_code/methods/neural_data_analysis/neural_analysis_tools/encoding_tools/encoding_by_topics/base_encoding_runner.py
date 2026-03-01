@@ -113,7 +113,7 @@ class BaseEncodingRunner:
         save_metadata: Optional[Dict] = None,
         verbose: bool = True,
         dt: Optional[float] = None,
-        cv_mode: Optional[str] = "blocked_time_buffered",
+        cv_mode: Optional[str] = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
         buffer_samples: int = 20,
         cv_groups=None,
     ) -> Dict:

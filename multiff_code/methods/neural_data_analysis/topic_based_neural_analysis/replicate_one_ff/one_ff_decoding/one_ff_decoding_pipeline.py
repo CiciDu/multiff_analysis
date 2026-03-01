@@ -16,6 +16,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
     one_ff_pipeline,
     population_analysis_utils,
 )
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
 
 DEFAULT_CANONCORR_VARS = ["v", "w", "d", "phi", "r_targ", "theta_targ"]
@@ -604,20 +605,12 @@ class OneFFDecodingRunner:
             self.stats["error_lineardecoder"] = {k: np.asarray(v) for k, v in err.items()}
 
     def plot_canoncorr_coefficients(self, **plot_kwargs):
-        from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-            plot_one_ff_decoding,
-        )
-
         canoncorr = self.stats.get("trialtype", {}).get("all", {}).get("canoncorr")
         if canoncorr is None:
             raise ValueError("No canoncorr results found. Run compute_canoncorr() first.")
         return plot_one_ff_decoding.plot_canoncorr_coefficients(canoncorr, **plot_kwargs)
 
     def plot_decoder_parity(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
-        from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-            plot_one_ff_decoding,
-        )
-
         decodertype = str(_get_attr(self.prs, "decodertype", "lineardecoder"))
         readout = self.stats.get(decodertype)
         if readout is None:
@@ -635,9 +628,7 @@ class OneFFDecodingRunner:
         source: str = "xt_from_vw",
         **plot_kwargs,
     ):
-        from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-            plot_one_ff_decoding,
-        )
+
 
         decodertype = str(_get_attr(self.prs, "decodertype", "lineardecoder"))
         readout = self.stats.get(decodertype)
@@ -656,10 +647,6 @@ class OneFFDecodingRunner:
         varnames: Optional[Sequence[str]] = None,
         **plot_kwargs,
     ):
-        from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-            plot_one_ff_decoding,
-        )
-
         decodertype = str(_get_attr(self.prs, "decodertype", "lineardecoder"))
         readout = self.stats.get(decodertype)
         if readout is None:
@@ -678,9 +665,6 @@ class OneFFDecodingRunner:
         trial_idx: int = 0,
         traj_source: str = "xt_from_vw",
     ):
-        from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-            plot_one_ff_decoding,
-        )
 
         canoncorr = self.stats.get("trialtype", {}).get("all", {}).get("canoncorr")
         decodertype = str(_get_attr(self.prs, "decodertype", "lineardecoder"))
@@ -701,10 +685,6 @@ class OneFFDecodingRunner:
         n_trials: int = 6,
         **plot_kwargs,
     ):
-        from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import (
-            plot_one_ff_decoding,
-        )
-
         decodertype = str(_get_attr(self.prs, "decodertype", "lineardecoder"))
         readout = self.stats.get(decodertype)
         if readout is None:
