@@ -7,7 +7,7 @@ stop-event encoding:
 - Default bin width and temporal window around each stop.
 - Default numbers of basis functions for temporal kernels and tuning.
 - Bin ranges (`binrange`) for kinematic and firefly-related variables, so
-  that tuning designs (e.g. `build_tuning_design_stop`) are consistent
+  that tuning designs (e.g. `build_tuning_design_for_continuous_vars`) are consistent
   across sessions and matched to the one_ff configuration.
 - Default penalties (`lam_f`, `lam_g`, `lam_h`, `lam_p`) to keep the
   stop_GAM regularization in the same order as one_ff_GAM.
@@ -28,8 +28,8 @@ class StopParams:
     -----
     - `bin_width` should match the binning used when assembling the stop design
       (e.g. `bin_width` argument to `StopEncodingRunner` and
-      `assemble_stop_encoding_design`).
-    - `binrange` is passed as `binrange_dict` to `build_tuning_design_stop`
+      `build_stop_encoding_design`).
+    - `binrange` is passed as `binrange_dict` to `build_tuning_design_for_continuous_vars`
       so that tuning boxcars for v/w/d/phi/... match one_ff.
     - `lam_*` match the semantics in `one_ff_gam.build_group_specs`:
         lam_f: tuning (1D curves over continuous covariates)
@@ -51,7 +51,8 @@ class StopParams:
     # =========================
     default_n_basis: int = 20        # raised-cosine basis functions for time
     tuning_n_bins: int = 10          # boxcar bins per tuning covariate
-    tuning_feature_mode: str = 'boxcar_only'  # raw_only | boxcar_only | raw_plus_boxcar
+    # raw_only | boxcar_only | raw_plus_boxcar
+    tuning_feature_mode: str = 'boxcar_only'
 
     # Penalties (match one_ff_gam defaults in scale)
     lam_f: float = 100.0             # tuning curves
@@ -67,7 +68,7 @@ class StopParams:
             # Kinematics / integrated motion (copied from one_ff_parameters)
             "v": np.array([0, 200]),            # cm/s
             "w": np.array([-90, 90]),           # deg/s
-            #"d": np.array([0, 400]),            # cm
+            # "d": np.array([0, 400]),            # cm
             "phi": np.array([-180, 180]),         # deg
             "accel": np.array([-1000, 1000]),  # cm/s^2
             "ang_accel_deg": np.array([-600, 600]),  # rad/s^2
@@ -121,7 +122,8 @@ def estimate_stop_binrange_from_binned_feats(
     for var in vars_to_include:
         if var not in binned_feats.columns:
             continue
-        x = pd.to_numeric(binned_feats[var], errors='coerce').to_numpy(dtype=float)
+        x = pd.to_numeric(binned_feats[var],
+                          errors='coerce').to_numpy(dtype=float)
         x = x[np.isfinite(x)]
         if x.size == 0:
             continue
@@ -158,4 +160,3 @@ def default_prs() -> StopParams:
     """
 
     return StopParams()
-

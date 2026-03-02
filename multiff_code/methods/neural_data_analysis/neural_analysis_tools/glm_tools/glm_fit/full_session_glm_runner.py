@@ -25,10 +25,6 @@ from neural_data_analysis.design_kits.design_by_segment import (
     create_pn_design_df,
 )
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    encode_stops_design,
-)
-
 from neural_data_analysis.topic_based_neural_analysis.full_session import (
     create_full_session_design,
     selected_pn_design_features,
@@ -50,6 +46,10 @@ from decision_making_analysis.data_compilation import (
     miss_events_class,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+    encode_stops_gam_helper,
+    encode_stops_utils,
+)
 
 class FullSessionGLMRunner:
 
@@ -271,7 +271,7 @@ class FullSessionGLMRunner:
             pn_df, pn_df['new_segment'], pn.ff_caught_T_new
         )
 
-        self.pn_design_df, _, self.pn_meta = create_pn_design_df.get_initial_design_df(
+        self.pn_design_df, _, self.pn_meta = create_pn_design_df.get_pn_design_base(
             pn_df, self.bin_width, pn_df['new_segment'])
 
         self.pn_design_df_sub = self.pn_design_df[
@@ -438,13 +438,13 @@ class FullSessionGLMRunner:
 
     def _build_stop_design(self):
 
-        pn, stop_binned_spikes, stop_binned_feats, offset_log, stop_meta_used, stop_meta_groups, _, _, _, _ = encode_stops_design.assemble_stop_encoding_design(
+        pn, binned_spikes, binned_feats, offset_log, stop_meta_used, stop_meta_groups, _, _ = encode_stops_utils.build_stop_encoding_design(
             self.raw_data_folder_path,
             self.bin_width,
             self.global_bins_2d,
         )
 
-        self.stop_design_df_sub = stop_binned_feats[
+        self.stop_design_df_sub = binned_feats[
             selected_stop_design_features.stop_design_predictors
         ].copy()
         self.stop_design_df_sub['bin'] = stop_meta_used['global_bin']

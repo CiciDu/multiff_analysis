@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
-import pickle
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -25,7 +22,6 @@ class BaseEncodingRunner:
 
     Subclasses must implement:
     - get_design_for_unit(unit_idx)
-    - get_binned_spikes()
     - get_gam_groups(unit_idx, lam_f, lam_g, lam_h, lam_p)
     - get_gam_save_paths(unit_idx, ...)
     - num_neurons
@@ -63,15 +59,16 @@ class BaseEncodingRunner:
         """Fit Poisson GAM for one unit."""
         self._collect_data(exists_ok=True)
         design_df = self.get_design_for_unit(unit_idx)
-        binned_spikes = self.get_binned_spikes()
+        binned_spikes = self.binned_spikes
         n_rows = len(design_df)
         if n_rows != len(binned_spikes):
             raise ValueError(
                 f"design and binned_spikes row count mismatch: {n_rows} vs {len(binned_spikes)}"
             )
-        y = np.asarray(binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(
+            binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
 
-        groups, _ = self.get_gam_groups(
+        groups, lambda_config = self.get_gam_groups(
             unit_idx=unit_idx, lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p
         )
         if save_path is None:
@@ -113,7 +110,8 @@ class BaseEncodingRunner:
         save_metadata: Optional[Dict] = None,
         verbose: bool = True,
         dt: Optional[float] = None,
-        cv_mode: Optional[str] = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
+        # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
+        cv_mode: Optional[str] = "blocked_time_buffered",
         buffer_samples: int = 20,
         cv_groups=None,
     ) -> Dict:
@@ -125,18 +123,20 @@ class BaseEncodingRunner:
         )
         if maybe_loaded is not None:
             if verbose:
-                print(f"Loaded cached cross-validation results from: {save_path}")
+                print(
+                    f"Loaded cached cross-validation results from: {save_path}")
             return maybe_loaded
 
         self._collect_data(exists_ok=True)
         design_df = self.get_design_for_unit(unit_idx)
-        binned_spikes = self.get_binned_spikes()
+        binned_spikes = self.binned_spikes
         n_rows = len(design_df)
         if n_rows != len(binned_spikes):
             raise ValueError(
                 f"design and binned_spikes row count mismatch: {n_rows} vs {len(binned_spikes)}"
             )
-        y = np.asarray(binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(
+            binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
         if dt is None:
             dt = float(self.bin_width)
         if fit_kwargs is None:
@@ -205,7 +205,7 @@ class BaseEncodingRunner:
             return None
 
         self._collect_data(exists_ok=True)
-        binned_spikes = self.get_binned_spikes()
+        binned_spikes = self.binned_spikes
         n_neurons = binned_spikes.shape[1]
         if unit_indices is None:
             unit_indices = list(range(n_neurons))
@@ -230,7 +230,7 @@ class BaseEncodingRunner:
 
         all_neuron_r2 = []
         for unit_idx in unit_indices:
-            groups, _ = self.get_gam_groups(
+            groups, lambda_config = self.get_gam_groups(
                 unit_idx=unit_idx,
                 lam_f=lam_f,
                 lam_g=lam_g,
@@ -239,7 +239,8 @@ class BaseEncodingRunner:
             )
             outdir = base / f"neuron_{unit_idx}"
             (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
-            cv_save_path = str(outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
+            cv_save_path = str(
+                outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
             cv_res = self.crossval_variance_explained(
                 unit_idx=unit_idx,
                 groups=groups,
@@ -341,7 +342,8 @@ class BaseEncodingRunner:
                 outdir = base / f"neuron_{unit_idx}"
                 (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
                 lam_suffix = paths_i["lam_suffix"]
-                cv_save_path = str(outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
+                cv_save_path = str(
+                    outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
 
                 maybe_loaded = gam_variance_explained.maybe_load_saved_crossval(
                     save_path=cv_save_path,
@@ -358,6 +360,7 @@ class BaseEncodingRunner:
                     return None
             except Exception as e:
                 if verbose:
-                    print(f"Try to load variance explained for unit {unit_idx} failed: {e}")
+                    print(
+                        f"Try to load variance explained for unit {unit_idx} failed: {e}")
                 return None
         return all_neuron_r2

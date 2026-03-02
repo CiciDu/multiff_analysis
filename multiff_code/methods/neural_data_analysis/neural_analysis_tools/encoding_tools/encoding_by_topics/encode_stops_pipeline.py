@@ -2,16 +2,14 @@ import os
 import pickle
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils, encoding_design_utils
 
 # Third-party imports
 import numpy as np
 import pandas as pd
 
 
-# Neuroscience-specific imports
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    encode_stops_design,
-)
+
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import (
     stop_parameters,
 )
@@ -60,8 +58,8 @@ class StopEncodingRunner(BaseEncodingRunner):
         self.stop_meta_used = None
         # deprecated: use get_design_for_unit(unit_idx)
         self.design_df_w_history = None
-        self.stop_binned_feats = None
-        self.stop_binned_spikes = None  # (n_bins x n_neurons) for Poisson GAM
+        self.binned_feats = None
+        self.binned_spikes = None  # (n_bins x n_neurons) for Poisson GAM
         # Spike-history components for per-neuron design (computed on first use)
         self._X_hist = None
         self._colnames = None
@@ -90,6 +88,37 @@ class StopEncodingRunner(BaseEncodingRunner):
     # Data collection
     # ------------------------------------------------------------------
 
+    def get_design_for_unit(self, unit_idx: int) -> pd.DataFrame:
+        """
+        Build design matrix with spike-history regressors for the given target neuron.
+
+        Spike-history must match the target neuron when predicting its spikes.
+        unit_idx maps to binned_spikes column order.
+        """
+        self._ensure_spike_history_components()
+        if unit_idx < 0 or unit_idx >= len(self._spike_cols):
+            raise IndexError(
+                f'unit_idx {unit_idx} out of range [0, {len(self._spike_cols)})'
+            )
+        target_col = self._spike_cols[unit_idx]
+        self._refresh_structured_meta_groups_for_unit(target_col)
+        design_df, _ = spike_history.add_spike_history_to_design(
+            design_df=self.binned_feats.reset_index(drop=True),
+            colnames=self._colnames,
+            X_hist=self._X_hist,
+            target_col=target_col,
+            include_self=True,
+            cross_neurons=None,
+            meta_groups=None,
+        )
+        # Drop constant columns except 'const'
+        const_cols_to_drop = [
+            c for c in design_df.columns
+            if c != 'const' and design_df[c].nunique() <= 1
+        ]
+        design_df = design_df.drop(columns=const_cols_to_drop)
+        return design_df
+
     def _collect_data(self, exists_ok=True,
                       # can be 'raw_only', 'boxcar_only', 'raw_plus_boxcar'
                       tuning_feature_mode='boxcar_only'
@@ -98,7 +127,7 @@ class StopEncodingRunner(BaseEncodingRunner):
         Collect and prepare data for stop encoding.
         """
         if exists_ok and self._load_design_matrices():
-            if not self._has_one_ff_like_terms(self.stop_binned_feats):
+            if not self._has_one_ff_like_terms(self.binned_feats):
                 print(
                     '[StopEncodingRunner] Cached encoding design is stale '
                     '(missing one_ff-like temporal/spatial terms); recomputing'
@@ -113,16 +142,13 @@ class StopEncodingRunner(BaseEncodingRunner):
 
         (
             self.pn,
-            self.stop_binned_spikes,
-            self.stop_binned_feats,
+            self.binned_spikes,
+            self.binned_feats,
             offset_log,
             self.stop_meta_used,
-            flat_meta_groups,
-            self.init_stop_binned_feats,
-            self.binrange_dict,
             temporal_meta,
             tuning_meta,
-        ) = encode_stops_design.assemble_stop_encoding_design(
+        ) = encode_stops_utils.build_stop_encoding_design(
             self.raw_data_folder_path,
             self.bin_width,
             **design_kwargs,
@@ -136,13 +162,10 @@ class StopEncodingRunner(BaseEncodingRunner):
         ).index
         self.stop_meta_used = self.stop_meta_used.loc[sort_idx].reset_index(
             drop=True)
-        self.stop_binned_feats = self.stop_binned_feats.loc[sort_idx].reset_index(
+        self.binned_feats = self.binned_feats.loc[sort_idx].reset_index(
             drop=True)
-        self.stop_binned_spikes = self.stop_binned_spikes.loc[sort_idx].reset_index(
+        self.binned_spikes = self.binned_spikes.loc[sort_idx].reset_index(
             drop=True)
-        if hasattr(self, 'init_stop_binned_feats') and self.init_stop_binned_feats is not None:
-            self.init_stop_binned_feats = self.init_stop_binned_feats.loc[sort_idx].reset_index(
-                drop=True)
 
         bin_df = spike_history.make_bin_df_from_stop_meta(self.stop_meta_used)
         n_basis_hist = getattr(self.stop_prs, 'default_n_basis', 20)
@@ -156,8 +179,8 @@ class StopEncodingRunner(BaseEncodingRunner):
         ) = spike_history.build_design_with_spike_history_from_bins(
             spikes_df=self.pn.spikes_df,
             bin_df=bin_df,
-            X_pruned=self.stop_binned_feats,
-            meta_groups=flat_meta_groups,
+            X_pruned=self.binned_feats,
+            meta_groups=None,
             dt=self.bin_width,
             t_max=self.t_max,
             return_X_hist=True,
@@ -166,7 +189,7 @@ class StopEncodingRunner(BaseEncodingRunner):
         self._spike_cols = list(self._colnames.keys())
 
         # Restructure meta_groups into one_ff_gam-style categories
-        self.structured_meta_groups = encode_stops_utils.build_structured_meta_groups(
+        self.structured_meta_groups = encoding_design_utils.build_structured_meta_groups(
             colnames=self._colnames,
             temporal_meta=temporal_meta,
             tuning_meta=tuning_meta,
@@ -184,9 +207,9 @@ class StopEncodingRunner(BaseEncodingRunner):
         """Compute spike-history components if not yet available (e.g. after cache load)."""
         if self._X_hist is not None:
             return
-        if self.stop_binned_feats is None or self.stop_meta_used is None:
+        if self.binned_feats is None or self.stop_meta_used is None:
             raise RuntimeError(
-                'Run _collect_data first since self.stop_binned_feats or self.stop_meta_used is None')
+                'Run _collect_data first since self.binned_feats or self.stop_meta_used is None')
         bin_df = spike_history.make_bin_df_from_stop_meta(self.stop_meta_used)
 
         if not hasattr(self.pn, 'spikes_df'):
@@ -197,7 +220,7 @@ class StopEncodingRunner(BaseEncodingRunner):
             spike_history.build_design_with_spike_history_from_bins(
                 spikes_df=self.pn.spikes_df,
                 bin_df=bin_df,
-                X_pruned=self.stop_binned_feats,
+                X_pruned=self.binned_feats,
                 meta_groups={},
                 dt=self.bin_width,
                 t_max=self.t_max,
@@ -205,37 +228,6 @@ class StopEncodingRunner(BaseEncodingRunner):
             )
         )
         self._spike_cols = list(self._colnames.keys())
-
-    def get_design_for_unit(self, unit_idx: int) -> pd.DataFrame:
-        """
-        Build design matrix with spike-history regressors for the given target neuron.
-
-        Spike-history must match the target neuron when predicting its spikes.
-        unit_idx maps to stop_binned_spikes column order.
-        """
-        self._ensure_spike_history_components()
-        if unit_idx < 0 or unit_idx >= len(self._spike_cols):
-            raise IndexError(
-                f'unit_idx {unit_idx} out of range [0, {len(self._spike_cols)})'
-            )
-        target_col = self._spike_cols[unit_idx]
-        self._refresh_structured_meta_groups_for_unit(target_col)
-        design_df, _ = spike_history.add_spike_history_to_design(
-            design_df=self.stop_binned_feats.reset_index(drop=True),
-            colnames=self._colnames,
-            X_hist=self._X_hist,
-            target_col=target_col,
-            include_self=True,
-            cross_neurons=None,
-            meta_groups=None,
-        )
-        # Drop constant columns except 'const'
-        const_cols_to_drop = [
-            c for c in design_df.columns
-            if c != 'const' and design_df[c].nunique() <= 1
-        ]
-        design_df = design_df.drop(columns=const_cols_to_drop)
-        return design_df
 
     def _refresh_structured_meta_groups_for_unit(
         self, unit_ref: Union[int, str]
@@ -268,9 +260,10 @@ class StopEncodingRunner(BaseEncodingRunner):
         if self._colnames is None:
             raise RuntimeError('Spike history colnames not initialized')
         if target_col not in self._colnames:
-            raise KeyError(f'target_col {target_col!r} not in spike-history colnames')
+            raise KeyError(
+                f'target_col {target_col!r} not in spike-history colnames')
 
-        self.structured_meta_groups = encode_stops_utils.build_structured_meta_groups(
+        self.structured_meta_groups = encoding_design_utils.build_structured_meta_groups(
             colnames=self._colnames,
             temporal_meta=self.structured_meta_groups.get('temporal', {}),
             tuning_meta=self.structured_meta_groups.get('tuning', {}),
@@ -307,12 +300,12 @@ class StopEncodingRunner(BaseEncodingRunner):
 
     def _encoding_design_kwargs(self) -> Dict:
         """
-        Build kwargs for assemble_stop_encoding_design from stop_prs.
+        Build kwargs for build_stop_encoding_design from stop_prs.
         """
         prs = self.stop_prs
         mode = getattr(prs, 'tuning_feature_mode', None)
         return {
-            'use_tuning_design': bool(
+            'use_boxcar': bool(
                 mode in ('boxcar_only', 'raw_plus_boxcar')
             ),
             'tuning_feature_mode': mode,
@@ -335,8 +328,8 @@ class StopEncodingRunner(BaseEncodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir()) / 'encoding_design'
         return {
-            'stop_binned_feats': save_dir / 'stop_binned_feats.pkl',
-            'stop_binned_spikes': save_dir / 'stop_binned_spikes.pkl',
+            'binned_feats': save_dir / 'binned_feats.pkl',
+            'binned_spikes': save_dir / 'binned_spikes.pkl',
             'stop_meta_used': save_dir / 'stop_meta_used.pkl',
             'binrange_dict': save_dir / 'binrange_dict.pkl',
             'structured_meta_groups': save_dir / 'structured_meta_groups.pkl',
@@ -344,11 +337,11 @@ class StopEncodingRunner(BaseEncodingRunner):
 
     def _save_design_matrices(self):
         paths = self._get_design_matrix_paths()
-        paths['stop_binned_feats'].parent.mkdir(parents=True, exist_ok=True)
+        paths['binned_feats'].parent.mkdir(parents=True, exist_ok=True)
 
         data_to_save = {
-            'stop_binned_feats': self.stop_binned_feats,
-            'stop_binned_spikes': self.stop_binned_spikes,
+            'binned_feats': self.binned_feats,
+            'binned_spikes': self.binned_spikes,
             'stop_meta_used': self.stop_meta_used,
             'binrange_dict': self.binrange_dict,
             'structured_meta_groups': self.structured_meta_groups,
@@ -367,20 +360,20 @@ class StopEncodingRunner(BaseEncodingRunner):
 
     def _load_design_matrices(self):
         paths = self._get_design_matrix_paths()
-        required = ['stop_binned_feats',
-                    'stop_binned_spikes', 'stop_meta_used', 'structured_meta_groups']
+        required = ['binned_feats',
+                    'binned_spikes', 'stop_meta_used', 'structured_meta_groups']
         if not all(paths[k].exists() for k in required):
             return False
 
         try:
-            with open(paths['stop_binned_feats'], 'rb') as f:
-                self.stop_binned_feats = pickle.load(f)
+            with open(paths['binned_feats'], 'rb') as f:
+                self.binned_feats = pickle.load(f)
 
             with open(paths['stop_meta_used'], 'rb') as f:
                 self.stop_meta_used = pickle.load(f)
 
-            with open(paths['stop_binned_spikes'], 'rb') as f:
-                self.stop_binned_spikes = pickle.load(f)
+            with open(paths['binned_spikes'], 'rb') as f:
+                self.binned_spikes = pickle.load(f)
 
             if paths['binrange_dict'].exists():
                 with open(paths['binrange_dict'], 'rb') as f:
@@ -412,13 +405,10 @@ class StopEncodingRunner(BaseEncodingRunner):
             ).index
             self.stop_meta_used = self.stop_meta_used.loc[sort_idx].reset_index(
                 drop=True)
-            self.stop_binned_feats = self.stop_binned_feats.loc[sort_idx].reset_index(
+            self.binned_feats = self.binned_feats.loc[sort_idx].reset_index(
                 drop=True)
-            self.stop_binned_spikes = self.stop_binned_spikes.loc[sort_idx].reset_index(
+            self.binned_spikes = self.binned_spikes.loc[sort_idx].reset_index(
                 drop=True)
-            if hasattr(self, 'init_stop_binned_feats') and self.init_stop_binned_feats is not None:
-                self.init_stop_binned_feats = self.init_stop_binned_feats.loc[sort_idx].reset_index(
-                    drop=True)
 
             print('[StopEncodingRunner] Loaded cached design matrices')
             return True
@@ -429,12 +419,6 @@ class StopEncodingRunner(BaseEncodingRunner):
                 f'{e}'
             )
             return False
-
-    # ------------------------------------------------------------------
-    # BaseEncodingRunner adapter methods
-    # ------------------------------------------------------------------
-    def get_binned_spikes(self):
-        return self.stop_binned_spikes
 
     def get_gam_groups(
         self,
@@ -476,7 +460,7 @@ class StopEncodingRunner(BaseEncodingRunner):
         return "stop_gam_results"
 
     # ------------------------------------------------------------------
-    # Poisson GAM fit (stop encoding: design_df_w_history + stop_binned_spikes)
+    # Poisson GAM fit (stop encoding: design_df_w_history + binned_spikes)
     # ------------------------------------------------------------------
     def fit_stop_poisson_gam(
         self,
@@ -502,12 +486,12 @@ class StopEncodingRunner(BaseEncodingRunner):
 
         Same as one_ff_gam_fit.fit_poisson_gam, but design matrix is
         built per-unit via get_design_for_unit(unit_idx) and the response
-        is the neural data for the given unit from self.stop_binned_spikes.
+        is the neural data for the given unit from self.binned_spikes.
 
         Parameters
         ----------
         unit_idx : int
-            Column index into self.stop_binned_spikes (0 .. n_neurons - 1).
+            Column index into self.binned_spikes (0 .. n_neurons - 1).
         groups : list of GroupSpec
             Penalty groups for the design columns (from get_stop_gam_groups(unit_idx)).
         lam_f, lam_g, lam_h, lam_p : float
@@ -568,9 +552,9 @@ class StopEncodingRunner(BaseEncodingRunner):
         lambda_config : dict
             For generate_lambda_suffix(lambda_config=lambda_config).
         """
-        if self.stop_binned_feats is None:
+        if self.binned_feats is None:
             raise RuntimeError(
-                'Run _collect_data first since self.stop_binned_feats is None')
+                'Run _collect_data first since self.binned_feats is None')
         self.design_df_w_history = self.get_design_for_unit(unit_idx)
         return encode_stops_utils.build_stop_gam_groups(
             self.design_df_w_history,
@@ -754,12 +738,12 @@ class StopEncodingRunner(BaseEncodingRunner):
         Run crossval_variance_explained for one unit using stop design and neural data.
 
         Uses gam_variance_explained.crossval_variance_explained with
-        design_df from get_design_for_unit(unit_idx) and y from self.stop_binned_spikes.
+        design_df from get_design_for_unit(unit_idx) and y from self.binned_spikes.
 
         Parameters
         ----------
         unit_idx : int
-            Column index into self.stop_binned_spikes.
+            Column index into self.binned_spikes.
         groups : list of GroupSpec
             Same as for fit_stop_poisson_gam (e.g. from get_stop_gam_groups()).
         n_folds, random_state, fit_kwargs, save_path, load_if_exists,
@@ -820,12 +804,12 @@ class StopEncodingRunner(BaseEncodingRunner):
         to analyze stability and consistency of tuning curve estimates.
 
         Uses gam_variance_explained.crossval_variance_explained wrapper with
-        design_df from get_design_for_unit(unit_idx) and y from self.stop_binned_spikes.
+        design_df from get_design_for_unit(unit_idx) and y from self.binned_spikes.
 
         Parameters
         ----------
         unit_idx : int
-            Column index into self.stop_binned_spikes.
+            Column index into self.binned_spikes.
         groups : list of GroupSpec
             Penalty groups for the design matrix (e.g. from get_stop_gam_groups()).
         n_folds : int
@@ -903,13 +887,13 @@ class StopEncodingRunner(BaseEncodingRunner):
         # Get design matrix and response for the target neuron
         self.design_df_w_history = self.get_design_for_unit(unit_idx)
         n_rows = len(self.design_df_w_history)
-        if n_rows != len(self.stop_binned_spikes):
+        if n_rows != len(self.binned_spikes):
             raise ValueError(
-                f'design and stop_binned_spikes row count mismatch: '
-                f'{n_rows} vs {len(self.stop_binned_spikes)}'
+                f'design and binned_spikes row count mismatch: '
+                f'{n_rows} vs {len(self.binned_spikes)}'
             )
         y = np.asarray(
-            self.stop_binned_spikes.iloc[:, unit_idx].to_numpy(),
+            self.binned_spikes.iloc[:, unit_idx].to_numpy(),
             dtype=float,
         ).ravel()
 

@@ -15,7 +15,7 @@ from neural_data_analysis.design_kits.design_by_segment import (
 ArrayLike = Union[np.ndarray, pd.Series, list]
 
 
-def get_initial_design_df(
+def get_pn_design_base(
     data: pd.DataFrame,
     dt: float,
     trial_ids: Optional[np.ndarray] = None,

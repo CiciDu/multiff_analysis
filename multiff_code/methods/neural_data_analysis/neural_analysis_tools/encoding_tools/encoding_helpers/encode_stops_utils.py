@@ -1,187 +1,294 @@
 
-import warnings
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Union
+
 
 import numpy as np
 import pandas as pd
 import re
-import os
+
+import numpy as np
+import pandas as pd
 
 from neural_data_analysis.design_kits.design_around_event import (
     event_binning,
     stop_design,
     cluster_design,
 )
-from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_design
+from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import stop_parameters
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
+    decode_stops_design,
+)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils, encoding_design_utils
+
+
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
     GroupSpec,
 )
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
+from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_design
 
 
-# Radians to degrees; monkey_information stores angles/angular rates in rad.
-_RAD_TO_DEG = 180.0 / np.pi
+# ---------------------------------------------------------------------------
+# Stop GAM group specs (mirror one_ff_gam: lam_f tuning, lam_g event, lam_h hist, lam_p coupling)
+# ---------------------------------------------------------------------------
 
-# Map planning/monkey_information column names -> one_ff names so extra_agg_cols find them.
-# Only renames when source exists and target does not (avoids overwriting one_ff data).
-# Do not map speed/ang_speed -> v/w here; base design already uses speed, ang_speed as kinematics.
-PLANNING_TO_ONE_FF_RENAME: Dict[str, str] = {
-    # integrated / heading (one_ff: d, phi)
-    'cum_distance': 'd',
-    'monkey_angle': 'phi',
-    # target (polar-like; one_ff: r_targ, theta_targ)
-    'target_distance': 'r_targ',
-    'target_angle': 'theta_targ',
-    # eye channels are handled explicitly in monkey_information_for_encoding:
-    # average left/right when both valid, else use available channel.
-}
+# Behavioral column groups aligned with decode_stops_design._build_feature_groups.
+# (name, list of column names, vartype). Only columns present in design_df are used.
+_STOP_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
+    # Kinematic (1D each)
+    ('accel', ['accel'], '1D'),
+    ('speed', ['speed'], '1D'),
+    ('ang_speed', ['ang_speed'], '1D'),
+    # One_ff_gam-style tuning (if present in design; from extra_agg_cols in encoding design)
+    ('v', ['v'], '1D'),
+    ('w', ['w'], '1D'),
+    ('d', ['d'], '1D'),
+    ('phi', ['phi'], '1D'),
+    ('r_targ', ['r_targ'], '1D'),
+    ('theta_targ', ['theta_targ'], '1D'),
+    ('eye_ver', ['eye_ver'], '1D'),
+    ('eye_hor', ['eye_hor'], '1D'),
+    # Event design (event = temporal basis)
+    ('basis', None, 'event'),   # cols: rcos_* without *captured; filled below
+    ('basis*captured', None, 'event'),
+    ('prepost', ['prepost'], '1D'),
+    ('prepost*speed', ['prepost*speed'], '1D'),
+    ('captured', ['captured'], '1D'),
+    ('time_since_prev_event', ['time_since_prev_event'], '1D'),
+    ('time_to_next_event', ['time_to_next_event'], '1D'),
+    # Cluster
+    ('cluster_flags', ['event_is_first_in_cluster'], '1D'),
+    ('cluster_gaps', ['gap_since_prev_event_in_cluster_z',
+     'gap_till_next_event_in_cluster_z'], '1D'),
+    ('cluster_duration', ['cluster_duration_s_z'], '1D'),
+    ('cluster_progress', ['cluster_progress_c', 'cluster_progress_c2'], '1D'),
+    ('cluster_rel_time', ['bin_t_from_cluster_start_s_z'], '1D'),
+    ('cluster_n_events', ['log_n_events_in_cluster_z'], '1D'),
+    ('is_clustered', ['is_clustered'], '1D'),
+    ('event_in_cluster_t', ['event_t_from_cluster_start_s'], '1D'),
+    # Firefly
+    ('ff_visible', ['log1p_num_ff_visible', 'k_ff_visible'], '1D'),
+    ('ff_in_memory', ['log1p_num_ff_in_memory', 'k_ff_in_memory'], '1D'),
+    # Retries
+    ('retries', [
+        'rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle',
+        'rsw_last', 'rcap_last', 'one_stop_miss', 'whether_in_retry_series', 'miss',
+    ], 'event'),
+    # Timing
+    ('time_rel_to_event_start', ['time_rel_to_event_start'], '1D'),
+]
 
 
-def monkey_information_for_encoding(
-    monkey_information: pd.DataFrame,
-    rename_planning_to_one_ff: bool = True,
-    custom_rename: Optional[Dict[str, str]] = None,
-) -> pd.DataFrame:
+
+def _build_feature_groups_for_encoding(
+    binned_feats: pd.DataFrame,
+    kinematic_cols: List[str],
+    basis_cols: List[str],
+    tuning_meta: Optional[Dict] = None,
+    include_raw_one_ff_cols: bool = True,
+) -> Dict[str, List[str]]:
     """
-    Wrapper to make monkey_information use one_ff-style column names for encoding design.
+    Build semantic feature groups (same style as decode_stops_design._build_feature_groups).
+    Uses 'basis' for the one_ff-style rcos_* columns. If tuning_meta is provided (from
+    build_tuning_design_for_continuous_vars), adds one group per variable (var:bin0..); otherwise
+    adds one_ff-style extra cols as single-column groups when present.
+    """
+    groups: Dict[str, List[str]] = {}
 
-    Renames planning/pipeline columns (e.g. target_distance, speed) to one_ff names
-    (r_targ, v) so that extra_agg_cols in build_stop_design picks them up when
-    building the encoding design.
+    def _add(name: str, cols: List[str]) -> None:
+        present = [c for c in cols if c in binned_feats.columns]
+        if present:
+            groups[name] = present
 
-    Parameters
-    ----------
-    monkey_information : pd.DataFrame
-        Per-sample dataframe (e.g. pn.monkey_information).
-    rename_planning_to_one_ff : bool
-        If True, apply PLANNING_TO_ONE_FF_RENAME for any source column that exists
-        and whose target name is not already a column.
-    custom_rename : dict, optional
-        Additional or override renames: {source_col: target_col}. Applied after
-        the default PLANNING_TO_ONE_FF_RENAME.
+    for c in kinematic_cols:
+        _add(c, [c])
+    if tuning_meta is not None and 'groups' in tuning_meta:
+        for var, cols in tuning_meta['groups'].items():
+            _add(var, cols)
+    if include_raw_one_ff_cols:
+        for c in encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS:
+            _add(c, [c])
+    _add('basis', basis_cols)
+
+    _add('cluster_flags', ['event_is_first_in_cluster'])
+    _add('cluster_gaps', ['gap_since_prev_event_in_cluster_z',
+         'gap_till_next_event_in_cluster_z'])
+    _add('cluster_duration', ['cluster_duration_s_z'])
+    _add('cluster_progress', ['cluster_progress_c', 'cluster_progress_c2'])
+    _add('cluster_rel_time', ['bin_t_from_cluster_start_s_z'])
+    _add('cluster_n_events', ['log_n_events_in_cluster_z'])
+    _add('is_clustered', ['is_clustered'])
+    _add('event_in_cluster_t', ['event_t_from_cluster_start_s'])
+
+    _add('ff_visible', ['log1p_num_ff_visible', 'k_ff_visible'])
+    _add('ff_in_memory', ['log1p_num_ff_in_memory', 'k_ff_in_memory'])
+    _add(
+        'retries',
+        [
+            'rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle',
+            'rsw_last', 'rcap_last', 'one_stop_miss',
+            'whether_in_retry_series', 'miss',
+        ],
+    )
+    _add('time_rel_to_event_start', ['time_rel_to_event_start'])
+
+    return groups
+
+
+
+def build_stop_encoding_design(
+    raw_data_folder_path: str,
+    bin_width: float,
+    global_bins_2d: Optional[np.ndarray] = None,
+    n_basis: int = 20,
+    t_min: float = -0.3,
+    t_max: float = 0.3,
+    use_boxcar: bool = False,
+    tuning_feature_mode: Optional[str] = None,
+    binrange_dict: Optional[Dict[str, Union[np.ndarray, Tuple[float, float]]]] = None,
+    tuning_n_bins: int = 10,
+    linear_vars: Optional[List[str]] = None,
+    angular_vars: Optional[List[str]] = None,
+    use_planning_rename: bool = True,
+    custom_rename: Optional[Dict[str, str]] = None,
+):
+    """
+    Full stop-aligned encoding design builder.
+
+    This is now the single entry point.
+
+    Pipeline:
+        1) Load and prepare stop inputs
+        2) Build base binning/spikes/cluster/ff/retries
+        3) Add summed stop-event temporal basis
+        4) Optionally add tuning boxcar features
+        5) Build semantic groups
+        6) Drop constant columns
 
     Returns
     -------
-    pd.DataFrame
-        Copy of monkey_information with columns renamed so one_ff-style names
-        (v, w, d, phi, r_targ, theta_targ, eye_ver, eye_hor) are present when
-        the planning data has the corresponding source columns.
+    pn
+    binned_spikes
+    binned_feats
+    offset_log
+    stop_meta_used
+    stop_meta_groups
+    temporal_meta
+    tuning_meta
     """
-    out = monkey_information.copy()
 
-    def _derive_eye_channel(
-        out_df: pd.DataFrame,
-        target_col: str,
-        left_col: str,
-        right_col: str,
-    ) -> None:
-        """
-        Derive eye target column using binocular average when possible.
-
-        When valid_view_point_l and valid_view_point_r exist (from
-        eye_positions.find_valid_view_points), only use left/right eye values
-        where that eye's gaze is valid. Otherwise fall back to row-wise mean
-        with skipna.
-
-        Priority:
-        1) If target already exists: keep it.
-        2) If valid_view_point_l/r exist: use left only where valid_view_point_l,
-           right only where valid_view_point_r; then mean of valid values.
-        3) Else if left/right both exist: row-wise mean(skipna=True).
-        4) Else use whichever of left/right exists.
-        5) Else leave missing (no gaze fallback).
-        """
-        if target_col in out_df.columns:
-            return
-
-        has_left = left_col in out_df.columns
-        has_right = right_col in out_df.columns
-        has_valid = (
-            'valid_view_point_l' in out_df.columns
-            and 'valid_view_point_r' in out_df.columns
+    # ------------------------------------------------------------------
+    # 1) Prepare stop inputs
+    # ------------------------------------------------------------------
+    pn, datasets, new_seg_info, events_with_stats = \
+        decode_stops_design._prepare_stop_design_inputs(
+            raw_data_folder_path,
+            bin_width,
         )
 
-        if has_valid and (has_left or has_right):
-            left_vals = np.full(len(out_df), np.nan, dtype=float)
-            right_vals = np.full(len(out_df), np.nan, dtype=float)
-            if has_left:
-                left_vals = np.where(
-                    out_df['valid_view_point_l'].to_numpy(dtype=bool),
-                    out_df[left_col].to_numpy(float),
-                    np.nan,
-                )
-            if has_right:
-                right_vals = np.where(
-                    out_df['valid_view_point_r'].to_numpy(dtype=bool),
-                    out_df[right_col].to_numpy(float),
-                    np.nan,
-                )
-            both = np.stack([left_vals, right_vals], axis=1)
-            with warnings.catch_warnings():
-                # Mean of empty slice
-                warnings.simplefilter('ignore', RuntimeWarning)
-                out_df[target_col] = np.nanmean(both, axis=1)
-            # Fill NaN from rows where both eyes invalid (avoids NaN in design -> rate=nan)
-            out_df[target_col] = out_df[target_col].fillna(0.0)
-            return
-        else:
-            print(
-                'Warning: columns valid_view_point_l or valid_view_point_r does not exist')
-
-        if has_left and has_right:
-            out_df[target_col] = out_df[[left_col, right_col]].mean(
-                axis=1, skipna=True
-            )
-            return
-        if has_left:
-            out_df[target_col] = out_df[left_col].to_numpy()
-            return
-        if has_right:
-            out_df[target_col] = out_df[right_col].to_numpy()
-            return
-
-    if rename_planning_to_one_ff:
-        _derive_eye_channel(
-            out_df=out,
-            target_col='eye_ver',
-            left_col='LDz',
-            right_col='RDz',
+    # ------------------------------------------------------------------
+    # 2) Rename planning vars if requested
+    # ------------------------------------------------------------------
+    if use_planning_rename or custom_rename:
+        monkey_for_encoding = encoding_design_utils.monkey_information_for_encoding(
+            pn.monkey_information,
+            rename_planning_to_one_ff=use_planning_rename,
+            custom_rename=custom_rename,
         )
-        _derive_eye_channel(
-            out_df=out,
-            target_col='eye_hor',
-            left_col='LDy',
-            right_col='RDy',
+    else:
+        monkey_for_encoding = pn.monkey_information
+
+    # ------------------------------------------------------------------
+    # 3) Base design (binning + cluster + ff + retries)
+    # ------------------------------------------------------------------
+    kinematic_cols = []
+    extra_agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
+
+    (
+        binned_spikes,
+        binned_feats,
+        offset_log,
+        meta_used,
+        _,
+    ) = encode_stops_utils.build_stop_design_base_for_encoding(
+        new_seg_info=new_seg_info,
+        events_with_stats=events_with_stats,
+        monkey_information=monkey_for_encoding,
+        spikes_df=pn.spikes_df,
+        ff_dataframe=pn.ff_dataframe,
+        bin_dt=bin_width,
+        add_ff_visible_info=True,
+        add_retries_info=True,
+        datasets=datasets,
+        global_bins_2d=global_bins_2d,
+        extra_agg_cols=extra_agg_cols,
+        kinematic_cols=kinematic_cols,
+    )
+
+    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(binned_feats)
+
+
+    # ------------------------------------------------------------------
+    # 4) Tuning block for continuous variables
+    # ------------------------------------------------------------------
+    binned_feats, tuning_meta, mode = encoding_design_utils.add_tuning_features_to_design(
+        binned_feats,
+        use_boxcar=use_boxcar,
+        tuning_feature_mode=tuning_feature_mode,
+        binrange_dict=binrange_dict,
+        tuning_n_bins=tuning_n_bins,
+        linear_vars=linear_vars,
+        angular_vars=angular_vars,
+        raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS,
+    )
+
+    # ------------------------------------------------------------------
+    # 5) Summed stop-event temporal basis
+    # ------------------------------------------------------------------
+    if 't_center' not in meta_used.columns:
+        raise ValueError('meta_used missing required column "t_center"')
+
+    if 'event_id_start_time' not in events_with_stats.columns:
+        raise ValueError(
+            'events_with_stats missing required column "event_id_start_time"'
         )
-        # Do NOT rename speed/ang_speed (base design needs them), but do provide
-        # one_ff-style aliases when absent.
-        if 'v' not in out.columns and 'speed' in out.columns:
-            out['v'] = out['speed'].to_numpy()
-        if 'w' not in out.columns and 'ang_speed' in out.columns:
-            out['w'] = out['ang_speed'].to_numpy()
-        if 'ang_accel_deg' not in out.columns and 'ang_accel' in out.columns:
-            out['ang_accel_deg'] = out['ang_accel'].to_numpy(
-                float, copy=False) * _RAD_TO_DEG
 
-    renames: Dict[str, str] = {}
-    if rename_planning_to_one_ff:
-        for src, tgt in PLANNING_TO_ONE_FF_RENAME.items():
-            if src in out.columns and tgt not in out.columns:
-                renames[src] = tgt
-    if custom_rename:
-        for src, tgt in custom_rename.items():
-            if src in out.columns and tgt not in out.columns:
-                renames[src] = tgt
-    if renames:
-        out = out.rename(columns=renames)
+    bin_t_center = meta_used['t_center'].to_numpy(dtype=float)
+    stop_times = events_with_stats['event_id_start_time'].to_numpy(dtype=float)
 
-    # Convert angular vars from radians to degrees (monkey_information stores rad)
-    for col in ('w', 'phi', 'theta_targ'):
-        if col in out.columns:
-            out[col] = out[col].to_numpy(float, copy=False) * _RAD_TO_DEG
+    temporal_df, temporal_meta = encoding_design_utils.build_temporal_design_from_event_times(
+        bin_t_center=bin_t_center,
+        event_times=stop_times,
+        bin_dt=bin_width,
+        n_basis=n_basis,
+        t_min=t_min,
+        t_max=t_max,
+        index=binned_feats.index,
+        name_prefix='rcos_stop',
+    )
 
-    return out
+    binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
 
+
+    # ------------------------------------------------------------------
+    # 6) Drop constant columns (except const)
+    # ------------------------------------------------------------------
+    const_cols_to_drop = [
+        c for c in binned_feats.columns
+        if c != 'const' and binned_feats[c].nunique() <= 1
+    ]
+    binned_feats = binned_feats.drop(columns=const_cols_to_drop)
+
+    return (
+        pn,
+        binned_spikes,
+        binned_feats,
+        offset_log,
+        meta_used,
+        temporal_meta,
+        tuning_meta,
+    )
 
 def build_stop_design_base_for_encoding(
     new_seg_info: pd.DataFrame,
@@ -205,62 +312,26 @@ def build_stop_design_base_for_encoding(
     but intentionally skips the legacy event-design block (prepost/captured/time_since*
     and old rcos_* basis), since encoding replaces temporal kernels anyway.
     """
+
     # 1) Build bins from event windows
     bins_2d, meta = event_binning.event_windows_to_bins2d(
-        new_seg_info, bin_dt=bin_dt, only_ok=False, global_bins_2d=global_bins_2d
+        new_seg_info,
+        bin_dt=bin_dt,
+        only_ok=False,
+        global_bins_2d=global_bins_2d,
     )
 
-    # 2) Assign continuous samples to bins
-    sample_idx, bin_idx_arr, dt_arr, _ = event_binning.build_bin_assignments(
-        monkey_information['time'].to_numpy(), bins_2d
-    )
-    monkey_sub = monkey_information.iloc[sample_idx].copy()
-
-    # 3) Compute exposure and valid bins
-    _, exposure, used_bins = event_binning.bin_timeseries_weighted(
-        monkey_sub['time'].to_numpy(), dt_arr, bin_idx_arr, how='mean'
-    )
-
-    def _agg_feat(col: str) -> np.ndarray:
-        vals = np.asarray(monkey_sub[col].to_numpy(), dtype=float)
-        # Use 0 for NaN so bin_timeseries_weighted does not drop rows (would change used_bins)
-        vals_safe = np.where(np.isfinite(vals), vals, 0.0)
-        finite_mask = np.isfinite(vals).astype(float)
-        out, exp_chk, used_bins_chk = event_binning.bin_timeseries_weighted(
-            vals_safe, dt_arr, bin_idx_arr, how='mean'
+    # 2–4) Bin monkey_information into event bins
+    binned_feats, exposure, used_bins, mask_used, pos = (
+        encoding_design_utils._bin_monkey_information_feats_from_event_bins(
+            monkey_information,
+            bins_2d,
+            kinematic_cols=kinematic_cols,
+            extra_agg_cols=extra_agg_cols,
         )
-        if not np.allclose(exp_chk, exposure):
-            raise ValueError(f'Exposure mismatch while aggregating {col!r}')
-        # Bins where all values were NaN: keep output as NaN
-        contrib, _, _ = event_binning.bin_timeseries_weighted(
-            finite_mask, dt_arr, bin_idx_arr, how='mean'
-        )
-        out = np.where(contrib > 0, out, np.nan)
-        if not np.array_equal(used_bins_chk, used_bins):
-            raise ValueError(f'used_bins mismatch while aggregating {col!r}')
-        return out
-
-    # 4) Aggregate kinematics + optional extra covariates
-
-    binned_feats = (
-        pd.DataFrame({c: _agg_feat(c) for c in kinematic_cols})
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
     )
-    if extra_agg_cols:
-        existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
-        if existing:
-            extra_df = (
-                pd.DataFrame({c: _agg_feat(c) for c in existing})
-                .replace([np.inf, -np.inf], np.nan)
-                .fillna(0.0)
-            )
-            binned_feats = pd.concat([binned_feats, extra_df], axis=1)
 
-    mask_used = exposure > 0
-    pos = used_bins[mask_used]
-    binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
-
+    # Align meta to kept bins (exposure > 0)
     meta_used = (
         meta.set_index('bin')
         .sort_index()
@@ -270,12 +341,18 @@ def build_stop_design_base_for_encoding(
 
     # 5) Bin spikes per cluster
     spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
-        spikes_df, bins_2d, time_col='time', cluster_col='cluster'
+        spikes_df,
+        bins_2d,
+        time_col='time',
+        cluster_col='cluster',
     )
-    binned_spikes = pd.DataFrame(
-        spike_counts[pos, :], columns=cluster_ids).reset_index(drop=True)
 
-    # 6) Cluster-level features (no event-design features here)
+    binned_spikes = (
+        pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
+        .reset_index(drop=True)
+    )
+
+    # 6) Cluster-level features (no legacy event-design features)
     cluster_df = cluster_design.build_cluster_features_workflow(
         meta_used[['event_id', 'rel_center']],
         events_with_stats,
@@ -285,6 +362,7 @@ def build_stop_design_base_for_encoding(
         zscore_progress=False,
         zscore_rel_time=True,
     )
+
     cluster_feats = [
         'is_clustered',
         'event_is_first_in_cluster',
@@ -294,9 +372,10 @@ def build_stop_design_base_for_encoding(
         'cluster_progress_c',
         'bin_t_from_cluster_start_s_z',
         'log_n_events_in_cluster_z',
+        'cluster_progress_c2',
+        'event_t_from_cluster_start_s',
     ]
-    cluster_feats = cluster_feats + \
-        ['cluster_progress_c2', 'event_t_from_cluster_start_s']
+
     _safe_add_columns(binned_feats, cluster_df, cluster_feats)
 
     # 7) Offset term and timing
@@ -306,18 +385,26 @@ def build_stop_design_base_for_encoding(
     # 8) Firefly visibility / memory features
     if add_ff_visible_info:
         binned_feats = _add_ff_visible_and_in_memory_info(
-            binned_feats, bins_2d, ff_dataframe, used_bins
+            binned_feats,
+            bins_2d,
+            ff_dataframe,
+            used_bins,
         )
 
     # 9) Retry-related features
     if add_retries_info:
         binned_feats, meta_used = _add_retries_info_to_binned_feats(
-            binned_feats, new_seg_info, datasets, meta_used
+            binned_feats,
+            new_seg_info,
+            datasets,
+            meta_used,
         )
 
     # groups are rebuilt later in build_encode_stops_design
     return binned_spikes, binned_feats, offset_log, meta_used, {}
 
+    
+# --- HELPER: only bins monkey_information columns into bins_2d ---
 
 def _safe_add_columns(target_df: pd.DataFrame, source_df: pd.DataFrame, cols: List[str]) -> None:
     cols = [c for c in cols if c in source_df.columns and c not in target_df.columns]
@@ -394,56 +481,8 @@ def _add_retries_info_to_binned_feats(
     return binned_feats, meta_used
 
 
-# ---------------------------------------------------------------------------
-# Stop GAM group specs (mirror one_ff_gam: lam_f tuning, lam_g event, lam_h hist, lam_p coupling)
-# ---------------------------------------------------------------------------
 
-# Behavioral column groups aligned with decode_stops_design._build_feature_groups.
-# (name, list of column names, vartype). Only columns present in design_df are used.
-_STOP_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
-    # Kinematic (1D each)
-    ('accel', ['accel'], '1D'),
-    ('speed', ['speed'], '1D'),
-    ('ang_speed', ['ang_speed'], '1D'),
-    # One_ff_gam-style tuning (if present in design; from extra_agg_cols in encoding design)
-    ('v', ['v'], '1D'),
-    ('w', ['w'], '1D'),
-    ('d', ['d'], '1D'),
-    ('phi', ['phi'], '1D'),
-    ('r_targ', ['r_targ'], '1D'),
-    ('theta_targ', ['theta_targ'], '1D'),
-    ('eye_ver', ['eye_ver'], '1D'),
-    ('eye_hor', ['eye_hor'], '1D'),
-    # Event design (event = temporal basis)
-    ('basis', None, 'event'),   # cols: rcos_* without *captured; filled below
-    ('basis*captured', None, 'event'),
-    ('prepost', ['prepost'], '1D'),
-    ('prepost*speed', ['prepost*speed'], '1D'),
-    ('captured', ['captured'], '1D'),
-    ('time_since_prev_event', ['time_since_prev_event'], '1D'),
-    ('time_to_next_event', ['time_to_next_event'], '1D'),
-    # Cluster
-    ('cluster_flags', ['event_is_first_in_cluster'], '1D'),
-    ('cluster_gaps', ['gap_since_prev_event_in_cluster_z',
-     'gap_till_next_event_in_cluster_z'], '1D'),
-    ('cluster_duration', ['cluster_duration_s_z'], '1D'),
-    ('cluster_progress', ['cluster_progress_c', 'cluster_progress_c2'], '1D'),
-    ('cluster_rel_time', ['bin_t_from_cluster_start_s_z'], '1D'),
-    ('cluster_n_events', ['log_n_events_in_cluster_z'], '1D'),
-    ('is_clustered', ['is_clustered'], '1D'),
-    ('event_in_cluster_t', ['event_t_from_cluster_start_s'], '1D'),
-    # Firefly
-    ('ff_visible', ['log1p_num_ff_visible', 'k_ff_visible'], '1D'),
-    ('ff_in_memory', ['log1p_num_ff_in_memory', 'k_ff_in_memory'], '1D'),
-    # Retries
-    ('retries', [
-        'rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle',
-        'rsw_last', 'rcap_last', 'one_stop_miss', 'whether_in_retry_series', 'miss',
-    ], 'event'),
-    # Timing
-    ('time_rel_to_event_start', ['time_rel_to_event_start'], '1D'),
-]
-
+# --- HELPER: only bins monkey_information columns into bins_2d ---
 
 def build_stop_gam_groups(
     design_df: pd.DataFrame,
@@ -522,7 +561,7 @@ def build_stop_gam_groups(
         lam = lam_g if vartype == 'event' else lam_f
         groups.append(GroupSpec(name, candidate_cols, vartype, lam))
 
-    # One_ff-style tuning boxcar columns (var:bin0 .. var:binK from build_tuning_design_stop)
+    # One_ff-style tuning boxcar columns (var:bin0 .. var:binK from build_tuning_design_for_continuous_vars)
     tuning_boxcar_pattern = re.compile(r'^(\w+):bin\d+$')
     tuning_cols_by_var: Dict[str, List[str]] = {}
     for c in behavioral_candidates:
@@ -552,7 +591,8 @@ def build_stop_gam_groups(
         else:
             neuron_match = re.match(r'^cluster_(\d+)$', neuron)
             cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
-            groups.append(GroupSpec(f'cpl_{cpl_suffix}', hist_cols, 'event', lam_p))
+            groups.append(
+                GroupSpec(f'cpl_{cpl_suffix}', hist_cols, 'event', lam_p))
 
     lambda_config = {
         'lam_f': lam_f,
@@ -598,7 +638,8 @@ def build_simple_gam_groups(
     if 'const' in cols_all:
         groups.append(GroupSpec('const', ['const'], '0D', 0.0))
     if behavioral_candidates:
-        groups.append(GroupSpec('behavioral', behavioral_candidates, 'event', lam_f))
+        groups.append(
+            GroupSpec('behavioral', behavioral_candidates, 'event', lam_f))
 
     neuron_order = sorted(spike_hist_cols_by_neuron.keys())
     for i, neuron in enumerate(neuron_order):
@@ -609,65 +650,10 @@ def build_simple_gam_groups(
         else:
             neuron_match = re.match(r'^cluster_(\d+)$', neuron)
             cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
-            groups.append(GroupSpec(f'cpl_{cpl_suffix}', hist_cols, 'event', lam_p))
+            groups.append(
+                GroupSpec(f'cpl_{cpl_suffix}', hist_cols, 'event', lam_p))
 
-    lambda_config = {'lam_f': lam_f, 'lam_g': lam_g, 'lam_h': lam_h, 'lam_p': lam_p}
+    lambda_config = {'lam_f': lam_f, 'lam_g': lam_g,
+                     'lam_h': lam_h, 'lam_p': lam_p}
     return groups, lambda_config
 
-
-def build_structured_meta_groups(
-    colnames: Dict[str, List[str]],
-    temporal_meta: Optional[Dict[str, Any]],
-    tuning_meta: Optional[Dict[str, Any]],
-    *,
-    target_col: Optional[str] = None,
-    dt: float,
-    t_max: float,
-    n_basis: int = 20,
-) -> Dict[str, Any]:
-    """
-    Restructure flat meta_groups into one_ff_gam-style categories.
-
-    Returns dict with 'tuning', 'temporal', 'hist', 'lambda_config' keys.
-    """
-    # Hist: build from colnames (all clusters), map to spike_hist / cpl_J for plot compatibility
-    hist_groups: Dict[str, List[str]] = {}
-    hist_basis_info: Dict[str, Dict] = {}
-    if colnames:
-        t_min = dt
-        lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
-            n_basis=n_basis,
-            t_min=t_min,
-            t_max=t_max,
-            dt=dt,
-            log_spaced=True,
-            hard_start_zero=True,
-        )
-        basis_info_entry = {'lags': lags_hist, 'basis': B_hist}
-        neuron_order = sorted(colnames.keys())
-        if target_col is not None:
-            if target_col not in colnames:
-                raise KeyError(f'target_col {target_col!r} not in colnames')
-            neuron_order = [target_col] + [n for n in neuron_order if n != target_col]
-        for i, neuron in enumerate(neuron_order):
-            cols = colnames[neuron]
-            if i == 0:
-                hist_groups['spike_hist'] = cols
-                hist_basis_info['spike_hist'] = basis_info_entry
-            else:
-                neuron_match = re.match(r'^cluster_(\d+)$', neuron)
-                cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
-                hist_groups[f'cpl_{cpl_suffix}'] = cols
-                hist_basis_info[f'cpl_{cpl_suffix}'] = basis_info_entry
-
-    hist_meta: Dict[str, Any] = {
-        'groups': hist_groups,
-        'basis_info': hist_basis_info,
-    } if hist_groups else {}
-
-    return {
-        'tuning': tuning_meta if tuning_meta else {},
-        'temporal': temporal_meta if temporal_meta else {},
-        'hist': hist_meta,
-        'lambda_config': {},
-    }

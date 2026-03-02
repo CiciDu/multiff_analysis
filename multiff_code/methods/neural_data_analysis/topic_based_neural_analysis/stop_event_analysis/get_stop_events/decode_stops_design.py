@@ -577,13 +577,26 @@ def add_interaction_columns(binned_feats):
 
 
 def scale_binned_feats(binned_feats, keep_constant_tuning_terms: bool = False):
-    # No z-scoring for raised-cosine (rcos_*, rcos_stop_*), boxcar tuning (*:bin*), or binary/dummy columns.
+    # No z-scoring for:
+    # - raised-cosine (rcos_*, rcos_stop_*)
+    # - boxcar tuning (*:bin*)
+    # - strictly binary columns (only 0 and 1)
+
     exclude_prefixes = ('rcos_', 'rcos_stop_')
+    
+    # --- Detect strictly binary 0/1 columns ---
+    binary_cols = [
+        c for c in binned_feats.columns
+        if set(binned_feats[c].dropna().unique()).issubset({0, 1})
+    ]
+
     binned_feats_sc, scaled_cols = event_binning.selective_zscore(
         binned_feats,
         exclude_prefixes=exclude_prefixes,
         exclude_substrings=(':bin',),
+        exclude_columns=binary_cols,  # <- prevent scaling of 0/1 columns
     )
+
     binned_feats_sc = sm.add_constant(binned_feats_sc, has_constant='add')
     print('Scaled columns:', scaled_cols)
 
@@ -595,8 +608,8 @@ def scale_binned_feats(binned_feats, keep_constant_tuning_terms: bool = False):
     print("Constant columns:", const_cols)
 
     binned_feats_sc = binned_feats_sc.drop(columns=const_cols)
-    return binned_feats_sc
 
+    return binned_feats_sc
 
 def _prepare_stop_design_inputs(raw_data_folder_path, bin_width):
     """
@@ -678,21 +691,21 @@ def assemble_stop_decoding_design(
     )
 
     (
-        stop_binned_spikes,
-        init_stop_binned_feats,
+        binned_spikes,
+        binned_feats,
         offset_log,
         stop_meta_used,
         stop_meta_groups,
     ) = build_result
 
-    stop_binned_feats = scale_binned_feats(
-        init_stop_binned_feats,
+    binned_feats = scale_binned_feats(
+        binned_feats,
     )
 
     return (
         pn,
-        stop_binned_spikes,
-        stop_binned_feats,
+        binned_spikes,
+        binned_feats,
         offset_log,
         stop_meta_used,
         stop_meta_groups,

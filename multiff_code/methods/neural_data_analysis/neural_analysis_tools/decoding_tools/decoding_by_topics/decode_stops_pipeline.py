@@ -45,7 +45,7 @@ class StopDecodingRunner(BaseDecodingRunner):
 
         self.stop_meta_used = None
         self.stop_feats_to_decode = None
-        self.stop_binned_spikes = None
+        self.binned_spikes = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,
@@ -62,7 +62,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         return self.stop_meta_used["event_id"].values
 
     def _get_neural_matrix(self) -> np.ndarray:
-        return np.asarray(self.stop_binned_spikes, dtype=float)
+        return np.asarray(self.binned_spikes, dtype=float)
 
     def _default_canoncorr_varnames(self) -> List[str]:
         y_df = self._get_numeric_target_df()
@@ -86,7 +86,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         print("[StopDecodingRunner] Computing design matrices from scratch")
         (
             self.pn,
-            self.stop_binned_spikes,
+            self.binned_spikes,
             self.stop_feats_to_decode,
             _offset_log,
             self.stop_meta_used,
@@ -110,21 +110,21 @@ class StopDecodingRunner(BaseDecodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
-            "stop_binned_spikes": save_dir / "stop_binned_spikes.pkl",
+            "binned_spikes": save_dir / "binned_spikes.pkl",
             "stop_feats_to_decode": save_dir / "stop_feats_to_decode.pkl",
             "stop_meta_used": save_dir / "stop_meta_used.pkl",
         }
 
     def _get_design_matrix_data(self):
         return {
-            "stop_binned_spikes": self.stop_binned_spikes,
+            "binned_spikes": self.binned_spikes,
             "stop_feats_to_decode": self.stop_feats_to_decode,
             "stop_meta_used": self.stop_meta_used,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
-            "stop_binned_spikes": "stop_binned_spikes",
+            "binned_spikes": "binned_spikes",
             "stop_feats_to_decode": "stop_feats_to_decode",
             "stop_meta_used": "stop_meta_used",
         }

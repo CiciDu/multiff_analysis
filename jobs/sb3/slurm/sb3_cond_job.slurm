@@ -67,9 +67,9 @@ echo "[info] perc_r=$PERC_R perc_th=$PERC_TH mem_r=$MEM_R mem_th=$MEM_TH"
 # ---------------------------------------
 
 LR=3e-4
-NUM_OBS_FF=4
+NUM_OBS_FF=5
 MAX_IN_MEMORY_TIME=3
-IDENTITY_SLOT_STRATEGY="drop_fill_visible_only"
+IDENTITY_SLOT_STRATEGY="drop_fill_visible_and_memory"
 V_NOISE_STD=0.0
 W_NOISE_STD=0.0
 N_ENVS=1

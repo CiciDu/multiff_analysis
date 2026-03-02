@@ -469,6 +469,16 @@ def tune_penalties(
     ...     retrieve_only=True
     ... )
     """
+
+    # Calculate grid dimensions
+    keys = list(lam_grid.keys())
+    n_combinations = int(np.prod([len(lam_grid[k]) for k in keys]))
+
+    # Print setup information
+    _print_grid_search_setup(lam_grid, group_name_map,
+                             n_combinations, n_folds, save_path)
+
+
     # Handle retrieve_only mode
     if retrieve_only:
         if save_path is None:
@@ -515,13 +525,6 @@ def tune_penalties(
         best_lams = None
         results = []
 
-    # Calculate grid dimensions
-    keys = list(lam_grid.keys())
-    n_combinations = int(np.prod([len(lam_grid[k]) for k in keys]))
-
-    # Print setup information
-    _print_grid_search_setup(lam_grid, group_name_map,
-                             n_combinations, n_folds, save_path)
 
     # Prepare save path if needed
     save_path_obj = None

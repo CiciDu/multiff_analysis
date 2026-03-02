@@ -40,9 +40,8 @@ class PNEncodingRunner(BaseEncodingRunner):
         self.t_max = t_max
 
         # Filled during setup
-        self.design_df = None
+        self.binned_feats = None
         self.trial_ids = None
-        self.spike_data_w_history = None
         self.binned_spikes = None
         self._bin_df = None
         self._X_hist_enc = None
@@ -94,64 +93,50 @@ class PNEncodingRunner(BaseEncodingRunner):
             rebinned_max_x_lag_number=2,
         )
 
-        data = pn.rebinned_y_var.copy()
-        trial_ids = data['new_segment']
-        dt = pn.bin_width
+        # data = pn.rebinned_y_var.copy()
+        # trial_ids = data['new_segment']
+        # dt = pn.bin_width
 
-        data = temporal_feats.add_stop_and_capture_columns(
-            data,
-            trial_ids,
-            pn.ff_caught_T_new,
-        )
+        # data = temporal_feats.add_stop_and_capture_columns(
+        #     data,
+        #     trial_ids,
+        #     pn.ff_caught_T_new,
+        # )
 
-        design_df, meta0, meta = (
-            create_pn_design_df.get_initial_design_df(
-                data,
-                dt,
-                trial_ids,
-            )
-        )
+        # binned_feats, meta0, meta = (
+        #     create_pn_design_df.get_pn_design_base(
+        #         data,
+        #         dt,
+        #         trial_ids,
+        #     )
+        # )
 
         cluster_cols = [
             c for c in pn.rebinned_x_var.columns
             if c.startswith('cluster_')
         ]
-
-        df_Y = pn.rebinned_x_var[cluster_cols]
-        df_Y.columns = (
-            df_Y.columns
+        self.binned_spikes = pn.rebinned_x_var[cluster_cols]
+        self.binned_spikes.columns = (
+            self.binned_spikes.columns
             .str.replace('cluster_', '')
             .astype(int)
         )
+        self.binned_spikes = self.binned_spikes.reset_index(drop=True)
+
+
 
         bin_df = create_pn_design_df.make_bin_df_for_pn(
             pn.rebinned_x_var,
             pn.bin_edges,
         )
 
-        (
-            spike_data_w_history,
-            basis,
-            colnames,
-            meta_groups,
-        ) = spike_history.build_design_with_spike_history_from_bins(
-            spikes_df=pn.spikes_df,
-            bin_df=bin_df,
-            X_pruned=df_Y,
-            meta_groups={},
-            dt=self.bin_width,
-            t_max=self.t_max,
-        )
-
         self.pn = pn
-        self.design_df = design_df
         self.trial_ids = trial_ids
-        self.spike_data_w_history = spike_data_w_history
-        self.binned_spikes = df_Y.reset_index(drop=True)
 
         # Build encoding design (behavioral + spike history) for GAM modeling
-        design_reset = design_df.reset_index(drop=True)
-        if len(design_reset) == len(bin_df):
+        self.binned_feats = binned_feats.reset_index(drop=True)
+
+        if len(self.binned_feats) == len(bin_df):
             (
                 _,
                 _,
@@ -161,7 +146,7 @@ class PNEncodingRunner(BaseEncodingRunner):
             ) = spike_history.build_design_with_spike_history_from_bins(
                 spikes_df=pn.spikes_df,
                 bin_df=bin_df,
-                X_pruned=design_reset,
+                X_pruned=self.binned_feats,
                 meta_groups={},
                 dt=self.bin_width,
                 t_max=self.t_max,
@@ -177,24 +162,26 @@ class PNEncodingRunner(BaseEncodingRunner):
 
         self._save_design_matrices()
 
-    def _ensure_encoding_spike_history(self):
+    def _ensure_spike_history_components(self):
         """Build encoding spike history if not yet available (e.g. after cache load)."""
         if self._X_hist_enc is not None:
             return
-        if self.design_df is None or self.binned_spikes is None:
+        if self.binned_feats is None or self.binned_spikes is None:
             raise RuntimeError("Run _collect_data first.")
         self._collect_data(exists_ok=False)
 
     def get_design_for_unit(self, unit_idx: int) -> pd.DataFrame:
         """Build design matrix with spike-history regressors for the given target neuron."""
-        self._ensure_encoding_spike_history()
+        self._ensure_spike_history_components()
         if self._spike_cols_enc is None:
-            raise RuntimeError("Encoding spike history not available; design/bin row count may mismatch.")
+            raise RuntimeError(
+                "Encoding spike history not available; design/bin row count may mismatch.")
         if unit_idx < 0 or unit_idx >= len(self._spike_cols_enc):
-            raise IndexError(f"unit_idx {unit_idx} out of range [0, {len(self._spike_cols_enc)})")
+            raise IndexError(
+                f"unit_idx {unit_idx} out of range [0, {len(self._spike_cols_enc)})")
         target_col = self._spike_cols_enc[unit_idx]
         design_df, _ = spike_history.add_spike_history_to_design(
-            design_df=self.design_df.reset_index(drop=True),
+            design_df=self.binned_feats.reset_index(drop=True),
             colnames=self._colnames_enc,
             X_hist=self._X_hist_enc,
             target_col=target_col,
@@ -210,9 +197,6 @@ class PNEncodingRunner(BaseEncodingRunner):
             design_df = design_df.drop(columns=const_cols_to_drop)
         return design_df
 
-    def get_binned_spikes(self) -> pd.DataFrame:
-        return self.binned_spikes
-
     def get_gam_groups(
         self,
         unit_idx: int,
@@ -222,7 +206,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         lam_h: float = 10.0,
         lam_p: float = 10.0,
     ):
-        self._ensure_encoding_spike_history()
+        self._ensure_spike_history_components()
         design_df = self.get_design_for_unit(unit_idx)
         return encode_stops_utils.build_simple_gam_groups(
             design_df,
@@ -245,8 +229,10 @@ class PNEncodingRunner(BaseEncodingRunner):
         base = Path(self._get_save_dir()) / "pn_gam_results"
         if ensure_dirs:
             base.mkdir(parents=True, exist_ok=True)
-        lambda_config = dict(lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p)
-        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lambda_config)
+        lambda_config = dict(lam_f=lam_f, lam_g=lam_g,
+                             lam_h=lam_h, lam_p=lam_p)
+        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
+            lambda_config=lambda_config)
         outdir = base / f"neuron_{unit_idx}"
         if ensure_dirs:
             (outdir / "fit_results").mkdir(parents=True, exist_ok=True)
@@ -355,7 +341,6 @@ class PNEncodingRunner(BaseEncodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
-            "spike_data_w_history": save_dir / "spike_data_w_history.pkl",
             "design_df": save_dir / "design_df.pkl",
             "trial_ids": save_dir / "trial_ids.pkl",
             "binned_spikes": save_dir / "binned_spikes.pkl",
@@ -369,8 +354,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         save_dir.mkdir(parents=True, exist_ok=True)
         paths = self._get_design_matrix_paths()
         data_to_save = {
-            "spike_data_w_history": self.spike_data_w_history,
-            "design_df": self.design_df,
+            "binned_feats": self.binned_feats,
             "trial_ids": self.trial_ids,
             "binned_spikes": self.binned_spikes,
             "bin_df": self._bin_df,
@@ -392,14 +376,12 @@ class PNEncodingRunner(BaseEncodingRunner):
 
     def _load_design_matrices(self):
         paths = self._get_design_matrix_paths()
-        required = ["spike_data_w_history", "design_df", "trial_ids", "binned_spikes"]
+        required = ["design_df", "trial_ids", "binned_spikes"]
         if not all(paths[k].exists() for k in required):
             return False
         try:
-            with open(paths["spike_data_w_history"], "rb") as f:
-                self.spike_data_w_history = pickle.load(f)
             with open(paths["design_df"], "rb") as f:
-                self.design_df = pickle.load(f)
+                self.binned_feats = pickle.load(f)
             with open(paths["trial_ids"], "rb") as f:
                 self.trial_ids = pickle.load(f)
             with open(paths["binned_spikes"], "rb") as f:

@@ -149,7 +149,8 @@ class BaseEncodingGAMAnalysisHelper:
         return cfg
 
     def _neuron_outdir(self, unit_idx: int, ensure_dirs: Optional[List[str]] = None) -> Path:
-        outdir = Path(self.runner._get_save_dir()) / self.gam_results_subdir / f"neuron_{unit_idx}"
+        outdir = Path(self.runner._get_save_dir()) / \
+            self.gam_results_subdir / f"neuron_{unit_idx}"
         outdir.mkdir(parents=True, exist_ok=True)
         if ensure_dirs:
             for subdir in ensure_dirs:
@@ -179,7 +180,8 @@ class BaseEncodingGAMAnalysisHelper:
         keep_cols = set()
         for g in groups_kept:
             keep_cols.update(g.cols)
-        cols_in_order = [c for c in design_df.columns if (c in keep_cols) or (c == "const")]
+        cols_in_order = [c for c in design_df.columns if (
+            c in keep_cols) or (c == "const")]
         return design_df.loc[:, cols_in_order], groups_kept
 
     @staticmethod
@@ -257,16 +259,19 @@ class BaseEncodingGAMAnalysisHelper:
         if category_names is None:
             category_names = list(self.var_categories.keys())
         else:
-            unknown = [c for c in category_names if c not in self.var_categories]
+            unknown = [
+                c for c in category_names if c not in self.var_categories]
             if unknown:
                 raise ValueError(
                     f"Unknown category_names: {unknown}. "
                     f"Available: {list(self.var_categories.keys())}"
                 )
         if not self.var_categories:
-            raise ValueError("var_categories cannot be empty for run_category_variance_contributions")
+            raise ValueError(
+                "var_categories cannot be empty for run_category_variance_contributions")
 
-        outdir = self._neuron_outdir(unit_idx, ensure_dirs=["cv_var_explained"])
+        outdir = self._neuron_outdir(
+            unit_idx, ensure_dirs=["cv_var_explained"])
         full_path = self._full_model_cv_path(outdir)
         load_ok = load_if_exists or retrieve_only
         full_cv = gam_variance_explained.maybe_load_saved_crossval(
@@ -294,7 +299,8 @@ class BaseEncodingGAMAnalysisHelper:
                     raise FileNotFoundError(
                         f"No saved full-model CV result found at: {full_path}"
                     )
-                missing = [c for c in category_names if c not in category_loads]
+                missing = [
+                    c for c in category_names if c not in category_loads]
                 if missing:
                     raise FileNotFoundError(
                         "No saved category CV result found for: " f"{missing}"
@@ -374,7 +380,8 @@ class BaseEncodingGAMAnalysisHelper:
                 "leave_out_mean_classical_r2": reduced_cv["mean_classical_r2"],
                 "leave_out_mean_pseudo_r2": reduced_cv["mean_pseudo_r2"],
                 "delta_classical_r2": (
-                    full_cv["mean_classical_r2"] - reduced_cv["mean_classical_r2"]
+                    full_cv["mean_classical_r2"] -
+                    reduced_cv["mean_classical_r2"]
                 ),
                 "delta_pseudo_r2": (
                     full_cv["mean_pseudo_r2"] - reduced_cv["mean_pseudo_r2"]
@@ -406,7 +413,8 @@ class BaseEncodingGAMAnalysisHelper:
         outdir = self._neuron_outdir(unit_idx)
         save_path = outdir / "penalty_tuning.pkl"
         if retrieve_only and not save_path.exists():
-            raise FileNotFoundError(f"No tuning results file found at: {save_path}")
+            raise FileNotFoundError(
+                f"No tuning results file found at: {save_path}")
         can_load = (load_if_exists or retrieve_only) and save_path.exists()
         if can_load:
             lam_grid_load = lam_grid or {
@@ -426,7 +434,8 @@ class BaseEncodingGAMAnalysisHelper:
                 save_path=str(save_path),
                 load_if_exists=load_if_exists,
                 retrieve_only=True,
-                save_metadata={"structured_meta_groups": self._get_structured_meta_groups()},
+                save_metadata={
+                    "structured_meta_groups": self._get_structured_meta_groups()},
             )
             return {
                 "best_lams": best_lams,
@@ -455,17 +464,21 @@ class BaseEncodingGAMAnalysisHelper:
                 if g.vartype == "event" and g.name != "spike_hist" and not g.name.startswith("cpl_")
             ]
             lam_h_groups = [g.name for g in groups if g.name == "spike_hist"]
-            lam_p_groups = [g.name for g in groups if g.name.startswith("cpl_")]
+            lam_p_groups = [
+                g.name for g in groups if g.name.startswith("cpl_")]
             group_name_map = {
                 "lam_f": lam_f_groups,
                 "lam_g": lam_g_groups,
                 "lam_h": lam_h_groups,
                 "lam_p": lam_p_groups,
             }
-        lam_grid = {k: v for k, v in lam_grid.items() if k in group_name_map and len(group_name_map[k]) > 0}
-        group_name_map = {k: v for k, v in group_name_map.items() if k in lam_grid and len(v) > 0}
+        lam_grid = {k: v for k, v in lam_grid.items(
+        ) if k in group_name_map and len(group_name_map[k]) > 0}
+        group_name_map = {
+            k: v for k, v in group_name_map.items() if k in lam_grid and len(v) > 0}
         if len(lam_grid) == 0:
-            raise ValueError("No valid lambda groups found for tuning in this design.")
+            raise ValueError(
+                "No valid lambda groups found for tuning in this design.")
         best_lams, cv_results = penalty_tuning.tune_penalties(
             design_df=design_df,
             y=y,
@@ -477,7 +490,8 @@ class BaseEncodingGAMAnalysisHelper:
             save_path=str(save_path),
             load_if_exists=load_if_exists,
             retrieve_only=retrieve_only,
-            save_metadata={"structured_meta_groups": self._get_structured_meta_groups()},
+            save_metadata={
+                "structured_meta_groups": self._get_structured_meta_groups()},
         )
         return {
             "best_lams": best_lams,
@@ -496,17 +510,21 @@ class BaseEncodingGAMAnalysisHelper:
         load_if_exists: bool = True,
         retrieve_only: bool = False,
     ) -> Dict:
-        outdir = self._neuron_outdir(unit_idx, ensure_dirs=["backward_elimination"])
+        outdir = self._neuron_outdir(unit_idx, ensure_dirs=[
+                                     "backward_elimination"])
         lam_cfg = self._resolve_lambda_config(lambda_config)
-        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(lambda_config=lam_cfg)
+        lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
+            lambda_config=lam_cfg)
         save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
         if retrieve_only and not save_path.exists():
-            raise FileNotFoundError(f"No backward elimination result found at: {save_path}")
+            raise FileNotFoundError(
+                f"No backward elimination result found at: {save_path}")
         can_load = (load_if_exists or retrieve_only) and save_path.exists()
         if can_load:
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
             kept = [
-                GroupSpec(name=g["name"], cols=g["cols"], vartype=g["vartype"], lam=g["lam"])
+                GroupSpec(name=g["name"], cols=g["cols"],
+                          vartype=g["vartype"], lam=g["lam"])
                 for g in loaded.get("kept_groups", [])
             ]
             history = loaded.get("history", [])
@@ -530,7 +548,8 @@ class BaseEncodingGAMAnalysisHelper:
         if load_if_exists and save_path.exists():
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
             kept = [
-                GroupSpec(name=g["name"], cols=g["cols"], vartype=g["vartype"], lam=g["lam"])
+                GroupSpec(name=g["name"], cols=g["cols"],
+                          vartype=g["vartype"], lam=g["lam"])
                 for g in loaded.get("kept_groups", [])
             ]
             history = loaded.get("history", [])
@@ -545,7 +564,8 @@ class BaseEncodingGAMAnalysisHelper:
                 verbose=True,
                 save_path=str(save_path),
                 load_if_exists=load_if_exists,
-                save_metadata={"structured_meta_groups": self._get_structured_meta_groups()},
+                save_metadata={
+                    "structured_meta_groups": self._get_structured_meta_groups()},
             )
         history_csv = outdir / "backward_elimination" / "history.csv"
         if history:
@@ -588,10 +608,11 @@ class StopEncodingGAMAnalysisHelper(BaseEncodingGAMAnalysisHelper):
         *,
         lambda_config: Optional[Dict[str, float]] = None,
     ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
-        if self.runner.stop_binned_feats is None or self.runner.stop_binned_spikes is None:
+        if self.runner.binned_feats is None or self.runner.binned_spikes is None:
             self.runner._collect_data(exists_ok=True)
         design_df = self.runner.get_design_for_unit(unit_idx)
-        y = np.asarray(self.runner.stop_binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(
+            self.runner.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
         lam_cfg = self._resolve_lambda_config(lambda_config)
         groups, _ = encode_stops_utils.build_stop_gam_groups(
             design_df,
@@ -632,10 +653,11 @@ class SimpleEncodingGAMAnalysisHelper(BaseEncodingGAMAnalysisHelper):
     ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
         self.runner._collect_data(exists_ok=True)
         design_df = self.runner.get_design_for_unit(unit_idx)
-        binned_spikes = self.runner.get_binned_spikes()
-        y = np.asarray(binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        binned_spikes = self.runner.binned_spikes
+        y = np.asarray(
+            binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
         lam_cfg = self._resolve_lambda_config(lambda_config)
-        groups, _ = self.runner.get_gam_groups(
+        groups, lambda_config = self.runner.get_gam_groups(
             unit_idx,
             lam_f=lam_cfg["lam_f"],
             lam_g=lam_cfg["lam_g"],

@@ -209,8 +209,6 @@ class FFVisEncodingRunner(BaseEncodingRunner):
             design_df = design_df.drop(columns=const_cols_to_drop)
         return design_df
 
-    def get_binned_spikes(self) -> pd.DataFrame:
-        return self.binned_spikes
 
     def get_gam_groups(
         self,
