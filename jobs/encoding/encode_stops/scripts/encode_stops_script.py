@@ -18,9 +18,7 @@ def main():
     from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics import (
         encode_stops_pipeline,
     )
-    from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import (
-        stop_parameters,
-    )
+    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -52,13 +50,13 @@ def main():
         print("=" * 80)
 
         try:
-            prs = stop_parameters.default_prs()
+            prs = multiff_encoding_params.default_prs()
 
             runner = encode_stops_pipeline.StopEncodingRunner(
                 raw_data_folder_path=raw_data_folder_path,
                 bin_width=args.bin_width,
                 t_max=args.t_max,
-                stop_prs=prs,
+                encoder_prs=prs,
             )
 
             runner._collect_data(

@@ -15,7 +15,7 @@ from neural_data_analysis.design_kits.design_around_event import (
     cluster_design,
 )
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import stop_parameters
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     decode_stops_design,
 )

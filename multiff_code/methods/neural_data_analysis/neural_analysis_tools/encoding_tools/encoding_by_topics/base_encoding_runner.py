@@ -37,6 +37,24 @@ class BaseEncodingRunner:
         """Subdir under save_dir for GAM results (e.g. stop_gam_results)."""
         raise NotImplementedError
 
+
+    def _encoding_design_kwargs(self) -> Dict:
+        """
+        Build kwargs for build_stop_encoding_design from encoder_prs.
+        """
+        mode = getattr(self.encoder_prs, 'tuning_feature_mode', None)
+        return {
+            'use_boxcar': bool(
+                mode in ('boxcar_only', 'raw_plus_boxcar')
+            ),
+            'tuning_feature_mode': mode,
+            'binrange_dict': self.binrange_dict,
+            'n_basis': getattr(self.encoder_prs, 'default_n_basis', 20),
+            't_min': -getattr(self.encoder_prs, 'pre_event', 0.3),
+            't_max': getattr(self.encoder_prs, 'post_event', 0.3),
+            'tuning_n_bins': getattr(self.encoder_prs, 'tuning_n_bins', 10),
+        }
+
     def fit_poisson_gam(
         self,
         unit_idx: int,

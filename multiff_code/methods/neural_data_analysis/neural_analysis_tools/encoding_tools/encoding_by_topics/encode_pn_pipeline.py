@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 # Third-party imports
 import pandas as pd
 
-# PN-specific imports
+# self.pn-specific imports
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import (
     pn_aligned_by_event
 )
@@ -21,12 +21,14 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
     encode_stops_gam_helper,
     encode_stops_utils,
+    encode_pn_utils
 )
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics.base_encoding_runner import (
     BaseEncodingRunner,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 
 class PNEncodingRunner(BaseEncodingRunner):
     def __init__(
@@ -34,10 +36,14 @@ class PNEncodingRunner(BaseEncodingRunner):
         raw_data_folder_path,
         bin_width=0.04,
         t_max=0.20,
+        encoder_prs=None,
     ):
         super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
         self.t_max = t_max
+
+        self.encoder_prs = encoder_prs if encoder_prs is not None else multiff_encoding_params.default_prs()
+        self.binrange_dict = self.encoder_prs.binrange
 
         # Filled during setup
         self.binned_feats = None
@@ -47,7 +53,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         self._X_hist_enc = None
         self._colnames_enc = None
         self._spike_cols_enc = None
-
+        
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
 
@@ -68,23 +74,19 @@ class PNEncodingRunner(BaseEncodingRunner):
     # Data collection
     # ------------------------------------------------------------------
 
-    def _collect_data(self, exists_ok=True):
-        if exists_ok and self._load_design_matrices():
-            print('[PNEncodingRunner] Using cached design matrices')
-            return
-
+    def _prepare_to_collect_data(self):
         print('[PNEncodingRunner] Computing design matrices from scratch')
 
-        pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
+        self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,
             bin_width=self.bin_width,
         )
 
-        pn.prep_data_to_analyze_planning(
+        self.pn.prep_data_to_analyze_planning(
             planning_data_by_point_exists_ok=True
         )
 
-        pn.rebin_data_in_new_segments(
+        self.pn.rebin_data_in_new_segments(
             cur_or_nxt='cur',
             first_or_last='first',
             time_limit_to_count_sighting=2,
@@ -93,29 +95,43 @@ class PNEncodingRunner(BaseEncodingRunner):
             rebinned_max_x_lag_number=2,
         )
 
-        # data = pn.rebinned_y_var.copy()
-        # trial_ids = data['new_segment']
-        # dt = pn.bin_width
+        self.pn.global_bins_2d = self.pn.bin_edges
 
-        # data = temporal_feats.add_stop_and_capture_columns(
-        #     data,
-        #     trial_ids,
-        #     pn.ff_caught_T_new,
-        # )
+        return
 
-        # binned_feats, meta0, meta = (
-        #     create_pn_design_df.get_pn_design_base(
-        #         data,
-        #         dt,
-        #         trial_ids,
-        #     )
-        # )
+    def _make_binned_feats(self):
+
+        design_kwargs = self._encoding_design_kwargs()
+
+        (self.binned_spikes,
+        self.binned_feats,
+        self.temporal_meta,
+        self.tuning_meta,
+        ) = encode_pn_utils.build_pn_encoding_design(
+            self.pn,
+            global_bins_2d=self.pn.global_bins_2d,
+            **design_kwargs,
+        )
+
+        
+
+
+    def _collect_data(self, exists_ok=True):
+        if exists_ok and self._load_design_matrices():
+            print('[PNEncodingRunner] Using cached design matrices')
+            return
+
+        self._prepare_to_collect_data()
+
+        self._make_binned_feats()
+
+        data = self.pn.rebinned_y_var.copy()
 
         cluster_cols = [
-            c for c in pn.rebinned_x_var.columns
+            c for c in self.pn.rebinned_x_var.columns
             if c.startswith('cluster_')
         ]
-        self.binned_spikes = pn.rebinned_x_var[cluster_cols]
+        self.binned_spikes = self.pn.rebinned_x_var[cluster_cols]
         self.binned_spikes.columns = (
             self.binned_spikes.columns
             .str.replace('cluster_', '')
@@ -123,18 +139,15 @@ class PNEncodingRunner(BaseEncodingRunner):
         )
         self.binned_spikes = self.binned_spikes.reset_index(drop=True)
 
-
-
         bin_df = create_pn_design_df.make_bin_df_for_pn(
-            pn.rebinned_x_var,
-            pn.bin_edges,
+            self.pn.rebinned_x_var,
+            self.pn.bin_edges,
         )
 
-        self.pn = pn
-        self.trial_ids = trial_ids
+        self.trial_ids = data['new_segment']
 
         # Build encoding design (behavioral + spike history) for GAM modeling
-        self.binned_feats = binned_feats.reset_index(drop=True)
+        self.binned_feats = self.binned_feats.reset_index(drop=True)
 
         if len(self.binned_feats) == len(bin_df):
             (
@@ -144,7 +157,7 @@ class PNEncodingRunner(BaseEncodingRunner):
                 _,
                 self._X_hist_enc,
             ) = spike_history.build_design_with_spike_history_from_bins(
-                spikes_df=pn.spikes_df,
+                spikes_df=self.pn.spikes_df,
                 bin_df=bin_df,
                 X_pruned=self.binned_feats,
                 meta_groups={},
@@ -271,7 +284,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         load_if_exists: bool = True,
     ) -> Dict:
         """
-        Run leave-one-category-out CV analysis for PN encoding.
+        Run leave-one-category-out CV analysis for self.pn encoding.
         """
         return self._get_gam_analysis_helper().run_category_variance_contributions(
             unit_idx=unit_idx,
@@ -295,7 +308,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         load_if_exists: bool = True,
     ) -> Dict:
         """
-        Run grid search over group penalties for PN encoding.
+        Run grid search over group penalties for self.pn encoding.
         """
         return self._get_gam_analysis_helper().run_penalty_tuning(
             unit_idx=unit_idx,
@@ -318,7 +331,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         retrieve_only: bool = False,
     ) -> Dict:
         """
-        Run backward elimination over PN GAM groups.
+        Run backward elimination over self.pn GAM groups.
         """
         return self._get_gam_analysis_helper().run_backward_elimination(
             unit_idx=unit_idx,
@@ -341,7 +354,7 @@ class PNEncodingRunner(BaseEncodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
-            "design_df": save_dir / "design_df.pkl",
+            "binned_feats": save_dir / "binned_feats.pkl",
             "trial_ids": save_dir / "trial_ids.pkl",
             "binned_spikes": save_dir / "binned_spikes.pkl",
             "bin_df": save_dir / "bin_df.pkl",
@@ -376,11 +389,11 @@ class PNEncodingRunner(BaseEncodingRunner):
 
     def _load_design_matrices(self):
         paths = self._get_design_matrix_paths()
-        required = ["design_df", "trial_ids", "binned_spikes"]
+        required = ["binned_feats", "trial_ids", "binned_spikes"]
         if not all(paths[k].exists() for k in required):
             return False
         try:
-            with open(paths["design_df"], "rb") as f:
+            with open(paths["binned_feats"], "rb") as f:
                 self.binned_feats = pickle.load(f)
             with open(paths["trial_ids"], "rb") as f:
                 self.trial_ids = pickle.load(f)

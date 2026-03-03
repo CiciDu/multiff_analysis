@@ -154,8 +154,8 @@ def default_prs() -> StopParams:
 
     Example
     -------
-    >>> from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import stop_parameters
-    >>> prs = stop_parameters.default_prs()
+    >>> from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
+    >>> prs = multiff_encoding_params.default_prs()
     >>> binrange_dict = prs.binrange
     """
 

@@ -41,7 +41,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         # Filled during setup
         self.behav_df = None
         self.trial_ids = None
-        self.pn_binned_spikes = None
+        self.binned_spikes = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
@@ -57,7 +57,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         return self.trial_ids
 
     def _get_neural_matrix(self) -> np.ndarray:
-        return np.asarray(self.pn_binned_spikes, dtype=float)
+        return np.asarray(self.binned_spikes, dtype=float)
 
     def _default_canoncorr_varnames(self) -> List[str]:
         y_df = self._get_numeric_target_df()
@@ -107,28 +107,18 @@ class PNDecodingRunner(BaseDecodingRunner):
             pn.ff_caught_T_new,
         )
 
-        cluster_cols = [
-            c for c in pn.rebinned_x_var.columns
-            if c.startswith('cluster_')
-        ]
-
-        df_Y = pn.rebinned_x_var[cluster_cols]
-        df_Y.columns = (
-            df_Y.columns
+        cluster_cols = [c for c in pn.rebinned_x_var.columns if c.startswith('cluster_')]
+        binned_spikes = pn.rebinned_x_var[cluster_cols]
+        binned_spikes.columns = (
+            binned_spikes.columns
             .str.replace('cluster_', '')
             .astype(int)
         )
-
-        # bin_df = create_pn_design_df.make_bin_df_for_pn(
-        #     pn.rebinned_x_var,
-        #     pn.bin_edges,
-        # )
-
+        self.binned_spikes = binned_spikes.copy()
 
         self.pn = pn
         self.behav_df = pn_feats_to_decode
         self.trial_ids = trial_ids
-        self.pn_binned_spikes = df_Y
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
@@ -143,21 +133,21 @@ class PNDecodingRunner(BaseDecodingRunner):
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
-            'pn_binned_spikes': save_dir / 'pn_binned_spikes.pkl',
+            'binned_spikes': save_dir / 'binned_spikes.pkl',
             'pn_feats_to_decode': save_dir / 'pn_feats_to_decode.pkl',
             'trial_ids': save_dir / 'trial_ids.pkl',
         }
 
     def _get_design_matrix_data(self):
         return {
-            'pn_binned_spikes': self.pn_binned_spikes,
+            'binned_spikes': self.binned_spikes,
             'pn_feats_to_decode': self.behav_df,
             'trial_ids': self.trial_ids,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
-            'pn_binned_spikes': 'pn_binned_spikes',
+            'binned_spikes': 'binned_spikes',
             'pn_feats_to_decode': 'behav_df',
             'trial_ids': 'trial_ids',
         }

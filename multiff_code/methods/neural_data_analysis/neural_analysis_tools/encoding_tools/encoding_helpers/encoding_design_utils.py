@@ -7,12 +7,13 @@ from typing import Optional, Tuple, Dict
 import numpy as np
 import pandas as pd
 
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import stop_parameters
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 import numpy as np
 import pandas as pd
 
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_glm_design
+from neural_data_analysis.design_kits.design_around_event import event_binning
 
 
 # Radians to degrees; monkey_information stores angles/angular rates in rad.
@@ -722,7 +723,7 @@ def add_tuning_features_to_design(
     # --------------------------------------------------------------
     # Estimate bin ranges from data
     # --------------------------------------------------------------
-    estimated = stop_parameters.estimate_stop_binrange_from_binned_feats(
+    estimated = multiff_encoding_params.estimate_stop_binrange_from_binned_feats(
         design_matrix
     )
 

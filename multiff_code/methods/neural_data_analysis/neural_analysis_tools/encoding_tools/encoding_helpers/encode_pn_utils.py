@@ -15,7 +15,7 @@ from neural_data_analysis.design_kits.design_around_event import (
     cluster_design,
 )
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis import stop_parameters
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     decode_stops_design,
 )
@@ -117,7 +117,6 @@ _PN_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
 
 def build_pn_encoding_design(
     pn,
-    bin_width: float,
     global_bins_2d,
     n_basis: int = 20,
     t_min: float = -0.3,
@@ -153,8 +152,13 @@ def build_pn_encoding_design(
         )
     )
 
-    binned_spikes = pn.binned_spikes.copy()
-
+    cluster_cols = [c for c in pn.rebinned_x_var.columns if c.startswith('cluster_')]
+    binned_spikes = pn.rebinned_x_var[cluster_cols]
+    binned_spikes.columns = (
+        binned_spikes.columns
+        .str.replace('cluster_', '')
+        .astype(int)
+    )
 
     # Optionally rename planning columns to one_ff names (target_distance -> r_targ, etc.)
     # -------------------------------------------------------------------------
@@ -171,10 +175,6 @@ def build_pn_encoding_design(
     extra_agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
     # -------------------------------------------------------------------------
 
-    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(binned_feats)
-
-
-
     # ------ add boxcar covariates
     binned_feats_to_add, exposure, used_bins, mask_used, pos = (
         encoding_design_utils._bin_monkey_information_feats_from_event_bins(
@@ -190,6 +190,9 @@ def build_pn_encoding_design(
     for col in binned_feats_to_add.columns:
         if col not in binned_feats.columns:
             binned_feats[col] = binned_feats_to_add[col]
+
+
+    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(binned_feats)
 
 
     binned_feats, tuning_meta, mode = encoding_design_utils.add_tuning_features_to_design(
@@ -218,7 +221,7 @@ def build_pn_encoding_design(
             temporal_df, current_temporal_meta = encoding_design_utils.build_temporal_design_from_binned_events(
                 bin_t_center=data['t_center'].to_numpy(dtype=float),
                 event_indicator=binned_feats['stop_event'].values,
-                bin_dt=bin_width,
+                bin_dt=dt,
                 n_basis=n_basis,
                 t_min=t_min,
                 t_max=t_max,
@@ -227,9 +230,12 @@ def build_pn_encoding_design(
             )
 
             binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
-            # combine temporal_meta and current_temporal_meta
-            for key in current_temporal_meta:
-                temporal_meta[key] = temporal_meta[key] + current_temporal_meta[key]
+            # combine temporal_meta and current_temporal_meta safely
+            for key, val in current_temporal_meta.items():
+                if key in temporal_meta:
+                    temporal_meta[key] = temporal_meta[key] + val
+                else:
+                    temporal_meta[key] = val
     else:
         temporal_df = None
         temporal_meta = None
