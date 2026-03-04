@@ -25,7 +25,7 @@ def main():
         help='Run decoding only on this raw data folder',
     )
     parser.add_argument('--bin_width', type=float, default=0.04)
-    parser.add_argument('--t_max', type=float, default=0.20)
+    
     parser.add_argument('--n_splits', type=int, default=5)
     parser.add_argument('--save_dir', default=None)
 
@@ -34,7 +34,7 @@ def main():
     runner = decode_stops_pipeline.StopDecodingRunner(
         raw_data_folder_path=args.raw_data_folder_path,
         bin_width=args.bin_width,
-        t_max=args.t_max,
+
     )
 
     results_df = runner.run(

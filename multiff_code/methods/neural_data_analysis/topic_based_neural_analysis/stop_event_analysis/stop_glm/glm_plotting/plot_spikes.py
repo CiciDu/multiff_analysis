@@ -148,7 +148,7 @@ def plot_spaghetti_per_stop(
 def plot_observed_vs_predicted_event(
     binned_feats_sc: pd.DataFrame,
     binned_spikes: pd.DataFrame,
-    meta_used: pd.DataFrame,
+    meta_df_used: pd.DataFrame,
     offset_log,                        # 1D np.ndarray or pd.Series aligned to rows
     # statsmodels GLMResults(_wrapper) for THIS cluster
     model_res,
@@ -178,10 +178,10 @@ def plot_observed_vs_predicted_event(
         The exact feature matrix used to FIT the model (same scaling & columns).
     binned_spikes : DataFrame
         Shape (n_bins, n_clusters), integer spike counts per bin.
-    meta_used : DataFrame
+    meta_df_used : DataFrame
         Must include seg_col and the time_col (e.g., 'rel_time').
     offset_log : 1D array-like
-        Log-exposure aligned 1:1 with rows of binned_feats_sc/meta_used.
+        Log-exposure aligned 1:1 with rows of binned_feats_sc/meta_df_used.
     model_res : GLMResults
         Fitted GLM for this cluster.
     cluster_idx : int | str
@@ -189,7 +189,7 @@ def plot_observed_vs_predicted_event(
     seg_id : int
         Stop/segment to visualize.
     time_col : str
-        Column in meta_used for the x-axis time (relative to stop).
+        Column in meta_df_used for the x-axis time (relative to stop).
     exposure_s : array-like | None
         Per-bin exposure in seconds. If None, uses exp(offset_log).
     sort_by_time : bool
@@ -204,27 +204,27 @@ def plot_observed_vs_predicted_event(
     tidy : DataFrame
         Columns: ['time_s', 'obs_hz', 'pred_hz', 'exposure_s', 'cluster', seg_col].
     """
-    n = len(meta_used)
+    n = len(meta_df_used)
     if binned_feats_sc.shape[0] != n or binned_spikes.shape[0] != n:
         raise ValueError(
             'Row counts must match across features, spikes, and meta.')
 
-    if seg_col not in meta_used.columns:
-        raise ValueError(f'meta_used must contain a {seg_col} column.')
-    if time_col not in meta_used.columns:
-        raise ValueError(f'meta_used must contain "{time_col}".')
+    if seg_col not in meta_df_used.columns:
+        raise ValueError(f'meta_df_used must contain a {seg_col} column.')
+    if time_col not in meta_df_used.columns:
+        raise ValueError(f'meta_df_used must contain "{time_col}".')
 
     offset_log = np.asarray(offset_log).reshape(-1)
     if offset_log.shape[0] != n:
-        raise ValueError('offset_log length must match rows of meta_used.')
+        raise ValueError('offset_log length must match rows of meta_df_used.')
 
     if exposure_s is not None:
         exposure_s = np.asarray(exposure_s).reshape(-1)
         if exposure_s.shape[0] != n:
-            raise ValueError('exposure_s length must match rows of meta_used.')
+            raise ValueError('exposure_s length must match rows of meta_df_used.')
 
     # --- mask rows for this stop
-    mask = (meta_used[seg_col].to_numpy() == seg_id)
+    mask = (meta_df_used[seg_col].to_numpy() == seg_id)
     if not np.any(mask):
         raise ValueError(f'No rows found for {seg_col}={seg_id}.')
 
@@ -261,7 +261,7 @@ def plot_observed_vs_predicted_event(
     pred_rate_hz = np.asarray(pred_counts, dtype=float) / exp_s
 
     # --- time axis (apply same "good" filter, then optional sort)
-    t = meta_used.loc[mask, time_col].to_numpy()
+    t = meta_df_used.loc[mask, time_col].to_numpy()
     t = t[good]
 
     if sort_by_time:

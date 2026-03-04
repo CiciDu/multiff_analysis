@@ -138,10 +138,11 @@ class PlanningAndNeuralEventAligned(pn_aligned_by_seg.PlanningAndNeuralSegmentAl
             self.rebinned_y_var = self.rebinned_y_var.merge(
                 self.new_seg_info[['event_time', 'new_segment']], on='new_segment', how='left')
 
-        self.rebinned_y_var['bin_mid_time_rel_to_event'] = self.rebinned_y_var['new_bin'] * self.bin_width + \
-            self.bin_width/2 + \
-            self.rebinned_y_var['new_seg_start_time'] - \
-            self.rebinned_y_var['event_time']
+        # add t_center, which is the absolute time of the middle of the bin
+        self.rebinned_y_var['t_center'] = self.rebinned_y_var['new_bin'] * self.bin_width + self.bin_width/2 + \
+            self.rebinned_y_var['new_seg_start_time'] 
+
+        self.rebinned_y_var['bin_mid_time_rel_to_event'] = self.rebinned_y_var['t_center'] - self.rebinned_y_var['event_time']
 
     def get_new_seg_info(self, cur_or_nxt='cur', first_or_last='first', time_limit_to_count_sighting=2,
                          start_t_rel_event=-0.25, end_t_rel_event=1.25,

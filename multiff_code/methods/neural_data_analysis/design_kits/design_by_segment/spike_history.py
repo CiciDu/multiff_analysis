@@ -406,7 +406,7 @@ def build_design_with_spike_history_from_bins(
     t_max,
     n_basis=20,
     target_col: Optional[str] = None,
-    return_X_hist: bool = False,
+    returnX_hist: bool = False,
 ):
     """
     Compute spike-history regressors from an explicit bin table and
@@ -430,7 +430,7 @@ def build_design_with_spike_history_from_bins(
         Cluster column for self spike-history (e.g. 'cluster_0').
         Defaults to first spike column. Must match the target neuron when
         predicting each unit's spikes.
-    return_X_hist : bool
+    returnX_hist : bool
         If True, also return X_hist for per-unit design reuse.
     """
 
@@ -473,7 +473,7 @@ def build_design_with_spike_history_from_bins(
         meta_groups=meta_groups,
     )
 
-    if return_X_hist:
+    if returnX_hist:
         return design_w_history, basis, colnames, meta_groups, X_hist
     return design_w_history, basis, colnames, meta_groups
 
@@ -607,9 +607,9 @@ def build_design_with_spike_history_and_coupling_from_bins(
     )
 
 
-def make_bin_df_from_stop_meta(meta_used):
+def make_bin_df_from_meta_df(meta_df_used):
     return (
-        meta_used[['event_id', 'k_within_seg', 't_left', 't_right']]
+        meta_df_used[['event_id', 'k_within_seg', 't_left', 't_right']]
         .copy()
         .rename(columns={
             'event_id': 'new_segment',

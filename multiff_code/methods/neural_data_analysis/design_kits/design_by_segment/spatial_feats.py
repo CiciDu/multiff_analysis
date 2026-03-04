@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -313,6 +313,63 @@ def circular_fourier_design(
     return X, names
 
 
+def add_transition_columns(
+    data: pd.DataFrame,
+    trial_ids: np.ndarray,
+    *,
+    stems: Sequence[str] = ('cur_vis', 'nxt_vis'),
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """
+    Add per-trial 0->1 ('_on') and 1->0 ('_off') transition columns for boolean flags.
+
+    For each `stem` column in `stems`, adds:
+        - f'{stem}_on'  : 0->1 transitions (per trial)
+        - f'{stem}_off' : 1->0 transitions (per trial)
+
+    Parameters
+    ----------
+    data : DataFrame
+        Must contain columns in `stems` (bool/int).
+    trial_ids : array-like
+        Trial segmentation vector aligned with `data` rows.
+    stems : sequence of str
+        Column names to treat as flags.
+    inplace : bool
+        If True, mutate `data`. Otherwise return a copy.
+
+    Returns
+    -------
+    data_out : DataFrame
+        DataFrame with added '{stem}_on' and '{stem}_off' float columns.
+    """
+    tid = np.asarray(trial_ids).ravel()
+    if len(tid) != len(data):
+        raise ValueError('trial_ids length must match len(data)')
+
+    if not isinstance(stems, (list, tuple)):
+        stems = (stems,)
+
+    data_out = data if inplace else data.copy()
+
+    def _on_off(flag: pd.Series, tid_vec: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        f = flag.astype(bool)
+        prev = f.groupby(tid_vec, sort=False).shift(1, fill_value=False)
+        on = (f & ~prev).to_numpy(dtype=float, copy=False)
+        off = (~f & prev).to_numpy(dtype=float, copy=False)
+        return on, off
+
+    for stem in stems:
+        if stem not in data_out.columns:
+            raise KeyError(f'missing column {stem!r} in data')
+
+        on, off = _on_off(data_out[stem], tid)
+        data_out[f'{stem}_on'] = on
+        data_out[f'{stem}_off'] = off
+
+    return data_out
+
+
 def add_visibility_transition_kernels(
     specs: Dict[str, temporal_feats.PredictorSpec],
     data: pd.DataFrame,
@@ -335,32 +392,6 @@ def add_visibility_transition_kernels(
         - '{stem}_on'  : 0->1 transitions (per-trial)
         - '{stem}_off' : 1->0 transitions (per-trial)
     Each gets a short causal temporal basis (default raised-cosine ~300 ms).
-
-    Parameters
-    ----------
-    specs : dict[str, PredictorSpec]
-        Existing predictor specs (will be copied unless inplace=True).
-    data : DataFrame
-        Must contain boolean/int columns for each `stem`.
-    trial_ids : array-like
-        Trial segmentation vector aligned with `data` rows.
-    dt : float
-        Bin width (s) for constructing the temporal basis (if `basis` is None).
-    stems : sequence of str
-        Column names in `data` to treat as visibility flags.
-    basis : (L, K) array or None
-        If provided, use this basis for all stems. Otherwise build from args.
-    family : str
-        'rc' (raised-cosine) or 'spline' (B-spline) when `basis` is None.
-    n_basis, t_max, t_min, log_spaced :
-        Basis controls passed to glm_bases.*_basis when `basis` is None.
-    inplace : bool
-        If True, mutate `specs`. Otherwise return a shallow-copied dict.
-
-    Returns
-    -------
-    specs_out : dict[str, PredictorSpec]
-        Updated mapping with '{stem}_on' and '{stem}_off' entries added.
     """
     if not inplace:
         specs = dict(specs)
@@ -388,30 +419,25 @@ def add_visibility_transition_kernels(
         if B.ndim != 2:
             raise ValueError('basis must be 2D (L, K)')
 
-    # Per-trial on/off detector
-    def _on_off(flag_bool: pd.Series | np.ndarray, tid_vec: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        if isinstance(flag_bool, pd.Series):
-            f = flag_bool.astype(bool)
-        else:
-            f = pd.Series(np.asarray(flag_bool, dtype=bool))
-        prev = f.groupby(tid_vec, sort=False).shift(1, fill_value=False)
-        on = (f & ~prev).to_numpy(dtype=float, copy=False)
-        off = (~f & prev).to_numpy(dtype=float, copy=False)
-        return on, off
-
-    # make sure stems is a list or tuple
+    # Ensure stems is list/tuple
     if not isinstance(stems, (list, tuple)):
         stems = (stems,)
 
-    for stem in stems:
-        if stem not in data.columns:
-            raise KeyError(f'missing column {stem!r} in data')
+    # Compute transitions once (reusable elsewhere), then make predictors
+    data_trans = add_transition_columns(
+        data, tid, stems=stems, inplace=False
+    )
 
-        on, off = _on_off(data[stem], tid)
+    for stem in stems:
+        on = data_trans[f'{stem}_on'].to_numpy(dtype=float, copy=False)
+        off = data_trans[f'{stem}_off'].to_numpy(dtype=float, copy=False)
+
         specs[f'{stem}_on'] = temporal_feats.PredictorSpec(
-            signal=on,  bases=[B], dt=dt, t_min=t_min)
+            signal=on, bases=[B], dt=dt, t_min=t_min
+        )
         specs[f'{stem}_off'] = temporal_feats.PredictorSpec(
-            signal=off, bases=[B], dt=dt, t_min=t_min)
+            signal=off, bases=[B], dt=dt, t_min=t_min
+        )
 
     return specs
 

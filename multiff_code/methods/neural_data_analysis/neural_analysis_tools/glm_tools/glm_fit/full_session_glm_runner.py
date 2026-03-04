@@ -438,7 +438,7 @@ class FullSessionGLMRunner:
 
     def _build_stop_design(self):
 
-        pn, binned_spikes, binned_feats, offset_log, stop_meta_used, stop_meta_groups, _, _ = encode_stops_utils.build_stop_encoding_design(
+        pn, binned_spikes, binned_feats, offset_log, meta_df_used, stop_meta_groups, _, _ = encode_stops_utils.build_stop_encoding_design(
             self.raw_data_folder_path,
             self.bin_width,
             self.global_bins_2d,
@@ -447,6 +447,6 @@ class FullSessionGLMRunner:
         self.stop_design_df_sub = binned_feats[
             selected_stop_design_features.stop_design_predictors
         ].copy()
-        self.stop_design_df_sub['bin'] = stop_meta_used['global_bin']
+        self.stop_design_df_sub['bin'] = meta_df_used['global_bin']
         self.stop_design_df_sub['in_stop_window'] = 1
         self.stop_meta_groups = stop_meta_groups

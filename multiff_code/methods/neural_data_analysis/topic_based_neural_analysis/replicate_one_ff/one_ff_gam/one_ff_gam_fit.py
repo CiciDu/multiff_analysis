@@ -369,7 +369,7 @@ def generate_lambda_suffix(
     """
     Generate a filename suffix based on the 4 main lambda parameters.
 
-    Prefer passing lambda_config (e.g. from build_group_specs / build_stop_gam_groups)
+    Prefer passing lambda_config
     so the suffix matches the lambdas used. If only groups are available, lambdas are
     inferred via _extract_lambda_config (group names must follow t_*, spike_hist, cpl_*).
 
@@ -390,7 +390,6 @@ def generate_lambda_suffix(
 
     Examples
     --------
-    >>> groups, lambda_config = build_stop_gam_groups(design_df)
     >>> generate_lambda_suffix(lambda_config=lambda_config)
     >>> generate_lambda_suffix(groups)  # backward compatible: infer from groups
     """

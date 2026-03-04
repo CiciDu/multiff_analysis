@@ -15,6 +15,10 @@ from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_glm_design
 from neural_data_analysis.design_kits.design_around_event import event_binning
 
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
+    FitResult,
+    GroupSpec,
+)
 
 # Radians to degrees; monkey_information stores angles/angular rates in rad.
 _RAD_TO_DEG = 180.0 / np.pi
@@ -128,9 +132,27 @@ def _resolve_tuning_vars(
     """
     linear = linear_vars if linear_vars is not None else DEFAULT_TUNING_VARS_NO_WRAP
     angular = angular_vars if angular_vars is not None else DEFAULT_TUNING_VARS_WRAP
+    print('linear_vars before resolving:', linear_vars)
+
+    # Find vars present in the design but missing from binrange_dict and
+    # attempt to estimate their ranges from the binned features using
+    # multiff_encoding_params.estimate_stop_binrange_from_binned_feats.
+    wanted = [c for c in list(linear) + list(angular) if c in binned_feats.columns]
+    missing = [c for c in wanted if c not in binrange_dict]
+    if missing:
+        try:
+            estimated = multiff_encoding_params.estimate_stop_binrange_from_binned_feats(
+                binned_feats,
+                vars_to_include=missing,
+            )
+        except Exception:
+            estimated = {}
+        for k, v in estimated.items():
+            if k not in binrange_dict:
+                binrange_dict[k] = np.asarray(v, dtype=float)
+
     linear = [c for c in linear if c in binned_feats.columns and c in binrange_dict]
-    angular = [
-        c for c in angular if c in binned_feats.columns and c in binrange_dict]
+    angular = [c for c in angular if c in binned_feats.columns and c in binrange_dict]
     return linear, angular
 
 
@@ -418,6 +440,7 @@ def _convolve_on_grid(
     n_basis: int,
     t_min: float,
     t_max: float,
+    event_name='event',
 ) -> Tuple[np.ndarray, Dict]:
 
     lags, B = glm_bases.raised_cosine_basis(
@@ -441,7 +464,7 @@ def _convolve_on_grid(
 
     meta = {
         'dt': bin_dt,
-        'basis_info': {'t_rel': {'lags': lags, 'basis': B}},
+        'basis_info': {event_name: {'lags': lags, 'basis': B}},
     }
 
     return X_grid, meta
@@ -455,12 +478,14 @@ def build_temporal_design_from_binned_events(
     t_min: float = -0.3,
     t_max: float = 0.3,
     index: Optional[pd.Index] = None,
-    name_prefix: str = 'rcos_event',
+    event_name='event',
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Temporal design from binned events.
     Works even if bin_t_center is discontinuous.
     """
+
+    name_prefix = 'rcos_' + event_name
 
     bin_t_center = np.asarray(bin_t_center, dtype=float).ravel()
     e_local = np.asarray(event_indicator, dtype=float).ravel()
@@ -516,7 +541,7 @@ def build_temporal_design_from_binned_events(
 
     temporal_meta = {
         **base_meta,
-        'groups': {'t_rel': rcos_names},
+        'groups': {event_name: rcos_names},
         'mode': 'summed_events_binned',
         'n_events': int(np.sum(e_local)),
     }
@@ -532,13 +557,15 @@ def build_temporal_design_from_event_times(
     t_min: float = -0.3,
     t_max: float = 0.3,
     index: Optional[pd.Index] = None,
-    name_prefix: str = 'rcos_event',
+    event_name='event',
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Temporal design from continuous event timestamps.
     Robust to discontinuous bin_t_center.
     """
 
+    name_prefix = 'rcos_' + event_name
+    
     bin_t_center = np.asarray(bin_t_center, dtype=float).ravel()
     event_times = np.asarray(event_times, dtype=float).ravel()
     event_times = event_times[np.isfinite(event_times)]
@@ -601,70 +628,93 @@ def build_temporal_design_from_event_times(
 
     temporal_meta = {
         **base_meta,
-        'groups': {'t_rel': rcos_names},
+        'groups': {event_name: rcos_names},
         'mode': 'summed_events_times',
         'n_events': int(event_times.size),
     }
 
     return temporal_df, temporal_meta
 
-
-def build_structured_meta_groups(
+def build_hist_meta_from_colnames(
     colnames: Dict[str, List[str]],
-    temporal_meta: Optional[Dict[str, Any]],
-    tuning_meta: Optional[Dict[str, Any]],
     *,
-    target_col: Optional[str] = None,
+    target_col: Optional[str],
     dt: float,
     t_max: float,
     n_basis: int = 20,
 ) -> Dict[str, Any]:
     """
-    Restructure flat meta_groups into one_ff_gam-style categories.
+    Build histogram meta structure from cluster colnames.
 
-    Returns dict with 'tuning', 'temporal', 'hist', 'lambda_config' keys.
+    Returns:
+        dict with 'groups' and 'basis_info' keys.
+        Returns {} if colnames is empty.
     """
-    # Hist: build from colnames (all clusters), map to spike_hist / cpl_J for plot compatibility
+    if not colnames:
+        return {}
+
+    # Build raised cosine basis
+    t_min = dt
+    lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
+        n_basis=n_basis,
+        t_min=t_min,
+        t_max=t_max,
+        dt=dt,
+        log_spaced=True,
+        hard_start_zero=True,
+    )
+
+    basis_info_entry = {
+        'lags': lags_hist,
+        'basis': B_hist,
+    }
+
     hist_groups: Dict[str, List[str]] = {}
     hist_basis_info: Dict[str, Dict] = {}
-    if colnames:
-        t_min = dt
-        lags_hist, B_hist = glm_bases.raised_log_cosine_basis(
-            n_basis=n_basis,
-            t_min=t_min,
-            t_max=t_max,
-            dt=dt,
-            log_spaced=True,
-            hard_start_zero=True,
-        )
-        basis_info_entry = {'lags': lags_hist, 'basis': B_hist}
-        neuron_order = sorted(colnames.keys())
-        if target_col is not None:
-            if target_col not in colnames:
-                raise KeyError(f'target_col {target_col!r} not in colnames')
-            neuron_order = [target_col] + \
-                [n for n in neuron_order if n != target_col]
-        for i, neuron in enumerate(neuron_order):
-            cols = colnames[neuron]
-            if i == 0:
-                hist_groups['spike_hist'] = cols
-                hist_basis_info['spike_hist'] = basis_info_entry
-            else:
-                neuron_match = re.match(r'^cluster_(\d+)$', neuron)
-                cpl_suffix = neuron_match.group(
-                    1) if neuron_match else str(i - 1)
-                hist_groups[f'cpl_{cpl_suffix}'] = cols
-                hist_basis_info[f'cpl_{cpl_suffix}'] = basis_info_entry
 
-    hist_meta: Dict[str, Any] = {
+    neuron_order = sorted(colnames.keys())
+
+    if target_col is not None:
+        if target_col not in colnames:
+            raise KeyError(f'target_col {target_col!r} not in colnames')
+        neuron_order = [target_col] + [
+            n for n in neuron_order if n != target_col
+        ]
+
+    for i, neuron in enumerate(neuron_order):
+        cols = colnames[neuron]
+
+        if i == 0:
+            group_name = 'spike_hist'
+        else:
+            neuron_match = re.match(r'^cluster_(\d+)$', neuron)
+            cpl_suffix = neuron_match.group(1) if neuron_match else str(i - 1)
+            group_name = f'cpl_{cpl_suffix}'
+
+        hist_groups[group_name] = cols
+        hist_basis_info[group_name] = basis_info_entry
+
+    return {
         'groups': hist_groups,
         'basis_info': hist_basis_info,
-    } if hist_groups else {}
+    }
+
+def build_structured_meta_groups(
+    *,
+    hist_meta: Optional[Dict[str, Any]],
+    temporal_meta: Optional[Dict[str, Any]],
+    tuning_meta: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Restructure meta groups into one_ff_gam-style categories.
+
+    Expects hist_meta to already be constructed.
+    """
 
     return {
         'tuning': tuning_meta if tuning_meta else {},
         'temporal': temporal_meta if temporal_meta else {},
-        'hist': hist_meta,
+        'hist': hist_meta if hist_meta else {},
         'lambda_config': {},
     }
 
@@ -742,6 +792,8 @@ def add_tuning_features_to_design(
     # --------------------------------------------------------------
     # Resolve tuning variables
     # --------------------------------------------------------------
+    print('linear_vars:', linear_vars)
+    
     linear_resolved, angular_resolved = \
         _resolve_tuning_vars(
             design_matrix,
@@ -749,6 +801,8 @@ def add_tuning_features_to_design(
             linear_vars,
             angular_vars,
         )
+
+    print('linear_resolved:', linear_resolved)
 
     if not (linear_resolved or angular_resolved):
         return design_matrix, tuning_meta, mode
@@ -865,3 +919,128 @@ def _bin_monkey_information_feats_from_event_bins(
     binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
 
     return binned_feats, exposure, used_bins, mask_used, pos
+
+
+def merge_meta_vals(a: Any, b: Any) -> Any:
+
+    # 1. Recursive dict merge
+    if isinstance(a, dict) and isinstance(b, dict):
+        out = dict(a)
+        for kk, vv in b.items():
+            if kk in out:
+                out[kk] = merge_meta_vals(out[kk], vv)
+            else:
+                out[kk] = vv
+        return out
+
+    # 2. NumPy arrays
+    if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+        return np.concatenate([a, b])
+
+    # 3. Lists / tuples
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return list(a) + list(b)
+
+    # 4. Numbers
+    if isinstance(a, (int, float, np.integer, np.floating)) and \
+       isinstance(b, (int, float, np.integer, np.floating)):
+        return a + b
+
+    # 5. Strings
+    if isinstance(a, str) and isinstance(b, str):
+        return a + b
+
+    # 6. Default: overwrite with b
+    return b
+
+
+
+def _collect_group_columns(groups: List[GroupSpec]) -> List[str]:
+    """Flatten all columns across groups."""
+    all_cols = []
+    for g in groups:
+        all_cols.extend(g.cols)
+    return all_cols
+
+
+def _validate_design_columns(design_df, groups: List[GroupSpec]) -> None:
+    """
+    Ensure every column in design_df appears in some GroupSpec.
+    Raises ValueError if any column is unassigned.
+    """
+    design_cols = set(design_df.columns)
+    grouped_cols = set(_collect_group_columns(groups))
+
+    missing = sorted(design_cols - grouped_cols)
+    if missing:
+        raise ValueError(
+            f'The following design_df columns are not assigned to any GroupSpec:\n{missing}'
+        )
+
+def build_gam_groups_from_meta(
+    structured_meta_groups,
+    design_df,
+    *,
+    lam_f: float = 100.0,
+    lam_g: float = 10.0,
+    lam_h: float = 10.0,
+    lam_p: float = 10.0,
+) -> Tuple[List[GroupSpec], Dict[str, float]]:
+    """
+    Build GroupSpec list and lambda_config for stop-encoding Poisson GAM from
+    `structured_meta_groups` instead of a full `design_df`.
+
+    Additionally validates that every column in design_df is assigned
+    to exactly one group.
+    """
+    tuning_meta = structured_meta_groups.get('tuning', {}) or {}
+    temporal_meta = structured_meta_groups.get('temporal', {}) or {}
+    hist_meta = structured_meta_groups.get('hist', {}) or {}
+
+    groups: List[GroupSpec] = []
+
+    # -------------------------
+    # Temporal groups (lam_g)
+    # -------------------------
+    temporal_groups = temporal_meta.get('groups', {}) if temporal_meta else {}
+    for name, cols in temporal_groups.items():
+        if not cols:
+            continue
+        groups.append(GroupSpec(name, list(cols), 'event', lam_g))
+
+    # -------------------------
+    # Tuning groups (lam_f)
+    # -------------------------
+    tuning_groups = tuning_meta.get('groups', {}) if tuning_meta else {}
+    for var, cols in tuning_groups.items():
+        if not cols:
+            continue
+        groups.append(GroupSpec('var', list(cols), '1D', lam_f))
+
+    # -------------------------
+    # History groups
+    # spike_hist -> lam_h
+    # others     -> lam_p
+    # -------------------------
+    hist_groups = hist_meta.get('groups', {}) if hist_meta else {}
+    for i, (gname, cols) in enumerate(hist_groups.items()):
+        if not cols:
+            continue
+        lam = lam_h if (i == 0 or gname == 'spike_hist') else lam_p
+        groups.append(GroupSpec(gname, list(cols), 'event', lam))
+
+    # -------------------------
+    # Validate coverage
+    # -------------------------
+    _validate_design_columns(design_df, groups)
+
+    lambda_config = {
+        'lam_f': lam_f,
+        'lam_g': lam_g,
+        'lam_h': lam_h,
+        'lam_p': lam_p,
+    }
+
+    return groups, lambda_config
+
+

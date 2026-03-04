@@ -365,6 +365,7 @@ def selective_zscore(
     *,
     exclude_prefixes: tuple = (),
     exclude_substrings: tuple = (),
+    exclude_columns: tuple = (),
     # treat centered & its square as “do not scale”
     centered_suffixes=('_c', '_c2'),
     zscored_suffixes=('_z', '_z2'),    # already standardized → skip
@@ -379,6 +380,7 @@ def selective_zscore(
       • dummies (0/1) or boolean,
       • already centered or squared-centered (name ends with any of `centered_suffixes`),
       • already z-scored or squared-z (name ends with any of `zscored_suffixes`),
+            • explicitly excluded via `exclude_columns`,
       • near-constant (std ~ 0),
       • the intercept column named 'const' (if present).
 
@@ -397,6 +399,8 @@ def selective_zscore(
         if exclude_prefixes and col.startswith(exclude_prefixes):
             continue
         if exclude_substrings and any(s in col for s in exclude_substrings):
+            continue
+        if exclude_columns and col in exclude_columns:
             continue
         # 1) never touch an intercept if it's already present
         if col == 'const':

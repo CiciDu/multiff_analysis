@@ -66,7 +66,7 @@ def build_stop_design(
         (n_bins × n_features) design matrix (exposure > 0 only)
     offset_log : np.ndarray
         log(exposure) per bin
-    meta_used : pd.DataFrame
+    meta_df_used : pd.DataFrame
         Per-bin metadata aligned row-wise to binned_feats
     groups : Dict[str, List[str]]
         Semantic feature groupings
@@ -134,7 +134,7 @@ def build_stop_design(
 
     print('meta.shape', meta.shape)
 
-    meta_used = (
+    meta_df_used = (
         meta.set_index('bin')
         .sort_index()
         .loc[pos]
@@ -158,7 +158,7 @@ def build_stop_design(
     # -------------------------------------------------------------------------
 
     cluster_df = cluster_design.build_cluster_features_workflow(
-        meta_used[['event_id', 'rel_center']],
+        meta_df_used[['event_id', 'rel_center']],
         events_with_stats,
         rel_time_col='rel_center',
         winsor_p=0.5,
@@ -202,7 +202,7 @@ def build_stop_design(
     # 7) Offset term and timing
     # -------------------------------------------------------------------------
     offset_log = np.log(np.clip(exposure[mask_used], 1e-12, None))
-    binned_feats['time_rel_to_event_start'] = meta_used['rel_center'].to_numpy()
+    binned_feats['time_rel_to_event_start'] = meta_df_used['rel_center'].to_numpy()
 
     # -------------------------------------------------------------------------
     # 8) Firefly visibility / memory features
@@ -220,8 +220,8 @@ def build_stop_design(
     # 9) Retry-related features
     # -------------------------------------------------------------------------
     if add_retries_info:
-        binned_feats, meta_used = add_retries_info_to_binned_feats(
-            binned_feats, new_seg_info, datasets, meta_used
+        binned_feats, meta_df_used = add_retries_info_to_binned_feats(
+            binned_feats, new_seg_info, datasets, meta_df_used
         )
 
     # -------------------------------------------------------------------------
@@ -230,7 +230,7 @@ def build_stop_design(
     groups = _build_feature_groups(
         binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
 
-    return binned_spikes, binned_feats, offset_log, meta_used, groups
+    return binned_spikes, binned_feats, offset_log, meta_df_used, groups
 
 
 def build_stop_design_decoding(
@@ -293,7 +293,7 @@ def build_stop_design_decoding(
     mask_used = exposure > 0
     pos = used_bins[mask_used]
     binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
-    meta_used = (
+    meta_df_used = (
         meta.set_index('bin')
         .sort_index()
         .loc[pos]
@@ -309,7 +309,7 @@ def build_stop_design_decoding(
     )
 
     cluster_df = cluster_design.build_cluster_features_workflow(
-        meta_used[['event_id', 'rel_center']],
+        meta_df_used[['event_id', 'rel_center']],
         events_with_stats,
         rel_time_col='rel_center',
         winsor_p=0.5,
@@ -343,7 +343,7 @@ def build_stop_design_decoding(
     _safe_add_columns(binned_feats, cluster_df, CLUSTER_FEATS)
 
     offset_log = np.log(np.clip(exposure[mask_used], 1e-12, None))
-    binned_feats['time_rel_to_event_start'] = meta_used['rel_center'].to_numpy()
+    binned_feats['time_rel_to_event_start'] = meta_df_used['rel_center'].to_numpy()
 
     if add_ff_visible_info:
         binned_feats = add_ff_visible_and_in_memory_info(
@@ -355,14 +355,14 @@ def build_stop_design_decoding(
         )
 
     if add_retries_info:
-        binned_feats, meta_used = add_retries_info_to_binned_feats(
-            binned_feats, new_seg_info, datasets, meta_used
+        binned_feats, meta_df_used = add_retries_info_to_binned_feats(
+            binned_feats, new_seg_info, datasets, meta_df_used
         )
 
     groups = _build_feature_groups(
         binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
 
-    return binned_spikes, binned_feats, offset_log, meta_used, groups
+    return binned_spikes, binned_feats, offset_log, meta_df_used, groups
 
 
 def _safe_add_columns(target_df, source_df, cols):
@@ -436,8 +436,8 @@ def _build_feature_groups(
     _add_group('cluster_rel_time', ['bin_t_from_cluster_start_s_z'])
 
     # Firefly features
-    _add_group('ff_visible', ['log1p_num_ff_visible', 'k_ff_visible'])
-    _add_group('ff_in_memory', ['log1p_num_ff_in_memory', 'k_ff_in_memory'])
+    _add_group('ff_visible', ['log1p_num_ff_visible', 'num_ff_visible'])
+    _add_group('ff_in_memory', ['log1p_num_ff_in_memory', 'num_ff_in_memory'])
 
     # Retry features
     _add_group(
@@ -458,7 +458,7 @@ def _build_feature_groups(
     return groups
 
 
-def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_used):
+def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_df_used):
     assert datasets is not None, 'datasets is required to add retries info'
 
     new_seg_info = new_seg_info.copy()
@@ -479,18 +479,18 @@ def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_
         new_seg_info, extras=RETRY_CATEGORIES
     )
 
-    meta_used = stop_design.join_event_tbl_avoid_collisions(
-        meta_used, event_tbl
+    meta_df_used = stop_design.join_event_tbl_avoid_collisions(
+        meta_df_used, event_tbl
     )
 
-    meta_used = meta_used.sort_values('bin').reset_index(drop=True)
+    meta_df_used = meta_df_used.sort_values('bin').reset_index(drop=True)
     binned_feats = binned_feats.reset_index(drop=True)
 
-    if len(meta_used) != len(binned_feats):
-        raise ValueError('meta_used and binned_feats misaligned')
+    if len(meta_df_used) != len(binned_feats):
+        raise ValueError('meta_df_used and binned_feats misaligned')
 
     for col in RETRY_CATEGORIES:
-        binned_feats[col] = meta_used[col].to_numpy()
+        binned_feats[col] = meta_df_used[col].to_numpy()
 
     retry_cols = ['rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle']
     miss_cols = retry_cols + ['rsw_last', 'one_stop_miss']
@@ -506,7 +506,7 @@ def add_retries_info_to_binned_feats(binned_feats, new_seg_info, datasets, meta_
     if 'is_clustered' in binned_feats.columns:
         binned_feats = binned_feats.drop(columns=['is_clustered'])
 
-    return binned_feats, meta_used
+    return binned_feats, meta_df_used
 
 
 # =============================================================================
@@ -542,12 +542,12 @@ def add_ff_visible_and_in_memory_info(
 # =============================================================================
 
 
-def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_used, mask):
+def subset_binned_data(binned_feats, binned_spikes, offset_log, meta_df_used, mask):
     return (
         binned_feats.loc[mask].reset_index(drop=True),
         binned_spikes.loc[mask].reset_index(drop=True),
         offset_log[mask],
-        meta_used.loc[mask].reset_index(drop=True),
+        meta_df_used.loc[mask].reset_index(drop=True),
     )
 
 
@@ -593,7 +593,7 @@ def scale_binned_feats(binned_feats, keep_constant_tuning_terms: bool = False):
     binned_feats_sc, scaled_cols = event_binning.selective_zscore(
         binned_feats,
         exclude_prefixes=exclude_prefixes,
-        exclude_substrings=(':bin',),
+        exclude_substrings=(':bin', 'num'),
         exclude_columns=binary_cols,  # <- prevent scaling of 0/1 columns
     )
 
@@ -694,7 +694,7 @@ def assemble_stop_decoding_design(
         binned_spikes,
         binned_feats,
         offset_log,
-        stop_meta_used,
+        meta_df_used,
         stop_meta_groups,
     ) = build_result
 
@@ -707,6 +707,6 @@ def assemble_stop_decoding_design(
         binned_spikes,
         binned_feats,
         offset_log,
-        stop_meta_used,
+        meta_df_used,
         stop_meta_groups,
     )

@@ -33,11 +33,11 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         self,
         raw_data_folder_path,
         bin_width=0.04,
-        t_max=0.20,
+        
     ):
         super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
-        self.t_max = t_max
+        
 
         # will be filled during setup
         self.datasets = None
@@ -54,7 +54,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         return self.vis_feats_to_decode
 
     def _get_groups(self):
-        return self.meta_used["event_id"].values
+        return self.meta_df_used["event_id"].values
 
     def _get_neural_matrix(self) -> np.ndarray:
         return np.asarray(self.vis_binned_spikes, dtype=float)
@@ -111,7 +111,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             (
                 self.vis_binned_spikes,
                 self.vis_feats_to_decode,
-                self.meta_used,
+                self.meta_df_used,
             ) = self._prepare_design_matrices()
 
             # Save the computed design matrices for future use
@@ -127,7 +127,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             binned_spikes,
             binned_feats,
             offset_log,
-            meta_used,
+            meta_df_used,
             meta_groups,
         ) = decode_stops_design.build_stop_design_decoding(
             new_seg_info,
@@ -141,8 +141,8 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             add_retries_info=False,
         )
 
-        if 'global_burst_id' not in meta_used.columns:
-            meta_used = meta_used.merge(
+        if 'global_burst_id' not in meta_df_used.columns:
+            meta_df_used = meta_df_used.merge(
                 new_seg_info[['event_id', 'global_burst_id']],
                 on='event_id',
                 how='left',
@@ -158,7 +158,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
   
         self.vis_binned_spikes = binned_spikes
 
-        return binned_spikes, vis_feats_to_decode, meta_used
+        return binned_spikes, vis_feats_to_decode, meta_df_used
 
     def _get_save_dir(self):
         return os.path.join(
@@ -171,20 +171,20 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         return {
             'vis_binned_spikes': save_dir / 'vis_binned_spikes.pkl',
             'vis_feats_to_decode': save_dir / 'vis_feats_to_decode.pkl',
-            'meta_used': save_dir / 'meta_used.pkl',
+            'meta_df_used': save_dir / 'meta_df_used.pkl',
         }
 
     def _get_design_matrix_data(self):
         return {
             'vis_binned_spikes': self.vis_binned_spikes,
             'vis_feats_to_decode': self.vis_feats_to_decode,
-            'meta_used': self.meta_used,
+            'meta_df_used': self.meta_df_used,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
             'vis_binned_spikes': 'vis_binned_spikes',
             'vis_feats_to_decode': 'vis_feats_to_decode',
-            'meta_used': 'meta_used',
+            'meta_df_used': 'meta_df_used',
         }
 

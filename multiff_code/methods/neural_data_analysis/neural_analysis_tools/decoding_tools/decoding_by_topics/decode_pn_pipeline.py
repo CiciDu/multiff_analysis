@@ -32,11 +32,10 @@ class PNDecodingRunner(BaseDecodingRunner):
         self,
         raw_data_folder_path,
         bin_width=0.04,
-        t_max=0.20,
     ):
         super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
-        self.t_max = t_max
+        
 
         # Filled during setup
         self.behav_df = None

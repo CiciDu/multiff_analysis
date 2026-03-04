@@ -37,13 +37,12 @@ class StopDecodingRunner(BaseDecodingRunner):
         self,
         raw_data_folder_path,
         bin_width: float = 0.04,
-        t_max: float = 0.20,
     ):
         super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
-        self.t_max = t_max
+        
 
-        self.stop_meta_used = None
+        self.meta_df_used = None
         self.stop_feats_to_decode = None
         self.binned_spikes = None
 
@@ -59,7 +58,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         return self.stop_feats_to_decode
 
     def _get_groups(self):
-        return self.stop_meta_used["event_id"].values
+        return self.meta_df_used["event_id"].values
 
     def _get_neural_matrix(self) -> np.ndarray:
         return np.asarray(self.binned_spikes, dtype=float)
@@ -89,7 +88,7 @@ class StopDecodingRunner(BaseDecodingRunner):
             self.binned_spikes,
             self.stop_feats_to_decode,
             _offset_log,
-            self.stop_meta_used,
+            self.meta_df_used,
             _stop_meta_groups,
         ) = decode_stops_design.assemble_stop_decoding_design(
             self.raw_data_folder_path,
@@ -112,19 +111,19 @@ class StopDecodingRunner(BaseDecodingRunner):
         return {
             "binned_spikes": save_dir / "binned_spikes.pkl",
             "stop_feats_to_decode": save_dir / "stop_feats_to_decode.pkl",
-            "stop_meta_used": save_dir / "stop_meta_used.pkl",
+            "meta_df_used": save_dir / "meta_df_used.pkl",
         }
 
     def _get_design_matrix_data(self):
         return {
             "binned_spikes": self.binned_spikes,
             "stop_feats_to_decode": self.stop_feats_to_decode,
-            "stop_meta_used": self.stop_meta_used,
+            "meta_df_used": self.meta_df_used,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
             "binned_spikes": "binned_spikes",
             "stop_feats_to_decode": "stop_feats_to_decode",
-            "stop_meta_used": "stop_meta_used",
+            "meta_df_used": "meta_df_used",
         }

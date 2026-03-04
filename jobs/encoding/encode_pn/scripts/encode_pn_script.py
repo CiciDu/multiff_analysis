@@ -26,7 +26,7 @@ def main():
         help="Run encoding only on this raw data folder",
     )
     parser.add_argument("--bin_width", type=float, default=0.04)
-    parser.add_argument("--t_max", type=float, default=0.20)
+
     parser.add_argument("--n_splits", type=int, default=5)
     parser.add_argument("--save_dir", default=None)
 
@@ -51,16 +51,18 @@ def main():
             runner = encode_pn_pipeline.PNEncodingRunner(
                 raw_data_folder_path=raw_data_folder_path,
                 bin_width=args.bin_width,
-                t_max=args.t_max,
+        
             )
 
             runner._collect_data(exists_ok=load_if_exists)
 
+            lambda_config = dict(DEFAULT_LAMBDA_CONFIG)
+
             all_neuron_r2 = runner.crossval_variance_explained_all_neurons(
-                lam_f=DEFAULT_LAMBDA_CONFIG["lam_f"],
-                lam_g=DEFAULT_LAMBDA_CONFIG["lam_g"],
-                lam_h=DEFAULT_LAMBDA_CONFIG["lam_h"],
-                lam_p=DEFAULT_LAMBDA_CONFIG["lam_p"],
+                lam_f=lambda_config["lam_f"],
+                lam_g=lambda_config["lam_g"],
+                lam_h=lambda_config["lam_h"],
+                lam_p=lambda_config["lam_p"],
                 n_folds=args.n_splits,
                 load_if_exists=load_if_exists,
                 cv_mode="blocked_time_buffered",
@@ -73,7 +75,7 @@ def main():
             all_session_results[raw_data_folder_path] = all_neuron_r2
 
             runner.run_category_contributions_and_penalty_tuning_all_neurons(
-                lambda_config=DEFAULT_LAMBDA_CONFIG,
+                lambda_config=lambda_config,
                 n_folds=args.n_splits,
                 buffer_samples=20,
                 backward_n_folds=10,
@@ -81,7 +83,6 @@ def main():
                 load_if_exists=load_if_exists,
                 verbose=True,
             )
-            
             
         except Exception as e:
             print(f"[ERROR] Failed for {raw_data_folder_path}: {e}")

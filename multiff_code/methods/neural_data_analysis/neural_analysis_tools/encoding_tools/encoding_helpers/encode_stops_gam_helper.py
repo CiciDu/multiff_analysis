@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+import copy
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
     encode_stops_utils,
@@ -19,42 +20,34 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     GroupSpec,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+
 
 DEFAULT_VAR_CATEGORIES = {
-    "sensory_vars": ["v", "w"],
-    "latent_vars": ["r_targ", "theta_targ"],
+    "sensory_vars": ["v", "w", "accel", "ang_accel"],
+    "latent_vars": ["cur_ff_distance", "cur_ff_angle", "nxt_ff_distance", "nxt_ff_angle"], # originally ["r_targ", "theta_targ"] in one-ff
     "position_vars": ["d", "phi"],
     "eye_position_vars": ["eye_ver", "eye_hor"],
-    "event_vars": ["basis", "basis*captured", "prepost", "captured"],
+    "event_vars": ["stop"],
     "spike_hist_vars": ["spike_hist"],
-}
-
-# PN encoding: column-based categories (match design column names/prefixes)
-PN_VAR_CATEGORIES = {
     "visibility_vars": ["cur_vis", "nxt_vis", "cur_in_memory", "nxt_in_memory"],
-    "spatial_vars": ["cur_ff_angle", "nxt_ff_angle", "cur_ff_distance", "nxt_ff_distance"],
-    "kinematic_vars": ["speed", "ang_speed", "accel", "ang_accel"],
     "ff_count_vars": ["num_ff_visible", "num_ff_in_memory", "log1p_num_ff_visible", "log1p_num_ff_in_memory"],
-    "event_vars": ["rcos_"],
-    "spike_hist_vars": ["spike_hist"],
 }
 
-# Vis encoding: column-based categories (stop-style design with ff visibility)
-VIS_VAR_CATEGORIES = {
-    "sensory_vars": ["v", "w", "speed", "ang_speed"],
-    "latent_vars": ["r_targ", "theta_targ"],
-    "position_vars": ["d", "phi"],
-    "ff_visibility_vars": [
-        "log1p_num_ff_visible", "k_ff_visible", "num_ff_visible",
-        "log1p_num_ff_in_memory", "k_ff_in_memory", "num_ff_in_memory",
-    ],
-    "event_vars": ["rcos_", "prepost", "captured", "time_since_prev_event", "time_to_next_event"],
+
+STOP_VAR_CATEGORIES = copy.deepcopy(DEFAULT_VAR_CATEGORIES)
+STOP_VAR_CATEGORIES.update({
     "cluster_vars": [
         "event_is_first_in_cluster", "gap_since_prev", "gap_till_next",
         "cluster_duration", "cluster_progress", "bin_t_from_cluster", "log_n_events", "event_t_from_cluster",
     ],
-    "spike_hist_vars": ["spike_hist"],
-}
+})
+VIS_VAR_CATEGORIES = copy.deepcopy(STOP_VAR_CATEGORIES)
+
+PN_VAR_CATEGORIES = copy.deepcopy(DEFAULT_VAR_CATEGORIES)
+PN_VAR_CATEGORIES.update({'event_vars': ["cur_ff_on", 'cur_ff_off']})
+
+
 
 DEFAULT_LAMBDA_CONFIG = {
     "lam_f": 100.0,
@@ -62,61 +55,6 @@ DEFAULT_LAMBDA_CONFIG = {
     "lam_h": 10.0,
     "lam_p": 10.0,
 }
-
-
-def _columns_matching_aliases(
-    design_df: pd.DataFrame,
-    groups: List[GroupSpec],
-    aliases: Sequence[str],
-) -> List[str]:
-    """
-    Find design columns matching aliases (column names, prefixes, or group names).
-
-    - Exact match: c == alias
-    - Prefix match: c.startswith(alias) for multi-char aliases (e.g. rcos_, cur_ff)
-    - Group match: alias "spike_hist" or "coupling" -> columns from that group
-    """
-    cols_to_drop = set()
-    available_group_names = {g.name for g in groups}
-    group_cols = {g.name: set(g.cols) for g in groups}
-
-    for alias in aliases:
-        if alias == "spike_hist" and "spike_hist" in available_group_names:
-            cols_to_drop.update(group_cols["spike_hist"])
-        elif alias == "coupling":
-            for gname in available_group_names:
-                if gname.startswith("cpl_"):
-                    cols_to_drop.update(group_cols[gname])
-        else:
-            for c in design_df.columns:
-                if c == alias:
-                    cols_to_drop.add(c)
-                elif len(alias) > 1 and (c.startswith(alias + "_") or c.startswith(alias)):
-                    cols_to_drop.add(c)
-    return [c for c in design_df.columns if c in cols_to_drop]
-
-
-def _subset_design_by_columns(
-    design_df: pd.DataFrame,
-    groups: List[GroupSpec],
-    drop_aliases: Sequence[str],
-    lam_f: float,
-    lam_g: float,
-    lam_h: float,
-    lam_p: float,
-) -> Tuple[pd.DataFrame, List[GroupSpec]]:
-    """Drop columns matching aliases and rebuild groups with build_simple_gam_groups."""
-    cols_to_drop = _columns_matching_aliases(design_df, groups, drop_aliases)
-    keep_cols = [c for c in design_df.columns if c not in set(cols_to_drop)]
-    if not keep_cols or (len(keep_cols) == 1 and keep_cols[0] == "const"):
-        raise ValueError(
-            f"Cannot leave out category: dropping {cols_to_drop} would remove all predictors"
-        )
-    reduced_df = design_df[keep_cols].copy()
-    reduced_groups, _ = encode_stops_utils.build_simple_gam_groups(
-        reduced_df, lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p
-    )
-    return reduced_df, reduced_groups
 
 
 class BaseEncodingGAMAnalysisHelper:
@@ -131,13 +69,13 @@ class BaseEncodingGAMAnalysisHelper:
         runner: Any,
         *,
         var_categories: Optional[Dict[str, List[str]]] = None,
-        gam_results_subdir: str = "gam_results",
-        use_column_based_categories: bool = False,
     ):
         self.runner = runner
-        self.var_categories = var_categories or {}
-        self.gam_results_subdir = gam_results_subdir
-        self.use_column_based_categories = use_column_based_categories
+        self.var_categories = var_categories or DEFAULT_VAR_CATEGORIES
+        self.gam_results_subdir = runner.get_gam_results_subdir()
+        
+
+        
 
     def _resolve_lambda_config(
         self,
@@ -339,30 +277,20 @@ class BaseEncodingGAMAnalysisHelper:
             if category_name in category_loads:
                 reduced_cv = category_loads[category_name]
             else:
-                if self.use_column_based_categories:
-                    reduced_df, reduced_groups = _subset_design_by_columns(
-                        design_df=design_df,
-                        groups=groups,
-                        drop_aliases=category_aliases,
-                        lam_f=lam_cfg["lam_f"],
-                        lam_g=lam_cfg["lam_g"],
-                        lam_h=lam_cfg["lam_h"],
-                        lam_p=lam_cfg["lam_p"],
-                    )
-                else:
-                    drop_group_names = self._expand_aliases_to_group_names(
-                        aliases=category_aliases,
-                        available_group_names=available_group_names,
-                    )
-                    keep_group_names = [
-                        gname for gname in available_group_names
-                        if gname not in set(drop_group_names)
-                    ]
-                    reduced_df, reduced_groups = self._subset_design_and_groups(
-                        design_df=design_df,
-                        groups=groups,
-                        keep_group_names=keep_group_names,
-                    )
+                drop_group_names = self._expand_aliases_to_group_names(
+                    aliases=category_aliases,
+                    available_group_names=available_group_names,
+                )
+                keep_group_names = [
+                    gname for gname in available_group_names
+                    if gname not in set(drop_group_names)
+                ]
+                reduced_df, reduced_groups = self._subset_design_and_groups(
+                    design_df=design_df,
+                    groups=groups,
+                    keep_group_names=keep_group_names,
+                )
+                
                 reduced_cv = self._run_crossval(
                     design_df=reduced_df,
                     y=y,
@@ -580,28 +508,6 @@ class BaseEncodingGAMAnalysisHelper:
             "outdir": outdir,
         }
 
-
-class StopEncodingGAMAnalysisHelper(BaseEncodingGAMAnalysisHelper):
-    """
-    Shared helper for stop-encoding GAM analyses.
-
-    Keeps category contribution, penalty tuning, and backward elimination out of
-    the main pipeline class so encode_stops_pipeline stays focused on data/design.
-    """
-
-    def __init__(
-        self,
-        runner: Any,
-        *,
-        var_categories: Optional[Dict[str, List[str]]] = None,
-    ):
-        super().__init__(
-            runner,
-            var_categories=var_categories or DEFAULT_VAR_CATEGORIES,
-            gam_results_subdir="stop_gam_results",
-            use_column_based_categories=False,
-        )
-
     def _unit_context(
         self,
         unit_idx: int,
@@ -610,48 +516,6 @@ class StopEncodingGAMAnalysisHelper(BaseEncodingGAMAnalysisHelper):
     ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
         if self.runner.binned_feats is None or self.runner.binned_spikes is None:
             self.runner._collect_data(exists_ok=True)
-        design_df = self.runner.get_design_for_unit(unit_idx)
-        y = np.asarray(
-            self.runner.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
-        lam_cfg = self._resolve_lambda_config(lambda_config)
-        groups, _ = encode_stops_utils.build_stop_gam_groups(
-            design_df,
-            lam_f=lam_cfg["lam_f"],
-            lam_g=lam_cfg["lam_g"],
-            lam_h=lam_cfg["lam_h"],
-            lam_p=lam_cfg["lam_p"],
-        )
-        return design_df, y, groups, lam_cfg
-
-
-class SimpleEncodingGAMAnalysisHelper(BaseEncodingGAMAnalysisHelper):
-    """
-    GAM analysis helper for PN and Vis encoding (uses build_simple_gam_groups).
-
-    Supports column-based var_categories for run_category_variance_contributions.
-    """
-
-    def __init__(
-        self,
-        runner: Any,
-        *,
-        var_categories: Optional[Dict[str, List[str]]] = None,
-        gam_results_subdir: str = "gam_results",
-    ):
-        super().__init__(
-            runner,
-            var_categories=var_categories or {},
-            gam_results_subdir=gam_results_subdir,
-            use_column_based_categories=True,
-        )
-
-    def _unit_context(
-        self,
-        unit_idx: int,
-        *,
-        lambda_config: Optional[Dict[str, float]] = None,
-    ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
-        self.runner._collect_data(exists_ok=True)
         design_df = self.runner.get_design_for_unit(unit_idx)
         binned_spikes = self.runner.binned_spikes
         y = np.asarray(
@@ -665,3 +529,235 @@ class SimpleEncodingGAMAnalysisHelper(BaseEncodingGAMAnalysisHelper):
             lam_p=lam_cfg["lam_p"],
         )
         return design_df, y, groups, lam_cfg
+
+    def crossval_tuning_curve_coef(
+        self,
+        unit_idx: int,
+        groups: List[GroupSpec],
+        *,
+        n_folds: int = 10,
+        random_state: int = 0,
+        fit_kwargs: Optional[Dict] = None,
+        save_path: Optional[str] = None,
+        load_if_exists: bool = True,
+        save_metadata: Optional[Dict] = None,
+        verbose: bool = True,
+        cv_mode: Optional[str] = 'blocked_time_buffered',
+        buffer_samples: int = 20,
+        cv_groups=None,
+    ) -> Dict:
+        """
+        Perform cross-validation for tuning curve coefficients.
+
+        Automatically saves to:
+        {save_dir}/{results_subdir}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl
+        """
+
+        # -------------------------------------------------
+        # Auto-generate save path
+        # -------------------------------------------------
+        if save_path is None:
+            save_path = self._auto_build_cv_save_path(unit_idx)
+
+        # -------------------------------------------------
+        # Load cached results if available
+        # -------------------------------------------------
+        if load_if_exists and save_path is not None and os.path.exists(save_path):
+            try:
+                with open(save_path, 'rb') as f:
+                    cached = pickle.load(f)
+                if verbose:
+                    print(f'Loaded cached tuning curve CV results from: {save_path}')
+                return cached
+            except Exception as e:
+                if verbose:
+                    print(f'Could not load cached results from {save_path}: {e}')
+
+        # -------------------------------------------------
+        # Get design matrix and response
+        # -------------------------------------------------
+        design_df = self.runner.get_design_for_unit(unit_idx)
+        y = self._extract_response_vector(unit_idx)
+
+        if len(design_df) != len(y):
+            raise ValueError(
+                f'design and response row mismatch: {len(design_df)} vs {len(y)}'
+            )
+
+        if fit_kwargs is None:
+            fit_kwargs = {'max_iter': 1000, 'tol': 1e-6, 'verbose': False}
+
+        # -------------------------------------------------
+        # Build splitter
+        # -------------------------------------------------
+        splitter = self._build_cv_splitter(
+            y=y,
+            n_folds=n_folds,
+            random_state=random_state,
+            cv_mode=cv_mode,
+            cv_groups=cv_groups,
+        )
+
+        # -------------------------------------------------
+        # Cross-validation loop
+        # -------------------------------------------------
+        fold_coef_list = []
+        fold_indices = []
+
+        if cv_mode == 'group_kfold':
+            fold_iter = splitter.split(y, groups=cv_groups)
+        else:
+            fold_iter = splitter.split(y)
+
+        for fold_idx, (train_idx, test_idx) in enumerate(fold_iter):
+
+            # Apply buffer for blocked_time_buffered
+            if cv_mode == 'blocked_time_buffered' and buffer_samples > 0:
+                if len(test_idx) > 0:
+                    min_test = test_idx.min()
+                    train_idx = train_idx[train_idx < (min_test - buffer_samples)]
+
+            X_train = design_df.iloc[train_idx, :]
+            y_train = y[train_idx]
+
+            if verbose:
+                print(
+                    f'Fold {fold_idx + 1}/{n_folds}: fitting {len(train_idx)} samples'
+                )
+
+            fit_result = one_ff_gam_fit.fit_poisson_gam(
+                design_df=X_train,
+                y=y_train,
+                groups=groups,
+                save_path=None,
+                save_design=False,
+                load_if_exists=False,
+                **fit_kwargs,
+            )
+
+            if not hasattr(fit_result, 'coef') or fit_result.coef is None:
+                raise RuntimeError(
+                    f'Fold {fold_idx}: fit_result does not contain valid coef'
+                )
+
+            fold_coef_list.append(np.asarray(fit_result.coef).copy())
+            fold_indices.append((train_idx, test_idx))
+
+        # -------------------------------------------------
+        # Aggregate statistics
+        # -------------------------------------------------
+        mean_coef, std_coef, coef_shape = self._aggregate_fold_statistics(
+            fold_coef_list
+        )
+
+        result = {
+            'fold_coef': fold_coef_list,
+            'fold_design_columns': list(design_df.columns),
+            'coef_shape': coef_shape,
+            'mean_coef': mean_coef,
+            'std_coef': std_coef,
+            'fold_indices': fold_indices,
+            'unit_idx': unit_idx,
+            'cv_mode': cv_mode,
+            'n_folds': n_folds,
+            'random_state': random_state,
+            'save_path': save_path,
+        }
+
+        if save_metadata is not None:
+            result['metadata'] = save_metadata
+
+        # -------------------------------------------------
+        # Save results
+        # -------------------------------------------------
+        if save_path is not None:
+            try:
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                with open(save_path, 'wb') as f:
+                    pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
+                if verbose:
+                    print(f'Saved tuning curve CV results to: {save_path}')
+            except Exception as e:
+                print(
+                    f'WARNING: could not save tuning curve CV results to {save_path}: {e}'
+                )
+
+        if verbose:
+            print(f'Completed {n_folds}-fold CV for unit {unit_idx}')
+            print(f'  Mean coef shape: {mean_coef.shape}')
+            print(
+                f'  Coef mean ± std: {np.mean(mean_coef):.4f} ± {np.mean(std_coef):.4f}'
+            )
+
+        return result
+
+
+    # =====================================================
+    # Private helpers
+    # =====================================================
+
+    def _build_cv_splitter(
+        self,
+        *,
+        y: np.ndarray,
+        n_folds: int,
+        random_state: int,
+        cv_mode: Optional[str],
+        cv_groups,
+    ):
+        from sklearn.model_selection import KFold, TimeSeriesSplit, GroupKFold
+
+        if cv_mode is None:
+            return KFold(
+                n_splits=n_folds,
+                shuffle=True,
+                random_state=random_state,
+            )
+
+        if cv_mode == 'blocked_time':
+            return TimeSeriesSplit(n_splits=n_folds)
+
+        if cv_mode == 'blocked_time_buffered':
+            return TimeSeriesSplit(n_splits=n_folds)
+
+        if cv_mode == 'group_kfold':
+            if cv_groups is None:
+                raise ValueError('cv_groups required for group_kfold mode')
+            return GroupKFold(n_splits=n_folds)
+
+        raise ValueError(f'Unknown cv_mode: {cv_mode}')
+
+
+    def _extract_response_vector(self, unit_idx: int) -> np.ndarray:
+        y = np.asarray(
+            self.runner.binned_spikes.iloc[:, unit_idx].to_numpy(),
+            dtype=float,
+        ).ravel()
+        return y
+
+
+    def _aggregate_fold_statistics(self, fold_coef_list):
+        if len(fold_coef_list) == 0:
+            return None, None, None
+
+        fold_coef_array = np.array(fold_coef_list)
+        mean_coef = np.mean(fold_coef_array, axis=0)
+        std_coef = np.std(fold_coef_array, axis=0)
+        coef_shape = fold_coef_array[0].shape
+
+        return mean_coef, std_coef, coef_shape
+
+
+    def _auto_build_cv_save_path(self, unit_idx: int) -> str:
+        paths = self.runner.get_gam_save_paths(
+            unit_idx=unit_idx,
+            ensure_dirs=False,
+        )
+
+        outdir = paths['outdir']
+        lam_suffix = paths['lam_suffix']
+
+        cv_tuning_dir = outdir / 'cv_tuning_coef'
+        cv_tuning_dir.mkdir(parents=True, exist_ok=True)
+
+        return str(cv_tuning_dir / f'{lam_suffix}.pkl')

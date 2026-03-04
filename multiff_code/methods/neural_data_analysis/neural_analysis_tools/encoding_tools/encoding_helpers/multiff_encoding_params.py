@@ -79,7 +79,7 @@ class StopParams:
             "eye_ver": np.array([-25, 0]),      # deg
             "eye_hor": np.array([-40, 40]),     # deg
             # Temporal windows (stop-aligned); kept symmetric for simplicity
-            "t_rel": np.array([-0.36, 0.36]),
+            "t_stop": np.array([-0.36, 0.36]),
             # Spike history (causal window, copied from one_ff_parameters)
             "spike_hist": np.array([0.006, 0.246]),
         }

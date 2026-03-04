@@ -27,7 +27,7 @@ def main():
         help="Run encoding only on this raw data folder",
     )
     parser.add_argument("--bin_width", type=float, default=0.04)
-    parser.add_argument("--t_max", type=float, default=0.20)
+
     parser.add_argument("--n_splits", type=int, default=5)
     parser.add_argument("--save_dir", default=None)
 
@@ -55,7 +55,7 @@ def main():
             runner = encode_stops_pipeline.StopEncodingRunner(
                 raw_data_folder_path=raw_data_folder_path,
                 bin_width=args.bin_width,
-                t_max=args.t_max,
+        
                 encoder_prs=prs,
             )
 
@@ -66,7 +66,7 @@ def main():
 
             lambda_config = dict(DEFAULT_LAMBDA_CONFIG)
 
-            all_neuron_r2 = runner.crossval_stop_variance_explained_all_neurons(
+            all_neuron_r2 = runner.crossval_variance_explained_all_neurons(
                 lam_f=lambda_config["lam_f"],
                 lam_g=lambda_config["lam_g"],
                 lam_h=lambda_config["lam_h"],

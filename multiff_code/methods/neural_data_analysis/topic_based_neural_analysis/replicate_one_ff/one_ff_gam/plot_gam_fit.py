@@ -801,7 +801,7 @@ def plot_fold_coefficients(
     Parameters
     ----------
     cv_result : dict
-        Result from crossval_stop_tuning_curve_coef with keys:
+        Result from crossval_tuning_curve_coef with keys:
         'mean_coef', 'std_coef', 'fold_design_columns', 'fold_coef', 'n_folds'
     structured_meta_groups : dict
         Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
@@ -906,7 +906,7 @@ def plot_fold_coefficient_by_variable(cv_result, structured_meta_groups, var_lis
     Parameters
     ----------
     cv_result : dict
-        Result from crossval_stop_tuning_curve_coef with keys:
+        Result from crossval_tuning_curve_coef with keys:
         'mean_coef', 'std_coef', 'fold_design_columns', 'fold_coef', 'n_folds'
     structured_meta_groups : dict
         Combined metadata with 'tuning', 'temporal', and 'hist' sub-dicts
