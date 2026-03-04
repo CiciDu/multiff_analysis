@@ -171,47 +171,58 @@ def plot_conditional(
     return subset
 
 
-def plot_all_single_param_conditionals(
-    df,
-    sweep_keys=('obs_perc_r', 'obs_perc_th', 'obs_mem_r', 'obs_mem_th'),
-    y_key='num_caught_ff',
-    base_fixed=None,
-    verbose=False
+def build_fixed_values_for_obs_sweep(
+    rl,
+    sweep_key,
 ):
     """
-    Create 2x2 subplot grid showing conditional distributions
-    for all sweep parameters.
+    Build fixed_values dict such that:
+    - One of the four obs keys is left free (NOT fixed)
+    - The other three are fixed to 0
+    - All environment cost parameters are fixed
+    
+    Parameters
+    ----------
+    rl : object
+        RL object containing env_for_data_collection
+    sweep_key : str
+        One of:
+        'obs_perc_r'
+        'obs_perc_th'
+        'obs_mem_r'
+        'obs_mem_th'
     """
 
-    if base_fixed is None:
-        base_fixed = {}
+    obs_keys = [
+        'obs_perc_r',
+        'obs_perc_th',
+        'obs_mem_r',
+        'obs_mem_th',
+    ]
 
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8), sharey=True)
-    axes = axes.flatten()
+    if sweep_key not in obs_keys:
+        raise ValueError(f'sweep_key must be one of {obs_keys}')
 
-    subsets = {}
+    # Fix the other three obs keys to 0
+    fixed_values = {
+        key: 0 for key in obs_keys if key != sweep_key
+    }
 
-    for i, x_key in enumerate(sweep_keys):
+    # Add environment fixed parameters
+    env = rl.env_for_data_collection
 
-        fixed_values = base_fixed.copy()
+    fixed_values.update({
+        'dv': env.dv_cost_factor,
+        'jerk': env.jerk_cost_factor,
+        'stop': env.cost_per_stop,
+        'num_obs_ff': env.num_obs_ff,
+        'max_in_memory_time': env.max_in_memory_time,
+        'identity_slot_strategy': env.identity_slot_strategy,
+        'identity_slot_base': env.identity_slot_base,
+        'new_ff_scope': env.new_ff_scope,
+        'v_noise_std': env.v_noise_std,
+        'w_noise_std': env.w_noise_std,
+    })
 
-        # Hold other sweep params at zero
-        for other_key in sweep_keys:
-            if other_key != x_key:
-                fixed_values[other_key] = 0.0
+    return fixed_values
 
-        subset = plot_conditional(
-            df,
-            x_key=x_key,
-            fixed_values=fixed_values,
-            y_key=y_key,
-            ax=axes[i],
-            verbose=verbose
-        )
-
-        subsets[x_key] = subset
-
-    plt.tight_layout()
-    plt.show()
-
-    return subsets

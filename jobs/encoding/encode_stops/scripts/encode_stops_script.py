@@ -59,7 +59,7 @@ def main():
                 encoder_prs=prs,
             )
 
-            runner._collect_data(
+            runner.collect_data(
                 exists_ok=load_if_exists,
                 tuning_feature_mode=tuning_feature_mode,
             )

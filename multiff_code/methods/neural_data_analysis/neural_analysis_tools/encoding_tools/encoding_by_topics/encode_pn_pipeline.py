@@ -132,7 +132,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         )
 
 
-    def _collect_data(self, exists_ok=True):
+    def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             print('[PNEncodingRunner] Using cached design matrices')
             return
@@ -175,8 +175,8 @@ class PNEncodingRunner(BaseEncodingRunner):
     #     if self.X_hist is not None:
     #         return
     #     if self.binned_feats is None or self.binned_spikes is None:
-    #         raise RuntimeError("Run _collect_data first.")
-    #     self._collect_data(exists_ok=False)
+    #         raise RuntimeError("Run collect_data first.")
+    #     self.collect_data(exists_ok=False)
 
 
     def _get_save_dir(self):

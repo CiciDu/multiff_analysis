@@ -93,7 +93,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         plot_one_ff_decoding.plot_decoder_correlation_bars(block, varnames=varnames, **plot_kwargs)
 
 
-    def _collect_data(self, exists_ok=True):
+    def collect_data(self, exists_ok=True):
         """
         Collect and prepare data for decoding.
 
@@ -102,12 +102,12 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         """
         # Try to load cached design matrices
         if exists_ok and self._load_design_matrices():
-            print('[_collect_data] Using cached design matrices')
+            print('[collect_data] Using cached design matrices')
         else:
             self.pn = collect_stop_data.init_pn_to_collect_stop_data(self.raw_data_folder_path, bin_width=0.04)
             self.pn.make_or_retrieve_ff_dataframe()
 
-            print('[_collect_data] Computing design matrices from scratch')
+            print('[collect_data] Computing design matrices from scratch')
             (
                 self.vis_binned_spikes,
                 self.vis_feats_to_decode,

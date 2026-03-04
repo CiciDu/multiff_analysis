@@ -41,7 +41,7 @@ class FFVisEncodingRunner(BaseEncodingRunner):
         self.var_categories = encode_stops_gam_helper.VIS_VAR_CATEGORIES
 
 
-    def _collect_data(self, exists_ok=True,     
+    def collect_data(self, exists_ok=True,     
                       tuning_feature_mode='boxcar_only' # can be 'raw_only', 'boxcar_only', 'raw_plus_boxcar'
                       ):
         
@@ -53,7 +53,7 @@ class FFVisEncodingRunner(BaseEncodingRunner):
         """
         # Try to load cached design matrices
         if exists_ok and self._load_design_matrices():
-            print('[_collect_data] Using cached design matrices')
+            print('[collect_data] Using cached design matrices')
             return
     
 

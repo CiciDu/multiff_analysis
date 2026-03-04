@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import copy
+import pickle
+import os
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
     encode_stops_utils,
@@ -95,14 +97,6 @@ class BaseEncodingGAMAnalysisHelper:
                 (outdir / subdir).mkdir(parents=True, exist_ok=True)
         return outdir
 
-    def _unit_context(
-        self,
-        unit_idx: int,
-        *,
-        lambda_config: Optional[Dict[str, float]] = None,
-    ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
-        """Override in subclasses. Returns (design_df, y, groups, lam_cfg)."""
-        raise NotImplementedError
 
     def _get_structured_meta_groups(self) -> Dict:
         return getattr(self.runner, "structured_meta_groups", {}) or {}
@@ -243,7 +237,7 @@ class BaseEncodingGAMAnalysisHelper:
                     raise FileNotFoundError(
                         "No saved category CV result found for: " f"{missing}"
                     )
-            design_df, y, groups, lam_cfg = self._unit_context(
+            design_df, y, groups, lambda_config = self._unit_context(
                 unit_idx=unit_idx,
                 lambda_config=lambda_config,
             )
@@ -371,7 +365,7 @@ class BaseEncodingGAMAnalysisHelper:
                 "save_path": save_path,
                 "outdir": outdir,
             }
-        design_df, y, groups, _ = self._unit_context(
+        design_df, y, groups, lambda_config = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
         )
@@ -469,7 +463,7 @@ class BaseEncodingGAMAnalysisHelper:
                 "save_path": save_path,
                 "outdir": outdir,
             }
-        design_df, y, groups, lam_cfg = self._unit_context(
+        design_df, y, groups, lambda_config = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
         )
@@ -515,26 +509,25 @@ class BaseEncodingGAMAnalysisHelper:
         lambda_config: Optional[Dict[str, float]] = None,
     ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
         if self.runner.binned_feats is None or self.runner.binned_spikes is None:
-            self.runner._collect_data(exists_ok=True)
-        design_df = self.runner.get_design_for_unit(unit_idx)
+            self.runner.collect_data(exists_ok=True)
+        self.runner.get_design_for_unit(unit_idx)
         binned_spikes = self.runner.binned_spikes
         y = np.asarray(
             binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
         lam_cfg = self._resolve_lambda_config(lambda_config)
-        groups, lambda_config = self.runner.get_gam_groups(
-            unit_idx,
+        groups = self.runner.get_gam_groups(
             lam_f=lam_cfg["lam_f"],
             lam_g=lam_cfg["lam_g"],
             lam_h=lam_cfg["lam_h"],
             lam_p=lam_cfg["lam_p"],
         )
-        return design_df, y, groups, lam_cfg
+        return self.runner.design_df, y, groups, lam_cfg
 
     def crossval_tuning_curve_coef(
         self,
         unit_idx: int,
-        groups: List[GroupSpec],
         *,
+        lambda_config: Optional[Dict[str, float]] = None,
         n_folds: int = 10,
         random_state: int = 0,
         fit_kwargs: Optional[Dict] = None,
@@ -545,6 +538,7 @@ class BaseEncodingGAMAnalysisHelper:
         cv_mode: Optional[str] = 'blocked_time_buffered',
         buffer_samples: int = 20,
         cv_groups=None,
+        
     ) -> Dict:
         """
         Perform cross-validation for tuning curve coefficients.
@@ -559,6 +553,11 @@ class BaseEncodingGAMAnalysisHelper:
         if save_path is None:
             save_path = self._auto_build_cv_save_path(unit_idx)
 
+        
+        design_df, y, groups, lambda_config = self._unit_context(
+            unit_idx=unit_idx,
+            lambda_config=lambda_config,
+        )
         # -------------------------------------------------
         # Load cached results if available
         # -------------------------------------------------
@@ -576,7 +575,8 @@ class BaseEncodingGAMAnalysisHelper:
         # -------------------------------------------------
         # Get design matrix and response
         # -------------------------------------------------
-        design_df = self.runner.get_design_for_unit(unit_idx)
+        self.runner.get_design_for_unit(unit_idx)
+        design_df = self.runner.design_df.copy()
         y = self._extract_response_vector(unit_idx)
 
         if len(design_df) != len(y):

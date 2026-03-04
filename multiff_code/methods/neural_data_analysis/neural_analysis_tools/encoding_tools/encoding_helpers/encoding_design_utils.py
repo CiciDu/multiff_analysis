@@ -672,7 +672,7 @@ def build_hist_meta_from_colnames(
     hist_groups: Dict[str, List[str]] = {}
     hist_basis_info: Dict[str, Dict] = {}
 
-    neuron_order = sorted(colnames.keys())
+    neuron_order = list(colnames.keys())
 
     if target_col is not None:
         if target_col not in colnames:

@@ -54,7 +54,7 @@ def main():
         
             )
 
-            runner._collect_data(exists_ok=load_if_exists)
+            runner.collect_data(exists_ok=load_if_exists)
 
             lambda_config = dict(DEFAULT_LAMBDA_CONFIG)
 

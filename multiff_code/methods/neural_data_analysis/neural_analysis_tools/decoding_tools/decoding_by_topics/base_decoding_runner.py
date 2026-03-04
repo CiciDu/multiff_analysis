@@ -356,7 +356,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             else pn_decoding_model_specs.MODEL_SPECS
         )
 
-        self._collect_data(exists_ok=design_matrices_exists_ok)
+        self.collect_data(exists_ok=design_matrices_exists_ok)
 
         if save_dir is None:
             save_dir = self._get_save_dir()

@@ -52,7 +52,7 @@ class BaseEncodingRunner:
     - get_gam_save_paths(unit_idx, ...)
     - num_neurons
     - _get_save_dir()
-    - _collect_data(exists_ok)
+    - collect_data(exists_ok)
     - get_gam_results_subdir()  e.g. "stop_gam_results", "pn_gam_results"
     """
 
@@ -117,10 +117,10 @@ class BaseEncodingRunner:
         load_if_exists: bool = True,
     ) -> FitResult:
         """Fit Poisson GAM for one unit."""
-        self._collect_data(exists_ok=True)
-        design_df = self.get_design_for_unit(unit_idx)
+        self.collect_data(exists_ok=True)
+        self.get_design_for_unit(unit_idx)
         binned_spikes = self.binned_spikes
-        n_rows = len(design_df)
+        n_rows = len(self.design_df)
         if n_rows != len(binned_spikes):
             raise ValueError(
                 f"design and binned_spikes row count mismatch: {n_rows} vs {len(binned_spikes)}"
@@ -128,8 +128,8 @@ class BaseEncodingRunner:
         y = np.asarray(
             binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
 
-        groups, lambda_config = self.get_gam_groups(
-            unit_idx=unit_idx, lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p
+        groups = self.get_gam_groups(
+            lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p
         )
         if save_path is None:
             paths = self.get_gam_save_paths(
@@ -142,7 +142,7 @@ class BaseEncodingRunner:
             save_path = paths["fit_save_path"]
 
         return one_ff_gam_fit.fit_poisson_gam(
-            design_df=design_df,
+            design_df=self.design_df,
             y=y,
             groups=groups,
             l1_groups=l1_groups,
@@ -187,8 +187,8 @@ class BaseEncodingRunner:
                     f"Loaded cached cross-validation results from: {save_path}")
             return maybe_loaded
 
-        self._collect_data(exists_ok=True)
-        design_df = self.get_design_for_unit(unit_idx)
+        self.collect_data(exists_ok=True)
+        self.get_design_for_unit(unit_idx)
         binned_spikes = self.binned_spikes
         n_rows = len(design_df)
         if n_rows != len(binned_spikes):
@@ -204,7 +204,7 @@ class BaseEncodingRunner:
         meta = dict(save_metadata or {}, unit_idx=unit_idx)
         return gam_variance_explained.crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
-            design_df=design_df,
+            design_df=self.design_df,
             y=y,
             groups=groups,
             dt=dt,
@@ -264,7 +264,7 @@ class BaseEncodingRunner:
                 print("Load only mode is enabled, returning None")
             return None
 
-        self._collect_data(exists_ok=True)
+        self.collect_data(exists_ok=True)
         binned_spikes = self.binned_spikes
         n_neurons = binned_spikes.shape[1]
         if unit_indices is None:
@@ -290,7 +290,7 @@ class BaseEncodingRunner:
 
         all_neuron_r2 = []
         for unit_idx in unit_indices:
-            groups, lambda_config = self.get_gam_groups(
+            groups = self.get_gam_groups(
                 unit_idx=unit_idx,
                 lam_f=lam_f,
                 lam_g=lam_g,
@@ -340,7 +340,7 @@ class BaseEncodingRunner:
         Delegates to run_category_variance_contributions, run_penalty_tuning,
         and run_backward_elimination for each unit. Subclasses must implement these.
         """
-        self._collect_data(exists_ok=True)
+        self.collect_data(exists_ok=True)
         n_neurons = self.num_neurons
         if unit_indices is None:
             unit_indices = list(range(n_neurons))
@@ -444,12 +444,12 @@ class BaseEncodingRunner:
         unit_idx maps to binned_spikes column order.
         """
         self._prepare_spike_history_components()
-        if unit_idx < 0 or unit_idx >= len(self.spike_cols):
+        if unit_idx < 0 or unit_idx >= len(self.spk_colnames):
             raise IndexError(
-                f'unit_idx {unit_idx} out of range [0, {len(self.spike_cols)})'
+                f'unit_idx {unit_idx} out of range [0, {len(self.spk_colnames)})'
             )
-        target_col = self.spike_cols[unit_idx]
-        self._make_structured_meta_groups()
+        target_col = list(self.spk_colnames.keys())[unit_idx]
+
         design_df, _ = spike_history.add_spike_history_to_design(
             design_df=self.binned_feats.reset_index(drop=True),
             colnames=self.spk_colnames,
@@ -459,13 +459,19 @@ class BaseEncodingRunner:
             cross_neurons=None,
             meta_groups=None,
         )
+
         # Drop constant columns except 'const'
         const_cols_to_drop = [
             c for c in design_df.columns
             if c != 'const' and design_df[c].nunique() <= 1
         ]
-        design_df = design_df.drop(columns=const_cols_to_drop)
-        return design_df
+        self.design_df = design_df.drop(columns=const_cols_to_drop)
+
+        self.make_hist_meta_for_unit(unit_idx)
+        self._make_structured_meta_groups()
+        self.get_gam_groups()
+
+        return
 
 
     def _get_design_matrix_paths(self):
@@ -539,7 +545,7 @@ class BaseEncodingRunner:
 
             with open(paths['spk_colnames'], 'rb') as f:
                 self.spk_colnames = pickle.load(f)
-                self.spike_cols = sorted(self.spk_colnames.keys())
+                self.spike_cols = list(self.spk_colnames.keys())
 
             print('Loaded cached design matrices')
 
@@ -559,7 +565,6 @@ class BaseEncodingRunner:
 
     def get_gam_groups(
         self,
-        unit_idx: int,
         *,
         lam_f: float = 100.0,
         lam_g: float = 10.0,
@@ -569,7 +574,7 @@ class BaseEncodingRunner:
         """
         Build GroupSpec list and lambda_config for a unit's design matrix.
 
-        Call after _collect_data(). Uses get_design_for_unit(unit_idx) and
+        Call after collect_data(). Uses get_design_for_unit(unit_idx) and
         build_stop_gam_groups() with the same lambda roles: lam_f tuning,
         lam_g event, lam_h spike history, lam_p coupling.
 
@@ -586,10 +591,6 @@ class BaseEncodingRunner:
         lambda_config : dict
             For generate_lambda_suffix(lambda_config=lambda_config).
         """
-        if self.binned_feats is None:
-            raise RuntimeError(
-                'Run _collect_data first since self.binned_feats is None')
-        self.design_df = self.get_design_for_unit(unit_idx)
         self.groups = encoding_design_utils.build_gam_groups_from_meta(
             self.structured_meta_groups,
             self.design_df,
@@ -624,14 +625,16 @@ class BaseEncodingRunner:
                 n_basis=n_basis_hist,
             )
         )
-        self.spike_cols = list(self.spk_colnames.keys())
 
+    def make_hist_meta_for_unit(self, unit_idx):
+        target_col = list(self.spk_colnames.keys())[unit_idx]
+        spike_hist_t_max = self.binrange_dict['spike_hist'][1]
         n_basis_hist = getattr(self.encoder_prs, 'default_n_basis', 20)
 
         # Build histogram meta separately
         self.hist_meta = encoding_design_utils.build_hist_meta_from_colnames(
             colnames=self.spk_colnames,
-            target_col=self.spike_cols[0] if self.spike_cols else None,
+            target_col=target_col,
             dt=self.bin_width,
             t_max=spike_hist_t_max,
             n_basis=n_basis_hist,
@@ -745,7 +748,6 @@ class BaseEncodingRunner:
     def crossval_tuning_curve_coef(
         self,
         unit_idx: int,
-        groups: List[GroupSpec],
         *,
         n_folds: int = 10,
         random_state: int = 0,
@@ -764,9 +766,9 @@ class BaseEncodingRunner:
         Results are automatically saved to:
         - ``{save_dir}/{results_subdir}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl``
         """
+
         return self._get_gam_analysis_helper().crossval_tuning_curve_coef(
             unit_idx=unit_idx,
-            groups=groups,
             n_folds=n_folds,
             random_state=random_state,
             fit_kwargs=fit_kwargs,

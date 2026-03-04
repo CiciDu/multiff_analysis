@@ -48,7 +48,7 @@ class StopEncodingRunner(BaseEncodingRunner):
 
 
 
-    def _collect_data(self, exists_ok=True,     
+    def collect_data(self, exists_ok=True,     
                       tuning_feature_mode='boxcar_only' # can be 'raw_only', 'boxcar_only', 'raw_plus_boxcar'
                       ):
         """

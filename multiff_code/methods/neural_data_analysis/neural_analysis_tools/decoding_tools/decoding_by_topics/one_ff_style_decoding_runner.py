@@ -56,8 +56,8 @@ class OneFFStyleDecodingRunner:
         load_if_exists: bool = True,
         verbose: bool = True,
     ) -> Dict:
-        """Run one-FF-style decoding: CCA + linear readout. Requires _collect_data implemented."""
-        self._collect_data(exists_ok=design_matrices_exists_ok)
+        """Run one-FF-style decoding: CCA + linear readout. Requires collect_data implemented."""
+        self.collect_data(exists_ok=design_matrices_exists_ok)
         if save_dir is None:
             save_dir = Path(self._get_save_dir()) / "one_ff_style"
         else:
@@ -246,7 +246,7 @@ class OneFFStyleDecodingRunner:
             self.stats["canoncorr"] = loaded
             return loaded
 
-        self._collect_data(exists_ok=True)
+        self.collect_data(exists_ok=True)
         y_df = self._get_numeric_target_df()
         if varnames is None:
             varnames = self._default_canoncorr_varnames()
@@ -307,7 +307,7 @@ class OneFFStyleDecodingRunner:
 
         if verbose:
             print(f"[{decodertype}] computing (no cached result found)")
-        self._collect_data(exists_ok=True)
+        self.collect_data(exists_ok=True)
         y_df = self._get_numeric_target_df()
         if varnames is None:
             varnames = self._default_readout_varnames()

@@ -72,7 +72,7 @@ class PNDecodingRunner(BaseDecodingRunner):
     # Data collection
     # ------------------------------------------------------------------
 
-    def _collect_data(self, exists_ok=True):
+    def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             print('[PNDecodingRunner] Using cached design matrices')
             return
