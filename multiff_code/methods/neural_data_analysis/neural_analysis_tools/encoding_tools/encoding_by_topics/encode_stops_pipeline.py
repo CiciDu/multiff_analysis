@@ -88,7 +88,7 @@ class StopEncodingRunner(BaseEncodingRunner):
             self.meta_df_used)
 
         self._prepare_spike_history_components()
-        self._make_structured_meta_groups()
+
         self._save_design_matrices()
 
     # ------------------------------------------------------------------

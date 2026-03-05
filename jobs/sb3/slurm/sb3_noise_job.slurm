@@ -25,10 +25,11 @@ RANDOM_SEED=12345
 # ---------------------
 declare -a V_NOISE_STDS=(0.0)
 declare -a W_NOISE_STDS=(0.0)
-declare -a PERC_R_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
-declare -a PERC_TH_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
-declare -a MEM_R_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
-declare -a MEM_TH_LIST=(0.0 0.05 0.1 0.2 0.5 1.0 2.0 4.0)
+declare -a PERC_R_LIST=(0.0)
+declare -a PERC_TH_LIST=(0.0)
+declare -a MEM_R_LIST=(0.5 1.0 1.5 2.0 2.5 3.0)
+declare -a MEM_TH_LIST=(0.5 1.0 1.5 2.0)
+declare -a SEEDS=(0 1 2 3 4 5 6 7)
 
 N_ENVS=1
 

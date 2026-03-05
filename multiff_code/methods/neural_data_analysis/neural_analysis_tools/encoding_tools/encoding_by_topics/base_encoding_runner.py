@@ -480,7 +480,6 @@ class BaseEncodingRunner:
             'binned_feats': save_dir / 'binned_feats.pkl',
             'binned_spikes': save_dir / 'binned_spikes.pkl',
             'binrange_dict': save_dir / 'binrange_dict.pkl',
-            'structured_meta_groups': save_dir / 'structured_meta_groups.pkl',
             'bin_df': save_dir / 'bin_df.pkl',
             'temporal_meta': save_dir / 'temporal_meta.pkl',
             'tuning_meta': save_dir / 'tuning_meta.pkl',
@@ -497,7 +496,8 @@ class BaseEncodingRunner:
             'binned_feats': self.binned_feats,
             'binned_spikes': self.binned_spikes,
             'binrange_dict': self.binrange_dict,
-            'structured_meta_groups': self.structured_meta_groups,
+            'temporal_meta': self.temporal_meta,
+            'tuning_meta': self.tuning_meta,
             'bin_df': getattr(self, 'bin_df', None),
             'X_hist': getattr(self, 'X_hist', None),
             'spk_colnames': getattr(self, 'spk_colnames', None),
@@ -534,8 +534,11 @@ class BaseEncodingRunner:
                 self.binrange_dict = pickle.load(f)
 
             # structured_meta_groups 
-            with open(paths['structured_meta_groups'], 'rb') as f:
-                self.structured_meta_groups = pickle.load(f)
+            with open(paths['temporal_meta'], 'rb') as f:
+                self.temporal_meta = pickle.load(f)
+
+            with open(paths['tuning_meta'], 'rb') as f:
+                self.tuning_meta = pickle.load(f)
 
             with open(paths['bin_df'], 'rb') as f:
                 self.bin_df = pickle.load(f)
@@ -548,10 +551,6 @@ class BaseEncodingRunner:
                 self.spike_cols = list(self.spk_colnames.keys())
 
             print('Loaded cached design matrices')
-
-            self.temporal_meta = self.structured_meta_groups['temporal']
-            self.tuning_meta = self.structured_meta_groups['tuning']
-            self.hist_meta = self.structured_meta_groups['hist']
 
             return True
 
