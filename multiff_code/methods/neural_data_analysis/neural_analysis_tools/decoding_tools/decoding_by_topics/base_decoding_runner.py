@@ -8,10 +8,11 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
-from catboost import CatBoostRegressor
+from catboost import CatBoostRegressor, CatBoostError
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
     decode_stops_utils, plot_decoding_utils
@@ -19,12 +20,11 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
     cv_decoding,
 )
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding import (
-    pn_decoding_model_specs,
-)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_model_specs
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_decoding_runner
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding, show_decoding_results
 
 class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     """
@@ -83,8 +83,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         design_matrices_exists_ok: bool = True,
         model_specs=None,
         shuffle_mode: str = "none",
-        fit_kernelwidth: bool = False,
-        candidate_widths: Sequence[int] = tuple(range(1, 21, 1)),
+        fit_kernelwidth: bool = True,
+        candidate_widths: Sequence[int] = tuple(range(2, 6, 1)),
         fixed_width: int = 25,
         inner_cv_splits: int = 3,
         cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
@@ -93,6 +93,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         cv_decoding_verbosity=1,
         
     ) -> pd.DataFrame:
+
+        if save_dir is None:
+            save_dir = Path(self._get_save_dir())    
         
         """Run CV decoding. Delegates to run_cv_decoding."""
         self.all_results = self.run_cv_decoding(
@@ -115,8 +118,6 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             self.results_df = self.all_results[self.all_results['cv_mode'] == cv_mode] 
         else:
             self.results_df = self.all_results.copy()
-            
-        return self.results_df
 
 
     def _ensure_cv_decoding_columns(
@@ -219,7 +220,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 model_class = config.regression_model_class or CatBoostRegressor
                 model_kwargs = config.regression_model_kwargs or dict(verbose=False)
                 model = model_class(**model_kwargs)
-                model.fit(X_tr, y_tr)
+                try:
+                    model.fit(X_tr, y_tr)
+                except CatBoostError as e:
+                    if "All train targets are equal" in str(e) or "All targets are equal" in str(e):
+                        continue
+                    raise
                 y_pred = model.predict(X_te)
                 
                 row = {
@@ -241,8 +247,13 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 # Ensure at least 2 classes in training and test
                 if np.unique(y_tr).size < 2 or np.unique(y_te).size < 2:
                     continue
-                
-                model.fit(X_tr, y_tr)
+
+                try:
+                    model.fit(X_tr, y_tr)
+                except CatBoostError as e:
+                    if "All train targets are equal" in str(e) or "All targets are equal" in str(e):
+                        continue
+                    raise
                 y_pred_proba = model.predict_proba(X_te)
                 
                 try:
@@ -258,9 +269,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                     "auc_std": np.nan,
                     "pr_mean": np.nan,
                     "pr_std": np.nan,
-                    "n_total_folds": 1,
-                    "n_valid_folds": 1,
-                    "n_skipped_folds": 0,
+                    # "n_total_folds": 1,
+                    # "n_valid_folds": 1,
+                    # "n_skipped_folds": 0,
                     "n_samples": int(len(y_te)),
                 }
             
@@ -334,7 +345,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         model_specs=None,
         shuffle_mode: str = "none",
         fit_kernelwidth: bool = False,
-        candidate_widths: Sequence[int] = tuple(range(1, 21, 1)),
+        candidate_widths: Sequence[int] = tuple(range(2, 6, 1)),
         fixed_width: int = 25,
         inner_cv_splits: int = 3,
         cv_mode: str = "blocked_time_buffered",
@@ -353,10 +364,11 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         self.model_specs = (
             model_specs
             if model_specs is not None
-            else pn_decoding_model_specs.MODEL_SPECS
+            else decoding_model_specs.MODEL_SPECS
         )
 
-        self.collect_data(exists_ok=design_matrices_exists_ok)
+        if not load_existing_only:
+            self.collect_data(exists_ok=design_matrices_exists_ok)
 
         if save_dir is None:
             save_dir = self._get_save_dir()
@@ -373,6 +385,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # --------------------------------------------------------
         for model_name, spec in self.model_specs.items():
 
+            print('Running model: ', model_name)
+
             results_df = self._run_single_model_cv(
                 model_name=model_name,
                 spec=spec,
@@ -388,6 +402,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 load_existing_only=load_existing_only,
                 verbosity=cv_decoding_verbosity,
             )
+            results_df['model_name'] = model_name
 
             self.all_results.append(results_df)
 
@@ -417,20 +432,17 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         verbosity,
     ):
 
-        model_save_path = Path(save_dir) / f"cv_decoding_{model_name}.pkl"
+        if fit_kernelwidth:
+            model_save_path = Path(save_dir) / "cv_decoding" / "cvnested" / f"{model_name}_n{n_splits}_inner{inner_cv_splits}_{cv_mode}.pkl"
+        else:
+            model_save_path = Path(save_dir) / "cv_decoding" / "fixed_width" / f"{model_name}_width{fixed_width}_n{n_splits}_{cv_mode}.pkl"
 
-        # --------------------------------------------------------
-        # Try loading cached result
-        # --------------------------------------------------------
+        print('model_save_path: ', model_save_path)
+
         loaded = self._maybe_load_cv_decoding_result(
             str(model_save_path),
             load_if_exists,
-            f"cv_decoding_{model_name}",
             verbose=True,
-            fit_kernelwidth=fit_kernelwidth,
-            n_splits=n_splits,
-            inner_cv_splits=inner_cv_splits if fit_kernelwidth else None,
-            cv_mode=cv_mode,
         )
 
         if loaded is not None:
@@ -442,6 +454,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             results_df = loaded["results_df"]
             results_df["model_name"] = model_name
             return results_df
+
+        if load_existing_only:
+            print('Failed to load existing results, and load_existing_only=True, so skipping computation.')
+            return pd.DataFrame()
 
         # --------------------------------------------------------
         # Build decoding config
@@ -459,31 +475,44 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # Branch: nested CV or fixed width
         # --------------------------------------------------------
         if fit_kernelwidth:
-            results_df = self._run_nested_kernelwidth_cv(
+            results_df = self.run_nested_kernelwidth_cv(
                 model_name=model_name,
                 config=config,
-                model_save_path=model_save_path,
                 n_splits=n_splits,
                 candidate_widths=candidate_widths,
                 inner_cv_splits=inner_cv_splits,
-                fixed_width=fixed_width,
                 cv_mode=cv_mode,
-                load_existing_only=load_existing_only,
+                model_save_path=model_save_path,
                 verbosity=verbosity,
             )
         else:
+            result_save_dir = Path(save_dir) / f"fixed_kernelwidth_{fixed_width}"
             results_df = self._run_fixed_width_cv(
                 model_name=model_name,
                 config=config,
-                model_save_path=model_save_path,
+                save_dir=result_save_dir,
                 n_splits=n_splits,
                 fixed_width=fixed_width,
                 cv_mode=cv_mode,
                 shuffle_mode=shuffle_mode,
                 load_existing_only=load_existing_only,
+                model_save_path=model_save_path,
                 verbosity=verbosity,
             )
 
+
+        # Ensure the results DataFrame contains the expected columns emitted by cv_decoding
+        results_df = self._ensure_cv_decoding_columns(
+            results_df,
+            model_name=model_name,
+            config=config,
+            n_splits=n_splits,
+            shuffle_mode=shuffle_mode,
+            cv_mode=cv_mode,
+            buffer_samples=None,
+            context_label="pooled",
+        )
+        
         return results_df
 
 
@@ -491,17 +520,43 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     # Fixed Width CV
     # ============================================================
 
+    @staticmethod
+    def _maybe_load_cv_decoding_result(
+        model_save_path: Optional[str],
+        load_if_exists: bool,
+        verbose: bool,
+    ):
+        """Load CV decoding result if it exists and load_if_exists=True."""
+        if not load_if_exists:
+            return None
+        
+        if model_save_path is None:
+            return None
+        else:
+            model_save_path = Path(model_save_path)
+
+        if not model_save_path.exists():
+            return None
+        with model_save_path.open("rb") as f:
+            obj = pickle.load(f)
+        if verbose:
+            print(f"cv decoding results loaded: {model_save_path}")
+        return obj
+
+
+
     def _run_fixed_width_cv(
         self,
         *,
         model_name,
         config,
-        model_save_path,
+        save_dir,
         n_splits,
         fixed_width,
         cv_mode,
         shuffle_mode,
         load_existing_only,
+        model_save_path,
         verbosity,
     ):
 
@@ -517,7 +572,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             n_splits=n_splits,
             config=config,
             context_label="pooled",
-            save_dir=None,
+            save_dir=save_dir,
             model_name=model_name,
             shuffle_mode=shuffle_mode,
             load_existing_only=load_existing_only,
@@ -538,6 +593,15 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         self.stats[f"cv_decoding_{model_name}"] = self.cv_decoding_out_of_models[model_name]
 
+        # save self.stats[f"cv_decoding_{model_name}"] to model_save_path
+        if model_save_path is not None:
+            model_save_path.parent.mkdir(parents=True, exist_ok=True)
+            with model_save_path.open("wb") as f:
+                pickle.dump(self.stats[f"cv_decoding_{model_name}"], f, protocol=pickle.HIGHEST_PROTOCOL)
+            if verbosity:
+                print(f"Nested CV results saved: {model_save_path}")
+
+
         return results_df
 
 
@@ -545,18 +609,16 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     # Nested Kernelwidth CV
     # ============================================================
 
-    def _run_nested_kernelwidth_cv(
+    def run_nested_kernelwidth_cv(
         self,
         *,
         model_name,
-        config,
         model_save_path,
+        config,
         n_splits,
         candidate_widths,
         inner_cv_splits,
-        fixed_width,
         cv_mode,
-        load_existing_only,
         verbosity,
     ):
 
@@ -578,17 +640,17 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         outer_results = []
         fold_tuning_info = []
+        width_results_all_folds = []
 
         for fold_idx, (train_idx, test_idx) in enumerate(outer_splits):
 
-            best_width, width_scores = self._run_inner_kernelwidth_search(
+            best_width, width_scores, width_results = self._run_inner_kernelwidth_search(
                 X=X[train_idx],
                 y_df=y_df.iloc[train_idx],
                 groups=groups[train_idx] if groups is not None else None,
                 config=config,
                 candidate_widths=candidate_widths,
                 inner_cv_splits=inner_cv_splits,
-                load_existing_only=load_existing_only,
                 verbosity=verbosity,
             )
 
@@ -606,11 +668,27 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
             outer_results.append(fold_result)
             fold_tuning_info.append(width_scores)
+            # collect per-width inner-CV results for this outer fold
+            for w, df_w in width_results.items():
+                if df_w is None or df_w.empty:
+                    continue
+                df_tmp = df_w.copy()
+                df_tmp["fold"] = fold_idx
+                df_tmp["kernelwidth"] = int(w)
+                width_results_all_folds.append(df_tmp)
 
         results_df = pd.concat(outer_results, ignore_index=True)
+        results_df['model_name'] = model_name
+
+        # combined per-width inner-CV results across folds
+        if width_results_all_folds:
+            results_df_all_filt = pd.concat(width_results_all_folds, ignore_index=True)
+        else:
+            results_df_all_filt = pd.DataFrame()
 
         self.cv_decoding_out_of_models[model_name] = {
             "results_df": results_df,
+            "results_df_all_filt": results_df_all_filt,
             "fold_tuning_info": fold_tuning_info,
             "_cv_config": {
                 "fit_kernelwidth": True,
@@ -622,6 +700,14 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         }
 
         self.stats[f"cv_decoding_{model_name}"] = self.cv_decoding_out_of_models[model_name]
+
+        # save self.stats[f"cv_decoding_{model_name}"] to model_save_path
+        if model_save_path is not None:
+            model_save_path.parent.mkdir(parents=True, exist_ok=True)
+            with model_save_path.open("wb") as f:
+                pickle.dump(self.stats[f"cv_decoding_{model_name}"], f, protocol=pickle.HIGHEST_PROTOCOL)
+            if verbosity:
+                print(f"Nested CV results saved: {model_save_path}")
 
         return results_df
 
@@ -638,13 +724,13 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         config,
         candidate_widths,
         inner_cv_splits,
-        load_existing_only,
         verbosity,
     ):
 
         best_width = None
         best_score = -np.inf
         width_scores = {}
+        width_results = {}
 
         for width in candidate_widths:
 
@@ -661,9 +747,17 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 save_dir=None,
                 model_name=None,
                 shuffle_mode="none",
-                load_existing_only=load_existing_only,
                 verbosity=verbosity,
             )
+
+            # store full per-width inner-CV result
+            try:
+                inner_df_copy = inner_df.copy() if inner_df is not None else pd.DataFrame()
+            except Exception:
+                inner_df_copy = pd.DataFrame()
+            if not inner_df_copy.empty:
+                inner_df_copy["kernelwidth"] = int(width)
+            width_results[int(width)] = inner_df_copy
 
             metric_scores = np.where(
                 inner_df["mode"] == "regression",
@@ -678,7 +772,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 best_score = mean_score
                 best_width = int(width)
 
-        return best_width, width_scores
+        return best_width, width_scores, width_results
 
 
     # ============================================================
@@ -706,3 +800,42 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             y_test,
             config,
         )
+    
+
+    def plot_fold_tuning_info(self):
+        for model in self.results_df['model_name'].unique():
+            fig, ax, summary = plot_decoding_utils.plot_fold_tuning_info(self.stats[f'cv_decoding_{model}']['fold_tuning_info'], shade='sem', show_folds=True)
+            print(summary['best_width'], summary['best_mean_cv'])
+            plt.show()
+
+    def extract_regression_feature_scores_df(self, row_selector_fn=None, regression_metric='r_cv', classification_metric='auc_mean') -> pd.DataFrame:
+        '''
+        Extract regression decoding scores from results_df.
+
+        Returns
+        -------
+        df : pandas.DataFrame
+            Columns:
+            - variable
+            - score
+        '''
+        if row_selector_fn is None:
+            row_selector_fn = show_decoding_results._select_rows
+
+        self.results_df = plot_decoding_utils.add_score_column(self.results_df, regression_metric, classification_metric)
+
+        selected_df = row_selector_fn(self.results_df)
+
+        reg_df = selected_df[selected_df['mode'] == 'regression'].copy()
+
+        if reg_df.empty:
+            raise ValueError('No regression rows found.')
+
+        df = (
+            reg_df[['behav_feature', 'score']]
+            .rename(columns={'behav_feature': 'variable'})
+            .sort_values('score', ascending=False)
+            .reset_index(drop=True)
+        )
+
+        self.regression_feature_scores_df = df.copy()

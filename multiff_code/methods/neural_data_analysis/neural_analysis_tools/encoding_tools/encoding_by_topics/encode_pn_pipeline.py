@@ -1,7 +1,4 @@
 import os
-import pickle
-from pathlib import Path
-from typing import Dict, List, Optional
 
 # Third-party imports
 
@@ -13,12 +10,8 @@ from neural_data_analysis.design_kits.design_by_segment import (
     temporal_feats,
     create_pn_design_df,
 )
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_fit,
-)
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encode_stops_gam_helper,
-    encode_stops_utils,
+    encoder_gam_helper,
     encode_pn_utils
 )
 
@@ -26,7 +19,6 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topic
     BaseEncodingRunner,
 )
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 
 from neural_data_analysis.design_kits.design_by_segment import spatial_feats
 
@@ -42,9 +34,16 @@ class PNEncodingRunner(BaseEncodingRunner):
     ):
         super().__init__(raw_data_folder_path, bin_width=bin_width, encoder_prs=encoder_prs)
 
-        self.var_categories = encode_stops_gam_helper.PN_VAR_CATEGORIES
+        self.var_categories = encoder_gam_helper.PN_VAR_CATEGORIES
+        
+        print('var_categories:', self.var_categories)
 
-
+        self.lam_grid = {
+            "lam_f": [50, 100, 200],
+            "lam_g": [50, 100, 200],
+            "lam_h": [5, 10, 30],
+            "lam_p": [10],
+        }
 
     # ------------------------------------------------------------------
     # Data collection
@@ -131,7 +130,6 @@ class PNEncodingRunner(BaseEncodingRunner):
             **design_kwargs,
         )
 
-
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             print('[PNEncodingRunner] Using cached design matrices')
@@ -166,6 +164,8 @@ class PNEncodingRunner(BaseEncodingRunner):
 
         self._prepare_spike_history_components()
 
+        self._make_structured_meta_groups()
+
         self._save_design_matrices()
 
     # def _prepare_spike_history_components(self):
@@ -175,7 +175,6 @@ class PNEncodingRunner(BaseEncodingRunner):
     #     if self.binned_feats is None or self.binned_spikes is None:
     #         raise RuntimeError("Run collect_data first.")
     #     self.collect_data(exists_ok=False)
-
 
     def _get_save_dir(self):
         return os.path.join(

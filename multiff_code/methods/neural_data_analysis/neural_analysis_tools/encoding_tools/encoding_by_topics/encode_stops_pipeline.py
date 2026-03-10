@@ -1,31 +1,15 @@
 import os
-import pickle
-from pathlib import Path
-from typing import Dict, List, Optional, Union
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import decode_stops_design
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils, encoding_design_utils
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils
 
 # Third-party imports
-import numpy as np
-import pandas as pd
 
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 from neural_data_analysis.design_kits.design_by_segment import spike_history
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
-    one_ff_gam_fit,
-)
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    FitResult,
-    GroupSpec,
-)
 
-
-from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encode_stops_gam_helper,
+    encoder_gam_helper,
 )
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics.base_encoding_runner import (
@@ -40,17 +24,25 @@ class StopEncodingRunner(BaseEncodingRunner):
         bin_width=0.04,
         encoder_prs=None,
     ):
-        super().__init__(raw_data_folder_path, 
+        super().__init__(raw_data_folder_path,
                          bin_width=bin_width,
                          encoder_prs=encoder_prs)
 
-        self.var_categories = encode_stops_gam_helper.STOP_VAR_CATEGORIES
+        self.var_categories = encoder_gam_helper.STOP_VAR_CATEGORIES
+        
+        print('var_categories:')
+        for k, v in self.var_categories.items():
+            print(f'  {k}: {v}')
 
+        self.lam_grid = {
+            "lam_f": [10, 50, 100, 300],
+            "lam_g": [1, 5, 10, 30],
+            "lam_h": [1, 5, 10],
+            "lam_p": [1, 5, 10],
+        }
 
-
-    def collect_data(self, exists_ok=True,     
-                      tuning_feature_mode='boxcar_only' # can be 'raw_only', 'boxcar_only', 'raw_plus_boxcar'
-                      ):
+    def collect_data(self, exists_ok=True,
+                     ):
         """
         Collect and prepare data for stop encoding.
         """
@@ -66,7 +58,6 @@ class StopEncodingRunner(BaseEncodingRunner):
 
         print('[EncodingRunner] Computing design matrices from scratch')
         design_kwargs = self._encoding_design_kwargs()
-        design_kwargs['tuning_feature_mode'] = tuning_feature_mode
 
         (
             self.pn,
@@ -89,6 +80,8 @@ class StopEncodingRunner(BaseEncodingRunner):
 
         self._prepare_spike_history_components()
 
+        self._make_structured_meta_groups()
+
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
@@ -102,4 +95,3 @@ class StopEncodingRunner(BaseEncodingRunner):
 
     def get_gam_results_subdir(self) -> str:
         return "stop_gam_results"
-

@@ -1,19 +1,19 @@
 import argparse
 import sys
 from pathlib import Path
+import os
 
-# Allow importing encode_common from jobs/encoding/
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+for p in [Path.cwd()] + list(Path.cwd().parents):
+    if p.name == 'Multifirefly-Project':
+        os.chdir(p)
+        sys.path.insert(0, str(p / 'multiff_analysis/multiff_code/methods'))
+        break
 
-from encode_common import (
-    bootstrap_repo_path,
-    get_session_paths,
-    DEFAULT_LAMBDA_CONFIG,
-)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 
 
 def main():
-    bootstrap_repo_path()
+    encoding_design_utils.bootstrap_repo_path()
 
     from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics import (
         encode_vis_pipeline,
@@ -36,7 +36,7 @@ def main():
     monkey_names = ["monkey_Bruno", "monkey_Schro"]
     load_if_exists = True
 
-    session_paths = get_session_paths(
+    session_paths = encoding_design_utils.get_session_paths(
         args.raw_data_folder_path, raw_data_dir_name, monkey_names
     )
 
@@ -55,14 +55,8 @@ def main():
             )
 
             runner.collect_data(exists_ok=load_if_exists)
-
-            lambda_config = dict(DEFAULT_LAMBDA_CONFIG)
-
+            
             all_neuron_r2 = runner.crossval_variance_explained_all_neurons(
-                lam_f=lambda_config["lam_f"],
-                lam_g=lambda_config["lam_g"],
-                lam_h=lambda_config["lam_h"],
-                lam_p=lambda_config["lam_p"],
                 n_folds=args.n_splits,
                 load_if_exists=load_if_exists,
                 cv_mode="blocked_time_buffered",
@@ -74,8 +68,7 @@ def main():
 
             all_session_results[raw_data_folder_path] = all_neuron_r2
 
-            runner.run_category_contributions_and_penalty_tuning_all_neurons(
-                lambda_config=lambda_config,
+            runner.run_category_contributions_etc_for_all_neurons(
                 n_folds=args.n_splits,
                 buffer_samples=20,
                 backward_n_folds=10,

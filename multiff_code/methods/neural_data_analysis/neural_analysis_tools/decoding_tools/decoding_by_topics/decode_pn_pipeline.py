@@ -22,6 +22,9 @@ from neural_data_analysis.design_kits.design_by_segment import (
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import plot_decoding_utils, decoding_design_utils
+
+
 class PNDecodingRunner(BaseDecodingRunner):
     """
     PN decoding runner. CV model-spec decoding via run(); one-FF style
@@ -38,7 +41,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         
 
         # Filled during setup
-        self.behav_df = None
+        self.pn_feats_to_decode = None
         self.trial_ids = None
         self.binned_spikes = None
 
@@ -50,7 +53,7 @@ class PNDecodingRunner(BaseDecodingRunner):
     # BaseDecodingRunner override points
     # ------------------------------------------------------------------
     def _get_target_df(self) -> pd.DataFrame:
-        return self.behav_df
+        return self.pn_feats_to_decode
 
     def _get_groups(self):
         return self.trial_ids
@@ -100,7 +103,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         data = pn.rebinned_y_var.copy()
         trial_ids = data['new_segment']
 
-        pn_feats_to_decode = temporal_feats.add_stop_and_capture_columns(
+        self.pn_feats_to_decode = temporal_feats.add_stop_and_capture_columns(
             data,
             trial_ids,
             pn.ff_caught_T_new,
@@ -116,7 +119,9 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.binned_spikes = binned_spikes.copy()
 
         self.pn = pn
-        self.behav_df = pn_feats_to_decode
+        self.pn_feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.pn_feats_to_decode)
+
+        
         self.trial_ids = trial_ids
         self._save_design_matrices()
 
@@ -140,13 +145,13 @@ class PNDecodingRunner(BaseDecodingRunner):
     def _get_design_matrix_data(self):
         return {
             'binned_spikes': self.binned_spikes,
-            'pn_feats_to_decode': self.behav_df,
+            'pn_feats_to_decode': self.pn_feats_to_decode,
             'trial_ids': self.trial_ids,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
             'binned_spikes': 'binned_spikes',
-            'pn_feats_to_decode': 'behav_df',
+            'pn_feats_to_decode': 'pn_feats_to_decode',
             'trial_ids': 'trial_ids',
         }

@@ -105,7 +105,7 @@ def make_rsw_events_df(stop_category_df, ff_real_position_sorted, monkey_informa
 
     # assert no duplicated ['cur_ff_index', 'stop_point_index']
     assert len(rsw_w_ff_df[rsw_w_ff_df.duplicated(
-        subset=['cur_ff_index', 'stop_point_index'])]) == 0
+        subset=['cur_ff_index', 'stop_cluster_id'], keep=False)]) == 0
 
     rsw_w_ff_df['target_index'] = rsw_events_df['trial']
 

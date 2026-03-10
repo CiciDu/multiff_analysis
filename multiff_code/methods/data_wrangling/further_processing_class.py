@@ -160,17 +160,18 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
     def make_or_retrieve_pattern_frequencies(self, exists_ok=True):
         self.pattern_frequencies = self.try_retrieving_df(
             df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
-        self.make_one_stop_w_ff_df()
-        # Count one-stop misses (stops near but not at fireflies) for pattern frequency analysis
-        self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
-        if getattr(self, 'rsw_w_ff_df', None) is None:
-            self.get_retry_switch_info()
-        # Count give-up-after-trying events (multiple stops with firefly proximity) for pattern frequency analysis
-        self.rsw_w_ff_frequency = len(self.rsw_w_ff_df)
 
         if self.pattern_frequencies is None:
             if getattr(self, 'monkey_information', None) is None:
                 self.retrieve_or_make_monkey_data(already_made_ok=True)
+            self.make_one_stop_w_ff_df()
+            # Count one-stop misses (stops near but not at fireflies) for pattern frequency analysis
+            self.one_stop_w_ff_frequency = len(self.one_stop_w_ff_df)
+            if getattr(self, 'rsw_w_ff_df', None) is None:
+                self.get_retry_switch_info()
+            # Count give-up-after-trying events (multiple stops with firefly proximity) for pattern frequency analysis
+            self.rsw_w_ff_frequency = len(self.rsw_w_ff_df)
+
             self.pattern_frequencies = organize_patterns_and_features.make_pattern_frequencies(self.all_trial_patterns, self.ff_caught_T_new, self.monkey_information,
                                                                                                self.rsw_w_ff_frequency, self.one_stop_w_ff_frequency,
                                                                                                data_folder_name=self.patterns_and_features_folder_path)

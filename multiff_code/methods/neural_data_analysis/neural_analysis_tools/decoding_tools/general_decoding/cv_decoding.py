@@ -11,6 +11,7 @@ from typing import Optional, Type, Union
 import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor, CatBoostError
+import pickle
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
@@ -555,28 +556,28 @@ def consolidate_results_across_models(
     save_output=False,
 ):
     """
-    Consolidate all results from different model CSV files into one combined CSV.
+    Consolidate results by scanning for pickled model result files (*.pkl)
+    under `out_dir` (recursively), unpickling each and extracting the
+    `loaded['results_df']` object when present. Concatenates all found
+    DataFrames, deduplicates and optionally saves to CSV.
 
     Parameters
     ----------
     out_dir : str or Path
-        Directory containing individual model CSV files.
+        Directory containing pickled model result files.
     output_filename : str, optional
         Name of the consolidated output CSV file. Default is 'all_models_results.csv'.
-        Only used if save_output=True.
     model_names : list of str, optional
-        List of specific model names to consolidate. If None, will scan for all CSV files
-        in the directory and attempt to consolidate all of them.
+        Unused for pickle-based consolidation (kept for backward compatibility).
     verbosity : int, optional
-        Verbosity level. 0 = silent, 1 = basic info, 2 = detailed info.
+        Verbosity level.
     save_output : bool, optional
-        Whether to save the consolidated results to a CSV file. Default is True.
-        If False, only returns the DataFrame without saving.
+        Whether to save the consolidated CSV to `out_dir`.
 
     Returns
     -------
     pd.DataFrame
-        Consolidated DataFrame with all results from all models.
+        Consolidated DataFrame with all results.
     """
     out_dir = Path(out_dir)
 
@@ -585,46 +586,42 @@ def consolidate_results_across_models(
             print(f'Directory does not exist: {out_dir}')
         return pd.DataFrame()
 
-    all_dfs = []
-
-    if model_names is not None:
-        # Load specific model files
-        csv_paths = [get_model_csv_path(out_dir, model_name)
-                     for model_name in model_names]
-    else:
-        # Scan directory for all CSV files, excluding:
-        # 1. The consolidated output file itself (to avoid circular inclusion)
-        # 2. Any other non-model result files
-        csv_paths = [
-            p for p in out_dir.glob('*.csv')
-            if p.name != output_filename  # Exclude the consolidated file
-        ]
+    pkl_paths = list(out_dir.rglob('*.pkl'))
 
     if verbosity > 0:
-        print(f'Found {len(csv_paths)} CSV files to consolidate')
+        print(f'Found {len(pkl_paths)} pkl files under {out_dir}')
 
-    for csv_path in csv_paths:
-        if not csv_path.exists():
+    all_dfs = []
+
+    for p in pkl_paths:
+        try:
+            with p.open('rb') as f:
+                loaded = pickle.load(f)
+        except Exception as e:
             if verbosity > 1:
-                print(f'Skipping non-existent file: {csv_path}')
+                print(f'Skipping {p}: failed to unpickle ({e})')
             continue
 
-        try:
-            df = pd.read_csv(csv_path)
-            if len(df) > 0:
-                all_dfs.append(df)
+        # Expect a dict with key 'results_df'
+        if isinstance(loaded, dict) and 'results_df' in loaded:
+            df = loaded['results_df']
+            try:
+                if isinstance(df, pd.DataFrame) and len(df) > 0:
+                    all_dfs.append(df.copy())
+                    if verbosity > 1:
+                        print(f'Loaded {len(df)} rows from {p.name}')
+            except Exception:
                 if verbosity > 1:
-                    print(f'Loaded {len(df)} rows from {csv_path.name}')
-        except Exception as e:
-            if verbosity > 0:
-                print(f'Error loading {csv_path.name}: {e}')
+                    print(f'Invalid results_df in {p.name}, skipping')
+        else:
+            if verbosity > 1:
+                print(f'No results_df key in {p.name}, skipping')
 
     if not all_dfs:
         if verbosity > 0:
-            print('No data found to consolidate')
+            print('No data found to consolidate from pickles')
         return pd.DataFrame()
 
-    # Concatenate all dataframes
     consolidated_df = pd.concat(all_dfs, ignore_index=True)
 
     # Remove duplicates based on key columns

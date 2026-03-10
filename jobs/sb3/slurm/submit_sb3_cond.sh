@@ -23,7 +23,7 @@ mkdir -p "$LOG_DIR"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARRAY_MAX=500
-MAX_CONCURRENT=7
+MAX_CONCURRENT=10
 
 submit_one () {
     local P="$1"

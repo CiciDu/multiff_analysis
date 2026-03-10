@@ -114,7 +114,7 @@ def _dd1_matrix(n: int, circ: bool) -> sparse.csr_matrix:
             format='csr'
         )
         return (D1.T @ D1).tocsr()
-    
+
 
 def _laplacian_2d_matrix(n: int) -> sparse.csr_matrix:
     """
@@ -130,7 +130,8 @@ def _laplacian_2d_matrix(n: int) -> sparse.csr_matrix:
         raise ValueError(f'2D penalty requires perfect square n, got n={n}')
 
     diags = np.vstack([-np.ones(s - 1), np.ones(s - 1)])
-    D1 = sparse.diags(diagonals=diags, offsets=[0, 1], shape=(s - 1, s), format='csr')
+    D1 = sparse.diags(diagonals=diags, offsets=[
+                      0, 1], shape=(s - 1, s), format='csr')
     DD1 = (D1.T @ D1).tocsr()
 
     I = sparse.eye(s, format='csr')
@@ -144,12 +145,12 @@ def _laplacian_2d_matrix(n: int) -> sparse.csr_matrix:
 def load_fit_results(save_path: str) -> Dict:
     """
     Load saved GAM fit results from pickle file.
-    
+
     Parameters
     ----------
     save_path : str
         Path to the saved pickle file
-    
+
     Returns
     -------
     Dict
@@ -169,12 +170,12 @@ def load_fit_results(save_path: str) -> Dict:
 def load_elimination_results(save_path: str) -> Dict:
     """
     Load saved backward elimination results from pickle file.
-    
+
     Parameters
     ----------
     save_path : str
         Path to the saved pickle file
-    
+
     Returns
     -------
     Dict
@@ -185,7 +186,7 @@ def load_elimination_results(save_path: str) -> Dict:
         - current_step: Number of steps completed
         - lambda_config: Dict with 4 main lambda parameters (lam_f, lam_g, lam_h, lam_p)
         - metadata: Additional metadata (if provided during elimination)
-        
+
     Note
     ----
     When using backward_elimination_gam with load_if_exists=True, the function
@@ -212,7 +213,8 @@ def build_penalty_blocks(
         if g.lam is None or float(g.lam) == 0.0:
             continue
 
-        idx = np.array([col_index[c] for c in g.cols if c in col_index], dtype=int)
+        idx = np.array([col_index[c]
+                       for c in g.cols if c in col_index], dtype=int)
         n = idx.size
         if n == 0:
             continue
@@ -226,7 +228,8 @@ def build_penalty_blocks(
         elif g.vartype == '0D':
             continue
         else:
-            raise ValueError(f'Unknown vartype {g.vartype!r} for group {g.name!r}')
+            raise ValueError(
+                f'Unknown vartype {g.vartype!r} for group {g.name!r}')
 
         # add tiny ridge to anchor constant mode (DC)
         if ridge > 0:
@@ -245,64 +248,110 @@ def build_penalty_blocks(
     cols = np.concatenate(all_cols)
     data = np.concatenate(all_data)
 
-    P_full = sparse.coo_matrix((data, (rows, cols)), shape=(n_total, n_total)).tocsr()
+    P_full = sparse.coo_matrix(
+        (data, (rows, cols)), shape=(n_total, n_total)).tocsr()
     return P_full, group_indices
 
 
+def poisson_nll_per_spike(y, rate, eps=1e-12):
+    """
+    Average negative log-likelihood per spike.
 
-def poisson_loglik(y, rate):
+    Returns NaN for silent data (sum(y) == 0), which avoids divide-by-zero
+    and makes degenerate cases explicit.
     """
-    Average negative log-likelihood per spike (same normalization as MATLAB).
-    """
-    eps = 1e-12
+    y = np.asarray(y, dtype=float).ravel()
+    rate = np.asarray(rate, dtype=float).ravel()
+
+    if y.shape != rate.shape:
+        raise ValueError(
+            f'y and rate must have the same shape, got {y.shape} and {rate.shape}')
+
     rate = np.clip(rate, eps, None)
-    return np.sum(rate - y * np.log(rate) + gammaln(y + 1)) / np.sum(y)
+
+    total_spikes = np.sum(y)
+    if total_spikes <= 0:
+        return np.nan
+
+    return np.sum(rate - y * np.log(rate) + gammaln(y + 1)) / total_spikes
 
 
-def compute_likelihoods(design_df, beta, y):
+def compute_likelihoods(design_df, beta, y, eps=1e-12):
+    """
+    Compute model, mean-model, and saturated-model negative log-likelihoods.
+
+    Returns NaNs for degenerate silent responses.
+    """
+    y = np.asarray(y, dtype=float).ravel()
+
     # --- Ensure beta aligns with design_df columns ---
     if isinstance(beta, pd.Series):
         beta = beta.reindex(design_df.columns).fillna(0).to_numpy()
     else:
-        beta = np.asarray(beta)
+        beta = np.asarray(beta, dtype=float).ravel()
 
-    X = design_df.to_numpy()
+    X = design_df.to_numpy(dtype=float)
     u = X @ beta
+
+    # Protect exp from overflow
+    u = np.clip(u, -50.0, 50.0)
     rate = np.exp(u)
 
-    # model
-    ll_model = poisson_loglik(y, rate)
+    # Silent neuron / all-zero response
+    if np.sum(y) <= 0:
+        return np.nan, np.nan, np.nan
 
-    # mean-rate model
-    mean_rate = np.mean(y)
-    ll_mean = poisson_loglik(y, np.full_like(y, mean_rate))
+    ll_model = poisson_nll_per_spike(y, rate, eps=eps)
 
-    # saturated model (best possible)
-    ll_sat = poisson_loglik(y, y)
+    mean_rate = max(np.mean(y), eps)
+    ll_mean = poisson_nll_per_spike(y, np.full(
+        y.shape, mean_rate, dtype=float), eps=eps)
+
+    # Saturated model
+    ll_sat = poisson_nll_per_spike(y, np.clip(y, eps, None), eps=eps)
 
     return ll_model, ll_mean, ll_sat
 
 
-def pseudo_r2(design_df, beta, y):
-    ll_model, ll_mean, ll_sat = compute_likelihoods(design_df, beta, y)
-    return (ll_mean - ll_model) / (ll_mean - ll_sat)
+def pseudo_r2(design_df, beta, y, eps=1e-12):
+    ll_model, ll_mean, ll_sat = compute_likelihoods(
+        design_df, beta, y, eps=eps)
 
-def bits_per_spike(design_df, beta, y):
+    if not np.all(np.isfinite([ll_model, ll_mean, ll_sat])):
+        return np.nan
+
+    denom = ll_mean - ll_sat
+    if np.isclose(denom, 0.0):
+        return np.nan
+
+    return (ll_mean - ll_model) / denom
+
+
+def bits_per_spike(design_df, beta, y, eps=1e-12):
+    y = np.asarray(y, dtype=float).ravel()
+
+    if np.sum(y) <= 0:
+        return np.nan
+
     # --- Ensure beta aligns with design_df columns ---
     if isinstance(beta, pd.Series):
         beta = beta.reindex(design_df.columns).fillna(0).to_numpy()
     else:
-        beta = np.asarray(beta)
+        beta = np.asarray(beta, dtype=float).ravel()
 
-    X = design_df.to_numpy()
-    u = X @ beta
+    X = design_df.to_numpy(dtype=float)
+    u = np.clip(X @ beta, -50.0, 50.0)
     rate = np.exp(u)
 
-    ll_model = poisson_loglik(y, rate)
-    ll_mean = poisson_loglik(y, np.full_like(y, np.mean(y)))
+    ll_model = poisson_nll_per_spike(y, rate, eps=eps)
+    ll_mean = poisson_nll_per_spike(y, np.full(
+        y.shape, max(np.mean(y), eps), dtype=float), eps=eps)
 
-    # convert nats → bits
+    if not np.all(np.isfinite([ll_model, ll_mean])):
+        return np.nan
+
     return (ll_mean - ll_model) / np.log(2)
+
 
 def cross_validated_ll(
     design_df,
@@ -399,7 +448,7 @@ def generate_lambda_suffix(
         config = _extract_lambda_config(groups)
     else:
         raise ValueError('Provide either groups or lambda_config')
-    
+
     parts = []
     # Order: F, G, H, P for consistency
     for key in ['lam_f', 'lam_g', 'lam_h', 'lam_p']:
@@ -408,7 +457,7 @@ def generate_lambda_suffix(
             # Use capitalized short names: lamF, lamG, lamH, lamP
             short_name = key.replace('lam_', 'lam').upper()
             parts.append(f'{short_name}-{lam_str}')
-    
+
     return delimiter.join(parts)
 
 
@@ -419,12 +468,12 @@ def _extract_lambda_config(groups):
     Mapping: t_* and event vartype -> lam_g; spike_hist -> lam_h; cpl_* -> lam_p;
     else (1D tuning, etc.) -> lam_f. Event groups without t_* prefix (e.g.
     basis, retries in encode_stops) are treated as lam_g via vartype.
-    
+
     Returns:
         dict: {'lam_f': float, 'lam_g': float, 'lam_h': float, 'lam_p': float}
     """
     lambda_config = {}
-    
+
     for g in groups:
         # Skip unpenalized groups (e.g. const); they don't affect the suffix
         if g.lam is None or (isinstance(g.lam, (int, float)) and float(g.lam) == 0.0):
@@ -445,7 +494,7 @@ def _extract_lambda_config(groups):
         else:
             # lam_f: tuning curves (firefly features, 1D smooth)
             key = 'lam_f'
-        
+
         # Store or verify consistency
         if key in lambda_config:
             if abs(lambda_config[key] - g.lam) > 1e-10:
@@ -455,7 +504,7 @@ def _extract_lambda_config(groups):
                 )
         else:
             lambda_config[key] = g.lam
-    
+
     return lambda_config
 
 
@@ -491,7 +540,8 @@ def _build_l1_terms(l1_groups, col_index):
     for g in l1_groups:
         if g.lam is None or float(g.lam) == 0.0:
             continue
-        idx = np.array([col_index[c] for c in g.cols if c in col_index], dtype=int)
+        idx = np.array([col_index[c]
+                       for c in g.cols if c in col_index], dtype=int)
         if idx.size > 0:
             terms.append((idx, float(g.lam)))
     return terms
@@ -525,6 +575,7 @@ def _make_l1_smooth_fns(l1_terms, eps, p):
 def _make_poisson_objective(X, y, P, l1_fun, l1_grad, l1_hess_diag):
     def fun(beta):
         u = X @ beta
+        u = np.clip(u, -50.0, 50.0)
         rate = np.exp(u)
         return (
             np.sum(rate - y * u)
@@ -534,6 +585,7 @@ def _make_poisson_objective(X, y, P, l1_fun, l1_grad, l1_hess_diag):
 
     def jac(beta):
         u = X @ beta
+        u = np.clip(u, -50.0, 50.0)
         rate = np.exp(u)
         return (
             X.T @ (rate - y)
@@ -543,6 +595,7 @@ def _make_poisson_objective(X, y, P, l1_fun, l1_grad, l1_hess_diag):
 
     def hessp(beta, v):
         u = X @ beta
+        u = np.clip(u, -50.0, 50.0)
         rate = np.exp(u)
         return (
             X.T @ (rate * (X @ v))
@@ -570,7 +623,8 @@ def _make_callback(fun, jac, beta0):
         gnorm = float(np.linalg.norm(jac(xk)))
         step = float(np.linalg.norm(xk - state['prev_beta']))
         state['prev_beta'] = xk.copy()
-        print(f'[iter {state["iter"]:4d}] fun={f: .6e} |grad|={gnorm: .3e} |step|={step: .3e}')
+        print(
+            f'[iter {state["iter"]:4d}] fun={f: .6e} |grad|={gnorm: .3e} |step|={step: .3e}')
 
     return callback
 
@@ -609,7 +663,7 @@ def _save_fit_results(
 
     if verbose:
         print(f'\nResults saved to: {save_path}')
-        
+
 
 def fit_poisson_gam(
     design_df: pd.DataFrame,
@@ -689,7 +743,8 @@ def fit_poisson_gam(
         print(f"y mean: {y.mean():.2e}, y sum: {y.sum():.2e}")
         print(f"Initial beta range: [{beta0.min():.2e}, {beta0.max():.2e}]")
         print(f"Initial u = X @ beta0 range: [{u0.min():.2e}, {u0.max():.2e}]")
-        print(f"Initial rate = exp(u) range: [{np.exp(u0).min():.2e}, {np.exp(u0).max():.2e}]")
+        print(
+            f"Initial rate = exp(u) range: [{np.exp(u0).min():.2e}, {np.exp(u0).max():.2e}]")
         print(f"Initial objective: {fun(beta0):.6e}")
         print(f"Initial gradient norm: {np.linalg.norm(jac(beta0)):.3e}")
         print('=' * 80 + '\n')
@@ -704,7 +759,8 @@ def fit_poisson_gam(
             method='L-BFGS-B',
             jac=jac,
             callback=callback,
-            options={'maxiter': int(max_iter), 'ftol': float(tol), 'disp': bool(verbose)},
+            options={'maxiter': int(max_iter), 'ftol': float(
+                tol), 'disp': bool(verbose)},
         )
     elif optimizer.lower() == 'trust-ncg':
         res = minimize(
@@ -714,10 +770,12 @@ def fit_poisson_gam(
             jac=jac,
             hessp=hessp,
             callback=callback,
-            options={'maxiter': int(max_iter), 'gtol': float(tol), 'disp': bool(verbose)},
+            options={'maxiter': int(max_iter), 'gtol': float(
+                tol), 'disp': bool(verbose)},
         )
     else:
-        raise ValueError(f"Unsupported optimizer: {optimizer}. Choose 'L-BFGS-B' or 'trust-ncg'.")
+        raise ValueError(
+            f"Unsupported optimizer: {optimizer}. Choose 'L-BFGS-B' or 'trust-ncg'.")
 
     beta_hat = res.x
     grad_norm = float(np.linalg.norm(jac(beta_hat)))
@@ -730,7 +788,7 @@ def fit_poisson_gam(
         fun=float(res.fun),
         grad_norm=grad_norm,
     )
-    
+
     # print message
     print(f'fit_result.message: {fit_result.message}')
 

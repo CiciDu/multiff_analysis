@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import pickle
 from pathlib import Path
-import os
+
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     gam_variance_explained,
@@ -25,7 +24,6 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
 from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 
-from neural_data_analysis.design_kits.design_by_segment import spike_history
 
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     collect_stop_data
@@ -34,12 +32,25 @@ from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_st
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encode_stops_gam_helper,
-    encode_stops_utils,
-    encode_pn_utils
+    encoder_gam_helper
 )
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
+
+
+DEFAULT_LAMBDA_CONFIG = {
+    "lam_f": 100.0,
+    "lam_g": 10.0,
+    "lam_h": 10.0,
+    "lam_p": 10.0,
+}
+
+DEFAULT_LAM_GRID = {
+    "lam_f": [50, 100, 200],
+    "lam_g": [50, 100, 200],
+    "lam_h": [5, 10, 30],
+    "lam_p": [10],
+}
 
 
 class BaseEncodingRunner:
@@ -48,7 +59,7 @@ class BaseEncodingRunner:
 
     Subclasses must implement:
     - get_design_for_unit(unit_idx)
-    - get_gam_groups(unit_idx, lam_f, lam_g, lam_h, lam_p)
+    - get_gam_groups(unit_idx)
     - get_gam_save_paths(unit_idx, ...)
     - num_neurons
     - _get_save_dir()
@@ -59,24 +70,33 @@ class BaseEncodingRunner:
     def __init__(self, raw_data_folder_path,
                  bin_width: float = 0.04,
                  encoder_prs=None,
+                 lambda_config: Optional[Dict[str, float]] = None,
                  ):
         self.raw_data_folder_path = raw_data_folder_path
         self.bin_width = bin_width
 
         self.num_neurons = neural_data_processing.find_num_neurons(
             self.raw_data_folder_path)
-        
-        # Optional: multiff_encoding_params.StopParams for encoding design (temporal + tuning)
+
+        # Optional: multiff_encoding_params.MultiFFParams for encoding design (temporal + tuning)
         self.encoder_prs = encoder_prs if encoder_prs is not None else multiff_encoding_params.default_prs()
         self.binrange_dict = self.encoder_prs.binrange
 
         # will be filled during setup
         self.binned_feats = None
         self.binned_spikes = None  # (n_bins x n_neurons) for Poisson GAM
+        self.hist_meta = None
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width)
 
-
+        self.lam_grid = DEFAULT_LAM_GRID
+        
+        self.lambda_config = lambda_config if lambda_config is not None else DEFAULT_LAMBDA_CONFIG
+        self.lam_f = self.lambda_config['lam_f']
+        self.lam_g = self.lambda_config['lam_g']
+        self.lam_h = self.lambda_config['lam_h']
+        self.lam_p = self.lambda_config['lam_p']
+        
 
     def get_gam_results_subdir(self) -> str:
         """Subdir under save_dir for GAM results (e.g. stop_gam_results)."""
@@ -101,10 +121,6 @@ class BaseEncodingRunner:
         self,
         unit_idx: int,
         *,
-        lam_f: float = 100.0,
-        lam_g: float = 10.0,
-        lam_h: float = 10.0,
-        lam_p: float = 10.0,
         l1_groups: Optional[List[GroupSpec]] = None,
         l1_smooth_eps: float = 1e-6,
         max_iter: int = 1000,
@@ -128,16 +144,10 @@ class BaseEncodingRunner:
         y = np.asarray(
             binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
 
-        groups = self.get_gam_groups(
-            lam_f=lam_f, lam_g=lam_g, lam_h=lam_h, lam_p=lam_p
-        )
+        groups = self.get_gam_groups()
         if save_path is None:
             paths = self.get_gam_save_paths(
                 unit_idx=unit_idx,
-                lam_f=lam_f,
-                lam_g=lam_g,
-                lam_h=lam_h,
-                lam_p=lam_p,
             )
             save_path = paths["fit_save_path"]
 
@@ -160,7 +170,6 @@ class BaseEncodingRunner:
     def crossval_variance_explained(
         self,
         unit_idx: int,
-        groups: List[GroupSpec],
         *,
         n_folds: int = 5,
         random_state: int = 0,
@@ -176,6 +185,17 @@ class BaseEncodingRunner:
         cv_groups=None,
     ) -> Dict:
         """Run crossval_variance_explained for one unit."""
+        if save_path is None:
+            paths_i = self.get_gam_save_paths(
+                unit_idx=unit_idx,
+            )
+            base = paths_i["base"]
+            outdir = base / f"neuron_{unit_idx}"
+            (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
+            lam_suffix = paths_i["lam_suffix"]
+            save_path = str(
+                outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
+
         maybe_loaded = gam_variance_explained.maybe_load_saved_crossval(
             save_path=save_path,
             load_if_exists=load_if_exists,
@@ -189,8 +209,9 @@ class BaseEncodingRunner:
 
         self.collect_data(exists_ok=True)
         self.get_design_for_unit(unit_idx)
+        groups = self.get_gam_groups()
         binned_spikes = self.binned_spikes
-        n_rows = len(design_df)
+        n_rows = len(self.design_df)
         if n_rows != len(binned_spikes):
             raise ValueError(
                 f"design and binned_spikes row count mismatch: {n_rows} vs {len(binned_spikes)}"
@@ -202,7 +223,7 @@ class BaseEncodingRunner:
         if fit_kwargs is None:
             fit_kwargs = {}
         meta = dict(save_metadata or {}, unit_idx=unit_idx)
-        return gam_variance_explained.crossval_variance_explained(
+        return gam_variance_explained._crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
             design_df=self.design_df,
             y=y,
@@ -223,10 +244,6 @@ class BaseEncodingRunner:
     def crossval_variance_explained_all_neurons(
         self,
         *,
-        lam_f: float = 100.0,
-        lam_g: float = 10.0,
-        lam_h: float = 10.0,
-        lam_p: float = 10.0,
         n_folds: int = 5,
         load_if_exists: bool = True,
         load_only: bool = False,
@@ -241,10 +258,6 @@ class BaseEncodingRunner:
         """Run crossval_variance_explained for all neurons."""
         if load_if_exists:
             all_neuron_r2 = self.try_load_variance_explained_for_all_neurons(
-                lam_f=lam_f,
-                lam_g=lam_g,
-                lam_h=lam_h,
-                lam_p=lam_p,
                 verbose=verbose,
             )
             if all_neuron_r2 is not None:
@@ -280,30 +293,19 @@ class BaseEncodingRunner:
 
         paths = self.get_gam_save_paths(
             unit_idx=unit_indices[0],
-            lam_f=lam_f,
-            lam_g=lam_g,
-            lam_h=lam_h,
-            lam_p=lam_p,
         )
         base = paths["base"]
         lam_suffix = paths["lam_suffix"]
 
         all_neuron_r2 = []
+
         for unit_idx in unit_indices:
-            groups = self.get_gam_groups(
-                unit_idx=unit_idx,
-                lam_f=lam_f,
-                lam_g=lam_g,
-                lam_h=lam_h,
-                lam_p=lam_p,
-            )
             outdir = base / f"neuron_{unit_idx}"
             (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
             cv_save_path = str(
                 outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
             cv_res = self.crossval_variance_explained(
                 unit_idx=unit_idx,
-                groups=groups,
                 n_folds=n_folds,
                 fit_kwargs=fit_kwargs,
                 save_path=cv_save_path,
@@ -322,10 +324,9 @@ class BaseEncodingRunner:
             )
         return all_neuron_r2
 
-    def run_category_contributions_and_penalty_tuning_all_neurons(
+    def run_category_contributions_etc_for_all_neurons(
         self,
         *,
-        lambda_config: Optional[Dict[str, float]] = None,
         n_folds: int = 5,
         buffer_samples: int = 20,
         backward_n_folds: int = 10,
@@ -345,7 +346,6 @@ class BaseEncodingRunner:
         if unit_indices is None:
             unit_indices = list(range(n_neurons))
 
-        lam_cfg = lambda_config or {}
         for unit_idx in unit_indices:
             if verbose:
                 print(
@@ -355,24 +355,21 @@ class BaseEncodingRunner:
             try:
                 self.run_category_variance_contributions(
                     unit_idx,
-                    lambda_config=lam_cfg,
                     n_folds=n_folds,
                     buffer_samples=buffer_samples,
                     load_if_exists=load_if_exists,
                 )
-                self.run_penalty_tuning(
-                    unit_idx,
-                    lambda_config=lam_cfg,
-                    n_folds=n_folds,
-                    load_if_exists=load_if_exists,
-                )
-                self.run_backward_elimination(
-                    unit_idx,
-                    lambda_config=lam_cfg,
-                    n_folds=backward_n_folds,
-                    alpha=alpha,
-                    load_if_exists=load_if_exists,
-                )
+                # self.run_penalty_tuning(
+                #     unit_idx,
+                #     n_folds=n_folds,
+                #     load_if_exists=load_if_exists,
+                # )
+                # self.run_backward_elimination(
+                #     unit_idx,
+                #     n_folds=backward_n_folds,
+                #     alpha=alpha,
+                #     load_if_exists=load_if_exists,
+                # )
             except Exception as e:
                 if verbose:
                     print(f"  [WARN] neuron {unit_idx}: {e}")
@@ -380,10 +377,6 @@ class BaseEncodingRunner:
     def try_load_variance_explained_for_all_neurons(
         self,
         *,
-        lam_f: float = 100.0,
-        lam_g: float = 10.0,
-        lam_h: float = 10.0,
-        lam_p: float = 10.0,
         load_if_exists: bool = True,
         verbose: bool = True,
     ) -> Optional[List[float]]:
@@ -393,10 +386,6 @@ class BaseEncodingRunner:
             try:
                 paths_i = self.get_gam_save_paths(
                     unit_idx=unit_idx,
-                    lam_f=lam_f,
-                    lam_g=lam_g,
-                    lam_h=lam_h,
-                    lam_p=lam_p,
                 )
                 base = paths_i["base"]
                 outdir = base / f"neuron_{unit_idx}"
@@ -425,8 +414,6 @@ class BaseEncodingRunner:
                 return None
         return all_neuron_r2
 
-
-    
     def _make_structured_meta_groups(self):
         # Restructure meta_groups into one_ff_gam-style categories
         self.structured_meta_groups = encoding_design_utils.build_structured_meta_groups(
@@ -434,7 +421,6 @@ class BaseEncodingRunner:
             temporal_meta=self.temporal_meta,
             tuning_meta=self.tuning_meta,
         )
-
 
     def get_design_for_unit(self, unit_idx: int) -> pd.DataFrame:
         """
@@ -469,10 +455,8 @@ class BaseEncodingRunner:
 
         self.make_hist_meta_for_unit(unit_idx)
         self._make_structured_meta_groups()
-        self.get_gam_groups()
 
         return
-
 
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir()) / 'encoding_design'
@@ -486,7 +470,6 @@ class BaseEncodingRunner:
             'X_hist': save_dir / 'X_hist.pkl',
             'spk_colnames': save_dir / 'spk_colnames.pkl',
         }
-
 
     def _save_design_matrices(self):
         paths = self._get_design_matrix_paths()
@@ -533,7 +516,7 @@ class BaseEncodingRunner:
             with open(paths['binrange_dict'], 'rb') as f:
                 self.binrange_dict = pickle.load(f)
 
-            # structured_meta_groups 
+            # structured_meta_groups
             with open(paths['temporal_meta'], 'rb') as f:
                 self.temporal_meta = pickle.load(f)
 
@@ -550,7 +533,10 @@ class BaseEncodingRunner:
                 self.spk_colnames = pickle.load(f)
                 self.spike_cols = list(self.spk_colnames.keys())
 
-            print('Loaded cached design matrices')
+            print('Loaded cached design matrices from:', paths['binned_feats'])
+
+            self.structured_meta_groups = encoding_design_utils.build_structured_meta_groups(
+                hist_meta=self.hist_meta, temporal_meta=self.temporal_meta, tuning_meta=self.tuning_meta)
 
             return True
 
@@ -561,14 +547,8 @@ class BaseEncodingRunner:
             )
             return False
 
-
     def get_gam_groups(
         self,
-        *,
-        lam_f: float = 100.0,
-        lam_g: float = 10.0,
-        lam_h: float = 10.0,
-        lam_p: float = 10.0,
     ):
         """
         Build GroupSpec list and lambda_config for a unit's design matrix.
@@ -593,13 +573,13 @@ class BaseEncodingRunner:
         self.groups = encoding_design_utils.build_gam_groups_from_meta(
             self.structured_meta_groups,
             self.design_df,
-            lam_f=lam_f,
-            lam_g=lam_g,
-            lam_h=lam_h,
-            lam_p=lam_p,
+            lam_f=self.lambda_config['lam_f'],
+            lam_g=self.lambda_config['lam_g'],
+            lam_h=self.lambda_config['lam_h'],
+            lam_p=self.lambda_config['lam_p'],
         )
         return self.groups
-    
+
     def _prepare_spike_history_components(self):
         """Compute spike-history components if not yet available (e.g. after cache load)."""
         if hasattr(self, 'X_hist') and self.X_hist is not None:
@@ -643,17 +623,13 @@ class BaseEncodingRunner:
         self,
         unit_idx: int,
         *,
-        lam_f: float = 100.0,
-        lam_g: float = 10.0,
-        lam_h: float = 10.0,
-        lam_p: float = 10.0,
         ensure_dirs: bool = True,
     ) -> dict:
         base = Path(self._get_save_dir()) / self.get_gam_results_subdir()
         if ensure_dirs:
             base.mkdir(parents=True, exist_ok=True)
-        lambda_config = dict(lam_f=lam_f, lam_g=lam_g,
-                             lam_h=lam_h, lam_p=lam_p)
+        lambda_config = dict(lam_f=self.lambda_config['lam_f'], lam_g=self.lambda_config['lam_g'],
+                             lam_h=self.lambda_config['lam_h'], lam_p=self.lambda_config['lam_p'])
         lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
             lambda_config=lambda_config)
         outdir = base / f"neuron_{unit_idx}"
@@ -669,12 +645,10 @@ class BaseEncodingRunner:
             "cv_save_path": str(outdir / "cv_var_explained" / f"{lam_suffix}.pkl"),
         }
 
-
     def run_category_variance_contributions(
         self,
         unit_idx: int,
         *,
-        lambda_config: Optional[Dict[str, float]] = None,
         n_folds: int = 5,
         buffer_samples: int = 20,
         category_names: Optional[List[str]] = None,
@@ -686,7 +660,7 @@ class BaseEncodingRunner:
         """
         return self._get_gam_analysis_helper().run_category_variance_contributions(
             unit_idx=unit_idx,
-            lambda_config=lambda_config,
+            lambda_config=self.lambda_config,
             n_folds=n_folds,
             buffer_samples=buffer_samples,
             category_names=category_names,
@@ -698,9 +672,7 @@ class BaseEncodingRunner:
         self,
         unit_idx: int,
         *,
-        lambda_config: Optional[Dict[str, float]] = None,
         n_folds: int = 5,
-        lam_grid: Optional[Dict[str, List[float]]] = None,
         group_name_map: Optional[Dict[str, List[str]]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
@@ -710,9 +682,8 @@ class BaseEncodingRunner:
         """
         return self._get_gam_analysis_helper().run_penalty_tuning(
             unit_idx=unit_idx,
-            lambda_config=lambda_config,
+            lambda_config=self.lambda_config,
             n_folds=n_folds,
-            lam_grid=lam_grid,
             group_name_map=group_name_map,
             retrieve_only=retrieve_only,
             load_if_exists=load_if_exists,
@@ -722,7 +693,6 @@ class BaseEncodingRunner:
         self,
         unit_idx: int,
         *,
-        lambda_config: Optional[Dict[str, float]] = None,
         alpha: float = 0.05,
         n_folds: int = 10,
         load_if_exists: bool = True,
@@ -737,7 +707,7 @@ class BaseEncodingRunner:
         """
         return self._get_gam_analysis_helper().run_backward_elimination(
             unit_idx=unit_idx,
-            lambda_config=lambda_config,
+            lambda_config=self.lambda_config,
             alpha=alpha,
             n_folds=n_folds,
             load_if_exists=load_if_exists,
@@ -780,11 +750,10 @@ class BaseEncodingRunner:
             cv_groups=cv_groups,
         )
 
-
     def _get_gam_analysis_helper(self):
         if not hasattr(self, '_gam_analysis_helper') or self._gam_analysis_helper is None:
             self._gam_analysis_helper = (
-                encode_stops_gam_helper.BaseEncodingGAMAnalysisHelper(
+                encoder_gam_helper.BaseEncodingGAMAnalysisHelper(
                     self,
                     var_categories=self.var_categories,
                 )

@@ -263,7 +263,7 @@ def _score_from_beta(beta, X_val, off_val, y_val, metric='loglik'):
     mu_val = _poisson_mu_from_eta(eta_val)
     if metric == 'deviance':
         return -_poisson_deviance(y_val, mu_val)
-    return float(np.sum(_poisson_loglik(y_val, mu_val)))
+    return float(np.sum(_poisson_logpmf(y_val, mu_val)))
 
 
 def _poisson_mu_from_eta(eta, clip=(-50.0, 50.0)):
@@ -278,7 +278,7 @@ def _poisson_mu_from_eta(eta, clip=(-50.0, 50.0)):
     return np.exp(eta)
 
 
-def _poisson_loglik(y, mu, eps=1e-12):
+def _poisson_logpmf(y, mu, eps=1e-12):
     """
     Pointwise log-likelihood for Poisson(y | mu).
 
@@ -425,7 +425,7 @@ def poisson_mu_from_eta(eta, mu_max=1e6):
     return np.clip(mu, 1e-12, mu_max)
 
 
-def poisson_loglik(y, mu):
+def poisson_logpmf(y, mu):
     # full log pmf; require finite positive mu
     mu = np.asarray(mu, float)
     mu = np.clip(mu, 1e-12, None)
@@ -458,7 +458,7 @@ def _null_glm_stats_poisson_with_offset(y, off):
         denom = n
     lam0 = float(np.sum(y)) / max(denom, 1e-12)
     mu0 = lam0 * np.exp(off)  # exp(b0 + off)
-    llnull = float(np.sum(poisson_loglik(y, mu0)))
+    llnull = float(np.sum(poisson_logpmf(y, mu0)))
     dev0 = poisson_deviance(y, mu0)
     return llnull, dev0
 
@@ -485,7 +485,7 @@ def metrics_from_result(res, y, X, off):
         offv = None if off is None else np.asarray(off, float).reshape(-1)
         eta = X @ beta + (0.0 if offv is None else offv)
         mu = poisson_mu_from_eta(eta)
-        llf = float(np.sum(poisson_loglik(y, mu)))
+        llf = float(np.sum(poisson_logpmf(y, mu)))
         dev = poisson_deviance(y, mu)
 
     # Recompute null-model metrics if needed (closed-form; no fitting)

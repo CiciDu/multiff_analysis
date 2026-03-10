@@ -19,7 +19,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
     def __init__(self,
-                 overall_folder='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise/',
+                 overall_folder='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise/',
                  add_date_to_model_folder_name=False,
                  **kwargs):
         

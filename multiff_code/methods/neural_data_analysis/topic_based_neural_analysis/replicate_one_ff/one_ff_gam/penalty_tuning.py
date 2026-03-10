@@ -88,9 +88,19 @@ def poisson_log_likelihood(y, rate, eps=1e-12):
     """
     Mean Poisson log-likelihood per sample (dropping constants).
     """
-    rate = np.maximum(rate, eps)
-    return np.mean(y * np.log(rate) - rate)
+    y = np.asarray(y, dtype=float).ravel()
+    rate = np.asarray(rate, dtype=float).ravel()
 
+    if y.shape != rate.shape:
+        raise ValueError(f'y and rate must have the same shape, got {y.shape} and {rate.shape}')
+
+    rate = np.clip(rate, eps, None)
+    ll = y * np.log(rate) - rate
+
+    if not np.all(np.isfinite(ll)):
+        return -np.inf
+
+    return np.mean(ll)
 
 def clone_groups_with_lams(groups, lam_map):
     """
@@ -149,10 +159,14 @@ def cv_score_gam(
             ll_vals.append(-np.inf)
             failed_folds.append((fold_idx, fit_res.message, fit_res.grad_norm))
             continue
+        
+        beta = fit_res.coef.reindex(X_test.columns).fillna(0).to_numpy()
+        u_test = X_test.to_numpy(dtype=float) @ beta
+        u_test = np.clip(u_test, -50.0, 50.0)
+        rate_test = np.exp(u_test)
 
-        beta = fit_res.coef.values
-        rate_test = np.exp(X_test.to_numpy() @ beta)
-        ll_vals.append(poisson_log_likelihood(y_test, rate_test))
+        ll_test = poisson_log_likelihood(y_test, rate_test)
+        ll_vals.append(ll_test if np.isfinite(ll_test) else -np.inf)
 
     # If verbose and all folds failed, print diagnostic info
     if verbose_errors and len(failed_folds) == n_folds:
@@ -160,6 +174,9 @@ def cv_score_gam(
         for fold_idx, msg, grad_norm in failed_folds[:2]:  # Show first 2
             print(f'    Fold {fold_idx}: {msg} (|grad|={grad_norm:.3e})')
 
+    ll_vals = np.asarray(ll_vals, dtype=float)
+    if np.all(~np.isfinite(ll_vals)):
+        return -np.inf
     return np.mean(ll_vals)
 
 
@@ -181,12 +198,17 @@ def _load_existing_results(save_path, lam_grid):
     keys = list(lam_grid.keys())
     n_total = int(np.prod([len(lam_grid[k]) for k in keys]))
 
+    tested_combos = {
+        tuple(sorted(lam_setting.items()))
+        for lam_setting, _ in saved_data['results']
+    }
+    
     if n_completed >= n_total:
         print(f'✓ All {n_total} combinations already tested.')
         print(f'✓ Best lambdas: {saved_data["best_lams"]}')
         print(f'✓ Best score: {saved_data["best_score"]:.6f}')
         print('='*80)
-        return saved_data, None, None, None, None
+        return saved_data, tested_combos, saved_data['best_score'], saved_data['best_lams'], saved_data['results']
 
     print(
         f'⚠ Found partial results: {n_completed}/{n_total} combinations tested ({100*n_completed/n_total:.1f}%)')
@@ -195,12 +217,7 @@ def _load_existing_results(save_path, lam_grid):
     print('⚠ Resuming from where it left off...')
     print('='*80)
 
-    tested_combos = {
-        tuple(sorted(lam_setting.items()))
-        for lam_setting, _ in saved_data['results']
-    }
-
-    return None, tested_combos, saved_data['best_score'], saved_data['best_lams'], saved_data['results']
+    return saved_data, tested_combos, saved_data['best_score'], saved_data['best_lams'], saved_data['results']
 
 
 def _print_grid_search_setup(lam_grid, group_name_map, n_combinations, n_folds, save_path):
@@ -357,14 +374,20 @@ def _validate_data(design_df, y, base_groups):
             f'  ⚠ WARNING: Design matrix has very large values (max={X_abs_max:.2e})')
         print('  ⚠ This may cause numerical instability. Consider standardizing features.')
 
-    # Check group specifications
-    col_index = {c: i for i, c in enumerate(design_df.columns)}
+    # Check that all design_df columns are covered by base_groups
+    grouped_cols = set()
     for g in base_groups:
-        missing_cols = [c for c in g.cols if c not in col_index]
-        if missing_cols:
-            print(
-                f'  ⚠ WARNING: Group {g.name} has missing columns: {missing_cols}')
-            return False
+        grouped_cols.update(g.cols)
+
+    missing_from_groups = [
+        c for c in design_df.columns if c not in grouped_cols
+    ]
+
+    if missing_from_groups:
+        print(
+            f'  ⚠ WARNING: The following design matrix columns are not assigned to any group: {missing_from_groups}'
+        )
+        return False
 
     # Check for constant columns (besides intercept)
     for col in design_df.columns:
@@ -609,15 +632,12 @@ from mpl_toolkits.mplot3d import Axes3D
 # 1. Convert cv_results → DataFrame
 # ============================================================
 
-def build_penalty_dataframe(cv_results):
+def build_penalty_dataframe(cv_results, lam_vars):
     rows = []
     for params, score in cv_results:
-        rows.append({
-            'lam_f': params['lam_f'],
-            'lam_g': params['lam_g'],
-            'lam_h': params['lam_h'],
-            'cv_score': float(score)
-        })
+        current_result = {var: params.get(var, None) for var in lam_vars}
+        current_result['cv_score'] = float(score)
+        rows.append(current_result)
 
     df = pd.DataFrame(rows)
     return df
@@ -679,19 +699,19 @@ def plot_interaction_heatmap(df, var1, var2, maximize_over):
 # 5. 3D Interaction Plot (log-transformed)
 # ============================================================
 
-def plot_3d_interaction(df):
+def plot_3d_interaction(df, var1='lam_f', var2='lam_g', var3='lam_h'):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
-    x = np.log10(df['lam_f'])
-    y = np.log10(df['lam_g'])
-    z = np.log10(df['lam_h'])
+    x = np.log10(df[var1])
+    y = np.log10(df[var2])
+    z = np.log10(df[var3])
 
     sc = ax.scatter(x, y, z, c=df['cv_score'])
 
-    ax.set_xlabel('log10(lam_f)')
-    ax.set_ylabel('log10(lam_g)')
-    ax.set_zlabel('log10(lam_h)')
+    ax.set_xlabel(f'log10({var1})')
+    ax.set_ylabel(f'log10({var2})')
+    ax.set_zlabel(f'log10({var3})')
     ax.set_title('3D Interaction of Penalties')
 
     fig.colorbar(sc, label='CV score')
@@ -704,25 +724,45 @@ def plot_3d_interaction(df):
 # ============================================================
 
 def analyze_penalty_tuning(tune_res):
+    
     cv_results = tune_res['cv_results']
+    lam_vars = tune_res['best_lams'].keys()
 
-    df = build_penalty_dataframe(cv_results)
+    df = build_penalty_dataframe(cv_results, lam_vars)
     df_sorted = rank_penalties(df)
 
     print('\n================ RANKED SUMMARY TABLE ================\n')
     print(df_sorted)
 
     # Marginals
-    plot_marginal_best(df, 'lam_f')
-    plot_marginal_best(df, 'lam_g')
-    plot_marginal_best(df, 'lam_h')
+    for var in lam_vars:
+        plot_marginal_best(df, var)
 
-    # Pairwise interactions
-    plot_interaction_heatmap(df, 'lam_f', 'lam_g', 'lam_h')
-    plot_interaction_heatmap(df, 'lam_f', 'lam_h', 'lam_g')
-    plot_interaction_heatmap(df, 'lam_g', 'lam_h', 'lam_f')
-
-    # 3D
-    plot_3d_interaction(df)
+    if len(lam_vars) == 3:
+        # Pairwise interactions
+        plot_interaction_heatmap(df, lam_vars[0], lam_vars[1], lam_vars[2])
+        plot_interaction_heatmap(df, lam_vars[0], lam_vars[2], lam_vars[1])
+        plot_interaction_heatmap(df, lam_vars[1], lam_vars[2], lam_vars[0])
+        plot_3d_interaction(df, var1=lam_vars[0], var2=lam_vars[1], var3=lam_vars[2])
 
     return df, df_sorted
+
+
+def plot_penalty_tuning_for_one_var(runner, var_name):
+    for unit_idx in range(runner.num_neurons):
+        tune_res = runner.run_penalty_tuning(
+            unit_idx,
+            n_folds=5,
+            group_name_map=None,  # default groups; or map lam keys -> group names
+            load_if_exists=True,
+        )
+        cv_results = tune_res['cv_results']
+        lam_vars = tune_res['best_lams'].keys()
+
+        df = build_penalty_dataframe(cv_results, lam_vars)
+        df_sorted = rank_penalties(df)
+
+        print('\n================ RANKED SUMMARY TABLE ================\n')
+        print(df_sorted)
+
+        plot_marginal_best(df, var_name)

@@ -7,7 +7,7 @@ from data_wrangling import further_processing_class
 class PlanFactorsOfAgent(further_processing_class.FurtherProcessing):
 
     def __init__(self,
-                 # overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise',
+                 # overall_folder_name='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise',
                  model_folder_name,
                  data_name='data_0',
                  use_curv_to_ff_center=False,

@@ -36,6 +36,13 @@ DEFAULT_VAR_CATEGORIES = {
     "ff_count_vars": ["num_ff_visible", "num_ff_in_memory", "log1p_num_ff_visible", "log1p_num_ff_in_memory"],
 }
 
+# All non-spike variables
+DEFAULT_VAR_CATEGORIES['non_spike_vars'] = [
+    var
+    for category, vars_list in DEFAULT_VAR_CATEGORIES.items()
+    if category != 'spike_hist_vars'
+    for var in vars_list
+]
 
 STOP_VAR_CATEGORIES = copy.deepcopy(DEFAULT_VAR_CATEGORIES)
 STOP_VAR_CATEGORIES.update({
@@ -137,7 +144,7 @@ class BaseEncodingGAMAnalysisHelper:
         load_if_exists: bool,
         cv_mode: str = "blocked_time_buffered",
     ) -> Dict:
-        return gam_variance_explained.crossval_variance_explained(
+        return gam_variance_explained._crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
             design_df=design_df,
             y=y,
@@ -275,6 +282,14 @@ class BaseEncodingGAMAnalysisHelper:
                     aliases=category_aliases,
                     available_group_names=available_group_names,
                 )
+                design_cols = set(design_df.columns)
+                for gname in drop_group_names:
+                    g = next((x for x in groups if x.name == gname), None)
+                    if g is not None:
+                        cols_in_design = [c for c in g.cols if c in design_cols]
+                        if cols_in_design:
+                            print('cols_in_design to drop for category:', category_name)
+                            print(f"{gname}: {cols_in_design}")
                 keep_group_names = [
                     gname for gname in available_group_names
                     if gname not in set(drop_group_names)
@@ -327,7 +342,6 @@ class BaseEncodingGAMAnalysisHelper:
         *,
         lambda_config: Optional[Dict[str, float]] = None,
         n_folds: int = 5,
-        lam_grid: Optional[Dict[str, List[float]]] = None,
         group_name_map: Optional[Dict[str, List[str]]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
@@ -338,19 +352,14 @@ class BaseEncodingGAMAnalysisHelper:
             raise FileNotFoundError(
                 f"No tuning results file found at: {save_path}")
         can_load = (load_if_exists or retrieve_only) and save_path.exists()
+        lam_grid = self.runner.lam_grid
         if can_load:
-            lam_grid_load = lam_grid or {
-                "lam_f": [10, 50, 100, 300],
-                "lam_g": [1, 5, 10, 30],
-                "lam_h": [1, 5, 10],
-                "lam_p": [1, 5, 10],
-            }
             best_lams, cv_results = penalty_tuning.tune_penalties(
                 design_df=None,
                 y=None,
                 base_groups=None,
                 l1_groups=[],
-                lam_grid=lam_grid_load,
+                lam_grid=lam_grid,
                 group_name_map=group_name_map or {},
                 n_folds=n_folds,
                 save_path=str(save_path),
@@ -369,13 +378,7 @@ class BaseEncodingGAMAnalysisHelper:
             unit_idx=unit_idx,
             lambda_config=lambda_config,
         )
-        if lam_grid is None:
-            lam_grid = {
-                "lam_f": [10, 50, 100, 300],
-                "lam_g": [1, 5, 10, 30],
-                "lam_h": [1, 5, 10],
-                "lam_p": [1, 5, 10],
-            }
+
         if group_name_map is None:
             lam_f_groups = [
                 g.name for g in groups if g.vartype in ("1D", "1Dcirc", "2D") and g.name != "const"
@@ -515,12 +518,7 @@ class BaseEncodingGAMAnalysisHelper:
         y = np.asarray(
             binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
         lam_cfg = self._resolve_lambda_config(lambda_config)
-        groups = self.runner.get_gam_groups(
-            lam_f=lam_cfg["lam_f"],
-            lam_g=lam_cfg["lam_g"],
-            lam_h=lam_cfg["lam_h"],
-            lam_p=lam_cfg["lam_p"],
-        )
+        groups = self.runner.get_gam_groups()
         return self.runner.design_df, y, groups, lam_cfg
 
     def crossval_tuning_curve_coef(

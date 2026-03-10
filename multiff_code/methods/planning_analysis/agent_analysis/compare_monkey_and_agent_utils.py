@@ -1,3 +1,14 @@
+
+from planning_analysis.show_planning.cur_vs_nxt_ff import find_cvn_utils
+from planning_analysis.show_planning import show_planning_class
+from planning_analysis.plan_factors import monkey_plan_factors_x_sess_class
+from planning_analysis.agent_analysis import agent_plan_factors_class
+from planning_analysis.factors_vs_indicators import variations_base_class
+from planning_analysis.factors_vs_indicators import make_variations_utils
+from reinforcement_learning.base_classes import rl_base_class
+from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
+from reinforcement_learning.agents.feedforward import sb3_class
+from reinforcement_learning.base_classes import rl_base_utils
 from planning_analysis.factors_vs_indicators import process_variations_utils
 import pandas as pd
 import os
@@ -123,3 +134,34 @@ def extract_ff_num(folder):
     if match:
         return int(match.group(1)), int(match.group(2))
     return float('inf'), float('inf')
+
+
+def get_agent_params(model_folder_name):
+    rl = sb3_class.SB3forMultifirefly(overall_folder=model_folder_name)
+    rl.load_latest_agent(load_replay_buffer=False)
+    params = dict(rl.manifest['env_params'])
+    env = rl.env.env
+    
+    obs_noise = env.obs_noise
+    params['obs_perc_r'] = obs_noise.perc_r
+    params['obs_perc_th'] = obs_noise.perc_th
+    params['obs_mem_r'] = obs_noise.mem_r
+    params['obs_mem_th'] = obs_noise.mem_th
+    
+    return params, env
+
+
+def add_agent_id_and_essential_agent_params_info_to_df(df, model_folder_name):
+    # Extract agent ID (remove training suffix like 'post'/'best')
+    agent_id = rl_base_utils.extract_config_name_from_post_best(model_folder_name)
+
+    if df is not None:
+        # Get agent parameters
+        params, env = get_agent_params(model_folder_name)
+
+        # Add essential parameter info to results
+        df = rl_base_utils.add_essential_agent_params_info(
+            df, params)
+        df['id'] = agent_id
+
+    return df, agent_id

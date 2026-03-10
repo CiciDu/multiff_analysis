@@ -19,9 +19,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
     cv_decoding,
 )
-from neural_data_analysis.topic_based_neural_analysis.planning_and_neural.pn_decoding import (
-    pn_decoding_model_specs,
-)
+
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
 
@@ -82,83 +80,6 @@ class OneFFStyleDecodingRunner:
         )
         print('Finished running one-FF-style decoding')
         return {"canoncorr": canoncorr, "readout": readout, "stats": self.stats}
-
-    @staticmethod
-    def _path_with_cv_decoding_params(
-        save_path: Optional[str],
-        *,
-        fit_kernelwidth: bool,
-        n_splits: int,
-        inner_cv_splits: Optional[int] = None,
-        cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
-    ) -> Optional[Path]:
-        """Derive save path that encodes CV decoding config so different configs don't collide."""
-        if save_path is None:
-            return None
-        p = Path(save_path)
-        stem, suf = p.stem, p.suffix
-        if fit_kernelwidth:
-            return p.parent / f"{stem}_cvnested_n{n_splits}_inner{inner_cv_splits}_{cv_mode}{suf}"
-        else:
-            return p.parent / f"{stem}_cvfixed_n{n_splits}_{cv_mode}{suf}"
-
-    @staticmethod
-    def _maybe_load_cv_decoding_result(
-        save_path: Optional[str],
-        load_if_exists: bool,
-        label: str,
-        verbose: bool,
-        *,
-        fit_kernelwidth: bool,
-        n_splits: int,
-        inner_cv_splits: Optional[int] = None,
-        cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
-    ):
-        """Load CV decoding result if it exists and load_if_exists=True."""
-        if (not load_if_exists) or save_path is None:
-            return None
-        p = OneFFStyleDecodingRunner._path_with_cv_decoding_params(
-            save_path,
-            fit_kernelwidth=fit_kernelwidth,
-            n_splits=n_splits,
-            inner_cv_splits=inner_cv_splits,
-            cv_mode=cv_mode,
-        )
-        if not p.exists():
-            return None
-        with p.open("rb") as f:
-            obj = pickle.load(f)
-        if verbose:
-            print(f"[{label}] loaded: {p}")
-        return obj
-
-    @staticmethod
-    def _save_cv_decoding_result(
-        save_path: Optional[str],
-        result,
-        label: str,
-        verbose: bool,
-        *,
-        fit_kernelwidth: bool,
-        n_splits: int,
-        inner_cv_splits: Optional[int] = None,
-        cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
-    ):
-        """Save CV decoding result to disk with parameter-encoded filename."""
-        if save_path is None:
-            return
-        p = OneFFStyleDecodingRunner._path_with_cv_decoding_params(
-            save_path,
-            fit_kernelwidth=fit_kernelwidth,
-            n_splits=n_splits,
-            inner_cv_splits=inner_cv_splits,
-            cv_mode=cv_mode,
-        )
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("wb") as f:
-            pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
-        if verbose:
-            print(f"[{label}] saved: {p}")
 
     @staticmethod
     def _path_with_cv_params(
@@ -509,3 +430,44 @@ class OneFFStyleDecodingRunner:
             trial_indices=trial_indices,
             n_trials=n_trials,
         )
+
+
+    def extract_one_ff_corr_df(self, block_key='lineardecoder'):
+        '''
+        Extract decoder correlation results from self.stats[block_key]
+        and return as a sorted dataframe.
+
+        Returns
+        -------
+        df : pandas.DataFrame
+            Columns:
+            - variable
+            - corr
+        '''
+
+        readout_block = self.stats.get(block_key)
+
+        if readout_block is None:
+            raise ValueError(f'No block "{block_key}" found in stats.')
+
+        rows = []
+
+        for k, v in readout_block.items():
+            if isinstance(v, dict) and ('corr' in v):
+                rows.append({
+                    'variable': k,
+                    'corr': float(v.get('corr', np.nan))
+                })
+
+        if len(rows) == 0:
+            raise ValueError('No decoder correlations found in readout block.')
+
+        df = pd.DataFrame(rows)
+
+        df = df.sort_values(
+            'corr',
+            key=lambda x: np.nan_to_num(x, nan=-np.inf),
+            ascending=False
+        ).reset_index(drop=True)
+
+        self.one_ff_corr_df = df.copy()

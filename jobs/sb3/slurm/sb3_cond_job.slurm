@@ -22,7 +22,7 @@ conda activate multiff_clean
 
 # 8 discrete levels, 3 seeds per level
 LEVELS=(0.5 1.0 1.5 2.0 2.5 3.0)
-SEEDS=(0 1 2 3 4 5 6 7)
+SEEDS=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14)
 NUM_LEVELS=${#LEVELS[@]}
 NUM_SEEDS=${#SEEDS[@]}
 
@@ -68,8 +68,8 @@ echo "[info] perc_r=$PERC_R perc_th=$PERC_TH mem_r=$MEM_R mem_th=$MEM_TH"
 
 LR=3e-4
 NUM_OBS_FF=5
-MAX_IN_MEMORY_TIME=3
-IDENTITY_SLOT_STRATEGY="drop_fill_visible_and_memory"
+MAX_IN_MEMORY_TIME=2.5
+IDENTITY_SLOT_STRATEGY="drop_fill_visible_only"
 V_NOISE_STD=0.0
 W_NOISE_STD=0.0
 N_ENVS=1
@@ -103,5 +103,6 @@ srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" \
   --v-noise-std "$V_NOISE_STD" \
   --w-noise-std "$W_NOISE_STD" \
-  --n-envs "$N_ENVS" \
-  --no-curriculum-training
+  #--no-curriculum-training \
+  --n-envs "$N_ENVS"
+  

@@ -2,6 +2,7 @@
 import numpy as np
 from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import _build_folds
 import pickle
@@ -32,10 +33,15 @@ def smooth_with_kernel(signal, kernel):
 # ------------------------------------------------------------------
 # Classical MATLAB-style R² on smoothed firing rate
 # ------------------------------------------------------------------
-
 def classical_r2(design_df, beta, spikes, dt, filtwidth=2, invlink=np.exp):
 
+    if isinstance(beta, pd.Series):
+        beta = beta.reindex(design_df.columns).fillna(0).to_numpy()
+    else:
+        beta = np.asarray(beta)
+
     linear_term = design_df.values @ beta
+    linear_term = np.clip(linear_term, -50, 50)
     r_hat = invlink(linear_term)
     fr_hat = r_hat / dt
 
@@ -49,10 +55,10 @@ def classical_r2(design_df, beta, spikes, dt, filtwidth=2, invlink=np.exp):
     sse = np.sum((smooth_fr_hat - smooth_fr) ** 2)
     sst = np.sum((smooth_fr - np.mean(smooth_fr)) ** 2)
 
-    r2 = 1.0 - (sse / sst)
+    if sst <= 0:
+        return np.nan
 
-    return r2
-
+    return 1.0 - (sse / sst)
 
 # ------------------------------------------------------------------
 # Unified evaluation
@@ -141,6 +147,7 @@ def _save_crossval_results(
         print(f'\nCross-validation results saved to: {save_path}')
 
 
+
 def maybe_load_saved_crossval(save_path, load_if_exists, verbose):
     """Load saved cross-validation results if they exist."""
     if save_path is None or not load_if_exists:
@@ -193,7 +200,7 @@ def load_crossval_results(save_path: str) -> Dict:
         return pickle.load(f)
 
 
-def crossval_variance_explained(
+def _crossval_variance_explained(
     fit_function,
     design_df,
     y,

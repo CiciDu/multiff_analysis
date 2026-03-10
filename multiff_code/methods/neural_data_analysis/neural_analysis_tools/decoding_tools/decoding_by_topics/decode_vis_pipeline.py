@@ -21,6 +21,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topic
     BaseDecodingRunner,
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import plot_decoding_utils, decoding_design_utils
 
 
 class FFVisDecodingRunner(BaseDecodingRunner):
@@ -69,29 +70,6 @@ class FFVisDecodingRunner(BaseDecodingRunner):
     def _target_df_error_msg(self) -> str:
         return "vis_feats_to_decode"
 
-    # ------------------------------------------------------------------
-    # Plotting helpers (one-FF-style outputs)
-    # ------------------------------------------------------------------
-    def plot_canoncorr_coefficients(self, **plot_kwargs):
-        block = self.stats.get("canoncorr")
-        if block is None:
-            raise ValueError("No canoncorr results found. Run compute_canoncorr() first.")
-        plot_one_ff_decoding.plot_canoncorr_coefficients(block, **plot_kwargs)
-
-    def plot_decoder_parity(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
-
-        block = self.stats.get("lineardecoder")
-        if block is None:
-            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
-        plot_one_ff_decoding.plot_decoder_parity(block, varnames=varnames, **plot_kwargs)
-
-    def plot_decoder_correlation_bars(self, *, varnames: Optional[Sequence[str]] = None, **plot_kwargs):
-
-        block = self.stats.get("lineardecoder")
-        if block is None:
-            raise ValueError("No lineardecoder results found. Run regress_popreadout() first.")
-        plot_one_ff_decoding.plot_decoder_correlation_bars(block, varnames=varnames, **plot_kwargs)
-
 
     def collect_data(self, exists_ok=True):
         """
@@ -113,6 +91,8 @@ class FFVisDecodingRunner(BaseDecodingRunner):
                 self.vis_feats_to_decode,
                 self.meta_df_used,
             ) = self._prepare_design_matrices()
+
+            self.vis_feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.vis_feats_to_decode)
 
             # Save the computed design matrices for future use
             self._save_design_matrices()

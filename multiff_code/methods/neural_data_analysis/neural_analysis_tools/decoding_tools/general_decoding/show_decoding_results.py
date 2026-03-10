@@ -12,6 +12,7 @@ def collect_all_session_decoding_results(
     decode_runner_class,
     verbose=False,
     shuffle_mode='none',
+    fit_kernelwidth=True,
 ):
     """
     Collect existing CV decoding results across all sessions for one monkey.
@@ -63,8 +64,13 @@ def collect_all_session_decoding_results(
         if shuffle_mode != 'none':
             save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
 
+        if fit_kernelwidth:
+            models_save_dir = Path(save_dir) / "cv_decoding" / "cvnested"
+        else:
+            models_save_dir = Path(save_dir) / "cv_decoding" / "fixed_width"
+
         session_results_df = cv_decoding.run_cv_decoding(
-            save_dir=save_dir,
+            save_dir=models_save_dir,
             load_existing_only=True,
             verbosity=1 if verbose else 0,
         )
@@ -258,10 +264,11 @@ def visualize_decoding_results(
     # CLASSIFICATION
     # ==========================================================
     if len(clf_df) > 0:
+        groupby_cols = ['behav_feature', 'shuffle_mode'] if 'shuffle_mode' in clf_df.columns else ['behav_feature']
 
         clf_summary = (
             clf_df
-            .groupby(['behav_feature', 'shuffle_mode'])
+            .groupby(groupby_cols)
             .agg(
                 mean_auc=('auc_mean', 'mean'),
                 sem_auc=('auc_mean', lambda x: x.std() / np.sqrt(len(x))),
@@ -419,20 +426,6 @@ def _select_rows(
 ):
     df = df.copy()
 
-    # Assign unified score column
-    df['score'] = np.nan
-
-    for mode in df['mode'].unique():
-        metric_col = _get_metric_column(
-            mode,
-            regression_metric,
-            classification_metric
-        )
-        mask = df['mode'] == mode
-        df.loc[mask, 'score'] = df.loc[mask, metric_col]
-
-    df = df.dropna(subset=['score'])
-
     # -------------------------------
     # Strategy 1: best per feature
     # -------------------------------
@@ -454,139 +447,4 @@ def _select_rows(
     return selected_df
 
 
-# ============================================================
-# Helper 3: Plot a single mode (with auto subplot splitting)
-# ============================================================
-def _plot_mode(
-    df_mode,
-    mode,
-    max_vars_per_plot=20,
-    chance_line=True,
-    metric_name=None,
-):
-    if df_mode.empty:
-        return
 
-    df_mode = df_mode.sort_values('score', ascending=False)
-
-    features = df_mode['behav_feature'].values
-    scores = df_mode['score'].values
-
-    n_vars = len(features)
-    n_subplots = math.ceil(n_vars / max_vars_per_plot)
-
-    # ---- Dynamic figure sizing ----
-    max_vars_this_plot = min(max_vars_per_plot, n_vars)
-    width = max(8, max_vars_this_plot * 0.6)   # scale width to number of bars
-    height = 4.5 * n_subplots                  # scale height to subplot count
-
-    fig, axes = plt.subplots(
-        n_subplots,
-        1,
-        figsize=(width, height),
-        squeeze=False
-    )
-
-    for i in range(n_subplots):
-
-        start = i * max_vars_per_plot
-        end = min((i + 1) * max_vars_per_plot, n_vars)
-
-        ax = axes[i, 0]
-
-        sub_features = features[start:end]
-        sub_scores = scores[start:end]
-
-        x = np.arange(len(sub_features))
-
-        ax.bar(x, sub_scores)
-
-        # ---- X-axis formatting ----
-        ax.set_xticks(x)
-        ax.set_xticklabels(sub_features, rotation=35, ha='right')
-        ax.margins(x=0.02)
-
-        # ---- Reference lines ----
-        if mode == 'regression':
-            ax.axhline(0, linewidth=1)
-        elif mode == 'classification' and chance_line:
-            ax.axhline(0.5, linestyle='--', linewidth=1)
-
-        label = 'Cross-validated score'
-        if metric_name:
-            label = f"{label} ({metric_name})"
-
-        ax.set_ylabel(label)
-
-        # Remove extra whitespace
-        ax.set_xlim(-0.6, len(sub_features) - 0.4)
-
-        # Cleaner look
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-    fig.suptitle(f'{mode.capitalize()} decoder performance', y=0.995)
-    plt.tight_layout()
-    plt.show()
-
-
-# ============================================================
-# Main plotting function
-# ============================================================
-
-def plot_decoder_performance(
-    all_results_df,
-    model_selection='best_per_feature', # 'best_per_feature' or 'single_model'
-    model_name=None,
-    regression_metric='r_cv',
-    classification_metric='auc_mean',
-    max_vars_per_plot=20
-):
-    """
-    Flexible decoder performance plot.
-
-    Parameters
-    ----------
-    model_selection : str
-        'best_per_feature' or 'single_model'
-
-    model_name : str
-        Required if model_selection='single_model'
-
-    regression_metric : str
-        'r_cv' or 'r2_cv'
-
-    classification_metric : str
-        'auc_mean' or 'pr_mean'
-
-    max_vars_per_plot : int
-        Number of variables per subplot before splitting.
-    """
-
-    selected_df = _select_rows(
-        all_results_df,
-        model_selection=model_selection,
-        model_name=model_name,
-        regression_metric=regression_metric,
-        classification_metric=classification_metric
-    )
-
-    # Split by mode
-    reg_df = selected_df[selected_df['mode'] == 'regression']
-    clf_df = selected_df[selected_df['mode'] == 'classification']
-
-    # Plot separately
-    _plot_mode(
-        reg_df,
-        'regression',
-        max_vars_per_plot=max_vars_per_plot,
-        metric_name=regression_metric,
-    )
-    _plot_mode(
-        clf_df,
-        'classification',
-        max_vars_per_plot=max_vars_per_plot,
-        metric_name=classification_metric,
-    )
-
-    return selected_df

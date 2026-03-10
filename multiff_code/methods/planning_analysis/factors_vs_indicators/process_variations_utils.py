@@ -134,30 +134,49 @@ def get_combinations_from_changeable_variables(df, changeable_variables):
     return combinations
 
 
-def break_up_df_to_smaller_ones(df, fixed_variable_values_to_use, changeable_variables, var_to_determine_x_offset_direction=None,
-                                y_var_column='avg_r_squared', add_ci_bounds=True):
+def filter_and_split_by_fixed_and_changeable(
+    df,
+    fixed_variable_values_to_use,
+    changeable_variables,
+    skip_missing_fixed_keys=False,
+):
+    """
+    Filter df by fixed values and split into smaller dfs by changeable variable combinations.
+    Returns (list_of_smaller_dfs, combinations).
+    Shared by ML/regression and agent plotting pipelines.
+    """
+    processed_df = df.copy()
+    fixed_variable_values_to_use = fixed_variable_values_to_use or {}
+    changeable_variables = changeable_variables or []
 
-    processed_df = process_lr_or_ml_df_for_visualization(df, var_to_split=var_to_determine_x_offset_direction,
-                                                         y_var_column=y_var_column, add_ci_bounds=add_ci_bounds)
-
-    # Filter the DataFrame by fixed_variable_values_to_use
     for key, value in fixed_variable_values_to_use.items():
+        if skip_missing_fixed_keys and key not in processed_df.columns:
+            continue
         processed_df = processed_df[processed_df[key] == value]
         if len(processed_df) == 0:
             raise ValueError(
                 f'No rows left after filtering by {key} = {value}. Check fixed_variable_values_to_use.')
 
     combinations = get_combinations_from_changeable_variables(
-        processed_df, changeable_variables)
-
+        processed_df, changeable_variables
+    )
     list_of_smaller_dfs = []
     for combo in combinations:
         filtered_df = processed_df.copy()
-        for key, value in combo.items():
-            filtered_df = filtered_df[filtered_df[key] == value]
+        for k, v in combo.items():
+            filtered_df = filtered_df[filtered_df[k] == v]
         list_of_smaller_dfs.append(filtered_df)
-
     return list_of_smaller_dfs, combinations
+
+
+def break_up_df_to_smaller_ones(df, fixed_variable_values_to_use, changeable_variables, var_to_determine_x_offset_direction=None,
+                                y_var_column='avg_r_squared', add_ci_bounds=True):
+
+    processed_df = process_lr_or_ml_df_for_visualization(df, var_to_split=var_to_determine_x_offset_direction,
+                                                         y_var_column=y_var_column, add_ci_bounds=add_ci_bounds)
+    return filter_and_split_by_fixed_and_changeable(
+        processed_df, fixed_variable_values_to_use, changeable_variables
+    )
 
 
 def process_lr_or_ml_df_for_visualization(lr_or_ml_df,

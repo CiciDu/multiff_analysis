@@ -4,6 +4,14 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+# Shared linestyle map: name -> matplotlib linestyle string
+LINESTYLE_MAP = {
+    'solid': '-',
+    'dash': '--',
+    'dot': ':',
+    'dashdot': '-.',
+}
+
 def use_publication_style(
     font_family='sans',            # 'serif' or 'sans'
     base_font_size=11,             # 9–12 good for publication
@@ -61,5 +69,3 @@ def use_publication_style(
             color=['#0072BD', '#D95319', '#EDB120', '#7E2F8E',
                    '#77AC30', '#4DBEEE', '#A2142F']
         )
-
-

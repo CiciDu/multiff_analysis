@@ -55,7 +55,7 @@ def main():
     
     results_one_ff_style = runner.run_one_ff_style()
 
-    print(results_df.head())
+    print(runner.results_df.head())
     return results_df, results_df_shuffled, results_one_ff_style
 
 

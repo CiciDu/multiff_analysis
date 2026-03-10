@@ -140,7 +140,7 @@ class OneFFGAMRunner:
         buffer_samples: int,
         load_if_exists: bool = True,
     ):
-        return gam_variance_explained.crossval_variance_explained(
+        return gam_variance_explained._crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
             design_df=design_df,
             y=y,

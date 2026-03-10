@@ -18,6 +18,9 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topic
     BaseDecodingRunner,
 )
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import plot_decoding_utils, decoding_design_utils
+
+
 DEFAULT_STOP_CANONCORR_VARS = [
     "speed",
     "ang_speed",
@@ -94,6 +97,8 @@ class StopDecodingRunner(BaseDecodingRunner):
             self.raw_data_folder_path,
             self.bin_width,
         )
+
+        self.stop_feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.stop_feats_to_decode)
 
         self._save_design_matrices()
 

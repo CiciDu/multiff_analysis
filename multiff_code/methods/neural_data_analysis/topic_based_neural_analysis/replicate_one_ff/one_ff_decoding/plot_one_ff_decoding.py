@@ -70,8 +70,9 @@ def plot_decoder_parity(
         varnames = _get_parity_varnames(readout_block)
     varnames = list(varnames)
     if len(varnames) == 0:
-        raise ValueError("No decodable variables found in readout block.")
-
+        print("Skip plotting decoder parity because of lack of true and pred values in results.")
+        return None, None
+    
     n_panels = len(varnames)
     n_cols = max(1, int(n_cols))
     n_rows = int(np.ceil(n_panels / n_cols))

@@ -12,13 +12,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.colors as mcolors
 
-
-LINESTYLE_MAP = {
-    'solid': 'solid',
-    'dash': '--',
-    'dot': ':',
-    'dashdot': '-.',
-}
+from planning_analysis.factors_vs_indicators.plot_plan_indicators.plot_styles_mpl import LINESTYLE_MAP
 
 
 def _get_mpl_ax(fig, row_number=None, col_number=None):
@@ -457,6 +451,42 @@ def make_matplotlib_plot_to_compare_two_sets_of_data(
     return fig
 
 
+# ---- shared streamline subplot grid creation ----
+
+def create_streamline_subplot_grid(
+    original_df,
+    changeable_variables,
+    combinations,
+    figsize_per_plot=(7, 5),
+    x_var_column_list=None,
+):
+    """
+    Create matplotlib subplot grid for streamline-style iteration over combinations.
+    Shared by streamline_making_matplotlib_plot_to_compare_two_sets_of_data and
+    streamline_plot_agents_with_conditions.
+    Returns (fig, axes, row_number, col_number, second_dim).
+    """
+    first_dim, second_dim = plot_variations_utils._find_first_and_second_dim(
+        original_df, changeable_variables, combinations
+    )
+    all_subplot_titles = plot_variations_utils._get_all_subplot_titles(combinations)
+    height_per_row = figsize_per_plot[1]
+    width_per_col = figsize_per_plot[0]
+    if x_var_column_list and 'id' in x_var_column_list:
+        height_per_row = max(height_per_row, 6)
+    fig, axes = plt.subplots(
+        first_dim,
+        second_dim,
+        figsize=(width_per_col * second_dim, height_per_row * first_dim),
+        squeeze=False,
+    )
+    fig._axes_grid = axes
+    for idx, combo_title in enumerate(all_subplot_titles):
+        r, c = idx // second_dim, idx % second_dim
+        axes[r, c].set_title(combo_title, fontsize=14)
+    return fig, axes, 1, 1, second_dim
+
+
 # ---- streamlined Matplotlib version of streamline_making_plotly_plot_to_compare_two_sets_of_data ----
 
 def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
@@ -480,7 +510,10 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
     Same interface; returns a Matplotlib Figure.
     """
 
-    if use_subplots_based_on_changeable_variables & (len(changeable_variables) == 2):
+    use_subplot_grid = (
+        use_subplots_based_on_changeable_variables & (len(changeable_variables) == 2)
+    )
+    if use_subplot_grid:
         changeable_variables = plot_variations_utils._check_order_in_changeable_variables(
             changeable_variables, original_df
         )
@@ -494,36 +527,18 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
         add_ci_bounds=add_ci_bounds,
     )
 
-    if use_subplots_based_on_changeable_variables:
-        first_dim, second_dim = plot_variations_utils._find_first_and_second_dim(
-            original_df, changeable_variables, combinations
+    if use_subplot_grid:
+        figsize = (7, 6 if x_var_column_list and 'id' in x_var_column_list else 5)
+        fig, axes, row_number, col_number, second_dim = create_streamline_subplot_grid(
+            original_df, changeable_variables, combinations,
+            figsize_per_plot=figsize,
+            x_var_column_list=x_var_column_list,
         )
-        all_subplot_titles = plot_variations_utils._get_all_subplot_titles(
-            combinations)
-
-        # Increase height if 'id' is in x_var_column_list
-        height_per_row = 6 if 'id' in x_var_column_list else 5
-        fig, axes = plt.subplots(
-            first_dim,
-            second_dim,
-            figsize=(7 * second_dim, height_per_row * first_dim),
-            squeeze=False
-        )
-        # stash axes grid for _get_mpl_ax
-        fig._axes_grid = axes
-
-        # set subplot titles
-        for idx, combo_title in enumerate(all_subplot_titles):
-            r = idx // second_dim
-            c = idx % second_dim
-            axes[r, c].set_title(combo_title, fontsize=14)
-
-        row_number = 1
-        col_number = 1
     else:
         fig = None
         row_number = None
         col_number = None
+        second_dim = None
 
     for combo, filtered_df in zip(combinations, list_of_smaller_dfs):
         for x_var_column in x_var_column_list:
@@ -537,7 +552,7 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
             if title_prefix is not None:
                 title = title_prefix + ' ' + title
 
-            if not use_subplots_based_on_changeable_variables:
+            if not use_subplot_grid:
                 # Increase height if x_var_column is 'id'
                 figsize = (10, 7) if x_var_column == 'id' else (10, 7)
                 fig, _ = plt.subplots(figsize=figsize)
@@ -560,7 +575,7 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
                 constant_marker_size=constant_marker_size,
             )
 
-            if use_subplots_based_on_changeable_variables:
+            if use_subplot_grid:
                 col_number += 1
                 if col_number > second_dim:
                     col_number = 1
@@ -570,7 +585,7 @@ def streamline_making_matplotlib_plot_to_compare_two_sets_of_data(
 
     fig._combinations = combinations
 
-    if show_fig and use_subplots_based_on_changeable_variables:
+    if show_fig and use_subplot_grid:
         plt.show()
 
     return fig

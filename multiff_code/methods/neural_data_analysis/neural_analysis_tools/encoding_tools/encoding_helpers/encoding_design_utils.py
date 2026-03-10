@@ -20,6 +20,12 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     GroupSpec,
 )
 
+import os
+import sys
+from pathlib import Path
+from data_wrangling import combine_info_utils
+
+
 # Radians to degrees; monkey_information stores angles/angular rates in rad.
 _RAD_TO_DEG = 180.0 / np.pi
 
@@ -982,7 +988,7 @@ def build_gam_groups_from_meta(
     design_df,
     *,
     lam_f: float = 100.0,
-    lam_g: float = 10.0,
+    lam_g: float = 100.0,
     lam_h: float = 10.0,
     lam_p: float = 10.0,
 ) -> Tuple[List[GroupSpec], Dict[str, float]]:
@@ -1015,7 +1021,7 @@ def build_gam_groups_from_meta(
     for var, cols in tuning_groups.items():
         if not cols:
             continue
-        groups.append(GroupSpec('var', list(cols), '1D', lam_f))
+        groups.append(GroupSpec(var, list(cols), '1D', lam_f))
 
     # -------------------------
     # History groups
@@ -1034,13 +1040,34 @@ def build_gam_groups_from_meta(
     # -------------------------
     _validate_design_columns(design_df, groups)
 
-    lambda_config = {
-        'lam_f': lam_f,
-        'lam_g': lam_g,
-        'lam_h': lam_h,
-        'lam_p': lam_p,
-    }
+    return groups
 
-    return groups, lambda_config
+def bootstrap_repo_path():
+    """Add multiff methods to path and chdir to project root."""
+    for p in [Path.cwd()] + list(Path.cwd().parents):
+        if p.name == "Multifirefly-Project":
+            os.chdir(p)
+            sys.path.insert(0, str(p / "multiff_analysis/multiff_code/methods"))
+            return
+    raise RuntimeError("Could not find Multifirefly-Project root")
 
+def get_session_paths(raw_data_folder_path, raw_data_dir_name, monkey_names):
+    """
+    Return session paths to process.
 
+    If raw_data_folder_path is not None, return [raw_data_folder_path].
+    Otherwise, collect all sessions from monkey_names via combine_info_utils.
+    """
+    if raw_data_folder_path is not None:
+        return [raw_data_folder_path]
+
+    session_paths = []
+    for monkey_name in monkey_names:
+        sessions_df = combine_info_utils.make_sessions_df_for_one_monkey(
+            raw_data_dir_name, monkey_name
+        )
+        for _, row in sessions_df.iterrows():
+            session_paths.append(
+                os.path.join(raw_data_dir_name, row["monkey_name"], row["data_name"])
+            )
+    return session_paths

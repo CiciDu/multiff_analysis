@@ -20,7 +20,7 @@ import numpy as np
 
 
 @dataclass
-class StopParams:
+class MultiFFParams:
     """
     Parameter bundle for stop-aligned GAM / PAM.
 
@@ -148,9 +148,9 @@ def estimate_stop_binrange_from_binned_feats(
     return out
 
 
-def default_prs() -> StopParams:
+def default_prs() -> MultiFFParams:
     """
-    Return a default StopParams object for stop-aligned analyses.
+    Return a default MultiFFParams object for stop-aligned analyses.
 
     Example
     -------
@@ -159,4 +159,4 @@ def default_prs() -> StopParams:
     >>> binrange_dict = prs.binrange
     """
 
-    return StopParams()
+    return MultiFFParams()

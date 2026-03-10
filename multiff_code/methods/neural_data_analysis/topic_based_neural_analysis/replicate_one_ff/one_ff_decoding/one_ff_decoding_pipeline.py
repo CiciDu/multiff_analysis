@@ -657,6 +657,7 @@ class OneFFDecodingRunner:
             **plot_kwargs,
         )
 
+
     def plot_all_decoding_results(
         self,
         *,

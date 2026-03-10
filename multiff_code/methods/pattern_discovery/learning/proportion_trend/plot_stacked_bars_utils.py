@@ -206,8 +206,39 @@ def prepare_for_stacked_bar_no_phase(df_monkey, category_order):
     M.index = ['single']   # only one bar
     return M
 
-def plot_stacked_bar_all_ids(df, category_order, title='', y_label='Proportion', id_col='monkey',
-                             category_colors=None):
+import pandas as pd
+
+
+def apply_label_mapping(df, label_mapping, item_col='item', new_col='new_label'):
+    """
+    Copy dataframe and map item labels to a new column.
+    """
+
+    out_df = df.copy()
+
+    out_df[new_col] = (
+        out_df[item_col]
+        .map(label_mapping)
+        .fillna('')
+    )
+
+    return out_df
+
+def plot_stacked_bar_all_ids(df, config, id_col='monkey'):
+
+    # unpack config
+    category_order = config['category_order']
+    title = config.get('title', '')
+    y_label = config.get('y_label', 'Proportion')
+    category_colors = config.get('category_colors')
+    label_mapping = config.get('new_label_mapping')
+
+    # apply mapping (same thing you previously did in notebook)
+    if label_mapping is not None:
+        df = apply_label_mapping(df, label_mapping)
+
+    # --- ORIGINAL FUNCTION BELOW (UNCHANGED) ---
+
     if category_colors is None:
         category_colors = ['#0072B2', '#CC79A7', '#E69F00', '#009E73',
                            '#F0E442', '#56B4E9', '#000000']
@@ -218,7 +249,6 @@ def plot_stacked_bar_all_ids(df, category_order, title='', y_label='Proportion',
 
     fig, ax = plt.subplots(figsize=(1.4*n + 2, 4.2), dpi=300)
 
-    # compute each id’s stacked proportions
     matrices = {i: prepare_for_stacked_bar_no_phase(
         df[df[id_col] == i], category_order
     ) for i in ids}
@@ -234,7 +264,6 @@ def plot_stacked_bar_all_ids(df, category_order, title='', y_label='Proportion',
                color=color, edgecolor='white', linewidth=0.7)
         bottoms += vals
 
-    # cosmetics
     ax.set_xticks(x_positions, ids)
     ax.set_ylabel(y_label)
     ax.set_title(title, weight='bold')
@@ -243,10 +272,11 @@ def plot_stacked_bar_all_ids(df, category_order, title='', y_label='Proportion',
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
-    # legend (all categories)
     handles = [plt.Rectangle((0,0),1,1,color=color_map[c]) for c in category_order]
-    ax.legend(handles, category_order, bbox_to_anchor=(1.02, 1), loc='upper left', title='Category')
+    ax.legend(handles, category_order, bbox_to_anchor=(1.02, 1),
+              loc='upper left', title='Category')
 
     fig.tight_layout()
     plt.show()
+
     return fig, ax

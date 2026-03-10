@@ -64,7 +64,7 @@ srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --lr "$LR" \
   --num-obs-ff "$NUM_OBS_FF" \
   --n-envs "$N_ENVS" \
-  --no-curriculum-training \
+  #--no-curriculum-training \
   --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" 2> >(tee -a "$ERR_FILE" >&2)
   
 

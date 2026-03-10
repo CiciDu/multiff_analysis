@@ -7,6 +7,7 @@ from planning_analysis.factors_vs_indicators import variations_base_class
 from planning_analysis.factors_vs_indicators import make_variations_utils
 from reinforcement_learning.base_classes import rl_base_class
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
+from reinforcement_learning.agents.feedforward import sb3_class
 from reinforcement_learning.base_classes import rl_base_utils
 
 import pandas as pd
@@ -59,9 +60,19 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                                     model_folder_name=None,
                                     ref_point_params_based_on_mode=None,
                                     use_stored_data_only=False,
+                                    high_level_only=False,
                                     **env_kwargs
                                     ):
-
+        """
+        Parameters
+        ----------
+        high_level_only : bool, optional
+            If True, only retrieve higher-level aggregated products
+            (all_ref_pooled_median_info, pooled_perc_info) from disk,
+            without loading lower-level data (heading info per session,
+            combd_heading_df_x_sessions, etc.). Raises if those products
+            do not already exist.
+        """
         save_data = False if use_stored_data_only else save_data
         self.num_steps_per_dataset = num_steps_per_dataset
 
@@ -78,6 +89,24 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
         if model_folder_name is None:
             model_folder_name = self.model_folder_name
+
+        if high_level_only:
+            # Only load higher-level products from disk; no lower-level retrieval
+            if not exists(self.all_ref_pooled_median_info_path):
+                raise FileNotFoundError(
+                    f'high_level_only=True but all_ref_pooled_median_info not found at {self.all_ref_pooled_median_info_path}')
+            self.all_ref_pooled_median_info = pd.read_csv(
+                self.all_ref_pooled_median_info_path).drop(
+                columns=['Unnamed: 0'], errors='ignore')
+            self.agent_all_ref_pooled_median_info = self.all_ref_pooled_median_info.copy()
+            if not exists(self.pooled_perc_info_path):
+                raise FileNotFoundError(
+                    f'high_level_only=True but pooled_perc_info not found at {self.pooled_perc_info_path}')
+            self.pooled_perc_info = pd.read_csv(self.pooled_perc_info_path).drop(
+                ["Unnamed: 0", "Unnamed: 0.1"], axis=1, errors='ignore')
+            self.agent_all_perc_df = self.pooled_perc_info.copy()
+            return
+
         if not use_stored_data_only:
             # make sure there's enough data from agent
             for i in range(num_datasets_to_collect):
@@ -618,3 +647,88 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             pass
 
         return self.pooled_perc_info
+
+    def process_and_save(self,
+                        save_dir,
+                        intermediate_products_exist_ok=True,
+                        agent_data_exists_ok=True,
+                        num_steps_per_dataset=9000,
+                        num_datasets_to_collect=2,
+                        use_stored_data_only=False,
+                        high_level_only=False):
+        """
+        Process a single agent and save results to CSV files.
+        
+        This method runs the complete analysis pipeline for one agent and saves
+        the median and percentile results to the specified directory.
+        
+        Parameters
+        ----------
+        save_dir : str
+            Directory where output CSV files will be saved
+        intermediate_products_exist_ok : bool, optional
+            Whether to reuse existing intermediate products (default: True)
+        agent_data_exists_ok : bool, optional
+            Whether to reuse existing agent data (default: True)
+        num_steps_per_dataset : int, optional
+            Number of steps per dataset (default: 9000)
+        num_datasets_to_collect : int, optional
+            Number of datasets to collect (default: 2)
+        use_stored_data_only : bool, optional
+            If True, only use stored data without generating new data (default: False)
+        
+        Returns
+        -------
+        tuple of (str, str) or None
+            Paths to saved median and percentile CSV files if successful, None if already exists or error
+        """
+        
+        print(f'[PROCESS] Processing agent folder: {self.model_folder_name}')
+        
+        self.all_ref_pooled_median_info = None
+        self.pooled_perc_info = None
+        
+        try:
+            save_data = False if use_stored_data_only else True
+            # Run the analysis pipeline
+            self.streamline_getting_y_values(
+                model_folder_name=self.model_folder_name,
+                intermediate_products_exist_ok=intermediate_products_exist_ok,
+                agent_data_exists_ok=agent_data_exists_ok,
+                num_datasets_to_collect=num_datasets_to_collect,
+                num_steps_per_dataset=num_steps_per_dataset,
+                use_stored_data_only=use_stored_data_only,
+                save_data=save_data,
+                high_level_only=high_level_only,
+            )
+
+
+            self.all_ref_pooled_median_info, agent_id = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(self.all_ref_pooled_median_info, self.model_folder_name)
+            self.pooled_perc_info, agent_id = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(self.pooled_perc_info, self.model_folder_name)
+            print(f'[PROCESS] Agent ID: {agent_id}')
+
+            # Create save directory
+            os.makedirs(save_dir, exist_ok=True)
+
+            median_path = os.path.join(save_dir, f'{agent_id}_median.csv')
+            perc_path = os.path.join(save_dir, f'{agent_id}_perc.csv')
+
+            # Skip if already processed
+            if os.path.exists(median_path) and os.path.exists(perc_path):
+                print(f'[PROCESS] Agent already processed: {agent_id}')
+                return None
+
+            # Save results
+            self.all_ref_pooled_median_info.to_csv(median_path, index=False)
+            self.pooled_perc_info.to_csv(perc_path, index=False)
+
+            print(f'[PROCESS] Saved median: {median_path}')
+            print(f'[PROCESS] Saved percentile: {perc_path}')
+            
+            return (median_path, perc_path)
+
+        except Exception as e:
+            print(f'[PROCESS][ERROR] Failed to process agent {self.model_folder_name}: {e}')
+            import traceback
+            traceback.print_exc()
+            return None

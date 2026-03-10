@@ -14,7 +14,7 @@ class PlanFactorsAcrossAgents():
     def __init__(self,
                  # this is the monkey whose data will be used for comparison
                  monkey_name='monkey_Bruno',
-                 overall_folder_name='multiff_analysis/RL_models/SB3_stored_models/all_agents/agents_without_noise',
+                 overall_folder_name='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise',
                  agent_folders=None):
         self.monkey_name = monkey_name
         self.overall_folder_name = overall_folder_name
@@ -27,13 +27,66 @@ class PlanFactorsAcrossAgents():
                 raise Exception('No folders with params found.')
 
 
-    def make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(self, exists_ok=True,
-                                                                     intermediate_products_exist_ok=True,
-                                                                     agent_data_exists_ok=True,
-                                                                     num_steps_per_dataset=9000,
-                                                                     num_datasets_to_collect=2,
-                                                                     use_stored_data_only=False):
+    def process_single_agent_and_save(self,
+                                    folder,
+                                    intermediate_products_exist_ok=True,
+                                    agent_data_exists_ok=True,
+                                    num_steps_per_dataset=9000,
+                                    num_datasets_to_collect=2,
+                                    use_stored_data_only=False,
+                                    high_level_only=False):
+        """
+        Process a single agent and save results.
+        
+        This method delegates to PlanFactorsAcrossAgentSessions.process_and_save()
+        
+        Parameters
+        ----------
+        folder : str
+            Path to agent folder
+        intermediate_products_exist_ok : bool, optional
+            Whether to reuse existing intermediate products (default: True)
+        agent_data_exists_ok : bool, optional
+            Whether to reuse existing agent data (default: True)
+        num_steps_per_dataset : int, optional
+            Number of steps per dataset (default: 9000)
+        num_datasets_to_collect : int, optional
+            Number of datasets to collect (default: 2)
+        use_stored_data_only : bool, optional
+            If True, only use stored data (default: False)
+        """
 
+        # Determine save directory based on overall folder structure
+        save_dir = self.overall_folder_name.replace(
+            'all_agents',
+            'all_collected_data/planning/combined_data_x_agents'
+        )
+
+        # Create session processor and run analysis
+        self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
+            model_folder_name=folder)
+
+        self.pfas.process_and_save(
+            save_dir=save_dir,
+            intermediate_products_exist_ok=intermediate_products_exist_ok,
+            agent_data_exists_ok=agent_data_exists_ok,
+            num_steps_per_dataset=num_steps_per_dataset,
+            num_datasets_to_collect=num_datasets_to_collect,
+            use_stored_data_only=use_stored_data_only,
+            high_level_only=high_level_only
+        )
+
+
+
+    def make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(self, exists_ok=True,
+                                                                    intermediate_products_exist_ok=True,
+                                                                    agent_data_exists_ok=True,
+                                                                    num_steps_per_dataset=9000,
+                                                                    num_datasets_to_collect=2,
+                                                                    use_stored_data_only=False,
+                                                                    high_level_only=False,
+                                                                    ):
+        
         self.combd_planning_info_x_agents_path = self.overall_folder_name.replace(
             'all_agents', 'all_collected_data/planning') + '/combined_data_x_agents'
         os.makedirs(self.combd_planning_info_x_agents_path, exist_ok=True)
@@ -51,45 +104,28 @@ class PlanFactorsAcrossAgents():
 
             self.all_ref_pooled_median_x_agents = pd.DataFrame()
             self.pooled_perc_x_agents = pd.DataFrame()
-            for folder in self.agent_folders:
-                print('folder:', folder)
+            
+            for i, folder in enumerate(self.agent_folders):
 
-                self.pfas = agent_plan_factors_x_sess_class.PlanFactorsAcrossAgentSessions(
-                    model_folder_name=folder)
+                print(f'Processing agent {i+1}/{len(self.agent_folders)}')
+                
+                self.process_single_agent_and_save(
+                    folder=folder,
+                    intermediate_products_exist_ok=intermediate_products_exist_ok,
+                    agent_data_exists_ok=agent_data_exists_ok,
+                    num_steps_per_dataset=num_steps_per_dataset,
+                    num_datasets_to_collect=num_datasets_to_collect,
+                    use_stored_data_only=use_stored_data_only,
+                    high_level_only=high_level_only,
+                )
 
-                save_data = False if use_stored_data_only else True
+                if self.pfas.all_ref_pooled_median_info is not None:
+                    self.all_ref_pooled_median_x_agents = pd.concat(
+                        [self.all_ref_pooled_median_x_agents, self.pfas.all_ref_pooled_median_info], axis=0)
+                if self.pfas.pooled_perc_info is not None:
+                    self.pooled_perc_x_agents = pd.concat(
+                        [self.pooled_perc_x_agents, self.pfas.pooled_perc_info], axis=0)
 
-
-                try:
-                    self.pfas.streamline_getting_y_values(
-                        model_folder_name=folder, intermediate_products_exist_ok=intermediate_products_exist_ok, agent_data_exists_ok=agent_data_exists_ok,
-                        num_datasets_to_collect=num_datasets_to_collect, num_steps_per_dataset=num_steps_per_dataset, use_stored_data_only=use_stored_data_only, save_data=save_data,
-                    )
-                except Exception as e:
-                    print(
-                        f'Failed to make overall all median info for agent {folder}: {e} \nWill continue to the next agent.')
-                    continue
-
-                # Remove job ID suffix
-                agent_id = rl_base_utils.extract_config_name_from_post_best(
-                    folder)
-                params = self.get_agent_params(folder)
-                agent_all_ref_pooled_median_info = rl_base_utils.add_essential_agent_params_info(
-                    self.pfas.all_ref_pooled_median_info, params)
-                print('id of agent to add to df:', agent_id)
-                print('shape of agent_all_ref_pooled_median_info to add to df:', agent_all_ref_pooled_median_info.shape)
-                agent_all_ref_pooled_median_info['id'] = agent_id
-                self.all_ref_pooled_median_x_agents = pd.concat(
-                    [self.all_ref_pooled_median_x_agents, agent_all_ref_pooled_median_info], axis=0)
-
-                agent_all_perc_df = rl_base_utils.add_essential_agent_params_info(
-                    self.pfas.pooled_perc_info, params)
-                agent_all_perc_df['id'] = agent_id
-                self.pooled_perc_x_agents = pd.concat(
-                    [self.pooled_perc_x_agents, agent_all_perc_df], axis=0)
-
-                # self.pfas.plot_monkey_and_agent_median_df()
-                # self.pfas.plot_monkey_and_agent_perc_df()
 
             self.all_ref_pooled_median_x_agents.reset_index(
                 drop=True, inplace=True)
@@ -103,10 +139,6 @@ class PlanFactorsAcrossAgents():
 
         return self.all_ref_pooled_median_x_agents, self.pooled_perc_x_agents
 
-    def get_agent_params(self, model_folder_name):
-        rl = sb3_class.SB3forMultifirefly(overall_folder=model_folder_name)
-        rl.load_latest_agent(load_replay_buffer=False, load_manifest_only=True)
-        return rl.manifest['env_params']
 
     def get_monkey_median_df(self):
         ps = monkey_plan_factors_x_sess_class.PlanAcrossSessions(

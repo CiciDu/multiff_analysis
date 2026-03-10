@@ -47,9 +47,9 @@ from decision_making_analysis.data_compilation import (
 )
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encode_stops_gam_helper,
     encode_stops_utils,
 )
+
 
 class FullSessionGLMRunner:
 
