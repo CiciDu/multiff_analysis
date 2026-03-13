@@ -62,17 +62,17 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
 
         self.dt = 0.0165
 
-    def make_df_related_to_patterns_and_features(self, exists_ok=True):
+    def make_df_related_to_patterns_and_features(self, exists_ok=True, retrieve_only=False):
 
-        self.make_or_retrieve_all_trial_patterns(exists_ok=exists_ok)
+        self.make_or_retrieve_all_trial_patterns(exists_ok=exists_ok, retrieve_only=retrieve_only)
 
-        self.make_or_retrieve_pattern_frequencies(exists_ok=exists_ok)
+        self.make_or_retrieve_pattern_frequencies(exists_ok=exists_ok, retrieve_only=retrieve_only)
 
-        self.make_or_retrieve_all_trial_features(exists_ok=exists_ok)
+        self.make_or_retrieve_all_trial_features(exists_ok=exists_ok, retrieve_only=retrieve_only)
 
-        self.make_or_retrieve_feature_statistics(exists_ok=exists_ok)
+        self.make_or_retrieve_feature_statistics(exists_ok=exists_ok, retrieve_only=retrieve_only)
 
-        self.make_or_retrieve_scatter_around_target_df(exists_ok=exists_ok)
+        self.make_or_retrieve_scatter_around_target_df(exists_ok=exists_ok, retrieve_only=retrieve_only)
 
     def _prepare_to_find_patterns_and_features(self, find_patterns=True):
         self.retrieve_or_make_monkey_data(already_made_ok=True)
@@ -147,21 +147,21 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             self.stop_category_df, self.ff_real_position_sorted, self.monkey_information)
         self.retry_switch_trials = self.rsw_w_ff_df['trial'].values
 
-    def make_or_retrieve_all_trial_patterns(self, exists_ok=True):
+    def make_or_retrieve_all_trial_patterns(self, exists_ok=True, retrieve_only=False):
         self.all_trial_patterns = self.try_retrieving_df(
             df_name='all_trial_patterns', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
-        if self.all_trial_patterns is None:
+        if self.all_trial_patterns is None and not retrieve_only:
             if getattr(self, 'n_ff_in_a_row', None) is None:
                 self._prepare_to_find_patterns_and_features()
             self.all_trial_patterns = self.make_all_trial_patterns()
             print("made all_trial_patterns")
 
-    def make_or_retrieve_pattern_frequencies(self, exists_ok=True):
+    def make_or_retrieve_pattern_frequencies(self, exists_ok=True, retrieve_only=False):
         self.pattern_frequencies = self.try_retrieving_df(
             df_name='pattern_frequencies', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
-        if self.pattern_frequencies is None:
+        if self.pattern_frequencies is None and not retrieve_only:
             if getattr(self, 'monkey_information', None) is None:
                 self.retrieve_or_make_monkey_data(already_made_ok=True)
             self.make_one_stop_w_ff_df()
@@ -177,31 +177,31 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
                                                                                                data_folder_name=self.patterns_and_features_folder_path)
             print("made pattern_frequencies")
 
-    def make_or_retrieve_all_trial_features(self, exists_ok=True):
+    def make_or_retrieve_all_trial_features(self, exists_ok=True, retrieve_only=False):
         self.all_trial_features = self.try_retrieving_df(
             df_name='all_trial_features', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
-        if self.all_trial_features is None:
+        if self.all_trial_features is None and not retrieve_only:
             if getattr(self, 'cluster_around_target_indices', None) is None:
                 self._prepare_to_find_patterns_and_features()
             self.all_trial_features = organize_patterns_and_features.make_all_trial_features(self.ff_dataframe, self.monkey_information, self.ff_caught_T_new, self.cluster_around_target_indices,
                                                                                              self.ff_real_position_sorted, self.ff_believed_position_sorted, data_folder_name=self.patterns_and_features_folder_path)
             print("made all_trial_features")
 
-    def make_or_retrieve_feature_statistics(self, exists_ok=True):
+    def make_or_retrieve_feature_statistics(self, exists_ok=True, retrieve_only=False):
         self.feature_statistics = self.try_retrieving_df(
             df_name='feature_statistics', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
-        if self.feature_statistics is None:
+        if self.feature_statistics is None and not retrieve_only:
             self.feature_statistics = organize_patterns_and_features.make_feature_statistics(
                 self.all_trial_features, data_folder_name=self.patterns_and_features_folder_path)
             print("made feature_statistics")
 
-    def make_or_retrieve_scatter_around_target_df(self, exists_ok=True):
+    def make_or_retrieve_scatter_around_target_df(self, exists_ok=True, retrieve_only=False):
         self.scatter_around_target_df = self.try_retrieving_df(
             df_name='scatter_around_target_df', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
-        if self.scatter_around_target_df is None:
+        if self.scatter_around_target_df is None and not retrieve_only:
             self.scatter_around_target_df = monkey_landing_in_ff.make_scatter_around_target_df(self.monkey_information,
                                                                                                self.closest_stop_to_capture_df,
                                                                                                self.ff_real_position_sorted,

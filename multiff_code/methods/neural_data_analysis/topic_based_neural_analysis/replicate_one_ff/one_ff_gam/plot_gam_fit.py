@@ -4,7 +4,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_parameters
-
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
+    backward_elimination,
+    gam_variance_explained,
+    one_ff_gam_design,
+    one_ff_gam_fit,
+    plot_gam_fit,
+    penalty_tuning,
+)
 
 def category_contributions_to_df(category_contributions):
     """
@@ -273,6 +280,8 @@ def plot_category_ecdf(
         ax.axvspan(1e-3, 1e-2, color='0.9', zorder=0)
         ax.axvspan(1e-2, 1e-1, color='0.95', zorder=0)
 
+    ax.axvline(x=0.1, color='gray', linestyle='--', lw=1, zorder=1)
+
     # Automatic color cycle
     for label, vals in data_dict.items():
 
@@ -310,6 +319,7 @@ def plot_category_ecdf(
     ax.legend(frameon=False)
     plt.tight_layout()
     plt.show()
+    
     
 def _cols_in_beta(cols, beta):
     """
@@ -1246,4 +1256,165 @@ def plot_tuning_heatmaps(
             fpath = Path(save_dir) / f"GAM_tuning_heatmap_{var}.png"
             fig.savefig(fpath, dpi=300, bbox_inches="tight")
         plt.show()
+        
 
+def run_unit_ecdf(runner, log_x=False):
+    all_results = []
+
+    for u in range(runner.num_neurons):
+        try:
+            result = runner.run_category_variance_contributions(
+                unit_idx=u,
+                retrieve_only=True,  # use cached if already computed
+            )
+            all_results.append(result)
+        except Exception as e:
+            # print(f'Error for unit {u}: {e}. Will stop trying further units.')
+            break
+
+    all_results = plot_gam_fit.add_clipped_leave_delta_metric(all_results)
+
+    plot_gam_fit.plot_category_ecdf(
+        all_results,
+        metric_key='delta_pseudo_r2_clip_leave',
+        log_x=log_x,
+    )
+
+    return all_results
+
+
+def run_unit_ecdf_collect(runner):
+    """
+    Same as run_unit_ecdf but returns all_results without plotting.
+    Use this to gather data from multiple sessions before calling
+    plot_category_ecdf_by_sessions.
+    """
+    all_results = []
+
+    for u in range(runner.num_neurons):
+        try:
+            result = runner.run_category_variance_contributions(
+                unit_idx=u,
+                retrieve_only=True,  # use cached if already computed
+            )
+            all_results.append(result)
+        except Exception as e:
+            break
+
+    all_results = add_clipped_leave_delta_metric(all_results)
+    return all_results
+
+
+def plot_category_ecdf_by_sessions(
+    session_results_list,
+    *,
+    metric_key='delta_pseudo_r2_clip_leave',
+    category_groups=None,
+    log_x=True,
+    figsize_per_subplot=(4.2, 3.0),
+    dpi=180,
+):
+    """
+    For each category, plot one ECDF line per session on a single plot.
+
+    Parameters
+    ----------
+    session_results_list : list of (session_label, all_results)
+        Each all_results is the output of run_unit_ecdf_collect (or run_unit_ecdf)
+        for that session.
+
+    metric_key : str
+        Which metric inside category_contributions to plot.
+
+    category_groups : dict or None
+        Optional mapping: { 'Legend Name': ['cat1', 'cat2', ...], ... }
+        If None, each category is plotted separately.
+
+    log_x : bool
+        Use log-scaled x-axis.
+
+    figsize_per_subplot, dpi : figure settings.
+    """
+    # Collect all categories present across all sessions
+    all_categories = set()
+    for _, all_results in session_results_list:
+        for res in all_results:
+            if 'category_contributions' in res:
+                all_categories.update(res['category_contributions'].keys())
+    all_categories = sorted(all_categories)
+
+    if category_groups is not None:
+        plot_names = list(category_groups.keys())
+    else:
+        plot_names = all_categories
+
+    n_plots = len(plot_names)
+    n_cols = min(3, n_plots)
+    n_rows = (n_plots + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(
+            figsize_per_subplot[0] * n_cols,
+            figsize_per_subplot[1] * n_rows,
+        ),
+        dpi=dpi,
+    )
+    axes = np.atleast_1d(axes).flatten()
+
+    for ax_idx, plot_name in enumerate(plot_names):
+        ax = axes[ax_idx]
+
+        if log_x:
+            ax.axvspan(1e-3, 1e-2, color='0.9', zorder=0)
+            ax.axvspan(1e-2, 1e-1, color='0.95', zorder=0)
+        ax.axvline(x=0.1, color='gray', linestyle='--', lw=1, zorder=1)
+
+        # Get category list for this plot
+        if category_groups is not None:
+            cat_list = category_groups[plot_name]
+        else:
+            cat_list = [plot_name]
+
+        # One line per session
+        for session_label, all_results in session_results_list:
+            if category_groups is None:
+                vals = []
+                for res in all_results:
+                    cc = res.get('category_contributions', {})
+                    if plot_name in cc and metric_key in cc[plot_name]:
+                        vals.append(cc[plot_name][metric_key])
+            else:
+                vals = []
+                for res in all_results:
+                    cc = res.get('category_contributions', {})
+                    group_vals = [
+                        cc[cat][metric_key]
+                        for cat in cat_list
+                        if cat in cc and metric_key in cc[cat]
+                    ]
+                    if len(group_vals) > 0:
+                        vals.append(np.sum(group_vals))
+
+            if len(vals) == 0:
+                continue
+
+            x, y = _ecdf(vals, clip_for_log=log_x)
+            ax.plot(x, y, lw=1.6, label=session_label)
+
+        # Axis formatting
+        if log_x:
+            ax.set_xscale('log')
+            ax.set_xlim(1e-3, 1.0)
+        else:
+            ax.set_xlim(0.0, None)
+        ax.set_ylim(0, 1.0)
+        ax.set_xlabel('Variance explained')
+        ax.set_ylabel('Cumulative prob.')
+        ax.set_title(plot_name)
+        # ax.legend(frameon=False, fontsize=8)
+
+    for idx in range(n_plots, len(axes)):
+        axes[idx].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()

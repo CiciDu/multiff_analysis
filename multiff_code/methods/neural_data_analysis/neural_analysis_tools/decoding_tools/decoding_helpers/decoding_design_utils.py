@@ -30,3 +30,28 @@ def clean_binary_and_drop_constant(df, tol=1e-8):
         df = df.drop(columns=drop_cols)
 
     return df
+
+def truncate_columns_to_percentiles(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """
+    Truncate values in specified columns of a DataFrame to the 1st and 99th percentiles.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe.
+    columns : list[str]
+        Column names to truncate.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with truncated values.
+    """
+    df = df.copy()
+
+    for col in columns:
+        lower = df[col].quantile(0.01)
+        upper = df[col].quantile(0.99)
+        df[col] = df[col].clip(lower=lower, upper=upper)
+
+    return df

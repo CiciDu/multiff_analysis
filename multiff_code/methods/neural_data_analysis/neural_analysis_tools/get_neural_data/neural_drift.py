@@ -337,6 +337,55 @@ def detrend_features_cv(
     return X_train_dt, X_test_dt
 
 
+def detrend_features_cv_covariates(X_train, X_test, T_train, T_test):
+    '''
+    CV-safe detrending of neural features using an arbitrary design matrix.
+
+    Fits a per-feature linear regression neural_j ~ T on TRAINING data only,
+    then subtracts the predicted trend from both train and test.
+
+    Parameters
+    ----------
+    X_train : np.ndarray
+        Shape (n_train_samples, n_features)
+    X_test : np.ndarray
+        Shape (n_test_samples, n_features)
+    T_train : np.ndarray
+        Shape (n_train_samples, n_covariates), design matrix (e.g. time, trial_index)
+    T_test : np.ndarray
+        Shape (n_test_samples, n_covariates), design matrix
+
+    Returns
+    -------
+    X_train_dt : np.ndarray
+        Detrended training features
+    X_test_dt : np.ndarray
+        Detrended test features
+    '''
+    X_train = np.asarray(X_train)
+    X_test = np.asarray(X_test)
+    T_train = np.asarray(T_train, dtype=float)
+    T_test = np.asarray(T_test, dtype=float)
+
+    if T_train.ndim == 1:
+        T_train = T_train.reshape(-1, 1)
+    if T_test.ndim == 1:
+        T_test = T_test.reshape(-1, 1)
+
+    X_train_dt = np.zeros_like(X_train, dtype=float)
+    X_test_dt = np.zeros_like(X_test, dtype=float)
+
+    for j in range(X_train.shape[1]):
+        lr = LinearRegression(fit_intercept=True)
+        lr.fit(T_train, X_train[:, j])
+        X_train_dt[:, j] = X_train[:, j] - lr.predict(T_train)
+        X_test_dt[:, j] = X_test[:, j] - lr.predict(T_test)
+        
+    print('detrended X_train and X_test')
+
+    return X_train_dt, X_test_dt
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.linear_model import LinearRegression

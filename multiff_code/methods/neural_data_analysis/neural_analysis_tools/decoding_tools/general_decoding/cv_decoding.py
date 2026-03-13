@@ -36,6 +36,9 @@ class DecodingRunConfig:
     buffer_samples: int = 20
     use_early_stopping: bool = True
 
+    # Detrending: when detrend_covariates is provided, regress them out of neural X before scaling
+    detrend_degree: int = 1  # polynomial degree when covariate is 1D
+
     # Regression
     regression_model_class: Optional[Type] = None
     regression_model_kwargs: dict = field(default_factory=dict)
@@ -68,6 +71,7 @@ def run_cv_decoding(
     load_existing_only=False,
     exists_ok=True,
     model_name: Optional[str] = None,
+    detrend_covariates=None,
 ):
 
     if config is None:
@@ -85,6 +89,20 @@ def run_cv_decoding(
         out_dir.mkdir(parents=True, exist_ok=True)
 
     X, groups, rng = _prepare_inputs(X, groups, shuffle_seed)
+
+    if detrend_covariates is not None:
+        if isinstance(detrend_covariates, pd.DataFrame):
+            if len(detrend_covariates) != len(X):
+                raise ValueError(
+                    f"detrend_covariates rows ({len(detrend_covariates)}) must match X rows ({len(X)})"
+                )
+        else:
+            arr = np.asarray(detrend_covariates)
+            n = arr.shape[0] if arr.ndim > 1 else len(arr)
+            if n != len(X):
+                raise ValueError(
+                    f"detrend_covariates length ({n}) must match X rows ({len(X)})"
+                )
 
     if behav_features is None:
         behav_features = y_df.columns.tolist()
@@ -113,7 +131,7 @@ def run_cv_decoding(
             print(f'Existing results for this feature: {sum(1 for key in existing_lookup if key[0] == feature)}')
 
         y = y_df[feature].to_numpy().ravel()
-        X_ok, y_ok, _ = filter_valid_rows(X, y, groups)
+        X_ok, y_ok, _, _ = filter_valid_rows(X, y, groups, detrend_covariates)
         mode = infer_decoding_type(y_ok)
         if mode == 'skip':
             continue
@@ -141,6 +159,7 @@ def run_cv_decoding(
             context_label,
             rng,
             model_name,
+            detrend_covariates=detrend_covariates,
         )
 
         if computed is None:
@@ -165,9 +184,48 @@ def infer_decoding_type(y):
     return 'regression'
 
 
-def filter_valid_rows(X, y, groups):
+def _build_detrend_design_matrix(covariates, degree=1):
+    """Build design matrix for detrending from covariates.
+
+    Parameters
+    ----------
+    covariates : None, np.ndarray (1D or 2D), or pd.DataFrame
+        - None: return None
+        - 1D array (n_samples,) or (n_samples, 1): polynomial [t, t^2, ..., t^degree]
+        - 2D array (n_samples, n_cov): use as-is (linear terms)
+        - DataFrame (n_samples, n_cols): use .values as-is
+    degree : int
+        Polynomial degree for 1D/single-column input only.
+
+    Returns
+    -------
+    np.ndarray or None
+        Design matrix (n_samples, n_features) or None
+    """
+    if covariates is None:
+        return None
+    if isinstance(covariates, pd.DataFrame):
+        T = np.asarray(covariates.values, dtype=float)
+    else:
+        T = np.asarray(covariates, dtype=float)
+
+    if T.ndim == 1:
+        T = T.reshape(-1, 1)
+    if T.shape[1] == 1:
+        T = np.hstack([T ** d for d in range(1, degree + 1)])
+    return np.nan_to_num(T, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def filter_valid_rows(X, y, groups, detrend_covariates=None):
     ok = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
-    return X[ok], y[ok], groups[ok]
+    dc_ok = None
+    if detrend_covariates is not None:
+        if isinstance(detrend_covariates, pd.DataFrame):
+            dc_ok = np.asarray(detrend_covariates.iloc[ok].values, dtype=float)
+        else:
+            arr = np.asarray(detrend_covariates)
+            dc_ok = arr[ok] if arr.ndim == 1 else arr[ok, :]
+    return X[ok], y[ok], groups[ok], dc_ok
 
 
 def shuffle_y_groupwise(y, groups, rng):
@@ -176,6 +234,39 @@ def shuffle_y_groupwise(y, groups, rng):
         m = groups == g
         y_shuf[m] = rng.permutation(y_shuf[m])
     return y_shuf
+
+
+def _shuffle_y_for_fold(y_tr, groups_tr, shuffle_mode, rng, buffer_samples=20):
+    """Apply shuffle to training labels based on shuffle_mode. Returns shuffled y_tr."""
+    min_shift = max(1, int(buffer_samples) + 1)
+    if shuffle_mode == 'none':
+        return y_tr
+    if shuffle_mode == 'foldwise':
+        return rng.permutation(y_tr)
+    if shuffle_mode == 'groupwise' and groups_tr is not None:
+        return shuffle_y_groupwise(y_tr, groups_tr, rng)
+    if shuffle_mode == 'timeshift_fold':
+        return _timeshift_1d(y_tr, rng, min_shift=min_shift)
+    if shuffle_mode == 'timeshift_group' and groups_tr is not None:
+        return shuffle_y_timeshift(y_tr, groups_tr, rng, min_shift=min_shift, within_groups=True)
+    raise ValueError(f'Unknown shuffle_mode: {shuffle_mode}')
+
+
+def _maybe_detrend_neural(X_tr, X_te, detrend_cov_tr, detrend_cov_te, degree=1):
+    """
+    Regress detrend covariates out of neural X. Fit on train, apply to train & test.
+    Returns (X_tr, X_te) unchanged if either cov is None.
+    """
+    if detrend_cov_tr is None or detrend_cov_te is None:
+        return X_tr.copy(), X_te.copy()
+    from neural_data_analysis.neural_analysis_tools.get_neural_data.neural_drift import (
+        detrend_features_cv_covariates,
+    )
+    T_tr = _build_detrend_design_matrix(detrend_cov_tr, degree=degree)
+    T_te = _build_detrend_design_matrix(detrend_cov_te, degree=degree)
+    if T_tr is None or T_te is None:
+        return X_tr.copy(), X_te.copy()
+    return detrend_features_cv_covariates(X_tr, X_te, T_tr, T_te)
 
 
 def build_group_kfold_splits(X, groups, n_splits):
@@ -355,6 +446,7 @@ def serialize_decoding_config(config):
         cv_mode=config.cv_mode,
         buffer_samples=config.buffer_samples,
         use_early_stopping=config.use_early_stopping,
+        detrend_degree=getattr(config, 'detrend_degree', 1),
 
         regression_model_class=(
             config.regression_model_class.__name__
@@ -392,7 +484,8 @@ def _load_existing_results(
     model_name=None,
 ):
     """
-    Load existing results matching current configuration.
+    Load existing results matching current configuration from pickle files.
+    Scans for *.pkl under out_dir, unpickles each and extracts results_df.
     Returns dict keyed by (feature, model_name).
     """
     existing_lookup = {}
@@ -400,50 +493,41 @@ def _load_existing_results(
     if out_dir is None:
         return existing_lookup
 
-    # If model_name is provided, only check that one file
-    # Otherwise check both regression and classification
-    if model_name is not None:
-        csv_path = get_model_csv_path(out_dir, model_name)
+    out_dir = Path(out_dir)
+    if not out_dir.exists():
+        return existing_lookup
 
-        if verbosity >= 1:
-            print(f'Checking for existing results in {csv_path}')
+    pkl_paths = list(out_dir.rglob('*.pkl'))
 
-        if csv_path.exists():
-            df = pd.read_csv(csv_path)
+    if verbosity >= 1:
+        print(f'Checking for existing results in {len(pkl_paths)} pickle file(s) under {out_dir}')
 
-            for _, row in df.iterrows():
-                if config_matches(row, n_splits, shuffle_mode, context_label, config, model_name):
-                    key = (row['behav_feature'], row['model_name'])
-                    existing_lookup[key] = row.to_dict()
+    for p in pkl_paths:
+        try:
+            with p.open('rb') as f:
+                loaded = pickle.load(f)
+        except Exception as e:
+            if verbosity >= 2:
+                print(f'Skipping {p}: failed to unpickle ({e})')
+            continue
 
-            if verbosity >= 1:
-                print(f'Loaded {len(existing_lookup)} matching rows')
-        else:
-            if verbosity >= 1:
-                print(f'No results found for {csv_path}')
-    else:
-        # Fallback: scan for files by inferring model_name from config
-        for mode in ['regression', 'classification']:
-            inferred_model_name = get_model_name(mode, config)
-            csv_path = get_model_csv_path(out_dir, inferred_model_name)
+        if not (isinstance(loaded, dict) and 'results_df' in loaded):
+            if verbosity >= 2:
+                print(f'No results_df key in {p.name}, skipping')
+            continue
 
-            if verbosity >= 1:
-                print(f'Checking for existing results in {csv_path}')
+        df = loaded['results_df']
+        if not (isinstance(df, pd.DataFrame) and len(df) > 0):
+            continue
 
-            if not csv_path.exists():
-                continue
+        for _, row in df.iterrows():
+            row_dict = row.to_dict()
+            if config_matches(row_dict, n_splits, shuffle_mode, context_label, config, model_name):
+                key = (row_dict['behav_feature'], row_dict.get('model_name', ''))
+                existing_lookup[key] = row_dict
 
-            df = pd.read_csv(csv_path)
-
-            for _, row in df.iterrows():
-                if config_matches(row, n_splits, shuffle_mode, context_label, config, None):
-                    # Use model_name from the row, or fall back to inferred name
-                    mname = row.get('model_name', inferred_model_name)
-                    key = (row['behav_feature'], mname)
-                    existing_lookup[key] = row.to_dict()
-
-            if verbosity >= 1:
-                print(f'Loaded {len(existing_lookup)} matching rows')
+    if verbosity >= 1:
+        print(f'Loaded {len(existing_lookup)} matching rows from pickles')
 
     return existing_lookup
 
@@ -597,6 +681,7 @@ def consolidate_results_across_models(
         try:
             with p.open('rb') as f:
                 loaded = pickle.load(f)
+                print('Loaded pickle file:', p)
         except Exception as e:
             if verbosity > 1:
                 print(f'Skipping {p}: failed to unpickle ({e})')
@@ -688,6 +773,7 @@ def _timeshift_1d(y, rng, min_shift):
         return rng.permutation(y)
 
     shift = rng.integers(min_shift, n - min_shift + 1)
+    print('Doing a circle time shift with shift:', shift)
     return np.roll(y, shift)
 
 
@@ -729,10 +815,11 @@ def _compute_single_feature(
     context_label,
     rng,
     model_name=None,
+    detrend_covariates=None,
 ):
 
     y = y_df[feature].to_numpy().ravel()
-    X_ok, y_ok, g_ok = filter_valid_rows(X, y, groups)
+    X_ok, y_ok, g_ok, detrend_cov_ok = filter_valid_rows(X, y, groups, detrend_covariates)
 
     mode = infer_decoding_type(y_ok)
     if mode == 'skip':
@@ -759,6 +846,7 @@ def _compute_single_feature(
             config,
             rng,
             shuffle_mode=shuffle_mode,
+            detrend_covariates=detrend_cov_ok,
         )
     else:
         metrics = run_classification_cv(
@@ -769,6 +857,7 @@ def _compute_single_feature(
             rng,
             groups=g_ok,
             shuffle_mode=shuffle_mode,
+            detrend_covariates=detrend_cov_ok,
         )
 
     row = dict(
@@ -797,6 +886,7 @@ def run_regression_cv(
     *,
     # can be 'none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group'
     shuffle_mode='none',
+    detrend_covariates=None,
 ):
 
     y_pred = np.full_like(y, np.nan, float)
@@ -807,36 +897,21 @@ def run_regression_cv(
     model_class = config.regression_model_class or CatBoostRegressor
     model_kwargs = config.regression_model_kwargs or dict(verbose=False)
 
-    min_shift = max(1, int(config.buffer_samples) + 1)
+    do_detrend = detrend_covariates is not None
+    detrend_degree = getattr(config, 'detrend_degree', 1)
+    buffer_samples = getattr(config, 'buffer_samples', 20)
+    if do_detrend:
+        T_full = _build_detrend_design_matrix(detrend_covariates, degree=detrend_degree)
 
     for tr, te in splits:
+        y_tr = _shuffle_y_for_fold(y[tr], groups[tr], shuffle_mode, rng, buffer_samples)
 
-        if shuffle_mode == 'none':
-            y_tr = y[tr]
-
-        elif shuffle_mode == 'foldwise':
-            y_tr = rng.permutation(y[tr])
-
-        elif shuffle_mode == 'groupwise':
-            y_tr = shuffle_y_groupwise(y[tr], groups[tr], rng)
-
-        elif shuffle_mode == 'timeshift_fold':
-            y_tr = _timeshift_1d(y[tr], rng, min_shift=min_shift)
-
-        elif shuffle_mode == 'timeshift_group':
-            y_tr = shuffle_y_timeshift(
-                y[tr],
-                groups[tr],
-                rng,
-                min_shift=min_shift,
-                within_groups=True,
+        X_tr = X[tr].copy()
+        X_te = X[te].copy()
+        if do_detrend:
+            X_tr, X_te = _maybe_detrend_neural(
+                X_tr, X_te, T_full[tr], T_full[te], degree=detrend_degree
             )
-
-        else:
-            raise ValueError(f'Unknown shuffle_mode: {shuffle_mode}')
-
-        X_tr = X[tr]
-        X_te = X[te]
 
         if np.unique(y_tr).size <= 1:
             # Not enough variance in this training fold to fit a model; fill with constant prediction
@@ -906,6 +981,7 @@ def run_classification_cv(
     *,
     groups=None,
     shuffle_mode='none',
+    detrend_covariates=None,
 ):
 
     aucs, pr_aucs = [], []
@@ -915,43 +991,30 @@ def run_classification_cv(
     model_class = config.classification_model_class or LogisticRegression
     model_kwargs = config.classification_model_kwargs or {}
 
-    min_shift = max(1, int(config.buffer_samples) + 1)
+    do_detrend = detrend_covariates is not None
+    detrend_degree = getattr(config, 'detrend_degree', 1)
+    buffer_samples = getattr(config, 'buffer_samples', 20)
+    if do_detrend:
+        T_full = _build_detrend_design_matrix(detrend_covariates, degree=detrend_degree)
 
     for tr, te in splits:
+        y_tr = _shuffle_y_for_fold(y[tr], groups[tr], shuffle_mode, rng, buffer_samples)
 
-        if shuffle_mode == 'none':
-            y_tr = y[tr]
-
-        elif shuffle_mode == 'foldwise':
-            y_tr = rng.permutation(y[tr])
-
-        elif shuffle_mode == 'groupwise':
-            y_tr = shuffle_y_groupwise(y[tr], groups[tr], rng)
-
-        elif shuffle_mode == 'timeshift_fold':
-            y_tr = _timeshift_1d(y[tr], rng, min_shift=min_shift)
-
-        elif shuffle_mode == 'timeshift_group':
-            y_tr = shuffle_y_timeshift(
-                y[tr],
-                groups[tr],
-                rng,
-                min_shift=min_shift,
-                within_groups=True,
-            )
-
-        else:
-            raise ValueError(f'Unknown shuffle_mode: {shuffle_mode}')
-
-        # Skip invalid folds
         if np.unique(y_tr).size < 2 or np.unique(y[te]).size < 2:
             continue
 
         n_valid_folds += 1
 
+        X_tr = X[tr].copy()
+        X_te = X[te].copy()
+        if do_detrend:
+            X_tr, X_te = _maybe_detrend_neural(
+                X_tr, X_te, T_full[tr], T_full[te], degree=detrend_degree
+            )
+
         scaler = StandardScaler()
-        X_tr = scaler.fit_transform(X[tr])
-        X_te = scaler.transform(X[te])
+        X_tr = scaler.fit_transform(X_tr)
+        X_te = scaler.transform(X_te)
 
         clf = model_class(**model_kwargs)
         clf.fit(X_tr, y_tr.astype(int))

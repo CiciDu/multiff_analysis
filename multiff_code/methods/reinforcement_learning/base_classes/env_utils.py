@@ -171,9 +171,11 @@ def calculate_angles_to_ff(ffxy, agentx, agenty, agentheading, ff_radius, ffdist
     return angle_to_center, angle_to_boundary
 
 
-def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visible_ff_indices):
+def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visible_ff_indices,
+                     rng: Optional[np.random.Generator] = None,
+                     seed: Optional[int] = None):
     """
-    Adding noise to the positions of the fireflies based on how long ago they were seen and 
+    Adding noise to the positions of the fireflies based on how long ago they were seen and
     meanwhile restoring the accurate positions of the currently visible fireflies
 
     Parameters
@@ -190,7 +192,10 @@ def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visibl
         containing the values of uncertainty of all fireflies; scaling is based on a parameter for the environment
     visible_ff_indices: np.ndarray
         containing the indices of the visible fireflies
-
+    rng : np.random.Generator | None
+        Random number generator for reproducibility. If None, uses np.random.default_rng(seed).
+    seed : int | None
+        Used only when rng is None. For reproducibility, pass rng from the env (e.g. env.np_random).
 
     Returns
     -------
@@ -202,13 +207,13 @@ def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visibl
         containing the x-coordinates and the y-coordinates of all fireflies with noise
 
     """
+    if rng is None:
+        rng = np.random.default_rng(seed)
 
     # update the positions of fireflies with uncertainties added; note that uncertainties are cummulative across steps
     num_alive_ff = len(ff_uncertainty_all)
-    ffx_noisy = ffx_noisy + \
-        np.random.normal(0, ff_uncertainty_all)
-    ffy_noisy = ffy_noisy + \
-        np.random.normal(0, ff_uncertainty_all)
+    ffx_noisy = ffx_noisy + rng.normal(0, ff_uncertainty_all)
+    ffy_noisy = ffy_noisy + rng.normal(0, ff_uncertainty_all)
     # for the visible fireflies, their positions are updated to be the real positions
     ffx_noisy[visible_ff_indices] = ffx[visible_ff_indices].copy()
     ffy_noisy[visible_ff_indices] = ffy[visible_ff_indices].copy()

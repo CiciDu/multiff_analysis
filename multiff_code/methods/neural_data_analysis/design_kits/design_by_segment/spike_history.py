@@ -93,8 +93,12 @@ def _rebin_spikes_from_bin_table(
     bin_df = bin_df.sort_values(
         ['new_segment', 'new_bin']).reset_index(drop=True)
 
-    for j, cid in enumerate(cluster_ids):
-        bin_df[f'cluster_{cid}'] = counts[:, j]
+    cluster_data = {
+        f'cluster_{cid}': counts[:, j]
+        for j, cid in enumerate(cluster_ids)
+    }
+    cluster_df = pd.DataFrame(cluster_data)
+    bin_df = pd.concat([bin_df, cluster_df], axis=1)
 
     return bin_df
 

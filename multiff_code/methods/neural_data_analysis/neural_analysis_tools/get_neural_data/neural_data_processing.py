@@ -270,8 +270,7 @@ def add_lags_to_each_feature(var, lag_numbers, trial_vector=None, rearrange_lag_
         trial_vector = pd.Series(
             trial_vector, index=var.index if isinstance(var, pd.DataFrame) else None)
         var['lag_segment_id'] = trial_vector
-        var_lags = var.groupby(
-            'lag_segment_id', group_keys=False).apply(lag_group)
+        var_lags = var.groupby('lag_segment_id', group_keys=False)[var.columns].apply(lag_group)
         # Fill NaNs forward/backward within each trial group
         var_lags = var_lags.groupby(trial_vector).apply(
             lambda df: df.ffill().bfill())

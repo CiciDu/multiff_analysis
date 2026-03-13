@@ -359,6 +359,13 @@ class BaseEncodingRunner:
                     buffer_samples=buffer_samples,
                     load_if_exists=load_if_exists,
                 )
+
+                # get tuning curve
+                self.get_design_for_unit(unit_idx)
+                groups = self.get_gam_groups()
+                fold_coef_results = self.crossval_tuning_curve_coef(unit_idx)
+
+
                 # self.run_penalty_tuning(
                 #     unit_idx,
                 #     n_folds=n_folds,
@@ -572,12 +579,17 @@ class BaseEncodingRunner:
         """
         self.groups = encoding_design_utils.build_gam_groups_from_meta(
             self.structured_meta_groups,
-            self.design_df,
             lam_f=self.lambda_config['lam_f'],
             lam_g=self.lambda_config['lam_g'],
             lam_h=self.lambda_config['lam_h'],
             lam_p=self.lambda_config['lam_p'],
         )
+
+        # -------------------------
+        # Validate coverage
+        # -------------------------
+        if hasattr(self, 'design_df'):
+            encoding_design_utils._validate_design_columns(self.design_df, self.groups)  
         return self.groups
 
     def _prepare_spike_history_components(self):

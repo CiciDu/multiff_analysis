@@ -33,17 +33,19 @@ def _get_mpl_ax(fig, row_number=None, col_number=None):
 def _update_ax_based_on_x_labels_to_values_map(ax, x_labels_to_values_map):
     """
     Set xticks and labels from the x_labels_to_values_map.
+    Uses ha='right' for rotated labels so they align cleanly with ticks.
     """
     tickvals = list(x_labels_to_values_map.values())
     ticktext = [str(k) for k in x_labels_to_values_map.keys()]
     ax.set_xticks(tickvals)
-    ax.set_xticklabels(ticktext)
 
     max_len = max((len(t) for t in ticktext), default=0)
     if max_len > 30:
-        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_xticklabels(ticktext, rotation=90, ha='right')
     elif max_len > 12:
-        ax.tick_params(axis='x', labelrotation=25)
+        ax.set_xticklabels(ticktext, rotation=25, ha='right')
+    else:
+        ax.set_xticklabels(ticktext, ha='right')
 
 
 def _set_minimal_y_scale_mpl(ax, sub_df, y_var_column):

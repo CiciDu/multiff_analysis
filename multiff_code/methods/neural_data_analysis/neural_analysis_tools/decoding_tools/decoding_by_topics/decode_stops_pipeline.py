@@ -58,7 +58,11 @@ class StopDecodingRunner(BaseDecodingRunner):
     # BaseDecodingRunner override points
     # ------------------------------------------------------------------
     def _get_target_df(self) -> pd.DataFrame:
-        return self.stop_feats_to_decode
+        if getattr(self, 'stop_feats_to_decode', None) is None:
+            self.collect_data(exists_ok=True)
+        self.target_df = self.stop_feats_to_decode.copy()
+        self.target_df = decoding_design_utils.truncate_columns_to_percentiles(self.target_df, ['time_since_prev_event'])
+        return self.target_df
 
     def _get_groups(self):
         return self.meta_df_used["event_id"].values
@@ -99,7 +103,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         )
 
         self.stop_feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.stop_feats_to_decode)
-
+ 
         self._save_design_matrices()
 
     # ------------------------------------------------------------------

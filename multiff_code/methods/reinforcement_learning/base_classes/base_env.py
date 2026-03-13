@@ -12,13 +12,13 @@ import gymnasium
 from typing import Optional, List
 from typing import Union
 
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 # ---- Tunables for transforms ----
 DEFAULT_D0 = 25.0      # anchor for d_log = log1p(dist/d0)
 CLIP_DMAX = 1000.0      # clip distance before log
 TMAX_DEFAULT = 5.0     # seconds cap for t_seen normalization
-
 
 @dataclass
 class ObsNoiseCfg:
@@ -95,7 +95,7 @@ class MultiFF(gymnasium.Env):
                  arena_radius=2000,
                  num_alive_ff=800,
                  recentering_trigger_radius=None,
-                 
+                 seed: Optional[int] = None,
                  **kwargs
                  ):
 
@@ -107,7 +107,8 @@ class MultiFF(gymnasium.Env):
             obs_noise = ObsNoiseCfg.from_dict(obs_noise)
         obs_noise.validate()
         self.obs_noise = obs_noise
-        self.rng = np.random.default_rng(obs_noise.seed)
+        # Default seed for reproducible reset(); when reset(seed=None), use this if set.
+        self._default_seed = seed
 
         # Identity-tracked slot config and transforms
         self.d0 = DEFAULT_D0
@@ -195,9 +196,12 @@ class MultiFF(gymnasium.Env):
         self.ffr = np.zeros(self.num_alive_ff, dtype=np.float32)
         self.fftheta = np.zeros(self.num_alive_ff, dtype=np.float32)
 
-    def reset(self, seed=None, use_random_ff=True):
+    def reset(self, seed=None, use_random_ff=True, options=None):
         '''
         reset the environment
+
+        For reproducibility: pass seed=42 (or use env = MultiFF(seed=42) and call reset()).
+        Uses Gymnasium's np_random as the single RNG for all stochastic operations.
 
         Returns
         -------
@@ -205,13 +209,10 @@ class MultiFF(gymnasium.Env):
             return an observation based on the reset environment
         '''
         print('TIME before resetting:', self.time)
-        super().reset(seed=seed)
-        # if leveraging Gymnasium's RNG, mirror it into self.rng for consistency
-        try:
-            # gymnasium sets self.np_random in reset(); pull its bitgen into np.random.Generator
-            self.rng = np.random.default_rng(self.np_random.bit_generator)
-        except Exception:
-            pass
+        # Use explicit seed when provided; otherwise fall back to _default_seed for reproducibility
+        effective_seed = seed if seed is not None else self._default_seed
+        super().reset(seed=effective_seed)
+        # self.np_random is now the canonical RNG; use it for all randomness
 
         print('current reward_boundary: ', self.reward_boundary)
         print('current angular_terminal_vel: ', self.angular_terminal_vel)
@@ -241,16 +242,17 @@ class MultiFF(gymnasium.Env):
                     self.num_alive_ff,
                     duration=self.episode_len * self.dt,
                     non_flashing_interval_mean=3,
-                    flash_on_interval=self.flash_on_interval
+                    flash_on_interval=self.flash_on_interval,
+                    rng=self.np_random,
                 )
             self._random_ff_positions(ff_index=np.arange(self.num_alive_ff))
 
         # reset agent
         self.agentr = np.array([0.0], dtype=np.float32)
         self.agentxy = np.zeros(2, dtype=np.float32)
-        self.agentheading = float(self.rng.uniform(0, 2 * pi))
+        self.agentheading = float(self.np_random.uniform(0, 2 * pi))
         self.arena_center_global = np.zeros(2, dtype=np.float32)
-        self.v = self.rng.uniform(-0.05, 0.05) * self.vgain
+        self.v = self.np_random.uniform(-0.05, 0.05) * self.vgain
         self.w = 0.0  # initialize with no angular velocity
         self.prev_w = self.w
         self.prev_v = self.v
@@ -429,8 +431,8 @@ class MultiFF(gymnasium.Env):
             new_action[0] = np.clip(float(action[0]), -1.0, 1.0)
             new_action[1] = float(-1)
         else:
-            self.vnoise = float(self.rng.normal(0.0, self.v_noise_std))
-            self.wnoise = float(self.rng.normal(0.0, self.w_noise_std))
+            self.vnoise = float(self.np_random.normal(0.0, self.v_noise_std))
+            self.wnoise = float(self.np_random.normal(0.0, self.w_noise_std))
             self.is_stop = False
             self.w_stop_deviance = 0
             new_action[0] = np.clip(float(action[0]) + self.wnoise, -1.0, 1.0)
@@ -495,9 +497,9 @@ class MultiFF(gymnasium.Env):
         self.respawn_idx = np.where(self.ffr >= respawn_outer_radius)[0]
         if self.respawn_idx.size:
             r1, r2 = respawn_outer_radius, self.arena_radius
-            u = self.rng.random(self.respawn_idx.size)
+            u = self.np_random.random(self.respawn_idx.size)
             new_r = np.sqrt(u * (r2**2 - r1**2) + r1**2)
-            new_theta = 2 * np.pi * self.rng.random(self.respawn_idx.size)
+            new_theta = 2 * np.pi * self.np_random.random(self.respawn_idx.size)
 
             # update local coords
             self.ffxy[self.respawn_idx, 0] = new_r * np.cos(new_theta)
@@ -544,9 +546,9 @@ class MultiFF(gymnasium.Env):
         generate random positions for ff
         '''
         num_alive_ff = len(ff_index)
-        self.ffr[ff_index] = np.sqrt(self.rng.random(num_alive_ff)).astype(
+        self.ffr[ff_index] = np.sqrt(self.np_random.random(num_alive_ff)).astype(
             np.float32) * self.arena_radius
-        self.fftheta[ff_index] = (self.rng.random(num_alive_ff).astype(
+        self.fftheta[ff_index] = (self.np_random.random(num_alive_ff).astype(
             np.float32) * 2 * pi).astype(np.float32)
         # write into contiguous buffers
         self.ffxy[ff_index, 0] = self.ffr[ff_index] * \
@@ -899,8 +901,8 @@ class MultiFF(gymnasium.Env):
         std_r = step_scale * (k_r * np.maximum(r_i, 0.0))
         std_th = np.full_like(r_i, step_scale * k_th)
 
-        dr = self.rng.normal(0.0, std_r)
-        dth = self.rng.normal(0.0, std_th)
+        dr = self.np_random.normal(0.0, std_r)
+        dth = self.np_random.normal(0.0, std_th)
 
         r_new = np.clip(r_i + dr, 0.0, None)
         th_new = self._wrap_pi(th + dth)
@@ -933,8 +935,8 @@ class MultiFF(gymnasium.Env):
         std_r = self.obs_noise.perc_r * r_v / 100 # scale by 1/100 to make the numbers more readable
         std_th = np.full_like(r_v, self.obs_noise.perc_th / 100)
 
-        dr = self.rng.normal(0.0, std_r)
-        dth = self.rng.normal(0.0, std_th)
+        dr = self.np_random.normal(0.0, std_r)
+        dth = self.np_random.normal(0.0, std_th)
         r_n = np.clip(r_v + dr, 0.0, None)
         th_n = self._wrap_pi(th_true + dth)
         theta_world = self._wrap_pi(th_n + self.agentheading)

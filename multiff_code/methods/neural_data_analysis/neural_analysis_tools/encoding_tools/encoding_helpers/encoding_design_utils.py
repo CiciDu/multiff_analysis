@@ -985,7 +985,6 @@ def _validate_design_columns(design_df, groups: List[GroupSpec]) -> None:
 
 def build_gam_groups_from_meta(
     structured_meta_groups,
-    design_df,
     *,
     lam_f: float = 100.0,
     lam_g: float = 100.0,
@@ -1035,10 +1034,6 @@ def build_gam_groups_from_meta(
         lam = lam_h if (i == 0 or gname == 'spike_hist') else lam_p
         groups.append(GroupSpec(gname, list(cols), 'event', lam))
 
-    # -------------------------
-    # Validate coverage
-    # -------------------------
-    _validate_design_columns(design_df, groups)
 
     return groups
 

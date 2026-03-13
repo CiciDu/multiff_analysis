@@ -15,6 +15,9 @@ def plot_retry_outcome_sweep_ci(df, config, sweep_key):
     category_order = config['category_order']
     agent_col = config.get('agent_col', 'id')
     title = config.get('title', '')
+    # strip off 'Across Early and Late Sessions' from title
+    title = title.replace('Across Early and Late Sessions', '').strip()
+
     label_mapping = config.get('new_label_mapping')
 
     df = plot_stacked_bars_utils.apply_label_mapping(df, label_mapping)
@@ -113,6 +116,9 @@ def plot_retry_strategy_lines(df, config, sweep_key):
     category_order = config['category_order']
     agent_col = config.get('agent_col', 'id')
     title = config.get('title', '')
+    # strip off 'Across Early and Late Sessions' from title
+    title = title.replace('Across Early and Late Sessions', '').strip()
+
     label_mapping = config.get('new_label_mapping')
     
 
@@ -136,7 +142,7 @@ def plot_retry_strategy_lines(df, config, sweep_key):
 
     sweep_vals = valid_sweep_vals
     
-    fig, ax = plt.subplots(figsize=(6,4), dpi=300)
+    fig, ax = plt.subplots(figsize=(6,4), dpi=100)
 
     for cat in category_order:
 

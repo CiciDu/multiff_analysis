@@ -11,7 +11,8 @@ import pandas as pd
 from catboost import CatBoostRegressor, CatBoostError
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.utils.multiclass import type_of_target
 import matplotlib.pyplot as plt
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
@@ -21,10 +22,9 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding 
     cv_decoding,
 )
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_model_specs
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_decoding_runner
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding, show_decoding_results
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import show_decoding_results
 
 class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     """
@@ -51,6 +51,17 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     def _get_groups(self):
         """Group labels for CV (e.g. event_id or trial_ids)."""
         raise NotImplementedError
+
+    def get_detrend_covariates(self):
+        """Return DataFrame with time, trial_index, etc. for detrending.
+        Override to add more columns (e.g. from rebinned_y_var)."""
+        # if getattr(self, 'target_df', None) is None:
+        #     self._get_target_df()
+        # self.detrend_covariates = self.target_df[['time']].copy()
+        
+        ## disbable detrending for now
+        self.detrend_covariates = None
+        return self.detrend_covariates
 
     def _get_neural_matrix(self) -> np.ndarray:
         """Neural data matrix (samples x neurons)."""
@@ -91,7 +102,6 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
-        
     ) -> pd.DataFrame:
 
         if save_dir is None:
@@ -177,6 +187,11 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         X_test: np.ndarray,
         y_test_df: pd.DataFrame,
         config: cv_decoding.DecodingRunConfig,
+        *,
+        shuffle_mode: str = "none",
+        groups_train=None,
+        detrend_cov_train=None,
+        detrend_cov_test=None,
     ) -> Dict:
         """Train models on training data and evaluate on test data.
         
@@ -184,7 +199,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """
         from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
             infer_decoding_type,
+            _shuffle_y_for_fold,
+            _maybe_detrend_neural,
         )
+
+        rng = np.random.default_rng(0)
+        buffer_samples = getattr(config, 'buffer_samples', 20)
         
         results = []
         
@@ -197,12 +217,15 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             test_valid = np.isfinite(y_test)
 
             X_tr = X_train[train_valid]
-            y_tr = y_train[train_valid]
+            y_tr = y_train[train_valid].copy()
+            g_tr = groups_train[train_valid] if groups_train is not None else None
             X_te = X_test[test_valid]
             y_te = y_test[test_valid]
 
             if len(y_tr) == 0 or len(y_te) == 0:
                 continue
+
+            y_tr = _shuffle_y_for_fold(y_tr, g_tr, shuffle_mode, rng, buffer_samples)
 
             # Skip if no variance in training labels
             if np.unique(y_tr).size <= 1:
@@ -210,6 +233,24 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
             # Infer decoding mode from the finite training labels
             mode = infer_decoding_type(y_tr)
+            
+            cov_tr = (
+                detrend_cov_train.iloc[train_valid].values
+                if isinstance(detrend_cov_train, pd.DataFrame)
+                else (np.asarray(detrend_cov_train)[train_valid] if detrend_cov_train is not None else None)
+            )
+            cov_te = (
+                detrend_cov_test.iloc[test_valid].values
+                if isinstance(detrend_cov_test, pd.DataFrame)
+                else (np.asarray(detrend_cov_test)[test_valid] if detrend_cov_test is not None else None)
+            )
+            detrend_degree = getattr(config, 'detrend_degree', 1)
+            X_tr, X_te = _maybe_detrend_neural(
+                X_tr, X_te,
+                cov_tr,
+                cov_te,
+                degree=detrend_degree,
+            )
             
             # Scale features
             scaler = StandardScaler()
@@ -240,24 +281,44 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                     "n_samples": int(len(y_te)),
                 }
             else:  # classification
+                # Guard: sklearn classifiers require discrete labels. If y_tr has
+                # non-integer floats (e.g. 0.5, 1.2) type_of_target returns
+                # 'continuous' and LogisticRegression raises. Encode to 0,1,...
+                # and filter test to seen classes only.
+                try:
+                    target_type = type_of_target(y_tr)
+                except Exception:
+                    target_type = "unknown"
+                if target_type == "continuous":
+                    continue
+
+                le = LabelEncoder()
+                y_tr_enc = le.fit_transform(y_tr)
+                # Filter test to rows with classes seen in training
+                seen = set(le.classes_)
+                te_mask = np.array([y in seen for y in y_te])
+                if not np.any(te_mask):
+                    continue
+                X_te_f = X_te[te_mask]
+                y_te_f = y_te[te_mask]
+                y_te_enc = le.transform(y_te_f)
+                if np.unique(y_te_enc).size < 2:
+                    continue
+
                 model_class = config.classification_model_class or LogisticRegression
                 model_kwargs = config.classification_model_kwargs or {}
                 model = model_class(**model_kwargs)
-                
-                # Ensure at least 2 classes in training and test
-                if np.unique(y_tr).size < 2 or np.unique(y_te).size < 2:
-                    continue
 
                 try:
-                    model.fit(X_tr, y_tr)
+                    model.fit(X_tr, y_tr_enc)
                 except CatBoostError as e:
                     if "All train targets are equal" in str(e) or "All targets are equal" in str(e):
                         continue
                     raise
-                y_pred_proba = model.predict_proba(X_te)
-                
+                y_pred_proba = model.predict_proba(X_te_f)
+
                 try:
-                    auc = float(roc_auc_score(y_te, y_pred_proba[:, 1]))
+                    auc = float(roc_auc_score(y_te_enc, y_pred_proba[:, 1]))
                 except Exception:
                     auc = np.nan
 
@@ -272,7 +333,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                     # "n_total_folds": 1,
                     # "n_valid_folds": 1,
                     # "n_skipped_folds": 0,
-                    "n_samples": int(len(y_te)),
+                    "n_samples": int(len(y_te_f)),
                 }
             
             results.append(row)
@@ -432,10 +493,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         verbosity,
     ):
 
+        detrend_covariates = self.get_detrend_covariates()
+        detrend_suffix = "_detrend" if detrend_covariates is not None else ""
         if fit_kernelwidth:
-            model_save_path = Path(save_dir) / "cv_decoding" / "cvnested" / f"{model_name}_n{n_splits}_inner{inner_cv_splits}_{cv_mode}.pkl"
+            model_save_path = Path(save_dir) / "cv_decoding" / "cvnested" / f"{model_name}_n{n_splits}_inner{inner_cv_splits}_{cv_mode}{detrend_suffix}.pkl"
         else:
-            model_save_path = Path(save_dir) / "cv_decoding" / "fixed_width" / f"{model_name}_width{fixed_width}_n{n_splits}_{cv_mode}.pkl"
+            model_save_path = Path(save_dir) / "cv_decoding" / "fixed_width" / f"{model_name}_width{fixed_width}_n{n_splits}_{cv_mode}{detrend_suffix}.pkl"
 
         print('model_save_path: ', model_save_path)
 
@@ -484,6 +547,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 cv_mode=cv_mode,
                 model_save_path=model_save_path,
                 verbosity=verbosity,
+                shuffle_mode=shuffle_mode,
             )
         else:
             result_save_dir = Path(save_dir) / f"fixed_kernelwidth_{fixed_width}"
@@ -564,6 +628,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         if fixed_width > 0:
             X = decode_stops_utils.smooth_signal(X, int(fixed_width))
 
+        detrend_covariates = self.get_detrend_covariates()
+
         results_df = cv_decoding.run_cv_decoding(
             X=X,
             y_df=self._get_target_df(),
@@ -577,6 +643,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             shuffle_mode=shuffle_mode,
             load_existing_only=load_existing_only,
             verbosity=verbosity,
+            detrend_covariates=detrend_covariates,
         )
 
         results_df["kernelwidth"] = fixed_width
@@ -620,6 +687,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         inner_cv_splits,
         cv_mode,
         verbosity,
+        shuffle_mode,
     ):
 
         from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
@@ -629,6 +697,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         X = self._get_neural_matrix()
         y_df = self._get_target_df()
         groups = self._get_groups()
+        detrend_covariates = self.get_detrend_covariates()
 
         outer_splits = _build_folds(
             len(X),
@@ -652,6 +721,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 candidate_widths=candidate_widths,
                 inner_cv_splits=inner_cv_splits,
                 verbosity=verbosity,
+                shuffle_mode=shuffle_mode,
+                detrend_covariates=detrend_covariates.iloc[train_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[train_idx] if detrend_covariates is not None else None),
             )
 
             fold_result = self._evaluate_outer_fold(
@@ -661,6 +732,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 y_test=y_df.iloc[test_idx],
                 best_width=best_width,
                 config=config,
+                shuffle_mode=shuffle_mode,
+                groups_train=groups[train_idx] if groups is not None else None,
+                detrend_cov_train=detrend_covariates.iloc[train_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[train_idx] if detrend_covariates is not None else None),
+                detrend_cov_test=detrend_covariates.iloc[test_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[test_idx] if detrend_covariates is not None else None),
             )
 
             fold_result["fold"] = fold_idx
@@ -725,6 +800,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         candidate_widths,
         inner_cv_splits,
         verbosity,
+        shuffle_mode,
+        detrend_covariates=None,
     ):
 
         best_width = None
@@ -746,8 +823,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 context_label="pooled",
                 save_dir=None,
                 model_name=None,
-                shuffle_mode="none",
+                shuffle_mode=shuffle_mode,
                 verbosity=verbosity,
+                detrend_covariates=detrend_covariates,
             )
 
             # store full per-width inner-CV result
@@ -788,6 +866,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         y_test,
         best_width,
         config,
+        shuffle_mode: str = "none",
+        groups_train=None,
+        detrend_cov_train=None,
+        detrend_cov_test=None,
     ):
 
         X_train = decode_stops_utils.smooth_signal(X_train, int(best_width))
@@ -799,6 +881,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             X_test,
             y_test,
             config,
+            shuffle_mode=shuffle_mode,
+            groups_train=groups_train,
+            detrend_cov_train=detrend_cov_train,
+            detrend_cov_test=detrend_cov_test,
         )
     
 

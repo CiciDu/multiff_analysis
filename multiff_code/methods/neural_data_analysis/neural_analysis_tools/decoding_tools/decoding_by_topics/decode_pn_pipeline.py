@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List
 
 # Third-party imports
 import numpy as np
@@ -16,13 +16,10 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
     pn_aligned_by_event,
 )
 from neural_data_analysis.design_kits.design_by_segment import (
-    spike_history,
     temporal_feats,
-    create_pn_design_df,
 )
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import plot_decoding_utils, decoding_design_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
 
 
 class PNDecodingRunner(BaseDecodingRunner):
@@ -44,6 +41,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.pn_feats_to_decode = None
         self.trial_ids = None
         self.binned_spikes = None
+        self.detrend_covariates = None  # DataFrame with time, trial_index, etc.
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
@@ -53,10 +51,14 @@ class PNDecodingRunner(BaseDecodingRunner):
     # BaseDecodingRunner override points
     # ------------------------------------------------------------------
     def _get_target_df(self) -> pd.DataFrame:
-        return self.pn_feats_to_decode
+        if getattr(self, 'pn_feats_to_decode', None) is None:
+            self.collect_data(exists_ok=True)
+        self.target_df = self.pn_feats_to_decode.copy()
+        return self.target_df
 
     def _get_groups(self):
         return self.trial_ids
+
 
     def _get_neural_matrix(self) -> np.ndarray:
         return np.asarray(self.binned_spikes, dtype=float)
@@ -121,7 +123,14 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.pn = pn
         self.pn_feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.pn_feats_to_decode)
 
-        
+        # detrend covariates for optional multi-covariate detrending
+        detrend_dict = {}
+        if 't_center' in pn.rebinned_y_var.columns:
+            detrend_dict['time'] = np.asarray(pn.rebinned_y_var['t_center'], dtype=float)
+        if 'new_segment' in pn.rebinned_y_var.columns:
+            detrend_dict['trial_index'] = np.asarray(pn.rebinned_y_var['new_segment'], dtype=float)
+        self.detrend_covariates = pd.DataFrame(detrend_dict) if detrend_dict else None
+
         self.trial_ids = trial_ids
         self._save_design_matrices()
 
@@ -140,6 +149,7 @@ class PNDecodingRunner(BaseDecodingRunner):
             'binned_spikes': save_dir / 'binned_spikes.pkl',
             'pn_feats_to_decode': save_dir / 'pn_feats_to_decode.pkl',
             'trial_ids': save_dir / 'trial_ids.pkl',
+            'detrend_covariates': save_dir / 'detrend_covariates.pkl',
         }
 
     def _get_design_matrix_data(self):
@@ -147,6 +157,7 @@ class PNDecodingRunner(BaseDecodingRunner):
             'binned_spikes': self.binned_spikes,
             'pn_feats_to_decode': self.pn_feats_to_decode,
             'trial_ids': self.trial_ids,
+            'detrend_covariates': self.detrend_covariates,
         }
 
     def _get_design_matrix_key_to_attr(self):
@@ -154,4 +165,5 @@ class PNDecodingRunner(BaseDecodingRunner):
             'binned_spikes': 'binned_spikes',
             'pn_feats_to_decode': 'pn_feats_to_decode',
             'trial_ids': 'trial_ids',
+            'detrend_covariates': 'detrend_covariates',
         }

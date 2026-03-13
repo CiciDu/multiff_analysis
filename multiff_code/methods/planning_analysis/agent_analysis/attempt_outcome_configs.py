@@ -5,7 +5,7 @@ CAPTURE_VS_MISS = {
         'miss_over_attempt': 'Miss',
     },
     'category_order': ['Capture', 'Miss'],
-    'title': 'Attempt Outcomes Across Early and Late Sessions',
+    'title': 'Attempt Outcomes',
     'y_label': 'Proportion of Attempts',
     'category_colors': ['#0072B2', '#C76E00']
 }
@@ -16,7 +16,7 @@ CAPTURE_VS_MISS = {
         'miss_over_attempt': 'Miss',
     },
     'category_order': ['Capture', 'Miss'],
-    'title': 'Attempt Outcomes Across Early and Late Sessions',
+    'title': 'Attempt Outcomes',
     'y_label': 'Proportion of Attempts',
     'category_colors': ['#0072B2', '#C76E00']
 }
@@ -30,7 +30,7 @@ ATTEMPT_BREAKDOWN = {
         'retry_fail_over_attempt': 'Retry + Fail',
     },
     'category_order': ['Capture', 'Retry + Capture', 'Retry + Fail', 'No Retry'],
-    'title': 'Attempt Outcomes Across Early and Late Sessions',
+    'title': 'Attempt Outcomes',
     'y_label': 'Proportion of Attempts',
     'category_colors': None
 }
@@ -44,7 +44,7 @@ AFTER_MISS = {
         'no_retry_over_miss': 'No Retry',
     },
     'category_order': ['Retry + Capture', 'Retry + Fail', 'No Retry'],
-    'title': 'Actions After a Miss Across Early and Late Sessions',
+    'title': 'Actions After a Miss',
     'y_label': 'Proportion of Misses',
     'category_colors': ['#CC79A7', '#E69F00', '#009E73']
 }
@@ -57,7 +57,7 @@ EVENTUAL_OUTCOME = {
         'eventual_miss_over_attempt': 'Miss',
     },
     'category_order': ['Capture', 'Miss'],
-    'title': 'Eventual Attempt Outcomes Across Early and Late Sessions',
+    'title': 'Eventual Attempt Outcomes',
     'y_label': 'Proportion of Attempts',
     'category_colors': ['#4e79a7', '#98df8a']
 }
@@ -70,7 +70,7 @@ RETRY_OUTCOME = {
         'rsw_over_both': 'Retry + Fail',
     },
     'category_order': ['Retry + Capture', 'Retry + Fail'],
-    'title': 'Actions After a Miss Across Early and Late Sessions',
-    'y_label': 'Proportion of Misses',
+    'title': 'Retry Outcomes',
+    'y_label': 'Proportion of Retries',
     'category_colors': ['#CC79A7', '#E69F00']
 }

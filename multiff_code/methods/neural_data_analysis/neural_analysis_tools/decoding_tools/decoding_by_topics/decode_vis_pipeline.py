@@ -52,7 +52,10 @@ class FFVisDecodingRunner(BaseDecodingRunner):
     # BaseDecodingRunner override points
     # ------------------------------------------------------------------
     def _get_target_df(self) -> pd.DataFrame:
-        return self.vis_feats_to_decode
+        if getattr(self, 'stop_feats_to_decode', None) is None:
+            self.collect_data(exists_ok=True)
+        self.target_df = self.vis_feats_to_decode.copy()
+        return self.target_df
 
     def _get_groups(self):
         return self.meta_df_used["event_id"].values

@@ -74,33 +74,33 @@ MODEL_SPECS = {
         ),
     },
 
-    'catboost_shallow': {
-        'cache_tag': 'cb_d4_i300',
+    # 'catboost_shallow': {
+    #     'cache_tag': 'cb_d4_i300',
 
-        'regression_model_class': CatBoostRegressor,
-        'regression_model_kwargs': dict(
-            loss_function='RMSE',
-            iterations=300,
-            depth=4,
-            learning_rate=0.05,
-            subsample=0.8,
-            verbose=False,
-            random_seed=0,
-            allow_writing_files=False
-        ),
+    #     'regression_model_class': CatBoostRegressor,
+    #     'regression_model_kwargs': dict(
+    #         loss_function='RMSE',
+    #         iterations=300,
+    #         depth=4,
+    #         learning_rate=0.05,
+    #         subsample=0.8,
+    #         verbose=False,
+    #         random_seed=0,
+    #         allow_writing_files=False
+    #     ),
 
-        'classification_model_class': CatBoostClassifier,
-        'classification_model_kwargs': dict(
-            loss_function='Logloss',
-            iterations=300,
-            depth=4,
-            learning_rate=0.05,
-            subsample=0.8,
-            verbose=False,
-            random_seed=0,
-            allow_writing_files=False
-        ),
-    },
+    #     'classification_model_class': CatBoostClassifier,
+    #     'classification_model_kwargs': dict(
+    #         loss_function='Logloss',
+    #         iterations=300,
+    #         depth=4,
+    #         learning_rate=0.05,
+    #         subsample=0.8,
+    #         verbose=False,
+    #         random_seed=0,
+    #         allow_writing_files=False
+    #     ),
+    # },
 }
 
 

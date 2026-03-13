@@ -109,7 +109,7 @@ def build_stop_design(
     # -------------------------------------------------------------------------
     # 4) Aggregate kinematics + optional one_ff-style extra covariates
     # -------------------------------------------------------------------------
-    KINEMATIC_COLS = ['accel', 'speed', 'ang_speed']
+    KINEMATIC_COLS = ['time', 'accel', 'speed', 'ang_speed']
     binned_feats = (
         pd.DataFrame({c: _agg_feat(c) for c in KINEMATIC_COLS})
         .replace([np.inf, -np.inf], np.nan)
@@ -272,12 +272,13 @@ def build_stop_design_decoding(
             raise ValueError(f'used_bins mismatch while aggregating "{col}"')
         return out
 
-    KINEMATIC_COLS = ['accel', 'speed', 'ang_speed']
+    cols_to_agg = ['time', 'accel', 'speed', 'ang_speed']
     binned_feats = (
-        pd.DataFrame({c: _agg_feat(c) for c in KINEMATIC_COLS})
+        pd.DataFrame({c: _agg_feat(c) for c in cols_to_agg})
         .replace([np.inf, -np.inf], np.nan)
         .fillna(0.0)
     )
+    
     extra_cols_added: List[str] = []
     if extra_agg_cols:
         existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
@@ -360,7 +361,7 @@ def build_stop_design_decoding(
         )
 
     groups = _build_feature_groups(
-        binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
+        binned_feats, cols_to_agg, extra_cols=extra_cols_added)
 
     return binned_spikes, binned_feats, offset_log, meta_df_used, groups
 
