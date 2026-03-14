@@ -12,9 +12,11 @@ from neural_data_analysis.design_kits.design_around_event import event_binning
 from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     collect_stop_data,
-    decode_stops_design
 )
-from neural_data_analysis.topic_based_neural_analysis.ff_visibility import decode_vis_utils
+from neural_data_analysis.topic_based_neural_analysis.ff_visibility import (
+    decode_vis_design,
+    decode_vis_utils,
+)
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics.base_decoding_runner import (
@@ -112,7 +114,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             offset_log,
             meta_df_used,
             meta_groups,
-        ) = decode_stops_design.build_stop_design_decoding(
+        ) = decode_vis_design.build_vis_design_decoding(
             new_seg_info,
             events_with_stats,
             self.pn.monkey_information,

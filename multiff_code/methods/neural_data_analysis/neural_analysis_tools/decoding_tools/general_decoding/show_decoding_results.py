@@ -176,16 +176,29 @@ def _prepare_decoding_df(decoding_results_df):
 # PLOTTING
 # ==========================================================
 
-def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline):
-
+def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_col=None):
+    """
+    Plot decoding summary. Uses hue_col for grouping when provided (e.g. 'result_group'
+    for multiple datasets), otherwise falls back to 'shuffle_mode'.
+    """
     max_height = 20
 
-    feature_order = (
-        summary_df
-        .sort_values('mean_value')
-        ['behav_feature']
-        .tolist()
-    )
+    if hue_col is not None and hue_col in summary_df.columns:
+        feature_order = (
+            summary_df
+            .groupby('behav_feature')['mean_value']
+            .mean()
+            .sort_values()
+            .index
+            .tolist()
+        )
+    else:
+        feature_order = (
+            summary_df
+            .sort_values('mean_value')
+            ['behav_feature']
+            .tolist()
+        )
 
     summary_df['behav_feature'] = pd.Categorical(
         summary_df['behav_feature'],
@@ -197,13 +210,21 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline):
 
     fig, ax = plt.subplots(figsize=(8, height))
 
-    hue_levels = summary_df['shuffle_mode'].unique()
+    if hue_col is not None and hue_col in summary_df.columns:
+        hue_levels = summary_df[hue_col].dropna().unique().tolist()
+    else:
+        hue_col = 'shuffle_mode'
+        hue_levels = summary_df['shuffle_mode'].unique().tolist()
+
     n_hue_levels = len(hue_levels)
+    # High-contrast palette: blue and orange for 2 groups, extend for more
+    default_colors = ['#e67e22', '#2166ac', '#2ca02c', '#9467bd', '#8c564b']
+    colors = [default_colors[i % len(default_colors)] for i in range(max(n_hue_levels, 2))]
 
     for i, hue_val in enumerate(hue_levels):
 
         sub = summary_df.query(
-            "shuffle_mode == @hue_val"
+            f"{hue_col} == @hue_val"
         ).sort_values('behav_feature')
 
         y_positions = np.arange(len(sub))
@@ -213,6 +234,9 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline):
             if n_hue_levels > 1 else 0
         )
 
+        color = colors[i % len(colors)] if n_hue_levels > 1 else None
+        label = f'Shuffle={hue_val}' if hue_col == 'shuffle_mode' else str(hue_val)
+
         ax.errorbar(
             x=sub['mean_value'],
             y=y_positions + offset,
@@ -220,22 +244,21 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline):
             fmt='o',
             capsize=4,
             markersize=6,
-            label=f'Shuffle={hue_val}'
+            label=label,
+            color=color
         )
 
-    sig_features = pval_df.query("significant")['behav_feature']
-
-    for idx, feature in enumerate(feature_order):
-
-        if feature in sig_features.values:
-
-            ax.text(
-                x=ax.get_xlim()[1],
-                y=idx,
-                s='*',
-                va='center',
-                fontsize=14
-            )
+    if pval_df is not None and len(pval_df) > 0 and 'significant' in pval_df.columns:
+        sig_features = pval_df.query("significant")['behav_feature']
+        for idx, feature in enumerate(feature_order):
+            if feature in sig_features.values:
+                ax.text(
+                    x=ax.get_xlim()[1],
+                    y=idx,
+                    s='*',
+                    va='center',
+                    fontsize=14
+                )
 
     ax.axvline(vline, linestyle='--')
     ax.set_yticks(np.arange(len(feature_order)))
@@ -243,25 +266,53 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline):
     ax.tick_params(axis='y', labelsize=9)
     ax.set_xlabel(value_label)
     ax.set_title(title)
+    
+    if 'r2_cv' in value_label or 'r_cv' in value_label:
+        ax.set_xlim(-0.5, 0.5)
 
     if n_hue_levels > 1:
         ax.legend(frameon=False)
-        
-    # plt.subplots_adjust(left=0.35)  
 
     plt.tight_layout()
     plt.show()
 
 
 def visualize_decoding_results(
-    decoding_results_df,
-    model_name,
+    decoding_results_df=None,
+    decoding_results_dfs=None,
+    model_name='ridge_strong',
     regression_metric_col='r2_cv',
     classification_metric_col='auc_mean',
     show_plots=True,
 ):
+    """
+    Visualize decoding results. Supports plotting multiple result DataFrames on the
+    same plot, differentiated by color.
 
-    df = _prepare_decoding_df(decoding_results_df)
+    Parameters
+    ----------
+    decoding_results_df : pd.DataFrame, optional
+        Single decoding results DataFrame. Ignored if decoding_results_dfs is provided.
+    decoding_results_dfs : dict, optional
+        Dict mapping label -> DataFrame, e.g. {'all': all_results, 'subset': all_results_s}.
+        When provided, all datasets are plotted on the same axes, differentiated by color.
+    model_name : str
+        Model name to filter (e.g. 'ridge_strong').
+    """
+    if decoding_results_dfs is not None:
+        dfs = []
+        for label, d in decoding_results_dfs.items():
+            prep = _prepare_decoding_df(d)
+            prep['result_group'] = label
+            dfs.append(prep)
+        df = pd.concat(dfs, axis=0, ignore_index=True)
+        hue_col = 'result_group'
+    elif decoding_results_df is not None:
+        df = _prepare_decoding_df(decoding_results_df)
+        df['result_group'] = 'single'
+        hue_col = None
+    else:
+        raise ValueError("Provide either decoding_results_df or decoding_results_dfs")
 
     if len(df) == 0:
         print(f"No decoding results found for model: {model_name}")
@@ -286,7 +337,7 @@ def visualize_decoding_results(
 
     if len(reg_df) > 0:
 
-        reg_summary = _compute_summary(reg_df, regression_metric_col)
+        reg_summary = _compute_summary(reg_df, regression_metric_col, hue_col=hue_col)
 
         pval_df = _compute_shuffle_pvals(reg_df, regression_metric_col)
 
@@ -303,7 +354,8 @@ def visualize_decoding_results(
                 pval_df,
                 value_label=f'Mean {regression_metric_col}',
                 title=f'Regression Decoding Strength\n{model_name}',
-                vline=0
+                vline=0,
+                hue_col=hue_col
             )
 
     # ======================================================
@@ -312,7 +364,7 @@ def visualize_decoding_results(
 
     if len(clf_df) > 0:
 
-        clf_summary = _compute_summary(clf_df, classification_metric_col)
+        clf_summary = _compute_summary(clf_df, classification_metric_col, hue_col=hue_col)
 
         pval_df = _compute_shuffle_pvals(clf_df, classification_metric_col)
 
@@ -329,7 +381,8 @@ def visualize_decoding_results(
                 pval_df,
                 value_label=f'Mean {classification_metric_col}',
                 title=f'Classification Decoding Strength\n{model_name}',
-                vline=0.5
+                vline=0.5,
+                hue_col=hue_col
             )
 
     return reg_summary, clf_summary
@@ -376,11 +429,17 @@ def _compute_shuffle_pvals(df, value_col):
     return pval_df
 
 
-def _compute_summary(df, value_col):
+def _compute_summary(df, value_col, hue_col=None):
+
+    group_cols = ['behav_feature']
+    if hue_col is not None and hue_col in df.columns:
+        group_cols = ['behav_feature', hue_col]
+    elif 'shuffle_mode' in df.columns:
+        group_cols = ['behav_feature', 'shuffle_mode']
 
     summary = (
         df
-        .groupby(['behav_feature', 'shuffle_mode'])
+        .groupby(group_cols)
         .agg(
             mean_value=(value_col, 'mean'),
             sem_value=(value_col, lambda x: x.std() / np.sqrt(len(x))),

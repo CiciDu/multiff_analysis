@@ -27,6 +27,9 @@ from tqdm import tqdm
 # Config
 # ============================================================
 
+# CV modes that use blocks (time or group); per_block detrending is default for these
+BLOCK_CV_MODES = ('blocked_time_buffered', 'blocked_time')
+
 
 @dataclass
 class DecodingRunConfig:
@@ -38,6 +41,9 @@ class DecodingRunConfig:
 
     # Detrending: when detrend_covariates is provided, regress them out of neural X before scaling
     detrend_degree: int = 1  # polynomial degree when covariate is 1D
+    # When True and groups is provided, fit detrend separately within each block (group).
+    # Default True for block-based CV (group_kfold, blocked_time*) to handle block-specific drift.
+    detrend_per_block: bool = True
 
     # Regression
     regression_model_class: Optional[Type] = None
@@ -252,9 +258,25 @@ def _shuffle_y_for_fold(y_tr, groups_tr, shuffle_mode, rng, buffer_samples=20):
     raise ValueError(f'Unknown shuffle_mode: {shuffle_mode}')
 
 
-def _maybe_detrend_neural(X_tr, X_te, detrend_cov_tr, detrend_cov_te, degree=1):
+def _maybe_detrend_neural(
+    X_tr,
+    X_te,
+    detrend_cov_tr,
+    detrend_cov_te,
+    degree=1,
+    groups_tr=None,
+    groups_te=None,
+    per_block=False,
+):
     """
-    Regress detrend covariates out of neural X. Fit on train, apply to train & test.
+    Regress detrend covariates out of neural X.
+
+    If per_block=True and (groups_tr, groups_te) are provided:
+        Fit detrend separately within each block (group). Each block's trend is
+        fit on that block's data only and applied to that block. Use when drift
+        varies by block (e.g., group_kfold, blocked CV with trial blocks).
+    Else:
+        Fit on all train data, apply to train and test (original behavior).
     Returns (X_tr, X_te) unchanged if either cov is None.
     """
     if detrend_cov_tr is None or detrend_cov_te is None:
@@ -264,9 +286,45 @@ def _maybe_detrend_neural(X_tr, X_te, detrend_cov_tr, detrend_cov_te, degree=1):
     )
     T_tr = _build_detrend_design_matrix(detrend_cov_tr, degree=degree)
     T_te = _build_detrend_design_matrix(detrend_cov_te, degree=degree)
+
     if T_tr is None or T_te is None:
         return X_tr.copy(), X_te.copy()
+
+    if per_block and groups_tr is not None and groups_te is not None:
+        print('detrended X_train and X_test by block')
+        return _detrend_neural_per_block(X_tr, X_te, T_tr, T_te, groups_tr, groups_te,
+                                        detrend_features_cv_covariates)
+                
+    print('detrended X_train and X_test')
     return detrend_features_cv_covariates(X_tr, X_te, T_tr, T_te)
+
+
+def _detrend_neural_per_block(X_tr, X_te, T_tr, T_te, groups_tr, groups_te, detrend_fn):
+    """
+    Detrend each block (group) separately. Fit on that block's data, apply to that block.
+    """
+    groups_tr = np.asarray(groups_tr)
+    groups_te = np.asarray(groups_te)
+    X_tr_out = X_tr.copy()
+    X_te_out = X_te.copy()
+
+    for g in np.unique(np.concatenate([groups_tr, groups_te])):
+        m_tr = groups_tr == g
+        m_te = groups_te == g
+        if m_tr.any() and m_te.any():
+            # Block appears in both train and test: fit on train, apply to both
+            X_tr_out[m_tr], X_te_out[m_te] = detrend_fn(
+                X_tr[m_tr], X_te[m_te], T_tr[m_tr], T_te[m_te]
+            )
+        elif m_tr.any():
+            # Block only in train: fit and apply on train block
+            dt_tr, _ = detrend_fn(X_tr[m_tr], X_tr[m_tr], T_tr[m_tr], T_tr[m_tr])
+            X_tr_out[m_tr] = dt_tr
+        elif m_te.any():
+            # Block only in test: fit and apply on test block
+            _, dt_te = detrend_fn(X_te[m_te], X_te[m_te], T_te[m_te], T_te[m_te])
+            X_te_out[m_te] = dt_te
+    return X_tr_out, X_te_out
 
 
 def build_group_kfold_splits(X, groups, n_splits):
@@ -447,6 +505,7 @@ def serialize_decoding_config(config):
         buffer_samples=config.buffer_samples,
         use_early_stopping=config.use_early_stopping,
         detrend_degree=getattr(config, 'detrend_degree', 1),
+        detrend_per_block=getattr(config, 'detrend_per_block', True),
 
         regression_model_class=(
             config.regression_model_class.__name__
@@ -709,30 +768,6 @@ def consolidate_results_across_models(
 
     consolidated_df = pd.concat(all_dfs, ignore_index=True)
 
-    # Remove duplicates based on key columns
-    dedup_cols = [
-        'behav_feature',
-        'model_name',
-        'n_splits',
-        'shuffle_mode',
-        'cv_mode',
-        'buffer_samples',
-        'context',
-    ]
-
-    actual_dedup_cols = [
-        col for col in dedup_cols if col in consolidated_df.columns]
-
-    if actual_dedup_cols:
-        before_dedup = len(consolidated_df)
-        consolidated_df = consolidated_df.drop_duplicates(
-            subset=actual_dedup_cols,
-            keep='first',
-        )
-        if verbosity > 1:
-            print(
-                f'Removed {before_dedup - len(consolidated_df)} duplicate rows')
-
     # Sort by model_name and behav_feature for cleaner output
     sort_cols = []
     if 'model_name' in consolidated_df.columns:
@@ -909,8 +944,23 @@ def run_regression_cv(
         X_tr = X[tr].copy()
         X_te = X[te].copy()
         if do_detrend:
+            cv_mode = getattr(config, 'cv_mode', None)
+            use_per_block = (
+                groups is not None
+                and (
+                    getattr(config, 'detrend_per_block', True)
+                    or (cv_mode in BLOCK_CV_MODES)
+                )
+            )
             X_tr, X_te = _maybe_detrend_neural(
-                X_tr, X_te, T_full[tr], T_full[te], degree=detrend_degree
+                X_tr,
+                X_te,
+                T_full[tr],
+                T_full[te],
+                degree=detrend_degree,
+                groups_tr=groups[tr] if groups is not None else None,
+                groups_te=groups[te] if groups is not None else None,
+                per_block=use_per_block,
             )
 
         if np.unique(y_tr).size <= 1:
@@ -1008,8 +1058,23 @@ def run_classification_cv(
         X_tr = X[tr].copy()
         X_te = X[te].copy()
         if do_detrend:
+            cv_mode = getattr(config, 'cv_mode', None)
+            use_per_block = (
+                groups is not None
+                and (
+                    getattr(config, 'detrend_per_block', True)
+                    or (cv_mode in BLOCK_CV_MODES)
+                )
+            )
             X_tr, X_te = _maybe_detrend_neural(
-                X_tr, X_te, T_full[tr], T_full[te], degree=detrend_degree
+                X_tr,
+                X_te,
+                T_full[tr],
+                T_full[te],
+                degree=detrend_degree,
+                groups_tr=groups[tr] if groups is not None else None,
+                groups_te=groups[te] if groups is not None else None,
+                per_block=use_per_block,
             )
 
         scaler = StandardScaler()

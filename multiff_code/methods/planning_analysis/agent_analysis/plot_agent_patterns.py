@@ -149,10 +149,13 @@ def build_conditioned_subset(
 
     mask = np.ones(len(df), dtype=bool)
 
-    for key, value in fixed_values.items():
-        if key not in df.columns:
-            continue
-        mask &= df[key] == value
+    if fixed_values is not None:
+        for key, value in fixed_values.items():
+            if key not in df.columns:
+                continue
+            mask &= df[key] == value
+    else:
+        mask = np.ones(len(df), dtype=bool)
 
     subset = df[mask]
 
@@ -204,7 +207,8 @@ def plot_conditional(
 
     subset, fixed_values = build_conditioned_subset(
         df=df,
-        verbose=verbose
+        verbose=verbose,
+        fixed_values=fixed_values
     )
 
     if subset is None:

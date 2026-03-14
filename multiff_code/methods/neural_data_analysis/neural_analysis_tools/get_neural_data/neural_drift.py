@@ -380,8 +380,6 @@ def detrend_features_cv_covariates(X_train, X_test, T_train, T_test):
         lr.fit(T_train, X_train[:, j])
         X_train_dt[:, j] = X_train[:, j] - lr.predict(T_train)
         X_test_dt[:, j] = X_test[:, j] - lr.predict(T_test)
-        
-    print('detrended X_train and X_test')
 
     return X_train_dt, X_test_dt
 

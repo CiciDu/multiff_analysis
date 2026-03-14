@@ -1,12 +1,10 @@
 import os
 
-# Third-party imports
-
 # Neuroscience specific imports
 from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+    encoding_design_utils,
     encoder_gam_helper,
-    encode_stops_utils,
 )
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     collect_stop_data
@@ -69,6 +67,11 @@ class FFVisEncodingRunner(BaseEncodingRunner):
         print('[EncodingRunner] Computing design matrices from scratch')
         design_kwargs = self._encoding_design_kwargs()
 
+
+        self.ff_on_df, self.group_on_df = decode_vis_utils.extract_ff_visibility_tables_fast(self.pn.ff_dataframe)
+
+
+
         (
             self.pn,
             self.binned_spikes,
@@ -76,11 +79,13 @@ class FFVisEncodingRunner(BaseEncodingRunner):
             self.meta_df_used,
             self.temporal_meta,
             self.tuning_meta,
-        ) = encode_stops_utils.build_stop_encoding_design(
+        ) = encoding_design_utils.build_vis_encoding_design(
             self.pn,
             datasets,
             new_seg_info,
             events_with_stats,
+            self.ff_on_df,
+            self.group_on_df,
             self.bin_width,
             add_stop_cluster_features=False,
             add_retry_features=False,

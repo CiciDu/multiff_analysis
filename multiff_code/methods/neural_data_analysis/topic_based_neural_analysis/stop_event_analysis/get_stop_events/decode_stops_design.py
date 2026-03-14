@@ -42,7 +42,7 @@ np.set_printoptions(suppress=True)
 # =============================================================================
 
 
-def build_stop_design(
+def build_stop_design_for_glm(
     new_seg_info: pd.DataFrame,
     events_with_stats: pd.DataFrame,
     monkey_information: pd.DataFrame,
@@ -248,7 +248,6 @@ def build_stop_design_decoding(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build stop design for decoding (minimal event design, no interaction columns).
-    Same interface as build_stop_design but uses build_event_design_for_decoding.
     """
     bins_2d, meta = event_binning.event_windows_to_bins2d(
         new_seg_info, bin_dt=bin_dt, only_ok=False, global_bins_2d=global_bins_2d

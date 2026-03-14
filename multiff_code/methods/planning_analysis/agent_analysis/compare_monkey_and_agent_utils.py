@@ -165,3 +165,56 @@ def add_agent_id_and_essential_agent_params_info_to_df(df, model_folder_name):
         df['id'] = agent_id
 
     return df, agent_id
+
+
+def prepare_agent_monkey_comparison_df(
+    agent_median_df,
+    monkey_median_df,
+    agent_perc_df,
+    monkey_perc_df,
+    max_agents=None
+):
+    """
+    Combine agent and monkey dataframes and optionally limit number of agent ids.
+
+    Parameters
+    ----------
+    agent_median_df : pd.DataFrame
+    monkey_median_df : pd.DataFrame
+    agent_perc_df : pd.DataFrame
+    monkey_perc_df : pd.DataFrame
+    max_agents : int or None, optional
+        Maximum number of agent ids to keep (excluding 'monkey').
+        If None, all agent ids are kept.
+
+    Returns
+    -------
+    both_median_df : pd.DataFrame
+    both_perc_df : pd.DataFrame
+    new_both_perc_df : pd.DataFrame
+    """
+
+    # combine median dfs
+    both_median_df = pd.concat([agent_median_df, monkey_median_df], axis=0)
+    both_median_df = process_variations_utils.make_new_df_for_plotly_comparison(both_median_df)
+
+    # combine perc dfs
+    monkey_perc_df = monkey_perc_df.copy()
+    monkey_perc_df['id'] = 'monkey'
+    both_perc_df = pd.concat([agent_perc_df, monkey_perc_df], axis=0)
+
+    # optionally reduce number of agent ids
+    if max_agents is not None:
+        ids = both_median_df['id'].unique()
+        ids_to_keep = ['monkey'] + [i for i in ids if i != 'monkey'][:max_agents]
+
+        both_median_df = both_median_df[both_median_df['id'].isin(ids_to_keep)].copy()
+        both_perc_df = both_perc_df[both_perc_df['id'].isin(ids_to_keep)].copy()
+
+    # process perc df
+    new_both_perc_df = process_variations_utils.make_new_df_for_plotly_comparison(
+        both_perc_df,
+        match_rows_based_on_ref_columns_only=False
+    )
+
+    return both_median_df, both_perc_df, new_both_perc_df

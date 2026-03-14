@@ -3,20 +3,16 @@ import warnings
 from typing import Dict, List, Optional, Tuple, Union, Any
 import re
 
-from typing import Optional, Tuple, Dict
 import numpy as np
 import pandas as pd
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
-import numpy as np
-import pandas as pd
 
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_glm_design
 from neural_data_analysis.design_kits.design_around_event import event_binning
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    FitResult,
     GroupSpec,
 )
 
@@ -119,7 +115,7 @@ def _fill_covariate_from_aliases(
     if required and missing:
         missing_msg = ', '.join([f'{t} (aliases: {a})' for t, a in missing])
         raise ValueError(
-            'Missing required stop-encoding covariates after build_stop_design: '
+            'Missing required stop-encoding covariates after building design: '
             f'{missing_msg}. '
             'Provide these columns in monkey_information (or via custom_rename) '
             'so they can be aggregated into binned_feats.'
@@ -270,8 +266,7 @@ def monkey_information_for_encoding(
     Wrapper to make monkey_information use one_ff-style column names for encoding design.
 
     Renames planning/pipeline columns (e.g. target_distance, speed) to one_ff names
-    (r_targ, v) so that extra_agg_cols in build_stop_design picks them up when
-    building the encoding design.
+    (r_targ, v) 
 
     Parameters
     ----------
@@ -640,6 +635,71 @@ def build_temporal_design_from_event_times(
     }
 
     return temporal_df, temporal_meta
+
+
+def build_vis_encoding_design(
+    pn,
+    datasets,
+    new_seg_info,
+    events_with_stats,
+    ff_on_df: pd.DataFrame,
+    group_on_df: pd.DataFrame,
+    bin_width: float,
+    *,
+    add_stop_cluster_features: bool = False,
+    add_retry_features: bool = False,
+    **design_kwargs,
+):
+    """
+    Build vis (ff visibility) encoding design: stop design + ff/group temporal bases.
+
+    Calls build_stop_encoding_design then adds ff_on, ff_off, group_ff_on, group_ff_off
+    temporal designs.
+    """
+    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+        encode_stops_utils,
+        encode_vis_utils,
+    )
+
+    (
+        pn,
+        binned_spikes,
+        binned_feats,
+        meta_df_used,
+        temporal_meta,
+        tuning_meta,
+    ) = encode_stops_utils.build_stop_encoding_design(
+        pn,
+        datasets,
+        new_seg_info,
+        events_with_stats,
+        bin_width,
+        add_stop_cluster_features=add_stop_cluster_features,
+        add_retry_features=add_retry_features,
+        **design_kwargs,
+    )
+
+    # binned_feats, temporal_meta = encode_vis_utils.add_ff_visibility_temporal_designs(
+    #     binned_feats,
+    #     temporal_meta,
+    #     meta_df_used,
+    #     ff_on_df,
+    #     group_on_df,
+    #     bin_width,
+    #     n_basis=design_kwargs.get('n_basis', 20),
+    #     t_min=design_kwargs.get('t_min', -0.3),
+    #     t_max=design_kwargs.get('t_max', 0.3),
+    # )
+
+    return (
+        pn,
+        binned_spikes,
+        binned_feats,
+        meta_df_used,
+        temporal_meta,
+        tuning_meta,
+    )
+
 
 def build_hist_meta_from_colnames(
     colnames: Dict[str, List[str]],

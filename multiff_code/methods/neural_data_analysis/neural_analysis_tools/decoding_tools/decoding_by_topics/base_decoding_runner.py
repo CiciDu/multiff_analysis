@@ -55,12 +55,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     def get_detrend_covariates(self):
         """Return DataFrame with time, trial_index, etc. for detrending.
         Override to add more columns (e.g. from rebinned_y_var)."""
-        # if getattr(self, 'target_df', None) is None:
-        #     self._get_target_df()
-        # self.detrend_covariates = self.target_df[['time']].copy()
+        if getattr(self, 'target_df', None) is None:
+            self._get_target_df()
+        self.detrend_covariates = self.target_df[['time']].copy()
         
-        ## disbable detrending for now
-        self.detrend_covariates = None
+        # ## disbable detrending for now
+        # self.detrend_covariates = None
         return self.detrend_covariates
 
     def _get_neural_matrix(self) -> np.ndarray:
@@ -102,6 +102,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
+        use_detrend: bool = True,
     ) -> pd.DataFrame:
 
         if save_dir is None:
@@ -122,6 +123,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             load_if_exists=load_if_exists,
             load_existing_only=load_existing_only,
             cv_decoding_verbosity=cv_decoding_verbosity,
+            use_detrend=use_detrend,
         )
         
         if cv_mode is not None and 'cv_mode' in self.all_results.columns:
@@ -413,6 +415,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
+        use_detrend: bool = True,
     ) -> pd.DataFrame:
         """
         Run cross-validated model-spec decoding with optional nested CV
@@ -462,6 +465,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 load_if_exists=load_if_exists,
                 load_existing_only=load_existing_only,
                 verbosity=cv_decoding_verbosity,
+                use_detrend=use_detrend,
             )
             results_df['model_name'] = model_name
 
@@ -491,10 +495,25 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists,
         load_existing_only,
         verbosity,
+        use_detrend: bool = True,
     ):
 
-        detrend_covariates = self.get_detrend_covariates()
-        detrend_suffix = "_detrend" if detrend_covariates is not None else ""
+        detrend_covariates = self.get_detrend_covariates() if use_detrend else None
+        groups = self._get_groups()
+        detrend_per_block = spec.get("detrend_per_block", True)
+        block_cv_modes = ("blocked_time_buffered", "blocked_time", "group_kfold")
+        use_per_block = (
+            detrend_covariates is not None
+            and groups is not None
+            and cv_mode in block_cv_modes
+            and detrend_per_block
+        )
+        if detrend_covariates is None:
+            detrend_suffix = ""
+        elif use_per_block:
+            detrend_suffix = "_detrend_perblock"
+        else:
+            detrend_suffix = "_detrend"
         if fit_kernelwidth:
             model_save_path = Path(save_dir) / "cv_decoding" / "cvnested" / f"{model_name}_n{n_splits}_inner{inner_cv_splits}_{cv_mode}{detrend_suffix}.pkl"
         else:
@@ -532,6 +551,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             classification_model_kwargs=spec.get("classification_model_kwargs", {}),
             use_early_stopping=False,
             cv_mode=cv_mode,
+            detrend_per_block=spec.get("detrend_per_block", True),
         )
 
         # --------------------------------------------------------
@@ -548,6 +568,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 model_save_path=model_save_path,
                 verbosity=verbosity,
                 shuffle_mode=shuffle_mode,
+                detrend_covariates=detrend_covariates,
             )
         else:
             result_save_dir = Path(save_dir) / f"fixed_kernelwidth_{fixed_width}"
@@ -562,6 +583,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 load_existing_only=load_existing_only,
                 model_save_path=model_save_path,
                 verbosity=verbosity,
+                detrend_covariates=detrend_covariates,
             )
 
 
@@ -622,13 +644,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_existing_only,
         model_save_path,
         verbosity,
+        detrend_covariates=None,
     ):
 
         X = self._get_neural_matrix()
         if fixed_width > 0:
             X = decode_stops_utils.smooth_signal(X, int(fixed_width))
-
-        detrend_covariates = self.get_detrend_covariates()
 
         results_df = cv_decoding.run_cv_decoding(
             X=X,
@@ -688,6 +709,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         cv_mode,
         verbosity,
         shuffle_mode,
+        detrend_covariates=None,
     ):
 
         from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
@@ -697,7 +719,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         X = self._get_neural_matrix()
         y_df = self._get_target_df()
         groups = self._get_groups()
-        detrend_covariates = self.get_detrend_covariates()
+        # detrend_covariates passed from caller (None when use_detrend=False)
 
         outer_splits = _build_folds(
             len(X),

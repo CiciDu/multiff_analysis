@@ -1,4 +1,5 @@
 from data_wrangling import time_calib_utils
+from reinforcement_learning.base_classes import env_utils
 
 import os
 import re
@@ -255,12 +256,20 @@ def _retrieve_ff_info_in_npz_from_txt_data(processed_data_folder_path):
 def _retrieve_ff_flash_sorted_in_npz(processed_data_folder_path):
     npz_file_for_flash = os.path.join(os.path.join(
         processed_data_folder_path, 'ff_flash_sorted.npz'))
-    loaded_ff_flash_sorted = np.load(npz_file_for_flash, allow_pickle=True)
-    ff_flash_sorted = []
-    # for keys, values in loaded_ff_flash_sorted.items():
-    #     ff_flash_sorted.append(values)
-    for file in loaded_ff_flash_sorted.files:
-        ff_flash_sorted.append(loaded_ff_flash_sorted[file])
+    loaded = np.load(npz_file_for_flash, allow_pickle=True)
+    if 'ff_flash_ids' in loaded:
+        ff_ids = loaded['ff_flash_ids']
+        starts = loaded['ff_flash_starts']
+        ends = loaded['ff_flash_ends']
+        num_ff = int(loaded['num_ff'])
+        ff_flash_sorted = env_utils.rebuild_ff_flash(ff_ids, starts, ends, num_ff)
+    else:
+        # jagged list format (arr_0, arr_1, ...)
+        files_sorted = sorted(
+            loaded.files,
+            key=lambda x: int(x.split('_')[1]) if x.startswith('arr_') else -1
+        )
+        ff_flash_sorted = [loaded[f] for f in files_sorted]
     print(f"Loaded ff_flash_sorted from {npz_file_for_flash}")
     return ff_flash_sorted
 

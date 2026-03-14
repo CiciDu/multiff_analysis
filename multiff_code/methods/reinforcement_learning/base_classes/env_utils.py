@@ -220,35 +220,42 @@ def update_noisy_ffxy(ffx_noisy, ffy_noisy, ffx, ffy, ff_uncertainty_all, visibl
     ffxy_noisy = np.stack((ffx_noisy, ffy_noisy), axis=1)
     return ffx_noisy, ffy_noisy, ffxy_noisy
 
-
 def find_visible_ff(time, ff_distance_all, ff_angle_all,
-                    invisible_distance, invisible_angle, ff_flash):
+                    invisible_distance, invisible_angle,
+                    ff_flash_ids=None, ff_flash_starts=None, ff_flash_ends=None):
     """
-    Returns indices (relative to inputs) of fireflies visible at `time`.
-    Uses NumPy arrays (not torch).
+    Fully vectorized visibility computation.
+
+    Returns indices of visible fireflies.
     """
+
     ff_distance_all = np.asarray(ff_distance_all)
     ff_angle_all = np.asarray(ff_angle_all)
 
-    # distance + angle gates
-    visible_ff = np.logical_and(
-        ff_distance_all < invisible_distance,
-        np.abs(ff_angle_all) < invisible_angle
+    # --- geometric gate ---
+    visible_mask = (
+        (ff_distance_all < invisible_distance) &
+        (np.abs(ff_angle_all) < invisible_angle)
     )
 
-    if ff_flash is not None:
-        # Among currently geometrically visible, keep only those flashing now
-        idx = np.where(visible_ff)[0]
-        for i in idx:
-            intervals = np.asarray(ff_flash[i])
-            # Expect shape (M, 2) with [start, end]
-            on_now = np.any((intervals[:, 0] <= time)
-                            & (intervals[:, 1] >= time))
-            if not on_now:
-                visible_ff[i] = False
+    if ff_flash_ids is None:
+        return np.nonzero(visible_mask)[0]
 
-    return np.where(visible_ff)[0]
+    # --- flash gate ---
+    flashing = (
+        (ff_flash_starts <= time) &
+        (ff_flash_ends >= time)
+    )
 
+    active_ids = ff_flash_ids[flashing]
+
+    # mark flashing fireflies
+    flash_mask = np.zeros_like(visible_mask, dtype=bool)
+    flash_mask[active_ids] = True
+
+    final_mask = visible_mask & flash_mask
+
+    return np.nonzero(final_mask)[0]
 
 def get_env_default_kwargs(env_cls):
     """Return all __init__ keyword arguments and their defaults for an environment class.
@@ -268,3 +275,50 @@ def get_env_default_kwargs(env_cls):
                 if param.default is not inspect.Parameter.empty:
                     kwargs[name] = param.default
     return kwargs
+
+def preprocess_flash_intervals(ff_flash):
+    """
+    Convert ragged flash list into flat arrays for fast querying.
+
+    Returns
+    -------
+    ff_ids : (K,) int
+        firefly id for each interval
+    starts : (K,) float
+    ends : (K,) float
+    """
+
+    ff_ids = []
+    starts = []
+    ends = []
+
+    for i, intervals in enumerate(ff_flash):
+        if intervals.size == 0:
+            continue
+        ff_ids.append(np.full(len(intervals), i))
+        starts.append(intervals[:, 0])
+        ends.append(intervals[:, 1])
+
+    ff_ids = np.concatenate(ff_ids)
+    starts = np.concatenate(starts)
+    ends = np.concatenate(ends)
+
+    return ff_ids, starts, ends
+
+
+def rebuild_ff_flash(ff_ids, starts, ends, num_ff):
+    counts = np.bincount(ff_ids, minlength=num_ff)
+
+    ff_flash = []
+    offset = 0
+
+    for c in counts:
+        ff_flash.append(
+            np.column_stack((
+                starts[offset:offset+c],
+                ends[offset:offset+c]
+            )).astype(np.float32)
+        )
+        offset += c
+
+    return ff_flash

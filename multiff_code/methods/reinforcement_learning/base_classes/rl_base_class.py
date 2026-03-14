@@ -635,10 +635,14 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  ff_believed_position_sorted=self.ff_believed_position_sorted,
                  ff_flash_end_sorted=self.ff_flash_end_sorted)
 
-        # also save ff_flash_sorted
+        # also save ff_flash_sorted as flat arrays (ff_flash_ids, ff_flash_starts, ff_flash_ends)
         npz_flash = os.path.join(os.path.join(
             self.processed_data_folder_path, 'ff_flash_sorted.npz'))
-        np.savez(npz_flash, *self.ff_flash_sorted)
+        ff_ids, starts, ends = env_utils.preprocess_flash_intervals(
+            self.ff_flash_sorted)
+        num_ff = len(self.ff_flash_sorted)
+        np.savez(npz_flash, ff_flash_ids=ff_ids, ff_flash_starts=starts,
+                 ff_flash_ends=ends, num_ff=num_ff)
         return
 
     def make_or_retrieve_ff_dataframe_for_agent(self, exists_ok=False, save_data=False):
@@ -1483,3 +1487,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
             except Exception as e:
                 print('Warning: failed to reset entropy temperature (alpha):', e)
+
+    def _prepare_to_find_patterns_and_features(self, find_patterns=True):
+        self.streamline_getting_data_from_agent(
+            n_steps=9000, exists_ok=True, save_data=True)
+        self.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.ff_dataframe, self.ff_real_position_sorted,
+                                                                    self.ff_caught_T_new, self.ff_life_sorted)
+        if find_patterns:
+            self.find_patterns()

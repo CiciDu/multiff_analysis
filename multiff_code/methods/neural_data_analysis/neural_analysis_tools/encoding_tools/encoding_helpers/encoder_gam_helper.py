@@ -52,6 +52,7 @@ STOP_VAR_CATEGORIES.update({
     ],
 })
 VIS_VAR_CATEGORIES = copy.deepcopy(STOP_VAR_CATEGORIES)
+VIS_VAR_CATEGORIES.update({'visibility_vars': ["ff_on", "group_ff_on", "ff_off", "group_ff_off"]})
 
 PN_VAR_CATEGORIES = copy.deepcopy(DEFAULT_VAR_CATEGORIES)
 PN_VAR_CATEGORIES.update({'event_vars': ["cur_ff_on", 'cur_ff_off']})

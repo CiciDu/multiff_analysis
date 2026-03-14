@@ -13,8 +13,6 @@ from typing import Optional, List
 from typing import Union
 
 
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
 # ---- Tunables for transforms ----
 DEFAULT_D0 = 25.0      # anchor for d_log = log1p(dist/d0)
 CLIP_DMAX = 1000.0      # clip distance before log
@@ -95,7 +93,7 @@ class MultiFF(gymnasium.Env):
                  arena_radius=2000,
                  num_alive_ff=800,
                  recentering_trigger_radius=None,
-                 seed: Optional[int] = None,
+                 seed: Optional[int] = 42,
                  **kwargs
                  ):
 
@@ -237,6 +235,9 @@ class MultiFF(gymnasium.Env):
         if use_random_ff is True:
             if self.make_ff_always_flash_on:
                 self.ff_flash = None
+                self.ff_flash_ids = None
+                self.ff_flash_starts = None
+                self.ff_flash_ends = None
             else:
                 self.ff_flash = env_utils.make_ff_flash_from_random_sampling(
                     self.num_alive_ff,
@@ -245,6 +246,8 @@ class MultiFF(gymnasium.Env):
                     flash_on_interval=self.flash_on_interval,
                     rng=self.np_random,
                 )
+                self.ff_flash_ids, self.ff_flash_starts, self.ff_flash_ends = \
+                        env_utils.preprocess_flash_intervals(self.ff_flash)
             self._random_ff_positions(ff_index=np.arange(self.num_alive_ff))
 
         # reset agent
@@ -631,16 +634,35 @@ class MultiFF(gymnasium.Env):
         self.angle_to_center_sel_ff_noisy = np.array([])
 
     def _get_ff_pos(self):
-        # squared distances (N,)
+        """
+        Compute firefly distances and angles relative to agent.
+        Optimized: single-pass vectorized geometry.
+        """
+
         dx = self.ffxy[:, 0] - self.agentxy[0]
         dy = self.ffxy[:, 1] - self.agentxy[1]
+
         dist2 = dx * dx + dy * dy
+        dist = np.sqrt(dist2, dtype=np.float32)
+
         self.ff_distance2_all = dist2
-        self.ff_distance_all = np.sqrt(dist2).astype(np.float32)
-        self.angle_to_center_all, self.angle_to_boundary_all = env_utils.calculate_angles_to_ff(
-            self.ffxy, self.agentxy[0], self.agentxy[1], self.agentheading,
-            self.ff_radius, ffdistance=self.ff_distance_all)
-        return
+        self.ff_distance_all = dist
+
+        # --- angle to center ---
+        angle_center = np.arctan2(dy, dx) - self.agentheading
+        angle_center = np.remainder(angle_center, 2 * np.pi)
+        angle_center[angle_center > np.pi] -= 2 * np.pi
+
+        # --- angle to boundary ---
+        hyp = np.clip(dist, self.ff_radius, None)
+        theta = np.arcsin(self.ff_radius / hyp)
+
+        angle_boundary_abs = np.clip(np.abs(angle_center) - theta, 0.0, None)
+        angle_boundary = np.sign(angle_center) * angle_boundary_abs
+
+        self.angle_to_center_all = angle_center
+        self.angle_to_boundary_all = angle_boundary
+        
 
     def _update_visible_ff_indices(self):
         # Case 1: force all visible
@@ -659,8 +681,14 @@ class MultiFF(gymnasium.Env):
 
         # ----- Main case -----
         vis_mask = env_utils.find_visible_ff(
-            self.time, self.ff_distance_all, self.angle_to_boundary_all,
-            self.invisible_distance, self.invisible_angle, self.ff_flash
+            self.time,
+            self.ff_distance_all,
+            self.angle_to_boundary_all,
+            self.invisible_distance,
+            self.invisible_angle,
+            self.ff_flash_ids,
+            self.ff_flash_starts,
+            self.ff_flash_ends
         )
 
         # Convert indices → boolean mask if needed
@@ -846,11 +874,15 @@ class MultiFF(gymnasium.Env):
         vis = self.visible_ff_indices
 
         prev_vis = getattr(self, '_prev_vis', np.array([], dtype=np.int32))
+        
+        mask_vis = np.zeros(self.num_alive_ff, dtype=bool)
+        mask_vis[vis] = True
 
-        newly_invisible = np.setdiff1d(prev_vis, vis, assume_unique=False)
-        still_invisible = np.setdiff1d(
-            np.arange(self.num_alive_ff), np.union1d(vis, newly_invisible)
-        )
+        mask_prev = np.zeros(self.num_alive_ff, dtype=bool)
+        mask_prev[prev_vis] = True
+
+        newly_invisible = np.where(mask_prev & ~mask_vis)[0]
+        still_invisible = np.where(~mask_vis & ~mask_prev)[0]
 
         # Visible → perception noise
         if vis.size:
@@ -1019,81 +1051,79 @@ class MultiFF(gymnasium.Env):
 
         return mask
 
-
     def _assign_slots_rank_keep(self, K):
-        """
-        Rank-keep assignment (enhanced, clean version):
-        - Rank all *eligible* FFs by distance (eligibility from _eligibility_mask()).
-        - Keep only the top-K.
-        - If a previously bound FF remains in top-K, it keeps its slot index.
-        - Fill remaining empty slots with top-ranked unbound FFs.
-        """
-        ff_dist = np.asarray(self.ff_distance_all, dtype=float)
+
+        ff_dist = self.ff_distance_all
         base_mask = self._eligibility_mask()
 
-        # 1️⃣ Get all eligible FFs sorted by distance
-        eligible_ids = np.nonzero(base_mask)[0].astype(np.int32)
+        eligible_ids = np.nonzero(base_mask)[0]
         if eligible_ids.size == 0:
             return np.full(K, -1, dtype=np.int32)
 
         ranked = eligible_ids[np.argsort(ff_dist[eligible_ids])]
         sel_ff = ranked[:K]
 
-        prev_slots = np.asarray(self.slot_ids, dtype=np.int32)
+        prev_slots = self.slot_ids
         new_slots = np.full(K, -1, dtype=np.int32)
 
-        # 2️⃣ Keep persistent FFs that remain in top-K
-        persistent_mask = (prev_slots >= 0) & np.isin(prev_slots, sel_ff)
-        persistent_pos = np.where(persistent_mask)[0]
-        persistent_ids = prev_slots[persistent_pos]
-        if persistent_pos.size:
+        # --- boolean lookup ---
+        sel_mask = np.zeros(self.num_alive_ff, dtype=bool)
+        sel_mask[sel_ff] = True
+
+        persistent_pos = []
+        persistent_ids = []
+
+        for s in range(K):
+            sid = prev_slots[s]
+            if sid >= 0 and sel_mask[sid]:
+                persistent_pos.append(s)
+                persistent_ids.append(sid)
+
+        if persistent_pos:
             new_slots[persistent_pos] = persistent_ids
 
-        # 3️⃣ Fill remaining empty slots with top-ranked unbound FFs
-        remaining = sel_ff[~np.isin(sel_ff, persistent_ids)]
+        # --- fill remaining slots ---
+        used_mask = np.zeros(self.num_alive_ff, dtype=bool)
+        used_mask[persistent_ids] = True
+
         empty_slots = np.where(new_slots < 0)[0]
-        n_fill = min(empty_slots.size, remaining.size)
-        if n_fill > 0:
-            new_slots[empty_slots[:n_fill]] = remaining[:n_fill]
+
+        fill_ids = sel_ff[~used_mask[sel_ff]]
+
+        n = min(len(empty_slots), len(fill_ids))
+        if n:
+            new_slots[empty_slots[:n]] = fill_ids[:n]
 
         return new_slots
 
     def _assign_slots_drop_fill(self):
-        """
-        Default assignment (drop_fill):
-        - Drops invalids among currently bound FFs (no longer eligible).
-        - Fills empty slots with nearest unbound eligible FFs.
-        - Eligibility determined by _eligibility_mask(), which
-            already encodes visible_only vs visible_and_memory logic.
-        """
-        slots = np.asarray(self.slot_ids, dtype=np.int32).copy()
+
+        slots = self.slot_ids.copy()
         base_mask = self._eligibility_mask()
-        ff_dist = np.asarray(self.ff_distance_all, dtype=float)
+        ff_dist = self.ff_distance_all
 
-        # 1️⃣ Drop invalids
-        valid_slots_mask = slots >= 0
-        if np.any(valid_slots_mask):
-            ffids = slots[valid_slots_mask]
-            keep_now = base_mask[ffids]
-            drop_positions = np.where(valid_slots_mask)[0][~keep_now]
-            if drop_positions.size:
-                slots[drop_positions] = -1
+        # drop invalid
+        for i in range(len(slots)):
+            sid = slots[i]
+            if sid >= 0 and not base_mask[sid]:
+                slots[i] = -1
 
-        # 2️⃣ Choose candidates: all eligible and unbound FFs
-        candidates = np.nonzero(base_mask)[0].astype(np.int32)
-        if candidates.size:
-            bound = slots[slots >= 0]
-            cand = candidates[~np.isin(
-                candidates, bound)] if bound.size else candidates
-            if cand.size:
-                order = np.argsort(ff_dist[cand])
-                candidates = cand[order]
+        # candidates
+        candidates = np.nonzero(base_mask)[0]
 
-                # 3️⃣ Fill empty slots with nearest eligible FFs
-                empty_slots = np.where(slots < 0)[0]
-                n = min(empty_slots.size, candidates.size)
-                if n:
-                    slots[empty_slots[:n]] = candidates[:n]
+        bound_mask = np.zeros(self.num_alive_ff, dtype=bool)
+        bound_ids = slots[slots >= 0]
+        bound_mask[bound_ids] = True
+
+        cand = candidates[~bound_mask[candidates]]
+
+        if cand.size:
+            cand = cand[np.argsort(ff_dist[cand])]
+
+            empty = np.where(slots < 0)[0]
+            n = min(len(empty), len(cand))
+
+            slots[empty[:n]] = cand[:n]
 
         return slots
 
