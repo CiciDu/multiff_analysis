@@ -4,20 +4,13 @@ from __future__ import annotations
 
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 import pandas as pd
-from catboost import CatBoostRegressor
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score
-from sklearn.preprocessing import StandardScaler
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
     decode_stops_utils, plot_decoding_utils
-)
-from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
-    cv_decoding,
 )
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
@@ -202,7 +195,7 @@ class OneFFStyleDecodingRunner:
         candidate_widths: Sequence[int] = tuple(range(1, 21, 1)),
         fixed_width: int = 25,
         n_splits: int = 5,
-        inner_cv_splits: int = 3,
+        inner_cv_splits: int = 5,
         cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
         buffer_samples: int = 20,
         save_path: Optional[str] = None,

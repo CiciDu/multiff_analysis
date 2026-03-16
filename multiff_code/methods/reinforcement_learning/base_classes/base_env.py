@@ -1,15 +1,13 @@
 # machine_learning/RL_models/env_related/MultiFF.py
-import inspect
 from typing import Optional, Dict
 from dataclasses import dataclass
 from reinforcement_learning.base_classes import env_utils
 
-import os
 import numpy as np
 import math
 from math import pi
 import gymnasium
-from typing import Optional, List
+from typing import List
 from typing import Union
 
 
@@ -252,7 +250,7 @@ class MultiFF(gymnasium.Env):
                 )
                 self.ff_flash_ids, self.ff_flash_starts, self.ff_flash_ends = \
                         env_utils.preprocess_flash_intervals(self.ff_flash)
-            self._random_ff_positions(ff_index=np.arange(self.num_alive_ff))
+            self.generate_random_ff_positions(ff_index=np.arange(self.num_alive_ff))
 
         # reset agent
         self.agentr = np.array([0.0], dtype=np.float32)
@@ -472,6 +470,7 @@ class MultiFF(gymnasium.Env):
         self.agentheading = float(
             np.remainder(self.agentheading + self.w * self.dt, 2 * pi)
         )
+        
 
     def recenter_and_respawn_ff(self, respawn_outer_radius=1000):
         """
@@ -548,7 +547,12 @@ class MultiFF(gymnasium.Env):
 
         self.ff_t_since_start_seen[self.newly_visible_ff] = self.dt
 
-    def _random_ff_positions(self, ff_index):
+
+    def generate_respawned_ff_locations(self):
+        self.generate_random_ff_positions(self._deferred_captured_ff)
+
+
+    def generate_random_ff_positions(self, ff_index):
         '''
         generate random positions for ff
         '''
@@ -1196,7 +1200,7 @@ class MultiFF(gymnasium.Env):
                             self.slot_ids[s] = -1
                 # respawn captured FFs for next step
                 if respawn_on_capture:
-                    self._random_ff_positions(self._deferred_captured_ff)
+                    self.generate_respawned_ff_locations()
                 else:
                     self._fill_ff_positions_with_na(self._deferred_captured_ff)
             # clear flags

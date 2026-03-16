@@ -97,7 +97,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         fit_kernelwidth: bool = True,
         candidate_widths: Sequence[int] = tuple(range(2, 6, 1)),
         fixed_width: int = 25,
-        inner_cv_splits: int = 3,
+        inner_cv_splits: int = 5,
         cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
         load_if_exists: bool = True,
         load_existing_only: bool = False,
@@ -410,7 +410,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         fit_kernelwidth: bool = False,
         candidate_widths: Sequence[int] = tuple(range(2, 6, 1)),
         fixed_width: int = 25,
-        inner_cv_splits: int = 3,
+        inner_cv_splits: int = 5,
         cv_mode: str = "blocked_time_buffered",
         load_if_exists: bool = True,
         load_existing_only: bool = False,
@@ -622,6 +622,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             model_save_path = Path(model_save_path)
 
         if not model_save_path.exists():
+            print('Model save path does not exist: ', model_save_path)
             return None
         with model_save_path.open("rb") as f:
             obj = pickle.load(f)

@@ -48,13 +48,20 @@ class BaseCollectInformation(base_env.MultiFF):
             self.ff_information[["index_in_ff_flash", "ff_lifetime_id"]].astype(int)
         )
 
-    def recenter_and_respawn_ff(self):
-        reward = super().recenter_and_respawn_ff()
-        self.add_to_ff_information_after_capturing_ff()
-        return reward
 
-    def add_to_ff_information_after_capturing_ff(self):
-        """Update ff_information when fireflies are captured."""
+    def calculate_reward(self):
+        reward = super().calculate_reward()
+        self.update_captured_ff_info()
+        return reward
+    
+    
+    def generate_respawned_ff_locations(self):
+        super().generate_respawned_ff_locations()
+        self.add_respawned_ff_info()
+
+
+
+    def update_captured_ff_info(self):
         if self.num_targets > 0:
             for slot_idx in self.captured_ff_index:
                 last_idx = np.where(
@@ -64,6 +71,11 @@ class BaseCollectInformation(base_env.MultiFF):
                 self.ff_information.loc[last_idx, "t_despawn"] = self.time
                 self.ff_information.loc[last_idx, "agent_x_at_capture"] = self.agentxy[0].item() + self.arena_center_global[0].item()
                 self.ff_information.loc[last_idx, "agent_y_at_capture"] = self.agentxy[1].item() + self.arena_center_global[1].item()
+
+
+    def add_respawned_ff_info(self):
+        """Update ff_information when fireflies are captured."""
+        if self.num_targets > 0:
 
             new_ff_info = pd.DataFrame(
                 np.ones([self.num_targets, len(self.ff_information_colnames)]) * (-9999),

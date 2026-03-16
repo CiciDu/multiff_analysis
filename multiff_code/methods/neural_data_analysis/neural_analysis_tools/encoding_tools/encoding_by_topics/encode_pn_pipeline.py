@@ -168,6 +168,7 @@ class PNEncodingRunner(BaseEncodingRunner):
 
         self._save_design_matrices()
 
+
     # def _prepare_spike_history_components(self):
     #     """Build encoding spike history if not yet available (e.g. after cache load)."""
     #     if self.X_hist is not None:
@@ -175,6 +176,7 @@ class PNEncodingRunner(BaseEncodingRunner):
     #     if self.binned_feats is None or self.binned_spikes is None:
     #         raise RuntimeError("Run collect_data first.")
     #     self.collect_data(exists_ok=False)
+
 
     def _get_save_dir(self):
         return os.path.join(

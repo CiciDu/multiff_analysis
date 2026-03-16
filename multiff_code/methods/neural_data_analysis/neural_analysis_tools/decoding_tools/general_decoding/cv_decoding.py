@@ -291,11 +291,11 @@ def _maybe_detrend_neural(
         return X_tr.copy(), X_te.copy()
 
     if per_block and groups_tr is not None and groups_te is not None:
-        print('detrended X_train and X_test by block')
+        #print('detrended X_train and X_test by block')
         return _detrend_neural_per_block(X_tr, X_te, T_tr, T_te, groups_tr, groups_te,
                                         detrend_features_cv_covariates)
                 
-    print('detrended X_train and X_test')
+    #print('detrended X_train and X_test')
     return detrend_features_cv_covariates(X_tr, X_te, T_tr, T_te)
 
 
@@ -403,6 +403,24 @@ def _build_folds(
     # -------- DEFAULT (NOT recommended for time series) --------
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     return list(kf.split(idx))
+
+
+def _infer_block_ids_from_splits(n, splits):
+    """
+    Infer a block id (fold id) for each sample index from CV splits.
+
+    Each sample is assigned the index of the fold in which it appears
+    as a test sample. This matches the notion that "each fold uses one block"
+    when using time- or group-blocked CV.
+    """
+    block_ids = -np.ones(n, dtype=int)
+    for k, (_, te) in enumerate(splits):
+        block_ids[te] = k
+    # Some CV schemes might leave a few points never in any test set;
+    # assign them to block 0 so they still get detrended.
+    if (block_ids < 0).any():
+        block_ids[block_ids < 0] = 0
+    return block_ids
 
 
 def make_feature_hash(feature, mode, n_splits, shuffle_mode, context, config):
@@ -937,6 +955,13 @@ def run_regression_cv(
     buffer_samples = getattr(config, 'buffer_samples', 20)
     if do_detrend:
         T_full = _build_detrend_design_matrix(detrend_covariates, degree=detrend_degree)
+        use_per_block = getattr(config, 'detrend_per_block', True) or (
+            getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+        )
+        block_ids = _infer_block_ids_from_splits(len(y), splits) if use_per_block else None
+
+
+    print('block_ids: ', block_ids)
 
     for tr, te in splits:
         y_tr = _shuffle_y_for_fold(y[tr], groups[tr], shuffle_mode, rng, buffer_samples)
@@ -944,15 +969,21 @@ def run_regression_cv(
         X_tr = X[tr].copy()
         X_te = X[te].copy()
         if do_detrend:
-            use_per_block = getattr(config, 'detrend_per_block', True) or (
-                getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
-            )
+            if use_per_block and block_ids is not None:
+                groups_tr = block_ids[tr]
+                groups_te = block_ids[te]
+            else:
+                groups_tr = None
+                groups_te = None
             X_tr, X_te = _maybe_detrend_neural(
-                X_tr, X_te, T_full[tr], T_full[te],
+                X_tr,
+                X_te,
+                T_full[tr],
+                T_full[te],
                 degree=detrend_degree,
-                groups_tr=np.zeros(X_tr.shape[0], dtype=int) if use_per_block else None,
-                groups_te=np.ones(X_te.shape[0], dtype=int) if use_per_block else None,
-                per_block=use_per_block,
+                groups_tr=groups_tr,
+                groups_te=groups_te,
+                per_block=use_per_block if do_detrend else False,
             )
 
         if np.unique(y_tr).size <= 1:
@@ -1038,6 +1069,10 @@ def run_classification_cv(
     buffer_samples = getattr(config, 'buffer_samples', 20)
     if do_detrend:
         T_full = _build_detrend_design_matrix(detrend_covariates, degree=detrend_degree)
+        use_per_block = getattr(config, 'detrend_per_block', True) or (
+            getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+        )
+        block_ids = _infer_block_ids_from_splits(len(y), splits) if use_per_block else None
 
     for tr, te in splits:
         y_tr = _shuffle_y_for_fold(y[tr], groups[tr], shuffle_mode, rng, buffer_samples)
@@ -1050,15 +1085,21 @@ def run_classification_cv(
         X_tr = X[tr].copy()
         X_te = X[te].copy()
         if do_detrend:
-            use_per_block = getattr(config, 'detrend_per_block', True) or (
-                getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
-            )
+            if use_per_block and block_ids is not None:
+                groups_tr = block_ids[tr]
+                groups_te = block_ids[te]
+            else:
+                groups_tr = None
+                groups_te = None
             X_tr, X_te = _maybe_detrend_neural(
-                X_tr, X_te, T_full[tr], T_full[te],
+                X_tr,
+                X_te,
+                T_full[tr],
+                T_full[te],
                 degree=detrend_degree,
-                groups_tr=np.zeros(X_tr.shape[0], dtype=int) if use_per_block else None,
-                groups_te=np.ones(X_te.shape[0], dtype=int) if use_per_block else None,
-                per_block=use_per_block,
+                groups_tr=groups_tr,
+                groups_te=groups_te,
+                per_block=use_per_block if do_detrend else False,
             )
 
         scaler = StandardScaler()

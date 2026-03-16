@@ -410,6 +410,7 @@ def build_design_with_spike_history_from_bins(
     t_max,
     n_basis=20,
     target_col: Optional[str] = None,
+    use_neural_coupling: bool = False,
     returnX_hist: bool = False,
 ):
     """
@@ -463,7 +464,11 @@ def build_design_with_spike_history_from_bins(
             f'target_col {target_col!r} not in colnames. '
             f'Available: {spike_cols}'
         )
-    cross_neurons = None
+
+    if use_neural_coupling:
+        cross_neurons = [c for c in spike_cols if c != target_col]
+    else:
+        cross_neurons = None
     # --------------------------------------------------
     # 3) Add history to design
     # --------------------------------------------------
