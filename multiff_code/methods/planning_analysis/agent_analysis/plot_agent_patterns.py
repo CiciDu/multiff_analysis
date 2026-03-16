@@ -244,6 +244,9 @@ def plot_conditional(
     ax.set_title(f'{y_key} vs {x_key}')
     ax.set_xlabel(x_key)
     ax.set_ylabel(y_key)
+    
+    # # set ylim
+    # ax.set_ylim(0, 100)
 
     if ax.figure:
         ax.figure.suptitle('')

@@ -679,17 +679,17 @@ def build_vis_encoding_design(
         **design_kwargs,
     )
 
-    # binned_feats, temporal_meta = encode_vis_utils.add_ff_visibility_temporal_designs(
-    #     binned_feats,
-    #     temporal_meta,
-    #     meta_df_used,
-    #     ff_on_df,
-    #     group_on_df,
-    #     bin_width,
-    #     n_basis=design_kwargs.get('n_basis', 20),
-    #     t_min=design_kwargs.get('t_min', -0.3),
-    #     t_max=design_kwargs.get('t_max', 0.3),
-    # )
+    binned_feats, temporal_meta = encode_vis_utils.add_ff_visibility_temporal_designs(
+        binned_feats,
+        temporal_meta,
+        meta_df_used,
+        ff_on_df,
+        group_on_df,
+        bin_width,
+        n_basis=design_kwargs.get('n_basis', 20),
+        t_min=design_kwargs.get('t_min', -0.3),
+        t_max=design_kwargs.get('t_max', 0.3),
+    )
 
     return (
         pn,

@@ -322,3 +322,7 @@ def rebuild_ff_flash(ff_ids, starts, ends, num_ff):
         offset += c
 
     return ff_flash
+
+
+def compute_episode_seed(base_seed, episode_id):
+    return (base_seed + episode_id * 1000003) % (2**32 - 1)

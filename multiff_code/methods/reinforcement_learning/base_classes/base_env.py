@@ -138,6 +138,8 @@ class MultiFF(gymnasium.Env):
         self.add_vel_cost_when_catching_ff_only = add_vel_cost_when_catching_ff_only
         self.noise_mode = noise_mode
         self.identity_slot_strategy = identity_slot_strategy
+        
+        self.episode_id = 0
 
         # parameters
         self.v_noise_std = v_noise_std
@@ -207,9 +209,11 @@ class MultiFF(gymnasium.Env):
             return an observation based on the reset environment
         '''
         print('TIME before resetting:', self.time)
+        self.episode_id += 1
         # Use explicit seed when provided; otherwise fall back to _default_seed for reproducibility
-        effective_seed = seed if seed is not None else self._default_seed
+        effective_seed = seed if seed is not None else env_utils.compute_episode_seed(self._default_seed, self.episode_id)
         super().reset(seed=effective_seed)
+        
         # self.np_random is now the canonical RNG; use it for all randomness
 
         print('current reward_boundary: ', self.reward_boundary)

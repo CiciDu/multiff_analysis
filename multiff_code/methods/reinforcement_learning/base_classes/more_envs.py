@@ -48,8 +48,8 @@ class BaseCollectInformation(base_env.MultiFF):
             self.ff_information[["index_in_ff_flash", "ff_lifetime_id"]].astype(int)
         )
 
-    def calculate_reward(self):
-        reward = super().calculate_reward()
+    def recenter_and_respawn_ff(self):
+        reward = super().recenter_and_respawn_ff()
         self.add_to_ff_information_after_capturing_ff()
         return reward
 

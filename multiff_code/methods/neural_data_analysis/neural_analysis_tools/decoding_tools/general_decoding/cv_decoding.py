@@ -944,22 +944,14 @@ def run_regression_cv(
         X_tr = X[tr].copy()
         X_te = X[te].copy()
         if do_detrend:
-            cv_mode = getattr(config, 'cv_mode', None)
-            use_per_block = (
-                groups is not None
-                and (
-                    getattr(config, 'detrend_per_block', True)
-                    or (cv_mode in BLOCK_CV_MODES)
-                )
+            use_per_block = getattr(config, 'detrend_per_block', True) or (
+                getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
             )
             X_tr, X_te = _maybe_detrend_neural(
-                X_tr,
-                X_te,
-                T_full[tr],
-                T_full[te],
+                X_tr, X_te, T_full[tr], T_full[te],
                 degree=detrend_degree,
-                groups_tr=groups[tr] if groups is not None else None,
-                groups_te=groups[te] if groups is not None else None,
+                groups_tr=np.zeros(X_tr.shape[0], dtype=int) if use_per_block else None,
+                groups_te=np.ones(X_te.shape[0], dtype=int) if use_per_block else None,
                 per_block=use_per_block,
             )
 
@@ -1058,22 +1050,14 @@ def run_classification_cv(
         X_tr = X[tr].copy()
         X_te = X[te].copy()
         if do_detrend:
-            cv_mode = getattr(config, 'cv_mode', None)
-            use_per_block = (
-                groups is not None
-                and (
-                    getattr(config, 'detrend_per_block', True)
-                    or (cv_mode in BLOCK_CV_MODES)
-                )
+            use_per_block = getattr(config, 'detrend_per_block', True) or (
+                getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
             )
             X_tr, X_te = _maybe_detrend_neural(
-                X_tr,
-                X_te,
-                T_full[tr],
-                T_full[te],
+                X_tr, X_te, T_full[tr], T_full[te],
                 degree=detrend_degree,
-                groups_tr=groups[tr] if groups is not None else None,
-                groups_te=groups[te] if groups is not None else None,
+                groups_tr=np.zeros(X_tr.shape[0], dtype=int) if use_per_block else None,
+                groups_te=np.ones(X_te.shape[0], dtype=int) if use_per_block else None,
                 per_block=use_per_block,
             )
 

@@ -719,7 +719,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         X = self._get_neural_matrix()
         y_df = self._get_target_df()
         groups = self._get_groups()
-        # detrend_covariates passed from caller (None when use_detrend=False)
+        # detrend_covariates passed from caller (None when use_detrend=True)
 
         outer_splits = _build_folds(
             len(X),
