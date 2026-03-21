@@ -14,6 +14,19 @@ from data_wrangling import combine_info_utils
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding
 
 
+# ==========================================================
+# VARIABLE CATEGORIES (DECODING)
+# ==========================================================
+
+DEFAULT_DECODING_VAR_CATEGORIES = {
+    "sensory_vars": ["v", "w", "accel", "ang_accel"],
+    "latent_vars": ["cur_ff_distance", "cur_ff_angle", "nxt_ff_distance", "nxt_ff_angle"],
+    "position_vars": ["d", "phi"],
+    "eye_position_vars": ["eye_ver", "eye_hor"],
+    "event_vars": ["stop"],
+}
+
+
 def collect_all_session_decoding_results(
     raw_data_dir_name,
     monkey_name,
@@ -21,6 +34,8 @@ def collect_all_session_decoding_results(
     verbose=False,
     shuffle_mode='none',
     fit_kernelwidth=True,
+    use_detrend=None,
+    detrend_per_block=None,
 ):
     """
     Collect existing CV decoding results across all sessions for one monkey.
@@ -38,6 +53,14 @@ def collect_all_session_decoding_results(
     shuffle_mode : str, optional
         Shuffle mode ('none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group').
         Default is 'none'.
+    fit_kernelwidth : bool, optional
+        Whether to load nested CV (fit kernelwidth) or fixed-width results.
+    use_detrend : bool, optional
+        If True, keep only results from detrended runs. If False, keep only
+        non-detrended. If None (default), keep all.
+    detrend_per_block : bool, optional
+        When use_detrend=True: if True, only per-block detrended; if False,
+        only global detrended; if None, both.
 
     Returns
     -------
@@ -81,6 +104,8 @@ def collect_all_session_decoding_results(
             save_dir=models_save_dir,
             load_existing_only=True,
             verbosity=1 if verbose else 0,
+            use_detrend=use_detrend,
+            detrend_per_block=detrend_per_block,
         )
 
         session_results_df['data_name'] = row['data_name']
@@ -172,31 +197,67 @@ def _prepare_decoding_df(decoding_results_df):
     return df
 
 
+def _build_var_category_lookup(var_categories):
+    lookup = {}
+    for cat, vars_list in var_categories.items():
+        for v in vars_list:
+            lookup[v] = cat
+    return lookup
+
+
+def _add_var_category_column(df, var_categories, feature_col='behav_feature', category_col='var_category'):
+    if var_categories is None:
+        return df
+    lookup = _build_var_category_lookup(var_categories)
+    df = df.copy()
+    df[category_col] = df[feature_col].map(lookup)
+    return df
+
+
 # ==========================================================
 # PLOTTING
 # ==========================================================
 
-def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_col=None):
+def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_col=None, var_categories=None):
     """
     Plot decoding summary. Uses hue_col for grouping when provided (e.g. 'result_group'
     for multiple datasets), otherwise falls back to 'shuffle_mode'.
     """
     max_height = 20
 
-    if hue_col is not None and hue_col in summary_df.columns:
-        feature_order = (
-            summary_df
-            .groupby('behav_feature')['mean_value']
-            .mean()
-            .sort_values()
-            .index
-            .tolist()
-        )
+    mean_by_feature = (
+        summary_df
+        .groupby('behav_feature')['mean_value']
+        .mean()
+    )
+
+    if var_categories is not None and 'var_category' in summary_df.columns:
+        feature_order = []
+        present_categories = summary_df['var_category'].dropna().unique().tolist()
+        ordered_categories = [
+            c for c in var_categories.keys() if c in present_categories
+        ]
+        for cat in ordered_categories:
+            sub = summary_df.query("var_category == @cat")
+            feats = sub['behav_feature'].unique().tolist()
+            feats_sorted = sorted(feats, key=lambda f: mean_by_feature[f])
+            feature_order.extend(feats_sorted)
+        remaining_feats = [
+            f for f in mean_by_feature.index.tolist() if f not in feature_order
+        ]
+        if remaining_feats:
+            remaining_sorted = (
+                mean_by_feature.loc[remaining_feats]
+                .sort_values()
+                .index
+                .tolist()
+            )
+            feature_order.extend(remaining_sorted)
     else:
         feature_order = (
-            summary_df
-            .sort_values('mean_value')
-            ['behav_feature']
+            mean_by_feature
+            .sort_values()
+            .index
             .tolist()
         )
 
@@ -284,6 +345,7 @@ def visualize_decoding_results(
     regression_metric_col='r2_cv',
     classification_metric_col='auc_mean',
     show_plots=True,
+    var_categories=None,
 ):
     """
     Visualize decoding results. Supports plotting multiple result DataFrames on the
@@ -298,6 +360,10 @@ def visualize_decoding_results(
         When provided, all datasets are plotted on the same axes, differentiated by color.
     model_name : str
         Model name to filter (e.g. 'ridge_strong').
+    var_categories : dict, optional
+        Mapping from category_name -> list of variable names. Used to add a
+        'var_category' column and to group variables on the y-axis. If None,
+        uses DEFAULT_DECODING_VAR_CATEGORIES.
     """
     if decoding_results_dfs is not None:
         dfs = []
@@ -320,7 +386,17 @@ def visualize_decoding_results(
 
     sns.set_theme(style='whitegrid', context='talk', font_scale=0.85)
 
+    if var_categories is None:
+        var_categories = DEFAULT_DECODING_VAR_CATEGORIES
+
     model_df = df.query("model_name == @model_name").copy()
+
+    model_df = _add_var_category_column(
+        model_df,
+        var_categories=var_categories,
+        feature_col='behav_feature',
+        category_col='var_category',
+    )
 
     if len(model_df) == 0:
         raise ValueError(f"No rows found for model: {model_name}")
@@ -355,7 +431,8 @@ def visualize_decoding_results(
                 value_label=f'Mean {regression_metric_col}',
                 title=f'Regression Decoding Strength\n{model_name}',
                 vline=0,
-                hue_col=hue_col
+                hue_col=hue_col,
+                var_categories=var_categories,
             )
 
     # ======================================================
@@ -382,7 +459,8 @@ def visualize_decoding_results(
                 value_label=f'Mean {classification_metric_col}',
                 title=f'Classification Decoding Strength\n{model_name}',
                 vline=0.5,
-                hue_col=hue_col
+                hue_col=hue_col,
+                var_categories=var_categories,
             )
 
     return reg_summary, clf_summary
@@ -432,10 +510,12 @@ def _compute_shuffle_pvals(df, value_col):
 def _compute_summary(df, value_col, hue_col=None):
 
     group_cols = ['behav_feature']
+    if 'var_category' in df.columns:
+        group_cols.append('var_category')
     if hue_col is not None and hue_col in df.columns:
         group_cols = ['behav_feature', hue_col]
     elif 'shuffle_mode' in df.columns:
-        group_cols = ['behav_feature', 'shuffle_mode']
+        group_cols.append('shuffle_mode')
 
     summary = (
         df

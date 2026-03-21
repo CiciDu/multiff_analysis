@@ -130,6 +130,7 @@ class PNEncodingRunner(BaseEncodingRunner):
             **design_kwargs,
         )
 
+
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             print('[PNEncodingRunner] Using cached design matrices')
@@ -162,6 +163,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         # Build encoding design (behavioral + spike history) for GAM modeling
         self.binned_feats = self.binned_feats.reset_index(drop=True)
 
+        self.reduce_binned_feats()
         self._prepare_spike_history_components()
 
         self._make_structured_meta_groups()

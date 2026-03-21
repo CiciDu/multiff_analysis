@@ -16,6 +16,10 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     GroupSpec,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+    encoding_design_utils,
+)
+
 import os
 import sys
 from pathlib import Path
@@ -25,7 +29,7 @@ from data_wrangling import combine_info_utils
 # Radians to degrees; monkey_information stores angles/angular rates in rad.
 _RAD_TO_DEG = 180.0 / np.pi
 
-# Map planning/monkey_information column names -> one_ff names so extra_agg_cols find them.
+# Map planning/monkey_information column names -> one_ff names so agg_cols find them.
 # Only renames when source exists and target does not (avoids overwriting one_ff data).
 # Do not map speed/ang_speed -> v/w here; base design already uses speed, ang_speed as kinematics.
 PLANNING_TO_ONE_FF_RENAME: Dict[str, str] = {
@@ -35,7 +39,7 @@ PLANNING_TO_ONE_FF_RENAME: Dict[str, str] = {
     # target (polar-like; one_ff: r_targ, theta_targ)
     'target_distance': 'r_targ',
     'target_angle': 'theta_targ',
-    # eye channels are handled explicitly in monkey_information_for_encoding:
+    # eye channels are handled explicitly in rename_monkey_information_columns:
     # average left/right when both valid, else use available channel.
 }
 
@@ -47,14 +51,16 @@ ONE_FF_STYLE_EXTRA_COLS = [
     'r_targ', 'theta_targ',
     'eye_ver', 'eye_hor',
     # though they are not in one_ff_gam, we add them to the design
-    'accel', 'ang_accel_deg',
+    'accel', 'ang_accel',
+    'time', # though this is not in one_ff_gam, it might be useful for multiff
 ]
+
 
 # Tuning vars without wrapping (passed as linear_vars to build_continuous_tuning_block)
 DEFAULT_TUNING_VARS_NO_WRAP = [
     'v', 'w', 'd', 'r_targ', 'eye_ver', 'eye_hor', 'theta_targ',
     # though these are not in one_ff_gam, we add them to the design
-    'accel', 'ang_accel_deg',
+    'accel', 'ang_accel',
 ]
 
 # Tuning vars with wrapping (e.g. phi; passed as angular_vars with wrap_angular=True)
@@ -76,12 +82,99 @@ _REQUIRED_ALIAS_MAP = {
     'eye_hor': ['LDz', 'RDz'],
     # add acceleration and angular acceleration
     'accel': ['accel'],
-    'ang_accel_deg': ['ang_accel'],
+    'ang_accel': ['ang_accel'],
 }
 _OPTIONAL_ALIAS_MAP = {
     'r_targ': ['target_distance'],
     'theta_targ': ['target_angle'],
 }
+
+
+# =============================================================================
+# Shared event-window binning core (stop encoding/decoding)
+# =============================================================================
+
+
+def bin_event_windows_core(
+    *,
+    new_seg_info: pd.DataFrame,
+    monkey_information: pd.DataFrame,
+    spikes_df: pd.DataFrame,
+    bin_dt: float,
+    global_bins_2d: Optional[np.ndarray] = None,
+    agg_cols: Optional[List[str]] = None,
+    time_col: str = 'time',
+    cluster_col: str = 'cluster',
+    verbose: bool = False,
+) -> Tuple[
+    np.ndarray,          # bins_2d
+    pd.DataFrame,        # meta
+    pd.DataFrame,        # binned_feats
+    np.ndarray,          # exposure
+    np.ndarray,          # used_bins
+    np.ndarray,          # mask_used
+    np.ndarray,          # pos
+    pd.DataFrame,        # meta_df_used
+    pd.DataFrame,        # binned_spikes
+    np.ndarray,          # cluster_ids
+]:
+    """
+    Shared core to go from event windows -> binned monkey features + spikes.
+
+    This is used by both stop decoding designs (in `decode_stops_design.py`)
+    and stop encoding designs (in `encode_stops_utils.py`).
+    """
+    agg_cols = ONE_FF_STYLE_EXTRA_COLS if agg_cols is None else agg_cols
+
+    bins_2d, meta = event_binning.event_windows_to_bins2d(
+        new_seg_info,
+        bin_dt=bin_dt,
+        only_ok=False,
+        global_bins_2d=global_bins_2d,
+    )
+
+    binned_feats, exposure, used_bins, mask_used, pos = (
+        bin_monkey_information_feats_from_event_bins(
+            monkey_information,
+            bins_2d,
+            kinematic_cols=[],
+            agg_cols=agg_cols,
+        )
+    )
+
+    if verbose:
+        print('meta.shape', meta.shape)
+
+    meta_df_used = (
+        meta.set_index('bin')
+        .sort_index()
+        .loc[pos]
+        .reset_index()
+    )
+
+    spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
+        spikes_df,
+        bins_2d,
+        time_col=time_col,
+        cluster_col=cluster_col,
+    )
+    binned_spikes = (
+        pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
+        .reset_index(drop=True)
+    )
+
+    return (
+        bins_2d,
+        meta,
+        binned_feats,
+        exposure,
+        used_bins,
+        mask_used,
+        pos,
+        meta_df_used,
+        binned_spikes,
+        cluster_ids,
+    )
 
 def _fill_covariate_from_aliases(
     binned_feats: pd.DataFrame,
@@ -117,7 +210,7 @@ def _fill_covariate_from_aliases(
         raise ValueError(
             'Missing required stop-encoding covariates after building design: '
             f'{missing_msg}. '
-            'Provide these columns in monkey_information (or via custom_rename) '
+            'Provide these columns in monkey_information '
             'so they can be aggregated into binned_feats.'
         )
     return binned_feats
@@ -257,10 +350,9 @@ def build_tuning_design_for_continuous_vars(
 
 
 
-def monkey_information_for_encoding(
+def rename_monkey_information_columns(
     monkey_information: pd.DataFrame,
     rename_planning_to_one_ff: bool = True,
-    custom_rename: Optional[Dict[str, str]] = None,
 ) -> pd.DataFrame:
     """
     Wrapper to make monkey_information use one_ff-style column names for encoding design.
@@ -275,9 +367,6 @@ def monkey_information_for_encoding(
     rename_planning_to_one_ff : bool
         If True, apply PLANNING_TO_ONE_FF_RENAME for any source column that exists
         and whose target name is not already a column.
-    custom_rename : dict, optional
-        Additional or override renames: {source_col: target_col}. Applied after
-        the default PLANNING_TO_ONE_FF_RENAME.
 
     Returns
     -------
@@ -378,17 +467,10 @@ def monkey_information_for_encoding(
             out['v'] = out['speed'].to_numpy()
         if 'w' not in out.columns and 'ang_speed' in out.columns:
             out['w'] = out['ang_speed'].to_numpy()
-        if 'ang_accel_deg' not in out.columns and 'ang_accel' in out.columns:
-            out['ang_accel_deg'] = out['ang_accel'].to_numpy(
-                float, copy=False) * _RAD_TO_DEG
 
     renames: Dict[str, str] = {}
     if rename_planning_to_one_ff:
         for src, tgt in PLANNING_TO_ONE_FF_RENAME.items():
-            if src in out.columns and tgt not in out.columns:
-                renames[src] = tgt
-    if custom_rename:
-        for src, tgt in custom_rename.items():
             if src in out.columns and tgt not in out.columns:
                 renames[src] = tgt
     if renames:
@@ -905,12 +987,13 @@ def add_tuning_features_to_design(
     return design_matrix, tuning_meta, mode
 
 
-def _bin_monkey_information_feats_from_event_bins(
+def bin_monkey_information_feats_from_event_bins(
     monkey_information: pd.DataFrame,
     bins_2d: np.ndarray,
     *,
     kinematic_cols: Optional[List[str]] = None,
-    extra_agg_cols: Optional[List[str]] = None,
+    agg_cols: Optional[List[str]] = None,
+    use_one_ff_rename: bool = True,
 ) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Bin (aggregate) selected columns from `monkey_information` into `bins_2d`.
@@ -922,6 +1005,13 @@ def _bin_monkey_information_feats_from_event_bins(
       mask_used:    boolean mask over `used_bins` where exposure > 0
       pos:          used_bins[mask_used] (bin indices into bins_2d)
     """
+
+    if use_one_ff_rename:
+        monkey_information = encoding_design_utils.rename_monkey_information_columns(
+           monkey_information,
+            rename_planning_to_one_ff=use_one_ff_rename,
+        )
+
     if kinematic_cols is None:
         kinematic_cols = []
 
@@ -968,8 +1058,8 @@ def _bin_monkey_information_feats_from_event_bins(
     else:
         binned_feats = pd.DataFrame(index=np.arange(len(used_bins)))
 
-    if extra_agg_cols:
-        existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
+    if agg_cols:
+        existing = [c for c in agg_cols if c in monkey_sub.columns]
         if existing:
             extra_df = (
                 pd.DataFrame({c: _agg_feat(c) for c in existing})
@@ -1105,6 +1195,7 @@ def bootstrap_repo_path():
             sys.path.insert(0, str(p / "multiff_analysis/multiff_code/methods"))
             return
     raise RuntimeError("Could not find Multifirefly-Project root")
+
 
 def get_session_paths(raw_data_folder_path, raw_data_dir_name, monkey_names):
     """

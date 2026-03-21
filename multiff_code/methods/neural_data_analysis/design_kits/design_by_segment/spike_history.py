@@ -7,7 +7,7 @@ from neural_data_analysis.design_kits.design_around_event.event_binning import (
 )
 from neural_data_analysis.design_kits.design_by_segment import temporal_feats
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import process_encode_design 
 # ============================================================
 # Padding utilities
 # ============================================================
@@ -399,6 +399,125 @@ def add_spike_history_to_design(
 
     return design_df, None
 
+def _reduce_design_and_sync_history(
+    *,
+    design_df,
+    X_hist,
+    colnames,
+    meta_groups,
+    reduce_design_kwargs,
+):
+    """
+    Reduce numeric columns of design_df and keep X_hist, colnames,
+    and meta_groups consistent with dropped columns.
+    """
+
+    
+
+    # ------------------------------
+    # 1) Split columns
+    # ------------------------------
+    id_cols = [c for c in ['new_segment', 'new_bin'] if c in design_df.columns]
+    other_cols = [c for c in design_df.columns if c not in id_cols]
+
+    numeric_cols = design_df[other_cols].select_dtypes(include=[np.number]).columns.tolist()
+    passthrough_cols = [c for c in other_cols if c not in numeric_cols]
+
+    # ------------------------------
+    # 2) Reduce numeric part
+    # ------------------------------
+    reduced_numeric = process_encode_design.reduce_encoding_design(
+        design_df[numeric_cols],
+        **(reduce_design_kwargs or {}),
+    )
+
+    # ------------------------------
+    # 3) Rebuild design
+    # ------------------------------
+    design_before_cols = list(design_df.columns)
+
+    design_reduced = pd.concat(
+        [design_df[id_cols].reset_index(drop=True)]
+        + ([design_df[passthrough_cols].reset_index(drop=True)] if passthrough_cols else [])
+        + [reduced_numeric.reset_index(drop=True)],
+        axis=1,
+    )
+
+    # ------------------------------
+    # 4) Sync dropped columns
+    # ------------------------------
+    dropped_cols = set(design_before_cols) - set(design_reduced.columns)
+
+    if dropped_cols:
+        # X_hist
+        for neuron, df in X_hist.items():
+            keep_cols = [c for c in df.columns if c not in dropped_cols]
+            X_hist[neuron] = df[keep_cols]
+
+        # colnames
+        for neuron, cols in colnames.items():
+            colnames[neuron] = [c for c in cols if c not in dropped_cols]
+
+        # meta_groups
+        if meta_groups is not None:
+            for k, cols in meta_groups.items():
+                if isinstance(cols, list):
+                    meta_groups[k] = [c for c in cols if c not in dropped_cols]
+
+    return design_reduced, X_hist, colnames, meta_groups
+
+def reduce_history_via_full_design(
+    *,
+    X_pruned,
+    X_hist,
+    colnames,
+    meta_groups,
+    spike_cols,
+    reduce_design_kwargs,
+):
+    """
+    Build a full design including ALL spike-history columns across neurons,
+    run reduction to remove collinearity, and sync X_hist/colnames/meta_groups.
+    """
+
+    print('Clean out X_hist to reduce collinearity')
+
+    # --------------------------------------------------
+    # 1) Build full history design
+    # --------------------------------------------------
+    hist_blocks = [
+        X_hist[n][colnames[n]].reset_index(drop=True)
+        for n in spike_cols
+        if colnames.get(n)
+    ]
+
+    design_for_reduction = pd.concat(
+        [X_pruned.reset_index(drop=True)] + hist_blocks,
+        axis=1,
+    )
+
+    # --------------------------------------------------
+    # 2) Ensure meta_groups includes all history cols
+    # --------------------------------------------------
+    if meta_groups is not None:
+        for neuron in spike_cols:
+            existing = set(meta_groups.get(neuron, []))
+            new = set(colnames.get(neuron, []))
+            meta_groups[neuron] = list(existing | new)
+
+    # --------------------------------------------------
+    # 3) Reduce + sync everything
+    # --------------------------------------------------
+    design_for_reduction, X_hist, colnames, meta_groups = _reduce_design_and_sync_history(
+        design_df=design_for_reduction,
+        X_hist=X_hist,
+        colnames=colnames,
+        meta_groups=meta_groups,
+        reduce_design_kwargs=reduce_design_kwargs,
+    )
+
+    return X_hist, colnames, meta_groups
+
 
 def build_design_with_spike_history_from_bins(
     *,
@@ -437,6 +556,11 @@ def build_design_with_spike_history_from_bins(
         predicting each unit's spikes.
     returnX_hist : bool
         If True, also return X_hist for per-unit design reuse.
+    reduce_design : bool
+        If True, run reduce_encoding_design on the final design matrix
+        (excluding id columns like 'new_segment'/'new_bin').
+    reduce_design_kwargs : dict, optional
+        Extra kwargs forwarded to reduce_encoding_design.
     """
 
     # --------------------------------------------------
@@ -472,6 +596,7 @@ def build_design_with_spike_history_from_bins(
     # --------------------------------------------------
     # 3) Add history to design
     # --------------------------------------------------
+    # Default behavior: target self-history (+ optional cross history)
     design_w_history, meta_groups = add_spike_history_to_design(
         design_df=X_pruned,
         colnames=colnames,
@@ -482,6 +607,8 @@ def build_design_with_spike_history_from_bins(
         meta_groups=meta_groups,
     )
 
+        
+           
     if returnX_hist:
         return design_w_history, basis, colnames, meta_groups, X_hist
     return design_w_history, basis, colnames, meta_groups

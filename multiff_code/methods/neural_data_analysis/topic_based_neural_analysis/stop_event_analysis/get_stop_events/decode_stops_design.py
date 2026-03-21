@@ -21,6 +21,10 @@ from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_st
     collect_stop_data,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
+    encoding_design_utils,
+)
+
 
 # =============================================================================
 # Global environment & plotting defaults
@@ -37,200 +41,89 @@ pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 50)
 np.set_printoptions(suppress=True)
 
+
 # =============================================================================
 # Stop Design Builder
 # =============================================================================
-
-
-def build_stop_design_for_glm(
+def _build_stop_core(
     new_seg_info: pd.DataFrame,
     events_with_stats: pd.DataFrame,
     monkey_information: pd.DataFrame,
     spikes_df: pd.DataFrame,
-    ff_dataframe: pd.DataFrame,
     bin_dt: float = 0.04,
-    add_ff_visible_info: bool = True,
-    add_retries_info: bool = True,
-    datasets: dict = None,
-    global_bins_2d: np.ndarray = None,  # optional global bins_2d to restrict to
-    extra_agg_cols: Optional[List[str]] = None,
-) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
+    global_bins_2d: np.ndarray = None,
+):
     """
-    Build a stop-aligned, bin-level design matrix and offset for GLM/decoding.
+    Shared core for building stop-aligned binned data structures.
 
-    Returns
-    -------
-    binned_spikes : pd.DataFrame
-        (n_bins × n_clusters) spike counts aligned to `binned_feats`
-    binned_feats : pd.DataFrame
-        (n_bins × n_features) design matrix (exposure > 0 only)
-    offset_log : np.ndarray
-        log(exposure) per bin
-    meta_df_used : pd.DataFrame
-        Per-bin metadata aligned row-wise to binned_feats
-    groups : Dict[str, List[str]]
-        Semantic feature groupings
+    Handles:
+    - Converting event windows to bin edges
+    - Binning monkey kinematic information
+    - Aligning metadata to used bins
+    - Binning spikes by cluster
+    - Building cluster-level features
     """
+    agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
 
-    # -------------------------------------------------------------------------
-    # 1) Build bins from event windows
-    # -------------------------------------------------------------------------
-    bins_2d, meta = event_binning.event_windows_to_bins2d(
-        new_seg_info, bin_dt=bin_dt, only_ok=False, global_bins_2d=global_bins_2d
+    (
+        bins_2d,
+        meta,
+        binned_feats,
+        exposure,
+        used_bins,
+        mask_used,
+        pos,
+        meta_df_used,
+        binned_spikes,
+        _,
+    ) = encoding_design_utils.bin_event_windows_core(
+        new_seg_info=new_seg_info,
+        monkey_information=monkey_information,
+        spikes_df=spikes_df,
+        bin_dt=bin_dt,
+        global_bins_2d=global_bins_2d,
+        agg_cols=agg_cols,
+        time_col="time",
+        cluster_col="cluster",
+        verbose=True,
     )
-
-    # -------------------------------------------------------------------------
-    # 2) Assign continuous samples to bins
-    # -------------------------------------------------------------------------
-    sample_idx, bin_idx_arr, dt_arr, _ = event_binning.build_bin_assignments(
-        monkey_information['time'].to_numpy(), bins_2d
-    )
-
-    monkey_sub = monkey_information.iloc[sample_idx].copy()
-
-    # -------------------------------------------------------------------------
-    # 3) Compute exposure and valid bins
-    # -------------------------------------------------------------------------
-    _, exposure, used_bins = event_binning.bin_timeseries_weighted(
-        monkey_sub['time'].to_numpy(), dt_arr, bin_idx_arr, how='mean'
-    )
-
-    def _agg_feat(col: str) -> np.ndarray:
-        vals = monkey_sub[col].to_numpy()
-        out, exp_chk, used_bins_chk = event_binning.bin_timeseries_weighted(
-            vals, dt_arr, bin_idx_arr, how='mean'
-        )
-        if not np.allclose(exp_chk, exposure):
-            raise ValueError(f'Exposure mismatch while aggregating "{col}"')
-        if not np.array_equal(used_bins_chk, used_bins):
-            raise ValueError(f'used_bins mismatch while aggregating "{col}"')
-        return out
-
-    # -------------------------------------------------------------------------
-    # 4) Aggregate kinematics + optional one_ff-style extra covariates
-    # -------------------------------------------------------------------------
-    KINEMATIC_COLS = ['time', 'accel', 'speed', 'ang_speed']
-    binned_feats = (
-        pd.DataFrame({c: _agg_feat(c) for c in KINEMATIC_COLS})
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
-    )
-    extra_cols_added: List[str] = []
-    if extra_agg_cols:
-        existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
-        if existing:
-            extra_df = (
-                pd.DataFrame({c: _agg_feat(c) for c in existing})
-                .replace([np.inf, -np.inf], np.nan)
-                .fillna(0.0)
-            )
-            binned_feats = pd.concat([binned_feats, extra_df], axis=1)
-            extra_cols_added = existing
-
-    mask_used = exposure > 0
-    pos = used_bins[mask_used]
-
-    binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
-
-    print('meta.shape', meta.shape)
-
-    meta_df_used = (
-        meta.set_index('bin')
-        .sort_index()
-        .loc[pos]
-        .reset_index()
-    )
-
-    # -------------------------------------------------------------------------
-    # 5) Bin spikes per cluster
-    # -------------------------------------------------------------------------
-    spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
-        spikes_df, bins_2d, time_col='time', cluster_col='cluster'
-    )
-
-    binned_spikes = (
-        pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
-        .reset_index(drop=True)
-    )
-
-    # -------------------------------------------------------------------------
-    # 6) Event- and cluster-level features
-    # -------------------------------------------------------------------------
 
     cluster_df = cluster_design.build_cluster_features_workflow(
-        meta_df_used[['event_id', 'rel_center']],
+        meta_df_used[["event_id", "rel_center"]],
         events_with_stats,
-        rel_time_col='rel_center',
+        rel_time_col="rel_center",
         winsor_p=0.5,
         use_midbin_progress=True,
         zscore_progress=False,
         zscore_rel_time=True,
     )
 
-    SHARED_CLUSTER_FEATS = [
-        'is_clustered',
-        'event_is_first_in_cluster',
-        'gap_since_prev_event_in_cluster_z',
-        'gap_till_next_event_in_cluster_z',
-        'cluster_duration_s_z',
-        'cluster_progress_c',
-        'bin_t_from_cluster_start_s_z',
-        'log_n_events_in_cluster_z',
+    shared_cluster_feats = [
+        "is_clustered",
+        "event_is_first_in_cluster",
+        "gap_since_prev_event_in_cluster_z",
+        "gap_till_next_event_in_cluster_z",
+        "cluster_duration_s_z",
+        "cluster_progress_c",
+        "bin_t_from_cluster_start_s_z",
+        "log_n_events_in_cluster_z",
     ]
 
-    X_event_df = stop_design.build_event_design_from_meta(
-        meta=meta,
-        pos=pos,
-        new_seg_info=new_seg_info,
-        speed_used=binned_feats['speed'].values,
-        include_columns=(
-            'basis', 'prepost', 'prepost*speed',
-            'captured', 'basis*captured',
-            'time_since_prev_event', 'time_to_next_event',
-        )
+    return (
+        bins_2d,
+        meta,
+        binned_feats,
+        exposure,
+        used_bins,
+        mask_used,
+        pos,
+        meta_df_used,
+        binned_spikes,
+        cluster_df,
+        shared_cluster_feats,
+        agg_cols,
     )
 
-    CLUSTER_FEATS = SHARED_CLUSTER_FEATS + [
-        'cluster_progress_c2',
-        'event_t_from_cluster_start_s',
-    ]
-
-    _safe_add_columns(binned_feats, X_event_df, X_event_df.columns)
-    _safe_add_columns(binned_feats, cluster_df, CLUSTER_FEATS)
-
-    # -------------------------------------------------------------------------
-    # 7) Offset term and timing
-    # -------------------------------------------------------------------------
-    offset_log = np.log(np.clip(exposure[mask_used], 1e-12, None))
-    binned_feats['time_rel_to_event_start'] = meta_df_used['rel_center'].to_numpy()
-
-    # -------------------------------------------------------------------------
-    # 8) Firefly visibility / memory features
-    # -------------------------------------------------------------------------
-    if add_ff_visible_info:
-        binned_feats = add_ff_visible_and_in_memory_info(
-            binned_feats,
-            bins_2d,
-            ff_dataframe,
-            used_bins,
-            max_in_memory_time_since_seen=2,
-        )
-
-    # -------------------------------------------------------------------------
-    # 9) Retry-related features
-    # -------------------------------------------------------------------------
-    if add_retries_info:
-        binned_feats, meta_df_used = add_retries_info_to_binned_feats(
-            binned_feats, new_seg_info, datasets, meta_df_used
-        )
-
-    # -------------------------------------------------------------------------
-    # 10) Feature groups
-    # -------------------------------------------------------------------------
-    groups = _build_feature_groups(
-        binned_feats, KINEMATIC_COLS, extra_cols=extra_cols_added)
-
-    return binned_spikes, binned_feats, offset_log, meta_df_used, groups
 
 
 def build_stop_design_decoding(
@@ -244,106 +137,45 @@ def build_stop_design_decoding(
     add_retries_info: bool = True,
     datasets: dict = None,
     global_bins_2d: np.ndarray = None,
-    extra_agg_cols: Optional[List[str]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build stop design for decoding (minimal event design, no interaction columns).
     """
-    bins_2d, meta = event_binning.event_windows_to_bins2d(
-        new_seg_info, bin_dt=bin_dt, only_ok=False, global_bins_2d=global_bins_2d
+    (
+        bins_2d,
+        meta,
+        binned_feats,
+        exposure,
+        used_bins,
+        mask_used,
+        pos,
+        meta_df_used,
+        binned_spikes,
+        cluster_df,
+        shared_cluster_feats,
+        _,
+    ) = _build_stop_core(
+        new_seg_info=new_seg_info,
+        events_with_stats=events_with_stats,
+        monkey_information=monkey_information,
+        spikes_df=spikes_df,
+        bin_dt=bin_dt,
+        global_bins_2d=global_bins_2d,
     )
-    sample_idx, bin_idx_arr, dt_arr, _ = event_binning.build_bin_assignments(
-        monkey_information['time'].to_numpy(), bins_2d
-    )
-    monkey_sub = monkey_information.iloc[sample_idx].copy()
-    _, exposure, used_bins = event_binning.bin_timeseries_weighted(
-        monkey_sub['time'].to_numpy(), dt_arr, bin_idx_arr, how='mean'
-    )
-
-    def _agg_feat(col: str) -> np.ndarray:
-        vals = monkey_sub[col].to_numpy()
-        out, exp_chk, used_bins_chk = event_binning.bin_timeseries_weighted(
-            vals, dt_arr, bin_idx_arr, how='mean'
-        )
-        if not np.allclose(exp_chk, exposure):
-            raise ValueError(f'Exposure mismatch while aggregating "{col}"')
-        if not np.array_equal(used_bins_chk, used_bins):
-            raise ValueError(f'used_bins mismatch while aggregating "{col}"')
-        return out
-
-    cols_to_agg = ['time', 'accel', 'speed', 'ang_speed']
-    binned_feats = (
-        pd.DataFrame({c: _agg_feat(c) for c in cols_to_agg})
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0.0)
-    )
-    
-    extra_cols_added: List[str] = []
-    if extra_agg_cols:
-        existing = [c for c in extra_agg_cols if c in monkey_sub.columns]
-        if existing:
-            extra_df = (
-                pd.DataFrame({c: _agg_feat(c) for c in existing})
-                .replace([np.inf, -np.inf], np.nan)
-                .fillna(0.0)
-            )
-            binned_feats = pd.concat([binned_feats, extra_df], axis=1)
-            extra_cols_added = existing
-
-    mask_used = exposure > 0
-    pos = used_bins[mask_used]
-    binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
-    meta_df_used = (
-        meta.set_index('bin')
-        .sort_index()
-        .loc[pos]
-        .reset_index()
-    )
-
-    spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
-        spikes_df, bins_2d, time_col='time', cluster_col='cluster'
-    )
-    binned_spikes = (
-        pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
-        .reset_index(drop=True)
-    )
-
-    cluster_df = cluster_design.build_cluster_features_workflow(
-        meta_df_used[['event_id', 'rel_center']],
-        events_with_stats,
-        rel_time_col='rel_center',
-        winsor_p=0.5,
-        use_midbin_progress=True,
-        zscore_progress=False,
-        zscore_rel_time=True,
-    )
-
-    SHARED_CLUSTER_FEATS = [
-        'is_clustered',
-        'event_is_first_in_cluster',
-        'gap_since_prev_event_in_cluster_z',
-        'gap_till_next_event_in_cluster_z',
-        'cluster_duration_s_z',
-        'cluster_progress_c',
-        'bin_t_from_cluster_start_s_z',
-        'log_n_events_in_cluster_z',
-    ]
 
     X_event_df = stop_design.build_event_design_for_decoding(
         meta=meta,
         pos=pos,
         new_seg_info=new_seg_info,
-        include_columns=(
-            'prepost', 'time_since_prev_event', 'cond_dummies', 'captured'
-        )
+        include_columns=("prepost", "time_since_prev_event", "cond_dummies", "captured"),
     )
-    CLUSTER_FEATS = SHARED_CLUSTER_FEATS
+    cluster_feats = shared_cluster_feats
 
     _safe_add_columns(binned_feats, X_event_df, X_event_df.columns)
-    _safe_add_columns(binned_feats, cluster_df, CLUSTER_FEATS)
+    _safe_add_columns(binned_feats, cluster_df, cluster_feats)
 
     offset_log = np.log(np.clip(exposure[mask_used], 1e-12, None))
-    binned_feats['time_rel_to_event_start'] = meta_df_used['rel_center'].to_numpy()
+    binned_feats["time_rel_to_event_start"] = meta_df_used["rel_center"].to_numpy()
 
     if add_ff_visible_info:
         binned_feats = add_ff_visible_and_in_memory_info(
@@ -358,11 +190,8 @@ def build_stop_design_decoding(
         binned_feats, meta_df_used = add_retries_info_to_binned_feats(
             binned_feats, new_seg_info, datasets, meta_df_used
         )
+    return binned_spikes, binned_feats, offset_log, meta_df_used
 
-    groups = _build_feature_groups(
-        binned_feats, cols_to_agg, extra_cols=extra_cols_added)
-
-    return binned_spikes, binned_feats, offset_log, meta_df_used, groups
 
 
 def _safe_add_columns(target_df, source_df, cols):
@@ -695,7 +524,6 @@ def assemble_stop_decoding_design(
         binned_feats,
         offset_log,
         meta_df_used,
-        stop_meta_groups,
     ) = build_result
 
     binned_feats = scale_binned_feats(
@@ -708,5 +536,4 @@ def assemble_stop_decoding_design(
         binned_feats,
         offset_log,
         meta_df_used,
-        stop_meta_groups,
     )

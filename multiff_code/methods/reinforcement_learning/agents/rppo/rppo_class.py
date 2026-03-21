@@ -305,6 +305,8 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     def make_init_env_for_curriculum_training(self,
                                               **kwargs):
         """Initialize environment for first stage of curriculum."""
-        self.make_env(**self.input_env_kwargs)
+        init_curriculum_env_kwargs = self.input_env_kwargs.copy()
+        init_curriculum_env_kwargs['seed'] = self.base_seed + 1000001
+        self.make_env(**init_curriculum_env_kwargs)
         self._make_init_env_for_curriculum_training(**kwargs)
         print('[rppo] Initialized env for curriculum training')

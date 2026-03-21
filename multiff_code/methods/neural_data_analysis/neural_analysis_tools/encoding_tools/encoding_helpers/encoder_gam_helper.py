@@ -9,9 +9,6 @@ import copy
 import pickle
 import os
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encode_stops_utils,
-)
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     backward_elimination,
     gam_variance_explained,
@@ -22,7 +19,6 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     GroupSpec,
 )
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 
 
 DEFAULT_VAR_CATEGORIES = {
@@ -34,6 +30,7 @@ DEFAULT_VAR_CATEGORIES = {
     "spike_hist_vars": ["spike_hist"],
     "visibility_vars": ["cur_vis", "nxt_vis", "cur_in_memory", "nxt_in_memory"],
     "ff_count_vars": ["num_ff_visible", "num_ff_in_memory", "log1p_num_ff_visible", "log1p_num_ff_in_memory"],
+    'session_time_vars': ["time"],
 }
 
 # All non-spike variables
@@ -66,6 +63,24 @@ DEFAULT_LAMBDA_CONFIG = {
     "lam_p": 10.0,
 }
 
+def add_other_category_from_groups(categories, groups):
+    all_group_names = {g.name for g in groups}
+
+    # exclude non_spike_vars from "assigned"
+    assigned = set(
+        v
+        for cat, vars_list in categories.items()
+        if cat != 'non_spike_vars'
+        for v in vars_list
+    )
+
+    other_vars = sorted(all_group_names - assigned)
+
+    categories = categories.copy()
+    categories['other_vars'] = other_vars
+
+    return categories
+
 
 class BaseEncodingGAMAnalysisHelper:
     """
@@ -96,10 +111,18 @@ class BaseEncodingGAMAnalysisHelper:
             cfg.update(lambda_config)
         return cfg
 
-    def _neuron_outdir(self, unit_idx: int, ensure_dirs: Optional[List[str]] = None) -> Path:
-        outdir = Path(self.runner._get_save_dir()) / \
-            self.gam_results_subdir / f"neuron_{unit_idx}"
-        outdir.mkdir(parents=True, exist_ok=True)
+    def _neuron_outdir(
+        self,
+        unit_idx: int,
+        ensure_dirs: Optional[List[str]] = None,
+        use_neural_coupling: bool = False,
+    ) -> Path:
+        paths = self.runner.get_gam_save_paths(
+            unit_idx=unit_idx,
+            use_neural_coupling=use_neural_coupling,
+            ensure_dirs=True,
+        )
+        outdir = paths["outdir"]
         if ensure_dirs:
             for subdir in ensure_dirs:
                 (outdir / subdir).mkdir(parents=True, exist_ok=True)
@@ -195,6 +218,7 @@ class BaseEncodingGAMAnalysisHelper:
         retrieve_only: bool = False,
         load_if_exists: bool = True,
         cv_mode: str = "blocked_time_buffered",
+        use_neural_coupling: bool = False,
     ) -> Dict:
         if category_names is None:
             category_names = list(self.var_categories.keys())
@@ -211,7 +235,10 @@ class BaseEncodingGAMAnalysisHelper:
                 "var_categories cannot be empty for run_category_variance_contributions")
 
         outdir = self._neuron_outdir(
-            unit_idx, ensure_dirs=["cv_var_explained"])
+            unit_idx,
+            ensure_dirs=["cv_var_explained"],
+            use_neural_coupling=use_neural_coupling,
+        )
         full_path = self._full_model_cv_path(outdir)
         load_ok = load_if_exists or retrieve_only
         full_cv = gam_variance_explained.maybe_load_saved_crossval(
@@ -248,6 +275,7 @@ class BaseEncodingGAMAnalysisHelper:
             design_df, y, groups, lambda_config = self._unit_context(
                 unit_idx=unit_idx,
                 lambda_config=lambda_config,
+                use_neural_coupling=use_neural_coupling,
             )
             available_group_names = [g.name for g in groups]
         else:
@@ -346,8 +374,9 @@ class BaseEncodingGAMAnalysisHelper:
         group_name_map: Optional[Dict[str, List[str]]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
+        use_neural_coupling: bool = False,
     ) -> Dict:
-        outdir = self._neuron_outdir(unit_idx)
+        outdir = self._neuron_outdir(unit_idx, use_neural_coupling=use_neural_coupling)
         save_path = outdir / "penalty_tuning.pkl"
         if retrieve_only and not save_path.exists():
             raise FileNotFoundError(
@@ -378,6 +407,7 @@ class BaseEncodingGAMAnalysisHelper:
         design_df, y, groups, lambda_config = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
+            use_neural_coupling=use_neural_coupling,
         )
 
         if group_name_map is None:
@@ -435,9 +465,13 @@ class BaseEncodingGAMAnalysisHelper:
         n_folds: int = 10,
         load_if_exists: bool = True,
         retrieve_only: bool = False,
+        use_neural_coupling: bool = False,
     ) -> Dict:
-        outdir = self._neuron_outdir(unit_idx, ensure_dirs=[
-                                     "backward_elimination"])
+        outdir = self._neuron_outdir(
+            unit_idx,
+            ensure_dirs=["backward_elimination"],
+            use_neural_coupling=use_neural_coupling,
+        )
         lam_cfg = self._resolve_lambda_config(lambda_config)
         lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
             lambda_config=lam_cfg)
@@ -470,6 +504,7 @@ class BaseEncodingGAMAnalysisHelper:
         design_df, y, groups, lambda_config = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
+            use_neural_coupling=use_neural_coupling,
         )
         if load_if_exists and save_path.exists():
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
@@ -511,10 +546,11 @@ class BaseEncodingGAMAnalysisHelper:
         unit_idx: int,
         *,
         lambda_config: Optional[Dict[str, float]] = None,
+        use_neural_coupling: bool = False,
     ) -> Tuple[pd.DataFrame, np.ndarray, List[GroupSpec], Dict[str, float]]:
         if self.runner.binned_feats is None or self.runner.binned_spikes is None:
             self.runner.collect_data(exists_ok=True)
-        self.runner.get_design_for_unit(unit_idx)
+        self.runner.get_design_for_unit(unit_idx, use_neural_coupling=use_neural_coupling)
         binned_spikes = self.runner.binned_spikes
         y = np.asarray(
             binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
@@ -537,25 +573,27 @@ class BaseEncodingGAMAnalysisHelper:
         cv_mode: Optional[str] = 'blocked_time_buffered',
         buffer_samples: int = 20,
         cv_groups=None,
-        
+        use_neural_coupling: bool = False,
     ) -> Dict:
         """
         Perform cross-validation for tuning curve coefficients.
 
         Automatically saves to:
-        {save_dir}/{results_subdir}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl
+        {save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl
         """
 
         # -------------------------------------------------
         # Auto-generate save path
         # -------------------------------------------------
         if save_path is None:
-            save_path = self._auto_build_cv_save_path(unit_idx)
+            save_path = self._auto_build_cv_save_path(
+                unit_idx, use_neural_coupling=use_neural_coupling
+            )
 
-        
         design_df, y, groups, lambda_config = self._unit_context(
             unit_idx=unit_idx,
             lambda_config=lambda_config,
+            use_neural_coupling=use_neural_coupling,
         )
         # -------------------------------------------------
         # Load cached results if available
@@ -574,7 +612,7 @@ class BaseEncodingGAMAnalysisHelper:
         # -------------------------------------------------
         # Get design matrix and response
         # -------------------------------------------------
-        self.runner.get_design_for_unit(unit_idx)
+        self.runner.get_design_for_unit(unit_idx, use_neural_coupling=use_neural_coupling)
         design_df = self.runner.design_df.copy()
         y = self._extract_response_vector(unit_idx)
 
@@ -747,9 +785,14 @@ class BaseEncodingGAMAnalysisHelper:
         return mean_coef, std_coef, coef_shape
 
 
-    def _auto_build_cv_save_path(self, unit_idx: int) -> str:
+    def _auto_build_cv_save_path(
+        self,
+        unit_idx: int,
+        use_neural_coupling: bool = False,
+    ) -> str:
         paths = self.runner.get_gam_save_paths(
             unit_idx=unit_idx,
+            use_neural_coupling=use_neural_coupling,
             ensure_dirs=False,
         )
 

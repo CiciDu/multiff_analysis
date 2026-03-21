@@ -5,6 +5,8 @@ from reinforcement_learning.agents.feedforward import sb3_utils
 from reinforcement_learning.base_classes import env_utils
 
 import os
+import numpy as np
+import torch
 import matplotlib.pyplot as plt
 from stable_baselines3 import SAC
 from stable_baselines3.common.monitor import Monitor
@@ -109,7 +111,9 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
         monitor_dir = self.best_model_postcurriculum_dir
         os.makedirs(monitor_dir, exist_ok=True)
         print('Making initial env for curriculum training...')
-        self.make_env(monitor_dir=monitor_dir, **self.input_env_kwargs)
+        init_curriculum_env_kwargs = self.input_env_kwargs.copy()
+        init_curriculum_env_kwargs['seed'] = self.base_seed + 1000001
+        self.make_env(monitor_dir=monitor_dir, **init_curriculum_env_kwargs)
         self._make_init_env_for_curriculum_training(initial_flash_on_interval=initial_flash_on_interval,
                                                     **kwargs)
 
@@ -171,6 +175,10 @@ class SB3forMultifirefly(rl_base_class._RLforMultifirefly):
 
         if not os.path.exists(path):
             raise FileNotFoundError(f"Model file not found at {path}")
+
+        stored_env_kwargs = self.manifest['env_params']
+        if hasattr(self, 'current_env_kwargs') and 'seed' in self.current_env_kwargs:
+            stored_env_kwargs['seed'] = self.current_env_kwargs['seed']  # Override seed for reproducibility; can be adjusted as needed
 
         if restore_env_from_checkpoint:
             self.make_env(**self.manifest['env_params'])

@@ -105,6 +105,9 @@ class MultiFF(gymnasium.Env):
         self.obs_noise = obs_noise
         # Default seed for reproducible reset(); when reset(seed=None), use this if set.
         self._default_seed = seed
+        
+        print('Initial environment seed: ', self._default_seed)
+        
 
         # Identity-tracked slot config and transforms
         self.d0 = DEFAULT_D0
@@ -144,7 +147,6 @@ class MultiFF(gymnasium.Env):
         self.w_noise_std = w_noise_std
         self.num_obs_ff = num_obs_ff
         self.max_in_memory_time = max_in_memory_time
-
 
         self._parse_identity_slot_strategy()
 
@@ -194,7 +196,8 @@ class MultiFF(gymnasium.Env):
         self.ffr = np.zeros(self.num_alive_ff, dtype=np.float32)
         self.fftheta = np.zeros(self.num_alive_ff, dtype=np.float32)
 
-    def reset(self, seed=None, use_random_ff=True, options=None):
+
+    def reset(self, seed=None, use_random_ff=True):
         '''
         reset the environment
 
@@ -211,6 +214,7 @@ class MultiFF(gymnasium.Env):
         # Use explicit seed when provided; otherwise fall back to _default_seed for reproducibility
         effective_seed = seed if seed is not None else env_utils.compute_episode_seed(self._default_seed, self.episode_id)
         super().reset(seed=effective_seed)
+        print('current episode seed: ', effective_seed)
         
         # self.np_random is now the canonical RNG; use it for all randomness
 
@@ -250,12 +254,15 @@ class MultiFF(gymnasium.Env):
                 )
                 self.ff_flash_ids, self.ff_flash_starts, self.ff_flash_ends = \
                         env_utils.preprocess_flash_intervals(self.ff_flash)
+                print('ff_flash_starts: ', self.ff_flash_starts[:10])
             self.generate_random_ff_positions(ff_index=np.arange(self.num_alive_ff))
 
         # reset agent
         self.agentr = np.array([0.0], dtype=np.float32)
         self.agentxy = np.zeros(2, dtype=np.float32)
         self.agentheading = float(self.np_random.uniform(0, 2 * pi))
+        print('initial agentxy: ', self.agentxy)
+        print('initial agentheading: ', self.agentheading)
         self.arena_center_global = np.zeros(2, dtype=np.float32)
         self.v = self.np_random.uniform(-0.05, 0.05) * self.vgain
         self.w = 0.0  # initialize with no angular velocity
@@ -322,6 +329,7 @@ class MultiFF(gymnasium.Env):
             self.new_ff_scope = 'visible_only'
         print('identity_slot_base: ', self.identity_slot_base)
         print('new_ff_scope: ', self.new_ff_scope)
+
 
     def calculate_reward(self):
         '''

@@ -12,6 +12,7 @@ def collect_category_ecdf_from_sessions(
     bin_width=0.04,
     exists_ok=True,
     save_path=None,
+    use_neural_coupling=False,
 ):
     """
     Gather category variance ECDF data from all sessions for given monkeys.
@@ -29,6 +30,8 @@ def collect_category_ecdf_from_sessions(
         If True, load from save_path when available; save results after computing.
     save_path : str or Path or None
         Where to save/load. If None and exists_ok, use default cache under multiff_analysis.
+    use_neural_coupling : bool
+        If True, use coupling subdir in path and pass to runner (matches base_encoding_runner).
 
     Returns
     -------
@@ -44,7 +47,7 @@ def collect_category_ecdf_from_sessions(
         raise ValueError('runner_class must be passed or set globally')
 
     # Default save path when exists_ok
-    # Uses: all_monkey_data/planning_and_neural/{monkey}/combined_data/encoding_outputs/{stop|vis|pn}_encoder_outputs
+    # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/category_ecdf_{monkeys}.pkl
     if save_path is None and exists_ok:
         # Map runner class to encoder type
         rc_name = rc.__name__
@@ -58,10 +61,11 @@ def collect_category_ecdf_from_sessions(
             encoder_dir = f'{rc_name}_encoder_outputs'
 
         base = raw_data_dir_name.replace('raw_monkey_data', 'planning_and_neural')
+        coupling_subdir = "coupling" if use_neural_coupling else "no_coupling"
         # Use first monkey for path; filename includes all monkeys for multi-monkey runs
         monkey_for_path = sorted(monkey_names)[0]
         monkeys_str = '_'.join(sorted(monkey_names)).replace(' ', '_')
-        cache_dir = Path(base) / monkey_for_path / 'combined_data' / 'encoding_outputs' / encoder_dir
+        cache_dir = Path(base) / monkey_for_path / 'combined_data' / 'encoding_outputs' / encoder_dir / coupling_subdir
         cache_dir.mkdir(parents=True, exist_ok=True)
         save_path = cache_dir / f"category_ecdf_{monkeys_str}.pkl"
     elif save_path is not None:
@@ -119,7 +123,7 @@ def collect_category_ecdf_from_sessions(
                     bin_width=bin_width,
                     encoder_prs=prs,
                 )
-                all_results = plot_gam_fit.run_unit_ecdf_collect(runner)
+                all_results = plot_gam_fit.run_unit_ecdf_collect(runner, use_neural_coupling=use_neural_coupling)
                 session_results_list.append((session_label, all_results))
             except Exception as e:
                 print(f'[ERROR] Failed for {raw_data_folder_path}: {e}')

@@ -2,23 +2,24 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List
 
 import numpy as np
 import pandas as pd
 
-from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
     decode_stops_design,
 )
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics.base_decoding_runner import (
     BaseDecodingRunner,
 )
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import plot_decoding_utils, decoding_design_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers.decoding_design_utils import (
+    STOP_DECODING_VAR_CATEGORIES,
+)
 
 
 DEFAULT_STOP_CANONCORR_VARS = [
@@ -40,13 +41,14 @@ class StopDecodingRunner(BaseDecodingRunner):
         self,
         raw_data_folder_path,
         bin_width: float = 0.04,
+        var_categories=None,
     ):
         super().__init__(bin_width=bin_width)
         self.raw_data_folder_path = raw_data_folder_path
-        
+        self.var_categories = var_categories if var_categories is not None else STOP_DECODING_VAR_CATEGORIES
 
         self.meta_df_used = None
-        self.stop_feats_to_decode = None
+        self.feats_to_decode = None
         self.binned_spikes = None
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
@@ -57,10 +59,10 @@ class StopDecodingRunner(BaseDecodingRunner):
     # ------------------------------------------------------------------
     # BaseDecodingRunner override points
     # ------------------------------------------------------------------
-    def _get_target_df(self) -> pd.DataFrame:
-        if getattr(self, 'stop_feats_to_decode', None) is None:
+    def get_target_df(self) -> pd.DataFrame:
+        if getattr(self, 'feats_to_decode', None) is None:
             self.collect_data(exists_ok=True)
-        self.target_df = self.stop_feats_to_decode.copy()
+        self.target_df = self.feats_to_decode.copy()
         self.target_df = decoding_design_utils.truncate_columns_to_percentiles(self.target_df, ['time_since_prev_event'])
         return self.target_df
 
@@ -79,7 +81,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         return list(self._get_numeric_target_df().columns)
 
     def _target_df_error_msg(self) -> str:
-        return "stop_feats_to_decode"
+        return "feats_to_decode"
 
     # ------------------------------------------------------------------
     # Data collection
@@ -93,17 +95,17 @@ class StopDecodingRunner(BaseDecodingRunner):
         (
             self.pn,
             self.binned_spikes,
-            self.stop_feats_to_decode,
+            self.feats_to_decode,
             _offset_log,
             self.meta_df_used,
-            _stop_meta_groups,
         ) = decode_stops_design.assemble_stop_decoding_design(
             self.raw_data_folder_path,
             self.bin_width,
         )
 
-        self.stop_feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.stop_feats_to_decode)
+        self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
  
+        self.reduce_binned_spikes()
         self._save_design_matrices()
 
     # ------------------------------------------------------------------
@@ -119,20 +121,20 @@ class StopDecodingRunner(BaseDecodingRunner):
         save_dir = Path(self._get_save_dir())
         return {
             "binned_spikes": save_dir / "binned_spikes.pkl",
-            "stop_feats_to_decode": save_dir / "stop_feats_to_decode.pkl",
+            "feats_to_decode": save_dir / "feats_to_decode.pkl",
             "meta_df_used": save_dir / "meta_df_used.pkl",
         }
 
     def _get_design_matrix_data(self):
         return {
             "binned_spikes": self.binned_spikes,
-            "stop_feats_to_decode": self.stop_feats_to_decode,
+            "feats_to_decode": self.feats_to_decode,
             "meta_df_used": self.meta_df_used,
         }
 
     def _get_design_matrix_key_to_attr(self):
         return {
             "binned_spikes": "binned_spikes",
-            "stop_feats_to_decode": "stop_feats_to_decode",
+            "feats_to_decode": "feats_to_decode",
             "meta_df_used": "meta_df_used",
         }

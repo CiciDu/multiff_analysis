@@ -108,7 +108,10 @@ class LSTMforMultifirefly(rl_base_class._RLforMultifirefly):
 
     def make_init_env_for_curriculum_training(self,
                                               **kwargs):
-        self.make_env(**self.input_env_kwargs)
+
+        init_curriculum_env_kwargs = self.input_env_kwargs.copy()
+        init_curriculum_env_kwargs['seed'] = self.base_seed + 1000001
+        self.make_env(**init_curriculum_env_kwargs)
         self._make_init_env_for_curriculum_training(**kwargs)
 
     def _curriculum_train_step(self, reward_threshold: float, eval_eps_freq: int, num_eval_episodes: int):

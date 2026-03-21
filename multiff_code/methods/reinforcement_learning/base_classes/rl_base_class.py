@@ -52,11 +52,13 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                  std_anneal_preserve_fraction=1,
                  replay_keep_fraction=0.8,
                  agent_id=None,
+                 base_seed = 58,
                  **additional_env_kwargs):
 
         self.player = "agent"
         self.agent_params = None
         self.overall_folder = overall_folder
+        self.base_seed = base_seed
 
         self.default_env_kwargs = env_utils.get_env_default_kwargs(
             base_env.MultiFF)
@@ -262,7 +264,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                     print('Loaded curr/best')
                     print(
                         f'Made env based on env params saved in {self.loaded_agent_dir}')
-                    self.make_env(**self.curriculum_env_kwargs)
+                    load_curriculum_env_kwargs = self.curriculum_env_kwargs.copy()
+                    load_curriculum_env_kwargs['seed'] = self.base_seed + 5000001
+                    self.make_env(**load_curriculum_env_kwargs)
                     self.load_best_model_in_curriculum(
                         load_replay_buffer=True, restore_env_from_checkpoint=False)
 
@@ -490,18 +494,22 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                           retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
         return
 
-    def collect_data(self, n_steps=8000, exists_ok=False, save_data=True, retrieve_ff_flash_sorted=False):
-        if exists_ok:
+    def collect_data(self, n_steps=8000, exists_ok=False, save_data=True, retrieve_ff_flash_sorted=False, 
+                     retrieve_data_only=False):
+        if exists_ok or retrieve_data_only:
             try:
                 self.retrieve_monkey_data(
                     retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.ff_caught_T_new = self.ff_caught_T_sorted
                 self.make_or_retrieve_ff_dataframe_for_agent(
                     exists_ok=exists_ok, save_data=save_data)
-
             except Exception as e:
                 print(
                     "Failed to retrieve monkey data. Will make new monkey data. Error: ", e)
+                if retrieve_data_only:
+                    print('Failed to retrieve data. Returning...')
+                    return False
+
                 self.run_agent_to_collect_data(
                     n_steps=n_steps, save_data=save_data)
         else:
@@ -511,6 +519,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=exists_ok)
         # self.calculate_pattern_frequencies_and_feature_statistics()
         # self.find_patterns()
+        
+        return True
 
     def run_agent_to_collect_data(self, n_steps=8000, save_data=False):
 
@@ -528,7 +538,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 try:
                     self.env
                 except AttributeError:
-                    self.make_env(**self.input_env_kwargs)
+                    test_env_kwargs = self.input_env_kwargs.copy()
+                    test_env_kwargs['seed'] = self.base_seed + 3000001
+                    self.make_env(**test_env_kwargs)
                 self.make_agent()
 
         env_data_collection_kwargs = copy.deepcopy(self.current_env_kwargs)
@@ -734,15 +746,11 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             n_steps=n_steps, exists_ok=exists_ok, save_data=save_data)
 
     def streamline_loading_and_making_animation(self, currentTrial_for_animation=None, num_trials_for_animation=None, duration=[10, 40], n_steps=8000):
-        try:
-            self.env
-        except AttributeError:
-            self.make_env(**self.input_env_kwargs)
-
-        try:
-            self.rl_agent
-        except AttributeError:
-            self.make_agent()
+        test_env_kwargs = self.input_env_kwargs.copy()
+        test_env_kwargs['seed'] = self.base_seed + 3000001
+        self.make_env(**test_env_kwargs)
+        self.make_agent()
+        
         self.load_latest_agent(load_replay_buffer=False)
         self.streamline_making_animation(currentTrial_for_animation=currentTrial_for_animation, num_trials_for_animation=num_trials_for_animation,
                                          duration=duration, n_steps=n_steps, file_name=None)
@@ -1040,7 +1048,9 @@ class _RLforMultifirefly(animation_class.AnimationClass):
 
         # Final post-curriculum training
         os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
-        self.make_env(**self.input_env_kwargs)
+        post_curriculum_env_kwargs = self.input_env_kwargs.copy()
+        post_curriculum_env_kwargs['seed'] = self.base_seed + 2000001
+        self.make_env(**post_curriculum_env_kwargs)
         self.load_best_model_in_curriculum(
             load_replay_buffer=True, restore_env_from_checkpoint=False)
 

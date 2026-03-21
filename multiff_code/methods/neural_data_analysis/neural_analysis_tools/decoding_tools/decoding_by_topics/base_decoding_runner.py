@@ -25,12 +25,15 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_decoding_runner
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import show_decoding_results
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import process_encode_design
+
+
 
 class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     """
     Base class for decoding runners that support one-FF-style population decoding
     (CCA + linear readout). Subclasses must implement:
-    - _get_target_df(): feature dataframe to decode
+    - get_target_df(): feature dataframe to decode
     - _get_groups(): group labels for CV (e.g. event_id)
     - _get_neural_matrix(): neural data array
     - _default_canoncorr_varnames(): default vars for CCA
@@ -44,8 +47,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     # ------------------------------------------------------------------
     # Abstract / override points (subclasses must implement)
     # ------------------------------------------------------------------
-    def _get_target_df(self) -> pd.DataFrame:
-        """Feature dataframe to decode (e.g. stop_feats_to_decode, behav_df, vis_feats_to_decode)."""
+    def get_target_df(self) -> pd.DataFrame:
+        """Feature dataframe to decode (e.g. feats_to_decode, behav_df, feats_to_decode)."""
         raise NotImplementedError
 
     def _get_groups(self):
@@ -56,7 +59,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """Return DataFrame with time, trial_index, etc. for detrending.
         Override to add more columns (e.g. from rebinned_y_var)."""
         if getattr(self, 'target_df', None) is None:
-            self._get_target_df()
+            self.get_target_df()
         self.detrend_covariates = self.target_df[['time']].copy()
         
         # ## disbable detrending for now
@@ -102,7 +105,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
-        use_detrend: bool = True,
+        use_detrend: bool = False,
     ) -> pd.DataFrame:
 
         if save_dir is None:
@@ -398,6 +401,18 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     # ============================================================
     # Cross-Validated Decoding (Refactored, Copy-Paste Ready)
     # ============================================================
+    
+    def reduce_binned_spikes(self, corr_threshold_for_lags_of_a_feature=0.98, 
+                         vif_threshold_for_initial_subset=20, 
+                         vif_threshold=20, 
+                         verbose=True):
+
+        self.binned_spikes = process_encode_design.reduce_encoding_design(self.binned_spikes, 
+                         corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature, 
+                         vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, 
+                         vif_threshold=vif_threshold, 
+                         verbose=verbose)
+
 
     def run_cv_decoding(
         self,
@@ -415,7 +430,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
-        use_detrend: bool = True,
+        use_detrend: bool = False,
     ) -> pd.DataFrame:
         """
         Run cross-validated model-spec decoding with optional nested CV
@@ -495,7 +510,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         load_if_exists,
         load_existing_only,
         verbosity,
-        use_detrend: bool = True,
+        use_detrend: bool = False,
     ):
 
         detrend_covariates = self.get_detrend_covariates() if use_detrend else None
@@ -654,7 +669,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         results_df = cv_decoding.run_cv_decoding(
             X=X,
-            y_df=self._get_target_df(),
+            y_df=self.get_target_df(),
             behav_features=None,
             groups=self._get_groups(),
             n_splits=n_splits,
@@ -677,6 +692,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 "fixed_width": fixed_width,
                 "n_splits": n_splits,
                 "cv_mode": cv_mode,
+                "use_detrend": detrend_covariates is not None,
+                "detrend_degree": getattr(config, "detrend_degree", 1),
+                "detrend_per_block": getattr(config, "detrend_per_block", True),
             },
         }
 
@@ -718,7 +736,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         )
 
         X = self._get_neural_matrix()
-        y_df = self._get_target_df()
+        y_df = self.get_target_df()
         groups = self._get_groups()
         # detrend_covariates passed from caller (None when use_detrend=True)
 
@@ -794,6 +812,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 "n_splits": n_splits,
                 "inner_cv_splits": inner_cv_splits,
                 "cv_mode": cv_mode,
+                "use_detrend": detrend_covariates is not None,
+                "detrend_degree": getattr(config, "detrend_degree", 1),
+                "detrend_per_block": getattr(config, "detrend_per_block", True),
             },
         }
 

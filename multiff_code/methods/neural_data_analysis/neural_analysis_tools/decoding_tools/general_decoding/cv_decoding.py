@@ -78,6 +78,8 @@ def run_cv_decoding(
     exists_ok=True,
     model_name: Optional[str] = None,
     detrend_covariates=None,
+    use_detrend=None,
+    detrend_per_block=None,
 ):
 
     if config is None:
@@ -88,7 +90,11 @@ def run_cv_decoding(
         if save_dir is None:
             raise ValueError(
                 "save_dir must be provided when load_existing_only=True")
-        return load_consolidated_results(save_dir)
+        return load_consolidated_results(
+            save_dir,
+            use_detrend=use_detrend,
+            detrend_per_block=detrend_per_block,
+        )
 
     out_dir = Path(save_dir) if save_dir is not None else None
     if out_dir is not None:
@@ -113,6 +119,7 @@ def run_cv_decoding(
     if behav_features is None:
         behav_features = y_df.columns.tolist()
 
+    do_detrend = detrend_covariates is not None
     existing_lookup = (
         _load_existing_results(
             out_dir,
@@ -122,6 +129,7 @@ def run_cv_decoding(
             context_label,
             verbosity,
             model_name,
+            do_detrend=do_detrend,
         )
         if exists_ok
         else {}
@@ -142,14 +150,20 @@ def run_cv_decoding(
         if mode == 'skip':
             continue
 
+        use_per_block = (
+            getattr(config, 'detrend_per_block', True) or getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+        ) if do_detrend else False
         lookup_model_name = (
             model_name if model_name is not None
-            else get_model_name(mode, config)
+            else get_model_name(mode, config, do_detrend=do_detrend, use_per_block=use_per_block)
         )
         lookup_key = (feature, lookup_model_name)
 
         if lookup_key in existing_lookup:
-            row = existing_lookup[lookup_key]
+            row = existing_lookup[lookup_key].copy()
+            row['model_name'] = lookup_model_name
+            if row.get('detrend_degree') is None and '_detrend' in str(row.get('model_name', '')):
+                row['detrend_degree'] = 1
             results.append(row)
             _aggregate_results(results_by_model, row, lookup_model_name, mode)
             continue
@@ -475,13 +489,33 @@ def get_mode_csv_path(out_dir, mode, params_hash):
     return out_dir / f'{mode}_{params_hash}.csv'
 
 
-def get_model_name(mode, config):
-    """Get the model name for a given mode and config."""
+def _normalize_detrend_model_name(name):
+    """If name ends with _detrend or _detrend_perblock (no _deg suffix), treat as degree 1."""
+    if name is None or name == '':
+        return name
+    if '_deg' in name:
+        return name
+    if name.endswith('_detrend_perblock'):
+        return name + '_deg1'
+    if name.endswith('_detrend'):
+        return name + '_deg1'
+    return name
+
+
+def get_model_name(mode, config, *, do_detrend=False, use_per_block=False):
+    """Get the model name for a given mode and config.
+    When do_detrend=True, appends _detrend[_perblock]_deg{N} to the base name.
+    """
     if mode == 'regression':
         model_class = config.regression_model_class or CatBoostRegressor
     else:
         model_class = config.classification_model_class or LogisticRegression
-    return model_class.__name__
+    base = model_class.__name__
+    if not do_detrend:
+        return base
+    detrend_degree = getattr(config, 'detrend_degree', 1)
+    suffix = '_perblock' if use_per_block else ''
+    return f"{base}_detrend{suffix}_deg{detrend_degree}"
 
 
 def get_model_csv_path(out_dir, model_name):
@@ -492,7 +526,7 @@ def get_model_csv_path(out_dir, model_name):
     return out_dir / f'{model_name}.csv'
 
 
-def config_matches(row, n_splits, shuffle_mode, context_label, config, model_name=None):
+def config_matches(row, n_splits, shuffle_mode, context_label, config, model_name=None, do_detrend=False):
 
     if row.get('n_splits') != n_splits:
         return False
@@ -510,8 +544,12 @@ def config_matches(row, n_splits, shuffle_mode, context_label, config, model_nam
         return row.get('model_name') == model_name
 
     mode = row.get('mode')
-    expected_model_name = get_model_name(mode, config)
-    return row.get('model_name') == expected_model_name
+    use_per_block = (
+        getattr(config, 'detrend_per_block', True) or getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+    ) if do_detrend else False
+    expected_model_name = get_model_name(mode, config, do_detrend=do_detrend, use_per_block=use_per_block)
+    row_model_name = _normalize_detrend_model_name(row.get('model_name'))
+    return row_model_name == expected_model_name
 # ============================================================
 # Main (slim orchestration)
 # ============================================================
@@ -559,6 +597,7 @@ def _load_existing_results(
     context_label,
     verbosity,
     model_name=None,
+    do_detrend=False,
 ):
     """
     Load existing results matching current configuration from pickle files.
@@ -599,8 +638,8 @@ def _load_existing_results(
 
         for _, row in df.iterrows():
             row_dict = row.to_dict()
-            if config_matches(row_dict, n_splits, shuffle_mode, context_label, config, model_name):
-                key = (row_dict['behav_feature'], row_dict.get('model_name', ''))
+            if config_matches(row_dict, n_splits, shuffle_mode, context_label, config, model_name, do_detrend=do_detrend):
+                key = (row_dict['behav_feature'], _normalize_detrend_model_name(row_dict.get('model_name', '')))
                 existing_lookup[key] = row_dict
 
     if verbosity >= 1:
@@ -632,6 +671,7 @@ def _save_results(
         'cv_mode',
         'buffer_samples',
         'context',
+        'detrend_degree',
     ]
 
     for model_name, data in results_by_model.items():
@@ -683,6 +723,8 @@ def _save_results(
 def load_consolidated_results(
     out_dir,
     filename='all_models_results.csv',
+    use_detrend=None,
+    detrend_per_block=None,
 ):
     """
     Load the consolidated results CSV file.
@@ -693,6 +735,12 @@ def load_consolidated_results(
         Directory containing the consolidated results file.
     filename : str, optional
         Name of the consolidated results CSV file. Default is 'all_models_results.csv'.
+    use_detrend : bool, optional
+        If True, keep only detrended results. If False, keep only non-detrended.
+        If None, keep all. When loading from CSV, filters by 'use_detrend' column if present.
+    detrend_per_block : bool, optional
+        When use_detrend=True: if True, keep only per-block detrended; if False,
+        keep only global detrended; if None, keep both. Ignored when use_detrend is False.
 
     Returns
     -------
@@ -703,10 +751,19 @@ def load_consolidated_results(
     csv_path = out_dir / filename
 
     if not csv_path.exists():
-        consolidated_df = consolidate_results_across_models(out_dir, filename)
+        consolidated_df = consolidate_results_across_models(
+            out_dir, filename,
+            use_detrend=use_detrend,
+            detrend_per_block=detrend_per_block,
+        )
         return consolidated_df
     else:
-        return pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path)
+        if use_detrend is not None and 'use_detrend' in df.columns:
+            df = df[df['use_detrend'] == use_detrend].reset_index(drop=True)
+        if use_detrend and detrend_per_block is not None and 'detrend_per_block' in df.columns:
+            df = df[df['detrend_per_block'] == detrend_per_block].reset_index(drop=True)
+        return df
 
 
 def consolidate_results_across_models(
@@ -715,6 +772,8 @@ def consolidate_results_across_models(
     model_names=None,
     verbosity=1,
     save_output=False,
+    use_detrend=None,
+    detrend_per_block=None,
 ):
     """
     Consolidate results by scanning for pickled model result files (*.pkl)
@@ -734,6 +793,14 @@ def consolidate_results_across_models(
         Verbosity level.
     save_output : bool, optional
         Whether to save the consolidated CSV to `out_dir`.
+    use_detrend : bool, optional
+        If True, include only detrended runs. If False, include only non-detrended.
+        If None, include all. When _cv_config lacks use_detrend, infers from
+        filename (*_detrend*.pkl = detrended).
+    detrend_per_block : bool, optional
+        When use_detrend=True: if True, only *_detrend_perblock*.pkl; if False,
+        only *_detrend*.pkl (global, not per block); if None, both. Ignored when
+        use_detrend is False.
 
     Returns
     -------
@@ -755,6 +822,18 @@ def consolidate_results_across_models(
     all_dfs = []
 
     for p in pkl_paths:
+        # Skip loading when filter is set and filename indicates mismatch
+        stem = p.stem
+        if use_detrend is False and '_detrend' in stem:
+            continue
+        if use_detrend is True:
+            if '_detrend' not in stem:
+                continue
+            if detrend_per_block is True and '_detrend_perblock' not in stem:
+                continue
+            if detrend_per_block is False and '_detrend_perblock' in stem:
+                continue
+
         try:
             with p.open('rb') as f:
                 loaded = pickle.load(f)
@@ -769,7 +848,24 @@ def consolidate_results_across_models(
             df = loaded['results_df']
             try:
                 if isinstance(df, pd.DataFrame) and len(df) > 0:
-                    all_dfs.append(df.copy())
+                    # Infer use_detrend and detrend_per_block from _cv_config or filename
+                    cv_config = loaded.get('_cv_config', {})
+                    pkl_use_detrend = cv_config.get('use_detrend')
+                    if pkl_use_detrend is None:
+                        pkl_use_detrend = '_detrend' in stem
+                    pkl_detrend_per_block = cv_config.get('detrend_per_block')
+                    if pkl_detrend_per_block is None:
+                        pkl_detrend_per_block = '_detrend_perblock' in stem if pkl_use_detrend else False
+                    if use_detrend is not None and pkl_use_detrend != use_detrend:
+                        continue
+                    if use_detrend and detrend_per_block is not None and pkl_detrend_per_block != detrend_per_block:
+                        continue
+                    df = df.copy()
+                    df['use_detrend'] = pkl_use_detrend
+                    df['detrend_per_block'] = pkl_detrend_per_block
+                    if 'detrend_degree' not in df.columns:
+                        df['detrend_degree'] = cv_config.get('detrend_degree', 1 if pkl_use_detrend else None)
+                    all_dfs.append(df)
                     if verbosity > 1:
                         print(f'Loaded {len(df)} rows from {p.name}')
             except Exception:
@@ -826,7 +922,7 @@ def _timeshift_1d(y, rng, min_shift):
         return rng.permutation(y)
 
     shift = rng.integers(min_shift, n - min_shift + 1)
-    print('Doing a circle time shift with shift:', shift)
+    #print('Doing a circle time shift with shift:', shift)
     return np.roll(y, shift)
 
 
@@ -878,8 +974,13 @@ def _compute_single_feature(
     if mode == 'skip':
         return None
 
+    do_detrend = detrend_covariates is not None
+    detrend_degree = getattr(config, 'detrend_degree', 1) if do_detrend else None
+    use_per_block = (
+        getattr(config, 'detrend_per_block', True) or getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+    ) if do_detrend else False
     if model_name is None:
-        model_name = get_model_name(mode, config)
+        model_name = get_model_name(mode, config, do_detrend=do_detrend, use_per_block=use_per_block)
 
     splits = _build_folds(
         len(X_ok),
@@ -923,6 +1024,7 @@ def _compute_single_feature(
         buffer_samples=config.buffer_samples,
         context=context_label,
         n_samples=len(y_ok),
+        detrend_degree=detrend_degree,
         **metrics,
     )
 
@@ -959,9 +1061,6 @@ def run_regression_cv(
             getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
         )
         block_ids = _infer_block_ids_from_splits(len(y), splits) if use_per_block else None
-
-
-    print('block_ids: ', block_ids)
 
     for tr, te in splits:
         y_tr = _shuffle_y_for_fold(y[tr], groups[tr], shuffle_mode, rng, buffer_samples)

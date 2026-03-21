@@ -71,7 +71,7 @@ class MultiFFParams:
             # "d": np.array([0, 400]),            # cm
             "phi": np.array([-180, 180]),         # deg
             "accel": np.array([-1000, 1000]),  # cm/s^2
-            "ang_accel_deg": np.array([-600, 600]),  # rad/s^2
+            "ang_accel": np.array([-600 * np.pi / 180, 600 * np.pi / 180]),  # rad/s^2
             # Target in egocentric polar coordinates
             "r_targ": np.array([0, 400]),       # cm
             "theta_targ": np.array([-60, 60]),  # deg

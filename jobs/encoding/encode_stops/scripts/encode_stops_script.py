@@ -6,6 +6,7 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == "Multifirefly-Project":
         os.chdir(p)
         sys.path.insert(0, str(p / "multiff_analysis/multiff_code/methods"))
+        sys.path.insert(0, str(p / 'multiff_analysis'))
         break
 
 

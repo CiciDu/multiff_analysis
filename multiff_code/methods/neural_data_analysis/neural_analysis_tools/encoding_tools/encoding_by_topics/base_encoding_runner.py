@@ -37,6 +37,8 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
 
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import process_encode_design
+
 
 DEFAULT_LAMBDA_CONFIG = {
     "lam_f": 100.0,
@@ -103,16 +105,9 @@ class BaseEncodingRunner:
         raise NotImplementedError
 
     @staticmethod
-    def _append_coupling_suffix(path: Optional[str], use_neural_coupling: bool) -> Optional[str]:
-        """
-        If use_neural_coupling is True, append a '_cpl' suffix before the file extension.
-        Otherwise, return the path unchanged.
-        """
-        if not use_neural_coupling or path is None:
-            return path
-        p = Path(path)
-        stem = p.stem + "_cpl"
-        return str(p.with_name(stem + p.suffix))
+    def _coupling_subdir(use_neural_coupling: bool) -> str:
+        """Return subfolder name: 'coupling' or 'no_coupling'."""
+        return "coupling" if use_neural_coupling else "no_coupling"
 
     def _encoding_design_kwargs(self) -> Dict:
 
@@ -157,21 +152,17 @@ class BaseEncodingRunner:
         y = np.asarray(
             binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
 
-        groups = self.get_gam_groups()
         if save_path is None:
             paths = self.get_gam_save_paths(
                 unit_idx=unit_idx,
+                use_neural_coupling=use_neural_coupling,
             )
             save_path = paths["fit_save_path"]
-
-        save_path = self._append_coupling_suffix(
-            save_path, use_neural_coupling=use_neural_coupling
-        )
 
         return one_ff_gam_fit.fit_poisson_gam(
             design_df=self.design_df,
             y=y,
-            groups=groups,
+            groups=self.groups,
             l1_groups=l1_groups,
             l1_smooth_eps=l1_smooth_eps,
             max_iter=max_iter,
@@ -206,6 +197,7 @@ class BaseEncodingRunner:
         if save_path is None:
             paths_i = self.get_gam_save_paths(
                 unit_idx=unit_idx,
+                use_neural_coupling=use_neural_coupling,
             )
             base = paths_i["base"]
             outdir = base / f"neuron_{unit_idx}"
@@ -213,10 +205,6 @@ class BaseEncodingRunner:
             lam_suffix = paths_i["lam_suffix"]
             save_path = str(
                 outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
-
-        save_path = self._append_coupling_suffix(
-            save_path, use_neural_coupling=use_neural_coupling
-        )
 
         maybe_loaded = gam_variance_explained.maybe_load_saved_crossval(
             save_path=save_path,
@@ -231,7 +219,6 @@ class BaseEncodingRunner:
 
         self.collect_data(exists_ok=True)
         self.get_design_for_unit(unit_idx, use_neural_coupling=use_neural_coupling)
-        groups = self.get_gam_groups()
         binned_spikes = self.binned_spikes
         n_rows = len(self.design_df)
         if n_rows != len(binned_spikes):
@@ -249,7 +236,7 @@ class BaseEncodingRunner:
             fit_function=one_ff_gam_fit.fit_poisson_gam,
             design_df=self.design_df,
             y=y,
-            groups=groups,
+            groups=self.groups,
             dt=dt,
             n_folds=n_folds,
             random_state=random_state,
@@ -282,6 +269,7 @@ class BaseEncodingRunner:
         if load_if_exists:
             all_neuron_r2 = self.try_load_variance_explained_for_all_neurons(
                 verbose=verbose,
+                use_neural_coupling=use_neural_coupling,
             )
             if all_neuron_r2 is not None:
                 if verbose:
@@ -316,6 +304,7 @@ class BaseEncodingRunner:
 
         paths = self.get_gam_save_paths(
             unit_idx=unit_indices[0],
+            use_neural_coupling=use_neural_coupling,
         )
         base = paths["base"]
         lam_suffix = paths["lam_suffix"]
@@ -327,9 +316,6 @@ class BaseEncodingRunner:
             (outdir / "cv_var_explained").mkdir(parents=True, exist_ok=True)
             cv_save_path = str(
                 outdir / "cv_var_explained" / f"{lam_suffix}.pkl")
-            cv_save_path = self._append_coupling_suffix(
-                cv_save_path, use_neural_coupling=use_neural_coupling
-            )
             cv_res = self.crossval_variance_explained(
                 unit_idx=unit_idx,
                 n_folds=n_folds,
@@ -386,6 +372,7 @@ class BaseEncodingRunner:
                     n_folds=n_folds,
                     buffer_samples=buffer_samples,
                     load_if_exists=load_if_exists,
+                    use_neural_coupling=use_neural_coupling,
                 )
 
                 # get tuning curve
@@ -393,9 +380,6 @@ class BaseEncodingRunner:
                     unit_idx,
                     use_neural_coupling=use_neural_coupling,
                 )
-                groups = self.get_gam_groups()
-                fold_coef_results = self.crossval_tuning_curve_coef(unit_idx)
-
 
                 # self.run_penalty_tuning(
                 #     unit_idx,
@@ -417,6 +401,7 @@ class BaseEncodingRunner:
         *,
         load_if_exists: bool = True,
         verbose: bool = True,
+        use_neural_coupling: bool = False,
     ) -> Optional[List[float]]:
         """Try to load variance explained for all neurons."""
         all_neuron_r2 = []
@@ -424,6 +409,7 @@ class BaseEncodingRunner:
             try:
                 paths_i = self.get_gam_save_paths(
                     unit_idx=unit_idx,
+                    use_neural_coupling=use_neural_coupling,
                 )
                 base = paths_i["base"]
                 outdir = base / f"neuron_{unit_idx}"
@@ -460,7 +446,12 @@ class BaseEncodingRunner:
             tuning_meta=self.tuning_meta,
         )
 
-    def get_design_for_unit(self, unit_idx: int) -> pd.DataFrame:
+    def get_design_for_unit(
+        self,
+        unit_idx: int,
+        *,
+        use_neural_coupling: bool = True,
+    ) -> pd.DataFrame:
         """
         Build design matrix with spike-history regressors for the given target neuron.
 
@@ -474,13 +465,18 @@ class BaseEncodingRunner:
             )
         target_col = list(self.spk_colnames.keys())[unit_idx]
 
+        cross_neurons = None
+        if use_neural_coupling:
+            cross_neurons = [c for c in self.spk_colnames.keys() if c != target_col]
+
+
         design_df, _ = spike_history.add_spike_history_to_design(
             design_df=self.binned_feats.reset_index(drop=True),
             colnames=self.spk_colnames,
             X_hist=self.X_hist,
             target_col=target_col,
             include_self=True,
-            cross_neurons=None,
+            cross_neurons=cross_neurons,
             meta_groups=None,
         )
 
@@ -494,7 +490,17 @@ class BaseEncodingRunner:
         self.make_hist_meta_for_unit(unit_idx)
         self._make_structured_meta_groups()
 
-        return
+        if use_neural_coupling:
+            # coupling groups are named cpl_* in build_hist_meta_from_colnames
+            hist_groups = (self.hist_meta or {}).get('groups', {}) if hasattr(self, 'hist_meta') else {}
+            self.var_categories['coupling_vars'] = sorted(
+                [g for g in hist_groups.keys() if str(g).startswith('cpl_')]
+            )
+        
+        self.groups = self.get_gam_groups()
+
+        return self.design_df
+    
 
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir()) / 'encoding_design'
@@ -508,6 +514,14 @@ class BaseEncodingRunner:
             'X_hist': save_dir / 'X_hist.pkl',
             'spk_colnames': save_dir / 'spk_colnames.pkl',
         }
+   
+    
+    def reduce_binned_feats(self):
+        
+        #self.binned_feats = process_encode_design.reduce_encoding_design(self.binned_feats)
+        pass
+
+
 
     def _save_design_matrices(self):
         paths = self._get_design_matrix_paths()
@@ -575,7 +589,7 @@ class BaseEncodingRunner:
 
             self.structured_meta_groups = encoding_design_utils.build_structured_meta_groups(
                 hist_meta=self.hist_meta, temporal_meta=self.temporal_meta, tuning_meta=self.tuning_meta)
-
+            
             return True
 
         except Exception as e:
@@ -621,6 +635,8 @@ class BaseEncodingRunner:
         # -------------------------
         if hasattr(self, 'design_df'):
             encoding_design_utils._validate_design_columns(self.design_df, self.groups)  
+            
+        self.var_categories = encoder_gam_helper.add_other_category_from_groups(self.var_categories, self.groups)
         return self.groups
 
     def _prepare_spike_history_components(self):
@@ -648,6 +664,16 @@ class BaseEncodingRunner:
             )
         )
 
+        # self.X_hist, self.spk_colnames, _ = spike_history.reduce_history_via_full_design(
+        #     X_pruned=self.binned_feats,
+        #     X_hist=self.X_hist,
+        #     colnames=self.spk_colnames,
+        #     meta_groups=None,
+        #     spike_cols=list(self.spk_colnames.keys()),
+        #     reduce_design_kwargs={},
+        # )
+        
+
     def make_hist_meta_for_unit(self, unit_idx):
         target_col = list(self.spk_colnames.keys())[unit_idx]
         spike_hist_t_max = self.binrange_dict['spike_hist'][1]
@@ -667,8 +693,10 @@ class BaseEncodingRunner:
         unit_idx: int,
         *,
         ensure_dirs: bool = True,
+        use_neural_coupling: bool = False,
     ) -> dict:
-        base = Path(self._get_save_dir()) / self.get_gam_results_subdir()
+        coupling_subdir = self._coupling_subdir(use_neural_coupling)
+        base = Path(self._get_save_dir()) / self.get_gam_results_subdir() / coupling_subdir
         if ensure_dirs:
             base.mkdir(parents=True, exist_ok=True)
         lambda_config = dict(lam_f=self.lambda_config['lam_f'], lam_g=self.lambda_config['lam_g'],
@@ -697,6 +725,7 @@ class BaseEncodingRunner:
         category_names: Optional[List[str]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
+        use_neural_coupling: bool = False,
     ) -> Dict:
         """
         Run leave-one-category-out CV analysis, mirroring one_ff_gam pipeline.
@@ -709,6 +738,7 @@ class BaseEncodingRunner:
             category_names=category_names,
             retrieve_only=retrieve_only,
             load_if_exists=load_if_exists,
+            use_neural_coupling=use_neural_coupling,
         )
 
     def run_penalty_tuning(
@@ -719,6 +749,7 @@ class BaseEncodingRunner:
         group_name_map: Optional[Dict[str, List[str]]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
+        use_neural_coupling: bool = False,
     ) -> Dict:
         """
         Run grid search over group penalties, mirroring one_ff_gam pipeline.
@@ -730,6 +761,7 @@ class BaseEncodingRunner:
             group_name_map=group_name_map,
             retrieve_only=retrieve_only,
             load_if_exists=load_if_exists,
+            use_neural_coupling=use_neural_coupling,
         )
 
     def run_backward_elimination(
@@ -740,13 +772,14 @@ class BaseEncodingRunner:
         n_folds: int = 10,
         load_if_exists: bool = True,
         retrieve_only: bool = False,
+        use_neural_coupling: bool = False,
     ) -> Dict:
         """
         Run backward elimination over stop GAM groups.
 
         Results are automatically saved to:
-        - ``{save_dir}/{results_subdir}/neuron_{unit_idx}/backward_elimination/{lam_suffix}.pkl``
-        - ``{save_dir}/{results_subdir}/neuron_{unit_idx}/backward_elimination/history.csv``
+        - ``{save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/backward_elimination/{lam_suffix}.pkl``
+        - ``{save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/backward_elimination/history.csv``
         """
         return self._get_gam_analysis_helper().run_backward_elimination(
             unit_idx=unit_idx,
@@ -755,6 +788,7 @@ class BaseEncodingRunner:
             n_folds=n_folds,
             load_if_exists=load_if_exists,
             retrieve_only=retrieve_only,
+            use_neural_coupling=use_neural_coupling,
         )
 
     def crossval_tuning_curve_coef(
@@ -771,14 +805,14 @@ class BaseEncodingRunner:
         cv_mode: Optional[str] = 'blocked_time_buffered',
         buffer_samples: int = 20,
         cv_groups=None,
+        use_neural_coupling: bool = False,
     ) -> Dict:
         """
         Perform cross-validation for tuning curve coefficients.
 
         Results are automatically saved to:
-        - ``{save_dir}/{results_subdir}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl``
+        - ``{save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl``
         """
-
         return self._get_gam_analysis_helper().crossval_tuning_curve_coef(
             unit_idx=unit_idx,
             n_folds=n_folds,
@@ -791,6 +825,7 @@ class BaseEncodingRunner:
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
             cv_groups=cv_groups,
+            use_neural_coupling=use_neural_coupling,
         )
 
     def _get_gam_analysis_helper(self):

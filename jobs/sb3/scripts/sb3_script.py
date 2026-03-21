@@ -27,7 +27,9 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=3e-4,
                         help="Learning rate for the sb3 optimizer")
     parser.add_argument("--seed", type=int, default=0,
-                        help="Random seed")
+                        help="Random seed (legacy, use --base-seed for agent)")
+    parser.add_argument("--base-seed", type=int, default=None,
+                        help="Base seed for agent and env. Defaults to --seed if not set. Used for reproducibility across seeds sweep.")
 
     # Environment and training arguments
     parser.add_argument("--overall-folder", type=str,
@@ -148,6 +150,8 @@ if __name__ == "__main__":
     if args.cost_per_stop is not None:
         env_kwargs['cost_per_stop'] = args.cost_per_stop
 
+    base_seed = args.base_seed if args.base_seed is not None else args.seed
+
     if args.model_folder_name:
         # If absolute path provided, use as-is; else place under overall_folder
         model_folder_name = (
@@ -163,11 +167,13 @@ if __name__ == "__main__":
         model_folder_name=model_folder_name,
         n_envs=args.n_envs,
         zero_invisible_ff_features=False,
+        base_seed=base_seed,
         **env_kwargs,
     )
 
     # Common sweep/run params (captured from slurm and CLI)
     sweep_params = {
+        'base_seed': base_seed,
         'lr': args.lr,
         'num_obs_ff': args.num_obs_ff,
         'max_in_memory_time': args.max_in_memory_time,

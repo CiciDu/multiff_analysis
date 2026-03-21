@@ -4,86 +4,24 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import re
 
-import numpy as np
-import pandas as pd
 
 from neural_data_analysis.design_kits.design_around_event import (
-    event_binning,
     stop_design,
     cluster_design,
 )
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    decode_stops_design,
-)
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils, encoding_design_utils
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    GroupSpec,
-)
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_design
 
 from neural_data_analysis.design_kits.design_by_segment import (
-    other_feats,
-    spatial_feats,
-    temporal_feats
+    other_feats
 )
 
 # ---------------------------------------------------------------------------
 # Stop GAM group specs (mirror one_ff_gam: lam_f tuning, lam_g event, lam_h hist, lam_p coupling)
 # ---------------------------------------------------------------------------
-
-# Behavioral column groups aligned with decode_stops_design._build_feature_groups.
-# (name, list of column names, vartype). Only columns present in design_df are used.
-# _STOP_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
-#     # Kinematic (1D each)
-#     ('accel', ['accel'], '1D'),
-#     ('speed', ['speed'], '1D'),
-#     ('ang_speed', ['ang_speed'], '1D'),
-#     # One_ff_gam-style tuning (if present in design; from extra_agg_cols in encoding design)
-#     ('v', ['v'], '1D'),
-#     ('w', ['w'], '1D'),
-#     ('d', ['d'], '1D'),
-#     ('phi', ['phi'], '1D'),
-#     ('r_targ', ['r_targ'], '1D'),
-#     ('theta_targ', ['theta_targ'], '1D'),
-#     ('eye_ver', ['eye_ver'], '1D'),
-#     ('eye_hor', ['eye_hor'], '1D'),
-#     # Event design (event = temporal basis)
-#     ('basis', None, 'event'),   # cols: rcos_* without *captured; filled below
-#     ('basis*captured', None, 'event'),
-#     ('prepost', ['prepost'], '1D'),
-#     ('prepost*speed', ['prepost*speed'], '1D'),
-#     ('captured', ['captured'], '1D'),
-#     ('time_since_prev_event', ['time_since_prev_event'], '1D'),
-#     ('time_to_next_event', ['time_to_next_event'], '1D'),
-#     # Cluster
-#     ('cluster_flags', ['event_is_first_in_cluster'], '1D'),
-#     ('cluster_gaps', ['gap_since_prev_event_in_cluster_z',
-#      'gap_till_next_event_in_cluster_z'], '1D'),
-#     ('cluster_duration', ['cluster_duration_s_z'], '1D'),
-#     ('cluster_progress', ['cluster_progress_c', 'cluster_progress_c2'], '1D'),
-#     ('cluster_rel_time', ['bin_t_from_cluster_start_s_z'], '1D'),
-#     ('cluster_n_events', ['log_n_events_in_cluster_z'], '1D'),
-#     ('is_clustered', ['is_clustered'], '1D'),
-#     ('event_in_cluster_t', ['event_t_from_cluster_start_s'], '1D'),
-#     # Firefly
-#     ('ff_visible', ['log1p_num_ff_visible', 'num_ff_visible'], '1D'),
-#     ('ff_in_memory', ['log1p_num_ff_in_memory', 'num_ff_in_memory'], '1D'),
-#     # Retries
-#     ('retries', [
-#         'rsw_first', 'rcap_first', 'rsw_middle', 'rcap_middle',
-#         'rsw_last', 'rcap_last', 'one_stop_miss', 'whether_in_retry_series', 'miss',
-#     ], 'event'),
-#     # Timing
-#     ('time_rel_to_event_start', ['time_rel_to_event_start'], '1D'),
-# ]
-
 
 def build_stop_encoding_design(
     pn,
@@ -101,8 +39,6 @@ def build_stop_encoding_design(
     tuning_n_bins: int = 10,
     linear_vars: Optional[List[str]] = None,
     angular_vars: Optional[List[str]] = None,
-    use_planning_rename: bool = True,
-    custom_rename: Optional[Dict[str, str]] = None,
     add_stop_cluster_features: bool = True,
     add_retry_features: bool = True,
 ):
@@ -111,56 +47,29 @@ def build_stop_encoding_design(
     """
 
     # ==============================================================
-    # 2) Rename planning vars if requested
+    # 3-4) Shared binning core (event windows -> binned feats/spikes)
     # ==============================================================
-    if use_planning_rename or custom_rename:
-        monkey_for_encoding = encoding_design_utils.monkey_information_for_encoding(
-            pn.monkey_information,
-            rename_planning_to_one_ff=use_planning_rename,
-            custom_rename=custom_rename,
-        )
-    else:
-        monkey_for_encoding = pn.monkey_information
-
-    # ==============================================================
-    # 3) Event binning
-    # ==============================================================
-    bins_2d, meta = event_binning.event_windows_to_bins2d(
-        new_seg_info,
-        bin_dt=bin_width,
-        only_ok=False,
-        global_bins_2d=global_bins_2d,
-    )
-
-    binned_feats, exposure, used_bins, mask_used, pos = (
-        encoding_design_utils._bin_monkey_information_feats_from_event_bins(
-            monkey_for_encoding,
-            bins_2d,
-            kinematic_cols=[],
-            extra_agg_cols=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS,
-        )
-    )
-
-    meta_df_used = (
-        meta.set_index('bin')
-        .sort_index()
-        .loc[pos]
-        .reset_index()
-    )
-
-    # ==============================================================
-    # 4) Spike binning
-    # ==============================================================
-    spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
-        pn.spikes_df,
+    (
         bins_2d,
+        meta,
+        binned_feats,
+        exposure,
+        used_bins,
+        mask_used,
+        pos,
+        meta_df_used,
+        binned_spikes,
+        _,
+    ) = encoding_design_utils.bin_event_windows_core(
+        new_seg_info=new_seg_info,
+        monkey_information=pn.monkey_information,
+        spikes_df=pn.spikes_df,
+        bin_dt=bin_width,
+        global_bins_2d=global_bins_2d,
+        agg_cols=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS,
         time_col='time',
         cluster_col='cluster',
-    )
-
-    binned_spikes = (
-        pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
-        .reset_index(drop=True)
+        verbose=False,
     )
 
     binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(
@@ -170,6 +79,8 @@ def build_stop_encoding_design(
     # ==============================================================
     # 5) Continuous tuning block
     # ==============================================================
+    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
+    raw_feature_cols_to_drop.remove('time')
     binned_feats, tuning_meta, _ = (
         encoding_design_utils.add_tuning_features_to_design(
             binned_feats,
@@ -179,8 +90,21 @@ def build_stop_encoding_design(
             tuning_n_bins=tuning_n_bins,
             linear_vars=linear_vars,
             angular_vars=angular_vars,
-            raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS,
+            raw_feature_cols_to_drop=raw_feature_cols_to_drop,
         )
+    )
+
+    # Ensure 'time' (kept as raw, not splines) is in tuning_meta
+    binned_feats, tuning_meta = other_feats.add_raw_feature(
+        binned_feats,
+        feature='time',
+        data=binned_feats,
+        name='time',
+        transform='linear',
+        eps=1e-6,
+        center=True,
+        scale=True,
+        meta=tuning_meta,
     )
 
     # ==============================================================
@@ -474,3 +398,11 @@ def add_retries_info_to_binned_feats(
 
     return binned_feats, added_columns
 
+
+
+"""
+Note: this module is for stop *encoding* utilities.
+
+Decoding/GLM stop design builders live in
+`topic_based_neural_analysis/stop_event_analysis/get_stop_events/decode_stops_design.py`.
+"""

@@ -12,9 +12,7 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         sys.path.insert(0, str(p / "multiff_analysis/multiff_code/methods"))
         break
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoding_design_utils,
-)
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 
 RunnerT = TypeVar("RunnerT")
 

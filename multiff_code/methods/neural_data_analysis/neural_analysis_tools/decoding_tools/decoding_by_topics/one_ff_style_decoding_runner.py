@@ -24,7 +24,7 @@ class OneFFStyleDecodingRunner:
     # ------------------------------------------------------------------
     def _get_numeric_target_df(self) -> pd.DataFrame:
         """Filter target df to numeric columns (exclude const)."""
-        y_df = self._get_target_df().copy()
+        y_df = self.get_target_df().copy()
         keep_cols = []
         for c in y_df.columns:
             if c == "const":

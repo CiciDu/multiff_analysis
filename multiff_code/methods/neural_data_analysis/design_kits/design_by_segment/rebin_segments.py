@@ -368,6 +368,211 @@ def _detect_binary_value_cols(df: pd.DataFrame, value_cols, *, tol_decimals: int
             binary_cols.append(c)
     return binary_cols
 
+
+def rebin_all_segments_local_bins(
+    df,
+    new_seg_info,
+    bin_width=None,
+    *,
+    time_col='time',
+    segment_col='segment',
+    how='mean',
+    respect_old_segment=True,
+    add_bin_edges=False,
+    add_support_duration=False,
+    label_na_value=-1,          # for non-binary label cols
+    binary_label_na_value=0,    # for binary-like label cols
+):
+    """
+    Local / segment-defined bins with:
+      - binary cols preserved as binary (ANY-1) via bin_timeseries_weighted(preserve_binary=True)
+      - label cols ('index'/'id') set via max-overlap representative sample per bin
+      - label casting uses per-col sentinel:
+            binary-like label cols -> fill NA with 0
+            other label cols -> fill NA with -1
+    """
+    if how not in ('mean', 'sum'):
+        raise ValueError("how must be 'mean' or 'sum'")
+
+    if bin_width is None:
+        raise ValueError('bin_width is required for local-bins mode')
+
+    dt = float(bin_width)
+    if not np.isfinite(dt) or dt <= 0:
+        raise ValueError('bin_width must be positive')
+
+    exclude = {
+        'new_segment',
+        'new_seg_start_time',
+        'new_seg_end_time',
+        'new_seg_duration',
+    }
+    if respect_old_segment:
+        exclude.add(segment_col)
+
+    value_cols = [
+        c for c in df.select_dtypes(include='number').columns
+        if c not in exclude
+    ]
+    if not value_cols:
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    # Label cols
+    label_cols = get_integer_label_columns(df, value_cols)
+    
+    # Binary detection helper (used for label cols)
+    def _is_binary_series(s: pd.Series, tol_decimals: int = 12) -> bool:
+        if pd.api.types.is_bool_dtype(s):
+            return True
+        x = pd.to_numeric(s, errors='coerce').dropna().to_numpy()
+        if x.size == 0:
+            return False
+        x = np.round(x.astype(float), tol_decimals)
+        return np.isin(x, [0.0, 1.0]).all()
+
+    binary_label_cols = {c for c in label_cols if _is_binary_series(df[c])}
+
+    # Prepare data access
+    if respect_old_segment:
+        df_by_segment = {seg: g.sort_values(time_col) for seg, g in df.groupby(segment_col)}
+    else:
+        df_sorted = df.sort_values(time_col)
+        times_all = df_sorted[time_col].to_numpy()
+
+    out_blocks = []
+    edges_blocks = [] if add_bin_edges else None
+
+    for _, r in new_seg_info.sort_values('new_segment').iterrows():
+        new_seg_id = int(r['new_segment'])
+        t0 = float(r['new_seg_start_time'])
+        t1 = float(r['new_seg_end_time'])
+
+        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
+            continue
+
+        # select data
+        if respect_old_segment:
+            old_seg_id = r[segment_col]
+            seg_df = df_by_segment.get(old_seg_id)
+            if seg_df is None:
+                continue
+            seg_df = seg_df[(seg_df[time_col] >= t0) & (seg_df[time_col] < t1)]
+        else:
+            i0 = np.searchsorted(times_all, t0, side='left')
+            i1 = np.searchsorted(times_all, t1, side='left')
+            seg_df = df_sorted.iloc[i0:i1]
+
+        if seg_df.empty:
+            continue
+
+        # unique times
+        times = seg_df[time_col].to_numpy(dtype=float)
+        times, uniq_idx = np.unique(times, return_index=True)
+        seg_df_u = seg_df.iloc[uniq_idx]
+
+        values = seg_df_u[value_cols].to_numpy(dtype=float)
+        label_values_raw = seg_df_u[label_cols].to_numpy() if label_cols else None
+
+        if times[-1] < t1:
+            times = np.r_[times, times[-1] + 0.01]
+        if times.size < 2:
+            continue
+
+        # local bins
+        n_bins = int(np.floor((t1 - t0) / dt))
+        if n_bins <= 0:
+            continue
+        lefts = t0 + dt * np.arange(n_bins)
+        rights = lefts + dt
+        seg_bins_2d = np.column_stack([lefts, rights])
+
+        # overlaps
+        sample_idx, bin_idx, dt_arr, _ = build_bin_assignments(
+            times,
+            seg_bins_2d,
+            assume_sorted=True,
+            check_nonoverlap=False,
+        )
+        if sample_idx.size == 0:
+            continue
+
+        # aggregate (continuous + binary)
+        weighted_vals, _, used_bins = bin_timeseries_weighted(
+            values[sample_idx],
+            dt_arr,
+            bin_idx,
+            how=how,
+            preserve_binary=True,
+        )
+        if weighted_vals.ndim == 1:
+            weighted_vals = weighted_vals[None, :]
+
+        block = pd.DataFrame(weighted_vals, columns=value_cols)
+        block.insert(0, 'new_bin', used_bins.astype(int))
+        block.insert(0, 'new_segment', new_seg_id)
+
+        # label cols via representative max-dt sample per bin
+        if label_cols:
+            order = np.lexsort((-dt_arr, bin_idx))  # bin asc, dt desc
+            bin_sorted = bin_idx[order]
+            _, first_pos = np.unique(bin_sorted, return_index=True)
+            chosen = order[first_pos]
+
+            chosen_bins = bin_idx[chosen]
+            chosen_sample = sample_idx[chosen]
+            bin_to_rep_sample = {int(b): int(s) for b, s in zip(chosen_bins, chosen_sample)}
+
+            rep_mat = np.zeros((used_bins.size, len(label_cols)), dtype=object)
+            for i, b in enumerate(used_bins.astype(int)):
+                sidx = bin_to_rep_sample.get(int(b), None)
+                if sidx is None:
+                    rep_mat[i, :] = np.nan
+                else:
+                    rep_mat[i, :] = label_values_raw[sidx, :]
+
+            for j, c in enumerate(label_cols):
+                s = pd.to_numeric(pd.Series(rep_mat[:, j]), errors='coerce')
+                block[c] = s.astype('Int64')   # preserves NA
+                if c in binary_label_cols:
+                    block[c] = (block[c] > 0).astype(int)
+
+        # extras
+        if add_support_duration:
+            support = np.zeros(seg_bins_2d.shape[0], dtype=float)
+            np.add.at(support, bin_idx, dt_arr)
+            block['bin_support_dt'] = support[used_bins.astype(int)]
+
+        if add_bin_edges:
+            edges_blocks.append(seg_bins_2d[used_bins.astype(int), :])
+
+        out_blocks.append(block)
+
+    if not out_blocks:
+        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
+
+    out = pd.concat(out_blocks, ignore_index=True)
+
+    # merge segment metadata
+    merge_cols = ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
+    if segment_col in new_seg_info.columns:
+        merge_cols.append(segment_col)
+
+    out = out.merge(
+        new_seg_info[merge_cols],
+        on='new_segment',
+        how='left',
+        validate='many_to_one',
+    )
+
+    if add_bin_edges:
+        bin_edges = np.vstack(edges_blocks) if edges_blocks else np.empty((0, 2))
+        return out, bin_edges
+
+    return out
+
+
+
+
 def rebin_all_segments_global_bins(
     df,
     new_seg_info,
@@ -608,208 +813,6 @@ def rebin_all_segments_global_bins(
 
     if add_bin_edges:
         bin_edges = bins_2d[out_bin, :]
-        return out, bin_edges
-
-    return out
-
-
-def rebin_all_segments_local_bins(
-    df,
-    new_seg_info,
-    bin_width=None,
-    *,
-    time_col='time',
-    segment_col='segment',
-    how='mean',
-    respect_old_segment=True,
-    add_bin_edges=False,
-    add_support_duration=False,
-    label_na_value=-1,          # for non-binary label cols
-    binary_label_na_value=0,    # for binary-like label cols
-):
-    """
-    Local / segment-defined bins with:
-      - binary cols preserved as binary (ANY-1) via bin_timeseries_weighted(preserve_binary=True)
-      - label cols ('index'/'id') set via max-overlap representative sample per bin
-      - label casting uses per-col sentinel:
-            binary-like label cols -> fill NA with 0
-            other label cols -> fill NA with -1
-    """
-    if how not in ('mean', 'sum'):
-        raise ValueError("how must be 'mean' or 'sum'")
-
-    if bin_width is None:
-        raise ValueError('bin_width is required for local-bins mode')
-
-    dt = float(bin_width)
-    if not np.isfinite(dt) or dt <= 0:
-        raise ValueError('bin_width must be positive')
-
-    exclude = {
-        'new_segment',
-        'new_seg_start_time',
-        'new_seg_end_time',
-        'new_seg_duration',
-    }
-    if respect_old_segment:
-        exclude.add(segment_col)
-
-    value_cols = [
-        c for c in df.select_dtypes(include='number').columns
-        if c not in exclude
-    ]
-    if not value_cols:
-        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
-
-    # Label cols
-    label_cols = get_integer_label_columns(df, value_cols)
-    
-    # Binary detection helper (used for label cols)
-    def _is_binary_series(s: pd.Series, tol_decimals: int = 12) -> bool:
-        if pd.api.types.is_bool_dtype(s):
-            return True
-        x = pd.to_numeric(s, errors='coerce').dropna().to_numpy()
-        if x.size == 0:
-            return False
-        x = np.round(x.astype(float), tol_decimals)
-        return np.isin(x, [0.0, 1.0]).all()
-
-    binary_label_cols = {c for c in label_cols if _is_binary_series(df[c])}
-
-    # Prepare data access
-    if respect_old_segment:
-        df_by_segment = {seg: g.sort_values(time_col) for seg, g in df.groupby(segment_col)}
-    else:
-        df_sorted = df.sort_values(time_col)
-        times_all = df_sorted[time_col].to_numpy()
-
-    out_blocks = []
-    edges_blocks = [] if add_bin_edges else None
-
-    for _, r in new_seg_info.sort_values('new_segment').iterrows():
-        new_seg_id = int(r['new_segment'])
-        t0 = float(r['new_seg_start_time'])
-        t1 = float(r['new_seg_end_time'])
-
-        if not np.isfinite(t0) or not np.isfinite(t1) or t1 <= t0:
-            continue
-
-        # select data
-        if respect_old_segment:
-            old_seg_id = r[segment_col]
-            seg_df = df_by_segment.get(old_seg_id)
-            if seg_df is None:
-                continue
-            seg_df = seg_df[(seg_df[time_col] >= t0) & (seg_df[time_col] < t1)]
-        else:
-            i0 = np.searchsorted(times_all, t0, side='left')
-            i1 = np.searchsorted(times_all, t1, side='left')
-            seg_df = df_sorted.iloc[i0:i1]
-
-        if seg_df.empty:
-            continue
-
-        # unique times
-        times = seg_df[time_col].to_numpy(dtype=float)
-        times, uniq_idx = np.unique(times, return_index=True)
-        seg_df_u = seg_df.iloc[uniq_idx]
-
-        values = seg_df_u[value_cols].to_numpy(dtype=float)
-        label_values_raw = seg_df_u[label_cols].to_numpy() if label_cols else None
-
-        if times[-1] < t1:
-            times = np.r_[times, times[-1] + 0.01]
-        if times.size < 2:
-            continue
-
-        # local bins
-        n_bins = int(np.floor((t1 - t0) / dt))
-        if n_bins <= 0:
-            continue
-        lefts = t0 + dt * np.arange(n_bins)
-        rights = lefts + dt
-        seg_bins_2d = np.column_stack([lefts, rights])
-
-        # overlaps
-        sample_idx, bin_idx, dt_arr, _ = build_bin_assignments(
-            times,
-            seg_bins_2d,
-            assume_sorted=True,
-            check_nonoverlap=False,
-        )
-        if sample_idx.size == 0:
-            continue
-
-        # aggregate (continuous + binary)
-        weighted_vals, _, used_bins = bin_timeseries_weighted(
-            values[sample_idx],
-            dt_arr,
-            bin_idx,
-            how=how,
-            preserve_binary=True,
-        )
-        if weighted_vals.ndim == 1:
-            weighted_vals = weighted_vals[None, :]
-
-        block = pd.DataFrame(weighted_vals, columns=value_cols)
-        block.insert(0, 'new_bin', used_bins.astype(int))
-        block.insert(0, 'new_segment', new_seg_id)
-
-        # label cols via representative max-dt sample per bin
-        if label_cols:
-            order = np.lexsort((-dt_arr, bin_idx))  # bin asc, dt desc
-            bin_sorted = bin_idx[order]
-            _, first_pos = np.unique(bin_sorted, return_index=True)
-            chosen = order[first_pos]
-
-            chosen_bins = bin_idx[chosen]
-            chosen_sample = sample_idx[chosen]
-            bin_to_rep_sample = {int(b): int(s) for b, s in zip(chosen_bins, chosen_sample)}
-
-            rep_mat = np.zeros((used_bins.size, len(label_cols)), dtype=object)
-            for i, b in enumerate(used_bins.astype(int)):
-                sidx = bin_to_rep_sample.get(int(b), None)
-                if sidx is None:
-                    rep_mat[i, :] = np.nan
-                else:
-                    rep_mat[i, :] = label_values_raw[sidx, :]
-
-            for j, c in enumerate(label_cols):
-                s = pd.to_numeric(pd.Series(rep_mat[:, j]), errors='coerce')
-                block[c] = s.astype('Int64')   # preserves NA
-                if c in binary_label_cols:
-                    block[c] = (block[c] > 0).astype(int)
-
-        # extras
-        if add_support_duration:
-            support = np.zeros(seg_bins_2d.shape[0], dtype=float)
-            np.add.at(support, bin_idx, dt_arr)
-            block['bin_support_dt'] = support[used_bins.astype(int)]
-
-        if add_bin_edges:
-            edges_blocks.append(seg_bins_2d[used_bins.astype(int), :])
-
-        out_blocks.append(block)
-
-    if not out_blocks:
-        return (pd.DataFrame(), np.empty((0, 2))) if add_bin_edges else pd.DataFrame()
-
-    out = pd.concat(out_blocks, ignore_index=True)
-
-    # merge segment metadata
-    merge_cols = ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
-    if segment_col in new_seg_info.columns:
-        merge_cols.append(segment_col)
-
-    out = out.merge(
-        new_seg_info[merge_cols],
-        on='new_segment',
-        how='left',
-        validate='many_to_one',
-    )
-
-    if add_bin_edges:
-        bin_edges = np.vstack(edges_blocks) if edges_blocks else np.empty((0, 2))
         return out, bin_edges
 
     return out

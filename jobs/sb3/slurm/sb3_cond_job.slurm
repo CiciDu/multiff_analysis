@@ -22,7 +22,7 @@ conda activate multiff_clean
 
 # 8 discrete levels, 3 seeds per level
 LEVELS=(0.5 1.0 1.5 2.0 2.5 3.0)
-SEEDS=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14)
+SEEDS=(100 101 102 103 104 105 106 107 108 109 110 111 112 113 114)
 NUM_LEVELS=${#LEVELS[@]}
 NUM_SEEDS=${#SEEDS[@]}
 
@@ -92,7 +92,7 @@ mkdir -p "$OVERALL_FOLDER"
 
 srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --overall-folder "$OVERALL_FOLDER" \
-  --seed "$SEED" \
+  --base-seed "$SEED" \
   --obs-perc-r "$PERC_R" \
   --obs-perc-th "$PERC_TH" \
   --obs-mem-r "$MEM_R" \

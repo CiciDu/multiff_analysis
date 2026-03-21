@@ -1,51 +1,26 @@
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 
 import numpy as np
 import pandas as pd
-import re
-
-import numpy as np
-import pandas as pd
-
-from neural_data_analysis.design_kits.design_around_event import (
-    event_binning,
-    stop_design,
-    cluster_design,
-)
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
-from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import (
-    decode_stops_design,
-)
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encode_stops_utils, encoding_design_utils
 
 
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
-    GroupSpec,
-)
-from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
-from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_design
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+
+
 
 from neural_data_analysis.design_kits.design_by_segment import (
-    other_feats,
-    spatial_feats,
-    temporal_feats
+    other_feats
 )
 
-from neural_data_analysis.design_kits.design_by_segment import (
-    spike_history,
-    temporal_feats,
-    create_pn_design_df,
-)
 
 _PN_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
     # Kinematic (1D each)
     ('accel', ['accel'], '1D'),
     ('speed', ['speed'], '1D'),
     ('ang_speed', ['ang_speed'], '1D'),
-    # One_ff_gam-style tuning (if present in design; from extra_agg_cols in encoding design)
+    # One_ff_gam-style tuning (if present in design; from agg_cols in encoding design)
     ('v', ['v'], '1D'),
     ('w', ['w'], '1D'),
     ('d', ['d'], '1D'),
@@ -82,8 +57,6 @@ def build_pn_encoding_design(
     tuning_n_bins: int = 10,
     linear_vars: Optional[List[str]] = None,
     angular_vars: Optional[List[str]] = None,
-    use_planning_rename: bool = True,
-    custom_rename: Optional[Dict[str, str]] = None,
 ):
     """
     Assemble stop design for encoding (GAM / temporal + tuning basis).
@@ -91,26 +64,19 @@ def build_pn_encoding_design(
 
     # Optionally rename planning columns to one_ff names (target_distance -> r_targ, etc.)
     # -------------------------------------------------------------------------
-    if use_planning_rename or custom_rename:
-        monkey_for_encoding = encoding_design_utils.monkey_information_for_encoding(
-           monkey_information,
-            rename_planning_to_one_ff=use_planning_rename,
-            custom_rename=custom_rename,
-        )
-    else:
-        monkey_for_encoding = monkey_information
+
 
     kinematic_cols = []
-    extra_agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
+    agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
     # -------------------------------------------------------------------------
 
     # ------ add boxcar covariates
     binned_feats, exposure, used_bins, mask_used, pos = (
-        encoding_design_utils._bin_monkey_information_feats_from_event_bins(
-            monkey_for_encoding,
+        encoding_design_utils.bin_monkey_information_feats_from_event_bins(
+            monkey_information,
             global_bins_2d,
             kinematic_cols=kinematic_cols,
-            extra_agg_cols=extra_agg_cols,
+            agg_cols=agg_cols,
         )
     )
 
@@ -125,6 +91,7 @@ def build_pn_encoding_design(
             else:
                 print(f'Missing required variable "{var}" in binned features. Will skip it.')
 
+    rebinned_y_var['time'] = binned_feats['time'].values # pass in as raw feature later
     raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS + (linear_vars or []) + (angular_vars or [])
     print('raw_feature_cols_to_drop:', raw_feature_cols_to_drop)
 
@@ -176,6 +143,7 @@ def build_pn_encoding_design(
 
     raw_features = [
             # 'curv_of_traj',
+            'time',  # kept as raw, not splines
             'num_ff_visible', 'log1p_num_ff_visible',
             'num_ff_in_memory', 'log1p_num_ff_in_memory',
         ]
@@ -190,7 +158,7 @@ def build_pn_encoding_design(
             transform='linear',
             eps=1e-6,
             center=True,
-            scale=False,
+            scale=True,
             meta=tuning_meta,
         )
 

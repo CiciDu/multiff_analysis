@@ -68,7 +68,6 @@ def build_vis_design_decoding(
     add_retries_info: bool = False,
     datasets: Optional[dict] = None,
     global_bins_2d: Optional[np.ndarray] = None,
-    extra_agg_cols: Optional[List[str]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build vis (ff visibility) design for decoding.
@@ -81,7 +80,6 @@ def build_vis_design_decoding(
         binned_feats,
         offset_log,
         meta_df_used,
-        groups,
     ) = decode_stops_design.build_stop_design_decoding(
         new_seg_info,
         events_with_stats,
@@ -93,7 +91,6 @@ def build_vis_design_decoding(
         add_retries_info=add_retries_info,
         datasets=datasets,
         global_bins_2d=global_bins_2d,
-        extra_agg_cols=extra_agg_cols,
     )
 
     ff_on_df, group_on_df = decode_vis_utils.extract_ff_visibility_tables_fast(
@@ -107,12 +104,4 @@ def build_vis_design_decoding(
         group_on_df,
     )
 
-    vis_event_cols = [
-        'ff_on_in_bin',
-        'ff_off_in_bin',
-        'group_ff_on_in_bin',
-        'group_ff_off_in_bin',
-    ]
-    groups['vis_events'] = [c for c in vis_event_cols if c in binned_feats.columns]
-
-    return binned_spikes, binned_feats, offset_log, meta_df_used, groups
+    return binned_spikes, binned_feats, offset_log, meta_df_used
