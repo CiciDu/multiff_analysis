@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 from pathlib import Path
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -34,7 +33,8 @@ def collect_all_session_decoding_results(
     verbose=False,
     shuffle_mode='none',
     fit_kernelwidth=True,
-    use_detrend=None,
+    detrend_spikes=True,
+    use_detrend_inside_cv=None,
     detrend_per_block=None,
 ):
     """
@@ -55,11 +55,11 @@ def collect_all_session_decoding_results(
         Default is 'none'.
     fit_kernelwidth : bool, optional
         Whether to load nested CV (fit kernelwidth) or fixed-width results.
-    use_detrend : bool, optional
+    use_detrend_inside_cv : bool, optional
         If True, keep only results from detrended runs. If False, keep only
         non-detrended. If None (default), keep all.
     detrend_per_block : bool, optional
-        When use_detrend=True: if True, only per-block detrended; if False,
+        When use_detrend_inside_cv=True: if True, only per-block detrended; if False,
         only global detrended; if None, both.
 
     Returns
@@ -91,7 +91,9 @@ def collect_all_session_decoding_results(
             raw_data_folder_path=raw_data_folder_path,
         )
 
+        runner.detrend_spikes = detrend_spikes
         save_dir = runner._get_save_dir()
+        
         if shuffle_mode != 'none':
             save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
 
@@ -104,7 +106,7 @@ def collect_all_session_decoding_results(
             save_dir=models_save_dir,
             load_existing_only=True,
             verbosity=1 if verbose else 0,
-            use_detrend=use_detrend,
+            use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
         )
 
@@ -172,13 +174,7 @@ def _select_rows(
 
 
 
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 
-from scipy.stats import ttest_rel
-from statsmodels.stats.multitest import multipletests
 
 
 # ==========================================================

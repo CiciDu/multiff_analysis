@@ -68,6 +68,7 @@ def build_vis_design_decoding(
     add_retries_info: bool = False,
     datasets: Optional[dict] = None,
     global_bins_2d: Optional[np.ndarray] = None,
+    detrend_spikes: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build vis (ff visibility) design for decoding.
@@ -76,7 +77,7 @@ def build_vis_design_decoding(
     ff_on, ff_off, group_ff_on, group_ff_off (no basis functions).
     """
     (
-        binned_spikes,
+        rebinned_spike_rates,
         binned_feats,
         offset_log,
         meta_df_used,
@@ -91,6 +92,7 @@ def build_vis_design_decoding(
         add_retries_info=add_retries_info,
         datasets=datasets,
         global_bins_2d=global_bins_2d,
+        detrend_spikes=detrend_spikes,
     )
 
     ff_on_df, group_on_df = decode_vis_utils.extract_ff_visibility_tables_fast(
@@ -104,4 +106,4 @@ def build_vis_design_decoding(
         group_on_df,
     )
 
-    return binned_spikes, binned_feats, offset_log, meta_df_used
+    return rebinned_spike_rates, binned_feats, offset_log, meta_df_used

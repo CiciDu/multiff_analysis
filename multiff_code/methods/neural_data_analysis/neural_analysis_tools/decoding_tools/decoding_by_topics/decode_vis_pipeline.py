@@ -46,6 +46,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         # will be filled during setup
         self.datasets = None
         self.comparisons = None
+        self.detrend_spikes = True
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
@@ -77,13 +78,14 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         return "feats_to_decode"
 
 
-    def collect_data(self, exists_ok=True):
+    def collect_data(self, exists_ok=True, detrend_spikes: bool = True):
         """
         Collect and prepare data for decoding.
 
         Args:
             exists_ok: If True, load cached design matrices if they exist.
         """
+        self.detrend_spikes = detrend_spikes
         # Try to load cached design matrices
         if exists_ok and self._load_design_matrices():
             print('[collect_data] Using cached design matrices')
@@ -96,7 +98,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
                 self.binned_spikes,
                 self.feats_to_decode,
                 self.meta_df_used,
-            ) = self._prepare_design_matrices()
+            ) = self._prepare_design_matrices(detrend_spikes=detrend_spikes)
 
             self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
 
@@ -104,14 +106,14 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             self.reduce_binned_spikes()
             self._save_design_matrices()
 
-    def _prepare_design_matrices(self):
+    def _prepare_design_matrices(self, detrend_spikes: bool = True):
         new_seg_info, events_with_stats = decode_vis_utils.prepare_new_seg_info(
             self.pn.ff_dataframe,
             self.pn.bin_width,
         )
 
         (
-            binned_spikes,
+            rebinned_spike_rates,
             binned_feats,
             offset_log,
             meta_df_used,
@@ -125,6 +127,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             bin_dt=self.pn.bin_width,
             add_ff_visible_info=True,
             add_retries_info=False,
+            detrend_spikes=detrend_spikes,
         )
 
         if 'global_burst_id' not in meta_df_used.columns:
@@ -141,15 +144,19 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             feats_to_decode,
             has_constant='add',
         )
-  
-        self.binned_spikes = binned_spikes
 
-        return binned_spikes, feats_to_decode, meta_df_used
+        _id_cols = {'new_segment', 'new_bin', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration'}
+        _cluster_cols = [c for c in rebinned_spike_rates.columns if c not in _id_cols]
+        self.binned_spikes = rebinned_spike_rates[_cluster_cols].copy()
+
+        return rebinned_spike_rates, feats_to_decode, meta_df_used
 
     def _get_save_dir(self):
+        sub = "detrended" if getattr(self, "detrend_spikes", True) else "raw"
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
-            'decoding_outputs/vis_decoder_outputs',
+            "decoding_outputs/vis_decoder_outputs",
+            sub,
         )
 
     def _get_design_matrix_paths(self):

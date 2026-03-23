@@ -99,12 +99,9 @@ def bin_event_windows_core(
     *,
     new_seg_info: pd.DataFrame,
     monkey_information: pd.DataFrame,
-    spikes_df: pd.DataFrame,
     bin_dt: float,
     global_bins_2d: Optional[np.ndarray] = None,
     agg_cols: Optional[List[str]] = None,
-    time_col: str = 'time',
-    cluster_col: str = 'cluster',
     verbose: bool = False,
 ) -> Tuple[
     np.ndarray,          # bins_2d
@@ -115,14 +112,13 @@ def bin_event_windows_core(
     np.ndarray,          # mask_used
     np.ndarray,          # pos
     pd.DataFrame,        # meta_df_used
-    pd.DataFrame,        # binned_spikes
-    np.ndarray,          # cluster_ids
 ]:
     """
-    Shared core to go from event windows -> binned monkey features + spikes.
+    Shared core to go from event windows -> binned monkey features.
 
     This is used by both stop decoding designs (in `decode_stops_design.py`)
     and stop encoding designs (in `encode_stops_utils.py`).
+    Spike binning is done separately via bin_spikes_for_event_windows().
     """
     agg_cols = ONE_FF_STYLE_EXTRA_COLS if agg_cols is None else agg_cols
 
@@ -152,6 +148,29 @@ def bin_event_windows_core(
         .reset_index()
     )
 
+    return (
+        bins_2d,
+        meta,
+        binned_feats,
+        exposure,
+        used_bins,
+        mask_used,
+        pos,
+        meta_df_used,
+    )
+
+
+def bin_spikes_for_event_windows(
+    spikes_df: pd.DataFrame,
+    bins_2d: np.ndarray,
+    pos: np.ndarray,
+    *,
+    time_col: str = 'time',
+    cluster_col: str = 'cluster',
+) -> Tuple[pd.DataFrame, np.ndarray]:
+    """
+    Bin spikes by cluster for event windows, subsetting to used bins (pos).
+    """
     spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
         spikes_df,
         bins_2d,
@@ -162,19 +181,7 @@ def bin_event_windows_core(
         pd.DataFrame(spike_counts[pos, :], columns=cluster_ids)
         .reset_index(drop=True)
     )
-
-    return (
-        bins_2d,
-        meta,
-        binned_feats,
-        exposure,
-        used_bins,
-        mask_used,
-        pos,
-        meta_df_used,
-        binned_spikes,
-        cluster_ids,
-    )
+    return binned_spikes, cluster_ids
 
 def _fill_covariate_from_aliases(
     binned_feats: pd.DataFrame,

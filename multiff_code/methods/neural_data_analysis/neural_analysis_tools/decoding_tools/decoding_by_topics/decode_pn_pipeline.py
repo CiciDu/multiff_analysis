@@ -19,7 +19,7 @@ from neural_data_analysis.design_kits.design_by_segment import (
     temporal_feats,
 )
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils, decode_pn_utils
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers.decoding_design_utils import (
     PN_DECODING_VAR_CATEGORIES,
 )
@@ -46,6 +46,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.trial_ids = None
         self.binned_spikes = None
         self.detrend_covariates = None  # DataFrame with time, trial_index, etc.
+        self.detrend_spikes = True
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
@@ -84,7 +85,8 @@ class PNDecodingRunner(BaseDecodingRunner):
     # Data collection
     # ------------------------------------------------------------------
 
-    def collect_data(self, exists_ok=True):
+    def collect_data(self, exists_ok=True, detrend_spikes: bool = True):
+        self.detrend_spikes = detrend_spikes
         if exists_ok and self._load_design_matrices():
             print('[PNDecodingRunner] Using cached design matrices')
             return
@@ -118,14 +120,18 @@ class PNDecodingRunner(BaseDecodingRunner):
             pn.ff_caught_T_new,
         )
 
-        cluster_cols = [c for c in pn.rebinned_x_var.columns if c.startswith('cluster_')]
-        binned_spikes = pn.rebinned_x_var[cluster_cols]
-        binned_spikes.columns = (
-            binned_spikes.columns
-            .str.replace('cluster_', '')
-            .astype(int)
-        )
-        self.binned_spikes = binned_spikes.copy()
+        if detrend_spikes:
+            self.binned_spikes = decode_pn_utils.get_rebinned_spike_rates(pn)
+        else:
+            cluster_cols = [c for c in pn.rebinned_x_var.columns if c.startswith('cluster_')]
+            binned_spikes = pn.rebinned_x_var[cluster_cols]
+            binned_spikes.columns = (
+                binned_spikes.columns
+                .str.replace('cluster_', '')
+                .astype(int)
+            )
+            self.binned_spikes = binned_spikes / self.bin_width
+
 
         self.pn = pn
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
@@ -146,10 +152,15 @@ class PNDecodingRunner(BaseDecodingRunner):
     # ------------------------------------------------------------------
     # Caching utilities (BaseDecodingRunner interface)
     # ------------------------------------------------------------------
+    
+
+    
     def _get_save_dir(self):
+        sub = 'detrended' if getattr(self, 'detrend_spikes', True) else 'raw'
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
             'decoding_outputs/pn_decoder_outputs',
+            sub,
         )
 
     def _get_design_matrix_paths(self):

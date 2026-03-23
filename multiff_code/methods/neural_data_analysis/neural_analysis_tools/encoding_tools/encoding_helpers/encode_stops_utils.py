@@ -58,18 +58,21 @@ def build_stop_encoding_design(
         mask_used,
         pos,
         meta_df_used,
-        binned_spikes,
-        _,
     ) = encoding_design_utils.bin_event_windows_core(
         new_seg_info=new_seg_info,
         monkey_information=pn.monkey_information,
-        spikes_df=pn.spikes_df,
         bin_dt=bin_width,
         global_bins_2d=global_bins_2d,
         agg_cols=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS,
+        verbose=False,
+    )
+
+    binned_spikes, _ = encoding_design_utils.bin_spikes_for_event_windows(
+        pn.spikes_df,
+        bins_2d,
+        pos,
         time_col='time',
         cluster_col='cluster',
-        verbose=False,
     )
 
     binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(

@@ -78,7 +78,7 @@ def run_cv_decoding(
     exists_ok=True,
     model_name: Optional[str] = None,
     detrend_covariates=None,
-    use_detrend=None,
+    use_detrend_inside_cv=None,
     detrend_per_block=None,
 ):
 
@@ -92,7 +92,7 @@ def run_cv_decoding(
                 "save_dir must be provided when load_existing_only=True")
         return load_consolidated_results(
             save_dir,
-            use_detrend=use_detrend,
+            use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
         )
 
@@ -723,7 +723,7 @@ def _save_results(
 def load_consolidated_results(
     out_dir,
     filename='all_models_results.csv',
-    use_detrend=None,
+    use_detrend_inside_cv=None,
     detrend_per_block=None,
 ):
     """
@@ -735,12 +735,12 @@ def load_consolidated_results(
         Directory containing the consolidated results file.
     filename : str, optional
         Name of the consolidated results CSV file. Default is 'all_models_results.csv'.
-    use_detrend : bool, optional
+    use_detrend_inside_cv : bool, optional
         If True, keep only detrended results. If False, keep only non-detrended.
-        If None, keep all. When loading from CSV, filters by 'use_detrend' column if present.
+        If None, keep all. When loading from CSV, filters by 'use_detrend_inside_cv' column if present.
     detrend_per_block : bool, optional
-        When use_detrend=True: if True, keep only per-block detrended; if False,
-        keep only global detrended; if None, keep both. Ignored when use_detrend is False.
+        When use_detrend_inside_cv=True: if True, keep only per-block detrended; if False,
+        keep only global detrended; if None, keep both. Ignored when use_detrend_inside_cv is False.
 
     Returns
     -------
@@ -753,15 +753,15 @@ def load_consolidated_results(
     if not csv_path.exists():
         consolidated_df = consolidate_results_across_models(
             out_dir, filename,
-            use_detrend=use_detrend,
+            use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
         )
         return consolidated_df
     else:
         df = pd.read_csv(csv_path)
-        if use_detrend is not None and 'use_detrend' in df.columns:
-            df = df[df['use_detrend'] == use_detrend].reset_index(drop=True)
-        if use_detrend and detrend_per_block is not None and 'detrend_per_block' in df.columns:
+        if use_detrend_inside_cv is not None and 'use_detrend_inside_cv' in df.columns:
+            df = df[df['use_detrend_inside_cv'] == use_detrend_inside_cv].reset_index(drop=True)
+        if use_detrend_inside_cv and detrend_per_block is not None and 'detrend_per_block' in df.columns:
             df = df[df['detrend_per_block'] == detrend_per_block].reset_index(drop=True)
         return df
 
@@ -772,7 +772,7 @@ def consolidate_results_across_models(
     model_names=None,
     verbosity=1,
     save_output=False,
-    use_detrend=None,
+    use_detrend_inside_cv=None,
     detrend_per_block=None,
 ):
     """
@@ -793,14 +793,14 @@ def consolidate_results_across_models(
         Verbosity level.
     save_output : bool, optional
         Whether to save the consolidated CSV to `out_dir`.
-    use_detrend : bool, optional
+    use_detrend_inside_cv : bool, optional
         If True, include only detrended runs. If False, include only non-detrended.
-        If None, include all. When _cv_config lacks use_detrend, infers from
+        If None, include all. When _cv_config lacks use_detrend_inside_cv, infers from
         filename (*_detrend*.pkl = detrended).
     detrend_per_block : bool, optional
-        When use_detrend=True: if True, only *_detrend_perblock*.pkl; if False,
+        When use_detrend_inside_cv=True: if True, only *_detrend_perblock*.pkl; if False,
         only *_detrend*.pkl (global, not per block); if None, both. Ignored when
-        use_detrend is False.
+        use_detrend_inside_cv is False.
 
     Returns
     -------
@@ -824,9 +824,9 @@ def consolidate_results_across_models(
     for p in pkl_paths:
         # Skip loading when filter is set and filename indicates mismatch
         stem = p.stem
-        if use_detrend is False and '_detrend' in stem:
+        if use_detrend_inside_cv is False and '_detrend' in stem:
             continue
-        if use_detrend is True:
+        if use_detrend_inside_cv is True:
             if '_detrend' not in stem:
                 continue
             if detrend_per_block is True and '_detrend_perblock' not in stem:
@@ -848,20 +848,20 @@ def consolidate_results_across_models(
             df = loaded['results_df']
             try:
                 if isinstance(df, pd.DataFrame) and len(df) > 0:
-                    # Infer use_detrend and detrend_per_block from _cv_config or filename
+                    # Infer use_detrend_inside_cv and detrend_per_block from _cv_config or filename
                     cv_config = loaded.get('_cv_config', {})
-                    pkl_use_detrend = cv_config.get('use_detrend')
+                    pkl_use_detrend = cv_config.get('use_detrend_inside_cv')
                     if pkl_use_detrend is None:
                         pkl_use_detrend = '_detrend' in stem
                     pkl_detrend_per_block = cv_config.get('detrend_per_block')
                     if pkl_detrend_per_block is None:
                         pkl_detrend_per_block = '_detrend_perblock' in stem if pkl_use_detrend else False
-                    if use_detrend is not None and pkl_use_detrend != use_detrend:
+                    if use_detrend_inside_cv is not None and pkl_use_detrend != use_detrend_inside_cv:
                         continue
-                    if use_detrend and detrend_per_block is not None and pkl_detrend_per_block != detrend_per_block:
+                    if use_detrend_inside_cv and detrend_per_block is not None and pkl_detrend_per_block != detrend_per_block:
                         continue
                     df = df.copy()
-                    df['use_detrend'] = pkl_use_detrend
+                    df['use_detrend_inside_cv'] = pkl_use_detrend
                     df['detrend_per_block'] = pkl_detrend_per_block
                     if 'detrend_degree' not in df.columns:
                         df['detrend_degree'] = cv_config.get('detrend_degree', 1 if pkl_use_detrend else None)

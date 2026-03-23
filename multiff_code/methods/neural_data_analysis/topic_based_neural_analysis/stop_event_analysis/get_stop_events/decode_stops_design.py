@@ -10,6 +10,7 @@ from matplotlib import rc
 import statsmodels.api as sm
 
 
+
 # --- Neuroscience / modeling imports
 from neural_data_analysis.design_kits.design_around_event import (
     event_binning, stop_design, cluster_design
@@ -25,6 +26,10 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
     encoding_design_utils,
 )
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import detrend_neural_data
+
+
+from neural_data_analysis.design_kits.design_by_segment import rebin_segments
 
 # =============================================================================
 # Global environment & plotting defaults
@@ -45,13 +50,43 @@ np.set_printoptions(suppress=True)
 # =============================================================================
 # Stop Design Builder
 # =============================================================================
+
+
+def _align_rebinned_spike_rates_to_meta(
+    rebinned_spike_rates: pd.DataFrame,
+    meta_df_used: pd.DataFrame,
+    new_seg_for_rebin: pd.DataFrame,
+) -> pd.DataFrame:
+    """Align rebinned spike rates to meta_df_used row order; forward-fill NaN."""
+    event_id_to_new_seg = dict(
+        zip(new_seg_for_rebin['event_id'].values, new_seg_for_rebin['new_segment'].values)
+    )
+    meta_copy = meta_df_used.copy()
+    meta_copy['_new_segment'] = meta_copy['event_id'].map(event_id_to_new_seg)
+    merge_keys = meta_copy[['_new_segment', 'bin']].rename(columns={'bin': 'new_bin'})
+    rebinned_aligned = rebinned_spike_rates.merge(
+        merge_keys,
+        left_on=['new_segment', 'new_bin'],
+        right_on=['_new_segment', 'new_bin'],
+        how='right',
+    )
+    id_cols = {'new_segment', 'new_bin', '_new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration'}
+    cluster_cols = [c for c in rebinned_aligned.columns if c not in id_cols]
+    out = rebinned_aligned[cluster_cols].reset_index(drop=True)
+    if out.isna().any().any():
+        out = out.ffill().bfill()
+    return out
+
+
 def _build_stop_core(
     new_seg_info: pd.DataFrame,
     events_with_stats: pd.DataFrame,
     monkey_information: pd.DataFrame,
-    spikes_df: pd.DataFrame,
+    detrended_spike_rates: pd.DataFrame = None,
+    spikes_df: pd.DataFrame = None,
     bin_dt: float = 0.04,
     global_bins_2d: np.ndarray = None,
+    detrend_spikes: bool = True,
 ):
     """
     Shared core for building stop-aligned binned data structures.
@@ -74,19 +109,49 @@ def _build_stop_core(
         mask_used,
         pos,
         meta_df_used,
-        binned_spikes,
-        _,
     ) = encoding_design_utils.bin_event_windows_core(
         new_seg_info=new_seg_info,
         monkey_information=monkey_information,
-        spikes_df=spikes_df,
         bin_dt=bin_dt,
         global_bins_2d=global_bins_2d,
         agg_cols=agg_cols,
-        time_col="time",
-        cluster_col="cluster",
         verbose=True,
     )
+
+
+    # rebin expects new_segment; event design uses event_id
+    new_seg_for_rebin = new_seg_info.copy()
+    if 'new_segment' not in new_seg_for_rebin.columns:
+        new_seg_for_rebin['new_segment'] = np.arange(len(new_seg_for_rebin))
+
+
+    if detrend_spikes and (detrended_spike_rates is not None):
+        rebinned_spike_rates = rebin_segments.rebin_all_segments_global_bins(
+            detrended_spike_rates,
+            new_seg_for_rebin,
+            bins_2d=bins_2d,
+            bin_left_col='time_bin_start',
+            bin_right_col='time_bin_end',
+            bin_center_col='time_bin_center',
+            how='mean',
+            respect_old_segment=False,
+            require_full_bin=False,
+            add_bin_edges=False,
+            add_support_duration=False,
+        )
+
+        rebinned_spike_rates = _align_rebinned_spike_rates_to_meta(
+            rebinned_spike_rates, meta_df_used, new_seg_for_rebin
+        )
+    else:
+        binned_spikes, _ = encoding_design_utils.bin_spikes_for_event_windows(
+            spikes_df,
+            bins_2d,
+            pos,
+            time_col='time',
+            cluster_col='cluster',
+        )  
+        rebinned_spike_rates = (binned_spikes / bin_dt).copy()  
 
     cluster_df = cluster_design.build_cluster_features_workflow(
         meta_df_used[["event_id", "rel_center"]],
@@ -118,7 +183,7 @@ def _build_stop_core(
         mask_used,
         pos,
         meta_df_used,
-        binned_spikes,
+        rebinned_spike_rates,
         cluster_df,
         shared_cluster_feats,
         agg_cols,
@@ -137,10 +202,28 @@ def build_stop_design_decoding(
     add_retries_info: bool = True,
     datasets: dict = None,
     global_bins_2d: np.ndarray = None,
+    detrend_spikes: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build stop design for decoding (minimal event design, no interaction columns).
     """
+
+
+    if detrend_spikes:
+        detrended_df = detrend_neural_data.detrend_spikes_session_wide(
+            spikes_df=spikes_df,
+            bin_size=0.05,          # 50 ms fine bins for detrending
+            drift_sigma_s=60.0,     # remove only very slow drift; tune 30-120 s
+            center_method='subtract'
+        )
+
+        detrended_spike_rates, cluster_columns = detrend_neural_data.reshape_detrended_df_to_wide(
+            detrended_df,
+            value_col='detrended_rate_hz'
+        )
+    else:
+        detrended_spike_rates = None
+
     (
         bins_2d,
         meta,
@@ -150,7 +233,7 @@ def build_stop_design_decoding(
         mask_used,
         pos,
         meta_df_used,
-        binned_spikes,
+        rebinned_spike_rates,
         cluster_df,
         shared_cluster_feats,
         _,
@@ -158,9 +241,11 @@ def build_stop_design_decoding(
         new_seg_info=new_seg_info,
         events_with_stats=events_with_stats,
         monkey_information=monkey_information,
+        detrended_spike_rates=detrended_spike_rates,
         spikes_df=spikes_df,
         bin_dt=bin_dt,
         global_bins_2d=global_bins_2d,
+        detrend_spikes=detrend_spikes,
     )
 
     X_event_df = stop_design.build_event_design_for_decoding(
@@ -190,7 +275,7 @@ def build_stop_design_decoding(
         binned_feats, meta_df_used = add_retries_info_to_binned_feats(
             binned_feats, new_seg_info, datasets, meta_df_used
         )
-    return binned_spikes, binned_feats, offset_log, meta_df_used
+    return rebinned_spike_rates, binned_feats, offset_log, meta_df_used
 
 
 
@@ -499,6 +584,7 @@ def assemble_stop_decoding_design(
     raw_data_folder_path,
     bin_width,
     global_bins_2d=None,
+    detrend_spikes: bool = True,
 ):
     """
     Assemble stop design for decoding.
@@ -517,10 +603,11 @@ def assemble_stop_decoding_design(
         datasets=datasets,
         add_ff_visible_info=True,
         global_bins_2d=global_bins_2d,
+        detrend_spikes=detrend_spikes,
     )
 
     (
-        binned_spikes,
+        rebinned_spike_rates,
         binned_feats,
         offset_log,
         meta_df_used,
@@ -532,7 +619,7 @@ def assemble_stop_decoding_design(
 
     return (
         pn,
-        binned_spikes,
+        rebinned_spike_rates,
         binned_feats,
         offset_log,
         meta_df_used,

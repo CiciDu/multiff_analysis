@@ -50,6 +50,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         self.meta_df_used = None
         self.feats_to_decode = None
         self.binned_spikes = None
+        self.detrend_spikes = True
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,
@@ -86,25 +87,32 @@ class StopDecodingRunner(BaseDecodingRunner):
     # ------------------------------------------------------------------
     # Data collection
     # ------------------------------------------------------------------
-    def collect_data(self, exists_ok: bool = True):
+    def collect_data(self, exists_ok: bool = True, detrend_spikes: bool = True):
+        self.detrend_spikes = detrend_spikes
         if exists_ok and self._load_design_matrices():
             print("[StopDecodingRunner] Using cached design matrices")
             return
 
         print("[StopDecodingRunner] Computing design matrices from scratch")
+
         (
             self.pn,
-            self.binned_spikes,
+            rebinned_spike_rates,
             self.feats_to_decode,
             _offset_log,
             self.meta_df_used,
         ) = decode_stops_design.assemble_stop_decoding_design(
             self.raw_data_folder_path,
             self.bin_width,
+            detrend_spikes=detrend_spikes,
         )
 
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
- 
+
+        _id_cols = {'new_segment', 'new_bin', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration'}
+        _cluster_cols = [c for c in rebinned_spike_rates.columns if c not in _id_cols]
+        self.binned_spikes = rebinned_spike_rates[_cluster_cols].copy()
+
         self.reduce_binned_spikes()
         self._save_design_matrices()
 
@@ -112,9 +120,11 @@ class StopDecodingRunner(BaseDecodingRunner):
     # Caching utilities (BaseDecodingRunner interface)
     # ------------------------------------------------------------------
     def _get_save_dir(self):
+        sub = "detrended" if getattr(self, "detrend_spikes", True) else "raw"
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
             "decoding_outputs/stop_decoder_outputs",
+            sub,
         )
 
     def _get_design_matrix_paths(self):
