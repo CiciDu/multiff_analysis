@@ -46,7 +46,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         # will be filled during setup
         self.datasets = None
         self.comparisons = None
-        self.detrend_spikes = True
+        
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width

@@ -172,93 +172,9 @@ def build_conditioned_subset(
     return subset, fixed_values
 
 
-def plot_conditional(
-    df,
-    x_key,
-    fixed_values=None,
-    y_key='num_caught_ff',
-    reference_row_index=0,
-    ax=None,
-    verbose=True
-):
-    """
-    Plot Y vs X while holding all other variables fixed.
-    Shows boxplot + scatter (no jitter).
-    """
-
-    if x_key not in df.columns:
-        raise ValueError(f'{x_key} not in dataframe')
-
-    if y_key not in df.columns:
-        raise ValueError(f'{y_key} not in dataframe')
-
-    if fixed_values is None:
-        reference_row = df.iloc[reference_row_index]
-
-        fixed_values = {
-            col: reference_row[col]
-            for col in df.columns
-            if col not in [x_key, y_key, 'agent_name']
-        }
-        
-    # ---------------------------------------
-    # Build conditioned subset
-    # ---------------------------------------
-
-    subset, fixed_values = build_conditioned_subset(
-        df=df,
-        verbose=verbose,
-        fixed_values=fixed_values
-    )
-
-    if subset is None:
-        return None
-
-    # ---------------------------------------
-    # Plot
-    # ---------------------------------------
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(5, 4))
-
-    subset = subset.sort_values(x_key)
-
-    # --- Boxplot ---
-    subset.boxplot(
-        column=y_key,
-        by=x_key,
-        ax=ax,
-        grid=False,
-        showfliers=False
-    )
-
-    # --- Scatter overlay (no jitter) ---
-    x_vals = subset[x_key].values
-    y_vals = subset[y_key].values
-
-    unique_x = np.sort(subset[x_key].unique())
-    x_positions = np.array([np.where(unique_x == v)[0][0] + 1 for v in x_vals])
-
-    ax.scatter(x_positions, y_vals, alpha=0.5)
-
-    ax.set_title(f'{y_key} vs {x_key}')
-    ax.set_xlabel(x_key)
-    ax.set_ylabel(y_key)
-    
-    # # set ylim
-    # ax.set_ylim(0, 100)
-
-    if ax.figure:
-        ax.figure.suptitle('')
-
-    if ax is None:
-        plt.tight_layout()
-        plt.show()
-
-    return subset
-
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-
 
 def add_seed_column(df):
     """
@@ -570,3 +486,131 @@ def streamline_plot_agents_with_conditions(
         plt.show()
 
     return fig
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def plot_conditional(
+    df,
+    x_key,
+    fixed_values=None,
+    y_key='num_caught_ff',
+    reference_row_index=0,
+    ax=None,
+    verbose=True,
+    color_by='seed',
+    jitter=0.1,
+):
+    """
+    Plot Y vs X while holding all other variables fixed.
+    Shows boxplot + scatter.
+
+    Parameters
+    ----------
+    color_by : str or None
+    jitter : float
+        Horizontal jitter magnitude (e.g. 0.1). 0 = no jitter.
+    """
+
+    if x_key not in df.columns:
+        raise ValueError(f'{x_key} not in dataframe')
+
+    if y_key not in df.columns:
+        raise ValueError(f'{y_key} not in dataframe')
+
+    if color_by is not None and color_by not in df.columns:
+        raise ValueError(f'{color_by} not in dataframe')
+
+    if fixed_values is None:
+        reference_row = df.iloc[reference_row_index]
+
+        fixed_values = {
+            col: reference_row[col]
+            for col in df.columns
+            if col not in [x_key, y_key, 'agent_name']
+        }
+
+    subset, fixed_values = build_conditioned_subset(
+        df=df,
+        verbose=verbose,
+        fixed_values=fixed_values
+    )
+
+    if subset is None:
+        return None
+
+    created_fig = False
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+        created_fig = True
+
+    subset = subset.sort_values(x_key)
+
+    # --- Boxplot ---
+    subset.boxplot(
+        column=y_key,
+        by=x_key,
+        ax=ax,
+        grid=False,
+        showfliers=False
+    )
+
+    # --- Scatter ---
+    x_vals = subset[x_key].values
+    y_vals = subset[y_key].values
+
+    unique_x = np.sort(subset[x_key].unique())
+    x_positions = np.array([np.where(unique_x == v)[0][0] + 1 for v in x_vals])
+
+    # --- Apply jitter ---
+    if jitter > 0:
+        x_positions = x_positions + np.random.uniform(-jitter, jitter, size=len(x_positions))
+
+    if color_by is None:
+        ax.scatter(x_positions, y_vals, alpha=0.5)
+
+    elif pd.api.types.is_numeric_dtype(subset[color_by]):
+        scatter = ax.scatter(
+            x_positions,
+            y_vals,
+            c=subset[color_by].values,
+            alpha=0.6
+        )
+        ax.figure.colorbar(scatter, ax=ax, label=color_by)
+
+    else:
+        for color_value, group_df in subset.groupby(color_by):
+            group_x_vals = group_df[x_key].values
+            group_y_vals = group_df[y_key].values
+            group_x_positions = np.array(
+                [np.where(unique_x == v)[0][0] + 1 for v in group_x_vals]
+            )
+
+            if jitter > 0:
+                group_x_positions = group_x_positions + np.random.uniform(
+                    -jitter, jitter, size=len(group_x_positions)
+                )
+
+            ax.scatter(
+                group_x_positions,
+                group_y_vals,
+                alpha=0.6,
+                label=str(color_value)
+            )
+
+        ax.legend(title=color_by)
+
+    ax.set_title(f'{y_key} vs {x_key}')
+    ax.set_xlabel(x_key)
+    ax.set_ylabel(y_key)
+
+    if ax.figure:
+        ax.figure.suptitle('')
+
+    if created_fig:
+        plt.tight_layout()
+        plt.show()
+
+    return subset

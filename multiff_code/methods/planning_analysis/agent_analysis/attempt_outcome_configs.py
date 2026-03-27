@@ -1,15 +1,3 @@
-# Capture vs miss
-CAPTURE_VS_MISS = {
-    'new_label_mapping': {
-        'capture_over_miss': 'Capture',
-        'miss_over_attempt': 'Miss',
-    },
-    'category_order': ['Capture', 'Miss'],
-    'title': 'Attempt Outcomes',
-    'y_label': 'Proportion of Attempts',
-    'category_colors': ['#0072B2', '#C76E00']
-}
-
 CAPTURE_VS_MISS = {
     'new_label_mapping': {
         'first_shot_capture_over_attempt': 'Capture',
@@ -19,6 +7,17 @@ CAPTURE_VS_MISS = {
     'title': 'Attempt Outcomes',
     'y_label': 'Proportion of Attempts',
     'category_colors': ['#0072B2', '#C76E00']
+}
+
+
+ATTEMPT_ONSET_RATE = {
+    'new_label_mapping': {
+        'attempt_onset_rate': 'Attempt Onset Rate',
+    },
+    'category_order': ['Attempt Onset Rate'],
+    'title': 'Attempt Onset Rate',
+    'y_label': 'Attempt Onset Rate (per second)',
+    'category_colors': ['#0072B2']
 }
 
 # Attempt breakdown

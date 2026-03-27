@@ -571,6 +571,8 @@ def plot_fold_session_heatmap(
     mode='regression',
     behav_feature=None,
     score_col=None,
+    vmin=None,
+    vmax=None,
 ):
     """
     Plot session × fold decoding performance heatmap.
@@ -587,6 +589,10 @@ def plot_fold_session_heatmap(
         optional feature to filter
     score_col : str or None
         score column (auto-detected if None)
+    vmin : float or None
+        lower bound for colorbar (None = auto from data)
+    vmax : float or None
+        upper bound for colorbar (None = auto from data)
     """
 
     df = all_results.copy()
@@ -635,14 +641,22 @@ def plot_fold_session_heatmap(
     # ---------------------------------------
     plt.figure(figsize=(6, max(4, 0.4 * len(pivot))))
 
-    sns.heatmap(
-        pivot,
+    heatmap_kwargs = dict(
         cmap='coolwarm',
-        center=pivot.values.mean(),
         annot=True,
         fmt='.2f',
-        cbar_kws={'label': score_col}
+        cbar_kws={'label': score_col},
     )
+    if vmin is not None:
+        heatmap_kwargs['vmin'] = vmin
+    if vmax is not None:
+        heatmap_kwargs['vmax'] = vmax
+
+    if vmin is None and vmax is None:
+        heatmap_kwargs['center'] = pivot.values.mean()
+        
+    
+    sns.heatmap(pivot, **heatmap_kwargs)
 
     plt.xlabel('Fold')
     plt.ylabel('Session')

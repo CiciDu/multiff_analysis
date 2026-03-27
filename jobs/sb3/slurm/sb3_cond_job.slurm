@@ -20,16 +20,20 @@ conda activate multiff_clean
 # ---------------------------------------
 : "${SWEEP_PARAM:?Must set SWEEP_PARAM=perc_r|perc_th|mem_r|mem_th}"
 
-# 8 discrete levels, 3 seeds per level
+# 6 discrete levels, base seeds, and N repeats per (level, base_seed)
 LEVELS=(0.5 1.0 1.5 2.0 2.5 3.0)
-SEEDS=(100 101 102 103 104 105 106 107 108 109 110 111 112 113 114)
+BASE_SEEDS=(100 101 102 103 104 105 106 107 108 109 110 111 112 113 114)
+NUM_REPEATS=5
 NUM_LEVELS=${#LEVELS[@]}
-NUM_SEEDS=${#SEEDS[@]}
+NUM_BASE_SEEDS=${#BASE_SEEDS[@]}
 
-LEVEL_IDX=$((SLURM_ARRAY_TASK_ID / NUM_SEEDS))
-SEED_IDX=$((SLURM_ARRAY_TASK_ID % NUM_SEEDS))
+COMBOS_PER_LEVEL=$((NUM_BASE_SEEDS * NUM_REPEATS))
+LEVEL_IDX=$((SLURM_ARRAY_TASK_ID / COMBOS_PER_LEVEL))
+REST=$((SLURM_ARRAY_TASK_ID % COMBOS_PER_LEVEL))
+BASE_SEED_IDX=$((REST / NUM_REPEATS))
+REPEAT_IDX=$((REST % NUM_REPEATS))
 SWEEP_VALUE=${LEVELS[$LEVEL_IDX]}
-SEED=${SEEDS[$SEED_IDX]}
+BASE_SEED=${BASE_SEEDS[$BASE_SEED_IDX]}
 
 # ---------------------------------------
 # Fix all other params to zero
@@ -59,7 +63,7 @@ case "$SWEEP_PARAM" in
         ;;
 esac
 
-echo "[info] Sweeping $SWEEP_PARAM = $SWEEP_VALUE (seed=$SEED)"
+echo "[info] Sweeping $SWEEP_PARAM = $SWEEP_VALUE (base_seed=$BASE_SEED, repeat=$REPEAT_IDX)"
 echo "[info] perc_r=$PERC_R perc_th=$PERC_TH mem_r=$MEM_R mem_th=$MEM_TH"
 
 # ---------------------------------------
@@ -81,7 +85,7 @@ SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
 
 BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents/sb3_conditional"
 SUB_RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
-RUN_NAME="${SWEEP_PARAM}_${SWEEP_VALUE//./p}_seed${SEED}"
+RUN_NAME="${SWEEP_PARAM}_${SWEEP_VALUE//./p}_seed${BASE_SEED}_rep${REPEAT_IDX}"
 OVERALL_FOLDER="${BASE_DIR}/${SUB_RUN_NAME}/${RUN_NAME}"
 
 mkdir -p "$OVERALL_FOLDER"
@@ -92,7 +96,7 @@ mkdir -p "$OVERALL_FOLDER"
 
 srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --overall-folder "$OVERALL_FOLDER" \
-  --base-seed "$SEED" \
+  --base-seed "$BASE_SEED" \
   --obs-perc-r "$PERC_R" \
   --obs-perc-th "$PERC_TH" \
   --obs-mem-r "$MEM_R" \

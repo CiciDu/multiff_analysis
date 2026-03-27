@@ -213,12 +213,6 @@ if __name__ == "__main__":
     except Exception:
         pass
 
-    # Ensure PPO hyperparams include learning rate prior to agent creation
-    try:
-        rl.prepare_agent_params(
-            agent_params_already_set_ok=True, learning_rate=args.lr)
-    except Exception as e:
-        print('[sb3] warning: failed to set agent params before training:', e)
 
     # If initializing from a pretrained model and training is requested, load and train directly
     if args.init_from and args.to_train_agent:

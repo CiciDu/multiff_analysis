@@ -89,7 +89,7 @@ def detrend_spikes_session_wide(
     min_time=None,
     max_time=None,
     center_method='subtract',
-    drift_method='gaussian',
+    drift_method='regression',
     regression_degree=2
 ):
     '''
@@ -251,3 +251,75 @@ def reshape_detrended_df_to_wide(
     wide_df = wide_df[time_columns + cluster_columns].reset_index(drop=True)
 
     return wide_df, cluster_columns
+
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
+
+
+def plot_subtraction_term(
+    detrended_df,
+    cluster_id,
+    smooth_raw_sigma_bins=None,
+    smooth_subtracted_sigma_bins=None,
+    smooth_residual_sigma_bins=None
+):
+    '''
+    Plot the raw rate, the term being subtracted, and the residual.
+
+    Parameters
+    ----------
+    detrended_df : pd.DataFrame
+        Output of detrend_spikes_session_wide.
+    cluster_id : int or str
+        Cluster to plot.
+    smooth_raw_sigma_bins : float or None
+        Optional Gaussian smoothing for raw rate before plotting.
+    smooth_subtracted_sigma_bins : float or None
+        Optional Gaussian smoothing for subtraction term before plotting.
+    smooth_residual_sigma_bins : float or None
+        Optional Gaussian smoothing for residual before plotting.
+    '''
+    cluster_df = (
+        detrended_df[detrended_df['cluster'] == cluster_id]
+        .sort_values('time_bin_center')
+        .reset_index(drop=True)
+    )
+
+    if cluster_df.empty:
+        raise ValueError(f'No rows found for cluster_id={cluster_id}.')
+
+    time = cluster_df['time_bin_center'].to_numpy()
+    raw_rate = cluster_df['spike_rate_hz'].to_numpy()
+    subtraction_term = cluster_df['drift_rate_hz'].to_numpy()
+    residual = cluster_df['detrended_rate_hz'].to_numpy()
+
+    def _maybe_smooth(signal, sigma_bins):
+        if sigma_bins is None or sigma_bins <= 0:
+            return signal
+        return gaussian_filter1d(signal, sigma=sigma_bins, mode='reflect')
+
+    raw_rate_to_plot = _maybe_smooth(raw_rate, smooth_raw_sigma_bins)
+    subtraction_term_to_plot = _maybe_smooth(subtraction_term, smooth_subtracted_sigma_bins)
+    residual_to_plot = _maybe_smooth(residual, smooth_residual_sigma_bins)
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+
+    axes[0].plot(time, raw_rate_to_plot, label='Raw rate')
+    axes[0].set_ylabel('Rate (Hz)')
+    axes[0].set_title(f'Cluster {cluster_id}: raw rate')
+    axes[0].legend()
+
+    axes[1].plot(time, subtraction_term_to_plot, label='Part being subtracted')
+    axes[1].set_ylabel('Rate (Hz)')
+    axes[1].set_title(f'Cluster {cluster_id}: subtraction term')
+    axes[1].legend()
+
+    axes[2].plot(time, residual_to_plot, label='Residual after subtraction')
+    axes[2].axhline(0, linestyle='--')
+    axes[2].set_xlabel('Time (s)')
+    axes[2].set_ylabel('Rate (Hz)')
+    axes[2].set_title(f'Cluster {cluster_id}: raw rate - subtraction term')
+    axes[2].legend()
+
+    plt.tight_layout()
+    plt.show()

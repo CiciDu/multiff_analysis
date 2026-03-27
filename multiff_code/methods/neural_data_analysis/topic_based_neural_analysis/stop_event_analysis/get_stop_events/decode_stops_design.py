@@ -213,7 +213,6 @@ def build_stop_design_decoding(
         detrended_df = detrend_neural_data.detrend_spikes_session_wide(
             spikes_df=spikes_df,
             bin_size=0.05,          # 50 ms fine bins for detrending
-            drift_sigma_s=60.0,     # remove only very slow drift; tune 30-120 s
             center_method='subtract'
         )
 

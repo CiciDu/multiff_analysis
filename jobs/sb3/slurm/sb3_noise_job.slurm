@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=5G
 #SBATCH -t 24:00:00
-#SBATCH --array=1-192%10
+#SBATCH --array=0-959%10
 #SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.out
 #SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.err
 #SBATCH --exclude=mind-1-29
@@ -24,7 +24,13 @@ N_ENVS=1
 # ---------------------
 declare -a MEM_R_LIST=(0.5 1.0 1.5 2.0 2.5 3.0)
 declare -a MEM_TH_LIST=(0.5 1.0 1.5 2.0)
-declare -a SEEDS=(0 1 2 3 4 5 6 7)
+declare -a BASE_SEEDS=(0 1 2 3 4 5 6 7)
+NUM_REPEATS=5
+
+# Discrete levels correspond to the (mem_r, mem_th) cartesian product.
+LEVELS=($(seq 0 $(( ${#MEM_R_LIST[@]} * ${#MEM_TH_LIST[@]} - 1 ))))
+NUM_LEVELS=${#LEVELS[@]}
+NUM_BASE_SEEDS=${#BASE_SEEDS[@]}
 
 # ---------------------
 # Fixed hyperparameters
@@ -43,13 +49,16 @@ W_NOISE_STD=0.0
 # ---------------------
 N_MEM_R=${#MEM_R_LIST[@]}
 N_MEM_TH=${#MEM_TH_LIST[@]}
-N_SEEDS=${#SEEDS[@]}
+NUM_BASE_SEEDS=${#BASE_SEEDS[@]}
 
-TOTAL_COMB=$((N_MEM_R * N_MEM_TH * N_SEEDS))
+# Treat the (mem_r, mem_th) cartesian product as discrete "levels".
+NUM_LEVELS=$((N_MEM_R * N_MEM_TH))
+COMBOS_PER_LEVEL=$((NUM_BASE_SEEDS * NUM_REPEATS))
+TOTAL_COMB=$((NUM_LEVELS * COMBOS_PER_LEVEL))
 
 echo "[info] TOTAL_COMB=${TOTAL_COMB}"
 
-TASK_ID=$((SLURM_ARRAY_TASK_ID - 1))
+TASK_ID=${SLURM_ARRAY_TASK_ID}
 
 if (( TASK_ID >= TOTAL_COMB )); then
   echo "[warning] TASK_ID exceeds TOTAL_COMB — exiting safely"
@@ -72,15 +81,20 @@ EOF
 # ---------------------
 _i=$IDX
 
-SEED_IDX=$((_i % N_SEEDS)); _i=$((_i / N_SEEDS))
-MEMTH_IDX=$((_i % N_MEM_TH)); _i=$((_i / N_MEM_TH))
-MEMR_IDX=$((_i % N_MEM_R))
+LEVEL_IDX=$((_i / COMBOS_PER_LEVEL))
+REST=$((_i % COMBOS_PER_LEVEL))
+BASE_SEED_IDX=$((REST / NUM_REPEATS))
+REPEAT_IDX=$((REST % NUM_REPEATS))
 
-SEED=${SEEDS[$SEED_IDX]}
+MEMR_TH_IDX=${LEVEL_IDX}
+MEMR_IDX=$((MEMR_TH_IDX / N_MEM_TH))
+MEMTH_IDX=$((MEMR_TH_IDX % N_MEM_TH))
+
+BASE_SEED=${BASE_SEEDS[$BASE_SEED_IDX]}
 MEM_R=${MEM_R_LIST[$MEMR_IDX]}
 MEM_TH=${MEM_TH_LIST[$MEMTH_IDX]}
 
-echo "[jobinfo] seed=${SEED} mem_r=${MEM_R} mem_th=${MEM_TH}"
+echo "[jobinfo] base_seed=${BASE_SEED} rep=${REPEAT_IDX} mem_r=${MEM_R} mem_th=${MEM_TH}"
 
 # ---------------------
 # Output folder
@@ -92,7 +106,7 @@ SAFE_MR="${MEM_R//./p}"
 SAFE_MT="${MEM_TH//./p}"
 
 SUB_RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
-AGENT_RUN_NAME="mr${SAFE_MR}_mt${SAFE_MT}_seed${SEED}"
+AGENT_RUN_NAME="mr${SAFE_MR}_mt${SAFE_MT}_seed${BASE_SEED}_rep${REPEAT_IDX}"
 
 OVERALL_FOLDER="${BASE_DIR}/${SUB_RUN_NAME}/${AGENT_RUN_NAME}"
 
@@ -103,7 +117,7 @@ mkdir -p "$OVERALL_FOLDER"
 # ---------------------
 srun --gres=gpu:1 python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --overall-folder "$OVERALL_FOLDER" \
-  --seed "$SEED" \
+  --base-seed "$BASE_SEED" \
   --max-in-memory-time "$MAX_IN_MEMORY_TIME" \
   --lr "$LR" \
   --num-obs-ff "$NUM_OBS_FF" \
@@ -117,4 +131,4 @@ srun --gres=gpu:1 python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --obs-mem-r "$MEM_R" \
   --obs-mem-th "$MEM_TH"
 
-echo "[jobinfo] Finished seed=${SEED} mem_r=${MEM_R} mem_th=${MEM_TH}"
+echo "[jobinfo] Finished base_seed=${BASE_SEED} rep=${REPEAT_IDX} mem_r=${MEM_R} mem_th=${MEM_TH}"

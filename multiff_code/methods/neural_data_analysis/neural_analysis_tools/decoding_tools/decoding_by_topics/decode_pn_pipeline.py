@@ -41,12 +41,6 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.raw_data_folder_path = raw_data_folder_path
         self.var_categories = var_categories if var_categories is not None else PN_DECODING_VAR_CATEGORIES
 
-        # Filled during setup
-        self.feats_to_decode = None
-        self.trial_ids = None
-        self.binned_spikes = None
-        self.detrend_covariates = None  # DataFrame with time, trial_index, etc.
-        self.detrend_spikes = True
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width

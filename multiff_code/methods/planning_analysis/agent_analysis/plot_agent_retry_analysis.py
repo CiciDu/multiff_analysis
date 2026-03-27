@@ -1,13 +1,8 @@
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter
-import matplotlib as mpl
-import math
 
-from pattern_discovery.learning.proportion_trend import analyze_proportion_trend, plot_stacked_bars_utils
+from pattern_discovery.learning.proportion_trend import plot_stacked_bars_utils
 
-import pandas as pd
 
 
 def plot_retry_outcome_sweep_ci(df, config, sweep_key):

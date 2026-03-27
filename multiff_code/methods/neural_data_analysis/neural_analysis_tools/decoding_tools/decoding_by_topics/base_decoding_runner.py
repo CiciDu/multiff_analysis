@@ -43,6 +43,14 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     def __init__(self, bin_width: float = 0.04):
         self.bin_width = bin_width
         self.stats: Dict = {}
+        self.detrend_spikes = False
+        
+        # Filled during setup
+        self.feats_to_decode = None
+        self.trial_ids = None
+        self.binned_spikes = None
+        self.detrend_covariates = None  # DataFrame with time, trial_index, etc.
+
 
     # ------------------------------------------------------------------
     # Abstract / override points (subclasses must implement)

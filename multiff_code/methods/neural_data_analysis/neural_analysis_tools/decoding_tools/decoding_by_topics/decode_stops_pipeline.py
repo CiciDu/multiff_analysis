@@ -47,10 +47,6 @@ class StopDecodingRunner(BaseDecodingRunner):
         self.raw_data_folder_path = raw_data_folder_path
         self.var_categories = var_categories if var_categories is not None else STOP_DECODING_VAR_CATEGORIES
 
-        self.meta_df_used = None
-        self.feats_to_decode = None
-        self.binned_spikes = None
-        self.detrend_spikes = True
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,

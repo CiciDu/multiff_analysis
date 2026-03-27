@@ -128,6 +128,14 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
             'denom_count': total_duration,
             'group': 2
         })
+        
+    # Attempt onset rate (per s)
+    rows.append({
+        'item': "attempt_onset_rate",
+        'frequency': first_attempt,
+        'denom_count': total_duration,
+        'group': 2
+    })
 
     # get miss_over_attempt and capture_over_attempt
     rows.extend([
@@ -188,6 +196,7 @@ def make_pattern_frequencies(all_trial_patterns, ff_caught_T_new, monkey_informa
         'retry_switch': 'Retry switch',
         'retry_capture': 'Retry capture',
         'ff_capture_rate': 'Firefly capture rate (per s)',
+        'attempt_onset_rate': 'Attempt onset rate (per s)',
         'stop_success_rate': 'Stop success rate',
         'three_in_a_row': 'Three in a row',
         'four_in_a_row': 'Four in a row',

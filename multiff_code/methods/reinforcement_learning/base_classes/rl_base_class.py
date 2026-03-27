@@ -1050,7 +1050,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         os.makedirs(self.best_model_postcurriculum_dir, exist_ok=True)
         post_curriculum_env_kwargs = self.input_env_kwargs.copy()
         post_curriculum_env_kwargs['seed'] = self.base_seed + 2000001
-        self.make_env(**post_curriculum_env_kwargs)
+        self.make_env(**post_curriculum_env_kwargs, monitor_dir=self.best_model_postcurriculum_dir)
         self.load_best_model_in_curriculum(
             load_replay_buffer=True, restore_env_from_checkpoint=False)
 
