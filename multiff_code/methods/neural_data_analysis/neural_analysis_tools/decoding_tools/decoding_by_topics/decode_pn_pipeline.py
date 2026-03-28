@@ -36,8 +36,9 @@ class PNDecodingRunner(BaseDecodingRunner):
         raw_data_folder_path,
         bin_width=0.04,
         var_categories=None,
+        **kwargs,
     ):
-        super().__init__(bin_width=bin_width)
+        super().__init__(bin_width=bin_width, **kwargs)
         self.raw_data_folder_path = raw_data_folder_path
         self.var_categories = var_categories if var_categories is not None else PN_DECODING_VAR_CATEGORIES
 
@@ -79,8 +80,8 @@ class PNDecodingRunner(BaseDecodingRunner):
     # Data collection
     # ------------------------------------------------------------------
 
-    def collect_data(self, exists_ok=True, detrend_spikes: bool = True):
-        self.detrend_spikes = detrend_spikes
+    def collect_data(self, exists_ok=True):
+
         if exists_ok and self._load_design_matrices():
             print('[PNDecodingRunner] Using cached design matrices')
             return
@@ -114,7 +115,7 @@ class PNDecodingRunner(BaseDecodingRunner):
             pn.ff_caught_T_new,
         )
 
-        if detrend_spikes:
+        if self.detrend_spikes:
             self.binned_spikes = decode_pn_utils.get_rebinned_spike_rates(pn)
         else:
             cluster_cols = [c for c in pn.rebinned_x_var.columns if c.startswith('cluster_')]
@@ -150,7 +151,7 @@ class PNDecodingRunner(BaseDecodingRunner):
 
     
     def _get_save_dir(self):
-        sub = 'detrended' if getattr(self, 'detrend_spikes', True) else 'raw'
+        sub = 'detrended' if self.detrend_spikes else 'raw'
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
             'decoding_outputs/pn_decoder_outputs',

@@ -117,6 +117,11 @@ if [[ "$NUM_AGENTS" -eq 0 ]]; then
   exit 1
 fi
 
+if [[ "$NUM_AGENTS" -gt 999 ]]; then
+  echo "[WARN] Number of agents ($NUM_AGENTS) exceeds maximum supported (999); capping to 999"
+  NUM_AGENTS=999
+fi
+
 ARRAY_RANGE="0-$((NUM_AGENTS-1))"
 
 echo "[INFO] Job array range: $ARRAY_RANGE"

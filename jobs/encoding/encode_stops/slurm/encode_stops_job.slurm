@@ -1,5 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=encode_stops
+# Job name cannot use $1 here (#SBATCH is parsed before the script runs).
+# Use submit_encode_stops.sh, or: sbatch --job-name=encode_stops_<MONKEY> ... encode_stops_job.slurm <MONKEY>
 #SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_stops/logs/run_stdout/encode_stops_%A_%a.out
 #SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_stops/logs/run_stdout/encode_stops_%A_%a.err
 #SBATCH --partition=cpu,xaqq

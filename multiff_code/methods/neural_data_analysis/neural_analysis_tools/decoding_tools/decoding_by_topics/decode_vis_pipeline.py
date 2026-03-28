@@ -38,8 +38,9 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         raw_data_folder_path,
         bin_width=0.04,
         var_categories=None,
+        **kwargs,
     ):
-        super().__init__(bin_width=bin_width)
+        super().__init__(bin_width=bin_width, **kwargs)
         self.raw_data_folder_path = raw_data_folder_path
         self.var_categories = var_categories if var_categories is not None else VIS_DECODING_VAR_CATEGORIES
 
@@ -78,14 +79,13 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         return "feats_to_decode"
 
 
-    def collect_data(self, exists_ok=True, detrend_spikes: bool = True):
+    def collect_data(self, exists_ok=True):
         """
         Collect and prepare data for decoding.
 
         Args:
             exists_ok: If True, load cached design matrices if they exist.
         """
-        self.detrend_spikes = detrend_spikes
         # Try to load cached design matrices
         if exists_ok and self._load_design_matrices():
             print('[collect_data] Using cached design matrices')
@@ -98,7 +98,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
                 self.binned_spikes,
                 self.feats_to_decode,
                 self.meta_df_used,
-            ) = self._prepare_design_matrices(detrend_spikes=detrend_spikes)
+            ) = self._prepare_design_matrices(detrend_spikes=self.detrend_spikes)
 
             self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
 
@@ -127,7 +127,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             bin_dt=self.pn.bin_width,
             add_ff_visible_info=True,
             add_retries_info=False,
-            detrend_spikes=detrend_spikes,
+            detrend_spikes=self.detrend_spikes,
         )
 
         if 'global_burst_id' not in meta_df_used.columns:
@@ -152,7 +152,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         return rebinned_spike_rates, feats_to_decode, meta_df_used
 
     def _get_save_dir(self):
-        sub = "detrended" if getattr(self, "detrend_spikes", True) else "raw"
+        sub = "detrended" if self.detrend_spikes else "raw"
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
             "decoding_outputs/vis_decoder_outputs",

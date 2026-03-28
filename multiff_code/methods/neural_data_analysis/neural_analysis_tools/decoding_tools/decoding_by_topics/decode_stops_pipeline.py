@@ -42,8 +42,9 @@ class StopDecodingRunner(BaseDecodingRunner):
         raw_data_folder_path,
         bin_width: float = 0.04,
         var_categories=None,
+        **kwargs,
     ):
-        super().__init__(bin_width=bin_width)
+        super().__init__(bin_width=bin_width, **kwargs)
         self.raw_data_folder_path = raw_data_folder_path
         self.var_categories = var_categories if var_categories is not None else STOP_DECODING_VAR_CATEGORIES
 
@@ -83,8 +84,7 @@ class StopDecodingRunner(BaseDecodingRunner):
     # ------------------------------------------------------------------
     # Data collection
     # ------------------------------------------------------------------
-    def collect_data(self, exists_ok: bool = True, detrend_spikes: bool = True):
-        self.detrend_spikes = detrend_spikes
+    def collect_data(self, exists_ok: bool = True):
         if exists_ok and self._load_design_matrices():
             print("[StopDecodingRunner] Using cached design matrices")
             return
@@ -100,7 +100,7 @@ class StopDecodingRunner(BaseDecodingRunner):
         ) = decode_stops_design.assemble_stop_decoding_design(
             self.raw_data_folder_path,
             self.bin_width,
-            detrend_spikes=detrend_spikes,
+            detrend_spikes=self.detrend_spikes,
         )
 
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
@@ -116,7 +116,7 @@ class StopDecodingRunner(BaseDecodingRunner):
     # Caching utilities (BaseDecodingRunner interface)
     # ------------------------------------------------------------------
     def _get_save_dir(self):
-        sub = "detrended" if getattr(self, "detrend_spikes", True) else "raw"
+        sub = "detrended" if self.detrend_spikes else "raw"
         return os.path.join(
             self.pn.planning_and_neural_folder_path,
             "decoding_outputs/stop_decoder_outputs",

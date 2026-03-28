@@ -32,12 +32,14 @@ def run_decoding_main(
     parser.add_argument('--bin_width', type=float, default=0.04)
     parser.add_argument('--n_splits', type=int, default=5)
     parser.add_argument('--save_dir', default=None)
+    parser.add_argument('--detrend_spikes', action='store_true', default=True)
 
     args = parser.parse_args()
 
     runner = runner_class(
         raw_data_folder_path=args.raw_data_folder_path,
         bin_width=args.bin_width,
+        detrend_spikes=args.detrend_spikes,
     )
 
     run_kwargs = run_kwargs or {}

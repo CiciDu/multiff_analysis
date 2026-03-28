@@ -40,10 +40,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     - _default_readout_varnames(): default vars for linear readout
     """
 
-    def __init__(self, bin_width: float = 0.04):
+    def __init__(self, bin_width: float = 0.04, detrend_spikes: bool = False):
         self.bin_width = bin_width
         self.stats: Dict = {}
-        self.detrend_spikes = False
+        self.detrend_spikes = detrend_spikes
         
         # Filled during setup
         self.feats_to_decode = None
