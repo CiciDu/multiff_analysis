@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=agent_plan
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_plan/logs/agent_plan_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_plan/logs/agent_plan_%A_%a.err
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_data/logs/agent_plan_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_data/logs/agent_plan_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=30G
@@ -18,7 +18,7 @@ set -o pipefail
 # Paths
 # --------------------------------------------------
 PROJECT_ROOT='/user_data/cicid/Multifirefly-Project'
-SCRIPT_PATH="$PROJECT_ROOT/multiff_analysis/jobs/agent_plan/scripts/agent_plan_script.py"
+SCRIPT_PATH="$PROJECT_ROOT/multiff_analysis/jobs/agent_data/scripts/agent_plan_script.py"
 
 cd "$PROJECT_ROOT"
 
@@ -52,7 +52,7 @@ set -u
 # --------------------------------------------------
 # Determine agent folder from manifest
 # --------------------------------------------------
-MANIFEST_PATH="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents/sb3_conditional/ff5_mem2p5_drop_fill_visible_only/agent_folder_manifest.json"
+MANIFEST_PATH="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents/agent_folder_manifest.json"
 AGENT_FOLDER=$(python -c "import json; manifest = json.load(open('$MANIFEST_PATH')); print(manifest[$SLURM_ARRAY_TASK_ID] if $SLURM_ARRAY_TASK_ID < len(manifest) else 'INDEX_OUT_OF_RANGE')")
 
 echo '[SLURM] Running Agent Planning Job'

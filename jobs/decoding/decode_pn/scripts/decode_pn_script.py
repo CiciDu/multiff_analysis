@@ -21,7 +21,7 @@ from jobs.decoding.shared_decoding_script import run_decoding_main
 def main():
     return run_decoding_main(
         decode_pn_pipeline.PNDecodingRunner,
-        run_kwargs={'cv_decoding_verbosity': 2},
+        run_kwargs={'cv_decoding_verbosity': 1},
     )
 
 

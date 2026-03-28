@@ -21,7 +21,7 @@ import argparse
 from reinforcement_learning.base_classes import rl_base_utils
 
 DEFAULT_OVERALL_FOLDER = (
-    "multiff_analysis/RL_models/sb3_stored_models/all_agents/sb3_conditional/ff5_mem2p5_drop_fill_visible_only"
+    "multiff_analysis/RL_models/sb3_stored_models/all_agents"
 )
 
 

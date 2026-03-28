@@ -1311,6 +1311,7 @@ def plot_category_ecdf_by_sessions(
     session_results_list,
     *,
     metric_key='delta_pseudo_r2_clip_leave',
+    include_total=True,
     category_groups=None,
     log_x=True,
     figsize_per_subplot=(4.2, 3.0),
@@ -1327,6 +1328,10 @@ def plot_category_ecdf_by_sessions(
 
     metric_key : str
         Which metric inside category_contributions to plot.
+
+    include_total : bool
+        If True, add a separate "Total" subplot with one ECDF
+        line per session for `full_cv_result['mean_pseudo_r2']`.
 
     category_groups : dict or None
         Optional mapping: { 'Legend Name': ['cat1', 'cat2', ...], ... }
@@ -1349,6 +1354,8 @@ def plot_category_ecdf_by_sessions(
         plot_names = list(category_groups.keys())
     else:
         plot_names = all_categories
+    if include_total:
+        plot_names = list(plot_names) + ['Total']
 
     n_plots = len(plot_names)
     n_cols = min(3, n_plots)
@@ -1379,6 +1386,17 @@ def plot_category_ecdf_by_sessions(
 
         # One line per session
         for session_label, all_results in session_results_list:
+            if plot_name == 'Total':
+                vals = []
+                for res in all_results:
+                    if 'full_cv_result' in res:
+                        vals.append(res['full_cv_result']['mean_pseudo_r2'])
+                if len(vals) == 0:
+                    continue
+                x, y = _ecdf(vals, clip_for_log=log_x)
+                ax.plot(x, y, lw=1.8, label=session_label)
+                continue
+
             if category_groups is None:
                 vals = []
                 for res in all_results:

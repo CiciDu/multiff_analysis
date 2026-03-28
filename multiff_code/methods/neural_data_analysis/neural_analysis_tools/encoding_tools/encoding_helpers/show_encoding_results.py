@@ -48,7 +48,7 @@ def collect_category_ecdf_from_sessions(
 
     # Default save path when exists_ok
     # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/category_ecdf_{monkeys}.pkl
-    if save_path is None and exists_ok:
+    if save_path is None:
         # Map runner class to encoder type
         rc_name = rc.__name__
         if 'Stop' in rc_name:
@@ -123,7 +123,8 @@ def collect_category_ecdf_from_sessions(
                     bin_width=bin_width,
                     encoder_prs=prs,
                 )
-                all_results = plot_gam_fit.run_unit_ecdf_collect(runner, use_neural_coupling=use_neural_coupling)
+                all_results = plot_gam_fit.run_unit_ecdf_collect(runner, 
+                                                                 use_neural_coupling=use_neural_coupling)
                 session_results_list.append((session_label, all_results))
             except Exception as e:
                 print(f'[ERROR] Failed for {raw_data_folder_path}: {e}')
@@ -131,7 +132,7 @@ def collect_category_ecdf_from_sessions(
 
     session_results_list = _filter_empty_categories(session_results_list)
 
-    if exists_ok and save_path is not None and session_results_list:
+    if session_results_list:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         with open(save_path, 'wb') as f:
             pickle.dump(session_results_list, f, protocol=pickle.HIGHEST_PROTOCOL)

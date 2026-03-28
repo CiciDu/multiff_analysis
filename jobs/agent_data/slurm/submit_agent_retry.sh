@@ -7,11 +7,11 @@ trap 'echo "[ERROR] Failed at line $LINENO" >&2' ERR
 # Paths
 # --------------------------------------------------
 PROJECT_ROOT='/user_data/cicid/Multifirefly-Project'
-RL_AGENT_DIR="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents/sb3_conditional/ff5_mem2p5_drop_fill_visible_only"
+RL_AGENT_DIR="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents"
 
 
-JOB_DIR="$PROJECT_ROOT/multiff_analysis/jobs/agent_plan"
-SLURM_SCRIPT="$JOB_DIR/slurm/agent_plan_job.slurm"
+JOB_DIR="$PROJECT_ROOT/multiff_analysis/jobs/agent_data"
+SLURM_SCRIPT="$JOB_DIR/slurm/agent_retry_job.slurm"
 SCRIPT_DIR="$JOB_DIR/scripts"
 
 MANIFEST_SCRIPT="$SCRIPT_DIR/build_agent_manifest.py"
@@ -27,17 +27,17 @@ mkdir -p "$LOG_DIR"
 usage() {
   cat <<EOF
 Usage:
-  submit_agent_plan.sh [options]
+  submit_agent_retry.sh [options]
 
 Options (handled by this script):
-  --max-parallel N  Max concurrent jobs (default: 4)
+  --max-parallel N  Max concurrent jobs (default: 20)
 
 All other arguments are forwarded directly to sbatch.
 
 Examples:
-  submit_agent_plan.sh
-  submit_agent_plan.sh --max-parallel 8
-  submit_agent_plan.sh -p cpu --time=24:00:00
+  submit_agent_retry.sh
+  submit_agent_retry.sh --max-parallel 8
+  submit_agent_retry.sh -p cpu --time=24:00:00
 EOF
 }
 
@@ -121,7 +121,7 @@ ARRAY_RANGE="0-$((NUM_AGENTS-1))"
 
 echo "[INFO] Job array range: $ARRAY_RANGE"
 echo "[INFO] Max concurrent jobs: $MAX_PARALLEL"
-echo "[INFO] Each job will run: python agent_plan_script.py <AGENT_INDEX>"
+echo "[INFO] Each job will run: python agent_retry_script.py --agent-path <AGENT_FOLDER>"
 echo "[INFO] Agent indices: $(seq -s ', ' 0 $((NUM_AGENTS-1)))"
 
 # --------------------------------------------------
@@ -131,6 +131,6 @@ echo '[SUBMIT] Running sbatch:'
 echo "sbatch --array=\"$ARRAY_RANGE%$MAX_PARALLEL\" ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \"$SLURM_SCRIPT\""
 
 sbatch \
-  --array="$ARRAY_RANGE"%"$MAX_PARALLEL" \
+  --array="${ARRAY_RANGE}%${MAX_PARALLEL}" \
   ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
   "$SLURM_SCRIPT"

@@ -31,6 +31,7 @@ DEFAULT_VAR_CATEGORIES = {
     "visibility_vars": ["cur_vis", "nxt_vis", "cur_in_memory", "nxt_in_memory"],
     "ff_count_vars": ["num_ff_visible", "num_ff_in_memory", "log1p_num_ff_visible", "log1p_num_ff_in_memory"],
     'session_time_vars': ["time"],
+    'coupling_vars': [],
 }
 
 # All non-spike variables
@@ -246,6 +247,7 @@ class BaseEncodingGAMAnalysisHelper:
             load_if_exists=load_ok,
             verbose=False,
         )
+        
         category_loads = {}
         for cat in category_names:
             cv = gam_variance_explained.maybe_load_saved_crossval(
@@ -316,9 +318,9 @@ class BaseEncodingGAMAnalysisHelper:
                     g = next((x for x in groups if x.name == gname), None)
                     if g is not None:
                         cols_in_design = [c for c in g.cols if c in design_cols]
-                        if cols_in_design:
-                            print('cols_in_design to drop for category:', category_name)
-                            print(f"{gname}: {cols_in_design}")
+                        # if cols_in_design:
+                        #     print('cols_in_design to drop for category:', category_name)
+                        #     print(f"{gname}: {cols_in_design}")
                 keep_group_names = [
                     gname for gname in available_group_names
                     if gname not in set(drop_group_names)

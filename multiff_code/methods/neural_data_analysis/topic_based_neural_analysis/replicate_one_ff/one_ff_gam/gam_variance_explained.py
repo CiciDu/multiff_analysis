@@ -173,6 +173,7 @@ def maybe_load_saved_crossval(save_path, load_if_exists, verbose):
         print(f'  Mean Pseudo R²: {cv_results["mean_pseudo_r2"]:.4f}')
         print(f'  Number of folds: {len(cv_results["fold_classical_r2"])}')
         print('=' * 80)
+    #print('Loaded CV results from: ', save_path)
 
     return cv_results
 

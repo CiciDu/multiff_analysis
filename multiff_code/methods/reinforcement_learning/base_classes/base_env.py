@@ -92,6 +92,7 @@ class MultiFF(gymnasium.Env):
                  num_alive_ff=800,
                  recentering_trigger_radius=None,
                  seed: Optional[int] = 42,
+                 verbosity: int = 0,
                  **kwargs
                  ):
 
@@ -105,9 +106,7 @@ class MultiFF(gymnasium.Env):
         self.obs_noise = obs_noise
         # Default seed for reproducible reset(); when reset(seed=None), use this if set.
         self._default_seed = seed
-        
-        print('Initial environment seed: ', self._default_seed)
-        
+        self.verbosity = verbosity
 
         # Identity-tracked slot config and transforms
         self.d0 = DEFAULT_D0
@@ -196,6 +195,10 @@ class MultiFF(gymnasium.Env):
         self.ffr = np.zeros(self.num_alive_ff, dtype=np.float32)
         self.fftheta = np.zeros(self.num_alive_ff, dtype=np.float32)
 
+    def _vprint(self, *args, level: int = 1, **kwargs):
+        """Print only when configured verbosity is high enough."""
+        if getattr(self, 'verbosity', 0) >= level:
+            print(*args, **kwargs)
 
     def reset(self, seed=None, use_random_ff=True):
         '''
@@ -209,30 +212,30 @@ class MultiFF(gymnasium.Env):
         obs: np.array
             return an observation based on the reset environment
         '''
-        print('TIME before resetting:', self.time)
+        self._vprint('TIME before resetting:', self.time)
         self.episode_id += 1
         # Use explicit seed when provided; otherwise fall back to _default_seed for reproducibility
         effective_seed = seed if seed is not None else env_utils.compute_episode_seed(self._default_seed, self.episode_id)
         super().reset(seed=effective_seed)
-        print('current episode seed: ', effective_seed)
+        self._vprint('current episode seed: ', effective_seed)
         
         # self.np_random is now the canonical RNG; use it for all randomness
 
-        print('current reward_boundary: ', self.reward_boundary)
-        print('current angular_terminal_vel: ', self.angular_terminal_vel)
-        print('current flash_on_interval: ', self.flash_on_interval)
+        self._vprint('current reward_boundary: ', self.reward_boundary)
+        self._vprint('current angular_terminal_vel: ', self.angular_terminal_vel)
+        self._vprint('current flash_on_interval: ', self.flash_on_interval)
 
-        print('current distance2center_cost: ', self.distance2center_cost)
-        print('current stop_vel_cost: ', self.stop_vel_cost)
+        self._vprint('current distance2center_cost: ', self.distance2center_cost)
+        self._vprint('current stop_vel_cost: ', self.stop_vel_cost)
 
-        print('current num_obs_ff: ', self.num_obs_ff)
-        print('current max_in_memory_time: ', self.max_in_memory_time)
+        self._vprint('current num_obs_ff: ', self.num_obs_ff)
+        self._vprint('current max_in_memory_time: ', self.max_in_memory_time)
 
-        print('======================COST Parameters=========================')
+        self._vprint('======================COST Parameters=========================')
 
-        print('current dv_cost_factor: ', self.dv_cost_factor)
-        print('current jerk_cost_factor: ', self.jerk_cost_factor)
-        print('current cost_per_stop: ', self.cost_per_stop)
+        self._vprint('current dv_cost_factor: ', self.dv_cost_factor)
+        self._vprint('current jerk_cost_factor: ', self.jerk_cost_factor)
+        self._vprint('current cost_per_stop: ', self.cost_per_stop)
 
         # print('current dw_cost_factor: ', self.dw_cost_factor)
         # print('current w_cost_factor: ', self.w_cost_factor)
@@ -254,15 +257,15 @@ class MultiFF(gymnasium.Env):
                 )
                 self.ff_flash_ids, self.ff_flash_starts, self.ff_flash_ends = \
                         env_utils.preprocess_flash_intervals(self.ff_flash)
-                print('ff_flash_starts: ', self.ff_flash_starts[:10])
+                self._vprint('ff_flash_starts: ', self.ff_flash_starts[:10])
             self.generate_random_ff_positions(ff_index=np.arange(self.num_alive_ff))
 
         # reset agent
         self.agentr = np.array([0.0], dtype=np.float32)
         self.agentxy = np.zeros(2, dtype=np.float32)
         self.agentheading = float(self.np_random.uniform(0, 2 * pi))
-        print('initial agentxy: ', self.agentxy)
-        print('initial agentheading: ', self.agentheading)
+        self._vprint('initial agentxy: ', self.agentxy)
+        self._vprint('initial agentheading: ', self.agentheading)
         self.arena_center_global = np.zeros(2, dtype=np.float32)
         self.v = self.np_random.uniform(-0.05, 0.05) * self.vgain
         self.w = 0.0  # initialize with no angular velocity
@@ -301,7 +304,7 @@ class MultiFF(gymnasium.Env):
         self.action = np.array([0.0, 0.0], dtype=np.float32)
         self.obs = self.beliefs()
         if self.epi_num > 0:
-            print('\n episode: ', self.epi_num)
+            self._vprint('\n episode: ', self.epi_num)
         self.epi_num += 1
         self.num_ff_caught_in_episode = 0
         # defer unbinding/respawn of captured ff until after obs of current step is produced
@@ -327,8 +330,8 @@ class MultiFF(gymnasium.Env):
         else:
             # default if unrecognized suffix
             self.new_ff_scope = 'visible_only'
-        print('identity_slot_base: ', self.identity_slot_base)
-        print('new_ff_scope: ', self.new_ff_scope)
+        self._vprint('identity_slot_base: ', self.identity_slot_base)
+        self._vprint('new_ff_scope: ', self.new_ff_scope)
 
 
     def calculate_reward(self):
@@ -380,7 +383,7 @@ class MultiFF(gymnasium.Env):
                     reward_breakdown += f' cost_for_distance2center: {float(self.cost_for_distance2center):.2f}'
                 if self.stop_vel_cost > 0:
                     reward_breakdown += f' cost_for_stop_vel: {float(self.cost_for_stop_vel):.2f}'
-                print(reward_breakdown)
+                self._vprint(reward_breakdown)
 
         self.num_ff_caught_in_episode = self.num_ff_caught_in_episode + self.num_targets
         self.reward = reward
@@ -412,17 +415,17 @@ class MultiFF(gymnasium.Env):
         if self.time >= self.episode_len * self.dt:
             self.end_episode = True
             if self.print_episode_reward_rates:
-                print(
+                self._vprint(
                     f'Firely capture rate for the episode:  {self.num_ff_caught_in_episode} ff for {self.time} s: -------------------> {round(self.num_ff_caught_in_episode/self.time, 2)}')
-                print('Total reward for the episode: ', self.episode_reward)
-                print('Cost breakdown: ', self.cost_breakdown)
+                self._vprint('Total reward for the episode: ', self.episode_reward)
+                self._vprint('Cost breakdown: ', self.cost_breakdown)
                 if self.distance2center_cost > 0 or self.stop_vel_cost > 0:
-                    print('Reward for each ff: ', np.array(
+                    self._vprint('Reward for each ff: ', np.array(
                         self.reward_for_each_ff))
 
         if self.agentr >= self.recentering_trigger_radius:
             self.recenter_and_respawn_ff()
-            print('Recentered and respawned fireflies')
+            self._vprint('Recentered and respawned fireflies')
 
         # update the observation
         self.obs = self.beliefs(respawn_on_capture=respawn_on_capture)
@@ -538,7 +541,7 @@ class MultiFF(gymnasium.Env):
                     removed.append(sid)
                     self.slot_ids[s] = -1
             if len(removed) > 0:
-                print(
+                self._vprint(
                     f"Warning: respawned ff indices present in slots; removed: {sorted(set(removed))}")
 
     def _update_ff_visible_time(self):

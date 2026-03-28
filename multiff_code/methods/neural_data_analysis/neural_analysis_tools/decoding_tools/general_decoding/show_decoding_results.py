@@ -284,20 +284,20 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
             f"{hue_col} == @hue_val"
         ).sort_values('behav_feature')
 
-        y_positions = np.arange(len(sub))
-
-        offset = (
-            (i - (n_hue_levels - 1) / 2) * 0.25
-            if n_hue_levels > 1 else 0
-        )
+        # Align each point to the global y-axis (feature_order), not sequential 0..n-1
+        # within this hue — otherwise missing/extra rows misplace markers vs tick labels.
+        y_codes = sub['behav_feature'].cat.codes.to_numpy()
+        valid = y_codes >= 0
+        sub_plot = sub.iloc[valid]
+        y_positions = y_codes[valid]
 
         color = colors[i % len(colors)] if n_hue_levels > 1 else None
         label = f'Shuffle={hue_val}' if hue_col == 'shuffle_mode' else str(hue_val)
 
         ax.errorbar(
-            x=sub['mean_value'],
-            y=y_positions + offset,
-            xerr=sub['sem_value'],
+            x=sub_plot['mean_value'],
+            y=y_positions,
+            xerr=sub_plot['sem_value'],
             fmt='o',
             capsize=4,
             markersize=6,
@@ -326,6 +326,8 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
     
     if 'r2_cv' in value_label or 'r_cv' in value_label:
         ax.set_xlim(-0.5, 0.5)
+    elif 'auc_mean' in value_label:
+        ax.set_xlim(0.4, 1.0)
 
     if n_hue_levels > 1:
         ax.legend(frameon=False)
@@ -600,10 +602,14 @@ def plot_fold_session_heatmap(
     # ---------------------------------------
     # filter model + mode
     # ---------------------------------------
-    df = df.query(
-        "model_name == @model_name and mode == @mode"
-    ).copy()
-
+    if model_name is not None:
+        df = df.query(
+            "model_name == @model_name"
+        ).copy()
+    if mode is not None:
+        df = df.query(
+            "mode == @mode"
+        ).copy()
     if behav_feature is not None:
         df = df.query(
             "behav_feature == @behav_feature"
@@ -661,7 +667,9 @@ def plot_fold_session_heatmap(
     plt.xlabel('Fold')
     plt.ylabel('Session')
 
-    title = f'{model_name} | {mode}'
+    title = f'{mode}'
+    if model_name:
+        title += f' | {model_name}'
     if behav_feature:
         title += f' | {behav_feature}'
 
@@ -671,3 +679,203 @@ def plot_fold_session_heatmap(
     plt.show()
 
     return pivot
+
+def plot_fold_session_heatmap(
+    all_results,
+    model_name,
+    mode='regression',
+    behav_feature=None,
+    score_col=None,
+    vmin=None,
+    vmax=None,
+    compare_results=None,
+    compare_label=None,
+):
+    """
+    Plot session × fold decoding performance heatmap.
+
+    Parameters
+    ----------
+    all_results : DataFrame
+        full decoding results dataframe
+    model_name : str
+        model to visualize
+    mode : str
+        'regression' or 'classification'
+    behav_feature : str or None
+        optional feature to filter
+    score_col : str or None
+        score column (auto-detected if None)
+    vmin : float or None
+        lower bound for colorbar (None = auto from data)
+    vmax : float or None
+        upper bound for colorbar (None = auto from data)
+    compare_results : DataFrame or None
+        if provided, plot the difference:
+        pivot(all_results) - pivot(compare_results)
+    compare_label : str or None
+        optional label to include in the title for the comparison dataframe
+    """
+
+    def _filter_results(df_in):
+        df = df_in.copy()
+
+        if model_name is not None:
+            df = df.query(
+                "model_name == @model_name"
+            ).copy()
+
+        if mode is not None:
+            df = df.query(
+                "mode == @mode"
+            ).copy()
+
+        if behav_feature is not None:
+            df = df.query(
+                "behav_feature == @behav_feature"
+            ).copy()
+
+        return df
+
+    def _make_pivot(df_in, value_col):
+        return df_in.pivot_table(
+            index='data_name',
+            columns='fold',
+            values=value_col,
+            aggfunc='mean'
+        )
+
+    # ---------------------------------------
+    # infer score column
+    # ---------------------------------------
+    if score_col is None:
+
+        if mode == 'regression':
+            score_col = 'r2_cv'
+
+        elif mode == 'classification':
+            score_col = 'auc_mean'
+
+        else:
+            raise ValueError('Unknown mode')
+
+    # ---------------------------------------
+    # filter primary results
+    # ---------------------------------------
+    df = _filter_results(all_results)
+
+    if len(df) == 0:
+        raise ValueError('No rows found after filtering')
+
+    pivot = _make_pivot(df, score_col)
+
+    # ---------------------------------------
+    # optionally compute difference
+    # ---------------------------------------
+    is_difference_plot = compare_results is not None
+
+    if is_difference_plot:
+        compare_df = _filter_results(compare_results)
+
+        if len(compare_df) == 0:
+            raise ValueError('No rows found in compare_results after filtering')
+
+        compare_pivot = _make_pivot(compare_df, score_col)
+
+        # align sessions/folds before subtraction
+        pivot, compare_pivot = pivot.align(compare_pivot)
+
+        pivot = pivot - compare_pivot
+        colorbar_label = f'{score_col} difference'
+    else:
+        colorbar_label = score_col
+
+    # ---------------------------------------
+    # plot
+    # ---------------------------------------
+    plt.figure(figsize=(6, max(4, 0.4 * len(pivot))))
+
+    heatmap_kwargs = dict(
+        cmap='coolwarm',
+        annot=True,
+        fmt='.2f',
+        cbar_kws={'label': colorbar_label},
+    )
+
+    if vmin is not None:
+        heatmap_kwargs['vmin'] = vmin
+    if vmax is not None:
+        heatmap_kwargs['vmax'] = vmax
+
+    if is_difference_plot:
+        # difference plots should usually be centered at zero
+        if vmin is None and vmax is None:
+            max_abs = np.nanmax(np.abs(pivot.values))
+            heatmap_kwargs['vmin'] = -max_abs
+            heatmap_kwargs['vmax'] = max_abs
+        heatmap_kwargs['center'] = 0
+
+    else:
+        if vmin is None and vmax is None:
+            heatmap_kwargs['center'] = np.nanmean(pivot.values)
+
+    sns.heatmap(pivot, **heatmap_kwargs)
+
+    plt.xlabel('Fold')
+    plt.ylabel('Session')
+
+    title = f'{mode}'
+    if model_name:
+        title += f' | {model_name}'
+    if behav_feature:
+        title += f' | {behav_feature}'
+
+    if is_difference_plot:
+        if compare_label is None:
+            compare_label = 'compare_results'
+        title += f' | minus {compare_label}'
+
+    plt.title(title)
+
+    plt.tight_layout()
+    plt.show()
+
+    return pivot
+
+
+def plot_fold_diagnostics(
+    all_results,
+    mode='regression',
+    vmin=-0.5,
+    vmax=0.5,
+    compare_results=None,
+    compare_label=None,
+):
+    result_df = all_results.query(f"mode == '{mode}'")
+    result_summary = _compute_summary(result_df, 'r2_cv')
+
+    mean_by_feature = (
+        result_summary
+        .groupby('behav_feature')['mean_value']
+        .mean()
+    )
+
+    result_summary = result_summary.sort_values('mean_value', ascending=False)
+
+    for behav_feature in result_summary['behav_feature'].values:
+        print(behav_feature)
+        try:
+            plot_fold_session_heatmap(
+                all_results,
+                model_name=None,
+                mode=mode,
+                behav_feature=behav_feature,
+                vmin=vmin,
+                vmax=vmax,
+                compare_results=compare_results,
+                compare_label=compare_label,
+            )
+        except Exception as e:
+            print(f'Error plotting {behav_feature}: {e}')
+
+    return result_summary, mean_by_feature
