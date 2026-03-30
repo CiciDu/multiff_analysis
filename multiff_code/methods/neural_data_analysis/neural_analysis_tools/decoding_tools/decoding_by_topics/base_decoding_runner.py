@@ -399,7 +399,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                     continue
                 with open(paths[key], "rb") as f:
                     setattr(self, attr, pickle.load(f))
-            print(f"[{name}] Loaded cached design matrices")
+            print(f"[{name}] Loaded cached design matrices from: {paths}")
             return True
         except Exception as e:
             print(f"[{name}] WARNING load matrices: {type(e).__name__}: {e}")

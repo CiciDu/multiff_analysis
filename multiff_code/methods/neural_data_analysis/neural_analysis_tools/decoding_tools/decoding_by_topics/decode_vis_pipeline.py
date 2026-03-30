@@ -98,7 +98,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
                 self.binned_spikes,
                 self.feats_to_decode,
                 self.meta_df_used,
-            ) = self._prepare_design_matrices(detrend_spikes=self.detrend_spikes)
+            ) = self._prepare_design_matrices()
 
             self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
 
@@ -106,7 +106,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             self.reduce_binned_spikes()
             self._save_design_matrices()
 
-    def _prepare_design_matrices(self, detrend_spikes: bool = True):
+    def _prepare_design_matrices(self):
         new_seg_info, events_with_stats = decode_vis_utils.prepare_new_seg_info(
             self.pn.ff_dataframe,
             self.pn.bin_width,

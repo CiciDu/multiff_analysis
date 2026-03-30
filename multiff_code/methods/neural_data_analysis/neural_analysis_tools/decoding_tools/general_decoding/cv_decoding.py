@@ -204,6 +204,17 @@ def infer_decoding_type(y):
     return 'regression'
 
 
+def _encode_binary_classification_labels(y):
+    """Map distinct label values to 0..K-1 (sorted uniques).
+
+    ``y.astype(int)`` must not be used for sklearn: it truncates floats (e.g. 0.2 and 0.8
+    both become 0), so folds can pass a two-value ``np.unique`` check yet fail in ``fit``.
+    """
+    y_arr = np.asarray(y).ravel()
+    _, inv = np.unique(y_arr, return_inverse=True)
+    return inv.astype(np.int64)
+
+
 def _build_detrend_design_matrix(covariates, degree=1):
     """Build design matrix for detrending from covariates.
 
@@ -1160,6 +1171,8 @@ def run_classification_cv(
     n_total_folds = len(splits)
     n_valid_folds = 0
 
+    y_enc = _encode_binary_classification_labels(y)
+
     model_class = config.classification_model_class or LogisticRegression
     model_kwargs = config.classification_model_kwargs or {}
 
@@ -1174,12 +1187,10 @@ def run_classification_cv(
         block_ids = _infer_block_ids_from_splits(len(y), splits) if use_per_block else None
 
     for tr, te in splits:
-        y_tr = _shuffle_y_for_fold(y[tr], groups[tr], shuffle_mode, rng, buffer_samples)
+        y_tr = _shuffle_y_for_fold(y_enc[tr], groups[tr], shuffle_mode, rng, buffer_samples)
 
-        if np.unique(y_tr).size < 2 or np.unique(y[te]).size < 2:
+        if np.unique(y_tr).size < 2 or np.unique(y_enc[te]).size < 2:
             continue
-
-        n_valid_folds += 1
 
         X_tr = X[tr].copy()
         X_te = X[te].copy()
@@ -1206,12 +1217,20 @@ def run_classification_cv(
         X_te = scaler.transform(X_te)
 
         clf = model_class(**model_kwargs)
-        clf.fit(X_tr, y_tr.astype(int))
+        try:
+            clf.fit(X_tr, y_tr)
+        except ValueError as e:
+            # Rare folds (e.g. label quirks); encoding above should prevent sklearn's
+            # "needs samples of at least 2 classes" in normal binary runs.
+            if 'least 2 classes' in str(e):
+                continue
+            raise
 
         p_te = clf.predict_proba(X_te)[:, 1]
 
-        aucs.append(roc_auc_score(y[te], p_te))
-        pr_aucs.append(average_precision_score(y[te], p_te))
+        aucs.append(roc_auc_score(y_enc[te], p_te))
+        pr_aucs.append(average_precision_score(y_enc[te], p_te))
+        n_valid_folds += 1
 
     # Handle pathological case
     if n_valid_folds == 0:
