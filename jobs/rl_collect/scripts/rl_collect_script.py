@@ -242,14 +242,14 @@ def build_argparser():
     parser.add_argument(
         '--agent-directory',
         type=str,
-        default='multiff_analysis/RL_models/meta/directory_of_agents/dir1.json',
+        default='RL_models/meta/directory_of_agents/dir1.json',
         help='Path to JSON file containing a list of agent model folders.',
     )
 
     parser.add_argument(
         '--log-dir',
         type=str,
-        default='multiff_analysis/RL_models/meta/pipeline_logs',
+        default='RL_models/meta/pipeline_logs',
         help='Directory to store pipeline log files.',
     )
 

@@ -15,8 +15,7 @@ matplotlib.rcParams['animation.embed_limit'] = 2**128
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 np.set_printoptions(suppress=True)
 
-from neural_data_analysis.design_kits.design_around_event import event_binning
-from neural_data_analysis.design_kits.design_by_segment import spike_history, rebin_segments
+from neural_data_analysis.design_kits.design_by_segment import rebin_segments
 
 monkey_info_columns_of_interest = ['bin',
                                    'LDy', 'LDz', 'RDy', 'RDz', 'gaze_mky_view_x', 'gaze_mky_view_y', 'gaze_world_x', 'gaze_world_y',
@@ -49,7 +48,7 @@ def strict_median(series, method='lower'):
 
 
 def _bin_behav_data_by_point(ori_df):
-    col_max = ['target_visible_dummy', 'target_cluster_visible_dummy', 'capture_ff',
+    col_max = ['target_visible_dummy', 'target_cluster_visible_dummy', 'capture',
                # 'num_visible_ff', 'log1p_num_ff_visible', 'catching_ff' # these features are merged into df after binning later
                ]
     col_strict_median = ['point_index', 'valid_view_point']

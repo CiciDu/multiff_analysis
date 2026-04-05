@@ -36,7 +36,7 @@ PY
 # ---------------------
 # Define sweep values
 # ---------------------
-BASE_RUN="/user_data/cicid/Multifirefly-Project/multiff_analysis/RL_models/rppo_stored_models/all_agents/agents_without_noise/ff4_mem2_drop_fill_lr3e-4_nenvs1_job194758_20"
+BASE_RUN="/user_data/cicid/Multifirefly-Project/RL_models/rppo_stored_models/all_agents/agents_without_noise/ff4_mem2_drop_fill_lr3e-4_nenvs1_job194758_20"
 
 declare -a DV_LIST=(0.5 0.7)
 declare -a JK_LIST=(0.5 0.7 0.9)

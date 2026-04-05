@@ -15,7 +15,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_pa
     default_prs,
 )
 
-DEFAULT_VAR_CATEGORIES = {
+DEFAULT_ENCODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w"],
     "latent_vars": ["r_targ", "theta_targ"],
     "position_vars": ["d", "phi"],
@@ -52,7 +52,7 @@ class OneFFPGAMRunner:
         self.category_output_root = Path(
             category_output_root or f"{self.pgam_save_dir}/category_contrib"
         )
-        self.var_categories = var_categories or DEFAULT_VAR_CATEGORIES
+        self.var_categories = var_categories or DEFAULT_ENCODING_VAR_CATEGORIES
         self.prs = default_prs()
 
         self.covariate_names = covariate_names or [

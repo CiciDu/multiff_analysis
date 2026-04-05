@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # Environment and training arguments
     parser.add_argument("--overall-folder", type=str,
-                        default='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise/',
+                        default='RL_models/sb3_stored_models/all_agents/agents_without_noise/',
                         help="Output directory to save models and manifests")
     parser.add_argument("--duration", type=int, nargs=2, default=[10, 40],
                         help="[min,max] steps for evaluation animations/checks")

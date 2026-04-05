@@ -178,7 +178,7 @@ def remove_all_data_derived_from_current_agent_data(processed_data_folder_path):
 
     after_processed_data = processed_data_folder_path.split(
         'processed_data', 1)[1]
-    search_root = 'multiff_analysis/RL_models/sb3_stored_models/all_collected_data'
+    search_root = 'RL_models/sb3_stored_models/all_collected_data'
 
     matching_dirs = []
     for root, dirs, files in os.walk(search_root, topdown=True):

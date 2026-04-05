@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import List
 
@@ -20,7 +19,6 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers.decoding_design_utils import (
     STOP_DECODING_VAR_CATEGORIES,
 )
-
 
 DEFAULT_STOP_CANONCORR_VARS = [
     "speed",
@@ -91,16 +89,31 @@ class StopDecodingRunner(BaseDecodingRunner):
 
         print("[StopDecodingRunner] Computing design matrices from scratch")
 
+        self.pn, datasets, new_seg_info, events_with_stats = \
+            decode_stops_design.prepare_stop_design_inputs(self.raw_data_folder_path, self.bin_width)
+
+        self.get_processed_spike_rates()
+
+        build_result = decode_stops_design.build_stop_design_decoding(
+            new_seg_info=new_seg_info,
+            events_with_stats=events_with_stats,
+            monkey_information=self.pn.monkey_information,
+            ff_dataframe=self.pn.ff_dataframe,
+            spikes_df=self.pn.spikes_df,
+            processed_spike_rates=self.processed_spike_rates,
+            bin_dt=self.bin_width,
+            datasets=datasets,
+        )
+
         (
-            self.pn,
             rebinned_spike_rates,
-            self.feats_to_decode,
-            _offset_log,
+            binned_feats,
+            offset_log,
             self.meta_df_used,
-        ) = decode_stops_design.assemble_stop_decoding_design(
-            self.raw_data_folder_path,
-            self.bin_width,
-            detrend_spikes=self.detrend_spikes,
+        ) = build_result
+
+        self.feats_to_decode = decode_stops_design.scale_binned_feats(
+            binned_feats,
         )
 
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
@@ -116,12 +129,7 @@ class StopDecodingRunner(BaseDecodingRunner):
     # Caching utilities (BaseDecodingRunner interface)
     # ------------------------------------------------------------------
     def _get_save_dir(self):
-        sub = "detrended" if self.detrend_spikes else "raw"
-        return os.path.join(
-            self.pn.planning_and_neural_folder_path,
-            "decoding_outputs/stop_decoder_outputs",
-            sub,
-        )
+        return self._get_save_dir_common("stop_decoder_outputs")
 
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())

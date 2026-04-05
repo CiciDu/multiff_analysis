@@ -52,16 +52,16 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
 
     def _rebin_data_in_new_segments(self, rebinned_max_x_lag_number=2):
         # rebin y_var (behavioral data)
-        self.rebinned_y_var, self.bin_edges = rebin_segments.rebin_all_segments_local_bins(
+        self.rebinned_y_var, self.local_bin_edges = rebin_segments.rebin_all_segments_local_bins(
             self.planning_data_by_point, self.new_seg_info, bin_width=self.bin_width, add_bin_edges=True)
 
         # drop columns with na
         self.rebinned_y_var = general_utils.drop_na_cols(
             self.rebinned_y_var, df_name='rebinned_y_var')
 
-        # make new_segment, new_bin, and target_index all integers
-        self.rebinned_y_var[['new_segment', 'new_bin', 'target_index']] = self.rebinned_y_var[[
-            'new_segment', 'new_bin', 'target_index']].astype(int)
+        # make new_segment, bin_in_new_seg, and target_index all integers
+        self.rebinned_y_var[['new_segment', 'bin_in_new_seg', 'target_index']] = self.rebinned_y_var[[
+            'new_segment', 'bin_in_new_seg', 'target_index']].astype(int)
 
         # # rebin x_var (neural data)
         if not hasattr(self, 'spikes_df'):
@@ -72,7 +72,7 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
         # self.rebinned_x_var = spike_history.rebin_spike_data(
         #     self.spikes_df, self.new_seg_info, bin_width=self.bin_width)
         
-        bins_2d = self.bin_edges
+        bins_2d = self.local_bin_edges
         spike_counts, cluster_ids = event_binning.bin_spikes_by_cluster(
             self.spikes_df, bins_2d, time_col='time', cluster_col='cluster'
         )
@@ -86,15 +86,15 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
         self.rebinned_x_var.columns = ['cluster_' + str(col) for col in self.rebinned_x_var.columns]
          
         self.rebinned_x_var['new_segment'] = self.rebinned_y_var['new_segment'].values
-        self.rebinned_x_var['new_bin'] = self.rebinned_y_var['new_bin'].values
+        self.rebinned_x_var['bin_in_new_seg'] = self.rebinned_y_var['bin_in_new_seg'].values
             
-        # # only keep the combination of ['new_segment', 'new_bin'] in self.rebinned_x_var
+        # # only keep the combination of ['new_segment', 'bin_in_new_seg'] in self.rebinned_x_var
         # self.rebinned_x_var = self.rebinned_x_var.merge(self.rebinned_y_var[[
-        #                                                 'new_segment', 'new_bin']], on=['new_segment', 'new_bin'], how='right')
+        #                                                 'new_segment', 'bin_in_new_seg']], on=['new_segment', 'bin_in_new_seg'], how='right')
 
-        # # assert that rebinned_y_var's [['new_segment', 'new_bin']] are the same as rebinned_x_var's [['new_segment', 'new_bin']]
-        # assert self.rebinned_y_var[['new_segment', 'new_bin']].equals(
-        #     self.rebinned_x_var[['new_segment', 'new_bin']])
+        # # assert that rebinned_y_var's [['new_segment', 'bin_in_new_seg']] are the same as rebinned_x_var's [['new_segment', 'bin_in_new_seg']]
+        # assert self.rebinned_y_var[['new_segment', 'bin_in_new_seg']].equals(
+        #     self.rebinned_x_var[['new_segment', 'bin_in_new_seg']])
 
         self._get_rebinned_x_var_lags(
             rebinned_max_x_lag_number=rebinned_max_x_lag_number)
@@ -112,11 +112,11 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
             if not hasattr(self, 'rebinned_y_var_lags'):
                 self._get_rebinned_y_var_lags()
             self.rebinned_behav_data = self.rebinned_y_var_lags.sort_values(
-                by=['new_segment', 'new_bin'])
+                by=['new_segment', 'bin_in_new_seg'])
             self.use_lagged_rebinned_behav_data = True
         else:
             self.rebinned_behav_data = self.rebinned_y_var.sort_values(
-                by=['new_segment', 'new_bin'])
+                by=['new_segment', 'bin_in_new_seg'])
 
     def get_new_seg_info(self, segment_duration=2):
         self.new_seg_duration = segment_duration
@@ -178,15 +178,15 @@ class PlanningAndNeuralSegmentAligned(planning_and_neural_class.PlanningAndNeura
     def get_concat_x_and_y_var_for_lr(self, test_or_control='both'):
         if test_or_control == 'test':
             x_var = self.test_concat_neural_trials.drop(
-                columns=['new_segment', 'new_bin'], errors='ignore')
+                columns=['new_segment', 'bin_in_new_seg'], errors='ignore')
             y_var = self.test_concat_behav_trials
         elif test_or_control == 'control':
             x_var = self.control_concat_neural_trials.drop(
-                columns=['new_segment', 'new_bin'], errors='ignore')
+                columns=['new_segment', 'bin_in_new_seg'], errors='ignore')
             y_var = self.control_concat_behav_trials
         elif test_or_control == 'both':
             x_var = self.concat_neural_trials.drop(
-                columns=['new_segment', 'new_bin'], errors='ignore')
+                columns=['new_segment', 'bin_in_new_seg'], errors='ignore')
             y_var = self.concat_behav_trials
         else:
             raise ValueError(

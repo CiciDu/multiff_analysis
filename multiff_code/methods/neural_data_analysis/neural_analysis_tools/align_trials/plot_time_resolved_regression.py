@@ -34,8 +34,8 @@ def plot_trial_counts_by_timepoint(time_resolved_cv_scores, trial_column='trial_
     plt.show()
 
 
-def _agg_info_across_folds(time_resolved_cv_scores, group_cols=['feature', 'new_bin']):
-    group_cols = ['feature', 'new_bin']
+def _agg_info_across_folds(time_resolved_cv_scores, group_cols=['feature', 'bin_in_new_seg']):
+    group_cols = ['feature', 'bin_in_new_seg']
 
     cols = [col for col in ['r2', 'bin_mid_time', 'trial_count', 'train_trial_count', 'test_trial_count'] if col in time_resolved_cv_scores.columns]
 
@@ -134,7 +134,7 @@ def _plot_time_resolved_regression(time_resolved_cv_scores, show_counts_on_xtick
 
     if features_not_to_plot is None:
         features_not_to_plot = [
-            'new_bin', 'new_seg_duration', 'trial_count', 'bin_mid_time']
+            'bin_in_new_seg', 'new_seg_duration', 'trial_count', 'bin_mid_time']
     else:
         features_not_to_plot = set(features_not_to_plot)
 

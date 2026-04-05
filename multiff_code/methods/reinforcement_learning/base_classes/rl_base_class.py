@@ -625,7 +625,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.monkey_information)
 
         if not hasattr(self, 'closest_stop_to_capture_df'):
-            self.make_or_retrieve_closest_stop_to_capture_df()
+            self.make_closest_stop_to_capture_df()
         if not hasattr(self, 'ff_caught_T_new'):
             self.make_ff_caught_T_new()
 

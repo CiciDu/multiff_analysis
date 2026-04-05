@@ -87,46 +87,6 @@ def _filter_spike_data(spike_times_in_s, spike_clusters, smr_markers_start_time)
     return spike_times_in_s, spike_clusters
 
 
-# def rebin_raw_spike_data(spike_segs_df, new_seg_info, bin_width=0.2):
-#     # This function rebins the data by segment and time bin, and takes the median of the data within each bin
-#     # It makes sure that the bins are perfectly aligned within segments (whereas in the previous method, bins are continuously assigned to all time points)
-#     # df must contain columns: segment, seg_start_time, seg_end_time, time, bin,
-
-#     new_seg_info.sort_values(by='segment', inplace=True)
-#     concat_seg_data = []
-
-#     df = spike_segs_df
-
-#     for _, segment_row in new_seg_info.iterrows():
-
-#         # Not using fully vectorized approach in case there's overlap of time between segments
-#         # Subset relevant rows belonging to the segment
-#         seg_data_df = df[
-#             (df['segment'] == segment_row['segment']) &
-#             (df['time'] >= segment_row['new_seg_start_time']) &
-#             (df['time'] <= segment_row['new_seg_end_time'])
-#         ].copy()  # copy to avoid SettingWithCopyWarning
-
-#         # Create time bins and assign bin index
-#         time_bins = np.arange(segment_row['new_seg_start_time'], segment_row['new_seg_end_time'], bin_width)
-#         seg_data_df['new_bin'] = np.digitize(
-#             seg_data_df['time'], time_bins) - 1
-
-#         cols = ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']
-#         seg_data_df[cols] = segment_row[cols].values
-
-#         concat_seg_data.append(seg_data_df)
-
-#     # Concatenate all processed segments
-#     concat_seg_data = pd.concat(concat_seg_data, ignore_index=True)
-#     concat_seg_data.sort_values(by=['new_segment', 'new_bin'], inplace=True)
-
-#     # Take the median of the data within each bin
-#     rebinned_data = concat_seg_data.groupby(
-#         ['new_segment', 'new_bin']).median().reset_index(drop=False)
-
-#     return rebinned_data
-
 
 def _make_all_binned_spikes(spikes_df, min_time=None, max_time=None, bin_width=0.02):
     """Efficiently bin spikes and stack bins for each spike cluster."""

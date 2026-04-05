@@ -107,7 +107,7 @@ behav_features_to_drop = [
     'monkey_angle_target_last_seen',
     'target_has_disappeared_for_last_time_dummy',
     'target_visible_dummy',
-    'capture_ff',
+    'capture',
     'trial',
     'turning_right',
     'valid_view_point'

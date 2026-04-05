@@ -14,7 +14,7 @@ class PlanFactorsAcrossAgents():
     def __init__(self,
                  # this is the monkey whose data will be used for comparison
                  monkey_name='monkey_Bruno',
-                 overall_folder_name='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise',
+                 overall_folder_name='RL_models/sb3_stored_models/all_agents/agents_without_noise',
                  agent_folders=None):
         self.monkey_name = monkey_name
         self.overall_folder_name = overall_folder_name

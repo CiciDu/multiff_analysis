@@ -18,14 +18,14 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate multiff_clean
 
 # Batch json path
-BATCH_DIR="multiff_analysis/RL_models/meta/directory_of_agents/batches"
+BATCH_DIR="RL_models/meta/directory_of_agents/batches"
 AGENT_JSON="${BATCH_DIR}/dir_batch_${SLURM_ARRAY_TASK_ID}.json"
 
 echo "[jobinfo] Processing batch: $AGENT_JSON"
 
 srun python multiff_analysis/jobs/rl_collect/scripts/rl_collect_script.py \
     --agent-directory "$AGENT_JSON" \
-    --log-dir multiff_analysis/RL_models/meta/pipeline_logs \
+    --log-dir RL_models/meta/pipeline_logs \
     --num-datasets-to-collect 3 \
     --num-steps-per-dataset 9000 \
     >> "$SLURM_STDOUT" 2>> "$SLURM_STDERR"

@@ -1,5 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=decode_pn
+# Job name cannot use $1 here (#SBATCH is parsed before the script runs).
+# Use submit_decode_pn.sh, or: sbatch --job-name=decode_pn_<MONKEY> ... decode_pn_job.slurm <MONKEY>
 #SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_pn/logs/run_stdout/decode_pn_%A_%a.out
 #SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_pn/logs/run_stdout/decode_pn_%A_%a.err
 #SBATCH --partition=cpu,xaqq

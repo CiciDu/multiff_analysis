@@ -470,6 +470,7 @@ def _event_windows_to_bins2d_local(
     only_ok=True,
     bin_dt=None,
     tol=1e-9,
+    tile_window=False,
 ):
     """
     Turn event-centered windows into per-event fixed-width bins (LOCAL mode).
@@ -477,6 +478,10 @@ def _event_windows_to_bins2d_local(
     Produces:
       - bins_2d: (N_bins, 2) array of [left, right] for each bin across all events
       - meta: tidy DataFrame with per-bin metadata
+
+    With tile_window=True the entire [win_t0, win_t1] window is tiled with
+    bin_dt-wide bins; n_pre_col / n_post_col are ignored and need not be present.
+    bin_dt must be supplied explicitly in this case.
     """
 
     df = picked_windows.copy()
@@ -485,19 +490,19 @@ def _event_windows_to_bins2d_local(
     if only_ok and ok_col in df.columns:
         df = df[df[ok_col].astype(bool)].copy()
 
-    required = [
-        event_id_col, event_time_col,
-        win_t0_col, win_t1_col,
-        n_pre_col, n_post_col,
-    ]
+    required = [event_id_col, event_time_col, win_t0_col, win_t1_col]
+    if not tile_window:
+        required += [n_pre_col, n_post_col]
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise KeyError(f'missing required columns: {missing}')
 
     # --------------------------------------------------
-    # Infer bin_dt if needed
+    # Infer bin_dt if needed (only possible in default mode)
     # --------------------------------------------------
     if bin_dt is None:
+        if tile_window:
+            raise ValueError('bin_dt must be supplied explicitly when tile_window=True')
         dts = []
         for _, r in df.iterrows():
             npre = int(r[n_pre_col])
@@ -525,32 +530,40 @@ def _event_windows_to_bins2d_local(
     for _, r in df.iterrows():
         event_id = r[event_id_col]
         s = float(r[event_time_col])
-        npre = int(r[n_pre_col])
-        npost = int(r[n_post_col])
-        n_bins = npre + npost
-        if n_bins <= 0:
-            continue
-
-        # Build local bins centered on event
-        left0 = s - npre * bin_dt
-        lefts = left0 + bin_dt * np.arange(n_bins)
-        rights = lefts + bin_dt
-        centers = 0.5 * (lefts + rights)
-
-        # Clip tiny numerical drift to window
         t0 = float(r[win_t0_col])
         t1 = float(r[win_t1_col])
-        if lefts[0] < t0 - tol:
-            lefts[0] = t0
-        if rights[-1] > t1 + tol:
-            rights[-1] = t1
 
+        if tile_window:
+            n_bins = max(0, int(np.floor((t1 - t0) / bin_dt)))
+            if n_bins <= 0:
+                continue
+            lefts = t0 + bin_dt * np.arange(n_bins)
+            rights = lefts + bin_dt
+            is_pre = rights <= s
+        else:
+            npre = int(r[n_pre_col])
+            npost = int(r[n_post_col])
+            n_bins = npre + npost
+            if n_bins <= 0:
+                continue
+
+            # Build local bins centered on event
+            left0 = s - npre * bin_dt
+            lefts = left0 + bin_dt * np.arange(n_bins)
+            rights = lefts + bin_dt
+
+            # Clip tiny numerical drift to window
+            if lefts[0] < t0 - tol:
+                lefts[0] = t0
+            if rights[-1] > t1 + tol:
+                rights[-1] = t1
+
+            is_pre = np.zeros(n_bins, dtype=bool)
+            if npre > 0:
+                is_pre[:npre] = True
+
+        centers = 0.5 * (lefts + rights)
         bins_list.append(np.column_stack([lefts, rights]))
-
-        # Pre / post flags
-        is_pre = np.zeros(n_bins, dtype=bool)
-        if npre > 0:
-            is_pre[:npre] = True
 
         meta_rows.append(pd.DataFrame({
             'event_id': event_id,
@@ -606,6 +619,7 @@ def _event_windows_to_bins2d_global(
     ok_col='ok_window',
     only_ok=True,
     enforce_exact_counts=False,
+    tile_window=False,
 ):
     """
     Global-bin mode:
@@ -613,6 +627,13 @@ def _event_windows_to_bins2d_global(
 
     No local bins are constructed.
     bin_dt is ignored by design.
+
+    By default (tile_window=False) the number of bins kept on each side of the
+    event is capped by n_pre_col / n_post_col, exactly as before.
+
+    With tile_window=True the caps are ignored and every bin that falls fully
+    inside [win_t0_col, win_t1_col] is included.  n_pre_col / n_post_col need
+    not be present in picked_windows in that case.
     """
 
     df = picked_windows.copy()
@@ -620,11 +641,9 @@ def _event_windows_to_bins2d_global(
     if only_ok and ok_col in df.columns:
         df = df[df[ok_col].astype(bool)].copy()
 
-    required = [
-        event_id_col, event_time_col,
-        win_t0_col, win_t1_col,
-        n_pre_col, n_post_col,
-    ]
+    required = [event_id_col, event_time_col, win_t0_col, win_t1_col]
+    if not tile_window:
+        required += [n_pre_col, n_post_col]
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise KeyError(f'missing required columns: {missing}')
@@ -645,47 +664,39 @@ def _event_windows_to_bins2d_global(
         s = float(r[event_time_col])
         t0 = float(r[win_t0_col])
         t1 = float(r[win_t1_col])
-        npre = int(r[n_pre_col])
-        npost = int(r[n_post_col])
 
         # bins fully inside the window
         in_window = (g_left >= t0) & (g_right <= t1)
         if not np.any(in_window):
             continue
 
-        # pre / post relative to event
-        is_pre = g_right <= s
-        is_post = g_left >= s
-
-        pre_idx = np.where(in_window & is_pre)[0]
-        post_idx = np.where(in_window & is_post)[0]
-
-        # choose bins
-        if enforce_exact_counts:
-            if (npre > 0 and pre_idx.size < npre) or (npost > 0 and post_idx.size < npost):
-                continue  # drop this event entirely
-
-            pre_idx = pre_idx[-npre:] if npre > 0 else np.array([], dtype=int)
-            post_idx = post_idx[:npost] if npost > 0 else np.array([], dtype=int)
+        if tile_window:
+            sel_idx = np.where(in_window)[0]
         else:
+            npre = int(r[n_pre_col])
+            npost = int(r[n_post_col])
+
+            pre_idx = np.where(in_window & (g_right <= s))[0]
+            post_idx = np.where(in_window & (g_left >= s))[0]
+
+            if enforce_exact_counts:
+                if (npre > 0 and pre_idx.size < npre) or (npost > 0 and post_idx.size < npost):
+                    continue
+
             pre_idx = pre_idx[-npre:] if npre > 0 else np.array([], dtype=int)
             post_idx = post_idx[:npost] if npost > 0 else np.array([], dtype=int)
+            sel_idx = np.concatenate([pre_idx, post_idx])
 
-        sel_idx = np.concatenate([pre_idx, post_idx])
         if sel_idx.size == 0:
             continue
 
         bins_list.append(global_bins_2d[sel_idx])
 
-        k_within = np.arange(sel_idx.size, dtype=int)
-        is_pre_flag = np.zeros(sel_idx.size, dtype=bool)
-        if pre_idx.size > 0:
-            is_pre_flag[:pre_idx.size] = True
-
+        is_pre_flag = g_right[sel_idx] <= s
         meta_rows.append(pd.DataFrame({
             'event_id': event_id,
             'global_bin': sel_idx.astype(int),
-            'k_within_seg': k_within,
+            'k_within_seg': np.arange(sel_idx.size, dtype=int),
             'is_pre': is_pre_flag,
             't_left': g_left[sel_idx],
             't_right': g_right[sel_idx],
@@ -723,6 +734,7 @@ def event_windows_to_bins2d(
     global_bins_2d=None,
     bin_dt=None,
     enforce_exact_counts=False,
+    tile_window=False,
     **kwargs,
 ):
     """
@@ -731,6 +743,9 @@ def event_windows_to_bins2d(
     Mode is inferred:
       - global mode if global_bins_2d is provided
       - local mode otherwise
+
+    tile_window (global mode only): if True, ignore n_pre_bins / n_post_bins
+      and include every global bin that falls fully inside the window.
     """
 
     if global_bins_2d is not None:
@@ -741,6 +756,7 @@ def event_windows_to_bins2d(
             picked_windows,
             global_bins_2d=global_bins_2d,
             enforce_exact_counts=enforce_exact_counts,
+            tile_window=tile_window,
             **kwargs,
         )
 
@@ -751,5 +767,6 @@ def event_windows_to_bins2d(
     return _event_windows_to_bins2d_local(
         picked_windows,
         bin_dt=bin_dt,
+        tile_window=tile_window,
         **kwargs,
     )

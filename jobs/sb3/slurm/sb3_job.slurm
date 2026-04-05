@@ -42,7 +42,7 @@ IDENTITY_SLOT_STRATEGY=${IDENTITY_SLOT_STRATEGY_LIST[$STRAT_IDX]}
 # ---------------------
 # Create a unique folder name
 # ---------------------
-BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise"
+BASE_DIR="RL_models/sb3_stored_models/all_agents/agents_without_noise"
 SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
 RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
 OVERALL_FOLDER="${BASE_DIR}/${RUN_NAME}"
@@ -64,8 +64,9 @@ srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --lr "$LR" \
   --num-obs-ff "$NUM_OBS_FF" \
   --n-envs "$N_ENVS" \
-  #--no-curriculum-training \
-  --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" 2> >(tee -a "$ERR_FILE" >&2)
+  --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" \
+  2> >(tee -a "$ERR_FILE" >&2)
+# --no-curriculum-training
   
 
 echo "[jobinfo] Finished sb3 training for LR=${LR}, NUM_OBS_FF=${NUM_OBS_FF}, MAX_IN_MEMORY_TIME=${MAX_IN_MEMORY_TIME}, STRAT=${IDENTITY_SLOT_STRATEGY}, N_ENVS=${N_ENVS}"

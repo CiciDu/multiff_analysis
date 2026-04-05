@@ -82,8 +82,8 @@ class TargetDecoderSegmentAlignedClass(target_decoder_class.TargetDecoderClass, 
             self.rebinned_behav_data['segment'])[0]
 
         if self.align_at_beginning:
-            # within each segment, reassign new_bin as a continuous array starting from 0 based on bin order
-            self.rebinned_behav_data['new_bin'] = (
+            # within each segment, reassign bin_in_new_seg as a continuous array starting from 0 based on bin order
+            self.rebinned_behav_data['bin_in_new_seg'] = (
                 self.rebinned_behav_data.groupby('new_segment').cumcount())
         else:
             self.rebinned_behav_data = fit_gpfa_utils.assign_new_bin_aligned_at_end(
@@ -105,6 +105,6 @@ class TargetDecoderSegmentAlignedClass(target_decoder_class.TargetDecoderClass, 
         x_var_df = x_var_df[[
             col for col in x_var_df.columns if col.startswith('cluster_')]]
 
-        x_var_df[['new_bin', 'new_segment']] = self.rebinned_behav_data[[
-            'new_bin', 'new_segment']].values
+        x_var_df[['bin_in_new_seg', 'new_segment']] = self.rebinned_behav_data[[
+            'bin_in_new_seg', 'new_segment']].values
         return x_var_df

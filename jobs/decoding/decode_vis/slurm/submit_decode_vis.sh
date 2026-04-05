@@ -75,6 +75,7 @@ echo "[SUBMIT] Submitting array: 0-$ARRAY_MAX (max $MAX_CONCURRENT concurrent)"
 # Submit job
 # ------------------------------
 sbatch \
+  --job-name="decode_vis_${MONKEY_NAME}" \
   --array=0-"$ARRAY_MAX"%$MAX_CONCURRENT \
   "${FORWARD_ARGS[@]}" \
   "$JOB_DIR/slurm/decode_vis_job.slurm" \

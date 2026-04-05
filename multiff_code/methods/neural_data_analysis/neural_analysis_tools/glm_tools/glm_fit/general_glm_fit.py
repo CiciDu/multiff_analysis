@@ -961,6 +961,7 @@ def _build_folds(
     cv_splitter options:
       - 'blocked_time_buffered': contiguous time blocks with buffers on both sides
       - 'blocked_time': forward-chaining (past → future)
+      - 'kfold': shuffled KFold (ignores groups)
       - groups != None: GroupKFold
       - default: shuffled KFold
     """
@@ -1008,6 +1009,10 @@ def _build_folds(
                 folds.append((train, valid))
         print('cv_splitter = blocked_time: Forward-chaining (past → future)')
         return folds
+
+    if cv_splitter == 'kfold':
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        return list(kf.split(idx))
 
     # -------- GROUPED CV --------
     if groups is not None:

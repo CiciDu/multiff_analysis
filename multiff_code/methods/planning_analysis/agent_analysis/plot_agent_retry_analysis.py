@@ -55,7 +55,8 @@ def plot_retry_outcome_sweep_ci(df, config, sweep_key):
 
                 M = plot_stacked_bars_utils.prepare_for_stacked_bar_no_phase(
                     sub,
-                    category_order
+                    category_order,
+                    use_simple_average=True
                 )
 
                 vals.append(M.iloc[0][cat])
@@ -159,7 +160,8 @@ def _build_retry_strategy_long_df(df_plot, sweep_vals, category_order, sweep_key
 
             M = plot_stacked_bars_utils.prepare_for_stacked_bar_no_phase(
                 sub,
-                category_order
+                category_order,
+                use_simple_average=True
             )
 
             if M.empty:

@@ -9,6 +9,7 @@ RunnerT = TypeVar("RunnerT")
 def run_decoding_main(
     runner_class: Type[RunnerT],
     *,
+    cv_mode: str = "group_kfold",
     run_kwargs: Optional[dict[str, Any]] = None,
 ) -> tuple:
     """
@@ -32,37 +33,40 @@ def run_decoding_main(
     parser.add_argument('--bin_width', type=float, default=0.04)
     parser.add_argument('--n_splits', type=int, default=5)
     parser.add_argument('--save_dir', default=None)
-    parser.add_argument('--detrend_spikes', action='store_true', default=True)
 
     args = parser.parse_args()
 
-    runner = runner_class(
-        raw_data_folder_path=args.raw_data_folder_path,
-        bin_width=args.bin_width,
-        detrend_spikes=args.detrend_spikes,
-    )
-
-    run_kwargs = run_kwargs or {}
-    common_run = dict(
-        n_splits=args.n_splits,
-        save_dir=args.save_dir,
-        fit_kernelwidth=True,
-        **run_kwargs,
-    )
-
-
-    results_df = runner.run(
-        **common_run,
-        shuffle_mode='none',
-    )
+    for smoothing_width in [None, 10, 20, 40]:
+        print(f"Running with smoothing_width={smoothing_width}")
     
-    results_df_shuffled = runner.run(
-        **common_run,
-        shuffle_mode='timeshift_fold',
-    )
+        runner = runner_class(
+            raw_data_folder_path=args.raw_data_folder_path,
+            bin_width=args.bin_width,
+            smoothing_width=smoothing_width,
+            cv_mode=cv_mode,
+        )
+
+        run_kwargs = run_kwargs or {}
+        common_run = dict(
+            n_splits=args.n_splits,
+            save_dir=args.save_dir,
+            fit_kernelwidth=True,
+            **run_kwargs,
+        )
 
 
-    results_one_ff_style = runner.run_one_ff_style()
+        results_df = runner.run(
+            **common_run,
+            shuffle_mode='none',
+        )
+        
+        # results_df_shuffled = runner.run(
+        #     **common_run,
+        #     shuffle_mode='timeshift_fold',
+        # )
 
-    print(runner.results_df.head())
-    return results_df, results_df_shuffled, results_one_ff_style
+
+        # results_one_ff_style = runner.run_one_ff_style()
+
+        print(runner.results_df.head())
+    return 

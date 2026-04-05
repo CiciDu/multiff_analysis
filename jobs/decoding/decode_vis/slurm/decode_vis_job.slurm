@@ -1,5 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=decode_vis
+# Job name cannot use $1 here (#SBATCH is parsed before the script runs).
+# Use submit_decode_vis.sh, or: sbatch --job-name=decode_vis_<MONKEY> ... decode_vis_job.slurm <MONKEY>
 #SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_vis/logs/run_stdout/decode_vis_%A_%a.out
 #SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_vis/logs/run_stdout/decode_vis_%A_%a.err
 #SBATCH --partition=cpu,xaqq

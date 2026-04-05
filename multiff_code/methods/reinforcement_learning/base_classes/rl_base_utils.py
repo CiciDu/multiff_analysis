@@ -166,7 +166,7 @@ def _strip_training_suffix(path_string):
     return path_string
 
 
-def get_agent_folders(path='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise'):
+def get_agent_folders(path='RL_models/sb3_stored_models/all_agents/agents_without_noise'):
     '''
     Walk through directories and return unique agent folders
     that contain checkpoint_manifest.json.
@@ -187,7 +187,7 @@ def get_agent_folders(path='multiff_analysis/RL_models/sb3_stored_models/all_age
     return agent_folders
 
 
-# def get_agent_folders(path='multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_without_noise'):
+# def get_agent_folders(path='RL_models/sb3_stored_models/all_agents/agents_without_noise'):
 
 #     dirs = [f for f in os.listdir(
 #         path) if os.path.isdir(os.path.join(path, f))]

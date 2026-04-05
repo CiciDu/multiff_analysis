@@ -67,7 +67,7 @@ class PGAMclass():
     #                  'retry_capture', 'retry_switch', 'cluster_around_target',
     #                  ]
 
-    temporal_vars = ['capture_ff', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'turning_right', 'stop', 'whether_test',
+    temporal_vars = ['capture', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'turning_right', 'stop', 'whether_test',
                      'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
     def __init__(self, x_var=None, y_var=None, bin_width=None, save_dir=None):

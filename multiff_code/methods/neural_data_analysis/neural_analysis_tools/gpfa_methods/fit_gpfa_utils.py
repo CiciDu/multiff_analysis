@@ -125,12 +125,12 @@ def turn_spike_segs_df_into_spiketrains(
 
 def assign_new_bin_aligned_at_end(df, new_segment_column='new_segment'):
     max_new_bin = df.groupby(new_segment_column).size().max()
-    # assign new_bin so that the last bin in each segment is aligned at max_new_bin - 1
+    # assign bin_in_new_seg so that the last bin in each segment is aligned at max_new_bin - 1
     df['segment_size'] = (
         df.groupby(new_segment_column)[new_segment_column].transform('count'))
     df['position_in_segment'] = (
         df.groupby(new_segment_column).cumcount())
-    df['new_bin'] = (
+    df['bin_in_new_seg'] = (
         max_new_bin - df['segment_size'] +
         df['position_in_segment'])
     # drop helper columns if no longer needed
@@ -162,7 +162,7 @@ def _get_concat_gpfa_data(trajectories, spiketrain_corr_segs, bin_bounds, new_se
         gpfa_trial_df = pd.DataFrame(
             gpfa_trial, columns=[f'dim_{i}' for i in range(gpfa_trial.shape[1])])
         gpfa_trial_df['new_segment'] = seg
-        gpfa_trial_df['new_bin'] = range(min_bin, max_bin + 1)
+        gpfa_trial_df['bin_in_new_seg'] = range(min_bin, max_bin + 1)
         dfs.append(gpfa_trial_df)
 
     concat_gpfa_data = pd.concat(dfs, ignore_index=True)

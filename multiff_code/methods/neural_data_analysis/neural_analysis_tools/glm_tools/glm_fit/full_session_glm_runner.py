@@ -229,13 +229,14 @@ class FullSessionGLMRunner:
                 - max(0, pn.ff_caught_T_sorted.min() - 1),
         }, index=[0])
 
-        rebinned_monkey_data, self.global_bins_2d = rebin_segments.rebin_all_segments_local_bins(
+        rebinned_monkey_data, self.global_bins_2d = rebin_segments.rebin_all_segments_global_bins(
             pn.monkey_information,
             new_seg_info_fs,
             bin_width=self.bin_width,
             respect_old_segment=False,
             add_bin_edges=True,
         )
+
 
         trial_ids = np.repeat(0, len(rebinned_monkey_data))
         rebinned_monkey_data = temporal_feats.add_stop_and_capture_columns(

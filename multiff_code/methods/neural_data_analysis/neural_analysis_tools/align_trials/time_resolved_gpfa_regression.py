@@ -49,15 +49,15 @@ def time_resolved_gpfa_regression_cv(
             test_segments)].reset_index(drop=True)
 
         # Check row alignment
-        if not gpfa_train[['new_segment', 'new_bin']].equals(behav_train[['new_segment', 'new_bin']]):
+        if not gpfa_train[['new_segment', 'bin_in_new_seg']].equals(behav_train[['new_segment', 'bin_in_new_seg']]):
             raise ValueError("GPFA train and behavior train are misaligned.")
-        if not gpfa_test[['new_segment', 'new_bin']].equals(behav_test[['new_segment', 'new_bin']]):
+        if not gpfa_test[['new_segment', 'bin_in_new_seg']].equals(behav_test[['new_segment', 'bin_in_new_seg']]):
             raise ValueError("GPFA test and behavior test are misaligned.")
 
         gpfa_train = gpfa_train.drop(
-            columns=['new_segment', 'new_bin']).reset_index(drop=True)
+            columns=['new_segment', 'bin_in_new_seg']).reset_index(drop=True)
         gpfa_test = gpfa_test.drop(
-            columns=['new_segment', 'new_bin']).reset_index(drop=True)
+            columns=['new_segment', 'bin_in_new_seg']).reset_index(drop=True)
 
         scores_df = run_time_resolved_regression_train_test(
             gpfa_train, behav_train,
@@ -110,9 +110,9 @@ def run_time_resolved_regression_train_test(
     """
     behavior_cols = behav_train.select_dtypes(include=[float, int]).columns
 
-    def fit_and_score_bin(new_bin):
-        train_mask = behav_train['new_bin'] == new_bin
-        test_mask = behav_test['new_bin'] == new_bin
+    def fit_and_score_bin(bin_in_new_seg):
+        train_mask = behav_train['bin_in_new_seg'] == bin_in_new_seg
+        test_mask = behav_test['bin_in_new_seg'] == bin_in_new_seg
 
         X_train = neural_train.loc[train_mask].select_dtypes(
             include=[float, int]).values
@@ -146,12 +146,12 @@ def run_time_resolved_regression_train_test(
             'feature': behavior_cols,
             'r2': r2s,
             'best_alpha': all_best_alphas,
-            'new_bin': new_bin,
+            'bin_in_new_seg': bin_in_new_seg,
             'train_trial_count': len(X_train),
             'test_trial_count': len(X_test)
         })
 
-    new_bins = behav_train['new_bin'].unique()
+    new_bins = behav_train['bin_in_new_seg'].unique()
     results = Parallel(n_jobs=n_jobs)(
         delayed(fit_and_score_bin)(nb) for nb in new_bins)
     results = [r for r in results if r is not None]

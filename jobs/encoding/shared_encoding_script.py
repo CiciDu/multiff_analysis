@@ -65,6 +65,7 @@ def run_encoding_main(
             runner = runner_factory(
                 raw_data_folder_path=raw_data_folder_path,
                 bin_width=args.bin_width,
+                cv_mode="group_kfold",
             )
 
             runner.collect_data(exists_ok=load_if_exists)
@@ -74,7 +75,6 @@ def run_encoding_main(
                 all_neuron_r2 = runner.crossval_variance_explained_all_neurons(
                     n_folds=args.n_splits,
                     load_if_exists=load_if_exists,
-                    cv_mode="blocked_time_buffered",
                     buffer_samples=20,
                     verbose=True,
                     plot_cdf=False,

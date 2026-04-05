@@ -30,14 +30,23 @@ from tqdm import tqdm
 # CV modes that use blocks (time or group); per_block detrending is default for these
 BLOCK_CV_MODES = ('blocked_time_buffered', 'blocked_time')
 
+# Default when run_cv_decoding(..., cv_mode=None)
+# Other options: 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold' (shuffled KFold)
+DEFAULT_CV_MODE = 'blocked_time_buffered'
+
+# For inferring cv_mode from pkl stems; longer names first so e.g. 'group_kfold' wins over 'kfold'
+CV_MODE_CANDIDATES = (
+    'blocked_time_buffered',
+    'blocked_time',
+    'group_kfold',
+    'kfold',
+)
+
 
 @dataclass
 class DecodingRunConfig:
-    # CV
-    # 'group_kfold', 'blocked_time_buffered'
-    cv_mode: str = 'blocked_time_buffered' # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
     buffer_samples: int = 20
-    use_early_stopping: bool = True
+    use_early_stopping: bool = False
 
     # Detrending: when detrend_covariates is provided, regress them out of neural X before scaling
     detrend_degree: int = 1  # polynomial degree when covariate is 1D
@@ -80,6 +89,7 @@ def run_cv_decoding(
     detrend_covariates=None,
     use_detrend_inside_cv=None,
     detrend_per_block=None,
+    cv_mode=None,  # 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold'; None -> DEFAULT_CV_MODE
 ):
 
     if config is None:
@@ -94,7 +104,12 @@ def run_cv_decoding(
             save_dir,
             use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
+            cv_mode=cv_mode,
         )
+
+    if cv_mode is None:
+        cv_mode = DEFAULT_CV_MODE
+        print(f'cv_mode is None, using default: {cv_mode}')
 
     out_dir = Path(save_dir) if save_dir is not None else None
     if out_dir is not None:
@@ -130,6 +145,7 @@ def run_cv_decoding(
             verbosity,
             model_name,
             do_detrend=do_detrend,
+            cv_mode=cv_mode,
         )
         if exists_ok
         else {}
@@ -151,7 +167,7 @@ def run_cv_decoding(
             continue
 
         use_per_block = (
-            getattr(config, 'detrend_per_block', True) or getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+            getattr(config, 'detrend_per_block', True) or cv_mode in BLOCK_CV_MODES
         ) if do_detrend else False
         lookup_model_name = (
             model_name if model_name is not None
@@ -180,6 +196,7 @@ def run_cv_decoding(
             rng,
             model_name,
             detrend_covariates=detrend_covariates,
+            cv_mode=cv_mode,
         )
 
         if computed is None:
@@ -256,7 +273,10 @@ def filter_valid_rows(X, y, groups, detrend_covariates=None):
         else:
             arr = np.asarray(detrend_covariates)
             dc_ok = arr[ok] if arr.ndim == 1 else arr[ok, :]
-    return X[ok], y[ok], groups[ok], dc_ok
+
+    if groups is not None:
+        groups = groups[ok]
+    return X[ok], y[ok], groups, dc_ok
 
 
 def shuffle_y_groupwise(y, groups, rng):
@@ -372,8 +392,10 @@ def _build_folds(
     cv_splitter options:
       - 'blocked_time_buffered': contiguous time blocks with buffers on both sides
       - 'blocked_time': forward-chaining (past → future)
-      - 'group_kfold' or groups != None: GroupKFold
-      - default: shuffled KFold
+      - 'group_kfold': GroupKFold (requires ``groups``)
+      - 'kfold': shuffled KFold (ignores ``groups`` for splitting)
+      - else if ``groups`` is not None: GroupKFold
+      - default: shuffled KFold (same as 'kfold')
     """
     idx = np.arange(n)
 
@@ -421,7 +443,21 @@ def _build_folds(
         return folds
 
     # -------- GROUPED CV --------
-    if cv_splitter == 'group_kfold' or groups is not None:
+    if cv_splitter == 'group_kfold':
+        if groups is None:
+            raise ValueError(
+                "cv_splitter='group_kfold' requires non-None `groups` "
+                "(length n_samples vector of trial / segment ids)."
+            )
+        gkf = GroupKFold(n_splits=n_splits)
+        return list(gkf.split(idx, groups=groups))
+
+    # -------- SHUFFLED K-FOLD (explicit; ignores groups) --------
+    if cv_splitter == 'kfold':
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        return list(kf.split(idx))
+
+    if groups is not None:
         gkf = GroupKFold(n_splits=n_splits)
         return list(gkf.split(idx, groups=groups))
 
@@ -448,7 +484,7 @@ def _infer_block_ids_from_splits(n, splits):
     return block_ids
 
 
-def make_feature_hash(feature, mode, n_splits, shuffle_mode, context, config):
+def make_feature_hash(feature, mode, n_splits, shuffle_mode, context, config, cv_mode):
     params_hash = hashlib.sha1(
         json.dumps(
             dict(
@@ -457,7 +493,7 @@ def make_feature_hash(feature, mode, n_splits, shuffle_mode, context, config):
                 n_splits=n_splits,
                 shuffle_mode=shuffle_mode,
                 context=context,
-                config=serialize_decoding_config(config),
+                config=serialize_decoding_config(config, cv_mode),
             ),
             sort_keys=True,
             default=str,
@@ -474,7 +510,7 @@ def get_feature_csv_path(out_dir, feature, mode, params_hash):
     return out_dir / f'{tag}_{mode}_{params_hash}.csv'
 
 
-def make_mode_hash(mode, n_splits, shuffle_mode, context, config):
+def make_mode_hash(mode, n_splits, shuffle_mode, context, config, cv_mode):
     """Create a hash based on mode and parameters (excluding feature)."""
     params_hash = hashlib.sha1(
         json.dumps(
@@ -483,7 +519,7 @@ def make_mode_hash(mode, n_splits, shuffle_mode, context, config):
                 n_splits=n_splits,
                 shuffle_mode=shuffle_mode,
                 context=context,
-                config=serialize_decoding_config(config),
+                config=serialize_decoding_config(config, cv_mode),
             ),
             sort_keys=True,
             default=str,
@@ -537,7 +573,7 @@ def get_model_csv_path(out_dir, model_name):
     return out_dir / f'{model_name}.csv'
 
 
-def config_matches(row, n_splits, shuffle_mode, context_label, config, model_name=None, do_detrend=False):
+def config_matches(row, n_splits, shuffle_mode, context_label, config, cv_mode, model_name=None, do_detrend=False):
 
     if row.get('n_splits') != n_splits:
         return False
@@ -546,7 +582,7 @@ def config_matches(row, n_splits, shuffle_mode, context_label, config, model_nam
     if row.get('context') != context_label:
         return False
 
-    if row.get('cv_mode') != config.cv_mode:
+    if row.get('cv_mode') != cv_mode:
         return False
     if row.get('buffer_samples') != config.buffer_samples:
         return False
@@ -556,7 +592,7 @@ def config_matches(row, n_splits, shuffle_mode, context_label, config, model_nam
 
     mode = row.get('mode')
     use_per_block = (
-        getattr(config, 'detrend_per_block', True) or getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+        getattr(config, 'detrend_per_block', True) or cv_mode in BLOCK_CV_MODES
     ) if do_detrend else False
     expected_model_name = get_model_name(mode, config, do_detrend=do_detrend, use_per_block=use_per_block)
     row_model_name = _normalize_detrend_model_name(row.get('model_name'))
@@ -566,9 +602,9 @@ def config_matches(row, n_splits, shuffle_mode, context_label, config, model_nam
 # ============================================================
 
 
-def serialize_decoding_config(config):
+def serialize_decoding_config(config, cv_mode):
     return dict(
-        cv_mode=config.cv_mode,
+        cv_mode=cv_mode,
         buffer_samples=config.buffer_samples,
         use_early_stopping=config.use_early_stopping,
         detrend_degree=getattr(config, 'detrend_degree', 1),
@@ -609,6 +645,7 @@ def _load_existing_results(
     verbosity,
     model_name=None,
     do_detrend=False,
+    cv_mode=None,
 ):
     """
     Load existing results matching current configuration from pickle files.
@@ -630,6 +667,14 @@ def _load_existing_results(
         print(f'Checking for existing results in {len(pkl_paths)} pickle file(s) under {out_dir}')
 
     for p in pkl_paths:
+        # Fast pre-filter: if cv_mode is encoded in the filename and doesn't match, skip
+        stem = p.stem
+        stem_cv_mode = next((c for c in CV_MODE_CANDIDATES if c in stem), None)
+        if stem_cv_mode is not None and stem_cv_mode != cv_mode:
+            if verbosity >= 2:
+                print(f'Skipping {p.name}: cv_mode {stem_cv_mode!r} != {cv_mode!r}')
+            continue
+
         try:
             with p.open('rb') as f:
                 loaded = pickle.load(f)
@@ -643,13 +688,26 @@ def _load_existing_results(
                 print(f'No results_df key in {p.name}, skipping')
             continue
 
+        # Confirm cv_mode from _cv_config (authoritative) after loading
+        pkl_cv_mode = loaded.get('_cv_config', {}).get('cv_mode')
+        if pkl_cv_mode is not None and pkl_cv_mode != cv_mode:
+            if verbosity >= 2:
+                print(f'Skipping {p.name}: _cv_config cv_mode {pkl_cv_mode!r} != {cv_mode!r}')
+            continue
+
         df = loaded['results_df']
         if not (isinstance(df, pd.DataFrame) and len(df) > 0):
             continue
 
+        if 'cv_mode' not in df.columns:
+            inferred_cv_mode = pkl_cv_mode or stem_cv_mode
+            if inferred_cv_mode is not None:
+                df = df.copy()
+                df['cv_mode'] = inferred_cv_mode
+
         for _, row in df.iterrows():
             row_dict = row.to_dict()
-            if config_matches(row_dict, n_splits, shuffle_mode, context_label, config, model_name, do_detrend=do_detrend):
+            if config_matches(row_dict, n_splits, shuffle_mode, context_label, config, cv_mode, model_name, do_detrend=do_detrend):
                 key = (row_dict['behav_feature'], _normalize_detrend_model_name(row_dict.get('model_name', '')))
                 existing_lookup[key] = row_dict
 
@@ -736,6 +794,7 @@ def load_consolidated_results(
     filename='all_models_results.csv',
     use_detrend_inside_cv=None,
     detrend_per_block=None,
+    cv_mode=None,
 ):
     """
     Load the consolidated results CSV file.
@@ -752,6 +811,8 @@ def load_consolidated_results(
     detrend_per_block : bool, optional
         When use_detrend_inside_cv=True: if True, keep only per-block detrended; if False,
         keep only global detrended; if None, keep both. Ignored when use_detrend_inside_cv is False.
+    cv_mode : str, optional
+        If provided, keep only rows whose 'cv_mode' matches this value. If None, keep all.
 
     Returns
     -------
@@ -766,15 +827,28 @@ def load_consolidated_results(
             out_dir, filename,
             use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
+            cv_mode=cv_mode,
         )
-        return consolidated_df
+        df = consolidated_df
     else:
         df = pd.read_csv(csv_path)
+        if 'cv_mode' not in df.columns:
+            # CSV predates cv_mode column — re-consolidate from pkls to recover it
+            df = consolidate_results_across_models(
+                out_dir, filename,
+                use_detrend_inside_cv=use_detrend_inside_cv,
+                detrend_per_block=detrend_per_block,
+                cv_mode=cv_mode,
+            )
         if use_detrend_inside_cv is not None and 'use_detrend_inside_cv' in df.columns:
             df = df[df['use_detrend_inside_cv'] == use_detrend_inside_cv].reset_index(drop=True)
         if use_detrend_inside_cv and detrend_per_block is not None and 'detrend_per_block' in df.columns:
             df = df[df['detrend_per_block'] == detrend_per_block].reset_index(drop=True)
-        return df
+
+    if cv_mode is not None and 'cv_mode' in df.columns:
+        df = df[df['cv_mode'] == cv_mode].reset_index(drop=True)
+
+    return df
 
 
 def consolidate_results_across_models(
@@ -785,6 +859,7 @@ def consolidate_results_across_models(
     save_output=False,
     use_detrend_inside_cv=None,
     detrend_per_block=None,
+    cv_mode=None,
 ):
     """
     Consolidate results by scanning for pickled model result files (*.pkl)
@@ -812,6 +887,9 @@ def consolidate_results_across_models(
         When use_detrend_inside_cv=True: if True, only *_detrend_perblock*.pkl; if False,
         only *_detrend*.pkl (global, not per block); if None, both. Ignored when
         use_detrend_inside_cv is False.
+    cv_mode : str, optional
+        If provided, only include pkls whose cv_mode matches this value (checked via
+        filename stem first, then _cv_config after loading). If None, include all.
 
     Returns
     -------
@@ -828,7 +906,7 @@ def consolidate_results_across_models(
     pkl_paths = list(out_dir.rglob('*.pkl'))
 
     if verbosity > 0:
-        print(f'Found {len(pkl_paths)} pkl files under {out_dir}')
+        print(f'Found {len(pkl_paths)} pkl files under {out_dir}: {pkl_paths}')
 
     all_dfs = []
 
@@ -845,6 +923,14 @@ def consolidate_results_across_models(
             if detrend_per_block is False and '_detrend_perblock' in stem:
                 continue
 
+        # Fast cv_mode pre-filter from filename (no I/O)
+        if cv_mode is not None:
+            stem_cv_mode = next((c for c in CV_MODE_CANDIDATES if c in stem), None)
+            if stem_cv_mode is not None and stem_cv_mode != cv_mode:
+                if verbosity > 1:
+                    print(f'Skipping {p.name}: cv_mode {stem_cv_mode!r} != {cv_mode!r}')
+                continue
+
         try:
             with p.open('rb') as f:
                 loaded = pickle.load(f)
@@ -859,8 +945,18 @@ def consolidate_results_across_models(
             df = loaded['results_df']
             try:
                 if isinstance(df, pd.DataFrame) and len(df) > 0:
-                    # Infer use_detrend_inside_cv and detrend_per_block from _cv_config or filename
                     cv_config = loaded.get('_cv_config', {})
+
+                    # Confirm cv_mode from _cv_config after loading
+                    pkl_cv_mode = cv_config.get('cv_mode')
+                    if pkl_cv_mode is None:
+                        pkl_cv_mode = next((c for c in CV_MODE_CANDIDATES if c in stem), None)
+                    if cv_mode is not None and pkl_cv_mode is not None and pkl_cv_mode != cv_mode:
+                        if verbosity > 1:
+                            print(f'Skipping {p.name}: _cv_config cv_mode {pkl_cv_mode!r} != {cv_mode!r}')
+                        continue
+
+                    # Infer use_detrend_inside_cv and detrend_per_block from _cv_config or filename
                     pkl_use_detrend = cv_config.get('use_detrend_inside_cv')
                     if pkl_use_detrend is None:
                         pkl_use_detrend = '_detrend' in stem
@@ -876,6 +972,8 @@ def consolidate_results_across_models(
                     df['detrend_per_block'] = pkl_detrend_per_block
                     if 'detrend_degree' not in df.columns:
                         df['detrend_degree'] = cv_config.get('detrend_degree', 1 if pkl_use_detrend else None)
+                    if 'cv_mode' not in df.columns and pkl_cv_mode is not None:
+                        df['cv_mode'] = pkl_cv_mode
                     all_dfs.append(df)
                     if verbosity > 1:
                         print(f'Loaded {len(df)} rows from {p.name}')
@@ -976,6 +1074,7 @@ def _compute_single_feature(
     rng,
     model_name=None,
     detrend_covariates=None,
+    cv_mode=None,
 ):
 
     y = y_df[feature].to_numpy().ravel()
@@ -988,7 +1087,7 @@ def _compute_single_feature(
     do_detrend = detrend_covariates is not None
     detrend_degree = getattr(config, 'detrend_degree', 1) if do_detrend else None
     use_per_block = (
-        getattr(config, 'detrend_per_block', True) or getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+        getattr(config, 'detrend_per_block', True) or cv_mode in BLOCK_CV_MODES
     ) if do_detrend else False
     if model_name is None:
         model_name = get_model_name(mode, config, do_detrend=do_detrend, use_per_block=use_per_block)
@@ -997,7 +1096,7 @@ def _compute_single_feature(
         len(X_ok),
         n_splits=n_splits,
         groups=g_ok,
-        cv_splitter=config.cv_mode,
+        cv_splitter=cv_mode,
         buffer_samples=config.buffer_samples,
         random_state=0,
     )
@@ -1012,6 +1111,7 @@ def _compute_single_feature(
             rng,
             shuffle_mode=shuffle_mode,
             detrend_covariates=detrend_cov_ok,
+            cv_mode=cv_mode,
         )
     else:
         metrics = run_classification_cv(
@@ -1023,6 +1123,7 @@ def _compute_single_feature(
             groups=g_ok,
             shuffle_mode=shuffle_mode,
             detrend_covariates=detrend_cov_ok,
+            cv_mode=cv_mode,
         )
 
     row = dict(
@@ -1031,7 +1132,7 @@ def _compute_single_feature(
         model_name=model_name,
         n_splits=n_splits,
         shuffle_mode=shuffle_mode,
-        cv_mode=config.cv_mode,
+        cv_mode=cv_mode,
         buffer_samples=config.buffer_samples,
         context=context_label,
         n_samples=len(y_ok),
@@ -1053,6 +1154,7 @@ def run_regression_cv(
     # can be 'none', 'foldwise', 'groupwise', 'timeshift_fold', 'timeshift_group'
     shuffle_mode='none',
     detrend_covariates=None,
+    cv_mode=None,
 ):
 
     y_pred = np.full_like(y, np.nan, float)
@@ -1069,7 +1171,7 @@ def run_regression_cv(
     if do_detrend:
         T_full = _build_detrend_design_matrix(detrend_covariates, degree=detrend_degree)
         use_per_block = getattr(config, 'detrend_per_block', True) or (
-            getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+            cv_mode in BLOCK_CV_MODES
         )
         block_ids = _infer_block_ids_from_splits(len(y), splits) if use_per_block else None
 
@@ -1165,6 +1267,7 @@ def run_classification_cv(
     groups=None,
     shuffle_mode='none',
     detrend_covariates=None,
+    cv_mode=None,
 ):
 
     aucs, pr_aucs = [], []
@@ -1182,7 +1285,7 @@ def run_classification_cv(
     if do_detrend:
         T_full = _build_detrend_design_matrix(detrend_covariates, degree=detrend_degree)
         use_per_block = getattr(config, 'detrend_per_block', True) or (
-            getattr(config, 'cv_mode', None) in BLOCK_CV_MODES
+            cv_mode in BLOCK_CV_MODES
         )
         block_ids = _infer_block_ids_from_splits(len(y), splits) if use_per_block else None
 

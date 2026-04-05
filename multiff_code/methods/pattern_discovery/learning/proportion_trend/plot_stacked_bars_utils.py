@@ -181,7 +181,7 @@ def plot_outcomes_by_phase_side_by_side(combd_pattern_frequencies,
         return fig, axes
 
 
-def prepare_for_stacked_bar_no_phase(df_monkey, category_order):
+def prepare_for_stacked_bar_no_phase(df_monkey, category_order, *, use_simple_average: bool = False):
     df_monkey_sub = df_monkey[df_monkey['new_label'].isin(category_order)].copy()
 
     # aggregate over items (or any existing grouping that yields frequency + denom_count)
@@ -194,15 +194,23 @@ def prepare_for_stacked_bar_no_phase(df_monkey, category_order):
     agg['denom_count'] = agg['denom_count'].astype(int)
     agg['ratio'] = agg['frequency'] / agg['denom_count']
 
-    # now get one ratio per label = sum(freq) / sum(denom)
-    M = (
-        agg.groupby('new_label')[['frequency', 'denom_count']]
-        .sum()
-        .assign(ratio=lambda x: x['frequency'] / x['denom_count'])
-    )
+    if use_simple_average:
+        # simple (unweighted) mean of per-item ratios within each label
+        series = (
+            agg.groupby('new_label')['rate']
+            .mean()
+        )
+    else:
+        # aggregate: sum(freq) / sum(denom) within each label (existing behavior)
+        M = (
+            agg.groupby('new_label')[['frequency', 'denom_count']]
+            .sum()
+            .assign(ratio=lambda x: x['frequency'] / x['denom_count'])
+        )
+        series = M['ratio']
 
     # reorder into row vector
-    M = M['ratio'].reindex(category_order).fillna(0.0).to_frame().T
+    M = series.reindex(category_order).fillna(0.0).to_frame().T
     M.index = ['single']   # only one bar
     return M
 
@@ -224,7 +232,7 @@ def apply_label_mapping(df, label_mapping, item_col='item', new_col='new_label')
 
     return out_df
 
-def plot_stacked_bar_all_ids(df, config, id_col='monkey'):
+def plot_stacked_bar_all_ids(df, config, id_col='monkey', use_simple_average: bool = False):
 
     # unpack config
     category_order = config['category_order']
@@ -250,7 +258,7 @@ def plot_stacked_bar_all_ids(df, config, id_col='monkey'):
     fig, ax = plt.subplots(figsize=(1.4*n + 2, 4.2), dpi=300)
 
     matrices = {i: prepare_for_stacked_bar_no_phase(
-        df[df[id_col] == i], category_order
+        df[df[id_col] == i], category_order, use_simple_average=use_simple_average
     ) for i in ids}
 
     x_positions = np.arange(n)

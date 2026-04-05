@@ -16,7 +16,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 )
 
 
-DEFAULT_VAR_CATEGORIES = {
+DEFAULT_ENCODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w"],
     "latent_vars": ["r_targ", "theta_targ"],
     "position_vars": ["d", "phi"],
@@ -52,7 +52,7 @@ class OneFFGAMRunner:
         output_root: str = "all_monkey_data/one_ff_data/my_gam_results",
     ):
         self.session_num = session_num
-        self.var_categories = var_categories or DEFAULT_VAR_CATEGORIES
+        self.var_categories = var_categories or DEFAULT_ENCODING_VAR_CATEGORIES
         self.selected_categories = selected_categories
         self.selected_vars = selected_vars
         self.output_root = Path(output_root)
@@ -67,7 +67,7 @@ class OneFFGAMRunner:
         self.unit_idx: Optional[int] = None
         self.design_df = None
         self.y = None
-        self.groups = None
+        self.gam_groups = None
         self.structured_meta_groups = None
         self.data_obj = None
         self.outdir: Optional[Path] = None
@@ -171,7 +171,7 @@ class OneFFGAMRunner:
         self.unit_idx = unit_idx
         self.design_df = design_df
         self.y = y
-        self.groups = groups
+        self.gam_groups = groups
         self.structured_meta_groups = structured_meta_groups
         self.data_obj = data_obj
         self.outdir = None
@@ -343,7 +343,7 @@ class OneFFGAMRunner:
         fit_res = one_ff_gam_fit.fit_poisson_gam(
             design_df=self.design_df,
             y=self.y,
-            groups=self.groups,
+            groups=self.gam_groups,
             l1_groups=[],
             tol=1e-6,
             verbose=True,
@@ -354,7 +354,7 @@ class OneFFGAMRunner:
         cv_res = self._run_crossval(
             design_df=self.design_df,
             y=self.y,
-            groups=self.groups,
+            groups=self.gam_groups,
             save_path=cv_save_path,
             n_folds=n_folds,
             buffer_samples=buffer_samples,
@@ -468,7 +468,7 @@ class OneFFGAMRunner:
         full_cv, category_contrib = self._compute_category_variance_contributions(
             design_df=self.design_df,
             y=self.y,
-            groups=self.groups,
+            groups=self.gam_groups,
             outdir=outdir,
             n_folds=n_folds,
             buffer_samples=buffer_samples,
@@ -605,7 +605,7 @@ class OneFFGAMRunner:
         kept, history = backward_elimination.backward_elimination_gam(
             design_df=self.design_df,
             y=self.y,
-            groups=self.groups,
+            groups=self.gam_groups,
             alpha=alpha,
             n_folds=n_folds,
             verbose=True,
@@ -675,7 +675,7 @@ class OneFFGAMRunner:
         best_lams, cv_results = penalty_tuning.tune_penalties(
             design_df=self.design_df,
             y=self.y,
-            base_groups=self.groups,
+            base_groups=self.gam_groups,
             l1_groups=[],
             lam_grid=lam_grid,
             group_name_map=group_name_map,

@@ -63,7 +63,7 @@ def build_stop_encoding_design(
         monkey_information=pn.monkey_information,
         bin_dt=bin_width,
         global_bins_2d=global_bins_2d,
-        agg_cols=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS,
+        agg_cols=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS,
         verbose=False,
     )
 
@@ -82,7 +82,7 @@ def build_stop_encoding_design(
     # ==============================================================
     # 5) Continuous tuning block
     # ==============================================================
-    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
+    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS
     raw_feature_cols_to_drop.remove('time')
     binned_feats, tuning_meta, _ = (
         encoding_design_utils.add_tuning_features_to_design(
@@ -255,6 +255,7 @@ def build_stop_encoding_design(
         temporal_meta,
         tuning_meta,
     )
+
 
 def add_ff_visible_and_in_memory_counts(
     binned_feats: pd.DataFrame,

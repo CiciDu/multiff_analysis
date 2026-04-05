@@ -15,6 +15,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_utils
 
 class OneFFStyleDecodingRunner:
 
@@ -175,7 +176,7 @@ class OneFFStyleDecodingRunner:
         x_task = y_df[varnames].to_numpy(dtype=float)
         y_neural = self._get_neural_matrix()
 
-        out = decode_stops_utils.compute_canoncorr_block(
+        out = one_ff_style_utils.compute_canoncorr_block(
             x_task=x_task,
             y_neural=y_neural,
             dt=float(self.bin_width),
@@ -196,7 +197,7 @@ class OneFFStyleDecodingRunner:
         fixed_width: int = 25,
         n_splits: int = 5,
         inner_cv_splits: int = 5,
-        cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
+        cv_mode: str = "blocked_time_buffered",  # 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold'
         buffer_samples: int = 20,
         save_path: Optional[str] = None,
         load_if_exists: bool = True,
@@ -234,7 +235,7 @@ class OneFFStyleDecodingRunner:
         neural = self._get_neural_matrix()
         groups = self._get_groups()
         groups = np.asarray(groups)
-        _, lengths = decode_stops_utils.build_group_lengths(groups)
+        _, lengths = one_ff_style_utils.build_group_lengths(groups)
 
         out: Dict = {}
         for v in varnames:
@@ -265,9 +266,9 @@ class OneFFStyleDecodingRunner:
                     train_idx = np.asarray(train_idx, dtype=int)
                     test_idx = np.asarray(test_idx, dtype=int)
 
-                    _, lengths_train = decode_stops_utils.build_group_lengths(groups[train_idx])
+                    _, lengths_train = one_ff_style_utils.build_group_lengths(groups[train_idx])
 
-                    best = decode_stops_utils.tune_linear_decoder_cv(
+                    best = one_ff_style_utils.tune_linear_decoder_cv(
                         y_neural=neural[train_idx],
                         x_true=x_true[train_idx],
                         lengths=lengths_train,
@@ -285,8 +286,8 @@ class OneFFStyleDecodingRunner:
                     wts_per_fold.append(wts)
 
                     # Smooth and fit on full training set (weights from `best` were fit on training subset)
-                    X_tr = decode_stops_utils.smooth_signal(neural[train_idx], int(best_width))
-                    X_te = decode_stops_utils.smooth_signal(neural[test_idx], int(best_width))
+                    X_tr = smooth_neural_data.smooth_signal(neural[train_idx], int(best_width))
+                    X_te = smooth_neural_data.smooth_signal(neural[test_idx], int(best_width))
 
                     # Fit linear weights on training set (fallback to best['wts'] if numerical issues)
                     try:
@@ -305,21 +306,21 @@ class OneFFStyleDecodingRunner:
                     "bestfiltwidth": rep_width,
                     "candidate_widths": widths_used,
                     "wts": wts_per_fold,
-                    "corr": decode_stops_utils.safe_corr(x_true, pred),
+                    "corr": one_ff_style_utils.safe_corr(x_true, pred),
                 }
                 if save_predictions:
                     entry["true"] = x_true
                     entry["pred"] = pred
                     entry["trials"] = {
-                        "true": decode_stops_utils.split_by_lengths(x_true, lengths),
-                        "pred": decode_stops_utils.split_by_lengths(pred, lengths),
+                        "true": one_ff_style_utils.split_by_lengths(x_true, lengths),
+                        "pred": one_ff_style_utils.split_by_lengths(pred, lengths),
                     }
                 entry["fold_tuning_info"] = fold_tuning_info
 
                 out[v] = entry
                 continue
             else:
-                best = decode_stops_utils.fit_linear_decoder_cv(
+                best = one_ff_style_utils.fit_linear_decoder_cv(
                     y_neural=neural,
                     x_true=x_true,
                     lengths=lengths,
@@ -337,14 +338,14 @@ class OneFFStyleDecodingRunner:
                 "bestfiltwidth": int(best["width"]),
                 "candidate_widths": widths_used,
                 "wts": best["wts"],
-                "corr": decode_stops_utils.safe_corr(x_true, pred),
+                "corr": one_ff_style_utils.safe_corr(x_true, pred),
             }
             if save_predictions:
                 entry["true"] = x_true
                 entry["pred"] = pred
                 entry["trials"] = {
-                    "true": decode_stops_utils.split_by_lengths(x_true, lengths),
-                    "pred": decode_stops_utils.split_by_lengths(pred, lengths),
+                    "true": one_ff_style_utils.split_by_lengths(x_true, lengths),
+                    "pred": one_ff_style_utils.split_by_lengths(pred, lengths),
                 }
             out[v] = entry
 

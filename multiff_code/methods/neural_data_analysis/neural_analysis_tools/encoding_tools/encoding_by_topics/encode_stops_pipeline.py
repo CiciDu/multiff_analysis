@@ -23,12 +23,18 @@ class StopEncodingRunner(BaseEncodingRunner):
         raw_data_folder_path,
         bin_width=0.04,
         encoder_prs=None,
+        cv_mode: str | None = None,
+        **kwargs,
     ):
-        super().__init__(raw_data_folder_path,
-                         bin_width=bin_width,
-                         encoder_prs=encoder_prs)
+        super().__init__(
+            raw_data_folder_path,
+            bin_width=bin_width,
+            encoder_prs=encoder_prs,
+            cv_mode=cv_mode,
+            **kwargs,
+        )
 
-        self.var_categories = encoder_gam_helper.STOP_VAR_CATEGORIES
+        self.var_categories = encoder_gam_helper.STOP_ENCODING_VAR_CATEGORIES
         
         print('var_categories:')
         for k, v in self.var_categories.items():
@@ -50,7 +56,7 @@ class StopEncodingRunner(BaseEncodingRunner):
             print('[StopEncodingRunner] Using cached design matrices')
             return
         self.pn, datasets, new_seg_info, events_with_stats = (
-            decode_stops_design._prepare_stop_design_inputs(
+            decode_stops_design.prepare_stop_design_inputs(
                 self.raw_data_folder_path,
                 self.bin_width,
             )

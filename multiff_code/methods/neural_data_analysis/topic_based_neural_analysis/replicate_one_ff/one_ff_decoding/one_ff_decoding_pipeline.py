@@ -17,7 +17,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
     population_analysis_utils,
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
-
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_utils
 
 DEFAULT_CANONCORR_VARS = ["v", "w", "d", "phi", "r_targ", "theta_targ"]
 DEFAULT_READOUT_VARS = ["v", "w", "d", "phi", "r_targ", "theta_targ"]
@@ -439,7 +439,7 @@ class OneFFDecodingRunner:
                 x_true = population_analysis_utils.smooth_signal(x_true, max(filtwidth_default, 1))
 
             if fit_kernel and candidate_widths is not None:
-                best = decode_stops_utils.tune_linear_decoder_cv(
+                best = one_ff_style_utils.tune_linear_decoder_cv(
                     y_neural=y_raw,
                     x_true=x_true,
                     lengths=bundle.trial_lengths,
@@ -449,7 +449,7 @@ class OneFFDecodingRunner:
                     buffer_samples=buffer_samples,
                 )
             else:
-                best = decode_stops_utils.fit_linear_decoder_cv(
+                best = one_ff_style_utils.fit_linear_decoder_cv(
                     y_neural=y_raw,
                     x_true=x_true,
                     lengths=bundle.trial_lengths,
@@ -479,7 +479,7 @@ class OneFFDecodingRunner:
             results[var] = {
                 "bestfiltwidth": int(best_width),
                 "wts": best_wts,
-                "corr": decode_stops_utils.safe_corr(x_true, best_pred),
+                "corr": one_ff_style_utils.safe_corr(x_true, best_pred),
                 "trials": {
                     "true": true_trials,
                     "pred": pred_trials,

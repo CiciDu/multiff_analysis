@@ -46,13 +46,15 @@ PLANNING_TO_ONE_FF_RENAME: Dict[str, str] = {
 
 # One_ff_gam tuning covariates (one_ff_gam_design finalize_one_ff_gam_design)
 # Only columns present in monkey_information are aggregated and added.
-ONE_FF_STYLE_EXTRA_COLS = [
+ONE_FF_STYLE_ENCODING_COLS = [
     'v', 'w', 'd', 'phi',
     'r_targ', 'theta_targ',
     'eye_ver', 'eye_hor',
     # though they are not in one_ff_gam, we add them to the design
     'accel', 'ang_accel',
-    'time', # though this is not in one_ff_gam, it might be useful for multiff
+    # though the following are not in one_ff_gam, they might be useful for multiff
+    'time', 
+    'eye_world_speed',
 ]
 
 
@@ -87,6 +89,7 @@ _REQUIRED_ALIAS_MAP = {
 _OPTIONAL_ALIAS_MAP = {
     'r_targ': ['target_distance'],
     'theta_targ': ['target_angle'],
+    'stop': ['whether_new_distinct_stop'],
 }
 
 
@@ -102,6 +105,7 @@ def bin_event_windows_core(
     bin_dt: float,
     global_bins_2d: Optional[np.ndarray] = None,
     agg_cols: Optional[List[str]] = None,
+    tile_window: bool = False,
     verbose: bool = False,
 ) -> Tuple[
     np.ndarray,          # bins_2d
@@ -120,13 +124,15 @@ def bin_event_windows_core(
     and stop encoding designs (in `encode_stops_utils.py`).
     Spike binning is done separately via bin_spikes_for_event_windows().
     """
-    agg_cols = ONE_FF_STYLE_EXTRA_COLS if agg_cols is None else agg_cols
+    agg_cols = ONE_FF_STYLE_ENCODING_COLS if agg_cols is None else agg_cols
 
+    # bins_2d contains the start/end times of each bin for each event window; meta contains info about each bin 
     bins_2d, meta = event_binning.event_windows_to_bins2d(
         new_seg_info,
         bin_dt=bin_dt,
         only_ok=False,
         global_bins_2d=global_bins_2d,
+        tile_window=tile_window,
     )
 
     binned_feats, exposure, used_bins, mask_used, pos = (
@@ -474,6 +480,10 @@ def rename_monkey_information_columns(
             out['v'] = out['speed'].to_numpy()
         if 'w' not in out.columns and 'ang_speed' in out.columns:
             out['w'] = out['ang_speed'].to_numpy()
+            
+    # also rename stop and capture
+    if 'stop' not in out.columns and 'whether_new_distinct_stop' in out.columns:
+        out['stop'] = out['whether_new_distinct_stop'].to_numpy()
 
     renames: Dict[str, str] = {}
     if rename_planning_to_one_ff:
@@ -1001,6 +1011,7 @@ def bin_monkey_information_feats_from_event_bins(
     kinematic_cols: Optional[List[str]] = None,
     agg_cols: Optional[List[str]] = None,
     use_one_ff_rename: bool = True,
+    ff_caught_T_new: Optional[np.ndarray] = None,
 ) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Bin (aggregate) selected columns from `monkey_information` into `bins_2d`.
@@ -1081,7 +1092,86 @@ def bin_monkey_information_feats_from_event_bins(
 
     binned_feats = binned_feats.iloc[mask_used].reset_index(drop=True)
 
+    has_stop = 'stop' in binned_feats.columns
+    has_capture = 'capture' in binned_feats.columns
+    if (has_stop or has_capture) and len(binned_feats) > 0:
+        p = np.asarray(pos, dtype=int)
+        t_mid = 0.5 * (bins_2d[p, 0] + bins_2d[p, 1])
+        bin_time_df_for_events = pd.DataFrame({'time': t_mid})
+    else:
+        bin_time_df_for_events = None
+
+    if has_stop:
+        binned_feats.drop(columns=['stop'], inplace=True)
+        stop_mask = _event_indicator_rows_mask(monkey_information['stop'])
+        stop_times = monkey_information.loc[stop_mask, 'time'].to_numpy(dtype=float)
+        if bin_time_df_for_events is None:
+            binned_feats['stop'] = np.zeros(len(binned_feats), dtype=float)
+        else:
+            binned_feats['stop'] = make_event_dummy(
+                bin_time_df_for_events, stop_times
+            ).astype(float).to_numpy()
+
+    if has_capture:
+        binned_feats.drop(columns=['capture'], inplace=True)
+        cap_mask = _event_indicator_rows_mask(monkey_information['capture'])
+        capture_times = monkey_information.loc[cap_mask, 'time'].to_numpy(dtype=float)
+        if bin_time_df_for_events is None:
+            binned_feats['capture'] = np.zeros(len(binned_feats), dtype=float)
+        else:
+            binned_feats['capture'] = make_event_dummy(
+                bin_time_df_for_events, capture_times
+            ).astype(float).to_numpy()
+
     return binned_feats, exposure, used_bins, mask_used, pos
+
+
+def _event_indicator_rows_mask(series: pd.Series) -> np.ndarray:
+    """True where `series` marks an event (boolean True or non-zero numeric)."""
+    if pd.api.types.is_bool_dtype(series):
+        return series.fillna(False).to_numpy(dtype=bool)
+    num = pd.to_numeric(series, errors='coerce').fillna(0.0).to_numpy(dtype=float)
+    return num != 0.0
+
+
+def make_event_dummy(df, event_times, time_col='time', convert_to_int: bool = True):
+    """
+    Returns a boolean Series marking nearest df rows to each event time.
+
+    df: DataFrame with time column
+    event_times: array-like of event times
+    time_col: name of time column in df
+
+    Returns:
+        pd.Series (bool) aligned with df.index
+    """
+    time_array = df[time_col].to_numpy()
+
+    # clean + sort event times
+    event_times = pd.Series(event_times).dropna().sort_values().to_numpy()
+
+    dummy = np.zeros(len(df), dtype=bool)
+
+    # find insertion points
+    idx = np.searchsorted(time_array, event_times)
+    idx = np.clip(idx, 1, len(time_array) - 1)
+
+    left = idx - 1
+    right = idx
+
+    # choose closest index
+    nearest_idx = np.where(
+        np.abs(time_array[left] - event_times) <= np.abs(time_array[right] - event_times),
+        left,
+        right
+    )
+
+    dummy[nearest_idx] = True
+    
+    if convert_to_int:
+        dummy = dummy.astype(int)
+
+    return pd.Series(dummy, index=df.index)
 
 
 def merge_meta_vals(a: Any, b: Any) -> Any:

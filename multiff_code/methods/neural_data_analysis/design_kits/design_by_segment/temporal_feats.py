@@ -226,12 +226,12 @@ def add_stop_and_capture_columns(data: pd.DataFrame, trial_ids: Optional[np.ndar
         )
 
     # ---------- builder: events + raw states (passthrough) ----------
-    if 'capture_ff' not in data.columns:
+    if 'capture' not in data.columns:
         if ff_caught_T_new is not None:
             data = prep_target_data.add_capture_target(data, ff_caught_T_new)
         else:
             raise ValueError(
-                'ff_caught_T_new is required to add capture_ff column')
+                'ff_caught_T_new is required to add capture column')
 
     return data
 
@@ -374,8 +374,6 @@ def add_event_predictors(
     return specs, meta
 
 
-import numpy as np
-from scipy import signal
 
 
 def _shift_non_circular(arr: np.ndarray, shift: int) -> np.ndarray:

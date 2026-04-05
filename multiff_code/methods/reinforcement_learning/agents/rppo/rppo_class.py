@@ -20,7 +20,7 @@ class RPPOforMultifirefly(rl_base_class._RLforMultifirefly):
     """
 
     def __init__(self,
-                 overall_folder='multiff_analysis/RL_models/rppo_stored_models/all_agents/agents_without_noise/',
+                 overall_folder='RL_models/rppo_stored_models/all_agents/agents_without_noise/',
                  add_date_to_model_folder_name=False,
                  dict_obs=True,
                  n_envs=1,

@@ -67,7 +67,7 @@ def build_pn_encoding_design(
 
 
     kinematic_cols = []
-    agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
+    agg_cols = encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS
     # -------------------------------------------------------------------------
 
     # ------ add boxcar covariates
@@ -92,7 +92,7 @@ def build_pn_encoding_design(
                 print(f'Missing required variable "{var}" in binned features. Will skip it.')
 
     rebinned_y_var['time'] = binned_feats['time'].values # pass in as raw feature later
-    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS + (linear_vars or []) + (angular_vars or [])
+    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS + (linear_vars or []) + (angular_vars or [])
     print('raw_feature_cols_to_drop:', raw_feature_cols_to_drop)
 
     binned_feats, tuning_meta, mode = encoding_design_utils.add_tuning_features_to_design(
@@ -146,6 +146,9 @@ def build_pn_encoding_design(
             'time',  # kept as raw, not splines
             'num_ff_visible', 'log1p_num_ff_visible',
             'num_ff_in_memory', 'log1p_num_ff_in_memory',
+             'cum_distance_since_target_last_seen', 
+             'time_since_last_capture',
+             'gaze_mky_view_y', 'gaze_mky_view_x', 'cur_eye_ver_l',
         ]
     for k in raw_features:
         if k not in rebinned_y_var.columns:

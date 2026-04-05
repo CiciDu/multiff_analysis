@@ -45,7 +45,7 @@ def get_pn_design_base(
         specs,
         meta0,
         data,
-        events_to_include=[],  # ['stop', 'capture_ff'],
+        events_to_include=[],  # ['stop', 'capture'],
         basis_family_event='rc',
         n_basis_event=6,
     )
@@ -208,7 +208,7 @@ def add_state_and_spatial_features(
 def make_bin_df_for_pn(rebinned_x_var, bin_edges):
     bin_df = (
         rebinned_x_var
-        [['new_segment', 'new_bin']]
+        [['new_segment', 'bin_in_new_seg']]
     ).copy()
 
     bin_df['bin_left'] = bin_edges[:, 0]
@@ -216,7 +216,7 @@ def make_bin_df_for_pn(rebinned_x_var, bin_edges):
 
     bin_df = (
         bin_df.drop_duplicates()
-        .sort_values(['new_segment', 'new_bin'])
+        .sort_values(['new_segment', 'bin_in_new_seg'])
         .reset_index(drop=True)
     )
 

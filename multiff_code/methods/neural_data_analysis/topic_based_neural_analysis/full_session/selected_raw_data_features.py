@@ -44,7 +44,7 @@ derived_motion = [
 ff_visibility = [
     'num_ff_visible', 'log1p_num_ff_visible',
     'num_ff_in_memory', 'log1p_num_ff_in_memory',
-    'capture_ff'
+    'capture'
 ]
 
 

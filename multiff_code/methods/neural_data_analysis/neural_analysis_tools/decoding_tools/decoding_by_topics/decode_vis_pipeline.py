@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import List
 
@@ -25,8 +24,6 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers.decoding_design_utils import (
     VIS_DECODING_VAR_CATEGORIES,
 )
-
-
 class FFVisDecodingRunner(BaseDecodingRunner):
     """
     FF visibility decoding runner. CV model-spec decoding via run(); one-FF style
@@ -112,6 +109,8 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             self.pn.bin_width,
         )
 
+        self.get_processed_spike_rates()
+        
         (
             rebinned_spike_rates,
             binned_feats,
@@ -121,13 +120,14 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             new_seg_info,
             events_with_stats,
             self.pn.monkey_information,
-            self.pn.spikes_df,
             self.pn.ff_dataframe,
+            self.pn.spikes_df,
+            processed_spike_rates=self.processed_spike_rates,
             datasets=self.datasets,
             bin_dt=self.pn.bin_width,
             add_ff_visible_info=True,
             add_retries_info=False,
-            detrend_spikes=self.detrend_spikes,
+            drop_bad_neurons=self.drop_bad_neurons,
         )
 
         if 'global_burst_id' not in meta_df_used.columns:
@@ -152,12 +152,8 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         return rebinned_spike_rates, feats_to_decode, meta_df_used
 
     def _get_save_dir(self):
-        sub = "detrended" if self.detrend_spikes else "raw"
-        return os.path.join(
-            self.pn.planning_and_neural_folder_path,
-            "decoding_outputs/vis_decoder_outputs",
-            sub,
-        )
+        return self._get_save_dir_common("vis_decoder_outputs")
+
 
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())

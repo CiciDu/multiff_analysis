@@ -25,7 +25,7 @@ def _pad_bin_table_for_history(
     Parameters
     ----------
     bin_df : DataFrame
-        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right']
+        Must contain ['new_segment', 'bin_in_new_seg', 'bin_left', 'bin_right']
     """
 
     bin_dt = _assert_dt_matches_bins(bin_df, dt)
@@ -37,7 +37,7 @@ def _pad_bin_table_for_history(
     pad_blocks = []
 
     for seg_id, g in bin_df.groupby('new_segment'):
-        g = g.sort_values('new_bin')
+        g = g.sort_values('bin_in_new_seg')
 
         first = g.iloc[0]
         left0 = float(first['bin_left'])
@@ -47,7 +47,7 @@ def _pad_bin_table_for_history(
 
         pad = pd.DataFrame({
             'new_segment': seg_id,
-            'new_bin': np.arange(-n_pad_bins, 0, dtype=int),
+            'bin_in_new_seg': np.arange(-n_pad_bins, 0, dtype=int),
             'bin_left': pad_lefts,
             'bin_right': pad_rights,
         })
@@ -91,7 +91,7 @@ def _rebin_spikes_from_bin_table(
     )
 
     bin_df = bin_df.sort_values(
-        ['new_segment', 'new_bin']).reset_index(drop=True)
+        ['new_segment', 'bin_in_new_seg']).reset_index(drop=True)
 
     cluster_data = {
         f'cluster_{cid}': counts[:, j]
@@ -125,7 +125,7 @@ def compute_spike_history_designs(
     spikes_df : DataFrame
         Must contain ['time', 'cluster']
     bin_df : DataFrame
-        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right']
+        Must contain ['new_segment', 'bin_in_new_seg', 'bin_left', 'bin_right']
         Produced by rebin_all_segments (local or global) with add_bin_edges=True.
     """
 
@@ -188,19 +188,19 @@ def compute_spike_history_designs(
 
         hist = pd.DataFrame(hist, columns=cols)
         hist['new_segment'] = design_pad['new_segment'].values
-        hist['new_bin'] = design_pad['new_bin'].values
+        hist['bin_in_new_seg'] = design_pad['bin_in_new_seg'].values
 
         # --------------------------------------------------
         # 5) Truncate padding
-        # Padding bins have new_bin < 0 and are removed after history construction
+        # Padding bins have bin_in_new_seg < 0 and are removed after history construction
         # --------------------------------------------------
-        keep = hist['new_bin'] >= 0
+        keep = hist['bin_in_new_seg'] >= 0
         hist = hist.loc[keep].copy()
         hist.reset_index(drop=True, inplace=True)
 
         X_hist[col] = hist
 
-    # pick one representative neuron to check that the sequence of 'new_segment', 'new_bin' is the same as the original bin_df
+    # pick one representative neuron to check that the sequence of 'new_segment', 'bin_in_new_seg' is the same as the original bin_df
     rep_col = spike_cols[0]
     rep_hist = X_hist[rep_col]
 
@@ -209,8 +209,8 @@ def compute_spike_history_designs(
         bin_df['new_segment'].values,
     )
     assert np.array_equal(
-        rep_hist['new_bin'].values,
-        bin_df['new_bin'].values,
+        rep_hist['bin_in_new_seg'].values,
+        bin_df['bin_in_new_seg'].values,
     )
 
     return X_hist, basis, colnames
@@ -280,7 +280,7 @@ def add_coupling_to_design(
     Parameters
     ----------
     design_df : DataFrame
-        Design matrix with ['new_segment', 'new_bin']
+        Design matrix with ['new_segment', 'bin_in_new_seg']
     colnames : dict
         From compute_coupling_designs, maps cluster names to column lists
     X_hist : dict
@@ -417,7 +417,7 @@ def _reduce_design_and_sync_history(
     # ------------------------------
     # 1) Split columns
     # ------------------------------
-    id_cols = [c for c in ['new_segment', 'new_bin'] if c in design_df.columns]
+    id_cols = [c for c in ['new_segment', 'bin_in_new_seg'] if c in design_df.columns]
     other_cols = [c for c in design_df.columns if c not in id_cols]
 
     numeric_cols = design_df[other_cols].select_dtypes(include=[np.number]).columns.tolist()
@@ -541,9 +541,9 @@ def build_design_with_spike_history_from_bins(
     spikes_df : DataFrame
         Must contain ['time', 'cluster'].
     bin_df : DataFrame
-        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right'].
+        Must contain ['new_segment', 'bin_in_new_seg', 'bin_left', 'bin_right'].
     X_pruned : DataFrame
-        Base design matrix with ['new_segment', 'new_bin'].
+        Base design matrix with ['new_segment', 'bin_in_new_seg'].
     meta_groups : dict
         Meta groups dict to be updated in-place.
     dt : float
@@ -558,7 +558,7 @@ def build_design_with_spike_history_from_bins(
         If True, also return X_hist for per-unit design reuse.
     reduce_design : bool
         If True, run reduce_encoding_design on the final design matrix
-        (excluding id columns like 'new_segment'/'new_bin').
+        (excluding id columns like 'new_segment'/'bin_in_new_seg').
     reduce_design_kwargs : dict, optional
         Extra kwargs forwarded to reduce_encoding_design.
     """
@@ -638,9 +638,9 @@ def build_design_with_spike_history_and_coupling_from_bins(
     spikes_df : DataFrame
         Must contain ['time', 'cluster'].
     bin_df : DataFrame
-        Must contain ['new_segment', 'new_bin', 'bin_left', 'bin_right'].
+        Must contain ['new_segment', 'bin_in_new_seg', 'bin_left', 'bin_right'].
     X_pruned : DataFrame
-        Base design matrix with ['new_segment', 'new_bin'].
+        Base design matrix with ['new_segment', 'bin_in_new_seg'].
     meta_groups : dict
         Meta groups dict to be updated in-place.
     dt : float
@@ -749,11 +749,11 @@ def make_bin_df_from_meta_df(meta_df_used):
         .copy()
         .rename(columns={
             'event_id': 'new_segment',
-            'k_within_seg': 'new_bin',
+            'k_within_seg': 'bin_in_new_seg',
             't_left': 'bin_left',
             't_right': 'bin_right',
         })
         .drop_duplicates()
-        .sort_values(['new_segment', 'new_bin'])
+        .sort_values(['new_segment', 'bin_in_new_seg'])
         .reset_index(drop=True)
     )

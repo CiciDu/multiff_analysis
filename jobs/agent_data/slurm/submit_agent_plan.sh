@@ -7,7 +7,7 @@ trap 'echo "[ERROR] Failed at line $LINENO" >&2' ERR
 # Paths
 # --------------------------------------------------
 PROJECT_ROOT='/user_data/cicid/Multifirefly-Project'
-RL_AGENT_DIR="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents"
+RL_AGENT_DIR="$PROJECT_ROOT/RL_models/sb3_stored_models/all_agents/agents_with_noise"
 
 
 JOB_DIR="$PROJECT_ROOT/multiff_analysis/jobs/agent_data"
@@ -127,7 +127,7 @@ ARRAY_RANGE="0-$((NUM_AGENTS-1))"
 echo "[INFO] Job array range: $ARRAY_RANGE"
 echo "[INFO] Max concurrent jobs: $MAX_PARALLEL"
 echo "[INFO] Each job will run: python agent_plan_script.py <AGENT_INDEX>"
-echo "[INFO] Agent indices: $(seq -s ', ' 0 $((NUM_AGENTS-1)))"
+# echo "[INFO] Agent indices: $(seq -s ', ' 0 $((NUM_AGENTS-1)))"
 
 # --------------------------------------------------
 # Submit job array

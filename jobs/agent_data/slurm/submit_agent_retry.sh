@@ -7,7 +7,7 @@ trap 'echo "[ERROR] Failed at line $LINENO" >&2' ERR
 # Paths
 # --------------------------------------------------
 PROJECT_ROOT='/user_data/cicid/Multifirefly-Project'
-RL_AGENT_DIR="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents"
+RL_AGENT_DIR="$PROJECT_ROOT/RL_models/sb3_stored_models/all_agents/agents_with_noise"
 
 
 JOB_DIR="$PROJECT_ROOT/multiff_analysis/jobs/agent_data"

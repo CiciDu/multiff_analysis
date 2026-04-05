@@ -32,7 +32,7 @@ def get_initial_full_session_design_df(
         specs,
         meta0,
         data,
-        events_to_include=['stop', 'capture_ff'],
+        events_to_include=['stop', 'capture'],
         basis_family_event='rc',
         n_basis_event=6,
     )

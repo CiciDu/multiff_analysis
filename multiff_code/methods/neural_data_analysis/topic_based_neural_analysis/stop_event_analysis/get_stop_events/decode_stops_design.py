@@ -27,9 +27,8 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
 )
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import detrend_neural_data
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import rebinned_alignment
 
-
-from neural_data_analysis.design_kits.design_by_segment import rebin_segments
 
 # =============================================================================
 # Global environment & plotting defaults
@@ -51,42 +50,15 @@ np.set_printoptions(suppress=True)
 # Stop Design Builder
 # =============================================================================
 
-
-def _align_rebinned_spike_rates_to_meta(
-    rebinned_spike_rates: pd.DataFrame,
-    meta_df_used: pd.DataFrame,
-    new_seg_for_rebin: pd.DataFrame,
-) -> pd.DataFrame:
-    """Align rebinned spike rates to meta_df_used row order; forward-fill NaN."""
-    event_id_to_new_seg = dict(
-        zip(new_seg_for_rebin['event_id'].values, new_seg_for_rebin['new_segment'].values)
-    )
-    meta_copy = meta_df_used.copy()
-    meta_copy['_new_segment'] = meta_copy['event_id'].map(event_id_to_new_seg)
-    merge_keys = meta_copy[['_new_segment', 'bin']].rename(columns={'bin': 'new_bin'})
-    rebinned_aligned = rebinned_spike_rates.merge(
-        merge_keys,
-        left_on=['new_segment', 'new_bin'],
-        right_on=['_new_segment', 'new_bin'],
-        how='right',
-    )
-    id_cols = {'new_segment', 'new_bin', '_new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration'}
-    cluster_cols = [c for c in rebinned_aligned.columns if c not in id_cols]
-    out = rebinned_aligned[cluster_cols].reset_index(drop=True)
-    if out.isna().any().any():
-        out = out.ffill().bfill()
-    return out
-
-
 def _build_stop_core(
     new_seg_info: pd.DataFrame,
     events_with_stats: pd.DataFrame,
     monkey_information: pd.DataFrame,
-    detrended_spike_rates: pd.DataFrame = None,
+    processed_spike_rates: pd.DataFrame = None,
     spikes_df: pd.DataFrame = None,
     bin_dt: float = 0.04,
     global_bins_2d: np.ndarray = None,
-    detrend_spikes: bool = True,
+    drop_bad_neurons: bool = True,
 ):
     """
     Shared core for building stop-aligned binned data structures.
@@ -98,7 +70,7 @@ def _build_stop_core(
     - Binning spikes by cluster
     - Building cluster-level features
     """
-    agg_cols = encoding_design_utils.ONE_FF_STYLE_EXTRA_COLS
+    agg_cols = encoding_design_utils.ONE_FF_STYLE_DECODING_COLS
 
     (
         bins_2d,
@@ -123,26 +95,18 @@ def _build_stop_core(
     new_seg_for_rebin = new_seg_info.copy()
     if 'new_segment' not in new_seg_for_rebin.columns:
         new_seg_for_rebin['new_segment'] = np.arange(len(new_seg_for_rebin))
+        
+    merge_keys = _prepare_merge_keys(meta_df_used, new_seg_for_rebin)
 
 
-    if detrend_spikes and (detrended_spike_rates is not None):
-        rebinned_spike_rates = rebin_segments.rebin_all_segments_global_bins(
-            detrended_spike_rates,
+    if processed_spike_rates is not None:
+        rebinned_spike_rates = rebinned_alignment.rebin_then_align_spike_rates(
+            processed_spike_rates,
             new_seg_for_rebin,
-            bins_2d=bins_2d,
-            bin_left_col='time_bin_start',
-            bin_right_col='time_bin_end',
-            bin_center_col='time_bin_center',
-            how='mean',
-            respect_old_segment=False,
-            require_full_bin=False,
-            add_bin_edges=False,
-            add_support_duration=False,
+            bins_2d,
+            merge_keys,
         )
 
-        rebinned_spike_rates = _align_rebinned_spike_rates_to_meta(
-            rebinned_spike_rates, meta_df_used, new_seg_for_rebin
-        )
     else:
         binned_spikes, _ = encoding_design_utils.bin_spikes_for_event_windows(
             spikes_df,
@@ -152,6 +116,11 @@ def _build_stop_core(
             cluster_col='cluster',
         )  
         rebinned_spike_rates = (binned_spikes / bin_dt).copy()  
+        
+        if drop_bad_neurons:
+            rebinned_spike_rates = detrend_neural_data.drop_nonstationary_neurons(rebinned_spike_rates)
+            
+            
 
     cluster_df = cluster_design.build_cluster_features_workflow(
         meta_df_used[["event_id", "rel_center"]],
@@ -190,38 +159,34 @@ def _build_stop_core(
     )
 
 
+def _prepare_merge_keys(meta_df_used: pd.DataFrame, new_seg_for_rebin: pd.DataFrame) -> pd.DataFrame:
+    event_id_to_new_seg = dict(
+        zip(new_seg_for_rebin['event_id'].values, new_seg_for_rebin['new_segment'].values)
+    )
+    meta_copy = meta_df_used.copy()
+    meta_copy['new_segment'] = meta_copy['event_id'].map(event_id_to_new_seg)
+    merge_keys = meta_copy[['new_segment', 'bin']].rename(columns={'bin': 'new_bin'})
+    return merge_keys
+
 
 def build_stop_design_decoding(
     new_seg_info: pd.DataFrame,
     events_with_stats: pd.DataFrame,
     monkey_information: pd.DataFrame,
-    spikes_df: pd.DataFrame,
     ff_dataframe: pd.DataFrame,
+    spikes_df: pd.DataFrame,
+    processed_spike_rates: pd.DataFrame = None,
     bin_dt: float = 0.04,
     add_ff_visible_info: bool = True,
     add_retries_info: bool = True,
     datasets: dict = None,
     global_bins_2d: np.ndarray = None,
-    detrend_spikes: bool = True,
+    drop_bad_neurons: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, pd.DataFrame, Dict[str, List[str]]]:
     """
     Build stop design for decoding (minimal event design, no interaction columns).
     """
 
-
-    if detrend_spikes:
-        detrended_df = detrend_neural_data.detrend_spikes_session_wide(
-            spikes_df=spikes_df,
-            bin_size=0.05,          # 50 ms fine bins for detrending
-            center_method='subtract'
-        )
-
-        detrended_spike_rates, cluster_columns = detrend_neural_data.reshape_detrended_df_to_wide(
-            detrended_df,
-            value_col='detrended_rate_hz'
-        )
-    else:
-        detrended_spike_rates = None
 
     (
         bins_2d,
@@ -240,11 +205,11 @@ def build_stop_design_decoding(
         new_seg_info=new_seg_info,
         events_with_stats=events_with_stats,
         monkey_information=monkey_information,
-        detrended_spike_rates=detrended_spike_rates,
+        processed_spike_rates=processed_spike_rates,
         spikes_df=spikes_df,
         bin_dt=bin_dt,
         global_bins_2d=global_bins_2d,
-        detrend_spikes=detrend_spikes,
+        drop_bad_neurons=drop_bad_neurons,
     )
 
     X_event_df = stop_design.build_event_design_for_decoding(
@@ -524,7 +489,7 @@ def scale_binned_feats(binned_feats, keep_constant_tuning_terms: bool = False):
 
     return binned_feats_sc
 
-def _prepare_stop_design_inputs(raw_data_folder_path, bin_width):
+def prepare_stop_design_inputs(raw_data_folder_path, bin_width):
     """
     Shared data loading + stop preprocessing for both
     decoding and encoding designs.
@@ -575,51 +540,3 @@ def _prepare_stop_design_inputs(raw_data_folder_path, bin_width):
     return pn, datasets, new_seg_info, events_with_stats
 
 
-# ============================================================
-# Decoding
-# ============================================================
-
-def assemble_stop_decoding_design(
-    raw_data_folder_path,
-    bin_width,
-    global_bins_2d=None,
-    detrend_spikes: bool = True,
-):
-    """
-    Assemble stop design for decoding.
-    """
-
-    pn, datasets, new_seg_info, events_with_stats = \
-        _prepare_stop_design_inputs(raw_data_folder_path, bin_width)
-
-    build_result = build_stop_design_decoding(
-        new_seg_info=new_seg_info,
-        events_with_stats=events_with_stats,
-        monkey_information=pn.monkey_information,
-        spikes_df=pn.spikes_df,
-        ff_dataframe=pn.ff_dataframe,
-        bin_dt=bin_width,
-        datasets=datasets,
-        add_ff_visible_info=True,
-        global_bins_2d=global_bins_2d,
-        detrend_spikes=detrend_spikes,
-    )
-
-    (
-        rebinned_spike_rates,
-        binned_feats,
-        offset_log,
-        meta_df_used,
-    ) = build_result
-
-    binned_feats = scale_binned_feats(
-        binned_feats,
-    )
-
-    return (
-        pn,
-        rebinned_spike_rates,
-        binned_feats,
-        offset_log,
-        meta_df_used,
-    )

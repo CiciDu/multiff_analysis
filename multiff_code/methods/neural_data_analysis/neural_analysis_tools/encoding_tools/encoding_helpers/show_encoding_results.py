@@ -1,7 +1,13 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from data_wrangling import combine_info_utils
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import plot_gam_fit
 import os
+
+_DEFAULT_CV_MODE = "blocked_time_buffered"
 
 
 def collect_category_ecdf_from_sessions(
@@ -13,6 +19,7 @@ def collect_category_ecdf_from_sessions(
     exists_ok=True,
     save_path=None,
     use_neural_coupling=False,
+    cv_mode: Optional[str] = None,
 ):
     """
     Gather category variance ECDF data from all sessions for given monkeys.
@@ -32,6 +39,10 @@ def collect_category_ecdf_from_sessions(
         Where to save/load. If None and exists_ok, use default cache under multiff_analysis.
     use_neural_coupling : bool
         If True, use coupling subdir in path and pass to runner (matches base_encoding_runner).
+    cv_mode : str or None
+        Cross-validation mode for the runner and default cache layout. If None, uses
+        ``'blocked_time_buffered'`` (same default as ``BaseEncodingRunner``). Default
+        cache path includes a ``{cv_mode}/`` segment under the coupling folder.
 
     Returns
     -------
@@ -46,8 +57,10 @@ def collect_category_ecdf_from_sessions(
     if rc is None:
         raise ValueError('runner_class must be passed or set globally')
 
+    effective_cv_mode = cv_mode if cv_mode is not None else _DEFAULT_CV_MODE
+
     # Default save path when exists_ok
-    # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/category_ecdf_{monkeys}.pkl
+    # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/{cv_mode}/category_ecdf_{monkeys}.pkl
     if save_path is None:
         # Map runner class to encoder type
         rc_name = rc.__name__
@@ -65,7 +78,15 @@ def collect_category_ecdf_from_sessions(
         # Use first monkey for path; filename includes all monkeys for multi-monkey runs
         monkey_for_path = sorted(monkey_names)[0]
         monkeys_str = '_'.join(sorted(monkey_names)).replace(' ', '_')
-        cache_dir = Path(base) / monkey_for_path / 'combined_data' / 'encoding_outputs' / encoder_dir / coupling_subdir
+        cache_dir = (
+            Path(base)
+            / monkey_for_path
+            / "combined_data"
+            / "encoding_outputs"
+            / encoder_dir
+            / coupling_subdir
+            / str(effective_cv_mode)
+        )
         cache_dir.mkdir(parents=True, exist_ok=True)
         save_path = cache_dir / f"category_ecdf_{monkeys_str}.pkl"
     elif save_path is not None:
@@ -122,6 +143,7 @@ def collect_category_ecdf_from_sessions(
                     raw_data_folder_path=raw_data_folder_path,
                     bin_width=bin_width,
                     encoder_prs=prs,
+                    cv_mode=effective_cv_mode,
                 )
                 all_results = plot_gam_fit.run_unit_ecdf_collect(runner, 
                                                                  use_neural_coupling=use_neural_coupling)

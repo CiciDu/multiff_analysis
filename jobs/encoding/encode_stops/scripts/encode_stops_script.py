@@ -26,12 +26,13 @@ def main():
         multiff_encoding_params,
     )
 
-    def make_runner(raw_data_folder_path, bin_width):
+    def make_runner(raw_data_folder_path, bin_width, **runner_kwargs):
         prs = multiff_encoding_params.default_prs()
         return encode_stops_pipeline.StopEncodingRunner(
             raw_data_folder_path=raw_data_folder_path,
             bin_width=bin_width,
             encoder_prs=prs,
+            **runner_kwargs,
         )
 
     return run_encoding_main(make_runner)

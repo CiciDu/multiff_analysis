@@ -1,34 +1,11 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter1d
 
-import numpy as np
-import pandas as pd
-from scipy.ndimage import gaussian_filter1d
-
-
-def _make_time_edges(start_time, end_time, bin_size):
-    '''
-    Build session-wide bin edges.
-    '''
-    if not np.isfinite(start_time) or not np.isfinite(end_time):
-        raise ValueError('start_time and end_time must be finite.')
-    if bin_size <= 0:
-        raise ValueError('bin_size must be positive.')
-    if end_time <= start_time:
-        raise ValueError('end_time must be greater than start_time.')
-
-    n_bins = int(np.ceil((end_time - start_time) / bin_size))
-    return start_time + np.arange(n_bins + 1) * bin_size
-
-
-def _bin_spikes_for_one_cluster(cluster_spike_times, time_edges):
-    '''
-    Bin spike times for one cluster.
-    '''
-    spike_count, _ = np.histogram(cluster_spike_times, bins=time_edges)
-    return spike_count.astype(float)
-
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
+    decoding_diagnostics,
+)
 
 def _estimate_slow_drift(spike_rate_hz, bin_size, drift_sigma_s):
     '''
@@ -83,30 +60,30 @@ def _estimate_time_regression_drift(spike_rate_hz, time_bin_center, regression_d
 
 
 def detrend_spikes_session_wide(
-    spikes_df,
-    bin_size=0.01,
+    fs_binned_spikes_hz,
+    time_bins_df,
+    bin_size,
     drift_sigma_s=60.0,
-    min_time=None,
-    max_time=None,
     center_method='subtract',
     drift_method='regression',
-    regression_degree=2
+    regression_degree=2,
 ):
     '''
-    Session-wide detrending from raw spike times.
+    Session-wide detrending from full-session binned spike rates (Hz).
 
     Parameters
     ----------
-    spikes_df : pd.DataFrame
-        Must contain columns 'time' and 'cluster'.
+    fs_binned_spikes_hz : pd.DataFrame
+        Rows = time bins, columns = cluster ids, values = firing rate (Hz).
+        Build with ``smooth_neural_data.make_full_session_binned_spikes`` then divide
+        by bin width, optionally ``drop_nonstationary_neurons`` on the rate matrix.
+    time_bins_df : pd.DataFrame
+        Must include ``time_bin_start`` and ``time_bin_end``; ``time_bin_center`` is
+        used if present, otherwise computed as the midpoints.
     bin_size : float
-        Bin size in seconds.
+        Bin width in seconds (used for spike counts from rates and for drift).
     drift_sigma_s : float
         Gaussian smoothing sigma in seconds, used when drift_method='gaussian'.
-    min_time : float or None
-        Session start time. If None, inferred from spikes_df.
-    max_time : float or None
-        Session end time. If None, inferred from spikes_df.
     center_method : str
         'subtract' or 'fractional'.
     drift_method : str
@@ -120,63 +97,54 @@ def detrend_spikes_session_wide(
     detrended_df : pd.DataFrame
         Long-format dataframe with raw, drift, and detrended rates.
     '''
-    required_columns = {'time', 'cluster'}
-    missing_columns = required_columns.difference(spikes_df.columns)
-    if missing_columns:
-        raise ValueError(f'spikes_df is missing required columns: {missing_columns}')
+    empty_columns = [
+        'time_bin_start',
+        'time_bin_end',
+        'time_bin_center',
+        'cluster',
+        'spike_count',
+        'spike_rate_hz',
+        'drift_rate_hz',
+        'detrended_rate_hz',
+    ]
 
-    if spikes_df.empty:
-        return pd.DataFrame(columns=[
-            'time_bin_start',
-            'time_bin_end',
-            'time_bin_center',
-            'cluster',
-            'spike_count',
-            'spike_rate_hz',
-            'drift_rate_hz',
-            'detrended_rate_hz'
-        ])
+    if fs_binned_spikes_hz is None or fs_binned_spikes_hz.empty or fs_binned_spikes_hz.shape[1] == 0:
+        return pd.DataFrame(columns=empty_columns)
 
-    spikes_df = spikes_df[['time', 'cluster']].copy()
+    required_time = {'time_bin_start', 'time_bin_end'}
+    missing_time = required_time.difference(time_bins_df.columns)
+    if missing_time:
+        raise ValueError(f'time_bins_df is missing required columns: {missing_time}')
 
-    if spikes_df['time'].isna().any() or spikes_df['cluster'].isna().any():
-        raise ValueError("spikes_df contains NaNs in 'time' or 'cluster'.")
+    time_bin_start = np.asarray(time_bins_df['time_bin_start'], dtype=float)
+    time_bin_end = np.asarray(time_bins_df['time_bin_end'], dtype=float)
+    if 'time_bin_center' in time_bins_df.columns:
+        time_bin_center = np.asarray(time_bins_df['time_bin_center'], dtype=float)
+    else:
+        time_bin_center = 0.5 * (time_bin_start + time_bin_end)
 
-    if min_time is None:
-        min_time = float(spikes_df['time'].min())
-    if max_time is None:
-        max_time = float(spikes_df['time'].max())
+    if len(time_bin_start) != len(fs_binned_spikes_hz):
+        raise ValueError(
+            'time_bins_df row count must match fs_binned_spikes_hz row count.'
+        )
 
-    time_edges = _make_time_edges(min_time, max_time, bin_size)
-    time_bin_start = time_edges[:-1]
-    time_bin_end = time_edges[1:]
-    time_bin_center = 0.5 * (time_bin_start + time_bin_end)
-
-    grouped_spikes = {
-        cluster_id: cluster_df['time'].to_numpy()
-        for cluster_id, cluster_df in spikes_df.groupby('cluster', sort=True)
-    }
-
-    cluster_ids = np.array(list(grouped_spikes.keys()))
     all_cluster_rows = []
 
-    for cluster_id in cluster_ids:
-        cluster_spike_times = grouped_spikes[cluster_id]
-
-        spike_count = _bin_spikes_for_one_cluster(cluster_spike_times, time_edges)
-        spike_rate_hz = spike_count / bin_size
+    for cluster_id in fs_binned_spikes_hz.columns:
+        spike_rate_hz = np.asarray(fs_binned_spikes_hz[cluster_id], dtype=float)
+        spike_count = spike_rate_hz * bin_size
 
         if drift_method == 'gaussian':
             drift_rate_hz = _estimate_slow_drift(
                 spike_rate_hz=spike_rate_hz,
                 bin_size=bin_size,
-                drift_sigma_s=drift_sigma_s
+                drift_sigma_s=drift_sigma_s,
             )
         elif drift_method == 'regression':
             drift_rate_hz = _estimate_time_regression_drift(
                 spike_rate_hz=spike_rate_hz,
                 time_bin_center=time_bin_center,
-                regression_degree=regression_degree
+                regression_degree=regression_degree,
             )
         else:
             raise ValueError("drift_method must be 'gaussian' or 'regression'.")
@@ -185,7 +153,9 @@ def detrend_spikes_session_wide(
             detrended_rate_hz = spike_rate_hz - drift_rate_hz
         elif center_method == 'fractional':
             small_value = 1e-6
-            detrended_rate_hz = (spike_rate_hz - drift_rate_hz) / np.maximum(drift_rate_hz, small_value)
+            detrended_rate_hz = (spike_rate_hz - drift_rate_hz) / np.maximum(
+                drift_rate_hz, small_value
+            )
         else:
             raise ValueError("center_method must be 'subtract' or 'fractional'.")
 
@@ -197,7 +167,7 @@ def detrend_spikes_session_wide(
             'spike_count': spike_count,
             'spike_rate_hz': spike_rate_hz,
             'drift_rate_hz': drift_rate_hz,
-            'detrended_rate_hz': detrended_rate_hz
+            'detrended_rate_hz': detrended_rate_hz,
         })
         all_cluster_rows.append(cluster_df)
 
@@ -251,9 +221,6 @@ def reshape_detrended_df_to_wide(
     wide_df = wide_df[time_columns + cluster_columns].reset_index(drop=True)
 
     return wide_df, cluster_columns
-
-import matplotlib.pyplot as plt
-from scipy.ndimage import gaussian_filter1d
 
 
 def plot_subtraction_term(
@@ -323,3 +290,27 @@ def plot_subtraction_term(
 
     plt.tight_layout()
     plt.show()
+
+
+def drop_nonstationary_neurons(binned_spikes):
+    keep_mask, qc_df = decoding_diagnostics.detect_nonstationary_neurons_windowed(
+        binned_spikes.values,
+        smooth_window_bins=10,              # 0.4 s smoothing
+        n_segments=5,
+        min_mean_rate=0.001,
+        max_firing_rate_stability=1.5,
+        max_segment_stability=4,
+        max_between_half_mean_shift=1.5,
+        max_between_half_var_ratio=20
+    )
+    
+    binned_spikes = binned_spikes.loc[:, keep_mask].copy()
+
+    # if there are any dropped neurons, print the qc_df
+    if qc_df['drop'].any():
+        print('Dropped nonstationary neurons:')
+        print(qc_df[['reason']])
+    else:
+        print('No nonstationary neurons dropped')
+        
+    return binned_spikes

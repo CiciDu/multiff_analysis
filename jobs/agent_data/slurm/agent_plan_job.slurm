@@ -52,7 +52,7 @@ set -u
 # --------------------------------------------------
 # Determine agent folder from manifest
 # --------------------------------------------------
-MANIFEST_PATH="$PROJECT_ROOT/multiff_analysis/RL_models/sb3_stored_models/all_agents/agent_folder_manifest.json"
+MANIFEST_PATH="$PROJECT_ROOT/RL_models/sb3_stored_models/all_agents/agent_folder_manifest.json"
 AGENT_FOLDER=$(python -c "import json; manifest = json.load(open('$MANIFEST_PATH')); print(manifest[$SLURM_ARRAY_TASK_ID] if $SLURM_ARRAY_TASK_ID < len(manifest) else 'INDEX_OUT_OF_RANGE')")
 
 echo '[SLURM] Running Agent Planning Job'

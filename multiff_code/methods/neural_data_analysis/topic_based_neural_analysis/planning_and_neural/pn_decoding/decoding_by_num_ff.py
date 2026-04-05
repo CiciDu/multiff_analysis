@@ -35,6 +35,7 @@ def _run_decoding_pass(
     verbosity,
     shuffle_mode,
     shuffle_seed,
+    cv_mode=None,
 ):
     return cv_decoding.run_cv_decoding(
         X=X_sub,
@@ -47,6 +48,7 @@ def _run_decoding_pass(
         verbosity=verbosity,
         shuffle_mode=shuffle_mode,
         shuffle_seed=shuffle_seed,
+        cv_mode=cv_mode,
     )
 
 
@@ -69,6 +71,7 @@ def decode_by_num_ff_visible_or_in_memory(
     verbosity: int = 1,
     shuffle_mode: str = 'none',
     shuffle_seed: int = 0,
+    cv_mode=None,
 ):
     if config is None:
         config = cv_decoding.DecodingRunConfig()
@@ -123,6 +126,7 @@ def decode_by_num_ff_visible_or_in_memory(
             verbosity=verbosity,
             shuffle_mode=shuffle_mode,
             shuffle_seed=shuffle_seed,
+            cv_mode=cv_mode,
         )
 
         results_df[ff_visibility_col] = num_ff
@@ -144,6 +148,7 @@ def decode_by_num_ff_visible_or_in_memory(
             verbosity=verbosity,
             shuffle_mode=shuffle_mode,
             shuffle_seed=shuffle_seed,
+            cv_mode=cv_mode,
         )
 
         results_df[ff_visibility_col] = -1
@@ -185,6 +190,7 @@ def decode_cur_ff_only(
     verbosity: int = 1,
     config: Optional[cv_decoding.DecodingRunConfig] = None,
     save_path=None,
+    cv_mode=None,
 ):
     if config is None:
         config = cv_decoding.DecodingRunConfig()
@@ -217,6 +223,7 @@ def decode_cur_ff_only(
         verbosity=verbosity,
         shuffle_mode='none',
         shuffle_seed=0,
+        cv_mode=cv_mode,
     )
 
     results_df[ff_visibility_col] = -2

@@ -99,7 +99,7 @@ echo "[jobinfo] base_seed=${BASE_SEED} rep=${REPEAT_IDX} mem_r=${MEM_R} mem_th=$
 # ---------------------
 # Output folder
 # ---------------------
-BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents/agents_with_noise"
+BASE_DIR="RL_models/sb3_stored_models/all_agents/agents_with_noise"
 
 SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
 SAFE_MR="${MEM_R//./p}"
@@ -122,7 +122,6 @@ srun --gres=gpu:1 python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --lr "$LR" \
   --num-obs-ff "$NUM_OBS_FF" \
   --n-envs "$N_ENVS" \
-  # --no-curriculum-training \
   --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" \
   --v-noise-std "$V_NOISE_STD" \
   --w-noise-std "$W_NOISE_STD" \
@@ -130,5 +129,6 @@ srun --gres=gpu:1 python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --obs-perc-th "$PERC_TH" \
   --obs-mem-r "$MEM_R" \
   --obs-mem-th "$MEM_TH"
+  # --no-curriculum-training \
 
 echo "[jobinfo] Finished base_seed=${BASE_SEED} rep=${REPEAT_IDX} mem_r=${MEM_R} mem_th=${MEM_TH}"

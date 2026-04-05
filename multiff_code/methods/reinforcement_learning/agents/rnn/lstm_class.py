@@ -25,7 +25,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 class LSTMforMultifirefly(rl_base_class._RLforMultifirefly):
 
     def __init__(self,
-                 overall_folder='multiff_analysis/RL_models/LSTM_stored_models/all_agents/gen_0/',
+                 overall_folder='RL_models/LSTM_stored_models/all_agents/gen_0/',
                  model_folder_name=None,
                  add_date_to_model_folder_name=False,
                  max_in_memory_time=1,

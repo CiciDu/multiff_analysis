@@ -38,7 +38,7 @@ def split_agent_list(input_json, output_dir, batch_size=10):
 
 if __name__ == "__main__":
     split_agent_list(
-        input_json="multiff_analysis/RL_models/meta/directory_of_agents/dir1.json",
-        output_dir="multiff_analysis/RL_models/meta/directory_of_agents/batches",
+        input_json="RL_models/meta/directory_of_agents/dir1.json",
+        output_dir="RL_models/meta/directory_of_agents/batches",
         batch_size=10
     )

@@ -14,72 +14,111 @@ def plot_pairwise_interactions(
     df,
     sweep_keys,
     target_col='num_caught_ff',
+    ci_low_col=None,
+    ci_high_col=None,
+    metrics=('mean', 'std'),
+    min_count=1,
     figsize=(6, 5),
     cmap='viridis'
 ):
     """
-    Plot mean interaction heatmaps for all pairwise combinations
-    of sweep_keys against target_col.
+    Plot pairwise heatmaps for selected metrics.
+
+    Parameters
+    ----------
+    metrics : tuple of str
+        Options: 'mean', 'std', 'ci_low', 'ci_high', 'ci_width'
     """
+
+    import itertools
+    import numpy as np
+    import matplotlib.pyplot as plt
 
     valid_keys = [k for k in sweep_keys if k in df.columns]
 
     for key_x, key_y in itertools.combinations(valid_keys, 2):
 
-        sub = df[[key_x, key_y, target_col]].dropna()
+        needed_cols = [key_x, key_y, target_col]
+        if 'ci_low' in metrics or 'ci_width' in metrics:
+            needed_cols.append(ci_low_col)
+        if 'ci_high' in metrics or 'ci_width' in metrics:
+            needed_cols.append(ci_high_col)
 
+        sub = df[needed_cols].dropna()
         if sub.empty:
             continue
 
-        # Compute mean performance grid
-        pivot = (
-            sub.groupby([key_y, key_x])[target_col]
-               .mean()
-               .unstack()
-               .sort_index(ascending=True)
-        )
+        grouped = sub.groupby([key_y, key_x])
 
-        if pivot.empty:
+        # --- Core grids ---
+        pivot_mean = grouped[target_col].mean().unstack().sort_index()
+        pivot_std  = grouped[target_col].std().unstack().reindex_like(pivot_mean)
+        pivot_count = grouped[target_col].count().unstack().reindex_like(pivot_mean)
+
+        pivots = {}
+
+        if 'mean' in metrics:
+            pivots['mean'] = pivot_mean
+
+        if 'std' in metrics:
+            pivots['std'] = pivot_std
+
+        if ci_low_col and 'ci_low' in metrics:
+            pivots['ci_low'] = grouped[ci_low_col].mean().unstack().reindex_like(pivot_mean)
+
+        if ci_high_col and 'ci_high' in metrics:
+            pivots['ci_high'] = grouped[ci_high_col].mean().unstack().reindex_like(pivot_mean)
+
+        if ci_low_col and ci_high_col and 'ci_width' in metrics:
+            pivot_low  = grouped[ci_low_col].mean().unstack().reindex_like(pivot_mean)
+            pivot_high = grouped[ci_high_col].mean().unstack().reindex_like(pivot_mean)
+            pivots['ci_width'] = pivot_high - pivot_low
+
+        if pivot_mean.empty:
             continue
 
-        x_vals = pivot.columns.values
-        y_vals = pivot.index.values
-        Z = pivot.values
+        x_vals = pivot_mean.columns.values
+        y_vals = pivot_mean.index.values
 
-        # Mask NaNs
-        Z_masked = np.ma.masked_invalid(Z)
+        # --- Plot ---
+        n_plots = len(pivots)
+        fig, axes = plt.subplots(1, n_plots, figsize=(figsize[0]*n_plots, figsize[1]))
 
-        fig, ax = plt.subplots(figsize=figsize)
+        if n_plots == 1:
+            axes = [axes]
 
-        im = ax.imshow(
-            Z_masked,
-            origin='lower',
-            aspect='equal',
-            cmap=cmap
-        )
+        for ax, (name, pivot) in zip(axes, pivots.items()):
 
-        # Proper numeric ticks
-        ax.set_xticks(np.arange(len(x_vals)))
-        ax.set_yticks(np.arange(len(y_vals)))
+            Z = pivot.values
+            mask = np.isnan(Z) | (pivot_count.values < min_count)
+            Z_masked = np.ma.masked_where(mask, Z)
 
-        ax.set_xticklabels(np.round(x_vals, 4), rotation=45)
-        ax.set_yticklabels(np.round(y_vals, 4))
+            # choose colormap
+            this_cmap = cmap if name == 'mean' else 'magma'
 
-        ax.set_xlabel(key_x)
-        ax.set_ylabel(key_y)
-        ax.set_title(f'{key_x} × {key_y}')
+            im = ax.imshow(
+                Z_masked,
+                origin='lower',
+                aspect='equal',
+                cmap=this_cmap
+            )
 
-        cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(f'Mean {target_col}')
+            ax.set_xticks(np.arange(len(x_vals)))
+            ax.set_yticks(np.arange(len(y_vals)))
+            ax.set_xticklabels(np.round(x_vals, 4), rotation=45)
+            ax.set_yticklabels(np.round(y_vals, 4))
 
-        plt.tight_layout()
+            ax.set_xlabel(key_x)
+            ax.set_ylabel(key_y)
+            ax.set_title(name)
+
+            cbar = fig.colorbar(im, ax=ax)
+            cbar.set_label(name)
+
+        fig.suptitle(f'{key_x} × {key_y}', y=1.02)
+
+        #plt.tight_layout()
         plt.show()
-       
-       
-import numpy as np
-import matplotlib.pyplot as plt
-
-
 
 def build_fixed_values_for_obs_sweep(
     sweep_key,

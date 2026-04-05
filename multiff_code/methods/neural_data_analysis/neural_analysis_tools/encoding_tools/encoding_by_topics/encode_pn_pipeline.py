@@ -31,10 +31,18 @@ class PNEncodingRunner(BaseEncodingRunner):
         raw_data_folder_path,
         bin_width=0.04,
         encoder_prs=None,
+        cv_mode=None,
+        **kwargs,
     ):
-        super().__init__(raw_data_folder_path, bin_width=bin_width, encoder_prs=encoder_prs)
+        super().__init__(
+            raw_data_folder_path,
+            bin_width=bin_width,
+            encoder_prs=encoder_prs,
+            cv_mode=cv_mode,
+            **kwargs,
+        )
 
-        self.var_categories = encoder_gam_helper.PN_VAR_CATEGORIES
+        self.var_categories = encoder_gam_helper.PN_ENCODING_VAR_CATEGORIES
         
         print('var_categories:', self.var_categories)
 
@@ -70,7 +78,7 @@ class PNEncodingRunner(BaseEncodingRunner):
             rebinned_max_x_lag_number=2,
         )
 
-        self.pn.global_bins_2d = self.pn.bin_edges
+        self.pn.global_bins_2d = self.pn.local_bin_edges
 
         return
 
@@ -114,7 +122,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         design_kwargs = self._encoding_design_kwargs()
 
         linear_vars = encoding_design_utils.DEFAULT_TUNING_VARS_NO_WRAP + \
-            ['time_since_target_last_seen', 'time_since_last_capture',
+            ['time_since_target_last_seen',
              'cur_ff_distance', 'nxt_ff_distance',
              'cur_ff_angle', 'nxt_ff_angle']
 
@@ -158,7 +166,7 @@ class PNEncodingRunner(BaseEncodingRunner):
 
         self.bin_df = create_pn_design_df.make_bin_df_for_pn(
             self.pn.rebinned_x_var,
-            self.pn.bin_edges,
+            self.pn.local_bin_edges,
         )
         # Build encoding design (behavioral + spike history) for GAM modeling
         self.binned_feats = self.binned_feats.reset_index(drop=True)

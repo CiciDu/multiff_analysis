@@ -6,6 +6,7 @@ from planning_analysis.show_planning import nxt_ff_utils
 from pattern_discovery import cluster_analysis
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from decision_making_analysis.event_detection import detect_rsw_and_rcap
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
 
 import os
 import os
@@ -207,8 +208,13 @@ class BaseProcessing:
             self.closest_stop_to_capture_df = pd.read_csv(
                 path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
         else:
-            self.closest_stop_to_capture_df = monkey_landing_in_ff.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted,
+            self.make_closest_stop_to_capture_df(path=path)
+        return
+    
+    def make_closest_stop_to_capture_df(self, path=None):
+        self.closest_stop_to_capture_df = monkey_landing_in_ff.get_closest_stop_time_to_all_capture_time(self.ff_caught_T_sorted, self.monkey_information, self.ff_real_position_sorted,
                                                                                                              cur_ff_index_array=np.arange(len(self.ff_caught_T_sorted)))
+        if path is not None:
             self.closest_stop_to_capture_df.to_csv(path)
         return
 
@@ -303,6 +309,12 @@ class BaseProcessing:
 
             self.monkey_information['trial'] = np.searchsorted(
                 self.ff_caught_T_new, self.monkey_information['time'])
+            
+            self.monkey_information = prep_target_data.add_capture_target(self.monkey_information, self.ff_caught_T_new)
+            
+            # also trim eye_world_speed
+            q95 = self.monkey_information['eye_world_speed'].quantile(0.95)
+            self.monkey_information['eye_world_speed'] = self.monkey_information['eye_world_speed'].clip(upper=q95)
 
 
     def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):

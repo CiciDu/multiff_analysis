@@ -236,6 +236,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Migrate legacy RL agent folders to standardized layout (curr/post/ln/meta).")
     parser.add_argument(
-        "root", type=str, help="Root directory to scan (e.g., multiff_analysis/RL_models)")
+        "root", type=str, help="Root directory to scan (e.g., RL_models)")
     args = parser.parse_args()
     migrate_all(os.path.abspath(os.path.expanduser(args.root)))

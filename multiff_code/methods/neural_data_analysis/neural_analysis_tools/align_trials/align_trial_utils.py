@@ -14,19 +14,19 @@ def get_rebinned_var_lags(rebinned_var, trial_vector, lag_numbers=None, rebinned
     rebinned_var_lags = neural_data_processing.add_lags_to_each_feature(
         rebinned_var, lag_numbers, trial_vector=trial_vector)
 
-    if 'new_bin_0' in rebinned_var_lags.columns:
-        rebinned_var_lags['new_bin'] = rebinned_var_lags['new_bin_0'].astype(
+    if 'bin_in_new_seg_0' in rebinned_var_lags.columns:
+        rebinned_var_lags['bin_in_new_seg'] = rebinned_var_lags['bin_in_new_seg_0'].astype(
             int)
         rebinned_var_lags = rebinned_var_lags.drop(
-            columns=[col for col in rebinned_var_lags.columns if 'new_bin_' in col])
+            columns=[col for col in rebinned_var_lags.columns if 'bin_in_new_seg_' in col])
     if 'new_segment_0' in rebinned_var_lags.columns:
         rebinned_var_lags['new_segment'] = rebinned_var_lags['new_segment_0'].astype(
             int)
         rebinned_var_lags = rebinned_var_lags.drop(
             columns=[col for col in rebinned_var_lags.columns if 'new_segment_' in col])
 
-    assert rebinned_var_lags['new_bin'].equals(
-        rebinned_var['new_bin'])
+    assert rebinned_var_lags['bin_in_new_seg'].equals(
+        rebinned_var['bin_in_new_seg'])
 
     return rebinned_var_lags
 

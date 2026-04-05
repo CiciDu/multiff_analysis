@@ -96,5 +96,7 @@ htmlcov/
 ## jobs
 # **/jobs/
 **/RL_models/
-
 **/logs/
+
+RL_models
+logs

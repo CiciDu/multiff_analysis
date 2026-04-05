@@ -11,7 +11,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     one_ff_gam_fit
 )
 
-DEFAULT_VAR_CATEGORIES = {
+DEFAULT_ENCODING_VAR_CATEGORIES = {
     'sensory_vars': ['v', 'w'],
     'latent_vars': ['r_targ', 'theta_targ'],
     'position_vars': ['d', 'phi'],
@@ -50,7 +50,7 @@ def resolve_selected_vars(
     If both selected_categories and selected_vars are None, all variables are used.
     """
     if var_categories is None:
-        var_categories = DEFAULT_VAR_CATEGORIES
+        var_categories = DEFAULT_ENCODING_VAR_CATEGORIES
 
     all_vars = _all_vars_from_categories(var_categories)
     all_var_set = set(all_vars)
@@ -136,7 +136,7 @@ def apply_variable_selection_and_update_meta(
         )
 
     selected_var_categories = (
-        var_categories if var_categories is not None else DEFAULT_VAR_CATEGORIES
+        var_categories if var_categories is not None else DEFAULT_ENCODING_VAR_CATEGORIES
     )
     structured_meta_groups['var_categories'] = selected_var_categories
     structured_meta_groups['selected_categories'] = used_categories

@@ -1,4 +1,5 @@
 import os
+import pickle
 import pandas as pd
 from pathlib import Path
 import numpy as np
@@ -33,9 +34,11 @@ def collect_all_session_decoding_results(
     verbose=False,
     shuffle_mode='none',
     fit_kernelwidth=True,
-    detrend_spikes=True,
+    detrend_spikes=False,
     use_detrend_inside_cv=None,
     detrend_per_block=None,
+    smoothing_width=None,
+    cv_mode=None,
 ):
     """
     Collect existing CV decoding results across all sessions for one monkey.
@@ -90,11 +93,13 @@ def collect_all_session_decoding_results(
         runner = decode_runner_class(
             raw_data_folder_path=raw_data_folder_path,
             detrend_spikes=detrend_spikes,
+            smoothing_width=smoothing_width,
+            cv_mode=cv_mode,
         )
 
         save_dir = runner._get_save_dir()
         
-        if shuffle_mode != 'none':
+        if (shuffle_mode is not None) and (shuffle_mode != 'none'):
             save_dir = Path(save_dir) / f'shuffle_{shuffle_mode}'
 
         if fit_kernelwidth:
@@ -108,9 +113,31 @@ def collect_all_session_decoding_results(
             verbosity=1 if verbose else 0,
             use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
+            cv_mode=cv_mode,
         )
 
+        if 'cv_mode' not in session_results_df.columns:
+            inferred_cv_mode = None
+            for pkl_path in Path(models_save_dir).rglob('*.pkl'):
+                try:
+                    with pkl_path.open('rb') as _f:
+                        _loaded = pickle.load(_f)
+                    _cv_config = _loaded.get('_cv_config', {}) if isinstance(_loaded, dict) else {}
+                    inferred_cv_mode = _cv_config.get('cv_mode')
+                    if inferred_cv_mode is None:
+                        for _candidate in cv_decoding.CV_MODE_CANDIDATES:
+                            if _candidate in pkl_path.stem:
+                                inferred_cv_mode = _candidate
+                                break
+                    if inferred_cv_mode is not None:
+                        break
+                except Exception:
+                    continue
+            if inferred_cv_mode is not None:
+                session_results_df['cv_mode'] = inferred_cv_mode
+
         session_results_df['data_name'] = row['data_name']
+        session_results_df['smoothing_width'] = smoothing_width
 
         all_session_results.append(session_results_df)
 
@@ -325,7 +352,7 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
     ax.set_title(title)
     
     if 'r2_cv' in value_label or 'r_cv' in value_label:
-        ax.set_xlim(-0.5, 0.5)
+        ax.set_xlim(-0.75, 0.75)
     elif 'auc_mean' in value_label:
         ax.set_xlim(0.4, 1.0)
 
@@ -567,168 +594,6 @@ def compute_fold_bias(df, score_col):
     return bias
 
 
-def plot_fold_session_heatmap(
-    all_results,
-    model_name,
-    mode='regression',
-    behav_feature=None,
-    score_col=None,
-    vmin=None,
-    vmax=None,
-    compare_results=None,
-    compare_label=None,
-):
-    """
-    Plot session × fold decoding performance heatmap.
-
-    Parameters
-    ----------
-    all_results : DataFrame
-        full decoding results dataframe
-    model_name : str
-        model to visualize
-    mode : str
-        'regression' or 'classification'
-    behav_feature : str or None
-        optional feature to filter
-    score_col : str or None
-        score column (auto-detected if None)
-    vmin : float or None
-        lower bound for colorbar (None = auto from data)
-    vmax : float or None
-        upper bound for colorbar (None = auto from data)
-    compare_results : DataFrame or None
-        if provided, plot the difference:
-        pivot(all_results) - pivot(compare_results)
-    compare_label : str or None
-        optional label to include in the title for the comparison dataframe
-    """
-
-    def _filter_results(df_in):
-        df = df_in.copy()
-
-        if model_name is not None:
-            df = df.query(
-                "model_name == @model_name"
-            ).copy()
-
-        if mode is not None:
-            df = df.query(
-                "mode == @mode"
-            ).copy()
-
-        if behav_feature is not None:
-            df = df.query(
-                "behav_feature == @behav_feature"
-            ).copy()
-
-        return df
-
-    def _make_pivot(df_in, value_col):
-        return df_in.pivot_table(
-            index='data_name',
-            columns='fold',
-            values=value_col,
-            aggfunc='mean'
-        )
-
-    # ---------------------------------------
-    # infer score column
-    # ---------------------------------------
-    if score_col is None:
-
-        if mode == 'regression':
-            score_col = 'r2_cv'
-
-        elif mode == 'classification':
-            score_col = 'auc_mean'
-
-        else:
-            raise ValueError('Unknown mode')
-
-    # ---------------------------------------
-    # filter primary results
-    # ---------------------------------------
-    df = _filter_results(all_results)
-
-    if len(df) == 0:
-        raise ValueError('No rows found after filtering')
-
-    pivot = _make_pivot(df, score_col)
-
-    # ---------------------------------------
-    # optionally compute difference
-    # ---------------------------------------
-    is_difference_plot = compare_results is not None
-
-    if is_difference_plot:
-        compare_df = _filter_results(compare_results)
-
-        if len(compare_df) == 0:
-            raise ValueError('No rows found in compare_results after filtering')
-
-        compare_pivot = _make_pivot(compare_df, score_col)
-
-        # align sessions/folds before subtraction
-        pivot, compare_pivot = pivot.align(compare_pivot)
-
-        pivot = pivot - compare_pivot
-        colorbar_label = f'{score_col} difference'
-    else:
-        colorbar_label = score_col
-
-    # ---------------------------------------
-    # plot
-    # ---------------------------------------
-    plt.figure(figsize=(6, max(4, 0.4 * len(pivot))))
-
-    heatmap_kwargs = dict(
-        cmap='coolwarm',
-        annot=True,
-        fmt='.2f',
-        cbar_kws={'label': colorbar_label},
-    )
-
-    if vmin is not None:
-        heatmap_kwargs['vmin'] = vmin
-    if vmax is not None:
-        heatmap_kwargs['vmax'] = vmax
-
-    if is_difference_plot:
-        # difference plots should usually be centered at zero
-        if vmin is None and vmax is None:
-            max_abs = np.nanmax(np.abs(pivot.values))
-            heatmap_kwargs['vmin'] = -max_abs
-            heatmap_kwargs['vmax'] = max_abs
-        heatmap_kwargs['center'] = 0
-
-    else:
-        if vmin is None and vmax is None:
-            heatmap_kwargs['center'] = np.nanmean(pivot.values)
-
-    sns.heatmap(pivot, **heatmap_kwargs)
-
-    plt.xlabel('Fold')
-    plt.ylabel('Session')
-
-    title = f'{mode}'
-    if model_name:
-        title += f' | {model_name}'
-    if behav_feature:
-        title += f' | {behav_feature}'
-
-    if is_difference_plot:
-        if compare_label is None:
-            compare_label = 'compare_results'
-        title += f' | minus {compare_label}'
-
-    plt.title(title)
-
-    plt.tight_layout()
-    plt.show()
-
-    return pivot
-
 
 def plot_fold_diagnostics(
     all_results,
@@ -737,6 +602,9 @@ def plot_fold_diagnostics(
     vmax=0.5,
     compare_results=None,
     compare_label=None,
+    compare_plot='difference',
+    diff_vmin=None,
+    diff_vmax=None,
 ):
     result_df = all_results.query(f"mode == '{mode}'")
     result_summary = _compute_summary(result_df, 'r2_cv')
@@ -761,8 +629,260 @@ def plot_fold_diagnostics(
                 vmax=vmax,
                 compare_results=compare_results,
                 compare_label=compare_label,
+                compare_plot=compare_plot,
+                diff_vmin=diff_vmin,
+                diff_vmax=diff_vmax,
             )
         except Exception as e:
             print(f'Error plotting {behav_feature}: {e}')
 
     return result_summary, mean_by_feature
+
+
+def plot_fold_session_heatmap(
+    all_results,
+    model_name,
+    mode='regression',
+    behav_feature=None,
+    score_col=None,
+    vmin=None,
+    vmax=None,
+    compare_results=None,
+    compare_label=None,
+    compare_plot='difference',
+    diff_vmin=None,
+    diff_vmax=None,
+):
+    """
+    Plot session × fold decoding performance heatmap.
+
+    compare_plot options
+    --------------------
+    'difference'
+        Plot only all_results - compare_results.
+    'side_by_side'
+        Plot raw all_results and difference side by side.
+    'three_panel'
+        Plot all_results, compare_results, and difference.
+    """
+    
+    if len(all_results) == 0:
+        raise ValueError('No rows found in all_results')
+
+    def _filter_results(df_in):
+        df = df_in.copy()
+
+        if model_name is not None:
+            df = df.query(
+                'model_name == @model_name'
+            ).copy()
+
+        if mode is not None:
+            df = df.query(
+                'mode == @mode'
+            ).copy()
+
+        if behav_feature is not None:
+            df = df.query(
+                'behav_feature == @behav_feature'
+            ).copy()
+
+        return df
+
+    def _make_pivot(df_in, value_col):
+        return df_in.pivot_table(
+            index='data_name',
+            columns='fold',
+            values=value_col,
+            aggfunc='mean'
+        )
+
+    def _plot_single_heatmap(
+        ax,
+        pivot,
+        title,
+        cbar_label,
+        plot_kind,
+    ):
+        heatmap_kwargs = dict(
+            cmap='coolwarm',
+            annot=True,
+            fmt='.2f',
+            cbar_kws={'label': cbar_label},
+            ax=ax,
+        )
+
+        if plot_kind == 'raw':
+            if vmin is not None:
+                heatmap_kwargs['vmin'] = vmin
+            if vmax is not None:
+                heatmap_kwargs['vmax'] = vmax
+
+            if vmin is None and vmax is None:
+                heatmap_kwargs['center'] = np.nanmean(pivot.values)
+
+        elif plot_kind == 'difference':
+            if diff_vmin is not None:
+                heatmap_kwargs['vmin'] = diff_vmin
+            if diff_vmax is not None:
+                heatmap_kwargs['vmax'] = diff_vmax
+
+            if diff_vmin is None and diff_vmax is None:
+                max_abs = np.nanmax(np.abs(pivot.values))
+                heatmap_kwargs['vmin'] = -max_abs
+                heatmap_kwargs['vmax'] = max_abs
+
+            heatmap_kwargs['center'] = 0
+
+        sns.heatmap(pivot, **heatmap_kwargs)
+        ax.set_xlabel('Fold')
+        ax.set_ylabel('Session')
+        ax.set_title(title)
+
+    # ---------------------------------------
+    # infer score column
+    # ---------------------------------------
+    if score_col is None:
+        if mode == 'regression':
+            score_col = 'r2_cv'
+        elif mode == 'classification':
+            score_col = 'auc_mean'
+        else:
+            raise ValueError('Unknown mode')
+
+    # ---------------------------------------
+    # filter primary results
+    # ---------------------------------------
+    df = _filter_results(all_results)
+
+    if len(df) == 0:
+        raise ValueError('No rows found after filtering')
+
+    pivot = _make_pivot(df, score_col)
+
+    base_title = f'{mode}'
+    if model_name:
+        base_title += f' | {model_name}'
+    if behav_feature:
+        base_title += f' | {behav_feature}'
+
+    # ---------------------------------------
+    # raw only
+    # ---------------------------------------
+    if (compare_results is None) or (len(compare_results) == 0):
+        if len(compare_results) == 0:
+            print('Warning: compare_results is provided but no rows found in compare_results')
+
+        fig, ax = plt.subplots(figsize=(6, max(4, 0.4 * len(pivot))))
+        _plot_single_heatmap(
+            ax=ax,
+            pivot=pivot,
+            title=base_title,
+            cbar_label=score_col,
+            plot_kind='raw',
+        )
+        plt.tight_layout()
+        plt.show()
+        return pivot
+
+
+
+
+    # ---------------------------------------
+    # comparison mode
+    # ---------------------------------------
+    compare_df = _filter_results(compare_results)
+
+    if len(compare_df) == 0:
+        raise ValueError('No rows found in compare_results after filtering')
+
+    compare_pivot = _make_pivot(compare_df, score_col)
+
+    pivot_aligned, compare_pivot_aligned = pivot.align(compare_pivot)
+    diff_pivot = pivot_aligned - compare_pivot_aligned
+
+    if compare_label is None:
+        compare_label = 'compare_results'
+
+    if compare_plot == 'difference':
+        fig, ax = plt.subplots(figsize=(6, max(4, 0.4 * len(diff_pivot))))
+        _plot_single_heatmap(
+            ax=ax,
+            pivot=diff_pivot,
+            title=f'{base_title} | minus {compare_label}',
+            cbar_label=f'{score_col} difference',
+            plot_kind='difference',
+        )
+        plt.tight_layout()
+        plt.show()
+
+    elif compare_plot == 'side_by_side':
+        fig, axes = plt.subplots(
+            1,
+            2,
+            figsize=(12, max(4, 0.4 * len(pivot_aligned))),
+            constrained_layout=True,
+        )
+
+        _plot_single_heatmap(
+            ax=axes[0],
+            pivot=pivot_aligned,
+            title=f'{base_title} | primary',
+            cbar_label=score_col,
+            plot_kind='raw',
+        )
+
+        _plot_single_heatmap(
+            ax=axes[1],
+            pivot=diff_pivot,
+            title=f'{base_title} | minus {compare_label}',
+            cbar_label=f'{score_col} difference',
+            plot_kind='difference',
+        )
+
+        plt.show()
+
+    elif compare_plot == 'three_panel':
+        fig, axes = plt.subplots(
+            1,
+            3,
+            figsize=(18, max(4, 0.4 * len(pivot_aligned))),
+            constrained_layout=True,
+        )
+
+        _plot_single_heatmap(
+            ax=axes[0],
+            pivot=pivot_aligned,
+            title=f'{base_title} | primary',
+            cbar_label=score_col,
+            plot_kind='raw',
+        )
+
+        _plot_single_heatmap(
+            ax=axes[1],
+            pivot=compare_pivot_aligned,
+            title=f'{base_title} | {compare_label}',
+            cbar_label=score_col,
+            plot_kind='raw',
+        )
+
+        _plot_single_heatmap(
+            ax=axes[2],
+            pivot=diff_pivot,
+            title=f'{base_title} | primary minus {compare_label}',
+            cbar_label=f'{score_col} difference',
+            plot_kind='difference',
+        )
+
+        plt.show()
+
+    else:
+        raise ValueError(
+            "compare_plot must be 'difference', 'side_by_side', or 'three_panel'"
+        )
+
+    return {
+        'raw_pivot': pivot_aligned,
+        'compare_pivot': compare_pivot_aligned,
+        'diff_pivot': diff_pivot,
+    }

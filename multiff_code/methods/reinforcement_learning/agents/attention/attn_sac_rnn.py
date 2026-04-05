@@ -781,7 +781,7 @@ class AttnRNNSACforMultifirefly:
     '''
 
     def __init__(self,
-                 model_folder: str = 'multiff_analysis/RL_models/ATTN_RNN/agent_0/',
+                 model_folder: str = 'RL_models/ATTN_RNN/agent_0/',
                  device: Optional[str] = None,
                  seed: int = 42,
                  **env_kwargs):

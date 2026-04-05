@@ -8,9 +8,8 @@ from joblib import Parallel, delayed
 import os
 import numpy as np
 import pandas as pd
-import numpy as np
 from sklearn.linear_model import RidgeCV
-from sklearn.model_selection import KFold, cross_val_score
+from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import StandardScaler
 
 os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"
@@ -20,31 +19,36 @@ def time_resolved_regression_cv(
     concat_neural_trials, concat_behav_trials, cv_folds=5, n_jobs=-1,
     alphas=np.logspace(-6, 6, 13), nested=False,
 ):
-    assert concat_neural_trials[['new_segment', 'new_bin']].equals(
-        concat_behav_trials[['new_segment', 'new_bin']]
+    
+    assert concat_neural_trials[['new_segment', 'bin_in_new_seg']].equals(
+        concat_behav_trials[['new_segment', 'bin_in_new_seg']]
     ), "Mismatch in data dimensions"
 
     n_behaviors = concat_behav_trials.shape[1]
 
-    new_bins = np.sort(concat_neural_trials['new_bin'].unique())
+    new_bins = np.sort(concat_neural_trials['bin_in_new_seg'].unique())
     kf = KFold(n_splits=cv_folds, shuffle=True)
 
-    neural_data_only = concat_neural_trials[
-        [col for col in concat_neural_trials.columns if col.startswith(
-            'dim_') or col == 'new_bin']
+    # Some column labels may not be strings (e.g., numeric column names), so
+    # guard before calling `.startswith`.
+    selected_cols = [
+        col
+        for col in concat_neural_trials.columns
+        if (isinstance(col, str) and col.startswith('dim_')) or col == 'bin_in_new_seg'
     ]
+    neural_data_only = concat_neural_trials[selected_cols]
 
-    neural_grouped = neural_data_only.groupby('new_bin')
-    behav_grouped = concat_behav_trials.groupby('new_bin')
+    neural_grouped = neural_data_only.groupby('bin_in_new_seg')
+    behav_grouped = concat_behav_trials.groupby('bin_in_new_seg')
 
     used_new_bins = []
     XYs = []
     trial_counts = []
 
-    for new_bin in new_bins:
+    for bin_in_new_seg in new_bins:
         try:
-            X_df = neural_grouped.get_group(new_bin)
-            Y_df = behav_grouped.get_group(new_bin)
+            X_df = neural_grouped.get_group(bin_in_new_seg)
+            Y_df = behav_grouped.get_group(bin_in_new_seg)
         except KeyError:
             continue
 
@@ -54,7 +58,7 @@ def time_resolved_regression_cv(
         if X.shape[0] < cv_folds:
             continue
 
-        used_new_bins.append(new_bin)
+        used_new_bins.append(bin_in_new_seg)
         trial_counts.append(len(X))
         XYs.append((X, Y))
 
@@ -74,13 +78,13 @@ def time_resolved_regression_cv(
     r2s_flat, alphas_flat = [], []
     all_new_bins, all_features, all_folds, trial_count_repeated = [], [], [], []
 
-    for i, (new_bin, r2_mat, alpha_mat) in enumerate(zip(used_new_bins, r2s, all_best_alphas)):
+    for i, (bin_in_new_seg, r2_mat, alpha_mat) in enumerate(zip(used_new_bins, r2s, all_best_alphas)):
         for b, feature in enumerate(behavior_names):
             n_folds_actual = len(r2_mat[b])
             for fold in range(n_folds_actual):
                 r2s_flat.append(r2_mat[b][fold])
                 alphas_flat.append(alpha_mat[b][fold])
-                all_new_bins.append(new_bin)
+                all_new_bins.append(bin_in_new_seg)
                 all_features.append(feature)
                 all_folds.append(fold)
                 trial_count_repeated.append(trial_counts[i])
@@ -88,7 +92,7 @@ def time_resolved_regression_cv(
     time_resolved_cv_scores = pd.DataFrame({
         'feature': all_features,
         'fold': all_folds,
-        'new_bin': all_new_bins,
+        'bin_in_new_seg': all_new_bins,
         'trial_count': np.repeat(trial_counts, n_behaviors * cv_folds),
         'r2': r2s_flat,
         'best_alpha': alphas_flat

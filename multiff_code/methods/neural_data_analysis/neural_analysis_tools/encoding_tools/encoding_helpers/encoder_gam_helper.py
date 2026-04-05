@@ -21,12 +21,12 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 
 
 
-DEFAULT_VAR_CATEGORIES = {
+DEFAULT_ENCODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w", "accel", "ang_accel"],
     "latent_vars": ["cur_ff_distance", "cur_ff_angle", "nxt_ff_distance", "nxt_ff_angle"], # originally ["r_targ", "theta_targ"] in one-ff
     "position_vars": ["d", "phi"],
     "eye_position_vars": ["eye_ver", "eye_hor"],
-    "event_vars": ["stop"],
+    "event_vars": ["stop", "capture"],
     "spike_hist_vars": ["spike_hist"],
     "visibility_vars": ["cur_vis", "nxt_vis", "cur_in_memory", "nxt_in_memory"],
     "ff_count_vars": ["num_ff_visible", "num_ff_in_memory", "log1p_num_ff_visible", "log1p_num_ff_in_memory"],
@@ -35,25 +35,30 @@ DEFAULT_VAR_CATEGORIES = {
 }
 
 # All non-spike variables
-DEFAULT_VAR_CATEGORIES['non_spike_vars'] = [
+DEFAULT_ENCODING_VAR_CATEGORIES['non_spike_vars'] = [
     var
-    for category, vars_list in DEFAULT_VAR_CATEGORIES.items()
+    for category, vars_list in DEFAULT_ENCODING_VAR_CATEGORIES.items()
     if category != 'spike_hist_vars'
     for var in vars_list
 ]
 
-STOP_VAR_CATEGORIES = copy.deepcopy(DEFAULT_VAR_CATEGORIES)
-STOP_VAR_CATEGORIES.update({
+FS_ENCODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_ENCODING_VAR_CATEGORIES)
+FS_ENCODING_VAR_CATEGORIES['event_vars'].extend(['ff_on', 'ff_off', 'group_ff_on', 'group_ff_off',
+                                                 ])
+FS_ENCODING_VAR_CATEGORIES['visibility_vars'].extend(['time_since_prev_ff_visible', 'time_since_global_burst_start'])
+
+STOP_ENCODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_ENCODING_VAR_CATEGORIES)
+STOP_ENCODING_VAR_CATEGORIES.update({
     "cluster_vars": [
         "event_is_first_in_cluster", "gap_since_prev", "gap_till_next",
         "cluster_duration", "cluster_progress", "bin_t_from_cluster", "log_n_events", "event_t_from_cluster",
     ],
 })
-VIS_VAR_CATEGORIES = copy.deepcopy(STOP_VAR_CATEGORIES)
-VIS_VAR_CATEGORIES.update({'visibility_vars': ["ff_on", "group_ff_on", "ff_off", "group_ff_off"]})
+VIS_ENCODING_VAR_CATEGORIES = copy.deepcopy(STOP_ENCODING_VAR_CATEGORIES)
+VIS_ENCODING_VAR_CATEGORIES['event_vars'].extend(["ff_on", "group_ff_on", "ff_off", "group_ff_off"])
 
-PN_VAR_CATEGORIES = copy.deepcopy(DEFAULT_VAR_CATEGORIES)
-PN_VAR_CATEGORIES.update({'event_vars': ["cur_ff_on", 'cur_ff_off']})
+PN_ENCODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_ENCODING_VAR_CATEGORIES)
+PN_ENCODING_VAR_CATEGORIES.update({'event_vars': ["cur_ff_on", 'cur_ff_off']})
 
 
 
@@ -97,7 +102,7 @@ class BaseEncodingGAMAnalysisHelper:
         var_categories: Optional[Dict[str, List[str]]] = None,
     ):
         self.runner = runner
-        self.var_categories = var_categories or DEFAULT_VAR_CATEGORIES
+        self.var_categories = var_categories or DEFAULT_ENCODING_VAR_CATEGORIES
         self.gam_results_subdir = runner.get_gam_results_subdir()
         
 
@@ -149,12 +154,12 @@ class BaseEncodingGAMAnalysisHelper:
         return design_df.loc[:, cols_in_order], groups_kept
 
     @staticmethod
-    def _full_model_cv_path(outdir: Path) -> Path:
-        return outdir / "cv_var_explained" / "full_model.pkl"
+    def _full_model_cv_path(cv_root: Path) -> Path:
+        return cv_root / "full_model.pkl"
 
     @staticmethod
-    def _category_cv_path(outdir: Path, category_name: str) -> Path:
-        return outdir / "cv_var_explained" / f"leave_out_{category_name}.pkl"
+    def _category_cv_path(cv_root: Path, category_name: str) -> Path:
+        return cv_root / f"leave_out_{category_name}.pkl"
 
     @staticmethod
     def _run_crossval(
@@ -168,6 +173,7 @@ class BaseEncodingGAMAnalysisHelper:
         buffer_samples: int,
         load_if_exists: bool,
         cv_mode: str = "blocked_time_buffered",
+        cv_groups=None,
     ) -> Dict:
         return gam_variance_explained._crossval_variance_explained(
             fit_function=one_ff_gam_fit.fit_poisson_gam,
@@ -187,6 +193,7 @@ class BaseEncodingGAMAnalysisHelper:
             load_if_exists=load_if_exists,
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
+            cv_groups=cv_groups,
         )
 
     @staticmethod
@@ -218,8 +225,9 @@ class BaseEncodingGAMAnalysisHelper:
         category_names: Optional[List[str]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
-        cv_mode: str = "blocked_time_buffered",
+        cv_mode: Optional[str] = None,
         use_neural_coupling: bool = False,
+        verbose: bool = True,
     ) -> Dict:
         if category_names is None:
             category_names = list(self.var_categories.keys())
@@ -235,25 +243,33 @@ class BaseEncodingGAMAnalysisHelper:
             raise ValueError(
                 "var_categories cannot be empty for run_category_variance_contributions")
 
-        outdir = self._neuron_outdir(
-            unit_idx,
-            ensure_dirs=["cv_var_explained"],
-            use_neural_coupling=use_neural_coupling,
+        resolved_cv_mode = (
+            cv_mode
+            if cv_mode is not None
+            else getattr(self.runner, "cv_mode", "blocked_time_buffered")
         )
-        full_path = self._full_model_cv_path(outdir)
+        paths = self.runner.get_gam_save_paths(
+            unit_idx=unit_idx,
+            use_neural_coupling=use_neural_coupling,
+            ensure_dirs=True,
+            cv_mode=resolved_cv_mode,
+        )
+        outdir = paths["outdir"]
+        cv_root = Path(paths["cv_save_path"]).parent
+        full_path = self._full_model_cv_path(cv_root)
         load_ok = load_if_exists or retrieve_only
         full_cv = gam_variance_explained.maybe_load_saved_crossval(
             save_path=full_path,
             load_if_exists=load_ok,
-            verbose=False,
+            verbose=verbose,
         )
         
         category_loads = {}
         for cat in category_names:
             cv = gam_variance_explained.maybe_load_saved_crossval(
-                save_path=self._category_cv_path(outdir, cat),
+                save_path=self._category_cv_path(cv_root, cat),
                 load_if_exists=load_ok,
-                verbose=False,
+                verbose=verbose,
             )
             if cv is not None:
                 category_loads[cat] = cv
@@ -287,6 +303,16 @@ class BaseEncodingGAMAnalysisHelper:
             lam_cfg = self._resolve_lambda_config(lambda_config)
             available_group_names = []
 
+        cv_groups_for_kfold = None
+        if resolved_cv_mode == "group_kfold" and need_compute and design_df is not None:
+            cv_groups_for_kfold = self.runner.get_cv_groups_for_design(design_df)
+            if cv_groups_for_kfold is None:
+                raise ValueError(
+                    "cv_mode='group_kfold' requires per-sample group labels. "
+                    "Ensure design has 'new_segment', or runner.trial_ids / "
+                    "meta_df_used['event_id'] aligns row-wise with the design."
+                )
+
         if full_cv is None:
             full_cv = self._run_crossval(
                 design_df=design_df,
@@ -297,7 +323,8 @@ class BaseEncodingGAMAnalysisHelper:
                 n_folds=n_folds,
                 buffer_samples=buffer_samples,
                 load_if_exists=load_if_exists,
-                cv_mode=cv_mode,
+                cv_mode=resolved_cv_mode,
+                cv_groups=cv_groups_for_kfold,
             )
 
         contributions = {}
@@ -335,11 +362,13 @@ class BaseEncodingGAMAnalysisHelper:
                     design_df=reduced_df,
                     y=y,
                     groups=reduced_groups,
-                    save_path=self._category_cv_path(outdir, category_name),
+                    save_path=self._category_cv_path(cv_root, category_name),
                     dt=float(self.runner.bin_width),
                     n_folds=n_folds,
                     buffer_samples=buffer_samples,
                     load_if_exists=load_if_exists,
+                    cv_mode=resolved_cv_mode,
+                    cv_groups=cv_groups_for_kfold,
                 )
             contributions[category_name] = {
                 "vars": category_aliases,
@@ -358,7 +387,7 @@ class BaseEncodingGAMAnalysisHelper:
 
         contrib_df = pd.DataFrame.from_dict(contributions, orient="index")
         contrib_df.index.name = "category"
-        contrib_csv = outdir / "cv_var_explained" / "category_contributions.csv"
+        contrib_csv = cv_root / "category_contributions.csv"
         contrib_df.to_csv(contrib_csv)
         return {
             "full_cv_result": full_cv,
@@ -377,9 +406,16 @@ class BaseEncodingGAMAnalysisHelper:
         retrieve_only: bool = False,
         load_if_exists: bool = True,
         use_neural_coupling: bool = False,
+        cv_mode: Optional[str] = None,
     ) -> Dict:
         outdir = self._neuron_outdir(unit_idx, use_neural_coupling=use_neural_coupling)
-        save_path = outdir / "penalty_tuning.pkl"
+        resolved_cv = (
+            cv_mode if cv_mode is not None
+            else getattr(self.runner, "cv_mode", None) or "blocked_time_buffered"
+        )
+        penalty_dir = outdir / "penalty_tuning" / str(resolved_cv)
+        penalty_dir.mkdir(parents=True, exist_ok=True)
+        save_path = penalty_dir / "penalty_tuning.pkl"
         if retrieve_only and not save_path.exists():
             raise FileNotFoundError(
                 f"No tuning results file found at: {save_path}")
@@ -468,16 +504,19 @@ class BaseEncodingGAMAnalysisHelper:
         load_if_exists: bool = True,
         retrieve_only: bool = False,
         use_neural_coupling: bool = False,
+        cv_mode: Optional[str] = None,
     ) -> Dict:
-        outdir = self._neuron_outdir(
-            unit_idx,
-            ensure_dirs=["backward_elimination"],
-            use_neural_coupling=use_neural_coupling,
+        outdir = self._neuron_outdir(unit_idx, use_neural_coupling=use_neural_coupling)
+        resolved_cv = (
+            cv_mode if cv_mode is not None
+            else getattr(self.runner, "cv_mode", None) or "blocked_time_buffered"
         )
+        be_dir = outdir / "backward_elimination" / str(resolved_cv)
+        be_dir.mkdir(parents=True, exist_ok=True)
         lam_cfg = self._resolve_lambda_config(lambda_config)
         lam_suffix = one_ff_gam_fit.generate_lambda_suffix(
             lambda_config=lam_cfg)
-        save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
+        save_path = be_dir / f"{lam_suffix}.pkl"
         if retrieve_only and not save_path.exists():
             raise FileNotFoundError(
                 f"No backward elimination result found at: {save_path}")
@@ -490,7 +529,7 @@ class BaseEncodingGAMAnalysisHelper:
                 for g in loaded.get("kept_groups", [])
             ]
             history = loaded.get("history", [])
-            history_csv = outdir / "backward_elimination" / "history.csv"
+            history_csv = be_dir / "history.csv"
             if history:
                 pd.DataFrame(history).to_csv(history_csv, index=False)
             else:
@@ -530,7 +569,7 @@ class BaseEncodingGAMAnalysisHelper:
                 save_metadata={
                     "structured_meta_groups": self._get_structured_meta_groups()},
             )
-        history_csv = outdir / "backward_elimination" / "history.csv"
+        history_csv = be_dir / "history.csv"
         if history:
             pd.DataFrame(history).to_csv(history_csv, index=False)
         else:
@@ -572,7 +611,7 @@ class BaseEncodingGAMAnalysisHelper:
         load_if_exists: bool = True,
         save_metadata: Optional[Dict] = None,
         verbose: bool = True,
-        cv_mode: Optional[str] = 'blocked_time_buffered',
+        cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
         cv_groups=None,
         use_neural_coupling: bool = False,
@@ -581,15 +620,22 @@ class BaseEncodingGAMAnalysisHelper:
         Perform cross-validation for tuning curve coefficients.
 
         Automatically saves to:
-        {save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/cv_tuning_coef/{lam_suffix}.pkl
+        {save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/cv_tuning_coef/{cv_mode}/{lam_suffix}.pkl
         """
+        resolved_cv_mode = (
+            cv_mode
+            if cv_mode is not None
+            else getattr(self.runner, "cv_mode", "blocked_time_buffered")
+        )
 
         # -------------------------------------------------
         # Auto-generate save path
         # -------------------------------------------------
         if save_path is None:
             save_path = self._auto_build_cv_save_path(
-                unit_idx, use_neural_coupling=use_neural_coupling
+                unit_idx,
+                use_neural_coupling=use_neural_coupling,
+                cv_mode=resolved_cv_mode,
             )
 
         design_df, y, groups, lambda_config = self._unit_context(
@@ -626,6 +672,14 @@ class BaseEncodingGAMAnalysisHelper:
         if fit_kwargs is None:
             fit_kwargs = {'max_iter': 1000, 'tol': 1e-6, 'verbose': False}
 
+        if resolved_cv_mode == 'group_kfold' and cv_groups is None:
+            cv_groups = self.runner.get_cv_groups_for_design(design_df)
+            if cv_groups is None:
+                raise ValueError(
+                    "group_kfold requires cv_groups or inferable trial/segment ids "
+                    "(design 'new_segment', runner.trial_ids, or meta_df_used['event_id'])."
+                )
+
         # -------------------------------------------------
         # Build splitter
         # -------------------------------------------------
@@ -633,7 +687,7 @@ class BaseEncodingGAMAnalysisHelper:
             y=y,
             n_folds=n_folds,
             random_state=random_state,
-            cv_mode=cv_mode,
+            cv_mode=resolved_cv_mode,
             cv_groups=cv_groups,
         )
 
@@ -643,7 +697,7 @@ class BaseEncodingGAMAnalysisHelper:
         fold_coef_list = []
         fold_indices = []
 
-        if cv_mode == 'group_kfold':
+        if resolved_cv_mode == 'group_kfold':
             fold_iter = splitter.split(y, groups=cv_groups)
         else:
             fold_iter = splitter.split(y)
@@ -651,7 +705,7 @@ class BaseEncodingGAMAnalysisHelper:
         for fold_idx, (train_idx, test_idx) in enumerate(fold_iter):
 
             # Apply buffer for blocked_time_buffered
-            if cv_mode == 'blocked_time_buffered' and buffer_samples > 0:
+            if resolved_cv_mode == 'blocked_time_buffered' and buffer_samples > 0:
                 if len(test_idx) > 0:
                     min_test = test_idx.min()
                     train_idx = train_idx[train_idx < (min_test - buffer_samples)]
@@ -697,7 +751,7 @@ class BaseEncodingGAMAnalysisHelper:
             'std_coef': std_coef,
             'fold_indices': fold_indices,
             'unit_idx': unit_idx,
-            'cv_mode': cv_mode,
+            'cv_mode': resolved_cv_mode,
             'n_folds': n_folds,
             'random_state': random_state,
             'save_path': save_path,
@@ -764,6 +818,13 @@ class BaseEncodingGAMAnalysisHelper:
                 raise ValueError('cv_groups required for group_kfold mode')
             return GroupKFold(n_splits=n_folds)
 
+        if cv_mode == 'kfold':
+            return KFold(
+                n_splits=n_folds,
+                shuffle=True,
+                random_state=random_state,
+            )
+
         raise ValueError(f'Unknown cv_mode: {cv_mode}')
 
 
@@ -791,17 +852,21 @@ class BaseEncodingGAMAnalysisHelper:
         self,
         unit_idx: int,
         use_neural_coupling: bool = False,
+        cv_mode: Optional[str] = None,
     ) -> str:
         paths = self.runner.get_gam_save_paths(
             unit_idx=unit_idx,
             use_neural_coupling=use_neural_coupling,
             ensure_dirs=False,
+            cv_mode=cv_mode,
         )
 
         outdir = paths['outdir']
         lam_suffix = paths['lam_suffix']
 
         cv_tuning_dir = outdir / 'cv_tuning_coef'
+        if cv_mode:
+            cv_tuning_dir = cv_tuning_dir / str(cv_mode)
         cv_tuning_dir.mkdir(parents=True, exist_ok=True)
 
         return str(cv_tuning_dir / f'{lam_suffix}.pkl')

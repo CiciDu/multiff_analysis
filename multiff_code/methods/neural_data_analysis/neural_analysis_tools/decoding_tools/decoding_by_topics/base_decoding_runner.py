@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
 import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor, CatBoostError
@@ -16,12 +18,12 @@ from sklearn.utils.multiclass import type_of_target
 import matplotlib.pyplot as plt
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
-    decode_stops_utils, plot_decoding_utils
+    plot_decoding_utils
 )
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
     cv_decoding,
 )
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_model_specs
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_model_specs, smooth_neural_data
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_decoding_runner
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import show_decoding_results
@@ -40,10 +42,24 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     - _default_readout_varnames(): default vars for linear readout
     """
 
-    def __init__(self, bin_width: float = 0.04, detrend_spikes: bool = False):
+    def __init__(
+        self,
+        bin_width: float = 0.04,
+        smoothing_width: int | None = None,
+        detrend_spikes: bool = False,
+        drop_bad_neurons: bool = True,
+        cv_mode: str = "group_kfold",
+    ):
+        
         self.bin_width = bin_width
         self.stats: Dict = {}
+        self.smooth_spikes = True if smoothing_width is not None else False
+        self.smoothing_width = smoothing_width
         self.detrend_spikes = detrend_spikes
+        self.drop_bad_neurons = drop_bad_neurons
+
+        # Cross-validation strategy (e.g. 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold')
+        self.cv_mode = cv_mode
         
         # Filled during setup
         self.feats_to_decode = None
@@ -90,6 +106,31 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """Base save directory for outputs."""
         raise NotImplementedError
 
+    def _get_save_dir_common(self, decoder_outputs_dirname: str) -> str:
+        """
+        Common save dir builder for decoding runners.
+
+        Subfolder rule:
+        - if smoothing is enabled: smooth/width_{smoothing_width}
+        - elif detrending is enabled: detrended
+        - else: raw
+        """
+        if getattr(self, "smooth_spikes", False):
+            sub = os.path.join("smooth", f"width_{int(self.smoothing_width)}")
+        elif getattr(self, "detrend_spikes", False):
+            sub = "detrended"
+        else:
+            sub = "raw"
+            
+        self.save_dir = os.path.join(
+            self.pn.planning_and_neural_folder_path,
+            "decoding_outputs",
+            decoder_outputs_dirname,
+            sub,
+        )
+
+        return self.save_dir
+
     def _runner_name(self) -> str:
         """Name for log messages. Override in subclass."""
         return self.__class__.__name__
@@ -106,18 +147,21 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         model_specs=None,
         shuffle_mode: str = "none",
         fit_kernelwidth: bool = True,
-        candidate_widths: Sequence[int] = tuple(range(2, 6, 1)),
+        candidate_widths: Sequence[int] = tuple(range(1, 6, 1)),
         fixed_width: int = 25,
         inner_cv_splits: int = 5,
-        cv_mode: str = "blocked_time_buffered",  # can be 'blocked_time_buffered', 'blocked_time', 'group_kfold'
+        cv_mode: Optional[str] = None,  # 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold'
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
         use_detrend_inside_cv: bool = False,
     ) -> pd.DataFrame:
-
+    
         if save_dir is None:
-            save_dir = Path(self._get_save_dir())    
+            save_dir = Path(self._get_save_dir())
+
+        # Resolve cv_mode: use argument if provided, otherwise default to instance setting
+        cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         
         """Run CV decoding. Delegates to run_cv_decoding."""
         self.all_results = self.run_cv_decoding(
@@ -130,15 +174,15 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             candidate_widths=candidate_widths,
             fixed_width=fixed_width,
             inner_cv_splits=inner_cv_splits,
-            cv_mode=cv_mode,
             load_if_exists=load_if_exists,
             load_existing_only=load_existing_only,
             cv_decoding_verbosity=cv_decoding_verbosity,
             use_detrend_inside_cv=use_detrend_inside_cv,
+            cv_mode=cv_mode,
         )
         
         if cv_mode is not None and 'cv_mode' in self.all_results.columns:
-            self.results_df = self.all_results[self.all_results['cv_mode'] == cv_mode] 
+            self.results_df = self.all_results[self.all_results['cv_mode'] == cv_mode]
         else:
             self.results_df = self.all_results.copy()
 
@@ -169,7 +213,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         df["model_name"] = model_name
         df["n_splits"] = n_splits
         df["shuffle_mode"] = shuffle_mode
-        df["cv_mode"] = config.cv_mode if cv_mode is None else cv_mode
+        df["cv_mode"] = cv_mode
         df["buffer_samples"] = buffer_samples
         df["context"] = context_label
 
@@ -203,6 +247,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         *,
         shuffle_mode: str = "none",
         groups_train=None,
+        groups_test=None,
+        kernelwidth_by_feature=None,
         detrend_cov_train=None,
         detrend_cov_test=None,
     ) -> Dict:
@@ -229,10 +275,31 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             train_valid = np.isfinite(y_train)
             test_valid = np.isfinite(y_test)
 
-            X_tr = X_train[train_valid]
+            # Optionally smooth neural data with a feature-specific kernel width
+            if kernelwidth_by_feature is not None and groups_train is not None and groups_test is not None:
+                width = kernelwidth_by_feature.get(col, None)
+                if width is not None:
+                    X_train_sm = smooth_neural_data.smooth_signal(
+                        X_train,
+                        int(width),
+                        trial_idx=groups_train,
+                    )
+                    X_test_sm = smooth_neural_data.smooth_signal(
+                        X_test,
+                        int(width),
+                        trial_idx=groups_test,
+                    )
+                else:
+                    X_train_sm = X_train
+                    X_test_sm = X_test
+            else:
+                X_train_sm = X_train
+                X_test_sm = X_test
+
+            X_tr = X_train_sm[train_valid]
             y_tr = y_train[train_valid].copy()
             g_tr = groups_train[train_valid] if groups_train is not None else None
-            X_te = X_test[test_valid]
+            X_te = X_test_sm[test_valid]
             y_te = y_test[test_valid]
 
             if len(y_tr) == 0 or len(y_te) == 0:
@@ -431,10 +498,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         model_specs=None,
         shuffle_mode: str = "none",
         fit_kernelwidth: bool = False,
-        candidate_widths: Sequence[int] = tuple(range(2, 6, 1)),
+        candidate_widths: Sequence[int] = tuple(range(1, 6, 1)),
         fixed_width: int = 25,
         inner_cv_splits: int = 5,
-        cv_mode: str = "blocked_time_buffered",
+        cv_mode: Optional[str] = None,
         load_if_exists: bool = True,
         load_existing_only: bool = False,
         cv_decoding_verbosity=1,
@@ -444,6 +511,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         Run cross-validated model-spec decoding with optional nested CV
         for kernel width tuning.
         """
+
+        # Resolve cv_mode: use argument if provided, otherwise default to instance setting
+        cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
         # --------------------------------------------------------
         # Prepare environment
@@ -460,7 +530,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         if save_dir is None:
             save_dir = self._get_save_dir()
 
-        if shuffle_mode != "none":
+        if (shuffle_mode is not None) and (shuffle_mode != 'none'):
             save_dir = Path(save_dir) / f"shuffle_{shuffle_mode}"
             save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -521,6 +591,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         use_detrend_inside_cv: bool = False,
     ):
 
+        # Resolve cv_mode: use argument if provided, otherwise default to instance setting
+        cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         detrend_covariates = self.get_detrend_covariates() if use_detrend_inside_cv else None
         groups = self._get_groups()
         detrend_per_block = spec.get("detrend_per_block", True)
@@ -573,7 +645,6 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             classification_model_class=spec.get("classification_model_class"),
             classification_model_kwargs=spec.get("classification_model_kwargs", {}),
             use_early_stopping=False,
-            cv_mode=cv_mode,
             detrend_per_block=spec.get("detrend_per_block", True),
         )
 
@@ -670,10 +741,17 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         verbosity,
         detrend_covariates=None,
     ):
+        # Resolve cv_mode: use argument if provided, otherwise default to instance setting
+        cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
         X = self._get_neural_matrix()
+        groups = self._get_groups()
         if fixed_width > 0:
-            X = decode_stops_utils.smooth_signal(X, int(fixed_width))
+            X = smooth_neural_data.smooth_signal(
+                X,
+                int(fixed_width),
+                trial_idx=groups,
+            )
 
         results_df = cv_decoding.run_cv_decoding(
             X=X,
@@ -689,9 +767,11 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             load_existing_only=load_existing_only,
             verbosity=verbosity,
             detrend_covariates=detrend_covariates,
+            cv_mode=cv_mode,
         )
 
         results_df["kernelwidth"] = fixed_width
+        results_df["cv_mode"] = cv_mode
 
         self.cv_decoding_out_of_models[model_name] = {
             "results_df": results_df,
@@ -743,6 +823,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             _build_folds,
         )
 
+        # Resolve cv_mode: use argument if provided, otherwise default to instance setting
+        cv_mode = cv_mode if cv_mode is not None else self.cv_mode
+
         X = self._get_neural_matrix()
         y_df = self.get_target_df()
         groups = self._get_groups()
@@ -760,18 +843,25 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         fold_tuning_info = []
         width_results_all_folds = []
 
+        groups = self._get_groups()
+
         for fold_idx, (train_idx, test_idx) in enumerate(outer_splits):
+
+            # Slice CV groups (for folds) and trial_idx (for smoothing) separately
+            groups_train = groups[train_idx] if groups is not None else None
+            groups_test = groups[test_idx] if groups is not None else None
 
             best_width, width_scores, width_results = self._run_inner_kernelwidth_search(
                 X=X[train_idx],
                 y_df=y_df.iloc[train_idx],
-                groups=groups[train_idx] if groups is not None else None,
+                groups=groups_train,
                 config=config,
                 candidate_widths=candidate_widths,
                 inner_cv_splits=inner_cv_splits,
                 verbosity=verbosity,
                 shuffle_mode=shuffle_mode,
                 detrend_covariates=detrend_covariates.iloc[train_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[train_idx] if detrend_covariates is not None else None),
+                cv_mode=cv_mode,
             )
 
             fold_result = self._evaluate_outer_fold(
@@ -779,16 +869,21 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 y_train=y_df.iloc[train_idx],
                 X_test=X[test_idx],
                 y_test=y_df.iloc[test_idx],
-                best_width=best_width,
+                best_width_by_feature=best_width,
                 config=config,
                 shuffle_mode=shuffle_mode,
-                groups_train=groups[train_idx] if groups is not None else None,
+                groups_train=groups_train,
+                groups_test=groups_test,
                 detrend_cov_train=detrend_covariates.iloc[train_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[train_idx] if detrend_covariates is not None else None),
                 detrend_cov_test=detrend_covariates.iloc[test_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[test_idx] if detrend_covariates is not None else None),
             )
 
             fold_result["fold"] = fold_idx
-            fold_result["kernelwidth"] = best_width
+            # Map per-feature best widths into the results rows
+            if isinstance(best_width, dict) and "behav_feature" in fold_result.columns:
+                fold_result["kernelwidth"] = fold_result["behav_feature"].map(best_width).astype(float)
+            else:
+                fold_result["kernelwidth"] = best_width
 
             outer_results.append(fold_result)
             fold_tuning_info.append(width_scores)
@@ -803,6 +898,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         results_df = pd.concat(outer_results, ignore_index=True)
         results_df['model_name'] = model_name
+        results_df["cv_mode"] = cv_mode
 
         # combined per-width inner-CV results across folds
         if width_results_all_folds:
@@ -854,18 +950,27 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         verbosity,
         shuffle_mode,
         detrend_covariates=None,
+        cv_mode=None,
     ):
 
-        best_width = None
-        best_score = -np.inf
+        # Track best width per feature (behav_feature)
+        best_width = {}
+        best_score = {}
         width_scores = {}
         width_results = {}
+        
+        cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
         for width in candidate_widths:
 
-            X_smooth = decode_stops_utils.smooth_signal(X, int(width))
+            X_smooth = smooth_neural_data.smooth_signal(
+                X,
+                int(width),
+                trial_idx=groups,
+            )
 
             inner_df = cv_decoding.run_cv_decoding(
+                cv_mode=cv_mode,
                 X=X_smooth,
                 y_df=y_df,
                 behav_features=None,
@@ -889,18 +994,47 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 inner_df_copy["kernelwidth"] = int(width)
             width_results[int(width)] = inner_df_copy
 
+            # Overall width score (mean across all features for plotting)
+            if inner_df is None or inner_df.empty or "mode" not in inner_df.columns:
+                width_scores[int(width)] = float("nan")
+                continue
+
+            n = len(inner_df)
+            r_cv = (
+                inner_df["r_cv"].to_numpy(dtype=float)
+                if "r_cv" in inner_df.columns
+                else np.full(n, np.nan)
+            )
+            auc_mean = (
+                inner_df["auc_mean"].to_numpy(dtype=float)
+                if "auc_mean" in inner_df.columns
+                else np.full(n, np.nan)
+            )
             metric_scores = np.where(
-                inner_df["mode"] == "regression",
-                inner_df["r_cv"],
-                inner_df["auc_mean"],
+                inner_df["mode"].to_numpy() == "regression",
+                r_cv,
+                auc_mean,
             )
 
             mean_score = float(np.nanmean(metric_scores))
             width_scores[int(width)] = mean_score
 
-            if mean_score > best_score:
-                best_score = mean_score
-                best_width = int(width)
+            # Per-feature best widths
+            for _, row in inner_df.iterrows():
+                feat = row.get("behav_feature", None)
+                if feat is None:
+                    continue
+                mode = row.get("mode")
+                if mode == "regression":
+                    score = row.get("r_cv", np.nan)
+                else:
+                    score = row.get("auc_mean", np.nan)
+                if not np.isfinite(score):
+                    continue
+                prev_best = best_score.get(feat, -np.inf)
+                if score > prev_best:
+                    best_score[feat] = float(score)
+                    best_width[feat] = int(width)
 
         return best_width, width_scores, width_results
 
@@ -916,16 +1050,14 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         y_train,
         X_test,
         y_test,
-        best_width,
+        best_width_by_feature,
         config,
         shuffle_mode: str = "none",
         groups_train=None,
+        groups_test=None,
         detrend_cov_train=None,
         detrend_cov_test=None,
     ):
-
-        X_train = decode_stops_utils.smooth_signal(X_train, int(best_width))
-        X_test = decode_stops_utils.smooth_signal(X_test, int(best_width))
 
         return self._train_test_single_fold(
             X_train,
@@ -935,6 +1067,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             config,
             shuffle_mode=shuffle_mode,
             groups_train=groups_train,
+            groups_test=groups_test,
+            kernelwidth_by_feature=best_width_by_feature,
             detrend_cov_train=detrend_cov_train,
             detrend_cov_test=detrend_cov_test,
         )
@@ -977,3 +1111,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         )
 
         self.regression_feature_scores_df = df.copy()
+
+    def get_processed_spike_rates(self):
+        self.processed_spike_rates = decoding_design_utils.get_processed_spike_rates(
+            self.pn.spikes_df,
+            smooth_spikes=self.smooth_spikes,
+            detrend_spikes=self.detrend_spikes,
+            smoothing_width=self.smoothing_width,
+            drop_bad_neurons=self.drop_bad_neurons,
+        )

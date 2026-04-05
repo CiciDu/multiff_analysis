@@ -19,8 +19,8 @@ REGRESSORS = {
     ],
 
     'capture_events': [
-        'capture_ff:b0:0', 'capture_ff:b0:1', 'capture_ff:b0:2',
-        'capture_ff:b0:3', 'capture_ff:b0:4', 'capture_ff:b0:5',
+        'capture:b0:0', 'capture:b0:1', 'capture:b0:2',
+        'capture:b0:3', 'capture:b0:4', 'capture:b0:5',
     ],
 
     # ------------------------------------------------------------------

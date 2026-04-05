@@ -205,11 +205,11 @@ def _build_segment_bins(new_seg_info, bin_width):
         bins_list.append(np.column_stack([lefts, rights]))
         meta_rows.append(pd.DataFrame({
             'new_segment': seg_id,
-            'new_bin': np.arange(n_bins, dtype=int),
+            'bin_in_new_seg': np.arange(n_bins, dtype=int),
         }))
 
     if not bins_list:
-        return np.zeros((0, 2)), pd.DataFrame(columns=['new_segment', 'new_bin'])
+        return np.zeros((0, 2)), pd.DataFrame(columns=['new_segment', 'bin_in_new_seg'])
 
     bins_2d = np.vstack(bins_list)
     meta = pd.concat(meta_rows, ignore_index=True)
@@ -237,7 +237,7 @@ def concat_new_seg_info(df, new_seg_info, bin_width=None):
 
         # Assign new bins relative to segment start
         if bin_width is not None:
-            seg_df['new_bin'] = (
+            seg_df['bin_in_new_seg'] = (
                 (seg_df['time'] - row['new_seg_start_time']) // bin_width).astype(int)
 
         for col in ['new_segment', 'new_seg_start_time', 'new_seg_end_time', 'new_seg_duration']:
@@ -267,7 +267,7 @@ def segment_windows_to_bins2d(
     bins_2d : (N_bins, 2) array
         [t_left, t_right] for each bin across all segments
     meta : DataFrame
-        Columns: new_segment, new_bin, t_left, t_right, bin
+        Columns: new_segment, bin_in_new_seg, t_left, t_right, bin
     """
     bins_list = []
     meta_rows = []
@@ -292,14 +292,14 @@ def segment_windows_to_bins2d(
 
         meta_rows.append(pd.DataFrame({
             'new_segment': seg_id,
-            'new_bin': np.arange(n_bins, dtype=int),
+            'bin_in_new_seg': np.arange(n_bins, dtype=int),
             't_left': lefts,
             't_right': rights,
         }))
 
     if not bins_list:
         return np.zeros((0, 2)), pd.DataFrame(
-            columns=['new_segment', 'new_bin', 't_left', 't_right', 'bin']
+            columns=['new_segment', 'bin_in_new_seg', 't_left', 't_right', 'bin']
         )
 
     bins_2d = np.vstack(bins_list)

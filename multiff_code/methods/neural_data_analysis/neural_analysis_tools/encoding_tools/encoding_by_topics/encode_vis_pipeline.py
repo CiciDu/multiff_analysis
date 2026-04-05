@@ -22,10 +22,18 @@ class FFVisEncodingRunner(BaseEncodingRunner):
         raw_data_folder_path,
         bin_width=0.04,
         encoder_prs=None,
+        cv_mode=None,
+        **kwargs,
     ):
-        super().__init__(raw_data_folder_path, bin_width=bin_width, encoder_prs=encoder_prs)
+        super().__init__(
+            raw_data_folder_path,
+            bin_width=bin_width,
+            encoder_prs=encoder_prs,
+            cv_mode=cv_mode,
+            **kwargs,
+        )
 
-        self.var_categories = encoder_gam_helper.VIS_VAR_CATEGORIES
+        self.var_categories = encoder_gam_helper.VIS_ENCODING_VAR_CATEGORIES
         
         print('var_categories:')
         for k, v in self.var_categories.items():

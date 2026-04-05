@@ -54,11 +54,11 @@ def _add_target_df_info(target_df, monkey_information, ff_real_position_sorted, 
 def add_capture_target(target_df, ff_caught_T_new):
     target_capture_point = np.searchsorted(target_df['time'], ff_caught_T_new)
     target_df.reset_index(drop=True, inplace=True)
-    target_df['capture_ff'] = 0
+    target_df['capture'] = 0
     # make sure target_capture_point is not out of bounds
     target_capture_point = target_capture_point[target_capture_point < len(
         target_df)]
-    target_df.loc[target_capture_point, 'capture_ff'] = 1
+    target_df.loc[target_capture_point, 'capture'] = 1
     return target_df
 
 
@@ -140,7 +140,7 @@ def fill_na_in_target_df(target_df):
         # Check and print results after filling
         na_sum = target_df.isna().sum()
         na_df = na_sum[na_sum > 0]
-        print(f"\nResults after fill NA:")
+        print("\nResults after fill NA:")
         print("-"*60)
         if len(na_df) > 0:
             print("Remaining NA values:")

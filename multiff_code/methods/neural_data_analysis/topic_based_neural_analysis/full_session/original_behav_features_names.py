@@ -52,7 +52,7 @@ derived_motion = [
 
 # segmentation_minimal = [
 #     'new_segment',
-#     'new_bin',
+#     'bin_in_new_seg',
 #     'new_seg_start_time',
 #     'new_seg_end_time',
 #     'new_seg_duration'
@@ -80,7 +80,7 @@ firefly_identity_visibility = [
     'cur_in_memory', 'nxt_in_memory',
     'num_ff_visible', 'log1p_num_ff_visible',
     'num_ff_in_memory', 'log1p_num_ff_in_memory',
-    'capture_ff'
+    'capture'
 ]
 
 firefly_geometry = [

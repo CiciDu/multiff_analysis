@@ -114,19 +114,19 @@ class GPFAHelperClass():
         self.num_pca_components = num_pca_components
 
         x_var_df = self.get_raw_spikes_for_regression()
-        # make sure that x_var_df has the same new_segment and new_bin as rebinned_behav_data
+        # make sure that x_var_df has the same new_segment and bin_in_new_seg as rebinned_behav_data
         x_var_df = x_var_df.merge(
-            self.rebinned_behav_data[['new_segment', 'new_bin']], on=['new_segment', 'new_bin'], how='right')
+            self.rebinned_behav_data[['new_segment', 'bin_in_new_seg']], on=['new_segment', 'bin_in_new_seg'], how='right')
 
         if apply_pca_on_raw_spike_data:
             pca = PCA(n_components=num_pca_components)
-            x_var_df.drop(columns=['new_segment', 'new_bin'],
+            x_var_df.drop(columns=['new_segment', 'bin_in_new_seg'],
                           inplace=True, errors='ignore')
             x_var = pca.fit_transform(x_var_df)
             x_var_df = pd.DataFrame(
                 x_var, columns=['pca_'+str(i) for i in range(num_pca_components)])
             x_var_df['new_segment'] = self.rebinned_behav_data['new_segment'].values
-            x_var_df['new_bin'] = self.rebinned_behav_data['new_bin'].values
+            x_var_df['bin_in_new_seg'] = self.rebinned_behav_data['bin_in_new_seg'].values
             self.concat_raw_spike_data = x_var_df
         else:
             self.concat_raw_spike_data, self.dropped_neurons = align_trial_utils.drop_redundant_neurons_from_concat_raw_spike_data(
@@ -134,9 +134,9 @@ class GPFAHelperClass():
 
     def get_concat_gpfa_data(self, new_segments_for_gpfa=None):
         self.apply_pca_on_raw_spike_data = False
-        # Precompute min and max new_bin per segment
+        # Precompute min and max bin_in_new_seg per segment
         bin_bounds = self.rebinned_behav_data.groupby(
-            'new_segment')['new_bin'].agg(['min', 'max'])
+            'new_segment')['bin_in_new_seg'].agg(['min', 'max'])
 
         if new_segments_for_gpfa is None:
             new_segments_for_gpfa = self.new_seg_info['new_segment'].unique()
@@ -186,9 +186,9 @@ class GPFAHelperClass():
             self.get_concat_gpfa_data()
             self.concat_neural_trials = self.concat_gpfa_data
 
-        # assert that their new_segment and new_bin are the same
-        assert self.concat_behav_trials[['new_segment', 'new_bin']].equals(
-            self.concat_neural_trials[['new_segment', 'new_bin']])
+        # assert that their new_segment and bin_in_new_seg are the same
+        assert self.concat_behav_trials[['new_segment', 'bin_in_new_seg']].equals(
+            self.concat_neural_trials[['new_segment', 'bin_in_new_seg']])
 
         # check for NA
         general_utils.check_na_in_df(
@@ -208,9 +208,9 @@ class GPFAHelperClass():
         self.max_timepoints = int(self.new_seg_duration/self.bin_width)
 
         if features_to_include is not None:
-            # make sure 'new_bin' and 'new_segment' are included
+            # make sure 'bin_in_new_seg' and 'new_segment' are included
             features_to_include = list(
-                set([*features_to_include, 'new_bin', 'new_segment']))
+                set([*features_to_include, 'bin_in_new_seg', 'new_segment']))
             concat_behav_trials = self.concat_behav_trials[features_to_include]
         else:
             concat_behav_trials = self.concat_behav_trials
@@ -221,12 +221,12 @@ class GPFAHelperClass():
         if not hasattr(self, 'new_bin_start_time'):
             self.new_bin_start_time = 0
 
-        self.time_resolved_cv_scores['bin_mid_time'] = self.time_resolved_cv_scores['new_bin'] * \
+        self.time_resolved_cv_scores['bin_mid_time'] = self.time_resolved_cv_scores['bin_in_new_seg'] * \
             self.bin_width + self.new_bin_start_time + self.bin_width/2
 
     def make_time_resolved_cv_scores_gpfa(self, cv_folds=10, latent_dimensionality=7):
         bin_bounds = self.rebinned_behav_data.groupby(
-            'new_segment')['new_bin'].agg(['min', 'max'])
+            'new_segment')['bin_in_new_seg'].agg(['min', 'max'])
 
         self.bin_width_w_unit = self.bin_width * pq.s
 
@@ -244,7 +244,7 @@ class GPFAHelperClass():
                 cv_folds=cv_folds, n_jobs=-1, latent_dimensionality=latent_dimensionality,
             )
 
-        self.time_resolved_cv_scores_gpfa['bin_mid_time'] = self.time_resolved_cv_scores_gpfa['new_bin'] * \
+        self.time_resolved_cv_scores_gpfa['bin_mid_time'] = self.time_resolved_cv_scores_gpfa['bin_in_new_seg'] * \
             self.bin_width + self.new_bin_start_time + self.bin_width/2
 
         self.time_resolved_cv_scores_gpfa['trial_count'] = self.time_resolved_cv_scores_gpfa['train_trial_count']
@@ -295,6 +295,7 @@ class GPFAHelperClass():
         print(
             f'Saved time_resolved_cv_scores to {time_resolved_cv_scores_path}')
         return
+
 
     def retrieve_or_make_time_resolved_cv_scores_gpfa(self, exists_ok=True, cv_folds=5, latent_dimensionality=7, file_name=None):
 

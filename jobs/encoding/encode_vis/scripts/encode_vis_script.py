@@ -25,9 +25,10 @@ def main():
     )
 
     return run_encoding_main(
-        lambda raw_data_folder_path, bin_width: encode_vis_pipeline.FFVisEncodingRunner(
+        lambda raw_data_folder_path, bin_width, **runner_kwargs: encode_vis_pipeline.FFVisEncodingRunner(
             raw_data_folder_path=raw_data_folder_path,
             bin_width=bin_width,
+            **runner_kwargs,
         )
     )
 

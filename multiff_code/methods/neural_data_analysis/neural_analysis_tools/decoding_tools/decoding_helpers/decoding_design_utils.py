@@ -1,5 +1,7 @@
 import copy
 import pandas as pd
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import smooth_neural_data
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import detrend_neural_data
 import numpy as np
 
 
@@ -7,12 +9,25 @@ import numpy as np
 # VARIABLE CATEGORIES (DECODING)
 # ==========================================================
 
+ONE_FF_STYLE_DECODING_COLS = [
+    'v', 'w', 'd', 'phi',
+    'r_targ', 'theta_targ',
+    'eye_ver', 'eye_hor',
+    # though they are not in one_ff_gam, we add them to the design
+    'accel', 'ang_accel',
+    # though the following are not in one_ff_gam, they might be useful for multiff
+    'time', 
+    'eye_world_speed',
+    'stop', 'capture',
+]
+
+
 DEFAULT_DECODING_VAR_CATEGORIES = {
     "sensory_vars": ["v", "w", "accel", "ang_accel"],
     "latent_vars": ["cur_ff_distance", "cur_ff_angle", "nxt_ff_distance", "nxt_ff_angle"],
     "position_vars": ["d", "phi"],
     "eye_position_vars": ["eye_ver", "eye_hor"],
-    "event_vars": ["stop"],
+    "event_vars": ["stop", "capture"],
     "visibility_vars": ["cur_vis", "nxt_vis", "cur_in_memory", "nxt_in_memory"],
     "ff_count_vars": ["num_ff_visible", "num_ff_in_memory", "log1p_num_ff_visible", "log1p_num_ff_in_memory"],
 }
@@ -24,6 +39,10 @@ DEFAULT_DECODING_VAR_CATEGORIES["non_spike_vars"] = [
     # keep everything; decoding design does not include 'spike_hist'
     for var in vars_list
 ]
+
+FS_DECODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_DECODING_VAR_CATEGORIES)
+FS_DECODING_VAR_CATEGORIES['event_vars'].extend(['ff_on_in_bin', 'ff_off_in_bin', 'group_ff_on_in_bin', 'group_ff_off_in_bin',
+                                                 'ff_vis_start', 'ff_vis_end', 'global_burst_start'])
 
 STOP_DECODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_DECODING_VAR_CATEGORIES)
 STOP_DECODING_VAR_CATEGORIES.update({
@@ -116,3 +135,66 @@ def add_other_category_from_df(categories, design_df):
     categories['other_vars'] = other_vars
 
     return categories
+
+
+def get_processed_spike_rates(
+    spikes_df,
+    smooth_spikes=True,
+    detrend_spikes=False,
+    smoothing_width=10,
+    drop_bad_neurons=True,
+    fs_bin_width=None,
+):
+    """
+    Build full-session binned rates, optionally drop unstable units, then detrend or smooth.
+
+    Parameters
+    ----------
+    fs_bin_width : float or None
+        Bin width (s) for ``make_full_session_binned_spikes``. If None, uses 0.05 s when
+        detrending (historical default) and 0.005 s when smoothing.
+    drop_bad_neurons : bool
+        If True, runs ``drop_nonstationary_neurons`` on the full-session rate matrix
+        before detrending or smoothing.
+    """
+    if smooth_spikes and detrend_spikes:
+        raise ValueError("smooth_spikes and detrend_spikes cannot both be True")
+
+    if not detrend_spikes and not smooth_spikes:
+        return None
+
+    if fs_bin_width is None:
+        bin_w = 0.05 if detrend_spikes else 0.005
+    else:
+        bin_w = float(fs_bin_width)
+
+    fs_counts, time_bins_df = smooth_neural_data.make_full_session_binned_spikes(
+        spikes_df, bin_width=bin_w
+    )
+    if fs_counts.empty or fs_counts.shape[1] == 0:
+        return None
+
+    fs_rates_hz = fs_counts / bin_w
+    if drop_bad_neurons:
+        fs_rates_hz = detrend_neural_data.drop_nonstationary_neurons(fs_rates_hz)
+
+    if detrend_spikes:
+        detrended_df = detrend_neural_data.detrend_spikes_session_wide(
+            fs_rates_hz,
+            time_bins_df,
+            bin_size=bin_w,
+            center_method='subtract',
+        )
+        processed_spike_rates, _cluster_columns = detrend_neural_data.reshape_detrended_df_to_wide(
+            detrended_df,
+            value_col='detrended_rate_hz',
+        )
+    else:
+        smoothed_df, time_bins_df = smooth_neural_data.smooth_contiguous_spike_rates(
+            fs_rates_hz, time_bins_df, width=smoothing_width
+        )
+        time_cols = ['time_bin_start', 'time_bin_end', 'time_bin_center']
+        processed_spike_rates = smoothed_df.copy()
+        processed_spike_rates[time_cols] = time_bins_df[time_cols]
+
+    return processed_spike_rates

@@ -83,7 +83,7 @@ N_ENVS=1
 # ---------------------------------------
 SAFE_MAX_IN_MEMORY_TIME="${MAX_IN_MEMORY_TIME//./p}"
 
-BASE_DIR="multiff_analysis/RL_models/sb3_stored_models/all_agents/sb3_conditional"
+BASE_DIR="RL_models/sb3_stored_models/all_agents/sb3_conditional"
 SUB_RUN_NAME="ff${NUM_OBS_FF}_mem${SAFE_MAX_IN_MEMORY_TIME}_${IDENTITY_SLOT_STRATEGY}"
 RUN_NAME="${SWEEP_PARAM}_${SWEEP_VALUE//./p}_seed${BASE_SEED}_rep${REPEAT_IDX}"
 OVERALL_FOLDER="${BASE_DIR}/${SUB_RUN_NAME}/${RUN_NAME}"
@@ -107,6 +107,6 @@ srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --identity-slot-strategy "$IDENTITY_SLOT_STRATEGY" \
   --v-noise-std "$V_NOISE_STD" \
   --w-noise-std "$W_NOISE_STD" \
-  #--no-curriculum-training \
   --n-envs "$N_ENVS"
+  #--no-curriculum-training
   

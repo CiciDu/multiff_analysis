@@ -4,7 +4,7 @@ all_features = ['cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis',
                 'cur_ff_distance', 'nxt_ff_distance', 'cur_ff_angle', 'nxt_ff_angle',
                 'abs_cur_ff_angle', 'abs_nxt_ff_angle',
                 'abs_cur_ff_rel_x', 'abs_nxt_ff_rel_x',
-                'stop', 'speed', 'angular_speed', 'curv_of_traj', 'capture_ff',
+                'stop', 'speed', 'angular_speed', 'curv_of_traj', 'capture',
                 'whether_test', 'turning_right', 'time_since_last_capture',
                 'accel', 'ang_accel', 'target_cluster_last_seen_distance',
                 'target_cluster_last_seen_angle_to_boundary',
@@ -18,7 +18,7 @@ all_features = ['cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis',
                 ]
 
 
-temporal_vars = ['capture_ff', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'cluster_around_target',
+temporal_vars = ['capture', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'cluster_around_target',
                  'cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis', 'target_cluster_has_disappeared_for_last_time_dummy']
 
 

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import List
 
@@ -42,7 +41,6 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.raw_data_folder_path = raw_data_folder_path
         self.var_categories = var_categories if var_categories is not None else PN_DECODING_VAR_CATEGORIES
 
-
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path, bin_width=self.bin_width
         )
@@ -61,7 +59,6 @@ class PNDecodingRunner(BaseDecodingRunner):
 
     def _get_groups(self):
         return self.trial_ids
-
 
     def _get_neural_matrix(self) -> np.ndarray:
         return np.asarray(self.binned_spikes, dtype=float)
@@ -107,6 +104,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         )
 
         data = pn.rebinned_y_var.copy()
+        self.meta_df_used = pn.rebinned_y_var[['new_segment', 'bin_in_new_seg']].rename(columns={'new_segment': 'event_id', 'bin_in_new_seg': 'k_within_seg'})
         trial_ids = data['new_segment']
 
         self.feats_to_decode = temporal_feats.add_stop_and_capture_columns(
@@ -115,20 +113,11 @@ class PNDecodingRunner(BaseDecodingRunner):
             pn.ff_caught_T_new,
         )
 
-        if self.detrend_spikes:
-            self.binned_spikes = decode_pn_utils.get_rebinned_spike_rates(pn)
-        else:
-            cluster_cols = [c for c in pn.rebinned_x_var.columns if c.startswith('cluster_')]
-            binned_spikes = pn.rebinned_x_var[cluster_cols]
-            binned_spikes.columns = (
-                binned_spikes.columns
-                .str.replace('cluster_', '')
-                .astype(int)
-            )
-            self.binned_spikes = binned_spikes / self.bin_width
-
-
+        # Ensure processed spikes are computed from this freshly prepared pn object.
         self.pn = pn
+        self.get_processed_spike_rates()
+        self.get_binned_spikes()
+        
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
 
         # detrend covariates for optional multi-covariate detrending
@@ -148,21 +137,28 @@ class PNDecodingRunner(BaseDecodingRunner):
     # Caching utilities (BaseDecodingRunner interface)
     # ------------------------------------------------------------------
     
+        
+    def get_binned_spikes(self):
+        self.get_processed_spike_rates()
 
+        if self.processed_spike_rates is not None:
+            self.binned_spikes = decode_pn_utils.rebin_processed_spike_rates(self.processed_spike_rates, self.pn.new_seg_info, self.pn.local_bin_edges, self.pn.rebinned_y_var)
+        else:
+            self.binned_spikes = decode_pn_utils.rebinned_x_var_to_binned_spike_rates_hz(
+                self.pn.rebinned_x_var,
+                self.bin_width,
+                drop_bad_neurons=self.drop_bad_neurons,
+            )
     
     def _get_save_dir(self):
-        sub = 'detrended' if self.detrend_spikes else 'raw'
-        return os.path.join(
-            self.pn.planning_and_neural_folder_path,
-            'decoding_outputs/pn_decoder_outputs',
-            sub,
-        )
+        return self._get_save_dir_common("pn_decoder_outputs")
 
     def _get_design_matrix_paths(self):
         save_dir = Path(self._get_save_dir())
         return {
             'binned_spikes': save_dir / 'binned_spikes.pkl',
             'feats_to_decode': save_dir / 'feats_to_decode.pkl',
+            'meta_df_used': save_dir / 'meta_df_used.pkl',
             'trial_ids': save_dir / 'trial_ids.pkl',
             'detrend_covariates': save_dir / 'detrend_covariates.pkl',
         }
@@ -171,6 +167,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         return {
             'binned_spikes': self.binned_spikes,
             'feats_to_decode': self.feats_to_decode,
+            'meta_df_used': self.meta_df_used,
             'trial_ids': self.trial_ids,
             'detrend_covariates': self.detrend_covariates,
         }
@@ -179,6 +176,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         return {
             'binned_spikes': 'binned_spikes',
             'feats_to_decode': 'feats_to_decode',
+            'meta_df_used': 'meta_df_used',
             'trial_ids': 'trial_ids',
             'detrend_covariates': 'detrend_covariates',
         }
