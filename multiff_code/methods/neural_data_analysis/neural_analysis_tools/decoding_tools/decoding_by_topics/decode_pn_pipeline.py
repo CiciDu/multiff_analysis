@@ -107,6 +107,9 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.meta_df_used = pn.rebinned_y_var[['new_segment', 'bin_in_new_seg']].rename(columns={'new_segment': 'event_id', 'bin_in_new_seg': 'k_within_seg'})
         trial_ids = data['new_segment']
 
+        if 't_center' in data.columns:
+            data['time'] = data['t_center']
+
         self.feats_to_decode = temporal_feats.add_stop_and_capture_columns(
             data,
             trial_ids,

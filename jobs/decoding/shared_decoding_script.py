@@ -60,11 +60,14 @@ def run_decoding_main(
             shuffle_mode='none',
         )
         
-        # results_df_shuffled = runner.run(
-        #     **common_run,
-        #     shuffle_mode='timeshift_fold',
-        # )
+        results_df_shuffled = runner.run(
+            **common_run,
+            shuffle_mode='timeshift_fold',
+        )
 
+        # also get ANOVA results
+        anova = runner.run_anova_all_neurons(alpha=0.05)
+        lm = runner.run_lm_all_neurons(include_all_feats=True, alpha=0.05)
 
         # results_one_ff_style = runner.run_one_ff_style()
 

@@ -131,7 +131,9 @@ def build_pn_encoding_design(
             )
 
             binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
-            
+            if event in binned_feats.columns:
+                binned_feats = binned_feats.drop(columns=[event])
+
             for key, val in current_temporal_meta.items():
                 if key in temporal_meta:
                     temporal_meta[key] = encoding_design_utils.merge_meta_vals(temporal_meta[key], val)

@@ -25,11 +25,8 @@ def main():
     )
 
     return run_encoding_main(
-        lambda raw_data_folder_path, bin_width, **runner_kwargs: encode_pn_pipeline.PNEncodingRunner(
-            raw_data_folder_path=raw_data_folder_path,
-            bin_width=bin_width,
-            **runner_kwargs,
-        )
+        encode_pn_pipeline.PNEncodingRunner,
+        cv_mode="blocked_time_buffered",
     )
 
 

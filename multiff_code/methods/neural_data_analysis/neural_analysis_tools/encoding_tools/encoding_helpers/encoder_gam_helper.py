@@ -43,9 +43,19 @@ DEFAULT_ENCODING_VAR_CATEGORIES['non_spike_vars'] = [
 ]
 
 FS_ENCODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_ENCODING_VAR_CATEGORIES)
-FS_ENCODING_VAR_CATEGORIES['event_vars'].extend(['ff_on', 'ff_off', 'group_ff_on', 'group_ff_off',
-                                                 ])
-FS_ENCODING_VAR_CATEGORIES['visibility_vars'].extend(['time_since_prev_ff_visible', 'time_since_global_burst_start'])
+FS_ENCODING_VAR_CATEGORIES['event_vars'].extend([
+    'ff_on', 'ff_off', 'group_ff_on', 'group_ff_off',
+    'ff_vis_start', 'ff_vis_end', 'global_burst_start',
+])
+FS_ENCODING_VAR_CATEGORIES['visibility_vars'].extend([
+    'time_since_prev_ff_visible', 'time_since_global_burst_start',
+])
+FS_ENCODING_VAR_CATEGORIES['non_spike_vars'] = [
+    var
+    for cat, vars_list in FS_ENCODING_VAR_CATEGORIES.items()
+    if cat not in ('spike_hist_vars', 'non_spike_vars')
+    for var in vars_list
+]
 
 STOP_ENCODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_ENCODING_VAR_CATEGORIES)
 STOP_ENCODING_VAR_CATEGORIES.update({

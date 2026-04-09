@@ -28,6 +28,7 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import detrend_neural_data
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import rebinned_alignment
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
 
 
 # =============================================================================
@@ -70,7 +71,7 @@ def _build_stop_core(
     - Binning spikes by cluster
     - Building cluster-level features
     """
-    agg_cols = encoding_design_utils.ONE_FF_STYLE_DECODING_COLS
+    agg_cols = decoding_design_utils.ONE_FF_STYLE_DECODING_COLS
 
     (
         bins_2d,

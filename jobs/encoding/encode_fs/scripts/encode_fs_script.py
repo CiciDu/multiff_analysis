@@ -20,11 +20,11 @@ def main():
     encoding_design_utils.bootstrap_repo_path()
 
     from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics import (
-        encode_stops_pipeline,
+        encode_fs_pipeline,
     )
 
     return run_encoding_main(
-        encode_stops_pipeline.StopEncodingRunner,
+        encode_fs_pipeline.FSEncodingRunner,
         cv_mode="blocked_time_buffered",
     )
 

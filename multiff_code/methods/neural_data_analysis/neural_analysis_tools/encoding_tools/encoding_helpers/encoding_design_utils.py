@@ -583,6 +583,10 @@ def build_temporal_design_from_binned_events(
     """
     Temporal design from binned events.
     Works even if bin_t_center is discontinuous.
+
+    After concatenating ``temporal_df`` into the full design, callers should drop
+    the source binned indicator column named ``event_name`` if it is still present,
+    so the model uses only the raised-cosine basis (no duplicate raw indicator).
     """
 
     name_prefix = 'rcos_' + event_name

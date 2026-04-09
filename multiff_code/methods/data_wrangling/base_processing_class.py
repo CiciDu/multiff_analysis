@@ -6,7 +6,7 @@ from planning_analysis.show_planning import nxt_ff_utils
 from pattern_discovery import cluster_analysis
 from pattern_discovery import pattern_by_trials, organize_patterns_and_features, monkey_landing_in_ff
 from decision_making_analysis.event_detection import detect_rsw_and_rcap
-from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_monkey_data, prep_target_data, neural_vs_behavioral_class
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
 
 import os
 import os
@@ -306,6 +306,10 @@ class BaseProcessing:
         if (not already_made_ok) | (getattr(self, 'closest_stop_to_capture_df', None) is None) | (getattr(self, 'ff_caught_T_new', None) is None):
             self.make_or_retrieve_closest_stop_to_capture_df()
             self.make_ff_caught_T_new()
+            self._process_data_based_on_closest_stop_to_capture_df()
+
+
+    def _process_data_based_on_closest_stop_to_capture_df(self):
 
             self.monkey_information['trial'] = np.searchsorted(
                 self.ff_caught_T_new, self.monkey_information['time'])
@@ -315,6 +319,7 @@ class BaseProcessing:
             # also trim eye_world_speed
             q95 = self.monkey_information['eye_world_speed'].quantile(0.95)
             self.monkey_information['eye_world_speed'] = self.monkey_information['eye_world_speed'].clip(upper=q95)
+
 
 
     def make_or_retrieve_monkey_information(self, exists_ok=True, save_data=True, min_distance_to_calculate_angle=5, speed_threshold_for_distinct_stop=1):

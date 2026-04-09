@@ -1,7 +1,7 @@
 """Shared logic for encoding scripts (encode_pn, encode_vis, encode_stops)."""
 
 import argparse
-from typing import Any, Callable, Dict, TypeVar
+from typing import Any, Callable, Dict, Optional, Type, TypeVar
 import os
 import sys
 from pathlib import Path
@@ -18,7 +18,9 @@ RunnerT = TypeVar("RunnerT")
 
 
 def run_encoding_main(
-    runner_factory: Callable[..., RunnerT],
+    runner_class: Type[RunnerT],
+    *,
+    cv_mode: str = "blocked_time_buffered",
 ) -> Dict[str, Any]:
     """
     Common main logic for encoding scripts.
@@ -62,10 +64,10 @@ def run_encoding_main(
         print("=" * 80)
 
         try:
-            runner = runner_factory(
+            runner = runner_class(
                 raw_data_folder_path=raw_data_folder_path,
                 bin_width=args.bin_width,
-                cv_mode="group_kfold",
+                cv_mode=cv_mode,
             )
 
             runner.collect_data(exists_ok=load_if_exists)

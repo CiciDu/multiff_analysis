@@ -33,7 +33,6 @@ def get_strong_correlations(design_df, threshold=0.9):
 
 
 def reduce_encoding_design(df, corr_threshold_for_lags_of_a_feature=0.99, 
-                         vif_threshold_for_initial_subset=20, 
                          vif_threshold=1000000, 
                          verbose=True):
         

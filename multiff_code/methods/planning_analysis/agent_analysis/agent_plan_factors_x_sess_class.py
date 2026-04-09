@@ -12,8 +12,17 @@ from reinforcement_learning.base_classes import rl_base_utils
 
 import pandas as pd
 import os
+import sys
 import warnings
+from contextlib import contextmanager, redirect_stdout
 from os.path import exists
+
+
+@contextmanager
+def _suppress_stdout():
+    with open(os.devnull, 'w') as devnull:
+        with redirect_stdout(devnull):
+            yield
 
 
 class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
@@ -655,7 +664,8 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                         num_steps_per_dataset=9000,
                         num_datasets_to_collect=2,
                         use_stored_data_only=False,
-                        high_level_only=False):
+                        high_level_only=False,
+                        verbose=False):
         """
         Process a single agent and save results to CSV files.
         
@@ -676,18 +686,43 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
             Number of datasets to collect (default: 2)
         use_stored_data_only : bool, optional
             If True, only use stored data without generating new data (default: False)
+        verbose : bool, optional
+            If True, print all progress messages from this method and all
+            nested calls. If False, suppress all stdout output (default: True)
         
         Returns
         -------
         tuple of (str, str) or None
             Paths to saved median and percentile CSV files if successful, None if already exists or error
         """
-        
+        ctx = _suppress_stdout() if not verbose else contextmanager(lambda: (yield))()
+        with ctx:
+            return self._process_and_save_inner(
+                save_dir=save_dir,
+                intermediate_products_exist_ok=intermediate_products_exist_ok,
+                agent_data_exists_ok=agent_data_exists_ok,
+                num_steps_per_dataset=num_steps_per_dataset,
+                num_datasets_to_collect=num_datasets_to_collect,
+                use_stored_data_only=use_stored_data_only,
+                high_level_only=high_level_only,
+                verbose=verbose,
+            )
+
+    def _process_and_save_inner(self,
+                                save_dir,
+                                intermediate_products_exist_ok,
+                                agent_data_exists_ok,
+                                num_steps_per_dataset,
+                                num_datasets_to_collect,
+                                use_stored_data_only,
+                                high_level_only,
+                                verbose):
+
         print(f'[PROCESS] Processing agent folder: {self.model_folder_name}')
-        
+
         self.all_ref_pooled_median_info = None
         self.pooled_perc_info = None
-        
+
         try:
             save_data = False if use_stored_data_only else True
             # Run the analysis pipeline
@@ -701,7 +736,6 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
                 save_data=save_data,
                 high_level_only=high_level_only,
             )
-
 
             self.all_ref_pooled_median_info, agent_id = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(self.all_ref_pooled_median_info, self.model_folder_name)
             self.pooled_perc_info, agent_id = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(self.pooled_perc_info, self.model_folder_name)
@@ -724,11 +758,12 @@ class PlanFactorsAcrossAgentSessions(variations_base_class._VariationsBase):
 
             print(f'[PROCESS] Saved median: {median_path}')
             print(f'[PROCESS] Saved percentile: {perc_path}')
-            
+
             return (median_path, perc_path)
 
         except Exception as e:
-            print(f'[PROCESS][ERROR] Failed to process agent {self.model_folder_name}: {e}')
+            # Print errors to stderr so they always surface regardless of verbose
+            print(f'[PROCESS][ERROR] Failed to process agent {self.model_folder_name}: {e}', file=sys.stderr)
             import traceback
-            traceback.print_exc()
+            traceback.print_exc(file=sys.stderr)
             return None

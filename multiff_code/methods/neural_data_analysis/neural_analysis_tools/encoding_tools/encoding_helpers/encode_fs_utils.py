@@ -109,6 +109,7 @@ def build_fs_encoding_design(
             )
 
             binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
+            binned_feats = binned_feats.drop(columns=[event])
 
             for key, val in current_temporal_meta.items():
                 if key in temporal_meta:

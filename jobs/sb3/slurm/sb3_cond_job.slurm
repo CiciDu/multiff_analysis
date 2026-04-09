@@ -21,7 +21,7 @@ conda activate multiff_clean
 : "${SWEEP_PARAM:?Must set SWEEP_PARAM=perc_r|perc_th|mem_r|mem_th}"
 
 # 6 discrete levels, base seeds, and N repeats per (level, base_seed)
-LEVELS=(0.5 1.0 1.5 2.0 2.5 3.0)
+LEVELS=(0.0 0.5 1.0 1.5 2.0 2.5 3.0)
 BASE_SEEDS=(100 101 102 103 104 105 106 107 108 109 110 111 112 113 114)
 NUM_REPEATS=5
 NUM_LEVELS=${#LEVELS[@]}

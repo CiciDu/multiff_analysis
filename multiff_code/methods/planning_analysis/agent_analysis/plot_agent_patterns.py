@@ -115,7 +115,7 @@ def plot_pairwise_interactions(
             cbar = fig.colorbar(im, ax=ax)
             cbar.set_label(name)
 
-        fig.suptitle(f'{key_x} × {key_y}', y=1.02)
+        fig.suptitle(f'{key_x} × {key_y}  |  {target_col}', y=1.02)
 
         #plt.tight_layout()
         plt.show()

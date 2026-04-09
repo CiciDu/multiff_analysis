@@ -233,6 +233,7 @@ class BaseEncodingRunner:
                 unit_idx=unit_idx,
                 use_neural_coupling=use_neural_coupling,
                 cv_mode=cv_mode,
+                n_folds=n_folds,
             )
             save_path = paths_i["cv_save_path"]
 
@@ -308,6 +309,7 @@ class BaseEncodingRunner:
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         if load_if_exists:
             all_neuron_r2 = self.try_load_variance_explained_for_all_neurons(
+                n_folds=n_folds,
                 verbose=verbose,
                 use_neural_coupling=use_neural_coupling,
             )
@@ -349,6 +351,7 @@ class BaseEncodingRunner:
                 unit_idx=unit_idx,
                 use_neural_coupling=use_neural_coupling,
                 cv_mode=cv_mode,
+                n_folds=n_folds,
             )
             cv_save_path = paths_i["cv_save_path"]
             cv_res = self.crossval_variance_explained(
@@ -371,6 +374,9 @@ class BaseEncodingRunner:
                 all_neuron_r2, log_x=log_x
             )
         return all_neuron_r2
+    
+    def temp_function(self, n_folds: int = 5):
+        pass
 
     def run_category_contributions_etc_for_all_neurons(
         self,
@@ -437,6 +443,7 @@ class BaseEncodingRunner:
     def try_load_variance_explained_for_all_neurons(
         self,
         *,
+        n_folds: int = 5,
         load_if_exists: bool = True,
         verbose: bool = True,
         use_neural_coupling: bool = False,
@@ -449,6 +456,7 @@ class BaseEncodingRunner:
                     unit_idx=unit_idx,
                     use_neural_coupling=use_neural_coupling,
                     cv_mode=self.cv_mode,
+                    n_folds=n_folds,
                 )
                 cv_save_path = paths_i["cv_save_path"]
 
@@ -740,6 +748,7 @@ class BaseEncodingRunner:
         ensure_dirs: bool = True,
         use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
+        n_folds: Optional[int] = 10,
     ) -> dict:
         coupling_subdir = self._coupling_subdir(use_neural_coupling)
         base = Path(self._get_save_dir()) / self.get_gam_results_subdir() / coupling_subdir
@@ -763,13 +772,16 @@ class BaseEncodingRunner:
             cv_dir = cv_dir / str(effective_cv_mode)
             if ensure_dirs:
                 cv_dir.mkdir(parents=True, exist_ok=True)
+        cv_filename_suffix = lam_suffix
+        if effective_cv_mode and n_folds is not None:
+            cv_filename_suffix = f"{lam_suffix}_nfolds{n_folds}"
         return {
             "base": base,
             "outdir": outdir,
             "lambda_config": lambda_config,
             "lam_suffix": lam_suffix,
             "fit_save_path": str(outdir / "fit_results" / f"{lam_suffix}.pkl"),
-            "cv_save_path": str(cv_dir / f"{lam_suffix}.pkl"),
+            "cv_save_path": str(cv_dir / f"{cv_filename_suffix}.pkl"),
         }
 
     def run_category_variance_contributions(
@@ -903,3 +915,115 @@ class BaseEncodingRunner:
                 )
             )
         return self._gam_analysis_helper
+
+
+
+    def get_max_temporal_dependency(self, verbose: bool = True) -> Dict:
+        """
+        Summarise the maximum temporal dependency of the encoding model.
+
+        Reads from (in decreasing priority):
+        1. ``hist_meta['basis_info']`` lags – exact lags after ``get_design_for_unit``
+        2. ``temporal_meta['basis_info']`` lags – exact lags after ``collect_data``
+        3. ``binrange_dict`` / ``encoder_prs`` – always available as fallback
+
+        Returns
+        -------
+        dict
+            spike_hist_window : (t_min, t_max) seconds – causal self-history window
+            event_windows     : {event_name: (t_min, t_max)} – per-event kernel spans
+            max_causal_s      : max lookback = max(|spike_hist_max|, |event_t_min|) s
+            max_acausal_s     : max lookahead = max event t_max s  (0 if none)
+            overall_max_s     : max(max_causal_s, max_acausal_s) s
+            overall_max_bins  : overall_max_s / bin_width  (rounded to int)
+        """
+        # ── 1. Spike-history window ──────────────────────────────────────────
+        sh_min: Optional[float] = None
+        sh_max: Optional[float] = None
+
+        hist_meta = getattr(self, 'hist_meta', None) or {}
+        for info in (hist_meta.get('basis_info') or {}).values():
+            lags = info.get('lags')
+            if lags is not None and len(lags):
+                sh_min = float(lags[0])
+                sh_max = float(lags[-1])
+                break
+
+        if sh_max is None:
+            sh_range = self.binrange_dict.get('spike_hist')
+            if sh_range is not None:
+                sh_min, sh_max = float(sh_range[0]), float(sh_range[1])
+
+        # ── 2. Event-kernel windows ──────────────────────────────────────────
+        ev_min_fallback: Optional[float] = None
+        ev_max_fallback: Optional[float] = None
+
+        temporal_meta = getattr(self, 'temporal_meta', None) or {}
+        basis_info_tm = temporal_meta.get('basis_info') or {}
+        first_tm_info = next(iter(basis_info_tm.values()), None)
+        if first_tm_info is not None:
+            lags = first_tm_info.get('lags')
+            if lags is not None and len(lags):
+                ev_min_fallback = float(lags[0])
+                ev_max_fallback = float(lags[-1])
+
+        if ev_min_fallback is None:
+            for key in ('t_stop', 't_event'):
+                br = self.binrange_dict.get(key)
+                if br is not None:
+                    ev_min_fallback = float(br[0])
+                    ev_max_fallback = float(br[1])
+                    break
+
+        if ev_min_fallback is None:
+            ev_min_fallback = -float(getattr(self.encoder_prs, 'pre_event', 0.3))
+            ev_max_fallback = float(getattr(self.encoder_prs, 'post_event', 0.3))
+
+        event_groups = temporal_meta.get('groups') or {}
+        event_windows: Dict[str, tuple] = {
+            name: (ev_min_fallback, ev_max_fallback)
+            for name in event_groups
+        }
+        if not event_windows and ev_min_fallback is not None:
+            event_windows['(default_event)'] = (ev_min_fallback, ev_max_fallback)
+
+        # ── 3. Derive summary scalars ────────────────────────────────────────
+        causal_candidates: List[float] = []
+        acausal_candidates: List[float] = [0.0]
+
+        if sh_max is not None:
+            causal_candidates.append(abs(sh_max))
+
+        for t0, t1 in event_windows.values():
+            if t0 is not None:
+                causal_candidates.append(abs(t0))
+            if t1 is not None:
+                acausal_candidates.append(abs(t1))
+
+        max_causal = max(causal_candidates) if causal_candidates else 0.0
+        max_acausal = max(acausal_candidates)
+        overall = max(max_causal, max_acausal)
+        overall_bins = int(round(overall / self.bin_width))
+
+        result = {
+            'spike_hist_window': (sh_min, sh_max),
+            'event_windows': event_windows,
+            'max_causal_s': max_causal,
+            'max_acausal_s': max_acausal,
+            'overall_max_s': overall,
+            'overall_max_bins': overall_bins,
+        }
+
+        if verbose:
+            def _fmt(t: Optional[float]) -> str:
+                return f"{t * 1000:.1f} ms" if t is not None else "N/A"
+
+            print("── Temporal dependency summary ──")
+            print(f"  Spike history :  {_fmt(sh_min)} → {_fmt(sh_max)}  (causal lookback)")
+            for name, (t0, t1) in event_windows.items():
+                print(f"  Event [{name:>20s}]:  {_fmt(t0)} → {_fmt(t1)}")
+            print(f"  Max causal    :  {_fmt(max_causal)}")
+            print(f"  Max acausal   :  {_fmt(max_acausal)}")
+            print(f"  Overall max   :  {_fmt(overall)}  ({overall_bins} bins @ {self.bin_width*1000:.0f} ms)")
+
+        return result

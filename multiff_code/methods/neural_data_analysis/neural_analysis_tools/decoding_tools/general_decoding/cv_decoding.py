@@ -154,7 +154,7 @@ def run_cv_decoding(
     results = []
     results_by_model = {}
 
-    for feature in tqdm(behav_features, desc='Decoding features'):
+    for feature in tqdm(behav_features, desc='Decoding features', mininterval=5):
 
         if verbosity >= 2:
             print(f'\nDecoding feature: {feature}')
@@ -439,7 +439,7 @@ def _build_folds(
             valid = idx[start:stop]
             if len(train) and len(valid):
                 folds.append((train, valid))
-        print('cv_splitter = blocked_time: Forward-chaining (past → future)')
+        # print('cv_splitter = blocked_time: Forward-chaining (past → future)')
         return folds
 
     # -------- GROUPED CV --------
@@ -663,7 +663,7 @@ def _load_existing_results(
 
     pkl_paths = list(out_dir.rglob('*.pkl'))
 
-    if verbosity >= 1:
+    if verbosity >= 2:
         print(f'Checking for existing results in {len(pkl_paths)} pickle file(s) under {out_dir}')
 
     for p in pkl_paths:
@@ -711,7 +711,7 @@ def _load_existing_results(
                 key = (row_dict['behav_feature'], _normalize_detrend_model_name(row_dict.get('model_name', '')))
                 existing_lookup[key] = row_dict
 
-    if verbosity >= 1:
+    if verbosity >= 2:
         print(f'Loaded {len(existing_lookup)} matching rows from pickles')
 
     return existing_lookup

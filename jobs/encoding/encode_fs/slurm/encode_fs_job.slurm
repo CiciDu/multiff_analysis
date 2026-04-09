@@ -1,11 +1,11 @@
 #!/bin/bash
 # Job name cannot use $1 here (#SBATCH is parsed before the script runs).
-# Use submit_decode_fs.sh, or: sbatch --job-name=decode_fs_<MONKEY> ... decode_fs_job.slurm <MONKEY>
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_fs/logs/run_stdout/decode_fs_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/decoding/decode_fs/logs/run_stdout/decode_fs_%A_%a.err
+# Use submit_encode_fs.sh, or: sbatch --job-name=encode_fs_<MONKEY> ... encode_fs_job.slurm <MONKEY>
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_fs/logs/run_stdout/encode_fs_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/encoding/encode_fs/logs/run_stdout/encode_fs_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=10G
+#SBATCH --mem=5G
 #SBATCH --time=48:00:00
 #SBATCH --mail-type=END,FAIL
 
@@ -14,7 +14,7 @@ set -euo pipefail
 # ------------------------------
 # Inputs
 # ------------------------------
-: "${1:?Usage: sbatch decode_fs_job.slurm MONKEY_NAME}"
+: "${1:?Usage: sbatch encode_fs_job.slurm MONKEY_NAME}"
 
 MONKEY_NAME="$1"
 shift
@@ -42,10 +42,6 @@ fi
 # ------------------------------
 # Paths
 # ------------------------------
-PROJECT_ROOT=/user_data/cicid/Multifirefly-Project
-DATA_CONFIG_DIR=$PROJECT_ROOT/multiff_analysis/jobs/data_configs
-RAW_PATH_FILE=$DATA_CONFIG_DIR/raw_data_paths_${MONKEY_NAME}.txt
-
 cd "$PROJECT_ROOT"
 
 # ------------------------------
@@ -96,9 +92,9 @@ else
 fi
 
 # ------------------------------
-# Run decode_fs
+# Run encode_fs
 # ------------------------------
-python -u multiff_analysis/jobs/decoding/decode_fs/scripts/decode_fs_script.py \
-    --raw_data_folder_path "$RAW_DATA_FOLDER_PATH" \
+python -u multiff_analysis/jobs/encoding/encode_fs/scripts/encode_fs_script.py \
+    --raw_data_folder_path "$RAW_DATA_FOLDER_PATH"
 
 echo "[SLURM] Done"

@@ -1,4 +1,7 @@
+import io
 import os
+import sys
+import contextlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -73,6 +76,7 @@ def collect_sweep_results_df(
     load_saved_df=False,
     save_filename='sweep_results.pkl',
     max_n_agents=None,
+    verbose=False,
 ):
     '''
     Collect the agent summary dataframe across all agent folders.
@@ -93,6 +97,9 @@ def collect_sweep_results_df(
         Filename used for saving/loading the dataframe.
     max_n_agents : int or None
         Maximum number of agents to iterate through. If None, use all agents.
+    verbose : bool
+        If False (default), suppress all output except a single progress line
+        ("Processing agent X/N"). If True, print all output as usual.
 
     Returns
     -------
@@ -120,31 +127,45 @@ def collect_sweep_results_df(
         agent_folders = agent_folders[:max_n_agents]
 
     sweep_results = pd.DataFrame()
+    n_total = len(agent_folders)
 
-    for folder in agent_folders:
-        print(folder)
+    for i, folder in enumerate(agent_folders):
+        print(f'\rProcessing agent {i + 1}/{n_total}', end='', flush=True)
         agent_name = os.path.basename(folder)
 
-        rl = sb3_class.SB3forMultifirefly(overall_folder=folder)
-
-        success = rl.collect_data(
-            n_steps=n_steps,
-            exists_ok=True,
-            save_data=True,
-            retrieve_data_only=retrieve_data_only,
+        _ctx = (
+            contextlib.nullcontext()
+            if verbose
+            else contextlib.ExitStack()
         )
-        if not success:
-            continue
+        if not verbose:
+            _ctx.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            _ctx.enter_context(contextlib.redirect_stderr(io.StringIO()))
 
-        agent_result = _build_single_agent_result(
-            rl=rl,
-            agent_name=agent_name,
-        )
+        with _ctx:
+            rl = sb3_class.SB3forMultifirefly(overall_folder=folder)
+
+            success = rl.collect_data(
+                n_steps=n_steps,
+                exists_ok=True,
+                save_data=True,
+                retrieve_data_only=retrieve_data_only,
+                retrieve_ff_dataframe=False,
+            )
+            if not success:
+                continue
+
+            agent_result = _build_single_agent_result(
+                rl=rl,
+                agent_name=agent_name,
+            )
 
         sweep_results = pd.concat(
             [sweep_results, agent_result],
             ignore_index=True,
         )
+
+    print()  # newline after progress line
 
     if save_df:
         os.makedirs(overall_folder_name, exist_ok=True)
@@ -161,9 +182,9 @@ def collect_plan_results_df(
     load_saved_df=False,
     save_filename='planfactor_results.pkl',
     max_n_agents=None,
-    overall_df_exists_ok=True,
     use_stored_data_only=False,
     high_level_only=False,
+    verbose=False,
 ):
     '''
     Collect pooled plan factor results across agents.
@@ -188,6 +209,9 @@ def collect_plan_results_df(
         Passed to pfaa method.
     high_level_only : bool
         Passed to pfaa method.
+    verbose : bool
+        If False (default), suppress all output from the aggregation and print
+        only a start/done status line. If True, print all output as usual.
 
     Returns
     -------
@@ -210,9 +234,15 @@ def collect_plan_results_df(
         return saved['median'], saved['perc']
 
     # ---------- Build pfaa ----------
-    pfaa = agent_plan_factors_x_agents_class.PlanFactorsAcrossAgents(
-        overall_folder_name=overall_folder_name
-    )
+    _ctx = contextlib.nullcontext() if verbose else contextlib.ExitStack()
+    if not verbose:
+        _ctx.enter_context(contextlib.redirect_stdout(io.StringIO()))
+        _ctx.enter_context(contextlib.redirect_stderr(io.StringIO()))
+
+    with _ctx:
+        pfaa = agent_plan_factors_x_agents_class.PlanFactorsAcrossAgents(
+            overall_folder_name=overall_folder_name
+        )
 
     # ---------- Filter agents ----------
     filtered_agent_folders = [
@@ -232,14 +262,25 @@ def collect_plan_results_df(
     pfaa.agent_folders = sorted_agent_folders
 
     # ---------- Run aggregation ----------
-    pfaa.make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(
-        exists_ok=overall_df_exists_ok,
-        num_datasets_to_collect=num_datasets_to_collect,
-        intermediate_products_exist_ok=True,
-        agent_data_exists_ok=True,
-        use_stored_data_only=use_stored_data_only,
-        high_level_only=high_level_only,
-    )
+    n_agents = len(sorted_agent_folders)
+    print(f'Processing {n_agents} agents...', end='', flush=True)
+
+    _ctx2 = contextlib.nullcontext() if verbose else contextlib.ExitStack()
+    if not verbose:
+        _ctx2.enter_context(contextlib.redirect_stdout(io.StringIO()))
+        _ctx2.enter_context(contextlib.redirect_stderr(io.StringIO()))
+
+    with _ctx2:
+        pfaa.make_all_ref_pooled_median_x_agents_AND_pooled_perc_x_agents(
+            exists_ok=False,
+            num_datasets_to_collect=num_datasets_to_collect,
+            intermediate_products_exist_ok=True,
+            agent_data_exists_ok=True,
+            use_stored_data_only=use_stored_data_only,
+            high_level_only=high_level_only,
+        )
+
+    print(' done.')
 
     agent_median_df = pfaa.all_ref_pooled_median_x_agents.copy()
     agent_perc_df = pfaa.pooled_perc_x_agents.copy()
@@ -266,6 +307,7 @@ def collect_pattern_frequencies_df(
     load_saved_df=False,
     save_filename='pattern_frequencies.pkl',
     max_n_agents=None,
+    verbose=False,
 ):
     '''
     Collect pattern frequency dataframe across agents.
@@ -284,6 +326,9 @@ def collect_pattern_frequencies_df(
         Filename for saving/loading.
     max_n_agents : int or None
         Limit number of agents.
+    verbose : bool
+        If False (default), suppress all output except a single progress line
+        ("Processing agent X/N"). If True, print all output as usual.
 
     Returns
     -------
@@ -315,32 +360,45 @@ def collect_pattern_frequencies_df(
 
     # ---------- Loop ----------
     for i, model_folder_name in enumerate(agent_folders):
-        print(f'Processing agent {i+1}/{num_agents}')
+        print(f'\rProcessing agent {i + 1}/{num_agents}', end='', flush=True)
 
-        agent = sb3_class.SB3forMultifirefly(
-            model_folder_name=model_folder_name
+        _ctx = (
+            contextlib.nullcontext()
+            if verbose
+            else contextlib.ExitStack()
         )
+        if not verbose:
+            _ctx.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            _ctx.enter_context(contextlib.redirect_stderr(io.StringIO()))
 
-        try:
-            agent.make_df_related_to_patterns_and_features(
-                retrieve_only=retrieve_only
+        with _ctx:
+            agent = sb3_class.SB3forMultifirefly(
+                model_folder_name=model_folder_name
             )
 
-            df, _ = compare_monkey_and_agent_utils \
-                .add_agent_id_and_essential_agent_params_info_to_df(
-                    agent.pattern_frequencies,
-                    model_folder_name
+            try:
+                agent.make_df_related_to_patterns_and_features(
+                    retrieve_only=retrieve_only
                 )
 
-            all_agents_pattern_frequencies = pd.concat(
-                [all_agents_pattern_frequencies, df],
-                axis=0,
-                ignore_index=True,
-            )
+                df, _ = compare_monkey_and_agent_utils \
+                    .add_agent_id_and_essential_agent_params_info_to_df(
+                        agent.pattern_frequencies,
+                        model_folder_name
+                    )
 
-        except Exception as e:
-            print(f'Error for {model_folder_name}: {e}')
-            continue
+                all_agents_pattern_frequencies = pd.concat(
+                    [all_agents_pattern_frequencies, df],
+                    axis=0,
+                    ignore_index=True,
+                )
+
+            except Exception as e:
+                if verbose:
+                    print(f'Error for {model_folder_name}: {e}')
+                continue
+
+    print()  # newline after progress line
 
     if len(all_agents_pattern_frequencies) == 0:
         print('No agent data found')

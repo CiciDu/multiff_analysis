@@ -147,7 +147,7 @@ def collect_all_session_decoding_results(
         ignore_index=True,
     )
     
-    all_session_results_df['shuffle_mode'] = shuffle_mode
+    all_session_results_df['shuffle_mode'] = 'none' if shuffle_mode is None else shuffle_mode
 
     return all_session_results_df
 
@@ -539,8 +539,6 @@ def _compute_summary(df, value_col, hue_col=None):
         group_cols.append('var_category')
     if hue_col is not None and hue_col in df.columns:
         group_cols = ['behav_feature', hue_col]
-    elif 'shuffle_mode' in df.columns:
-        group_cols.append('shuffle_mode')
 
     summary = (
         df
@@ -607,7 +605,8 @@ def plot_fold_diagnostics(
     diff_vmax=None,
 ):
     result_df = all_results.query(f"mode == '{mode}'")
-    result_summary = _compute_summary(result_df, 'r2_cv')
+    value_col = 'r2_cv' if mode == 'regression' else 'auc_mean'
+    result_summary = _compute_summary(result_df, value_col)
 
     mean_by_feature = (
         result_summary
@@ -616,6 +615,7 @@ def plot_fold_diagnostics(
     )
 
     result_summary = result_summary.sort_values('mean_value', ascending=False)
+    
 
     for behav_feature in result_summary['behav_feature'].values:
         print(behav_feature)

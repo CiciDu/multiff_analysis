@@ -128,9 +128,9 @@ def add_ff_visibility_cols_to_binned_feats(binned_feats, pn, vis_events_with_sta
 
     binned_feats.rename(columns={
         'ff_on_in_bin': 'ff_on',
-        'group_on_in_bin': 'group_on',
         'ff_off_in_bin': 'ff_off',
-        'group_off_in_bin': 'group_ff_off',
+        'group_ff_on_in_bin': 'group_ff_on',
+        'group_ff_off_in_bin': 'group_ff_off',
     }, inplace=True, errors='ignore')
     
     return binned_feats

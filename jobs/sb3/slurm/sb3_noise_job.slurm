@@ -22,8 +22,9 @@ N_ENVS=1
 # ---------------------
 # Hyperparameter lists
 # ---------------------
-declare -a MEM_R_LIST=(0.5 1.0 1.5 2.0 2.5 3.0)
-declare -a MEM_TH_LIST=(0.5 1.0 1.5 2.0)
+declare -a MEM_R_LIST=(0.0 0.5 1.0 1.5 2.0 2.5 3.0)
+# declare -a MEM_TH_LIST=(0.0 0.5 1.0 1.5 2.0)
+declare -a MEM_TH_LIST=(2.5 3.0)
 declare -a BASE_SEEDS=(0 1 2 3 4 5 6 7)
 NUM_REPEATS=5
 

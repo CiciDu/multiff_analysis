@@ -28,6 +28,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topic
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import show_decoding_results
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import process_encode_design
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import linear_model_utils
 
 
 
@@ -49,6 +50,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         detrend_spikes: bool = False,
         drop_bad_neurons: bool = True,
         cv_mode: str = "group_kfold",
+        pca_n_components: int | None = None,
     ):
         
         self.bin_width = bin_width
@@ -60,6 +62,11 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         # Cross-validation strategy (e.g. 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold')
         self.cv_mode = cv_mode
+
+        # Optional PCA dimensionality reduction applied to neural data before decoding.
+        # PCA is fit once on the full neural matrix and cached in self.pca_.
+        self.pca_n_components = pca_n_components
+        self.pca_ = None
         
         # Filled during setup
         self.feats_to_decode = None
@@ -94,6 +101,30 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """Neural data matrix (samples x neurons)."""
         raise NotImplementedError
 
+    def _get_neural_matrix_for_decoding(self) -> np.ndarray:
+        """Return neural matrix, optionally reduced via PCA.
+
+        PCA is fit once on the full matrix and cached in ``self.pca_``.  When
+        ``pca_n_components`` is *None* the raw matrix is returned unchanged.
+        """
+        X = self._get_neural_matrix()
+        if self.pca_n_components is None:
+            return X
+
+        from sklearn.decomposition import PCA
+
+        if self.pca_ is None:
+            self.pca_ = PCA(n_components=self.pca_n_components, random_state=0)
+            X = self.pca_.fit_transform(X)
+            explained = self.pca_.explained_variance_ratio_.sum()
+            print(
+                f"[{self._runner_name()}] PCA fitted: {self.pca_n_components} components, "
+                f"cumulative explained variance = {explained:.3f}"
+            )
+        else:
+            X = self.pca_.transform(X)
+        return X
+
     def _default_canoncorr_varnames(self) -> List[str]:
         """Default variable names for canoncorr."""
         raise NotImplementedError
@@ -121,7 +152,10 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             sub = "detrended"
         else:
             sub = "raw"
-            
+
+        if getattr(self, "pca_n_components", None) is not None:
+            sub = sub + f"_pca{self.pca_n_components}"
+
         self.save_dir = os.path.join(
             self.pn.planning_and_neural_folder_path,
             "decoding_outputs",
@@ -208,11 +242,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             df = pd.DataFrame()
 
         df = df.copy()
+        shuffle_mode_value = "none" if shuffle_mode is None else shuffle_mode
 
         # Basic identifying columns
         df["model_name"] = model_name
         df["n_splits"] = n_splits
-        df["shuffle_mode"] = shuffle_mode
+        df["shuffle_mode"] = shuffle_mode_value
         df["cv_mode"] = cv_mode
         df["buffer_samples"] = buffer_samples
         df["context"] = context_label
@@ -478,13 +513,11 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     # ============================================================
     
     def reduce_binned_spikes(self, corr_threshold_for_lags_of_a_feature=0.98, 
-                         vif_threshold_for_initial_subset=20, 
                          vif_threshold=20, 
                          verbose=True):
 
         self.binned_spikes = process_encode_design.reduce_encoding_design(self.binned_spikes, 
                          corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature, 
-                         vif_threshold_for_initial_subset=vif_threshold_for_initial_subset, 
                          vif_threshold=vif_threshold, 
                          verbose=verbose)
 
@@ -744,7 +777,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # Resolve cv_mode: use argument if provided, otherwise default to instance setting
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
-        X = self._get_neural_matrix()
+        X = self._get_neural_matrix_for_decoding()
         groups = self._get_groups()
         if fixed_width > 0:
             X = smooth_neural_data.smooth_signal(
@@ -826,7 +859,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # Resolve cv_mode: use argument if provided, otherwise default to instance setting
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
-        X = self._get_neural_matrix()
+        X = self._get_neural_matrix_for_decoding()
         y_df = self.get_target_df()
         groups = self._get_groups()
         # detrend_covariates passed from caller (None when use_detrend_inside_cv=True)
@@ -1098,13 +1131,13 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         selected_df = row_selector_fn(self.results_df)
 
-        reg_df = selected_df[selected_df['mode'] == 'regression'].copy()
+        rel_df = selected_df[selected_df['mode'] == 'regression'].copy()
 
-        if reg_df.empty:
+        if rel_df.empty:
             raise ValueError('No regression rows found.')
 
         df = (
-            reg_df[['behav_feature', 'score']]
+            rel_df[['behav_feature', 'score']]
             .rename(columns={'behav_feature': 'variable'})
             .sort_values('score', ascending=False)
             .reset_index(drop=True)
@@ -1119,4 +1152,639 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             detrend_spikes=self.detrend_spikes,
             smoothing_width=self.smoothing_width,
             drop_bad_neurons=self.drop_bad_neurons,
+        )
+
+    # ------------------------------------------------------------------
+    # Categorical variable discovery and ANOVA
+    #
+    # NOTE: ANOVA is conceptually an *encoding* analysis — it asks whether
+    # neural activity (spike counts) is modulated by a behavioral variable,
+    # i.e. the variable → neuron direction.  It lives here in the decoding
+    # runner purely for convenience: the runner already holds both
+    # ``feats_to_decode`` (behavioral features) and ``binned_spikes``
+    # (neural activity) in the same data-collection pipeline, so there is
+    # no need to duplicate that infrastructure in the encoding runner just
+    # to run a quick significance screen.  Think of these methods as a
+    # lightweight sanity-check / pre-filter that can be called before or
+    # after a full decoding run without touching the encoding codebase.
+    # ------------------------------------------------------------------
+
+    def find_categorical_vars_in_binned_feats(
+        self,
+        max_unique: int = 20,
+        min_unique: int = 2,
+    ) -> List[str]:
+        """
+        Return column names in ``feats_to_decode`` that are categorical
+        (integer-valued with few distinct levels) but are *not* event variables
+        and *not* spline / basis-function columns.
+
+        A column qualifies when ALL of the following hold:
+        - Not listed in ``var_categories['event_vars']`` (if present)
+        - Not a known basis column (from ``temporal_meta`` / ``tuning_meta`` groups, if present)
+        - Name does not match the ``_{digits}$`` suffix pattern used for basis columns
+        - Its non-null values are all integers (or integer-valued floats)
+        - The number of unique values is between ``min_unique`` and ``max_unique``
+
+        Parameters
+        ----------
+        max_unique : int
+            Upper bound on distinct values (inclusive).
+        min_unique : int
+            Lower bound on distinct values (inclusive, usually 2).
+
+        Returns
+        -------
+        List[str]
+            Ordered list of qualifying column names.
+        """
+        import re
+
+        feats_df = self.feats_to_decode
+        if feats_df is None:
+            raise RuntimeError(
+                "feats_to_decode is None; call collect_data() first."
+            )
+
+        event_vars: set = set(
+            getattr(self, "var_categories", {}).get("event_vars", [])
+        )
+
+        # Exact spline/basis column names from temporal and tuning meta groups
+        basis_cols: set = set()
+        for meta_attr in ("temporal_meta", "tuning_meta"):
+            meta = getattr(self, meta_attr, None) or {}
+            for col_list in (meta.get("groups") or {}).values():
+                basis_cols.update(col_list)
+
+        # Regex fallback: basis columns end with _{int} (e.g. stop_0, v_19)
+        _basis_suffix = re.compile(r"_\d+$")
+
+        categorical_cols: List[str] = []
+        for col in feats_df.columns:
+            if col in event_vars:
+                continue
+            if col in basis_cols:
+                continue
+            if _basis_suffix.search(col):
+                continue
+
+            series = feats_df[col]
+            notnull = series.dropna()
+            if len(notnull) == 0:
+                continue
+
+            is_int_like = pd.api.types.is_integer_dtype(series) or (
+                pd.api.types.is_float_dtype(series)
+                and bool((notnull == notnull.round()).all())
+            )
+            if not is_int_like:
+                continue
+
+            n_unique = int(series.nunique(dropna=True))
+            if min_unique <= n_unique <= max_unique:
+                categorical_cols.append(col)
+
+        return categorical_cols
+
+    def run_anova_for_categorical_vars(
+        self,
+        unit_idx: int,
+        categorical_cols: Optional[List[str]] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+    ) -> pd.DataFrame:
+        """
+        One-way ANOVA of spike counts grouped by each categorical variable.
+
+        Although ANOVA is an encoding-direction test (variable → neuron), it
+        is implemented here because the decoding runner already has both
+        ``feats_to_decode`` and ``binned_spikes`` readily available.
+
+        Delegates per-column computation to
+        ``linear_model_utils.anova_spike_counts_for_columns``.
+
+        Parameters
+        ----------
+        unit_idx : int
+            Column index of the target neuron in ``binned_spikes``.
+        categorical_cols : list of str, optional
+            Columns to test.  Defaults to the output of
+            ``find_categorical_vars_in_binned_feats()``.
+        alpha : float
+            Significance threshold used for the ``significant`` flag.
+        verbose : bool
+            Print a summary table when ``True``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per variable; columns:
+            ``variable``, ``n_categories``, ``F``, ``p_value``, ``significant``
+        """
+        if self.feats_to_decode is None or self.binned_spikes is None:
+            self.collect_data(exists_ok=True)
+
+        if categorical_cols is None:
+            categorical_cols = self.find_categorical_vars_in_binned_feats()
+
+        y = np.asarray(
+            self.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float
+        ).ravel()
+
+        result_df = linear_model_utils.anova_spike_counts_for_columns(
+            y=y,
+            binned_feats=self.feats_to_decode,
+            categorical_cols=categorical_cols,
+            alpha=alpha,
+        )
+
+        if verbose:
+            linear_model_utils.print_anova_single_unit(result_df, unit_idx, alpha)
+
+        return result_df
+
+    def run_anova_all_neurons(
+        self,
+        categorical_cols: Optional[List[str]] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+        results_cache: Optional[str] = None,
+        force_rerun: bool = False,
+    ) -> Dict[int, pd.DataFrame]:
+        """
+        Run one-way ANOVA for categorical variables across all neurons.
+
+        See ``run_anova_for_categorical_vars`` for the rationale of why an
+        encoding-direction ANOVA lives inside the decoding runner.
+
+        Calls ``run_anova_for_categorical_vars`` for each neuron and collects
+        the results.  ``collect_data`` is called implicitly when needed.
+
+        Parameters
+        ----------
+        categorical_cols : list of str, optional
+            Columns to test.  Defaults to ``self.categorical_vars`` (if set) or
+            the result of ``find_categorical_vars_in_binned_feats()``.
+        alpha : float
+            Significance threshold forwarded to each per-neuron call.
+        verbose : bool
+            Print per-neuron summaries.
+        results_cache : str, optional
+            Path to a pickle file for saving / loading the full results dict.
+            Defaults to ``<save_dir>/anova_results.pkl`` (next to
+            ``feats_to_decode.pkl``).  Pass ``""`` to disable caching.
+        force_rerun : bool
+            When ``True``, ignore an existing cache and recompute from scratch,
+            then overwrite the cache with the new results.
+
+        Returns
+        -------
+        Dict[int, pd.DataFrame]
+            Mapping from ``unit_idx`` to its ANOVA result DataFrame.
+        """
+        # ── resolve cache path ────────────────────────────────────────────
+        if results_cache == "":
+            cache_path: Optional[Path] = None
+        elif results_cache is not None:
+            cache_path = Path(results_cache)
+        else:
+            cache_path = self._results_cache_path("anova")
+
+        if not force_rerun and cache_path is not None:
+            cached = self._load_results_cache(cache_path, "anova")
+            if cached is not None:
+                if verbose:
+                    linear_model_utils.print_anova_all_neurons(cached, alpha)
+                return cached
+
+        # ── run ───────────────────────────────────────────────────────────
+        self.collect_data(exists_ok=True)
+
+        cols = categorical_cols
+        if cols is None:
+            cols = getattr(self, 'categorical_vars', None)
+        if cols is None:
+            cols = self.find_categorical_vars_in_binned_feats()
+
+        if not cols:
+            print(f'[{self._runner_name()}] No categorical vars to test — ANOVA skipped.')
+            return {}
+
+        n_neurons = self.binned_spikes.shape[1]
+        results: Dict[int, pd.DataFrame] = {}
+        for unit_idx in range(n_neurons):
+            # Pass verbose=False here; the all-neuron summary below replaces
+            # the per-neuron printouts when verbose=True.
+            results[unit_idx] = self.run_anova_for_categorical_vars(
+                unit_idx=unit_idx,
+                categorical_cols=cols,
+                alpha=alpha,
+                verbose=False,
+            )
+
+        if cache_path is not None:
+            self._save_results_cache(results, cache_path, "anova")
+
+        if verbose:
+            linear_model_utils.print_anova_all_neurons(results, alpha)
+
+        return results
+
+    def plot_anova_results(
+        self,
+        anova_results: Dict[int, pd.DataFrame],
+        alpha: float = 0.05,
+        figsize: Optional[tuple] = None,
+        title: Optional[str] = None,
+    ) -> plt.Figure:
+        """
+        Visualise the output of ``run_anova_all_neurons``.
+
+        Delegates all logic to
+        ``linear_model_utils.plot_anova_results``; see that function for full
+        parameter and return-value documentation.  The only runner-specific
+        behaviour is supplying a default ``title`` that includes the runner
+        name and dataset dimensions.
+        """
+        if not anova_results:
+            print(f"[{self._runner_name()}] plot_anova_results: empty results dict.")
+            return plt.figure()
+
+        if title is None:
+            n_neurons = len(anova_results)
+            n_vars    = len(next(iter(anova_results.values())))
+            title     = (
+                f"ANOVA  —  {self._runner_name()}  "
+                f"({n_neurons} neurons, {n_vars} vars, α={alpha})"
+            )
+
+        return linear_model_utils.plot_anova_results(
+            anova_results=anova_results,
+            alpha=alpha,
+            figsize=figsize,
+            title=title,
+        )
+
+    # ------------------------------------------------------------------
+    # LM (OLS with partial F-tests per categorical variable)
+    #
+    # These methods mirror the ANOVA block above.  The key difference:
+    # ANOVA tests each variable in isolation (marginal effects), while
+    # the LM tests each variable while controlling for all others
+    # simultaneously (partial / Type-II effects).  Running both and
+    # comparing via plot_lm_vs_anova_results reveals confounds:
+    #
+    #   ANOVA sig, LM not  →  apparent effect was confounded by another var
+    #   Both sig            →  effect is robust to other variables
+    #   LM sig, ANOVA not  →  effect was suppressed in isolation (rare)
+    # ------------------------------------------------------------------
+
+    def _default_covariates_cache_path(self) -> Optional[Path]:
+        """Return ``<save_dir>/lm_covariates_cache.json``, or None if unavailable."""
+        try:
+            return Path(self._get_save_dir()) / "lm_covariates_cache.json"
+        except Exception:
+            return None
+
+    def _results_cache_path(self, label: str) -> Optional[Path]:
+        """Return ``<save_dir>/<label>_results.pkl``, or None if unavailable."""
+        try:
+            return Path(self._get_save_dir()) / f"{label}_results.pkl"
+        except Exception:
+            return None
+
+    def _load_results_cache(
+        self, cache_path: Path, label: str
+    ) -> Optional[Dict[int, pd.DataFrame]]:
+        """Load a pickled results dict.  Returns None on any failure."""
+        if not cache_path.exists():
+            return None
+        try:
+            with open(cache_path, "rb") as fh:
+                results = pickle.load(fh)
+            print(
+                f"[{self._runner_name()}] {label.upper()}: loaded results from cache"
+                f"  ({cache_path})"
+            )
+            return results
+        except Exception as exc:
+            print(
+                f"[{self._runner_name()}] {label.upper()}: cache load failed"
+                f" ({exc}) — re-running."
+            )
+            return None
+
+    def _save_results_cache(
+        self, results: Dict[int, pd.DataFrame], cache_path: Path, label: str
+    ) -> None:
+        """Pickle a results dict, creating parent directories as needed."""
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_path, "wb") as fh:
+                pickle.dump(results, fh, protocol=pickle.HIGHEST_PROTOCOL)
+            print(
+                f"[{self._runner_name()}] {label.upper()}: saved results to cache"
+                f"  ({cache_path})"
+            )
+        except Exception as exc:
+            print(
+                f"[{self._runner_name()}] {label.upper()}: cache save failed ({exc})"
+            )
+
+    def _resolve_lm_covariate_cols(
+        self,
+        categorical_cols: List[str],
+        continuous_cols: Optional[List[str]],
+        covariates_cache: Optional[str],
+    ) -> List[str]:
+        """
+        Build the reduced covariate column list for ``include_all_feats`` LM calls.
+
+        All columns of ``feats_to_decode`` not already in ``categorical_cols``
+        or ``continuous_cols`` are candidates.
+        ``process_encode_design.reduce_encoding_design`` is then applied
+        (corr threshold 0.95, VIF threshold 20) to remove zero-variance,
+        near-perfectly-correlated (e.g. adjacent spline bases), and high-VIF
+        columns so the OLS design matrix stays well-conditioned.
+
+        The result is always cached as a JSON list of column names so that
+        subsequent calls skip the expensive reduction step.  The cache file
+        lives next to ``feats_to_decode.pkl`` in ``_get_save_dir()`` unless
+        an explicit ``covariates_cache`` path is provided.
+
+        Parameters
+        ----------
+        categorical_cols : list of str
+            Columns used as main effects (excluded from covariates).
+        continuous_cols : list of str or None
+            Columns used as reported continuous predictors (excluded).
+        covariates_cache : str or None
+            Override the default cache path.  Pass an empty string ``""`` to
+            disable caching entirely.
+
+        Returns
+        -------
+        list of str
+            Reduced covariate column names.
+        """
+        import json
+
+        # Resolve the effective cache path: explicit > auto-derived > disabled
+        if covariates_cache == "":
+            cache_path: Optional[Path] = None          # explicitly disabled
+        elif covariates_cache is not None:
+            cache_path = Path(covariates_cache)
+        else:
+            cache_path = self._default_covariates_cache_path()  # same dir as feats_to_decode
+
+        if cache_path is not None and cache_path.exists():
+            with open(cache_path) as fh:
+                covariate_cols = json.load(fh)
+            print(
+                f"[{self._runner_name()}] LM covariates: loaded "
+                f"{len(covariate_cols)} cols from cache  ({cache_path})"
+            )
+            return covariate_cols
+
+        # Build the full joint design matrix so the reduction sees correlations
+        # between covariates AND test-variable dummies, not covariates alone.
+        exclude       = set(categorical_cols) | set(continuous_cols or [])
+        candidate_cov = [c for c in self.feats_to_decode.columns if c not in exclude]
+
+        test_dummies = pd.get_dummies(
+            self.feats_to_decode[categorical_cols], drop_first=True, dtype=float
+        )
+        cont_df  = (
+            self.feats_to_decode[list(continuous_cols)].astype(float)
+            if continuous_cols else pd.DataFrame(index=self.feats_to_decode.index)
+        )
+        cov_df   = self.feats_to_decode[candidate_cov].astype(float)
+        joint_df = pd.concat([test_dummies, cont_df, cov_df], axis=1)
+
+        # Protected columns (test variables) must not be dropped.
+        protected = set(test_dummies.columns) | set(continuous_cols or [])
+
+        joint_reduced = process_encode_design.reduce_encoding_design(
+            joint_df,
+            corr_threshold_for_lags_of_a_feature=0.9,
+            vif_threshold=5,
+            verbose=False,
+        )
+        # Add back any protected columns the reduction may have dropped
+        for col in protected:
+            if col not in joint_reduced.columns and col in joint_df.columns:
+                joint_reduced[col] = joint_df[col]
+
+        # Extract surviving covariate column names (original, non-dummy names)
+        covariate_cols = [c for c in candidate_cov if c in joint_reduced.columns]
+
+        if cache_path is not None:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_path, "w") as fh:
+                json.dump(covariate_cols, fh)
+            print(
+                f"[{self._runner_name()}] LM covariates: saved "
+                f"{len(covariate_cols)} cols to cache  ({cache_path})"
+            )
+
+        return covariate_cols
+
+    def run_lm_for_categorical_vars(
+        self,
+        unit_idx: int,
+        categorical_cols: Optional[List[str]] = None,
+        continuous_cols: Optional[List[str]] = None,
+        include_all_feats: bool = True,
+        covariates_cache: Optional[str] = None,
+        _covariate_cols: Optional[List[str]] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Fit an OLS LM for one neuron and compute partial F-tests.
+
+        All categorical variables are included simultaneously; each is tested
+        via a drop-one partial F-test (Type-II SS) that controls for every
+        other predictor.  Optional ``continuous_cols`` are included as
+        covariates and also reported.
+
+        Parameters
+        ----------
+        unit_idx : int
+            Column index of the target neuron in ``binned_spikes``.
+        categorical_cols : list of str, optional
+            Columns to dummy-encode and test.  Defaults to the output of
+            ``find_categorical_vars_in_binned_feats()``.
+        continuous_cols : list of str, optional
+            Continuous predictors included in the model and reported.
+        include_all_feats : bool
+            When ``True``, every remaining column of ``feats_to_decode``
+            (after reduction via ``_resolve_lm_covariate_cols``) is added as
+            an unreported covariate.
+        covariates_cache : str, optional
+            Path to a JSON file for saving / loading the reduced covariate
+            column list.  Only used when ``include_all_feats=True``.
+            On first call the list is computed and saved; on later calls it
+            is loaded directly, skipping the expensive reduction step.
+        alpha : float
+            Significance threshold.
+        verbose : bool
+            Print a formatted result table when ``True``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per variable; columns:
+            ``variable``, ``n_params``, ``F``, ``p_value``, ``significant``
+        """
+        if self.feats_to_decode is None or self.binned_spikes is None:
+            self.collect_data(exists_ok=True)
+
+        if categorical_cols is None:
+            categorical_cols = self.find_categorical_vars_in_binned_feats()
+
+        # _covariate_cols is a private shortcut used by run_lm_all_neurons to
+        # pass pre-resolved covariates directly, avoiding per-neuron recomputation.
+        covariate_cols: Optional[List[str]] = _covariate_cols
+        if covariate_cols is None and include_all_feats:
+            covariate_cols = self._resolve_lm_covariate_cols(
+                categorical_cols=categorical_cols,
+                continuous_cols=continuous_cols,
+                covariates_cache=covariates_cache,
+            )
+
+        y = np.asarray(
+            self.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float
+        ).ravel()
+
+        result_df = linear_model_utils.lm_spike_counts_for_columns(
+            y=y,
+            binned_feats=self.feats_to_decode,
+            categorical_cols=categorical_cols,
+            continuous_cols=continuous_cols,
+            covariate_cols=covariate_cols,
+            alpha=alpha,
+        )
+
+        if verbose:
+            linear_model_utils.print_lm_single_unit(result_df, unit_idx, alpha)
+
+        return result_df
+
+    def run_lm_all_neurons(
+        self,
+        categorical_cols: Optional[List[str]] = None,
+        continuous_cols: Optional[List[str]] = None,
+        include_all_feats: bool = True,
+        covariates_cache: Optional[str] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+    ) -> Dict[int, pd.DataFrame]:
+        """
+        Run the partial-F LM for categorical variables across all neurons.
+
+        Calls ``run_lm_for_categorical_vars`` for each neuron.
+        ``collect_data`` is called implicitly when needed.
+
+        When ``include_all_feats=True`` the covariate column list is resolved
+        **once** via ``_resolve_lm_covariate_cols`` and reused for every
+        neuron, so the expensive ``reduce_encoding_design`` call is not
+        repeated N times.
+
+        Parameters
+        ----------
+        categorical_cols : list of str, optional
+            Columns to test.  Defaults to ``self.categorical_vars`` (if set)
+            or ``find_categorical_vars_in_binned_feats()``.
+        continuous_cols : list of str, optional
+            Continuous covariates forwarded to each per-neuron call.
+        include_all_feats : bool
+            When ``True``, all remaining columns of ``feats_to_decode`` are
+            added as unreported covariates.  See ``run_lm_for_categorical_vars``
+            for details.
+        covariates_cache : str, optional
+            Path to a JSON file for saving / loading the reduced covariate
+            column list.  Only used when ``include_all_feats=True``.
+        alpha : float
+            Significance threshold.
+        verbose : bool
+            Print an all-neuron summary grid when ``True``.
+
+        Returns
+        -------
+        Dict[int, pd.DataFrame]
+            Mapping from ``unit_idx`` to its LM result DataFrame.
+        """
+        self.collect_data(exists_ok=True)
+
+        cols = categorical_cols
+        if cols is None:
+            cols = getattr(self, "categorical_vars", None)
+        if cols is None:
+            cols = self.find_categorical_vars_in_binned_feats()
+
+        if not cols:
+            print(f"[{self._runner_name()}] No categorical vars to test — LM skipped.")
+            return {}
+
+        # Resolve covariates once for all neurons when include_all_feats is set.
+        resolved_covariate_cols: Optional[List[str]] = None
+        if include_all_feats:
+            resolved_covariate_cols = self._resolve_lm_covariate_cols(
+                categorical_cols=cols,
+                continuous_cols=continuous_cols,
+                covariates_cache=covariates_cache,
+            )
+
+        n_neurons = self.binned_spikes.shape[1]
+        results: Dict[int, pd.DataFrame] = {}
+        for unit_idx in range(n_neurons):
+            results[unit_idx] = self.run_lm_for_categorical_vars(
+                unit_idx=unit_idx,
+                categorical_cols=cols,
+                continuous_cols=continuous_cols,
+                include_all_feats=False,           # already resolved above
+                _covariate_cols=resolved_covariate_cols,
+                alpha=alpha,
+                verbose=False,
+            )
+
+        if verbose:
+            linear_model_utils.print_lm_all_neurons(results, alpha)
+
+        return results
+
+    def plot_lm_vs_anova_results(
+        self,
+        anova_results: Dict[int, pd.DataFrame],
+        lm_results: Dict[int, pd.DataFrame],
+        alpha: float = 0.05,
+        figsize: Optional[tuple] = None,
+        title: Optional[str] = None,
+    ) -> plt.Figure:
+        """
+        Visualise ANOVA vs LM consistency across all neurons.
+
+        Delegates all logic to ``linear_model_utils.plot_lm_vs_anova``; see
+        that function for full documentation.  Supplies a runner-specific
+        default title.
+        """
+        if not anova_results or not lm_results:
+            print(f"[{self._runner_name()}] plot_lm_vs_anova_results: empty results.")
+            return plt.figure()
+
+        if title is None:
+            n_neurons = len(anova_results)
+            title = (
+                f"ANOVA vs LM  —  {self._runner_name()}  "
+                f"({n_neurons} neurons, α={alpha})"
+            )
+
+        return linear_model_utils.plot_lm_vs_anova(
+            anova_results=anova_results,
+            lm_results=lm_results,
+            alpha=alpha,
+            figsize=figsize,
+            title=title,
         )

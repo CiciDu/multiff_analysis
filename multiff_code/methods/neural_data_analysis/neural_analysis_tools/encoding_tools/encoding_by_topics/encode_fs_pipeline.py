@@ -82,6 +82,7 @@ class FSEncodingRunner(BaseEncodingRunner):
 
         self._save_design_matrices()
 
+
     # ------------------------------------------------------------------
     # Caching utilities
     # ------------------------------------------------------------------

@@ -137,5 +137,6 @@ echo "sbatch --array=\"$ARRAY_RANGE%$MAX_PARALLEL\" ${FORWARD_ARGS[@]+"${FORWARD
 
 sbatch \
   --array="${ARRAY_RANGE}%${MAX_PARALLEL}" \
+  --export=ALL,MANIFEST_PATH="$MANIFEST_PATH" \
   ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
   "$SLURM_SCRIPT"

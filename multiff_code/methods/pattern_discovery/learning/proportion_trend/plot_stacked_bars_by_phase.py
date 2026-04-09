@@ -43,7 +43,7 @@ def prepare_for_stacked_bar(df_monkey, category_order):
     phase_df = (ses.groupby(['phase', 'new_label', 'item'], observed=True)[['frequency', 'denom_count']]
                 .sum().reset_index(drop=False))
     phase_df['denom_count'] = phase_df['denom_count'].astype(int)
-    phase_df['ratio'] = phase_df['frequency'] / phase_df['denom_count']
+    phase_df['rate'] = phase_df['frequency'] / phase_df['denom_count']
     phase_df_sub = phase_df[phase_df['phase'].isin(['early', 'late'])].copy()
     phase_df_sub['phase'] = pd.Categorical(
         phase_df_sub['phase'], ['early', 'late'], ordered=True)
@@ -146,7 +146,7 @@ def plot_outcomes_by_phase_side_by_side(combd_pattern_frequencies, category_orde
             )
             phase_df_sub = prepare_for_stacked_bar(df_monkey, category_order)
             p_values = get_p_values(phase_df_sub, category_order)
-            M = (phase_df_sub.pivot_table(index='phase', columns='new_label', values='ratio', aggfunc='sum')
+            M = (phase_df_sub.pivot_table(index='phase', columns='new_label', values='rate', aggfunc='sum')
                  .reindex(index=['early', 'late'], columns=category_order)
                  .fillna(0.0))
             plot_stacked_bar(

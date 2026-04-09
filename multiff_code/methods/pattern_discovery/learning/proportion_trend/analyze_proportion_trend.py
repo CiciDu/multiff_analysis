@@ -425,7 +425,7 @@ def plot_poisson_proportion_fit(
     event_count_col: str = 'success',
     denom_count_col: str = 'stops',
     title: str = 'Ratio across sessions',
-    ylabel: str = 'Ratio',
+    ylabel: str = 'Rate',
     pval: Optional[float] = None,
     *,
     monkey_col: str = 'monkey',

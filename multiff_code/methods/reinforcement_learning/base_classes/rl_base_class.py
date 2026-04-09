@@ -495,14 +495,15 @@ class _RLforMultifirefly(animation_class.AnimationClass):
         return
 
     def collect_data(self, n_steps=8000, exists_ok=False, save_data=True, retrieve_ff_flash_sorted=False, 
-                     retrieve_data_only=False):
+                     retrieve_data_only=False, retrieve_ff_dataframe=True):
         if exists_ok or retrieve_data_only:
             try:
                 self.retrieve_monkey_data(
                     retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.ff_caught_T_new = self.ff_caught_T_sorted
-                self.make_or_retrieve_ff_dataframe_for_agent(
-                    exists_ok=exists_ok, save_data=save_data)
+                if retrieve_ff_dataframe:
+                    self.make_or_retrieve_ff_dataframe_for_agent(
+                        exists_ok=exists_ok, save_data=save_data)
             except Exception as e:
                 print(
                     "Failed to retrieve monkey data. Will make new monkey data. Error: ", e)
@@ -517,6 +518,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 n_steps=n_steps, save_data=save_data)
 
         self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=exists_ok)
+        self.make_ff_caught_T_new()
+        self._process_data_based_on_closest_stop_to_capture_df()
         # self.calculate_pattern_frequencies_and_feature_statistics()
         # self.find_patterns()
         
