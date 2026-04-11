@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J rppo_sweep
 #SBATCH --partition=xaqq,gpu
-#SBATCH --exclude=mind-1-29,mind-1-15
+,mind-1-15
 #SBATCH --gres=gpu:1
 #SBATCH -c 2
 #SBATCH --mem=5G

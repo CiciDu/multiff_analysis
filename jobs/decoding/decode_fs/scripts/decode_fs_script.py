@@ -20,7 +20,7 @@ from jobs.decoding.shared_decoding_script import run_decoding_main
 
 
 def main():
-    return run_decoding_main(decode_fs_pipeline.FSDecodingRunner, cv_mode='kfold')
+    return run_decoding_main(decode_fs_pipeline.FSDecodingRunner, cv_mode='blocked_time_buffered')
 
 
 if __name__ == '__main__':

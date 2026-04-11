@@ -3,11 +3,12 @@
 #SBATCH --partition=gpu,xaqq
 #SBATCH -c 1
 #SBATCH --gres=gpu:1
-#SBATCH --mem=2G
+#SBATCH --mem=5G
 #SBATCH -t 24:00:00
-#SBATCH --array=0-23
-#SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/cond/sb3_cond-%A_%a.out
-#SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/cond/sb3_cond-%A_%a.err
+# Submit via submit_sb3_cond.sh for full sweep (chunks ≤1000 tasks). Direct sbatch: tiny test array only.
+#SBATCH --array=0-0%10
+#SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/sb3_cond/sb3_cond-%A_%a.out
+#SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/sb3_cond/sb3_cond-%A_%a.err
 
 set -euo pipefail
 cd /user_data/cicid/Multifirefly-Project
@@ -28,8 +29,20 @@ NUM_LEVELS=${#LEVELS[@]}
 NUM_BASE_SEEDS=${#BASE_SEEDS[@]}
 
 COMBOS_PER_LEVEL=$((NUM_BASE_SEEDS * NUM_REPEATS))
-LEVEL_IDX=$((SLURM_ARRAY_TASK_ID / COMBOS_PER_LEVEL))
-REST=$((SLURM_ARRAY_TASK_ID % COMBOS_PER_LEVEL))
+TOTAL_COMB=$((NUM_LEVELS * COMBOS_PER_LEVEL))
+
+# Global flat index when submit_sb3_cond.sh splits the array (SLURM_ARRAY_OFFSET per chunk).
+ARRAY_OFFSET=${SLURM_ARRAY_OFFSET:-0}
+TASK_ID=$((ARRAY_OFFSET + SLURM_ARRAY_TASK_ID))
+echo "[info] TOTAL_COMB=${TOTAL_COMB} ARRAY_OFFSET=${ARRAY_OFFSET} SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} TASK_ID=${TASK_ID}"
+
+if (( TASK_ID >= TOTAL_COMB )); then
+  echo "[warning] TASK_ID exceeds TOTAL_COMB — exiting safely"
+  exit 0
+fi
+
+LEVEL_IDX=$((TASK_ID / COMBOS_PER_LEVEL))
+REST=$((TASK_ID % COMBOS_PER_LEVEL))
 BASE_SEED_IDX=$((REST / NUM_REPEATS))
 REPEAT_IDX=$((REST % NUM_REPEATS))
 SWEEP_VALUE=${LEVELS[$LEVEL_IDX]}

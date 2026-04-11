@@ -39,6 +39,7 @@ def collect_all_session_decoding_results(
     detrend_per_block=None,
     smoothing_width=None,
     cv_mode=None,
+    model_name=None,
 ):
     """
     Collect existing CV decoding results across all sessions for one monkey.
@@ -64,6 +65,9 @@ def collect_all_session_decoding_results(
     detrend_per_block : bool, optional
         When use_detrend_inside_cv=True: if True, only per-block detrended; if False,
         only global detrended; if None, both.
+    model_name : str, optional
+        If set, keep only rows for this decoder model (matches the ``model_name``
+        column in consolidated results). If None, keep all models.
 
     Returns
     -------
@@ -115,6 +119,18 @@ def collect_all_session_decoding_results(
             detrend_per_block=detrend_per_block,
             cv_mode=cv_mode,
         )
+
+        if model_name is not None:
+            if session_results_df.empty or 'model_name' not in session_results_df.columns:
+                if verbose and not session_results_df.empty:
+                    print(
+                        f"Warning: no 'model_name' column in results under {models_save_dir}; "
+                        f"cannot filter by model_name={model_name!r}."
+                    )
+            else:
+                session_results_df = session_results_df[
+                    session_results_df['model_name'] == model_name
+                ].reset_index(drop=True)
 
         if 'cv_mode' not in session_results_df.columns:
             inferred_cv_mode = None
@@ -414,7 +430,10 @@ def visualize_decoding_results(
     if var_categories is None:
         var_categories = DEFAULT_DECODING_VAR_CATEGORIES
 
-    model_df = df.query("model_name == @model_name").copy()
+    if model_name is not None:
+        model_df = df.query("model_name == @model_name").copy()
+    else:
+        model_df = df
 
     model_df = _add_var_category_column(
         model_df,
@@ -638,6 +657,63 @@ def plot_fold_diagnostics(
 
     return result_summary, mean_by_feature
 
+# =========================
+# Helper: visualize + diagnostics
+# =========================
+def run_and_analyze_decoding_sweep(
+    all_results_dict,
+    runner,
+    model_name='ridge_strong',
+    mode='regression',
+    vmin=-0.2,
+    vmax=0.2,
+    compare_keys=None,
+):
+    if not all_results_dict:
+        return None, None, None, None
+
+    # summary
+    reg_summary, clf_summary = visualize_decoding_results(
+        decoding_results_dfs=all_results_dict,
+        model_name=model_name,
+        var_categories=runner.var_categories,
+    )
+
+    keys = list(all_results_dict.keys())
+    key_a = keys[0]
+    key_b = None
+
+    # try custom keys
+    if compare_keys is not None and len(compare_keys) >= 2:
+        k1, k2 = compare_keys
+        if k1 in all_results_dict:
+            key_a = k1
+        if k1 in all_results_dict and k2 in all_results_dict:
+            key_b = k2
+
+    # fallback compare
+    if key_b is None and len(keys) >= 2:
+        key_b = keys[1] if key_a == keys[0] else keys[0]
+
+    # ALWAYS call diagnostics
+    kwargs = dict(
+        all_results=all_results_dict[key_a],
+        mode=mode,
+        vmin=vmin,
+        vmax=vmax,
+    )
+
+    if key_b is not None:
+        kwargs.update(dict(
+            compare_results=all_results_dict[key_b],
+            compare_label=key_b,
+            compare_plot=f'three_panel',
+        ))
+
+    reg_summary2, mean_by_feature = plot_fold_diagnostics(**kwargs)
+
+    # return reg_summary, clf_summary, reg_summary2, mean_by_feature
+
 
 def plot_fold_session_heatmap(
     all_results,
@@ -769,10 +845,7 @@ def plot_fold_session_heatmap(
     # ---------------------------------------
     # raw only
     # ---------------------------------------
-    if (compare_results is None) or (len(compare_results) == 0):
-        if len(compare_results) == 0:
-            print('Warning: compare_results is provided but no rows found in compare_results')
-
+    if compare_results is None or len(compare_results) == 0:
         fig, ax = plt.subplots(figsize=(6, max(4, 0.4 * len(pivot))))
         _plot_single_heatmap(
             ax=ax,
@@ -877,9 +950,10 @@ def plot_fold_session_heatmap(
         plt.show()
 
     else:
-        raise ValueError(
-            "compare_plot must be 'difference', 'side_by_side', or 'three_panel'"
-        )
+        pass
+        # raise ValueError(
+        #     "compare_plot must be 'difference', 'side_by_side', or 'three_panel'"
+        # )
 
     return {
         'raw_pivot': pivot_aligned,

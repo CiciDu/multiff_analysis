@@ -45,6 +45,8 @@ EOF
 # Defaults
 # --------------------------------------------------
 MAX_PARALLEL=20
+# Same idea as submit_sb3_cond.sh: at most ARRAY_MAX tasks per array job (Slurm MaxArraySize)
+ARRAY_MAX=1000
 
 # --------------------------------------------------
 # Argument parsing
@@ -117,26 +119,29 @@ if [[ "$NUM_AGENTS" -eq 0 ]]; then
   exit 1
 fi
 
-if [[ "$NUM_AGENTS" -gt 999 ]]; then
-  echo "[WARN] Number of agents ($NUM_AGENTS) exceeds maximum supported (999); capping to 999"
-  NUM_AGENTS=999
-fi
-
-ARRAY_RANGE="0-$((NUM_AGENTS-1))"
-
-echo "[INFO] Job array range: $ARRAY_RANGE"
-echo "[INFO] Max concurrent jobs: $MAX_PARALLEL"
-echo "[INFO] Each job will run: python agent_plan_script.py <AGENT_INDEX>"
-# echo "[INFO] Agent indices: $(seq -s ', ' 0 $((NUM_AGENTS-1)))"
+echo "[INFO] Total agents: $NUM_AGENTS (chunk size ≤ $ARRAY_MAX per sbatch)"
+echo "[INFO] Max concurrent jobs per array: $MAX_PARALLEL"
+echo "[INFO] Each task runs: python agent_plan_script.py for manifest index = SLURM_ARRAY_TASK_ID"
 
 # --------------------------------------------------
-# Submit job array
+# Submit job array(s) — chunk so every agent is covered under Slurm array limits
 # --------------------------------------------------
-echo '[SUBMIT] Running sbatch:'
-echo "sbatch --array=\"$ARRAY_RANGE%$MAX_PARALLEL\" ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \"$SLURM_SCRIPT\""
+offset=0
+while (( offset < NUM_AGENTS )); do
+  remaining=$((NUM_AGENTS - offset))
+  if (( remaining > ARRAY_MAX )); then
+    chunk=$ARRAY_MAX
+  else
+    chunk=$remaining
+  fi
+  last=$((offset + chunk - 1))
 
-sbatch \
-  --array="$ARRAY_RANGE"%"$MAX_PARALLEL" \
-  --export=ALL,MANIFEST_PATH="$MANIFEST_PATH" \
-  ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
-  "$SLURM_SCRIPT"
+  echo "[SUBMIT] sbatch --array=${offset}-${last}%${MAX_PARALLEL} ... \"$SLURM_SCRIPT\""
+  sbatch \
+    --array="${offset}-${last}%${MAX_PARALLEL}" \
+    --export=ALL,MANIFEST_PATH="$MANIFEST_PATH" \
+    ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
+    "$SLURM_SCRIPT"
+
+  offset=$((offset + chunk))
+done

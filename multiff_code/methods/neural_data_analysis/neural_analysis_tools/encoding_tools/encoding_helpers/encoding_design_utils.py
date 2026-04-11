@@ -11,6 +11,7 @@ from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers 
 from neural_data_analysis.neural_analysis_tools.glm_tools.tpg import glm_bases
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import one_ff_glm_design
 from neural_data_analysis.design_kits.design_around_event import event_binning
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
 
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
     GroupSpec,
@@ -1318,3 +1319,15 @@ def get_session_paths(raw_data_folder_path, raw_data_dir_name, monkey_names):
                 os.path.join(raw_data_dir_name, row["monkey_name"], row["data_name"])
             )
     return session_paths
+
+def build_clean_var_categories(structured_meta_groups, var_categories):
+    """
+    Use structured_meta_groups as source of valid vars.
+    """
+
+    tuning_vars = structured_meta_groups['tuning']['groups'].keys()
+    temporal_vars = structured_meta_groups['temporal']['groups'].keys()
+
+    valid_vars = set(tuning_vars) | set(temporal_vars)
+
+    return decoding_design_utils.build_clean_var_categories_from_feats(valid_vars, var_categories)

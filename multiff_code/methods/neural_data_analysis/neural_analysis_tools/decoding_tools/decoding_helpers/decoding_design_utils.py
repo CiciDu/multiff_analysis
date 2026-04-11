@@ -198,3 +198,47 @@ def get_processed_spike_rates(
         processed_spike_rates[time_cols] = time_bins_df[time_cols]
 
     return processed_spike_rates
+
+
+def build_clean_var_categories(valid_vars, var_categories):
+    """
+    Core helper: filter var_categories using a provided set of valid_vars.
+    """
+
+    valid_vars = set(valid_vars)  # ensure set
+
+    clean_var_categories = {}
+
+    for category, var_list in var_categories.items():
+
+        # skip non_spike_vars (we rebuild it later)
+        if category == 'non_spike_vars':
+            continue
+
+        # filter
+        filtered = [v for v in var_list if v in valid_vars]
+
+        if filtered:
+            clean_var_categories[category] = filtered
+
+    # --- rebuild non_spike_vars ---
+    all_non_spike = []
+    for category, var_list in clean_var_categories.items():
+        if category != 'spike_hist_vars':
+            all_non_spike.extend(var_list)
+
+    # preserve order (no sorting)
+    seen = set()
+    clean_var_categories['non_spike_vars'] = [
+        v for v in all_non_spike if not (v in seen or seen.add(v))
+    ]
+
+    return clean_var_categories
+
+
+def build_clean_var_categories_from_feats(feats_to_decode, var_categories):
+    """
+    Use feats_to_decode columns as source of valid vars.
+    """
+
+    return build_clean_var_categories(feats_to_decode.columns, var_categories)

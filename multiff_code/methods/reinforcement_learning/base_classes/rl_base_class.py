@@ -10,6 +10,7 @@ from reinforcement_learning.base_classes import rl_base_utils
 from reinforcement_learning.base_classes import run_logger
 from reinforcement_learning.base_classes import base_env
 from reinforcement_learning.base_classes import env_utils
+from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
 
 
 import time as time_package
@@ -517,9 +518,12 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.run_agent_to_collect_data(
                 n_steps=n_steps, save_data=save_data)
 
-        self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=exists_ok)
+        self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=False)
         self.make_ff_caught_T_new()
-        self._process_data_based_on_closest_stop_to_capture_df()
+        self.monkey_information['trial'] = np.searchsorted(
+            self.ff_caught_T_new, self.monkey_information['time'])
+        self.monkey_information = prep_target_data.add_capture_target(self.monkey_information, self.ff_caught_T_new)
+        
         # self.calculate_pattern_frequencies_and_feature_statistics()
         # self.find_patterns()
         
@@ -627,11 +631,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.monkey_information = process_monkey_information._process_monkey_information_for_agent(
                 self.monkey_information)
 
-        if not hasattr(self, 'closest_stop_to_capture_df'):
-            self.make_closest_stop_to_capture_df()
-        if not hasattr(self, 'ff_caught_T_new'):
-            self.make_ff_caught_T_new()
-
+        self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=False)
+        self.make_ff_caught_T_new()
         self.monkey_information['trial'] = np.searchsorted(
             self.ff_caught_T_new, self.monkey_information['time'])
 

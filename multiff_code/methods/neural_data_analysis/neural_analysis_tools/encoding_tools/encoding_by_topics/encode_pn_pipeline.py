@@ -177,6 +177,7 @@ class PNEncodingRunner(BaseEncodingRunner):
         self._make_structured_meta_groups()
 
         self._save_design_matrices()
+        self.clean_var_categories()
 
 
     # def _prepare_spike_history_components(self):

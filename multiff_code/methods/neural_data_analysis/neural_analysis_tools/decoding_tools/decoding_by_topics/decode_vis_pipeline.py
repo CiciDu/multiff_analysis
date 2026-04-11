@@ -102,6 +102,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             # Save the computed design matrices for future use
             self.reduce_binned_spikes()
             self._save_design_matrices()
+            self.clean_var_categories()
 
     def _prepare_design_matrices(self):
         new_seg_info, events_with_stats = decode_vis_utils.prepare_new_seg_info(

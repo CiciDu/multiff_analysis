@@ -16,10 +16,11 @@ def plot_pairwise_interactions(
     target_col='num_caught_ff',
     ci_low_col=None,
     ci_high_col=None,
-    metrics=('mean', 'std'),
+    metrics=('mean'), #('mean', 'std')
     min_count=1,
     figsize=(6, 5),
-    cmap='viridis'
+    cmap='viridis',
+    title=None,
 ):
     """
     Plot pairwise heatmaps for selected metrics.
@@ -28,6 +29,9 @@ def plot_pairwise_interactions(
     ----------
     metrics : tuple of str
         Options: 'mean', 'std', 'ci_low', 'ci_high', 'ci_width'
+    title : str or None
+        If set, used as the figure suptitle. Otherwise
+        ``{key_x} × {key_y} | {target_col}``.
     """
 
     import itertools
@@ -115,7 +119,12 @@ def plot_pairwise_interactions(
             cbar = fig.colorbar(im, ax=ax)
             cbar.set_label(name)
 
-        fig.suptitle(f'{key_x} × {key_y}  |  {target_col}', y=1.02)
+        suptitle = (
+            title
+            if title is not None
+            else f'{key_x} × {key_y}  |  {target_col}'
+        )
+        fig.suptitle(suptitle, y=1.02)
 
         #plt.tight_layout()
         plt.show()

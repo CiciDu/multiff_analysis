@@ -855,7 +855,7 @@ def consolidate_results_across_models(
     out_dir,
     output_filename='all_models_results.csv',
     model_names=None,
-    verbosity=1,
+    verbosity=0,
     save_output=False,
     use_detrend_inside_cv=None,
     detrend_per_block=None,
@@ -934,7 +934,8 @@ def consolidate_results_across_models(
         try:
             with p.open('rb') as f:
                 loaded = pickle.load(f)
-                print('Loaded pickle file:', p)
+                if verbosity > 1:
+                    print('Loaded pickle file:', p)
         except Exception as e:
             if verbosity > 1:
                 print(f'Skipping {p}: failed to unpickle ({e})')

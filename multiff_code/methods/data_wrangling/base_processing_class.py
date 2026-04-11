@@ -8,6 +8,7 @@ from pattern_discovery import pattern_by_trials, organize_patterns_and_features,
 from decision_making_analysis.event_detection import detect_rsw_and_rcap
 from neural_data_analysis.topic_based_neural_analysis.neural_vs_behavioral import prep_target_data
 
+
 import os
 import os
 import os.path
@@ -310,15 +311,14 @@ class BaseProcessing:
 
 
     def _process_data_based_on_closest_stop_to_capture_df(self):
-
-            self.monkey_information['trial'] = np.searchsorted(
-                self.ff_caught_T_new, self.monkey_information['time'])
-            
-            self.monkey_information = prep_target_data.add_capture_target(self.monkey_information, self.ff_caught_T_new)
-            
-            # also trim eye_world_speed
-            q95 = self.monkey_information['eye_world_speed'].quantile(0.95)
-            self.monkey_information['eye_world_speed'] = self.monkey_information['eye_world_speed'].clip(upper=q95)
+        self.monkey_information['trial'] = np.searchsorted(
+            self.ff_caught_T_new, self.monkey_information['time'])
+        
+        self.monkey_information = prep_target_data.add_capture_target(self.monkey_information, self.ff_caught_T_new)
+        
+        # also trim eye_world_speed
+        q95 = self.monkey_information['eye_world_speed'].quantile(0.95)
+        self.monkey_information['eye_world_speed'] = self.monkey_information['eye_world_speed'].clip(upper=q95)
 
 
 

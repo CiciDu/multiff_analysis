@@ -1,14 +1,15 @@
 #!/bin/bash
-#SBATCH -J sb3_sweep
+#SBATCH -J sb3_noise
 #SBATCH --partition=gpu,xaqq
 #SBATCH -c 1
 #SBATCH --gres=gpu:1
 #SBATCH --mem=5G
 #SBATCH -t 24:00:00
-#SBATCH --array=0-959%10
-#SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.out
-#SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/run_stdout/sb3_sweep-%A_%a.err
-#SBATCH --exclude=mind-1-29
+# Submit via submit_sb3_noise.sh for full sweep (chunks ≤1000 tasks). Direct sbatch: tiny test array only.
+#SBATCH --array=0-0%10
+#SBATCH -o /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/sb3_noise/sb3_noise-%A_%a.out
+#SBATCH -e /user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/sb3/logs/sb3_noise/sb3_noise-%A_%a.err
+
 
 set -euo pipefail
 cd /user_data/cicid/Multifirefly-Project
@@ -22,9 +23,11 @@ N_ENVS=1
 # ---------------------
 # Hyperparameter lists
 # ---------------------
-declare -a MEM_R_LIST=(0.0 0.5 1.0 1.5 2.0 2.5 3.0)
-# declare -a MEM_TH_LIST=(0.0 0.5 1.0 1.5 2.0)
-declare -a MEM_TH_LIST=(2.5 3.0)
+# declare -a MEM_R_LIST=(0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0)
+
+# flip the below next time
+declare -a MEM_R_LIST=(0.0 3.5 4.0)
+declare -a MEM_TH_LIST=(0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0)
 declare -a BASE_SEEDS=(0 1 2 3 4 5 6 7)
 NUM_REPEATS=5
 
@@ -59,7 +62,10 @@ TOTAL_COMB=$((NUM_LEVELS * COMBOS_PER_LEVEL))
 
 echo "[info] TOTAL_COMB=${TOTAL_COMB}"
 
-TASK_ID=${SLURM_ARRAY_TASK_ID}
+# Global flat index when submit_sb3_noise.sh splits the array (SLURM_ARRAY_OFFSET per chunk).
+ARRAY_OFFSET=${SLURM_ARRAY_OFFSET:-0}
+TASK_ID=$((ARRAY_OFFSET + SLURM_ARRAY_TASK_ID))
+echo "[info] ARRAY_OFFSET=${ARRAY_OFFSET} SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} TASK_ID=${TASK_ID}"
 
 if (( TASK_ID >= TOTAL_COMB )); then
   echo "[warning] TASK_ID exceeds TOTAL_COMB — exiting safely"
@@ -116,7 +122,7 @@ mkdir -p "$OVERALL_FOLDER"
 # ---------------------
 # Run training
 # ---------------------
-srun --gres=gpu:1 python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
+srun python -u multiff_analysis/jobs/sb3/scripts/sb3_script.py \
   --overall-folder "$OVERALL_FOLDER" \
   --base-seed "$BASE_SEED" \
   --max-in-memory-time "$MAX_IN_MEMORY_TIME" \

@@ -689,7 +689,6 @@ class BaseEncodingRunner:
         if hasattr(self, 'design_df'):
             encoding_design_utils._validate_design_columns(self.design_df, self.gam_groups)  
             
-        self.var_categories = encoder_gam_helper.add_other_category_from_groups(self.var_categories, self.gam_groups)
         return self.gam_groups
 
     def _prepare_spike_history_components(self):
@@ -1027,3 +1026,7 @@ class BaseEncodingRunner:
             print(f"  Overall max   :  {_fmt(overall)}  ({overall_bins} bins @ {self.bin_width*1000:.0f} ms)")
 
         return result
+    
+    def clean_var_categories(self):
+        self.var_categories = encoding_design_utils.build_clean_var_categories(self.structured_meta_groups, self.var_categories)
+        self.var_categories = encoder_gam_helper.add_other_category_from_groups(self.var_categories, self.gam_groups)

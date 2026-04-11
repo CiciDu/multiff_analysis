@@ -81,7 +81,8 @@ class FSEncodingRunner(BaseEncodingRunner):
         self._make_structured_meta_groups()
 
         self._save_design_matrices()
-
+        self.clean_var_categories()
+        
 
     # ------------------------------------------------------------------
     # Caching utilities

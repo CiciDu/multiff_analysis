@@ -7,7 +7,7 @@
 #SBATCH --mem=20G
 #SBATCH --time=48:00:00
 #SBATCH --mail-type=END,FAIL
-#SBATCH --exclude=mind-1-29
+
 
 
 set -euo pipefail

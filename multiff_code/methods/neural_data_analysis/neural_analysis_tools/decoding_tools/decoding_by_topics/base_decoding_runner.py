@@ -22,6 +22,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers 
 )
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import (
     cv_decoding,
+    plot_decoding_predictions,
 )
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_model_specs, smooth_neural_data
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_decoding_runner
@@ -220,6 +221,84 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         else:
             self.results_df = self.all_results.copy()
 
+    def find_true_vs_pred_cv_for_feature(
+        self,
+        feature: str,
+        *,
+        config: Optional[cv_decoding.DecodingRunConfig] = None,
+        model_name: str = "ridge_strong",
+        model_specs: Optional[Mapping[str, Any]] = None,
+        n_splits: int = 5,
+        cv_mode: Optional[str] = None,
+        design_matrices_exists_ok: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Run :func:`plot_decoding_predictions.get_cv_predictions` on this runner's data, then optionally plot.
+
+        Uses :class:`plot_decoding_predictions.ConfigRegressionEstimator` as ``runner_class`` and
+        :func:`plot_decoding_predictions.plot_true_vs_pred` when ``show_plot`` is True.
+        """
+        cv_mode_resolved = cv_mode if cv_mode is not None else self.cv_mode
+        specs = (
+            model_specs
+            if model_specs is not None
+            else decoding_model_specs.MODEL_SPECS
+        )
+        if config is None:
+            if model_name not in specs:
+                raise KeyError(
+                    f"model_name={model_name!r} not in model_specs; keys={list(specs)!r}"
+                )
+            spec = specs[model_name]
+            config = cv_decoding.DecodingRunConfig(
+                regression_model_class=spec.get("regression_model_class"),
+                regression_model_kwargs=spec.get("regression_model_kwargs", {}),
+                classification_model_class=spec.get("classification_model_class"),
+                classification_model_kwargs=spec.get("classification_model_kwargs", {}),
+                use_early_stopping=False,
+                detrend_per_block=spec.get("detrend_per_block", True),
+            )
+
+        self.collect_data(exists_ok=design_matrices_exists_ok)
+
+        X = np.asarray(self._get_neural_matrix_for_decoding(), dtype=float)
+        y_df = self.get_target_df()
+        if feature not in y_df.columns:
+            raise KeyError(
+                f"feature={feature!r} not in target columns: {list(y_df.columns)!r}"
+            )
+        y = y_df[feature].to_numpy().ravel()
+
+        groups = self._get_groups()
+        if groups is None:
+            groups = np.zeros(len(X), dtype=int)
+        X, groups, _ = cv_decoding._prepare_inputs(X, groups, 0)
+        X_ok, y_ok, g_ok, _ = cv_decoding.filter_valid_rows(X, y, groups, None)
+
+        mode = cv_decoding.infer_decoding_type(y_ok)
+        if mode == "skip":
+            raise ValueError(
+                f"feature={feature!r} has insufficient / non-finite values for decoding"
+            )
+        if mode != "regression":
+            raise ValueError(
+                "find_true_vs_pred_cv_for_feature only supports regression targets; "
+                f"got mode={mode!r}"
+            )
+        if g_ok is None:
+            g_ok = np.zeros(len(y_ok), dtype=int)
+
+        y_true, y_pred, fold_ids = plot_decoding_predictions.get_cv_predictions(
+            X_ok,
+            y_ok,
+            g_ok,
+            plot_decoding_predictions.ConfigRegressionEstimator,
+            config,
+            n_splits=n_splits,
+            cv_mode=cv_mode_resolved,
+            model_name=model_name,
+        )
+
+        return y_true, y_pred, fold_ids
 
     def _ensure_cv_decoding_columns(
         self,
@@ -1788,3 +1867,6 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             figsize=figsize,
             title=title,
         )
+        
+    def clean_var_categories(self):
+        self.var_categories = decoding_design_utils.build_clean_var_categories_from_feats(self.feats_to_decode, self.var_categories)

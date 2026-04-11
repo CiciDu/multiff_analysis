@@ -135,6 +135,7 @@ class PNDecodingRunner(BaseDecodingRunner):
         
         self.reduce_binned_spikes()
         self._save_design_matrices()
+        self.clean_var_categories()
 
     # ------------------------------------------------------------------
     # Caching utilities (BaseDecodingRunner interface)
