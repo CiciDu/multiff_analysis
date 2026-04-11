@@ -721,16 +721,32 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             detrend_suffix = "_detrend_perblock"
         else:
             detrend_suffix = "_detrend"
-        if fit_kernelwidth:
-            model_save_path = Path(save_dir) / "cv_decoding" / "cvnested" / f"{model_name}_n{n_splits}_inner{inner_cv_splits}_{cv_mode}{detrend_suffix}.pkl"
-        else:
-            model_save_path = Path(save_dir) / "cv_decoding" / "fixed_width" / f"{model_name}_width{fixed_width}_n{n_splits}_{cv_mode}{detrend_suffix}.pkl"
+        model_save_path = self._cv_decoding_model_pickle_path(
+            save_dir,
+            model_name,
+            shuffle_mode,
+            fit_kernelwidth=fit_kernelwidth,
+            n_splits=n_splits,
+            inner_cv_splits=inner_cv_splits,
+            fixed_width=fixed_width,
+            cv_mode=cv_mode,
+            detrend_suffix=detrend_suffix,
+            include_shuffle_in_stem=True,
+        )
 
         print('model_save_path: ', model_save_path)
 
         loaded = self._maybe_load_cv_decoding_result(
-            str(model_save_path),
-            load_if_exists,
+            save_dir=save_dir,
+            model_name=model_name,
+            shuffle_mode=shuffle_mode,
+            fit_kernelwidth=fit_kernelwidth,
+            n_splits=n_splits,
+            inner_cv_splits=inner_cv_splits,
+            fixed_width=fixed_width,
+            cv_mode=cv_mode,
+            detrend_suffix=detrend_suffix,
+            load_if_exists=load_if_exists,
             verbose=True,
         )
 
@@ -741,7 +757,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             self.cv_decoding_out_of_models[model_name] = loaded
 
             results_df = loaded["results_df"]
-            results_df["model_name"] = model_name
+            shuffle_mode_value = "none" if shuffle_mode is None else shuffle_mode
+            if "model_name" not in results_df.columns:
+                results_df["model_name"] = model_name
+            if "shuffle_mode" not in results_df.columns:
+                results_df["shuffle_mode"] = shuffle_mode_value
+
             return results_df
 
         if load_existing_only:
@@ -813,28 +834,116 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     # ============================================================
 
     @staticmethod
+    def _cv_shuffle_stem_for_pickle(
+        shuffle_mode: Optional[str], *, include_shuffle_in_stem: bool
+    ) -> str:
+        if not include_shuffle_in_stem:
+            return ""
+        sm = "none" if shuffle_mode is None else str(shuffle_mode)
+        if sm == "none":
+            return ""
+        safe = "".join(
+            ch if (ch.isalnum() or ch in "-._") else "_" for ch in sm
+        )
+        return f"_shuffle_{safe}"
+
+    @staticmethod
+    def _cv_decoding_model_pickle_path(
+        save_dir: Path | str,
+        model_name: str,
+        shuffle_mode: Optional[str],
+        *,
+        fit_kernelwidth: bool,
+        n_splits: int,
+        inner_cv_splits: int,
+        fixed_width: int,
+        cv_mode: str,
+        detrend_suffix: str,
+        include_shuffle_in_stem: bool = True,
+    ) -> Path:
+        """Canonical path for the per-model CV decoding pickle (matches load/save)."""
+        save_dir = Path(save_dir)
+        shuff = BaseDecodingRunner._cv_shuffle_stem_for_pickle(
+            shuffle_mode, include_shuffle_in_stem=include_shuffle_in_stem
+        )
+        if fit_kernelwidth:
+            return (
+                save_dir
+                / "cv_decoding"
+                / "cvnested"
+                / f"{model_name}_n{n_splits}_inner{inner_cv_splits}_{cv_mode}{detrend_suffix}{shuff}.pkl"
+            )
+        return (
+            save_dir
+            / "cv_decoding"
+            / "fixed_width"
+            / f"{model_name}_width{fixed_width}_n{n_splits}_{cv_mode}{detrend_suffix}{shuff}.pkl"
+        )
+
+    @staticmethod
     def _maybe_load_cv_decoding_result(
-        model_save_path: Optional[str],
+        *,
+        save_dir: Path | str,
+        model_name: str,
+        shuffle_mode: Optional[str],
+        fit_kernelwidth: bool,
+        n_splits: int,
+        inner_cv_splits: int,
+        fixed_width: int,
+        cv_mode: str,
+        detrend_suffix: str,
         load_if_exists: bool,
         verbose: bool,
-    ):
-        """Load CV decoding result if it exists and load_if_exists=True."""
+    ) -> Optional[Dict[str, Any]]:
+        """Load CV decoding pickle for this model and shuffle_mode (and CV layout), if present."""
         if not load_if_exists:
             return None
-        
-        if model_save_path is None:
-            return None
-        else:
-            model_save_path = Path(model_save_path)
 
-        if not model_save_path.exists():
-            print('Model save path does not exist: ', model_save_path)
-            return None
-        with model_save_path.open("rb") as f:
-            obj = pickle.load(f)
-        if verbose:
-            print(f"cv decoding results loaded: {model_save_path}")
-        return obj
+        shuffle_mode_resolved = "none" if shuffle_mode is None else str(shuffle_mode)
+
+        primary = BaseDecodingRunner._cv_decoding_model_pickle_path(
+            save_dir,
+            model_name,
+            shuffle_mode,
+            fit_kernelwidth=fit_kernelwidth,
+            n_splits=n_splits,
+            inner_cv_splits=inner_cv_splits,
+            fixed_width=fixed_width,
+            cv_mode=cv_mode,
+            detrend_suffix=detrend_suffix,
+            include_shuffle_in_stem=True,
+        )
+        candidates: List[Path] = [primary]
+        if shuffle_mode_resolved != "none":
+            legacy = BaseDecodingRunner._cv_decoding_model_pickle_path(
+                save_dir,
+                model_name,
+                shuffle_mode,
+                fit_kernelwidth=fit_kernelwidth,
+                n_splits=n_splits,
+                inner_cv_splits=inner_cv_splits,
+                fixed_width=fixed_width,
+                cv_mode=cv_mode,
+                detrend_suffix=detrend_suffix,
+                include_shuffle_in_stem=False,
+            )
+            if legacy.resolve() != primary.resolve():
+                candidates.append(legacy)
+
+        for model_save_path in candidates:
+            if not model_save_path.exists():
+                continue
+            with model_save_path.open("rb") as f:
+                obj = pickle.load(f)
+            if verbose:
+                print(
+                    f"cv decoding results loaded: {model_save_path} "
+                    f"(model_name={model_name!r}, shuffle_mode={shuffle_mode_resolved!r})"
+                )
+            return obj
+
+        print("Model save path does not exist (tried): ", candidates)
+        return None
 
 
 
@@ -1869,4 +1978,4 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         )
         
     def clean_var_categories(self):
-        self.var_categories = decoding_design_utils.build_clean_var_categories_from_feats(self.feats_to_decode, self.var_categories)
+        self.var_categories = decoding_design_utils._build_clean_var_categories(self.feats_to_decode, self.var_categories)

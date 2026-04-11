@@ -17,9 +17,6 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     GroupSpec,
 )
 
-from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
-    encoding_design_utils,
-)
 
 import os
 import sys
@@ -1030,7 +1027,7 @@ def bin_monkey_information_feats_from_event_bins(
     """
 
     if use_one_ff_rename:
-        monkey_information = encoding_design_utils.rename_monkey_information_columns(
+        monkey_information = rename_monkey_information_columns(
            monkey_information,
             rename_planning_to_one_ff=use_one_ff_rename,
         )
@@ -1320,14 +1317,25 @@ def get_session_paths(raw_data_folder_path, raw_data_dir_name, monkey_names):
             )
     return session_paths
 
-def build_clean_var_categories(structured_meta_groups, var_categories):
+def get_meta_var_names(structured_meta_groups):
     """
-    Use structured_meta_groups as source of valid vars.
+    Collect all variable names from structured_meta_groups that contain 'groups'.
     """
 
-    tuning_vars = structured_meta_groups['tuning']['groups'].keys()
-    temporal_vars = structured_meta_groups['temporal']['groups'].keys()
+    var_names = set()
 
-    valid_vars = set(tuning_vars) | set(temporal_vars)
+    for key, val in structured_meta_groups.items():
+        if isinstance(val, dict) and 'groups' in val:
+            var_names |= set(val['groups'].keys())
 
-    return decoding_design_utils.build_clean_var_categories_from_feats(valid_vars, var_categories)
+    return var_names
+
+
+def build_clean_var_categories_from_meta(var_categories, structured_meta_groups):
+
+    valid_vars = list(get_meta_var_names(structured_meta_groups))
+
+    return decoding_design_utils._build_clean_var_categories(
+        valid_vars,
+        var_categories
+    )

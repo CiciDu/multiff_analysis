@@ -129,10 +129,10 @@ def add_other_category_from_df(categories, design_df):
         for v in vars_list
     )
 
-    other_vars = sorted(all_vars - assigned)
+    unassigned_vars = sorted(all_vars - assigned)
 
     categories = categories.copy()
-    categories['other_vars'] = other_vars
+    categories['unassigned_vars'] = unassigned_vars
 
     return categories
 
@@ -200,7 +200,7 @@ def get_processed_spike_rates(
     return processed_spike_rates
 
 
-def build_clean_var_categories(valid_vars, var_categories):
+def _build_clean_var_categories(valid_vars, var_categories):
     """
     Core helper: filter var_categories using a provided set of valid_vars.
     """
@@ -241,4 +241,4 @@ def build_clean_var_categories_from_feats(feats_to_decode, var_categories):
     Use feats_to_decode columns as source of valid vars.
     """
 
-    return build_clean_var_categories(feats_to_decode.columns, var_categories)
+    return _build_clean_var_categories(feats_to_decode.columns, var_categories)

@@ -430,12 +430,14 @@ class BaseEncodingRunner:
                 #     n_folds=n_folds,
                 #     load_if_exists=load_if_exists,
                 # )
-                # self.run_backward_elimination(
-                #     unit_idx,
-                #     n_folds=backward_n_folds,
-                #     alpha=alpha,
-                #     load_if_exists=load_if_exists,
-                # )
+                
+                self.run_backward_elimination(
+                    unit_idx,
+                    n_folds=backward_n_folds,
+                    alpha=alpha,
+                    load_if_exists=load_if_exists,
+                )
+                
             except Exception as e:
                 if verbose:
                     print(f"  [WARN] neuron {unit_idx}: {e}")
@@ -1028,5 +1030,5 @@ class BaseEncodingRunner:
         return result
     
     def clean_var_categories(self):
-        self.var_categories = encoding_design_utils.build_clean_var_categories(self.structured_meta_groups, self.var_categories)
-        self.var_categories = encoder_gam_helper.add_other_category_from_groups(self.var_categories, self.gam_groups)
+        self.var_categories = encoding_design_utils.build_clean_var_categories_from_meta(self.var_categories, self.structured_meta_groups)
+        self.var_categories = encoder_gam_helper.add_category_unassigned_vars(self.var_categories, self.structured_meta_groups)

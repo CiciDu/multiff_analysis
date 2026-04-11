@@ -262,6 +262,7 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
     Plot decoding summary. Uses hue_col for grouping when provided (e.g. 'result_group'
     for multiple datasets), otherwise falls back to 'shuffle_mode'.
     """
+    summary_df = summary_df.copy()
     max_height = 20
 
     mean_by_feature = (
@@ -314,6 +315,8 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
         hue_levels = summary_df[hue_col].dropna().unique().tolist()
     else:
         hue_col = 'shuffle_mode'
+        if 'shuffle_mode' not in summary_df.columns:
+            summary_df['shuffle_mode'] = 'none'
         hue_levels = summary_df['shuffle_mode'].unique().tolist()
 
     n_hue_levels = len(hue_levels)
@@ -558,6 +561,8 @@ def _compute_summary(df, value_col, hue_col=None):
         group_cols.append('var_category')
     if hue_col is not None and hue_col in df.columns:
         group_cols = ['behav_feature', hue_col]
+    elif 'shuffle_mode' in df.columns:
+        group_cols = [*group_cols, 'shuffle_mode']
 
     summary = (
         df

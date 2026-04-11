@@ -19,6 +19,8 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
     GroupSpec,
 )
 
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+
 
 
 DEFAULT_ENCODING_VAR_CATEGORIES = {
@@ -79,10 +81,10 @@ DEFAULT_LAMBDA_CONFIG = {
     "lam_p": 10.0,
 }
 
-def add_other_category_from_groups(categories, groups):
-    all_group_names = {g.name for g in groups}
+def add_category_unassigned_vars(categories, structured_meta_groups):
 
-    # exclude non_spike_vars from "assigned"
+    all_group_names = encoding_design_utils.get_meta_var_names(structured_meta_groups)
+
     assigned = set(
         v
         for cat, vars_list in categories.items()
@@ -90,10 +92,10 @@ def add_other_category_from_groups(categories, groups):
         for v in vars_list
     )
 
-    other_vars = sorted(all_group_names - assigned)
+    unassigned_vars = sorted(all_group_names - assigned)
 
     categories = categories.copy()
-    categories['other_vars'] = other_vars
+    categories['unassigned_vars'] = unassigned_vars
 
     return categories
 
