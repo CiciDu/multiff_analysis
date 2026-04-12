@@ -16,6 +16,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 )
 from neural_data_analysis.design_kits.design_by_segment import (
     temporal_feats,
+    create_pn_design_df,
 )
 
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils, decode_pn_utils
@@ -120,7 +121,13 @@ class PNDecodingRunner(BaseDecodingRunner):
         self.pn = pn
         self.get_processed_spike_rates()
         self.get_binned_spikes()
-        
+
+        if self.use_spike_history:
+            self.bin_df = create_pn_design_df.make_bin_df_for_pn(
+                self.pn.rebinned_x_var,
+                self.pn.local_bin_edges,
+            )
+
         self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
 
         # detrend covariates for optional multi-covariate detrending
@@ -165,6 +172,7 @@ class PNDecodingRunner(BaseDecodingRunner):
             'meta_df_used': save_dir / 'meta_df_used.pkl',
             'trial_ids': save_dir / 'trial_ids.pkl',
             'detrend_covariates': save_dir / 'detrend_covariates.pkl',
+            'bin_df': save_dir / 'bin_df.pkl',
         }
 
     def _get_design_matrix_data(self):
@@ -174,6 +182,7 @@ class PNDecodingRunner(BaseDecodingRunner):
             'meta_df_used': self.meta_df_used,
             'trial_ids': self.trial_ids,
             'detrend_covariates': self.detrend_covariates,
+            'bin_df': self.bin_df,
         }
 
     def _get_design_matrix_key_to_attr(self):
@@ -183,4 +192,5 @@ class PNDecodingRunner(BaseDecodingRunner):
             'meta_df_used': 'meta_df_used',
             'trial_ids': 'trial_ids',
             'detrend_covariates': 'detrend_covariates',
+            'bin_df': 'bin_df',
         }

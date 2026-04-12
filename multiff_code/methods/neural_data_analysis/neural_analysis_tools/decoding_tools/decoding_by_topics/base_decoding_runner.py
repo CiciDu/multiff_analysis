@@ -24,6 +24,7 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding 
     cv_decoding,
     plot_decoding_predictions,
 )
+from neural_data_analysis.design_kits.design_by_segment import spike_history as spike_history_kit
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_model_specs, smooth_neural_data
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_decoding_runner
 
@@ -52,6 +53,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         drop_bad_neurons: bool = True,
         cv_mode: str = "group_kfold",
         pca_n_components: int | None = None,
+        pca_fit_presmooth_width: int = 0,
+        use_spike_history: bool = False,
+        spike_history_mode: str = 'lags',
+        spike_history_t_max: float = 0.4,
+        spike_history_n_basis: int = 10,
+        spike_history_n_lags: int = 8,
     ):
         
         self.bin_width = bin_width
@@ -64,17 +71,246 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # Cross-validation strategy (e.g. 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold')
         self.cv_mode = cv_mode
 
-        # Optional PCA dimensionality reduction applied to neural data before decoding.
-        # PCA is fit once on the full neural matrix and cached in self.pca_.
+        # Optional PCA on neural data. Fit once on the full matrix (optionally after a
+        # fixed presmooth); transforms always use smooth(raw, width) → PCA → [hist].
         self.pca_n_components = pca_n_components
+        self.pca_fit_presmooth_width = int(pca_fit_presmooth_width)
         self.pca_ = None
         
         # Filled during setup
         self.feats_to_decode = None
         self.trial_ids = None
         self.binned_spikes = None
+        self.bin_df = None  # set in collect_data when use_spike_history (spike_history.compute_spike_history_designs)
         self.detrend_covariates = None  # DataFrame with time, trial_index, etc.
+        # Per-bin spike-history features from raw spikes (before neural smooth / PCA); disk-cached like binned_spikes.
+        self.spike_history_features = None
+        # Same rows as neural matrix; columns named per cluster (see _compute_spike_history_feature_matrix_with_columns).
+        self.spike_history_features_df: Optional[pd.DataFrame] = None
 
+        self.use_spike_history = use_spike_history
+        # 'lags' | 'basis' | 'raised_cosine' → design_kits spike_history.compute_spike_history_designs
+        self.spike_history_mode = spike_history_mode
+        # basis params
+        self.spike_history_t_max = spike_history_t_max
+        self.spike_history_n_basis = spike_history_n_basis
+        # lag params
+        self.spike_history_n_lags = spike_history_n_lags
+
+
+    def _neural_ncols_after_pca(self) -> int:
+        """Columns of the neural-only design matrix after optional PCA."""
+        raw = np.asarray(self._get_neural_matrix(), dtype=float)
+        if self.pca_n_components is not None:
+            return int(self.pca_n_components)
+        return int(raw.shape[1])
+
+    def _smooth_raw_neural(
+        self,
+        raw: np.ndarray,
+        width: int,
+        trial_idx: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Gaussian-smooth raw neural columns (counts/rates), in-place safe copy."""
+        raw = np.asarray(raw, dtype=float)
+        if int(width) <= 0:
+            return raw
+        if trial_idx is None:
+            return smooth_neural_data.smooth_signal(raw, int(width))
+        return smooth_neural_data.smooth_signal(raw, int(width), trial_idx=trial_idx)
+
+    def _ensure_pca_fitted(self) -> None:
+        """Fit PCA once on full-session raw neural (optionally presmoothed)."""
+        if self.pca_n_components is None or self.pca_ is not None:
+            return
+        from sklearn.decomposition import PCA
+
+        raw = np.asarray(self._get_neural_matrix(), dtype=float)
+        groups = self._get_groups()
+        trial_idx = np.asarray(groups) if groups is not None else None
+        w_fit = int(getattr(self, "pca_fit_presmooth_width", 0) or 0)
+        raw_fit = self._smooth_raw_neural(raw, w_fit, trial_idx=trial_idx)
+        self.pca_ = PCA(n_components=self.pca_n_components, random_state=0)
+        self.pca_.fit(raw_fit)
+        explained = self.pca_.explained_variance_ratio_.sum()
+        print(
+            f"[{self._runner_name()}] PCA fitted on "
+            f"{'presmoothed' if w_fit > 0 else 'raw'} neural: "
+            f"{self.pca_n_components} components, cumulative explained variance = {explained:.3f}"
+        )
+
+    def _neural_matrix_after_pca(
+        self,
+        *,
+        smooth_width: int = 0,
+        trial_idx: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Smooth raw neural, then optional PCA transform (no spike history)."""
+        raw = np.asarray(self._get_neural_matrix(), dtype=float)
+        raw_sm = self._smooth_raw_neural(raw, int(smooth_width), trial_idx=trial_idx)
+        if self.pca_n_components is None:
+            return raw_sm
+        self._ensure_pca_fitted()
+        return np.asarray(self.pca_.transform(raw_sm), dtype=float)
+
+    def _design_matrix_for_row_indices(
+        self,
+        global_idx: np.ndarray,
+        *,
+        neural_smooth_width: int,
+    ) -> np.ndarray:
+        """Decode design matrix for session rows ``global_idx`` (smooth raw → PCA → hist)."""
+        global_idx = np.asarray(global_idx, dtype=int)
+        raw = np.asarray(self._get_neural_matrix(), dtype=float)[global_idx]
+        groups = self._get_groups()
+        trial_idx = (
+            np.asarray(groups)[global_idx] if groups is not None else None
+        )
+        raw_sm = self._smooth_raw_neural(raw, int(neural_smooth_width), trial_idx=trial_idx)
+        if self.pca_n_components is None:
+            Xn = raw_sm
+        else:
+            self._ensure_pca_fitted()
+            Xn = np.asarray(self.pca_.transform(raw_sm), dtype=float)
+        if not self.use_spike_history:
+            return Xn
+        self._ensure_spike_history_features_materialized()
+        Xh = np.asarray(self.spike_history_features, dtype=float)[global_idx]
+        if Xh.shape[1] == 0:
+            return Xn
+        return np.hstack([Xn, Xh])
+
+    def _get_spikes_df_for_spike_history(self) -> pd.DataFrame:
+        pn = getattr(self, "pn", None)
+        if pn is None:
+            raise RuntimeError(
+                "Spike history requires a decoding runner with `.pn` (e.g. PN/FS/stop pipelines)."
+            )
+        if getattr(pn, "spikes_df", None) is None and hasattr(pn, "retrieve_neural_data"):
+            pn.retrieve_neural_data()
+        df = getattr(pn, "spikes_df", None)
+        if df is None:
+            raise RuntimeError("Could not obtain `pn.spikes_df` for spike-history designs.")
+        return df
+
+    def _cluster_ids_for_spike_history(self) -> List:
+        bs = getattr(self, "binned_spikes", None)
+        if bs is not None and hasattr(bs, "columns"):
+            return list(bs.columns)
+        return list(range(int(np.asarray(self._get_neural_matrix()).shape[1])))
+
+    def _compute_spike_history_feature_matrix_with_columns(
+        self,
+    ) -> tuple[np.ndarray, List[str]]:
+        """Build spike-history columns from raw spikes (ignores in-memory cache on ``self``)."""
+        bin_df = getattr(self, "bin_df", None)
+        if bin_df is None or bin_df.empty:
+            raise RuntimeError(
+                "Spike history requires `self.bin_df` (build in collect_data, same as encoding)."
+            )
+        spikes_df = self._get_spikes_df_for_spike_history()
+        mode = self.spike_history_mode
+        if mode in ("basis", "raised_cosine"):
+            X_hist_dict, _, _ = spike_history_kit.compute_spike_history_designs(
+                spikes_df=spikes_df,
+                bin_df=bin_df,
+                dt=float(self.bin_width),
+                t_max=float(self.spike_history_t_max),
+                n_basis=int(self.spike_history_n_basis),
+                basis_type="raised_cosine",
+            )
+        elif mode == "lags":
+            t_max = max(
+                float(self.spike_history_t_max),
+                (int(self.spike_history_n_lags) + 1) * float(self.bin_width),
+            )
+            X_hist_dict, _, _ = spike_history_kit.compute_spike_history_designs(
+                spikes_df=spikes_df,
+                bin_df=bin_df,
+                dt=float(self.bin_width),
+                t_max=t_max,
+                n_basis=int(self.spike_history_n_basis),
+                basis_type="lagged",
+                n_lags=int(self.spike_history_n_lags),
+            )
+        else:
+            raise ValueError(
+                f"Unknown spike_history_mode={mode!r}; use 'lags', 'basis', or 'raised_cosine'."
+            )
+
+        meta_cols = {"new_segment", "bin_in_new_seg"}
+        cluster_ids = self._cluster_ids_for_spike_history()
+        blocks: List[np.ndarray] = []
+        col_names: List[str] = []
+        n_expect = int(np.asarray(self._get_neural_matrix()).shape[0])
+        for cid in cluster_ids:
+            key = f"cluster_{cid}"
+            if key not in X_hist_dict:
+                raise KeyError(
+                    f"Spike history missing {key!r}; check bin_df / binned_spikes cluster alignment."
+                )
+            dfh = X_hist_dict[key]
+            feat_cols = [c for c in dfh.columns if c not in meta_cols]
+            block = np.asarray(dfh[feat_cols].to_numpy(dtype=float), dtype=float)
+            if block.shape[0] != n_expect:
+                raise ValueError(
+                    f"Spike history rows ({block.shape[0]}) != neural rows ({n_expect}) for {key}."
+                )
+            blocks.append(block)
+            col_names.extend(f"{key}__{c}" for c in feat_cols)
+        if not blocks:
+            return np.zeros((n_expect, 0), dtype=float), []
+        return np.hstack(blocks), col_names
+
+    def _compute_spike_history_feature_matrix(self) -> np.ndarray:
+        """Build spike-history columns from raw spikes (ignores ``spike_history_features`` cache)."""
+        X, _ = self._compute_spike_history_feature_matrix_with_columns()
+        return X
+
+    def _spike_history_feature_matrix(self) -> np.ndarray:
+        """Spike-history block for decoding: materialized ``spike_history_features`` (and ``spike_history_features_df``).
+
+        Uses disk-cached features from ``collect_data`` / ``_load_design_matrices`` when present;
+        otherwise computes once and stores on ``self``.
+        """
+        self._ensure_spike_history_features_materialized()
+        return np.asarray(self.spike_history_features, dtype=float)
+
+    def _smooth_decoding_X(
+        self,
+        X: np.ndarray,
+        width: int,
+        trial_idx: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Smooth raw neural columns when [neural | spike_hist] without PCA.
+
+        When PCA is enabled, temporal smoothing is applied to raw counts before the
+        PCA transform (see ``_get_neural_matrix_for_decoding``); this helper is then
+        a no-op on the neural block to avoid smoothing PCA components.
+        """
+        X = np.asarray(X, dtype=float)
+        if int(width) <= 0:
+            return X
+        if self.pca_n_components is not None:
+            return X
+        if not self.use_spike_history:
+            if trial_idx is None:
+                return smooth_neural_data.smooth_signal(X, int(width))
+            return smooth_neural_data.smooth_signal(X, int(width), trial_idx=trial_idx)
+        k = self._neural_ncols_after_pca()
+        if k >= X.shape[1]:
+            if trial_idx is None:
+                return smooth_neural_data.smooth_signal(X, int(width))
+            return smooth_neural_data.smooth_signal(X, int(width), trial_idx=trial_idx)
+        Xn = np.asarray(X[:, :k], dtype=float)
+        Xh = np.asarray(X[:, k:], dtype=float)
+        if trial_idx is None:
+            Xn_s = smooth_neural_data.smooth_signal(Xn, int(width))
+        else:
+            Xn_s = smooth_neural_data.smooth_signal(Xn, int(width), trial_idx=trial_idx)
+        if Xh.size == 0:
+            return Xn_s
+        return np.hstack([Xn_s, Xh])
 
     # ------------------------------------------------------------------
     # Abstract / override points (subclasses must implement)
@@ -102,29 +338,40 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """Neural data matrix (samples x neurons)."""
         raise NotImplementedError
 
-    def _get_neural_matrix_for_decoding(self) -> np.ndarray:
-        """Return neural matrix, optionally reduced via PCA.
+    def _get_neural_matrix_for_decoding(
+        self,
+        *,
+        neural_smooth_width: int = 0,
+        trial_idx: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """Return neural design: Gaussian-smooth raw (optional), PCA (optional), spike history.
 
-        PCA is fit once on the full matrix and cached in ``self.pca_``.  When
-        ``pca_n_components`` is *None* the raw matrix is returned unchanged.
+        Smoothing is always applied to **raw** neuron columns before PCA. Kernel-width
+        CV passes ``neural_smooth_width`` here instead of smoothing PCA components.
+
+        When ``use_spike_history`` is True, appends columns from
+        :func:`spike_history_kit.compute_spike_history_designs` (materialized once on
+        ``self.spike_history_features`` / ``self.spike_history_features_df``, including disk cache).
+        History columns are not PCA-compressed and are not Gaussian-smoothed here.
         """
-        X = self._get_neural_matrix()
-        if self.pca_n_components is None:
-            return X
-
-        from sklearn.decomposition import PCA
-
-        if self.pca_ is None:
-            self.pca_ = PCA(n_components=self.pca_n_components, random_state=0)
-            X = self.pca_.fit_transform(X)
-            explained = self.pca_.explained_variance_ratio_.sum()
-            print(
-                f"[{self._runner_name()}] PCA fitted: {self.pca_n_components} components, "
-                f"cumulative explained variance = {explained:.3f}"
+        if trial_idx is None and int(neural_smooth_width) > 0:
+            g = self._get_groups()
+            trial_idx = np.asarray(g) if g is not None else None
+        Xn = self._neural_matrix_after_pca(
+            smooth_width=int(neural_smooth_width),
+            trial_idx=trial_idx,
+        )
+        if not self.use_spike_history:
+            return Xn
+        self._ensure_spike_history_features_materialized()
+        Xh = np.asarray(self.spike_history_features, dtype=float)
+        if Xh.shape[0] != Xn.shape[0]:
+            raise ValueError(
+                f"Spike history n_rows={Xh.shape[0]} != neural n_rows={Xn.shape[0]}"
             )
-        else:
-            X = self.pca_.transform(X)
-        return X
+        if Xh.shape[1] == 0:
+            return Xn
+        return np.hstack([Xn, Xh])
 
     def _default_canoncorr_varnames(self) -> List[str]:
         """Default variable names for canoncorr."""
@@ -365,6 +612,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         kernelwidth_by_feature=None,
         detrend_cov_train=None,
         detrend_cov_test=None,
+        fold_train_idx: Optional[np.ndarray] = None,
+        fold_test_idx: Optional[np.ndarray] = None,
     ) -> Dict:
         """Train models on training data and evaluate on test data.
         
@@ -393,16 +642,30 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             if kernelwidth_by_feature is not None and groups_train is not None and groups_test is not None:
                 width = kernelwidth_by_feature.get(col, None)
                 if width is not None:
-                    X_train_sm = smooth_neural_data.smooth_signal(
-                        X_train,
-                        int(width),
-                        trial_idx=groups_train,
-                    )
-                    X_test_sm = smooth_neural_data.smooth_signal(
-                        X_test,
-                        int(width),
-                        trial_idx=groups_test,
-                    )
+                    if (
+                        self.pca_n_components is not None
+                        and fold_train_idx is not None
+                        and fold_test_idx is not None
+                    ):
+                        X_train_sm = self._design_matrix_for_row_indices(
+                            fold_train_idx,
+                            neural_smooth_width=int(width),
+                        )
+                        X_test_sm = self._design_matrix_for_row_indices(
+                            fold_test_idx,
+                            neural_smooth_width=int(width),
+                        )
+                    else:
+                        X_train_sm = self._smooth_decoding_X(
+                            X_train,
+                            int(width),
+                            trial_idx=groups_train,
+                        )
+                        X_test_sm = self._smooth_decoding_X(
+                            X_test,
+                            int(width),
+                            trial_idx=groups_test,
+                        )
                 else:
                     X_train_sm = X_train
                     X_test_sm = X_test
@@ -550,12 +813,89 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """Map path key -> attribute name for loading. Override in subclass."""
         raise NotImplementedError
 
+    def _spike_history_features_pickle_path(self, save_dir: Path) -> Path:
+        """Canonical pickle path for cached spike-history features."""
+        return save_dir / "spike_history_features.pkl"
+
+    def _resolve_spike_history_features_pickle(self, save_dir: Path) -> Optional[Path]:
+        """Return path to load from: new name first, then legacy ``spike_history_design.pkl``."""
+        p_new = self._spike_history_features_pickle_path(save_dir)
+        if p_new.exists():
+            return p_new
+        legacy = save_dir / "spike_history_design.pkl"
+        if legacy.exists():
+            return legacy
+        return None
+
+    def _spike_history_features_cache_paths(self) -> Dict[str, Path]:
+        """Extra pickle paths when ``use_spike_history`` (same directory as other design caches)."""
+        if not self.use_spike_history:
+            return {}
+        save_dir = Path(self._get_save_dir())
+        return {"spike_history_features": self._spike_history_features_pickle_path(save_dir)}
+
+    def _ensure_spike_history_features_materialized(self) -> None:
+        """Fill ``spike_history_features`` and ``spike_history_features_df`` once (from cache or spikes)."""
+        if not self.use_spike_history:
+            return
+        if getattr(self, "spike_history_features", None) is not None:
+            if getattr(self, "spike_history_features_df", None) is None:
+                X = np.asarray(self.spike_history_features, dtype=float)
+                ncols = int(X.shape[1])
+                cols = (
+                    [f"spike_hist_{j}" for j in range(ncols)]
+                    if ncols
+                    else []
+                )
+                self.spike_history_features_df = (
+                    pd.DataFrame(X, columns=cols)
+                    if ncols
+                    else pd.DataFrame(index=range(int(X.shape[0])))
+                )
+            return
+        X, col_names = self._compute_spike_history_feature_matrix_with_columns()
+        self.spike_history_features = X
+        self.spike_history_features_df = (
+            pd.DataFrame(X, columns=col_names)
+            if X.shape[1] > 0
+            else pd.DataFrame(index=range(int(X.shape[0])))
+        )
+
+    def _merged_design_matrix_paths(self) -> Dict[str, Path]:
+        out = dict(self._get_design_matrix_paths())
+        out.update(self._spike_history_features_cache_paths())
+        if not self.use_spike_history:
+            out.pop("bin_df", None)
+        return out
+
+    def _merged_design_matrix_data(self) -> Dict[str, Any]:
+        data = dict(self._get_design_matrix_data())
+        if self.use_spike_history:
+            self._ensure_spike_history_features_materialized()
+            data["spike_history_features"] = self.spike_history_features
+        else:
+            data.pop("bin_df", None)
+        return data
+
+    def _merged_design_matrix_key_to_attr(self) -> Dict[str, str]:
+        m = dict(self._get_design_matrix_key_to_attr())
+        if self.use_spike_history:
+            m["spike_history_features"] = "spike_history_features"
+        else:
+            m.pop("bin_df", None)
+        return m
+
+    def _design_matrix_cache_path_ready(self, key: str, path: Path) -> bool:
+        if key == "spike_history_features" and self.use_spike_history:
+            return self._resolve_spike_history_features_pickle(path.parent) is not None
+        return path.exists()
+
     def _save_design_matrices(self) -> None:
         """Save design matrices to disk. Uses _get_design_matrix_paths and _get_design_matrix_data."""
         save_dir = Path(self._get_save_dir())
         save_dir.mkdir(parents=True, exist_ok=True)
-        paths = self._get_design_matrix_paths()
-        data = self._get_design_matrix_data()
+        paths = self._merged_design_matrix_paths()
+        data = self._merged_design_matrix_data()
         name = self._runner_name()
         for key, path in paths.items():
             if key not in data:
@@ -569,21 +909,48 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
     def _load_design_matrices(self) -> bool:
         """Load design matrices from disk. Returns True if successful."""
-        paths = self._get_design_matrix_paths()
-        key_to_attr = self._get_design_matrix_key_to_attr()
-        if not all(paths[k].exists() for k in key_to_attr if k in paths):
-            return False
+        paths = self._merged_design_matrix_paths()
+        key_to_attr = self._merged_design_matrix_key_to_attr()
         name = self._runner_name()
+        not_ready: List[str] = []
+        for key in key_to_attr:
+            if key not in paths:
+                continue
+            path = paths[key]
+            if self._design_matrix_cache_path_ready(key, path):
+                continue
+            if key == "spike_history_features" and self.use_spike_history:
+                p_new = self._spike_history_features_pickle_path(path.parent)
+                legacy = path.parent / "spike_history_design.pkl"
+                not_ready.append(
+                    f"{key}: neither {p_new} nor legacy {legacy} exists"
+                )
+            else:
+                not_ready.append(f"{key}: cache file missing at {path}")
+        if not_ready:
+            print(
+                f"[{name}] Cannot load cached design matrices (cache not ready): "
+                + "; ".join(not_ready)
+            )
+            return False
         try:
             for key, attr in key_to_attr.items():
                 if key not in paths:
                     continue
-                with open(paths[key], "rb") as f:
+                load_path = paths[key]
+                if key == "spike_history_features" and self.use_spike_history:
+                    resolved = self._resolve_spike_history_features_pickle(paths[key].parent)
+                    if resolved is not None:
+                        load_path = resolved
+                with open(load_path, "rb") as f:
                     setattr(self, attr, pickle.load(f))
             print(f"[{name}] Loaded cached design matrices from: {paths}")
             return True
         except Exception as e:
-            print(f"[{name}] WARNING load matrices: {type(e).__name__}: {e}")
+            print(
+                f"[{name}] Cannot load cached design matrices (read/unpickle failed): "
+                f"{type(e).__name__}: {e}"
+            )
             return False
 
 
@@ -594,6 +961,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     def reduce_binned_spikes(self, corr_threshold_for_lags_of_a_feature=0.98, 
                          vif_threshold=20, 
                          verbose=True):
+        if getattr(self, "use_spike_history", False):
+            self.spike_history_features = None
+            self.spike_history_features_df = None
 
         self.binned_spikes = process_encode_design.reduce_encoding_design(self.binned_spikes, 
                          corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature, 
@@ -638,6 +1008,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
 
         if not load_existing_only:
             self.collect_data(exists_ok=design_matrices_exists_ok)
+
+        if self.use_spike_history:
+            self._ensure_spike_history_features_materialized()
 
         if save_dir is None:
             save_dir = self._get_save_dir()
@@ -965,14 +1338,12 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # Resolve cv_mode: use argument if provided, otherwise default to instance setting
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
-        X = self._get_neural_matrix_for_decoding()
         groups = self._get_groups()
-        if fixed_width > 0:
-            X = smooth_neural_data.smooth_signal(
-                X,
-                int(fixed_width),
-                trial_idx=groups,
-            )
+        trial_idx = np.asarray(groups) if groups is not None else None
+        X = self._get_neural_matrix_for_decoding(
+            neural_smooth_width=int(fixed_width) if int(fixed_width) > 0 else 0,
+            trial_idx=trial_idx,
+        )
 
         results_df = cv_decoding.run_cv_decoding(
             X=X,
@@ -1047,13 +1418,14 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         # Resolve cv_mode: use argument if provided, otherwise default to instance setting
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
 
-        X = self._get_neural_matrix_for_decoding()
         y_df = self.get_target_df()
         groups = self._get_groups()
+        X_full = self._get_neural_matrix_for_decoding()
+        n_samples = len(X_full)
         # detrend_covariates passed from caller (None when use_detrend_inside_cv=True)
 
         outer_splits = _build_folds(
-            len(X),
+            n_samples,
             n_splits=n_splits,
             groups=groups,
             cv_splitter=cv_mode,
@@ -1073,7 +1445,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             groups_test = groups[test_idx] if groups is not None else None
 
             best_width, width_scores, width_results = self._run_inner_kernelwidth_search(
-                X=X[train_idx],
+                train_idx=np.asarray(train_idx, dtype=int),
                 y_df=y_df.iloc[train_idx],
                 groups=groups_train,
                 config=config,
@@ -1086,9 +1458,9 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             )
 
             fold_result = self._evaluate_outer_fold(
-                X_train=X[train_idx],
+                X_train=X_full[train_idx],
                 y_train=y_df.iloc[train_idx],
-                X_test=X[test_idx],
+                X_test=X_full[test_idx],
                 y_test=y_df.iloc[test_idx],
                 best_width_by_feature=best_width,
                 config=config,
@@ -1097,6 +1469,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
                 groups_test=groups_test,
                 detrend_cov_train=detrend_covariates.iloc[train_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[train_idx] if detrend_covariates is not None else None),
                 detrend_cov_test=detrend_covariates.iloc[test_idx] if isinstance(detrend_covariates, pd.DataFrame) else (detrend_covariates[test_idx] if detrend_covariates is not None else None),
+                fold_train_idx=np.asarray(train_idx, dtype=int),
+                fold_test_idx=np.asarray(test_idx, dtype=int),
             )
 
             fold_result["fold"] = fold_idx
@@ -1162,7 +1536,7 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
     def _run_inner_kernelwidth_search(
         self,
         *,
-        X,
+        train_idx: np.ndarray,
         y_df,
         groups,
         config,
@@ -1181,14 +1555,16 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         width_results = {}
         
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
+        train_idx = np.asarray(train_idx, dtype=int)
+        groups_full = self._get_groups()
+        trial_full = np.asarray(groups_full) if groups_full is not None else None
 
         for width in candidate_widths:
 
-            X_smooth = smooth_neural_data.smooth_signal(
-                X,
-                int(width),
-                trial_idx=groups,
-            )
+            X_smooth = self._get_neural_matrix_for_decoding(
+                neural_smooth_width=int(width),
+                trial_idx=trial_full,
+            )[train_idx]
 
             inner_df = cv_decoding.run_cv_decoding(
                 cv_mode=cv_mode,
@@ -1278,6 +1654,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         groups_test=None,
         detrend_cov_train=None,
         detrend_cov_test=None,
+        fold_train_idx: Optional[np.ndarray] = None,
+        fold_test_idx: Optional[np.ndarray] = None,
     ):
 
         return self._train_test_single_fold(
@@ -1292,6 +1670,8 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
             kernelwidth_by_feature=best_width_by_feature,
             detrend_cov_train=detrend_cov_train,
             detrend_cov_test=detrend_cov_test,
+            fold_train_idx=fold_train_idx,
+            fold_test_idx=fold_test_idx,
         )
     
 

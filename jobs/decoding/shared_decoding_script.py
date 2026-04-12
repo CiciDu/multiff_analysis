@@ -44,6 +44,7 @@ def run_decoding_main(
             bin_width=args.bin_width,
             smoothing_width=smoothing_width,
             cv_mode=cv_mode,
+            use_spike_history=True,
         )
 
         run_kwargs = run_kwargs or {}

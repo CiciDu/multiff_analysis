@@ -116,9 +116,15 @@ def compute_spike_history_designs(
     n_basis: int = 20,
     t_min: Optional[float] = None,
     edge: str = 'zero',
+    basis_type: str = 'raised_cosine',   # NEW: 'raised_cosine' or 'lagged'
+    n_lags: Optional[int] = None,        # used if basis_type == 'lagged'
 ):
     """
     Build spike-history design matrices using externally defined bins.
+
+    Supports two basis types:
+    - 'raised_cosine' (default): smooth log-spaced basis
+    - 'lagged': raw lag features [t, t-1, ..., t-n_lags]
 
     Parameters
     ----------
@@ -126,7 +132,10 @@ def compute_spike_history_designs(
         Must contain ['time', 'cluster']
     bin_df : DataFrame
         Must contain ['new_segment', 'bin_in_new_seg', 'bin_left', 'bin_right']
-        Produced by rebin_all_segments (local or global) with add_bin_edges=True.
+    basis_type : str
+        'raised_cosine' or 'lagged'
+    n_lags : int, optional
+        Required if basis_type == 'lagged'
     """
 
     if t_min is None:
@@ -149,26 +158,39 @@ def compute_spike_history_designs(
         bin_df=bin_df_pad,
     )
 
-    # --------------------------------------------------
-    # 3) Build history basis (ONCE)
-    # --------------------------------------------------
-    _, basis = glm_bases.raised_log_cosine_basis(
-        n_basis=n_basis,
-        t_max=t_max,
-        dt=dt,
-        t_min=t_min,
-        log_spaced=True,
-        hard_start_zero=True,
-    )
-
     trial_ids = design_pad['new_segment'].to_numpy()
     spike_cols = [c for c in design_pad.columns if c.startswith('cluster_')]
 
+    # --------------------------------------------------
+    # 3) Build basis (SWITCH HERE)
+    # --------------------------------------------------
+    if basis_type == 'raised_cosine':
+        _, basis = glm_bases.raised_log_cosine_basis(
+            n_basis=n_basis,
+            t_max=t_max,
+            dt=dt,
+            t_min=t_min,
+            log_spaced=True,
+            hard_start_zero=True,
+        )
+
+    elif basis_type == 'lagged':
+        if n_lags is None:
+            raise ValueError('n_lags must be provided when basis_type="lagged"')
+
+        # identity basis → pure lag features
+        basis = np.eye(n_lags + 1)
+
+        # override t_min behavior for raw lags
+        t_min = 0.0
+
+    else:
+        raise ValueError(f'Unknown basis_type: {basis_type}')
+
+    K = basis.shape[1]
+
     X_hist = {}
     colnames = {}
-
-    n_pad_bins = pad_info['n_pad_bins']
-    K = basis.shape[1]
 
     # --------------------------------------------------
     # 4) History per neuron
@@ -178,12 +200,19 @@ def compute_spike_history_designs(
             design_pad[col].to_numpy(),
             basis,
             trial_ids,
-            dt=dt,
+            dt=dt if basis_type == 'raised_cosine' else 1.0,
             t_min=t_min,
             edge=edge,
         )
 
-        cols = [f'{col}:b0:{k}' for k in range(K)]
+        # ----------------------------------------------
+        # Column naming
+        # ----------------------------------------------
+        if basis_type == 'raised_cosine':
+            cols = [f'{col}:b0:{k}' for k in range(K)]
+        else:  # lagged
+            cols = [f'{col}:lag:{k}' for k in range(K)]
+
         colnames[col] = cols
 
         hist = pd.DataFrame(hist, columns=cols)
@@ -192,7 +221,6 @@ def compute_spike_history_designs(
 
         # --------------------------------------------------
         # 5) Truncate padding
-        # Padding bins have bin_in_new_seg < 0 and are removed after history construction
         # --------------------------------------------------
         keep = hist['bin_in_new_seg'] >= 0
         hist = hist.loc[keep].copy()
@@ -200,7 +228,9 @@ def compute_spike_history_designs(
 
         X_hist[col] = hist
 
-    # pick one representative neuron to check that the sequence of 'new_segment', 'bin_in_new_seg' is the same as the original bin_df
+    # --------------------------------------------------
+    # 6) Sanity check alignment
+    # --------------------------------------------------
     rep_col = spike_cols[0]
     rep_hist = X_hist[rep_col]
 
@@ -214,6 +244,7 @@ def compute_spike_history_designs(
     )
 
     return X_hist, basis, colnames
+
 
 def compute_coupling_designs(
     *,
@@ -607,7 +638,6 @@ def build_design_with_spike_history_from_bins(
         meta_groups=meta_groups,
     )
 
-        
            
     if returnX_hist:
         return design_w_history, basis, colnames, meta_groups, X_hist

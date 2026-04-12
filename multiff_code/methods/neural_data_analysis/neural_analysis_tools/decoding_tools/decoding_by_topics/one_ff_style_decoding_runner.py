@@ -174,13 +174,24 @@ class OneFFStyleDecodingRunner:
         if verbose:
             print(f"[canoncorr] vars: {varnames}")
         x_task = y_df[varnames].to_numpy(dtype=float)
-        y_neural = self._get_neural_matrix()
+        groups = self._get_groups()
+        trial_full = np.asarray(groups) if groups is not None else None
+        y_neural = self._get_neural_matrix_for_decoding(
+            neural_smooth_width=int(filtwidth),
+            trial_idx=trial_full,
+        )
+        n_smooth = (
+            self._neural_ncols_after_pca()
+            if getattr(self, "use_spike_history", False)
+            else None
+        )
 
         out = one_ff_style_utils.compute_canoncorr_block(
             x_task=x_task,
             y_neural=y_neural,
             dt=float(self.bin_width),
-            filtwidth=int(filtwidth),
+            filtwidth=0,
+            neural_cols_to_smooth=n_smooth,
         )
         out["vars"] = list(varnames)
         self.stats["canoncorr"] = out
@@ -232,10 +243,25 @@ class OneFFStyleDecodingRunner:
                 f"No valid readout variables found in {self._target_df_error_msg()}."
             )
 
-        neural = self._get_neural_matrix()
         groups = self._get_groups()
         groups = np.asarray(groups)
+        trial_full = groups
+        if fit_kernelwidth:
+            neural = self._get_neural_matrix_for_decoding(
+                neural_smooth_width=0,
+                trial_idx=trial_full,
+            )
+        else:
+            neural = self._get_neural_matrix_for_decoding(
+                neural_smooth_width=int(fixed_width),
+                trial_idx=trial_full,
+            )
         _, lengths = one_ff_style_utils.build_group_lengths(groups)
+        n_smooth = (
+            self._neural_ncols_after_pca()
+            if getattr(self, "use_spike_history", False)
+            else None
+        )
 
         out: Dict = {}
         for v in varnames:
@@ -268,15 +294,49 @@ class OneFFStyleDecodingRunner:
 
                     _, lengths_train = one_ff_style_utils.build_group_lengths(groups[train_idx])
 
-                    best = one_ff_style_utils.tune_linear_decoder_cv(
-                        y_neural=neural[train_idx],
-                        x_true=x_true[train_idx],
-                        lengths=lengths_train,
-                        candidate_widths=candidate_widths,
-                        n_splits=inner_cv_splits,
-                        cv_mode=cv_mode,
-                        buffer_samples=buffer_samples,
-                    )
+                    if getattr(self, "pca_n_components", None) is not None:
+                        # Width must vary presmooth(raw) → PCA, not smooth(PCA components).
+                        if not len(candidate_widths):
+                            raise ValueError(
+                                "candidate_widths must be non-empty when "
+                                "fit_kernelwidth=True and PCA is enabled."
+                            )
+                        best_err = float("inf")
+                        best_w = int(candidate_widths[0])
+                        best_inner = None
+                        for w in candidate_widths:
+                            neu_w = self._get_neural_matrix_for_decoding(
+                                neural_smooth_width=int(w),
+                                trial_idx=trial_full,
+                            )[train_idx]
+                            cur = one_ff_style_utils.fit_linear_decoder_cv(
+                                y_neural=neu_w,
+                                x_true=x_true[train_idx],
+                                lengths=lengths_train,
+                                width=0,
+                                n_splits=inner_cv_splits,
+                                cv_mode=cv_mode,
+                                buffer_samples=buffer_samples,
+                                neural_cols_to_smooth=None,
+                            )
+                            if cur["error"] < best_err:
+                                best_err = float(cur["error"])
+                                best_w = int(w)
+                                best_inner = cur
+                        best = dict(best_inner) if best_inner is not None else {}
+                        if best_inner is not None:
+                            best["width"] = best_w
+                    else:
+                        best = one_ff_style_utils.tune_linear_decoder_cv(
+                            y_neural=neural[train_idx],
+                            x_true=x_true[train_idx],
+                            lengths=lengths_train,
+                            candidate_widths=candidate_widths,
+                            n_splits=inner_cv_splits,
+                            cv_mode=cv_mode,
+                            buffer_samples=buffer_samples,
+                            neural_cols_to_smooth=n_smooth,
+                        )
 
                     best_width = int(best["width"])
                     widths_per_fold.append(best_width)
@@ -285,9 +345,15 @@ class OneFFStyleDecodingRunner:
                     wts = np.asarray(best.get("wts"))
                     wts_per_fold.append(wts)
 
-                    # Smooth and fit on full training set (weights from `best` were fit on training subset)
-                    X_tr = smooth_neural_data.smooth_signal(neural[train_idx], int(best_width))
-                    X_te = smooth_neural_data.smooth_signal(neural[test_idx], int(best_width))
+                    # Smooth raw (then PCA / hist) at chosen width; align rows to this fold
+                    X_tr = self._get_neural_matrix_for_decoding(
+                        neural_smooth_width=int(best_width),
+                        trial_idx=trial_full,
+                    )[train_idx]
+                    X_te = self._get_neural_matrix_for_decoding(
+                        neural_smooth_width=int(best_width),
+                        trial_idx=trial_full,
+                    )[test_idx]
 
                     # Fit linear weights on training set (fallback to best['wts'] if numerical issues)
                     try:
@@ -328,6 +394,7 @@ class OneFFStyleDecodingRunner:
                     n_splits=n_splits,
                     cv_mode=cv_mode,
                     buffer_samples=buffer_samples,
+                    neural_cols_to_smooth=n_smooth,
                 )
 
             pred = best["pred"]

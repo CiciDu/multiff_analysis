@@ -11,6 +11,8 @@ from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_st
     decode_stops_design,
 )
 
+from neural_data_analysis.design_kits.design_by_segment import spike_history
+
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics.base_decoding_runner import (
     BaseDecodingRunner,
 )
@@ -135,9 +137,10 @@ class FSDecodingRunner(BaseDecodingRunner):
             self.pos,
             self.new_seg_info,
         ) = decode_fs_utils.build_fs_design_decoding(self.pn)
-        
-        
-        
+
+        if self.use_spike_history:
+            self.bin_df = spike_history.make_bin_df_from_meta_df(self.meta_df_used)
+
         self.feats_to_decode = decode_stops_design.scale_binned_feats(
             binned_feats,
         )
@@ -202,6 +205,7 @@ class FSDecodingRunner(BaseDecodingRunner):
             "binned_spikes": save_dir / "binned_spikes.pkl",
             "feats_to_decode": save_dir / "feats_to_decode.pkl",
             "meta_df_used": save_dir / "meta_df_used.pkl",
+            "bin_df": save_dir / "bin_df.pkl",
         }
 
     def _get_design_matrix_data(self):
@@ -209,6 +213,7 @@ class FSDecodingRunner(BaseDecodingRunner):
             "binned_spikes": self.binned_spikes,
             "feats_to_decode": self.feats_to_decode,
             "meta_df_used": self.meta_df_used,
+            "bin_df": self.bin_df,
         }
 
     def _get_design_matrix_key_to_attr(self):
@@ -216,4 +221,5 @@ class FSDecodingRunner(BaseDecodingRunner):
             "binned_spikes": "binned_spikes",
             "feats_to_decode": "feats_to_decode",
             "meta_df_used": "meta_df_used",
+            "bin_df": "bin_df",
         }

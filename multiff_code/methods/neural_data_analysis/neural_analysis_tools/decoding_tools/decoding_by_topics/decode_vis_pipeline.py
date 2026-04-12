@@ -17,6 +17,8 @@ from neural_data_analysis.topic_based_neural_analysis.ff_visibility import (
 )
 from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import pn_aligned_by_event
 
+from neural_data_analysis.design_kits.design_by_segment import spike_history
+
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics.base_decoding_runner import (
     BaseDecodingRunner,
 )
@@ -100,6 +102,9 @@ class FFVisDecodingRunner(BaseDecodingRunner):
 
             self.feats_to_decode = decoding_design_utils.clean_binary_and_drop_constant(self.feats_to_decode)
 
+            if self.use_spike_history:
+                self.bin_df = spike_history.make_bin_df_from_meta_df(self.meta_df_used)
+
             # Save the computed design matrices for future use
             self.reduce_binned_spikes()
             self._save_design_matrices()
@@ -163,6 +168,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             'binned_spikes': save_dir / 'binned_spikes.pkl',
             'feats_to_decode': save_dir / 'feats_to_decode.pkl',
             'meta_df_used': save_dir / 'meta_df_used.pkl',
+            'bin_df': save_dir / 'bin_df.pkl',
         }
 
     def _get_design_matrix_data(self):
@@ -170,6 +176,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             'binned_spikes': self.binned_spikes,
             'feats_to_decode': self.feats_to_decode,
             'meta_df_used': self.meta_df_used,
+            'bin_df': self.bin_df,
         }
 
     def _get_design_matrix_key_to_attr(self):
@@ -177,5 +184,6 @@ class FFVisDecodingRunner(BaseDecodingRunner):
             'binned_spikes': 'binned_spikes',
             'feats_to_decode': 'feats_to_decode',
             'meta_df_used': 'meta_df_used',
+            'bin_df': 'bin_df',
         }
 

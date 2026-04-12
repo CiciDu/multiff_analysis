@@ -1,13 +1,36 @@
 from __future__ import annotations
 
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from sklearn.cross_decomposition import CCA
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
+    smooth_neural_data,
+)
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
     _build_folds,
 )
+
+
+def _smooth_neural_cols_only(
+    y: np.ndarray,
+    width: int,
+    *,
+    neural_cols_to_smooth: Optional[int] = None,
+) -> np.ndarray:
+    """Gaussian-smooth selected columns; leave remaining columns unchanged."""
+    y = np.asarray(y, dtype=float)
+    if int(width) <= 0:
+        return y
+    if neural_cols_to_smooth is None or neural_cols_to_smooth <= 0:
+        return smooth_neural_data.smooth_signal(y, int(width))
+    k = int(neural_cols_to_smooth)
+    if k >= y.shape[1]:
+        return smooth_neural_data.smooth_signal(y, int(width))
+    out = y.copy()
+    out[:, :k] = smooth_neural_data.smooth_signal(np.asarray(y[:, :k], dtype=float), int(width))
+    return out
 
 
 def safe_corr(x: np.ndarray, y: np.ndarray) -> float:
@@ -51,8 +74,16 @@ def split_by_lengths(vec: np.ndarray, lengths: Sequence[int]) -> List[np.ndarray
     return out
 
 
-def fit_linear_decoder(y_neural: np.ndarray, x_true: np.ndarray, width: int) -> Dict:
-    y_fit = smooth_neural_data.smooth_signal(y_neural, int(width))
+def fit_linear_decoder(
+    y_neural: np.ndarray,
+    x_true: np.ndarray,
+    width: int,
+    *,
+    neural_cols_to_smooth: Optional[int] = None,
+) -> Dict:
+    y_fit = _smooth_neural_cols_only(
+        y_neural, int(width), neural_cols_to_smooth=neural_cols_to_smooth
+    )
     wts, _, _, _ = np.linalg.lstsq(y_fit, x_true, rcond=None)
     pred = y_fit @ wts
     err = float(np.sqrt(np.sum((pred - x_true) ** 2)))
@@ -63,11 +94,18 @@ def tune_linear_decoder(
     y_neural: np.ndarray,
     x_true: np.ndarray,
     candidate_widths: Sequence[int],
+    *,
+    neural_cols_to_smooth: Optional[int] = None,
 ) -> Dict:
     best = None
     print(f"Tuning linear decoder with candidate widths: {candidate_widths}")
     for w in candidate_widths:
-        cur = fit_linear_decoder(y_neural, x_true, int(w))
+        cur = fit_linear_decoder(
+            y_neural,
+            x_true,
+            int(w),
+            neural_cols_to_smooth=neural_cols_to_smooth,
+        )
         if (best is None) or (cur["error"] < best["error"]):
             best = cur
     return best
@@ -90,6 +128,8 @@ def fit_linear_decoder_cv(
     cv_mode: str = "blocked_time_buffered",  # 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold'
     buffer_samples: int = 20,
     random_state: int = 0,
+    *,
+    neural_cols_to_smooth: Optional[int] = None,
 ) -> Dict:
     """
     Fit linear decoder with cross-validation.
@@ -110,7 +150,12 @@ def fit_linear_decoder_cv(
     n_trials = len(lengths)
     n_splits_eff = min(n_splits, n_trials) if groups is not None else n_splits
     if n_splits_eff < 2:
-        return fit_linear_decoder(y_neural, x_true, width)
+        return fit_linear_decoder(
+            y_neural,
+            x_true,
+            width,
+            neural_cols_to_smooth=neural_cols_to_smooth,
+        )
 
     # For group_kfold, pass groups; for blocked modes, pass None so cv_splitter is used
     groups_for_folds = groups if cv_mode == "group_kfold" else None
@@ -123,7 +168,12 @@ def fit_linear_decoder_cv(
         buffer_samples=buffer_samples,
     )
     if not splits:
-        return fit_linear_decoder(y_neural, x_true, width)
+        return fit_linear_decoder(
+            y_neural,
+            x_true,
+            width,
+            neural_cols_to_smooth=neural_cols_to_smooth,
+        )
 
     pred = np.full_like(x_true, np.nan, dtype=float)
     for train_idx, test_idx in splits:
@@ -131,13 +181,19 @@ def fit_linear_decoder_cv(
         x_tr = x_true[train_idx]
         y_te = y_neural[test_idx]
 
-        y_tr_smooth = smooth_neural_data.smooth_signal(y_tr, int(width))
+        y_tr_smooth = _smooth_neural_cols_only(
+            y_tr, int(width), neural_cols_to_smooth=neural_cols_to_smooth
+        )
         wts, _, _, _ = np.linalg.lstsq(y_tr_smooth, x_tr, rcond=None)
-        y_te_smooth = smooth_neural_data.smooth_signal(y_te, int(width))
+        y_te_smooth = _smooth_neural_cols_only(
+            y_te, int(width), neural_cols_to_smooth=neural_cols_to_smooth
+        )
         pred[test_idx] = y_te_smooth @ wts
 
     err = float(np.sqrt(np.nansum((pred - x_true) ** 2)))
-    y_fit = smooth_neural_data.smooth_signal(y_neural, int(width))
+    y_fit = _smooth_neural_cols_only(
+        y_neural, int(width), neural_cols_to_smooth=neural_cols_to_smooth
+    )
     wts_full, _, _, _ = np.linalg.lstsq(y_fit, x_true, rcond=None)
     return {
         "width": int(width),
@@ -157,6 +213,8 @@ def tune_linear_decoder_cv(
     cv_mode: str = "blocked_time_buffered",  # 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold'
     buffer_samples: int = 20,
     random_state: int = 0,
+    *,
+    neural_cols_to_smooth: Optional[int] = None,
 ) -> Dict:
     """Tune kernel width using CV; select width with lowest CV error."""
     best = None
@@ -170,6 +228,7 @@ def tune_linear_decoder_cv(
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
             random_state=random_state,
+            neural_cols_to_smooth=neural_cols_to_smooth,
         )
         if (best is None) or (cur["error"] < best["error"]):
             best = cur
@@ -182,13 +241,21 @@ def compute_canoncorr_block(
     *,
     dt: float,
     filtwidth: int,
+    neural_cols_to_smooth: Optional[int] = None,
 ) -> Dict:
     x = np.asarray(x_task, dtype=float)
     y_raw = np.asarray(y_neural, dtype=float)
     x[np.isnan(x)] = 0.0
 
-    y_smooth = smooth_neural_data.smooth_signal(y_raw, int(filtwidth))
-    y_rate = y_smooth / float(dt)
+    y_smooth = _smooth_neural_cols_only(
+        y_raw, int(filtwidth), neural_cols_to_smooth=neural_cols_to_smooth
+    )
+    y_rate = y_smooth.copy()
+    if neural_cols_to_smooth is not None and neural_cols_to_smooth > 0:
+        k = min(int(neural_cols_to_smooth), y_rate.shape[1])
+        y_rate[:, :k] = y_smooth[:, :k] / float(dt)
+    else:
+        y_rate = y_smooth / float(dt)
 
     n_comp = int(min(x.shape[1], y_rate.shape[1]))
     cca = CCA(n_components=max(1, n_comp), max_iter=2000)

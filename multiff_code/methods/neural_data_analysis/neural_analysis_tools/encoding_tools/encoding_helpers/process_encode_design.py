@@ -33,7 +33,7 @@ def get_strong_correlations(design_df, threshold=0.9):
 
 
 def reduce_encoding_design(df, corr_threshold_for_lags_of_a_feature=0.99, 
-                         vif_threshold=1000000, 
+                         vif_threshold=None, 
                          verbose=True):
         
     df_reduced_initial = prep_target_decoder.remove_zero_var_cols(
@@ -47,12 +47,13 @@ def reduce_encoding_design(df, corr_threshold_for_lags_of_a_feature=0.99,
                                                                                 filter_by_subsets=False,
                                                                                 filter_by_all_columns=True)
 
-    df_reduced = drop_high_vif_vars.drop_columns_with_high_vif(df_reduced,
-                                                                        vif_threshold=vif_threshold,
-                                                                        verbose=verbose,
-                                                                        filter_by_feature=False,
-                                                                        filter_by_subsets=False,
-                                                                        filter_by_all_columns=False,
-                                                                        get_column_subsets_func=False)
+    if vif_threshold is not None:
+        df_reduced = drop_high_vif_vars.drop_columns_with_high_vif(df_reduced,
+                                                                            vif_threshold=vif_threshold,
+                                                                            verbose=verbose,
+                                                                            filter_by_feature=False,
+                                                                            filter_by_subsets=False,
+                                                                            filter_by_all_columns=True,
+                                                                            get_column_subsets_func=False)
     
     return df_reduced
