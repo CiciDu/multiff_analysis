@@ -119,7 +119,7 @@ def truncate_columns_to_percentiles(df: pd.DataFrame, columns: list[str]) -> pd.
     return df
 
 
-def add_other_category_from_df(categories, design_df):
+def add_category_unassigned_vars_for_encoding_for_decoding(categories, design_df):
     all_vars = set(design_df.columns)
 
     assigned = set(
@@ -135,7 +135,6 @@ def add_other_category_from_df(categories, design_df):
     categories['unassigned_vars'] = unassigned_vars
 
     return categories
-
 
 def get_processed_spike_rates(
     spikes_df,

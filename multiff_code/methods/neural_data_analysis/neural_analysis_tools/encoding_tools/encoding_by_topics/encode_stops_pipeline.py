@@ -53,6 +53,7 @@ class StopEncodingRunner(BaseEncodingRunner):
         Collect and prepare data for stop encoding.
         """
         if exists_ok and self._load_design_matrices():
+            self.clean_var_categories()
             print('[StopEncodingRunner] Using cached design matrices')
             return
         self.pn, datasets, new_seg_info, events_with_stats = (

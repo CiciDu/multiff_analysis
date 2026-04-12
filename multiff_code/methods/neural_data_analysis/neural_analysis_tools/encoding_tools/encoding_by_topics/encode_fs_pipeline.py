@@ -49,6 +49,7 @@ class FSEncodingRunner(BaseEncodingRunner):
         Collect and prepare data for full-session encoding.
         """
         if exists_ok and self._load_design_matrices():
+            self.clean_var_categories()
             print('[FSEncodingRunner] Using cached design matrices')
             return
 

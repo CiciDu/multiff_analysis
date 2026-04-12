@@ -56,6 +56,7 @@ class FFVisEncodingRunner(BaseEncodingRunner):
         """
         # Try to load cached design matrices
         if exists_ok and self._load_design_matrices():
+            self.clean_var_categories()
             print('[collect_data] Using cached design matrices')
             return
 

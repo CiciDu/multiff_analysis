@@ -406,8 +406,7 @@ class BaseEncodingRunner:
         for unit_idx in unit_indices:
             if verbose:
                 print(
-                    f"  [neuron {unit_idx}] Running category contributions, "
-                    "penalty tuning, backward elimination"
+                    f"  [neuron {unit_idx}] Running category contributions."
                 )
             try:
                 self.run_category_variance_contributions(
@@ -857,6 +856,7 @@ class BaseEncodingRunner:
         - ``{save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/backward_elimination/{cv_mode}/{lam_suffix}.pkl``
         - ``{save_dir}/{results_subdir}/{coupling|no_coupling}/neuron_{unit_idx}/backward_elimination/{cv_mode}/history.csv``
         """
+        print('Running backward elimination for unit', unit_idx)
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         return self._get_gam_analysis_helper().run_backward_elimination(
             unit_idx=unit_idx,
@@ -912,7 +912,6 @@ class BaseEncodingRunner:
             self._gam_analysis_helper = (
                 encoder_gam_helper.BaseEncodingGAMAnalysisHelper(
                     self,
-                    var_categories=self.var_categories,
                 )
             )
         return self._gam_analysis_helper
@@ -1031,4 +1030,4 @@ class BaseEncodingRunner:
     
     def clean_var_categories(self):
         self.var_categories = encoding_design_utils.build_clean_var_categories_from_meta(self.var_categories, self.structured_meta_groups)
-        self.var_categories = encoder_gam_helper.add_category_unassigned_vars(self.var_categories, self.structured_meta_groups)
+        self.var_categories = encoder_gam_helper.add_category_unassigned_vars_for_encoding(self.var_categories, self.structured_meta_groups)

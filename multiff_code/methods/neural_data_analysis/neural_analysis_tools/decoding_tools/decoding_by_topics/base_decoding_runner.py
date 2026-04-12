@@ -1979,3 +1979,5 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         
     def clean_var_categories(self):
         self.var_categories = decoding_design_utils._build_clean_var_categories(self.feats_to_decode, self.var_categories)
+        self.var_categories = decoding_design_utils.add_category_unassigned_vars_for_encoding_for_decoding(self.var_categories, self.feats_to_decode)
+

@@ -85,6 +85,7 @@ class FFVisDecodingRunner(BaseDecodingRunner):
         """
         # Try to load cached design matrices
         if exists_ok and self._load_design_matrices():
+            self.clean_var_categories()
             print('[collect_data] Using cached design matrices')
         else:
             self.pn = collect_stop_data.init_pn_to_collect_stop_data(self.raw_data_folder_path, bin_width=0.04)

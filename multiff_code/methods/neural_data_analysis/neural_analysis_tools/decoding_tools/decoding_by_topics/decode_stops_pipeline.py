@@ -84,6 +84,7 @@ class StopDecodingRunner(BaseDecodingRunner):
     # ------------------------------------------------------------------
     def collect_data(self, exists_ok: bool = True):
         if exists_ok and self._load_design_matrices():
+            self.clean_var_categories()
             print("[StopDecodingRunner] Using cached design matrices")
             return
 

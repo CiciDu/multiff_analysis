@@ -53,7 +53,6 @@ class PNDecodingRunner(BaseDecodingRunner):
             self.collect_data(exists_ok=True)
         self.target_df = self.feats_to_decode.copy()
                         
-        self.var_categories = decoding_design_utils.add_other_category_from_df(self.var_categories, self.target_df)
 
         return self.target_df
 
@@ -80,6 +79,7 @@ class PNDecodingRunner(BaseDecodingRunner):
     def collect_data(self, exists_ok=True):
 
         if exists_ok and self._load_design_matrices():
+            self.clean_var_categories()
             print('[PNDecodingRunner] Using cached design matrices')
             return
 

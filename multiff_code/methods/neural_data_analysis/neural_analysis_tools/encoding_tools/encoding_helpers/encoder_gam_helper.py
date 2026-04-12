@@ -81,7 +81,7 @@ DEFAULT_LAMBDA_CONFIG = {
     "lam_p": 10.0,
 }
 
-def add_category_unassigned_vars(categories, structured_meta_groups):
+def add_category_unassigned_vars_for_encoding(categories, structured_meta_groups):
 
     all_group_names = encoding_design_utils.get_meta_var_names(structured_meta_groups)
 
@@ -110,11 +110,8 @@ class BaseEncodingGAMAnalysisHelper:
     def __init__(
         self,
         runner: Any,
-        *,
-        var_categories: Optional[Dict[str, List[str]]] = None,
     ):
         self.runner = runner
-        self.var_categories = var_categories or DEFAULT_ENCODING_VAR_CATEGORIES
         self.gam_results_subdir = runner.get_gam_results_subdir()
         
 
@@ -242,16 +239,16 @@ class BaseEncodingGAMAnalysisHelper:
         verbose: bool = True,
     ) -> Dict:
         if category_names is None:
-            category_names = list(self.var_categories.keys())
+            category_names = list(self.runner.var_categories.keys())
         else:
             unknown = [
-                c for c in category_names if c not in self.var_categories]
+                c for c in category_names if c not in self.runner.var_categories]
             if unknown:
                 raise ValueError(
                     f"Unknown category_names: {unknown}. "
-                    f"Available: {list(self.var_categories.keys())}"
+                    f"Available: {list(self.runner.var_categories.keys())}"
                 )
-        if not self.var_categories:
+        if not self.runner.var_categories:
             raise ValueError(
                 "var_categories cannot be empty for run_category_variance_contributions")
 
@@ -344,7 +341,7 @@ class BaseEncodingGAMAnalysisHelper:
             category_names if need_compute else list(category_loads.keys())
         )
         for category_name in categories_to_process:
-            category_aliases = self.var_categories[category_name]
+            category_aliases = self.runner.var_categories[category_name]
             if category_name in category_loads:
                 reduced_cv = category_loads[category_name]
             else:
