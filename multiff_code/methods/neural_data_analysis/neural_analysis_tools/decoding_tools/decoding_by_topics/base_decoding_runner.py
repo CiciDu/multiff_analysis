@@ -385,12 +385,28 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         """Base save directory for outputs."""
         raise NotImplementedError
 
+    def _spike_history_save_subdir(self) -> str:
+        """Filesystem-safe folder when ``use_spike_history``; encodes mode and hyperparameters."""
+        bw = f"{float(self.bin_width):g}".replace(".", "p").replace("-", "m")
+        mode = str(getattr(self, "spike_history_mode", "lags")).replace(os.sep, "_")
+        if os.altsep:
+            mode = mode.replace(os.altsep, "_")
+        t_max = float(getattr(self, "spike_history_t_max", 0.4))
+        tm = f"{t_max:g}".replace(".", "p").replace("-", "m")
+        nb = int(getattr(self, "spike_history_n_basis", 10))
+        if mode == "lags":
+            nl = int(getattr(self, "spike_history_n_lags", 8))
+            return f"sh_{mode}_nl{nl}_nb{nb}_tm{tm}_bw{bw}"
+        return f"sh_{mode}_nb{nb}_tm{tm}_bw{bw}"
+
     def _get_save_dir_common(self, decoder_outputs_dirname: str) -> str:
         """
         Common save dir builder for decoding runners.
 
-        Subfolder rule:
-        - if smoothing is enabled: smooth/width_{smoothing_width}
+        Subfolder rule (under ``decoding_outputs/<decoder_outputs_dirname>/``):
+        - if ``use_spike_history``: insert :meth:`_spike_history_save_subdir` (same layout as
+          before when spike history is off)
+        - then: if smoothing is enabled: smooth/width_{smoothing_width}
         - elif detrending is enabled: detrended
         - else: raw
         """
@@ -404,12 +420,15 @@ class BaseDecodingRunner(one_ff_style_decoding_runner.OneFFStyleDecodingRunner):
         if getattr(self, "pca_n_components", None) is not None:
             sub = sub + f"_pca{self.pca_n_components}"
 
-        self.save_dir = os.path.join(
+        parts = [
             self.pn.planning_and_neural_folder_path,
             "decoding_outputs",
             decoder_outputs_dirname,
-            sub,
-        )
+        ]
+        if bool(getattr(self, "use_spike_history", False)):
+            parts.append(self._spike_history_save_subdir())
+        parts.append(sub)
+        self.save_dir = os.path.join(*parts)
 
         return self.save_dir
 
