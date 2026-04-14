@@ -11,7 +11,8 @@ from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding 
 class ConfigRegressionEstimator:
     """Sklearn-style regressor built from :class:`cv_decoding.DecodingRunConfig`.
 
-    Intended as ``runner_class`` for :func:`get_cv_predictions` (``fit`` / ``predict`` on neural ``X``).
+    Intended as ``estimator_class`` for :func:`get_cv_predictions`
+    (``fit`` / ``predict`` on neural ``X``).
     """
 
     def __init__(self, config=None, model_name=None):
@@ -37,7 +38,7 @@ def get_cv_predictions(
     X,
     y,
     groups,
-    runner_class,
+    estimator_class,
     config,
     n_splits=5,
     cv_mode="kfold",
@@ -66,7 +67,7 @@ def get_cv_predictions(
     fold_ids = []
 
     for fold_idx, (train_idx, test_idx) in enumerate(splits):
-        model = runner_class(config=config, model_name=model_name)
+        model = estimator_class(config=config, model_name=model_name)
 
         model.fit(X[train_idx], y[train_idx])
         y_pred = model.predict(X[test_idx])

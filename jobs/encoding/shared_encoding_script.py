@@ -1,7 +1,7 @@
 """Shared logic for encoding scripts (encode_pn, encode_vis, encode_stops)."""
 
 import argparse
-from typing import Any, Callable, Dict, Optional, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar
 import os
 import sys
 from pathlib import Path
@@ -13,12 +13,16 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         break
 
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import (
+    encoding_models,
+    encoding_runner,
+)
 
 RunnerT = TypeVar("RunnerT")
 
 
 def run_encoding_main(
-    runner_class: Type[RunnerT],
+    task_class: Type[RunnerT],
     *,
     cv_mode: str = "blocked_time_buffered",
 ) -> Dict[str, Any]:
@@ -26,14 +30,13 @@ def run_encoding_main(
     Common main logic for encoding scripts.
 
     Args:
-        runner_factory: Callable that returns an encoding runner instance when
-            called with keyword arguments ``raw_data_folder_path`` and
-            ``bin_width`` (and any additional runner-specific kwargs).
+        task_class: Encoding task class that accepts ``raw_data_folder_path``,
+            ``bin_width``, and ``encoder_prs``.
 
     Returns:
         A mapping from ``raw_data_folder_path`` to the per-session results
         (``all_neuron_r2``) returned by
-        ``runner.crossval_variance_explained_all_neurons``.
+        ``runner.crossval_all_neurons``.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -64,17 +67,20 @@ def run_encoding_main(
         print("=" * 80)
 
         try:
-            runner = runner_class(
+            task = task_class(
                 raw_data_folder_path=raw_data_folder_path,
                 bin_width=args.bin_width,
-                cv_mode=cv_mode,
             )
+            
+            model = encoding_models.RNNModel(cv_mode=cv_mode)
+            # model = encoding_models.PGAMModel(cv_mode=cv_mode)
+            runner = encoding_runner.EncodingRunner(task, model)
 
             runner.collect_data(exists_ok=load_if_exists)
             
             for use_neural_coupling in [True, False]:
 
-                all_neuron_r2 = runner.crossval_variance_explained_all_neurons(
+                all_neuron_r2 = runner.crossval_all_neurons(
                     n_folds=args.n_splits,
                     load_if_exists=load_if_exists,
                     buffer_samples=20,
@@ -86,7 +92,7 @@ def run_encoding_main(
 
                 all_session_results[raw_data_folder_path] = all_neuron_r2
 
-                runner.run_category_contributions_etc_for_all_neurons(
+                runner.run_full_analysis_all_neurons(
                     n_folds=args.n_splits,
                     buffer_samples=20,
                     backward_n_folds=10,

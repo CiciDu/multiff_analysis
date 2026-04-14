@@ -11,6 +11,10 @@ from statsmodels.stats.multitest import multipletests
 
 
 from data_wrangling import combine_info_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
+    decoding_models,
+    decoding_runner,
+)
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding
 
 
@@ -30,7 +34,7 @@ DEFAULT_DECODING_VAR_CATEGORIES = {
 def collect_all_session_decoding_results(
     raw_data_dir_name,
     monkey_name,
-    decode_runner_class,
+    task_class,
     verbose=False,
     shuffle_mode='none',
     fit_kernelwidth=True,
@@ -50,8 +54,8 @@ def collect_all_session_decoding_results(
         Root directory containing raw data.
     monkey_name : str
         Name of the monkey.
-    decode_runner_class : class
-        Runner class (e.g., decode_stops_pipeline.StopDecodingRunner).
+    task_class : class
+        Decoding task class (decoding_pipelines interface).
     verbose : bool, optional
         If True, print progress information. Default is True.
     shuffle_mode : str, optional
@@ -94,12 +98,13 @@ def collect_all_session_decoding_results(
             row['data_name'],
         )
 
-        runner = decode_runner_class(
+        task = task_class(
             raw_data_folder_path=raw_data_folder_path,
             detrend_spikes=detrend_spikes,
             smoothing_width=smoothing_width,
-            cv_mode=cv_mode,
         )
+        model = decoding_models.CVDecodingModel(cv_mode=cv_mode or "group_kfold")
+        runner = decoding_runner.DecodingRunner(task, model)
 
         save_dir = runner._get_save_dir()
         
@@ -718,7 +723,7 @@ def run_and_analyze_decoding_sweep(
         kwargs.update(dict(
             compare_results=all_results_dict[key_b],
             compare_label=key_b,
-            compare_plot=f'three_panel',
+            compare_plot='three_panel',
         ))
 
     reg_summary2, mean_by_feature = plot_fold_diagnostics(**kwargs)

@@ -4,6 +4,10 @@ from typing import Optional
 
 from data_wrangling import combine_info_utils
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import multiff_encoding_params
+from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import (
+    encoding_models,
+    encoding_runner,
+)
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import plot_gam_fit
 import os
 
@@ -14,7 +18,7 @@ def collect_category_ecdf_from_sessions(
     monkey_names,
     *,
     raw_data_dir_name='all_monkey_data/raw_monkey_data',
-    runner_class=None,
+    task_class=None,
     bin_width=0.04,
     exists_ok=True,
     save_path=None,
@@ -30,8 +34,8 @@ def collect_category_ecdf_from_sessions(
         e.g. ['monkey_Schro'] or ['monkey_Bruno', 'monkey_Schro']
     raw_data_dir_name : str
         Base directory for raw data.
-    runner_class : class
-        e.g. encode_stops_pipeline.StopEncodingRunner (uses global if None)
+    task_class : class
+        e.g. encoding_tasks.StopTask (uses global if None)
     bin_width : float
     exists_ok : bool
         If True, load from save_path when available; save results after computing.
@@ -51,11 +55,16 @@ def collect_category_ecdf_from_sessions(
     import pickle
     from pathlib import Path
 
-    rc = runner_class
-    if rc is None:
-        rc = globals().get('runner_class')
-    if rc is None:
-        raise ValueError('runner_class must be passed or set globally')
+    tc = task_class
+    if tc is None:
+        tc = globals().get('task_class')
+    if tc is None:
+        raise ValueError('task_class must be passed or set globally')
+    if tc.__name__.endswith("EncodingRunner"):
+        raise ValueError(
+            "collect_category_ecdf_from_sessions now expects a task class "
+            "(e.g., encoding_tasks.StopTask), not a legacy runner class."
+        )
 
     effective_cv_mode = cv_mode if cv_mode is not None else _DEFAULT_CV_MODE
 
@@ -63,15 +72,15 @@ def collect_category_ecdf_from_sessions(
     # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/{cv_mode}/category_ecdf_{monkeys}.pkl
     if save_path is None:
         # Map runner class to encoder type
-        rc_name = rc.__name__
-        if 'Stop' in rc_name:
+        tc_name = tc.__name__
+        if 'Stop' in tc_name:
             encoder_dir = 'stop_encoder_outputs'
-        elif 'Vis' in rc_name:
+        elif 'Vis' in tc_name:
             encoder_dir = 'vis_encoder_outputs'
-        elif 'PN' in rc_name:
+        elif 'PN' in tc_name:
             encoder_dir = 'pn_encoder_outputs'
         else:
-            encoder_dir = f'{rc_name}_encoder_outputs'
+            encoder_dir = f'{tc_name}_encoder_outputs'
 
         base = raw_data_dir_name.replace('raw_monkey_data', 'planning_and_neural')
         coupling_subdir = "coupling" if use_neural_coupling else "no_coupling"
@@ -139,12 +148,13 @@ def collect_category_ecdf_from_sessions(
             print('=' * 80)
             try:
                 prs = multiff_encoding_params.default_prs()
-                runner = rc(
+                task = tc(
                     raw_data_folder_path=raw_data_folder_path,
                     bin_width=bin_width,
                     encoder_prs=prs,
-                    cv_mode=effective_cv_mode,
                 )
+                model = encoding_models.PGAMModel(cv_mode=effective_cv_mode)
+                runner = encoding_runner.EncodingRunner(task, model)
                 all_results = plot_gam_fit.run_unit_ecdf_collect(runner, 
                                                                  use_neural_coupling=use_neural_coupling)
                 session_results_list.append((session_label, all_results))

@@ -9,7 +9,7 @@
 #         pca = PCA(n_components=n_components)
 #         X_trials = [pca.fit_transform(trial) for trial in X_trials]
 #     # Use your time-resolved regression function
-#     from methods.neural_data_analysis.neural_analysis_tools.gpfa_methods import time_resolved_regression
+#     from neural_data_analysis.neural_analysis_tools.gpfa_methods import time_resolved_regression
 #     scores_by_time, times, trial_counts = time_resolved_regression.time_resolved_regression_cv(
 #         X_trials, Y_trials, time_step=0.02, cv_folds=5, max_timepoints=75, align_at_beginning=True
 #     )

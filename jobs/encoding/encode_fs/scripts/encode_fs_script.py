@@ -19,12 +19,12 @@ from jobs.encoding.shared_encoding_script import run_encoding_main
 def main():
     encoding_design_utils.bootstrap_repo_path()
 
-    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_by_topics import (
-        encode_fs_pipeline,
+    from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_pipelines import (
+        encoding_tasks,
     )
 
     return run_encoding_main(
-        encode_fs_pipeline.FSEncodingRunner,
+        encoding_tasks.FSTask,
         cv_mode="blocked_time_buffered",
     )
 

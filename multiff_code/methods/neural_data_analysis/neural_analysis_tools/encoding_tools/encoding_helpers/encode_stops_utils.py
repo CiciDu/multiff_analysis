@@ -82,7 +82,7 @@ def build_stop_encoding_design(
     # ==============================================================
     # 5) Continuous tuning block
     # ==============================================================
-    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS
+    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS.copy()
     raw_feature_cols_to_drop.remove('time')
     binned_feats, tuning_meta, _ = (
         encoding_design_utils.add_tuning_features_to_design(

@@ -7,20 +7,12 @@ Usage
     from encoding_models import PGAMModel, RNNModel
     from encoding_runner import EncodingRunner
 
-    # Swap tasks
     runner = EncodingRunner(PNTask(path), PGAMModel())
     runner.crossval(unit_idx=0)
+    runner.run_category_variance_contributions(unit_idx=0)
 
-    # Swap models — identical task, different model
     runner2 = EncodingRunner(PNTask(path), RNNModel())
     runner2.crossval(unit_idx=0)
-
-The runner owns *no* data-loading and *no* model-fitting logic; it
-simply binds a task to a model and exposes a clean call-site.
-
-For PGAMModel the runner also exposes convenience pass-throughs to the
-richer GAM analysis methods (category contributions, penalty tuning,
-backward elimination).
 """
 
 from __future__ import annotations
@@ -33,15 +25,17 @@ from .base_encoding_task import BaseEncodingTask
 
 class EncodingRunner:
     """
-    Orchestrates a (Task, Model) pair.
+    Binds a (Task, Model) pair and exposes a flat call-site.
+
+    All methods are pure pass-throughs — no logic lives here.
+    External code reads task data attributes via __getattr__ fallthrough.
 
     Parameters
     ----------
-    task  : BaseEncodingTask subclass instance
-    model : BaseEncodingModel subclass instance
-    gam_results_subdir : str
-        Sub-directory for GAM results under the task's save dir.
-        Ignored for non-GAM models.
+    task               : BaseEncodingTask subclass
+    model              : BaseEncodingModel subclass
+    gam_results_subdir : str   sub-directory for GAM results under save dir.
+                               Auto-inferred from task class name if not given.
     """
 
     def __init__(
@@ -53,137 +47,80 @@ class EncodingRunner:
         self.task = task
         self.model = model
 
-        # Infer sensible default subdir from task class name
         if gam_results_subdir is None:
             prefix = type(task).__name__.lower().replace("task", "")
             gam_results_subdir = f"{prefix}_gam_results" if prefix else "gam_results"
         self.gam_results_subdir = gam_results_subdir
 
+        # Attach subdir to model so _TaskModelProxy can read it
+        self.model._gam_results_subdir = gam_results_subdir
+
     # ------------------------------------------------------------------
-    # Core interface
+    # Fallthrough: task data attributes available directly on runner
     # ------------------------------------------------------------------
 
-    def run(self, unit_idx: int, **kwargs):
-        """Fit model on all data for one unit."""
+    def __getattr__(self, name):
+        # Only called when normal lookup fails — routes to task
+        return getattr(self.task, name)
+
+    # ------------------------------------------------------------------
+    # Data
+    # ------------------------------------------------------------------
+
+    def collect_data(self, exists_ok: bool = True):
+        self.task.collect_data(exists_ok=exists_ok)
+
+    # ------------------------------------------------------------------
+    # Core model interface
+    # ------------------------------------------------------------------
+
+    def fit(self, unit_idx: int, **kwargs):
         return self.model.fit(self.task, unit_idx, **kwargs)
 
     def crossval(self, unit_idx: int, **kwargs):
-        """Cross-validate model for one unit."""
-        # Pass gam_results_subdir only if the model accepts it
-        if isinstance(self.model, PGAMModel):
-            kwargs.setdefault("gam_results_subdir", self.gam_results_subdir)
+        kwargs.setdefault("gam_results_subdir", self.gam_results_subdir)
         return self.model.crossval(self.task, unit_idx, **kwargs)
 
-    # ------------------------------------------------------------------
-    # Convenience: all-neuron crossval
-    # ------------------------------------------------------------------
-
     def crossval_all_neurons(self, **kwargs):
-        """
-        Cross-validate all neurons.  Only supported for PGAMModel right now;
-        for other models call runner.crossval(unit_idx) in a loop.
-        """
-        if not isinstance(self.model, PGAMModel):
-            n = self.task.num_neurons
-            return [self.crossval(i, **kwargs) for i in range(n)]
         kwargs.setdefault("gam_results_subdir", self.gam_results_subdir)
         return self.model.crossval_all_neurons(self.task, **kwargs)
 
     # ------------------------------------------------------------------
-    # GAM-specific pass-throughs (only valid when model is PGAMModel)
+    # GAM pass-throughs
     # ------------------------------------------------------------------
 
-    def _require_pgam(self, method_name: str):
+    def get_gam_save_paths(self, unit_idx: int, **kwargs):
         if not isinstance(self.model, PGAMModel):
-            raise TypeError(
-                f"{method_name} is only available when the model is PGAMModel, "
-                f"got {type(self.model).__name__}."
-            )
+            return None
+            # raise TypeError(
+            #     "get_gam_save_paths is only available for PGAMModel, "
+            #     f"got {type(self.model).__name__}."
+            # )
+        kwargs.setdefault("gam_results_subdir", self.gam_results_subdir)
+        return self.model.get_gam_save_paths(self.task, unit_idx, **kwargs)
+
 
     def run_category_variance_contributions(self, unit_idx: int, **kwargs) -> Dict:
-        self._require_pgam("run_category_variance_contributions")
-        return self.model.run_category_variance_contributions(
-            self.task, unit_idx, **kwargs
-        )
+        return self.model.run_category_variance_contributions(self.task, unit_idx, **kwargs)
 
     def run_penalty_tuning(self, unit_idx: int, **kwargs) -> Dict:
-        self._require_pgam("run_penalty_tuning")
         return self.model.run_penalty_tuning(self.task, unit_idx, **kwargs)
 
     def run_backward_elimination(self, unit_idx: int, **kwargs) -> Dict:
-        self._require_pgam("run_backward_elimination")
         return self.model.run_backward_elimination(self.task, unit_idx, **kwargs)
 
-    def run_full_analysis(
-        self,
-        unit_idx: int,
-        *,
-        n_folds: int = 5,
-        backward_n_folds: int = 10,
-        alpha: float = 0.05,
-        load_if_exists: bool = True,
-        verbose: bool = True,
-        use_neural_coupling: bool = False,
-        cv_mode: Optional[str] = None,
-        buffer_samples: int = 20,
-    ) -> None:
-        """
-        Category contributions + backward elimination for one unit.
-        Convenience wrapper for PGAMModel.
-        """
-        self._require_pgam("run_full_analysis")
-        if verbose:
-            print(f"[EncodingRunner] Full analysis for unit {unit_idx}")
-        try:
-            self.run_category_variance_contributions(
-                unit_idx,
-                n_folds=n_folds,
-                buffer_samples=buffer_samples,
-                load_if_exists=load_if_exists,
-                use_neural_coupling=use_neural_coupling,
-                cv_mode=cv_mode,
-            )
-            self.run_backward_elimination(
-                unit_idx,
-                n_folds=backward_n_folds,
-                alpha=alpha,
-                load_if_exists=load_if_exists,
-                use_neural_coupling=use_neural_coupling,
-                cv_mode=cv_mode,
-            )
-        except Exception as e:
-            if verbose:
-                print(f"  [WARN] unit {unit_idx}: {e}")
+    def crossval_tuning_curve_coef(self, unit_idx: int, **kwargs) -> Dict:
+        return self.model.crossval_tuning_curve_coef(self.task, unit_idx, **kwargs)
 
-    def run_full_analysis_all_neurons(
-        self,
-        *,
-        unit_indices: Optional[List[int]] = None,
-        n_folds: int = 5,
-        backward_n_folds: int = 10,
-        alpha: float = 0.05,
-        load_if_exists: bool = True,
-        verbose: bool = True,
-        use_neural_coupling: bool = False,
-        cv_mode: Optional[str] = None,
-        buffer_samples: int = 20,
-    ) -> None:
-        self._require_pgam("run_full_analysis_all_neurons")
-        self.task.collect_data(exists_ok=True)
-        if unit_indices is None:
-            unit_indices = list(range(self.task.num_neurons))
-        for unit_idx in unit_indices:
-            self.run_full_analysis(
-                unit_idx,
-                n_folds=n_folds,
-                backward_n_folds=backward_n_folds,
-                alpha=alpha,
-                load_if_exists=load_if_exists,
-                verbose=verbose,
-                use_neural_coupling=use_neural_coupling,
-                cv_mode=cv_mode,
-                buffer_samples=buffer_samples,
-            )
+    def try_load_variance_explained_for_all_neurons(self, **kwargs):
+        kwargs.setdefault("gam_results_subdir", self.gam_results_subdir)
+        return self.model.try_load_variance_explained_for_all_neurons(self.task, **kwargs)
+
+    def run_full_analysis(self, unit_idx: int, **kwargs) -> None:
+        return self.model.run_full_analysis(self.task, unit_idx, **kwargs)
+
+    def run_full_analysis_all_neurons(self, **kwargs) -> None:
+        return self.model.run_full_analysis_all_neurons(self.task, **kwargs)
 
     # ------------------------------------------------------------------
     # Repr
@@ -196,4 +133,14 @@ class EncodingRunner:
             f"  model = {type(self.model).__name__},\n"
             f"  subdir= {self.gam_results_subdir!r},\n"
             f")"
+        )
+        
+    def get_gam_groups(self):
+        from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
+        return encoding_design_utils.build_gam_groups_from_meta(
+            self.task.structured_meta_groups,
+            lam_f=self.model.lambda_config['lam_f'],
+            lam_g=self.model.lambda_config['lam_g'],
+            lam_h=self.model.lambda_config['lam_h'],
+            lam_p=self.model.lambda_config['lam_p'],
         )

@@ -1,23 +1,30 @@
-"""Shared logic for decoding scripts (decode_stops, decode_pn, decode_vis)."""
+"""Shared logic for decoding scripts using decoding_pipelines."""
 
 import argparse
 from typing import Any, Optional, Type, TypeVar
 
-RunnerT = TypeVar("RunnerT")
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
+    decoding_models,
+    decoding_runner,
+)
+
+TaskT = TypeVar("TaskT")
 
 
 def run_decoding_main(
-    runner_class: Type[RunnerT],
+    task_class: Type[TaskT],
     *,
     cv_mode: str = "group_kfold",
     run_kwargs: Optional[dict[str, Any]] = None,
+    task_kwargs: Optional[dict[str, Any]] = None,
+    model_kwargs: Optional[dict[str, Any]] = None,
 ) -> tuple:
     """
     Common main logic for decoding scripts.
 
     Args:
-        runner_class: The decoding runner class (e.g. StopDecodingRunner,
-            PNDecodingRunner, FFVisDecodingRunner).
+        task_class: The decoding task class (e.g. StopDecodingTask,
+            PNDecodingTask, VisDecodingTask).
         run_kwargs: Optional extra kwargs passed to runner.run() (e.g.
             cv_decoding_verbosity=2).
 
@@ -39,13 +46,23 @@ def run_decoding_main(
     for smoothing_width in [None, 10, 20, 40]:
         print(f"Running with smoothing_width={smoothing_width}")
     
-        runner = runner_class(
+        task_kwargs = task_kwargs or {}
+        model_kwargs = model_kwargs or {}
+        runner = decoding_runner.DecodingRunner(
+            task_class(
             raw_data_folder_path=args.raw_data_folder_path,
             bin_width=args.bin_width,
             smoothing_width=smoothing_width,
-            cv_mode=cv_mode,
             use_spike_history=True,
+            **task_kwargs,
+            ),
+            decoding_models.CVDecodingModel(
+                cv_mode=cv_mode,
+                **model_kwargs,
+            ),
         )
+
+        runner.collect_data(exists_ok=True)
 
         run_kwargs = run_kwargs or {}
         common_run = dict(

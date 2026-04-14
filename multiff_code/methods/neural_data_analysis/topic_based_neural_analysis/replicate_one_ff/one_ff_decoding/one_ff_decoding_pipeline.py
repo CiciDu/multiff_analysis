@@ -17,7 +17,7 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff import (
     population_analysis_utils,
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_decoding import plot_one_ff_decoding
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import one_ff_style_utils
 
 DEFAULT_CANONCORR_VARS = ["v", "w", "d", "phi", "r_targ", "theta_targ"]
 DEFAULT_READOUT_VARS = ["v", "w", "d", "phi", "r_targ", "theta_targ"]

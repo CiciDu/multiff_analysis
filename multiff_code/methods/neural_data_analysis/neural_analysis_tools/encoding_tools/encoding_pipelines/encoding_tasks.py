@@ -151,6 +151,9 @@ class PNTask(BaseEncodingTask):
             self.pn.planning_and_neural_folder_path,
             "encoding_outputs/pn_encoder_outputs",
         )
+        
+    def get_gam_results_subdir(self):
+        return "pn_gam_results"
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +208,9 @@ class FSTask(BaseEncodingTask):
             self.pn.planning_and_neural_folder_path,
             "encoding_outputs/fs_encoder_outputs",
         )
+        
+    def get_gam_results_subdir(self):
+        return "fs_gam_results"
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +266,9 @@ class StopTask(BaseEncodingTask):
             self.pn.planning_and_neural_folder_path,
             "encoding_outputs/stop_encoder_outputs",
         )
+        
+    def get_gam_results_subdir(self):
+        return "stop_gam_results"
 
 
 # ---------------------------------------------------------------------------
@@ -331,3 +340,6 @@ class VisTask(BaseEncodingTask):
             self.pn.planning_and_neural_folder_path,
             "encoding_outputs/vis_encoder_outputs",
         )
+
+    def get_gam_results_subdir(self):
+        return "vis_gam_results"

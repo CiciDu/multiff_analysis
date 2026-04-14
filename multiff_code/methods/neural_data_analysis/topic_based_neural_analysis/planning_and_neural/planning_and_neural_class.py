@@ -6,6 +6,7 @@ from neural_data_analysis.topic_based_neural_analysis.planning_and_neural import
 import numpy as np
 import pandas as pd
 import os
+import warnings
 
 
 class PlanningAndNeural(base_neural_class.NeuralBaseClass):
@@ -259,9 +260,20 @@ class PlanningAndNeural(base_neural_class.NeuralBaseClass):
 
     def get_x_and_y_var(self, exists_ok=True):
         original_len = len(self.planning_data_by_bin)
-        cols = list(dict.fromkeys(
+        requested_cols = list(dict.fromkeys(
             ['bin', 'segment', 'whether_test'] + pn_feature_selection.all_features))
-        self.y_var = self.planning_data_by_bin[cols]
+        available_cols = [
+            col for col in requested_cols if col in self.planning_data_by_bin.columns]
+        missing_cols = [
+            col for col in requested_cols if col not in self.planning_data_by_bin.columns]
+
+        if missing_cols:
+            warnings.warn(
+                "Missing expected planning features in planning_data_by_bin; "
+                f"these columns will be skipped: {missing_cols}"
+            )
+
+        self.y_var = self.planning_data_by_bin[available_cols]
         self.y_var = self.y_var.dropna().sort_values(
             by=['segment', 'bin']).reset_index(drop=True)
         self.y_var['bin'] = self.y_var['bin'].astype(int)

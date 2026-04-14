@@ -225,6 +225,103 @@ class BaseEncodingTask:
     # var_categories cleanup (called at end of collect_data)
     # ------------------------------------------------------------------
 
+    def get_max_temporal_dependency(self, verbose: bool = True) -> Dict:
+        """
+        Summarise the maximum temporal dependency of the encoding model.
+
+        Reads from (in decreasing priority):
+        1. ``hist_meta['basis_info']`` lags – exact lags after get_design_for_unit
+        2. ``temporal_meta['basis_info']`` lags – exact lags after collect_data
+        3. ``binrange_dict`` / ``encoder_prs`` – always available as fallback
+
+        Returns
+        -------
+        dict with keys:
+            spike_hist_window, event_windows, max_causal_s, max_acausal_s,
+            overall_max_s, overall_max_bins
+        """
+        sh_min: Optional[float] = None
+        sh_max: Optional[float] = None
+
+        hist_meta = getattr(self, 'hist_meta', None) or {}
+        for info in (hist_meta.get('basis_info') or {}).values():
+            lags = info.get('lags')
+            if lags is not None and len(lags):
+                sh_min = float(lags[0])
+                sh_max = float(lags[-1])
+                break
+
+        if sh_max is None:
+            sh_range = self.binrange_dict.get('spike_hist')
+            if sh_range is not None:
+                sh_min, sh_max = float(sh_range[0]), float(sh_range[1])
+
+        ev_min: Optional[float] = None
+        ev_max: Optional[float] = None
+
+        temporal_meta = getattr(self, 'temporal_meta', None) or {}
+        basis_info_tm = temporal_meta.get('basis_info') or {}
+        first_tm_info = next(iter(basis_info_tm.values()), None)
+        if first_tm_info is not None:
+            lags = first_tm_info.get('lags')
+            if lags is not None and len(lags):
+                ev_min = float(lags[0])
+                ev_max = float(lags[-1])
+
+        if ev_min is None:
+            for key in ('t_stop', 't_event'):
+                br = self.binrange_dict.get(key)
+                if br is not None:
+                    ev_min, ev_max = float(br[0]), float(br[1])
+                    break
+
+        if ev_min is None:
+            ev_min = -float(getattr(self.encoder_prs, 'pre_event', 0.3))
+            ev_max = float(getattr(self.encoder_prs, 'post_event', 0.3))
+
+        event_groups = temporal_meta.get('groups') or {}
+        event_windows: Dict[str, tuple] = {
+            name: (ev_min, ev_max) for name in event_groups
+        }
+        if not event_windows and ev_min is not None:
+            event_windows['(default_event)'] = (ev_min, ev_max)
+
+        causal_candidates: List[float] = []
+        acausal_candidates: List[float] = [0.0]
+        if sh_max is not None:
+            causal_candidates.append(abs(sh_max))
+        for t0, t1 in event_windows.values():
+            if t0 is not None:
+                causal_candidates.append(abs(t0))
+            if t1 is not None:
+                acausal_candidates.append(abs(t1))
+
+        max_causal = max(causal_candidates) if causal_candidates else 0.0
+        max_acausal = max(acausal_candidates)
+        overall = max(max_causal, max_acausal)
+        overall_bins = int(round(overall / self.bin_width))
+
+        result = {
+            'spike_hist_window': (sh_min, sh_max),
+            'event_windows': event_windows,
+            'max_causal_s': max_causal,
+            'max_acausal_s': max_acausal,
+            'overall_max_s': overall,
+            'overall_max_bins': overall_bins,
+        }
+
+        if verbose:
+            fmt = lambda t: f"{t * 1000:.1f} ms" if t is not None else "N/A"
+            print("── Temporal dependency summary ──")
+            print(f"  Spike history :  {fmt(sh_min)} → {fmt(sh_max)}  (causal lookback)")
+            for name, (t0, t1) in event_windows.items():
+                print(f"  Event [{name:>20s}]:  {fmt(t0)} → {fmt(t1)}")
+            print(f"  Max causal    :  {fmt(max_causal)}")
+            print(f"  Max acausal   :  {fmt(max_acausal)}")
+            print(f"  Overall max   :  {fmt(overall)}  ({overall_bins} bins @ {self.bin_width*1000:.0f} ms)")
+
+        return result
+
     def clean_var_categories(self):
         from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
             encoder_gam_helper,

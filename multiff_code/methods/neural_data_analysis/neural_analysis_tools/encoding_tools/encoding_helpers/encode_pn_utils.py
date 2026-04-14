@@ -92,7 +92,7 @@ def build_pn_encoding_design(
                 print(f'Missing required variable "{var}" in binned features. Will skip it.')
 
     rebinned_y_var['time'] = binned_feats['time'].values # pass in as raw feature later
-    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS + (linear_vars or []) + (angular_vars or [])
+    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS.copy() + (linear_vars or []) + (angular_vars or [])
     print('raw_feature_cols_to_drop:', raw_feature_cols_to_drop)
 
     binned_feats, tuning_meta, mode = encoding_design_utils.add_tuning_features_to_design(

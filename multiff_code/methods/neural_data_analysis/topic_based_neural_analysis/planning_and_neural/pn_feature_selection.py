@@ -1,3 +1,5 @@
+import warnings
+
 
 
 all_features = ['cur_in_memory', 'nxt_in_memory', 'cur_vis', 'nxt_vis',
@@ -23,8 +25,14 @@ temporal_vars = ['capture', 'log1p_num_ff_visible', 'log1p_num_ff_in_memory', 'c
 
 
 def select_features(data):
-
-    data_sub = data[all_features].copy()
+    available_features = [feat for feat in all_features if feat in data.columns]
+    missing_features = [feat for feat in all_features if feat not in data.columns]
+    if missing_features:
+        warnings.warn(
+            "Missing expected planning features; these columns will be skipped: "
+            f"{missing_features}"
+        )
+    data_sub = data[available_features].copy()
 
     return data_sub
 

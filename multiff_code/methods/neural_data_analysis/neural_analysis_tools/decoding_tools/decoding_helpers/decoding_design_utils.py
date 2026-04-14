@@ -41,7 +41,7 @@ DEFAULT_DECODING_VAR_CATEGORIES["non_spike_vars"] = [
 ]
 
 FS_DECODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_DECODING_VAR_CATEGORIES)
-FS_DECODING_VAR_CATEGORIES['event_vars'].extend(['ff_on_in_bin', 'ff_off_in_bin', 'group_ff_on_in_bin', 'group_ff_off_in_bin',
+FS_DECODING_VAR_CATEGORIES['event_vars'].extend(['ff_on_in_bin', 'ff_off_in_bin', 'group_ff_on', 'group_ff_off',
                                                  'ff_vis_start', 'ff_vis_end', 'global_burst_start'])
 
 STOP_DECODING_VAR_CATEGORIES = copy.deepcopy(DEFAULT_DECODING_VAR_CATEGORIES)

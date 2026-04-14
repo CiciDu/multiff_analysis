@@ -13,14 +13,14 @@ for p in [Path.cwd()] + list(Path.cwd().parents):
         sys.path.insert(0, str(p / 'multiff_analysis'))
         break
 
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import (
-    decode_stops_pipeline,
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
+    decoding_tasks,
 )
 from jobs.decoding.shared_decoding_script import run_decoding_main
 
 
 def main():
-    return run_decoding_main(decode_stops_pipeline.StopDecodingRunner)
+    return run_decoding_main(decoding_tasks.StopDecodingTask)
 
 
 if __name__ == '__main__':

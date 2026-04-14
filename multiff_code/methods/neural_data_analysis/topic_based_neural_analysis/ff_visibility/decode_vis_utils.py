@@ -224,8 +224,8 @@ def _add_ff_visibility_onehot_to_binned_feats(
     vis_specs = [
         (ff_on_df['ff_vis_start_time'].to_numpy(dtype=float), 'ff_on_in_bin'),
         (ff_on_df['ff_vis_end_time'].to_numpy(dtype=float), 'ff_off_in_bin'),
-        (group_on_df['group_on_start_time'].to_numpy(dtype=float), 'group_ff_on_in_bin'),
-        (group_on_df['group_on_end_time'].to_numpy(dtype=float), 'group_ff_off_in_bin'),
+        (group_on_df['group_on_start_time'].to_numpy(dtype=float), 'group_ff_on'),
+        (group_on_df['group_on_end_time'].to_numpy(dtype=float), 'group_ff_off'),
     ]
 
     for event_times, col_name in vis_specs:

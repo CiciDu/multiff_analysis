@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from neural_data_analysis.neural_analysis_tools.get_neural_data import neural_data_processing
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_by_topics import one_ff_style_utils
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import one_ff_style_utils
 
 
 def make_full_session_binned_spikes(spikes_df, bin_width=0.005):

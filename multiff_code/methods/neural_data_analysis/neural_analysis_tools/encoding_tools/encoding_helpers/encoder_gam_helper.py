@@ -100,22 +100,132 @@ def add_category_unassigned_vars_for_encoding(categories, structured_meta_groups
     return categories
 
 
+class _TaskModelProxy:
+    """
+    Proxy that satisfies all self.runner.* calls made by BaseEncodingGAMAnalysisHelper,
+    routing each to the right object.
+
+    Data reads  → task
+    Model attrs → model
+    GAM methods → model(task, ...)
+    """
+
+    def __init__(self, task, model):
+        self._task = task
+        self._model = model
+
+    # ------------------------------------------------------------------
+    # Data attributes (from task)
+    # ------------------------------------------------------------------
+    def __getattr__(self, name):
+        # Fall through to task for any attribute not explicitly defined here
+        return getattr(self._task, name)
+
+    @property
+    def binned_feats(self):
+        return self._task.binned_feats
+
+    @property
+    def binned_spikes(self):
+        return self._task.binned_spikes
+
+    @property
+    def bin_width(self):
+        return self._task.bin_width
+
+    @property
+    def var_categories(self):
+        return self._task.var_categories
+
+    @property
+    def structured_meta_groups(self):
+        return self._task.structured_meta_groups
+
+    # ------------------------------------------------------------------
+    # Model attributes
+    # ------------------------------------------------------------------
+    @property
+    def lam_grid(self):
+        return self._model.lam_grid
+
+    @property
+    def cv_mode(self):
+        return self._model.cv_mode
+
+    @property
+    def lambda_config(self):
+        return self._model.lambda_config
+
+    # ------------------------------------------------------------------
+    # Methods that need both task + model
+    # ------------------------------------------------------------------
+    def collect_data(self, exists_ok=True):
+        self._task.collect_data(exists_ok=exists_ok)
+
+    def get_gam_save_paths(self, unit_idx, **kwargs):
+        gam_results_subdir = getattr(
+            self._model, "_gam_results_subdir",
+            getattr(self._task, "_gam_results_subdir", "gam_results"),
+        )
+        return self._model.get_gam_save_paths(
+            self._task, unit_idx,
+            gam_results_subdir=gam_results_subdir,
+            **kwargs,
+        )
+
+    def get_design_for_unit(self, unit_idx, **kwargs):
+        design_df, gam_groups = self._model._get_design_for_unit(
+            self._task, unit_idx, **kwargs
+        )
+        # expose as attributes so downstream code can do self.runner.design_df
+        self._task._design_df = design_df
+        self._task._gam_groups = gam_groups
+        return design_df
+
+    @property
+    def design_df(self):
+        return getattr(self._task, "_design_df", None)
+
+    def get_gam_groups(self):
+        return getattr(self._task, "_gam_groups", None)
+
+    def get_cv_groups_for_design(self, design_df):
+        return self._task.get_cv_groups_for_design(design_df)
+
+    def get_gam_results_subdir(self):
+        return getattr(
+            self._model, "_gam_results_subdir",
+            getattr(self._task, "_gam_results_subdir", "gam_results"),
+        )
+
+
 class BaseEncodingGAMAnalysisHelper:
     """
-    Base helper for encoding GAM analyses (category contributions, penalty tuning, backward elimination).
+    Helper for encoding GAM analyses (category contributions, penalty tuning,
+    backward elimination).
 
-    Subclasses override _unit_context and _neuron_outdir for pipeline-specific behavior.
+    New interface  : BaseEncodingGAMAnalysisHelper(task, model)
+    Legacy interface: BaseEncodingGAMAnalysisHelper(runner)   # model=None
+
+    When both task and model are supplied all self.runner.* reads are
+    satisfied by a _TaskModelProxy that routes data attrs to task and
+    model/GAM attrs to model.
     """
 
-    def __init__(
-        self,
-        runner: Any,
-    ):
-        self.runner = runner
-        self.gam_results_subdir = runner.get_gam_results_subdir()
-        
+    def __init__(self, task: Any, model: Any = None):
+        self._task = task
+        self._model = model
 
-        
+        if model is None:
+            # Legacy: task IS the old monolithic runner
+            self.runner = task
+            self.gam_results_subdir = task.get_gam_results_subdir()
+        else:
+            self.runner = _TaskModelProxy(task, model)
+            self.gam_results_subdir = getattr(
+                model, "_gam_results_subdir",
+                getattr(task, "_gam_results_subdir", "gam_results"),
+            )
 
     def _resolve_lambda_config(
         self,
