@@ -205,13 +205,24 @@ class BaseDecodingTask:
         if self.processed_spike_rates is not None:
             return
         from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import (
-            smooth_neural_data as snd,
+            decoding_design_utils,
         )
-        if self.smooth_spikes and self.smoothing_width is not None:
-            raw = np.asarray(self._get_neural_matrix(), dtype=float)
-            self.processed_spike_rates = snd.smooth_signal(raw, self.smoothing_width)
-        else:
+        # Smooth/detrend full-session binned rates from spikes_df — not binned_spikes,
+        # which is only filled after collect_data builds event-aligned matrices.
+        pn = getattr(self, "pn", None)
+        spikes_df = getattr(pn, "spikes_df", None) if pn is not None else None
+        if spikes_df is None:
             self.processed_spike_rates = None
+            return
+        sw = self.smoothing_width if self.smoothing_width is not None else 10
+        self.processed_spike_rates = decoding_design_utils.get_processed_spike_rates(
+            spikes_df,
+            smooth_spikes=self.smooth_spikes,
+            detrend_spikes=self.detrend_spikes,
+            smoothing_width=int(sw),
+            drop_bad_neurons=self.drop_bad_neurons,
+            fs_bin_width=None,
+        )
 
     # ------------------------------------------------------------------
     # Misc helpers
@@ -259,8 +270,6 @@ class BaseDecodingTask:
             parts.append(self._spike_history_save_subdir())
         else:
             parts.append("no_spike_history")
-        parts.append(sub)
-
         parts.append(sub)
         self.save_dir = os.path.join(*parts)
         return self.save_dir

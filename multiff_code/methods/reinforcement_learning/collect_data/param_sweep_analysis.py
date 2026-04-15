@@ -73,7 +73,7 @@ def collect_sweep_results_df(
     n_steps=8000,
     retrieve_data_only=False,
     save_df=True,
-    load_saved_df=False,
+    load_saved_overall_df=False,
     save_filename='sweep_results.pkl',
     max_n_agents=None,
     verbose=False,
@@ -91,7 +91,7 @@ def collect_sweep_results_df(
         Passed to rl.collect_data().
     save_df : bool
         Whether to save the aggregated dataframe to disk.
-    load_saved_df : bool
+    load_saved_overall_df : bool
         If True, return the saved dataframe directly when available.
     save_filename : str
         Filename used for saving/loading the dataframe.
@@ -115,7 +115,7 @@ def collect_sweep_results_df(
         save_filename=save_filename,
     )
 
-    if load_saved_df:
+    if load_saved_overall_df:
         saved_df = _load_saved_sweep_results(save_path)
         if saved_df is not None:
             print(f'Loaded saved dataframe from: {save_path}')
@@ -179,7 +179,7 @@ def collect_plan_results_df(
     overall_folder_name='RL_models/sb3_stored_models/all_agents',
     num_datasets_to_collect=10,
     save_df=True,
-    load_saved_df=False,
+    load_saved_overall_df=False,
     save_filename='planfactor_results.pkl',
     max_n_agents=None,
     use_stored_data_only=False,
@@ -197,7 +197,7 @@ def collect_plan_results_df(
         Number of datasets to collect per agent.
     save_df : bool
         Whether to save the aggregated results.
-    load_saved_df : bool
+    load_saved_overall_df : bool
         If True, load saved results if available.
     save_filename : str
         Filename for saving/loading.
@@ -228,7 +228,7 @@ def collect_plan_results_df(
     save_path = os.path.join(overall_folder_name, save_filename)
 
     # ---------- Load ----------
-    if load_saved_df and os.path.exists(save_path):
+    if load_saved_overall_df and os.path.exists(save_path):
         print(f'Loaded saved dataframe from: {save_path}')
         saved = pd.read_pickle(save_path)
         return saved['median'], saved['perc']
@@ -304,7 +304,7 @@ def collect_pattern_frequencies_df(
     overall_folder_name='RL_models/sb3_stored_models/all_agents',
     retrieve_only=True,
     save_df=True,
-    load_saved_df=False,
+    load_saved_overall_df=False,
     save_filename='pattern_frequencies.pkl',
     max_n_agents=None,
     verbose=False,
@@ -320,7 +320,7 @@ def collect_pattern_frequencies_df(
         Passed to agent.make_df_related_to_patterns_and_features().
     save_df : bool
         Whether to save the aggregated dataframe.
-    load_saved_df : bool
+    load_saved_overall_df : bool
         If True, load saved dataframe if available.
     save_filename : str
         Filename for saving/loading.
@@ -344,7 +344,7 @@ def collect_pattern_frequencies_df(
     save_path = os.path.join(overall_folder_name, save_filename)
 
     # ---------- Load ----------
-    if load_saved_df and os.path.exists(save_path):
+    if load_saved_overall_df and os.path.exists(save_path):
         print(f'Loaded saved dataframe from: {save_path}')
         return pd.read_pickle(save_path)
 

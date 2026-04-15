@@ -8,7 +8,7 @@ trap 'echo "[ERROR] Failed at line $LINENO" >&2' ERR
 # --------------------------------------------------
 PROJECT_ROOT='/user_data/cicid/Multifirefly-Project'
 RL_AGENT_DIR="$PROJECT_ROOT/RL_models/sb3_stored_models/all_agents/agents_with_noise"
-
+MANIFEST_PATH="$RL_AGENT_DIR/agent_folder_manifest.json"
 
 JOB_DIR="$PROJECT_ROOT/multiff_analysis/jobs/agent_data"
 SLURM_SCRIPT="$JOB_DIR/slurm/agent_retry_job.slurm"
@@ -16,10 +16,11 @@ SCRIPT_DIR="$JOB_DIR/scripts"
 
 MANIFEST_SCRIPT="$SCRIPT_DIR/build_agent_manifest.py"
 BUILD_MANIFEST_ARGS="--overall-folder $RL_AGENT_DIR"
-MANIFEST_PATH="$RL_AGENT_DIR/agent_folder_manifest.json"
+
 
 LOG_DIR="$JOB_DIR/logs"
 mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR/agent_retry"
 
 # --------------------------------------------------
 # Usage
@@ -121,7 +122,7 @@ fi
 
 echo "[INFO] Total agents: $NUM_AGENTS (chunk size ≤ $ARRAY_MAX per sbatch)"
 echo "[INFO] Max concurrent jobs per array: $MAX_PARALLEL"
-echo "[INFO] Each task runs: python agent_retry_script.py for manifest index = SLURM_ARRAY_TASK_ID"
+echo "[INFO] Each task runs: python agent_retry_script.py for manifest index = SLURM_ARRAY_OFFSET + SLURM_ARRAY_TASK_ID"
 if (( NUM_AGENTS <= 50 )); then
   echo "[INFO] Agent indices: $(seq -s ', ' 0 $((NUM_AGENTS-1)))"
 else
@@ -134,17 +135,19 @@ fi
 offset=0
 while (( offset < NUM_AGENTS )); do
   remaining=$((NUM_AGENTS - offset))
+  declare chunk last
   if (( remaining > ARRAY_MAX )); then
     chunk=$ARRAY_MAX
   else
     chunk=$remaining
   fi
-  last=$((offset + chunk - 1))
+  # Array task IDs must stay within cluster MaxArraySize (often 0–999): use 0..chunk-1 + SLURM_ARRAY_OFFSET (see submit_sb3_cond.sh)
+  last=$((chunk - 1))
 
-  echo "[SUBMIT] sbatch --array=${offset}-${last}%${MAX_PARALLEL} ... \"$SLURM_SCRIPT\""
+  echo "[SUBMIT] sbatch --array=0-${last}%${MAX_PARALLEL} SLURM_ARRAY_OFFSET=${offset} ... \"$SLURM_SCRIPT\""
   sbatch \
-    --array="${offset}-${last}%${MAX_PARALLEL}" \
-    --export=ALL,MANIFEST_PATH="$MANIFEST_PATH" \
+    --array="0-${last}%${MAX_PARALLEL}" \
+    --export=ALL,MANIFEST_PATH="$MANIFEST_PATH",SLURM_ARRAY_OFFSET="$offset" \
     ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
     "$SLURM_SCRIPT"
 

@@ -56,7 +56,8 @@ def main():
             )
         
         print(f'[SCRIPT] Save directory: {save_dir}')
-        
+
+
         pfas.process_and_save(
             save_dir=save_dir,
             intermediate_products_exist_ok=True,
@@ -66,6 +67,16 @@ def main():
             use_stored_data_only=False
         )
 
-
+        # Force regeneration of ff_dataframe for this specific agent/data split(s)
+        collected_base = args.agent_path.replace('/all_agents/', '/all_collected_data/')
+        for i in range(args.num_datasets_to_collect):
+            data_name = f'data_{i}'
+            ff_dataframe_path = Path(collected_base) / 'processed_data' / data_name / 'ff_dataframe.csv'
+            if ff_dataframe_path.exists():
+                ff_dataframe_path.unlink()
+                print(f'[SCRIPT] Deleted existing ff_dataframe: {ff_dataframe_path}')
+        
+        
+        
 if __name__ == '__main__':
     main()

@@ -5,10 +5,13 @@ Extends neural_population.py with different grouping variables.
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+import sys
+from contextlib import contextmanager
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.dummy import DummyClassifier
 
-from neural_data_analysis.topic_based_neural_analysis.conditioned_responses import trajectory_clustering, plot_trajectories, neural_conditioned, neural_population, behavioral_decoding
+from neural_data_analysis.topic_based_neural_analysis.conditioned_responses import trajectory_clustering, neural_conditioned, neural_population
 
 
 # =========================
@@ -58,7 +61,7 @@ def make_quantile_labels(values_dict, seg_ids, n_bins=3):
 # (new — not in neural_population.py)
 # =========================
 # in behavioral_decoding.py, define locally
-def _safe_n_splits(y, n_splits=5):
+def _safe_n_splits(y, n_splits=5, verbose=True):
     min_count = np.bincount(y).min()
     if min_count < n_splits:
         if verbose:
@@ -67,9 +70,9 @@ def _safe_n_splits(y, n_splits=5):
     return n_splits
 
         
-def decode_at_entry(X_3d, y, t_bins, n_splits=5, method="svm"):
+def decode_at_entry(X_3d, y, t_bins, n_splits=5, method="svm", verbose=True):
     """Decode label from population vector at t=0 only."""
-    n_splits = _safe_n_splits(y, n_splits)
+    n_splits = _safe_n_splits(y, n_splits, verbose=verbose)
     entry_idx = np.argmin(np.abs(t_bins))
     X_entry = X_3d[:, :, entry_idx]
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=0)
@@ -145,7 +148,11 @@ def run_all(psth, trial_rates, seg_ids, labels_spatial, entry_by_seg,
     curvature_labels, _ = make_curvature_labels(entry_times, seg_ids, df, n_bins=n_bins)
 
     all_labels = {
-        "spatial bin": make_quantile_labels({s: int(l) for s, l in zip(seg_ids, labels_spatial)}, seg_ids, n_bins=n_bins),
+        "spatial bin": make_quantile_labels(
+            {s: int(label) for s, label in zip(seg_ids, labels_spatial)},
+            seg_ids,
+            n_bins=n_bins,
+        ),
         "duration":    duration_labels,
         "distance":    distance_labels,
         "curvature":   curvature_labels,
@@ -156,10 +163,13 @@ def run_all(psth, trial_rates, seg_ids, labels_spatial, entry_by_seg,
         if verbose:
             print(f"\n--- {var_name} ---")
         X_3d, y = neural_population.build_population_matrix(
-            trial_rates, seg_ids, lbl, neuron_ids, t_bins
+            trial_rates, seg_ids, lbl, neuron_ids, verbose=verbose
         )
         if verbose:
-            print(f"  trials per bin: { {l: int((y==l).sum()) for l in np.unique(y)} }")
+            print(
+                f"  trials per bin: "
+                f"{ {label: int((y == label).sum()) for label in np.unique(y)} }"
+            )
 
         acc_t, chance_t = neural_population.decode_per_timepoint(
             X_3d, y, n_splits=n_splits, method=method, verbose=verbose
@@ -184,10 +194,6 @@ def run_all(psth, trial_rates, seg_ids, labels_spatial, entry_by_seg,
     fig = plot_decoding_summary(results, t_bins)
     return fig, results
 
-import os
-import sys
-from contextlib import contextmanager
-
 @contextmanager
 def suppress_stdout():
     with open(os.devnull, 'w') as devnull:
@@ -199,7 +205,7 @@ def suppress_stdout():
             sys.stdout = old
 
 def run_session(pn, bin_size=50, std_thresh=0.004, range_thresh=0.01,
-                n_bins=20, pre=0.2, n_decode_bins=3, method="lda"):
+                n_bins=20, pre=0.2, n_decode_bins=3, method="lda", verbose=False):
     """Run full pipeline for one session. Returns (fig, results) or None if failed."""
 
     # trajectory clustering

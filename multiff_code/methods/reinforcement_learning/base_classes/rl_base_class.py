@@ -504,7 +504,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.ff_caught_T_new = self.ff_caught_T_sorted
                 if retrieve_ff_dataframe:
                     self.make_or_retrieve_ff_dataframe_for_agent(
-                        exists_ok=exists_ok, save_data=save_data)
+                        exists_ok=exists_ok, save_data=False)
             except Exception as e:
                 print(
                     "Failed to retrieve monkey data. Will make new monkey data. Error: ", e)

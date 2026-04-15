@@ -8,8 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
 from sklearn.dummy import DummyClassifier
 
-def build_population_matrix(trial_rates, seg_ids, labels, neuron_ids, t_bins):
-    T = len(t_bins)
+def build_population_matrix(trial_rates, seg_ids, labels, neuron_ids, verbose=True):
     N = len(neuron_ids)
     trial_list, label_list = [], []
     for seg_id, lbl in zip(seg_ids, labels):
@@ -22,7 +21,8 @@ def build_population_matrix(trial_rates, seg_ids, labels, neuron_ids, t_bins):
             trial_list.append(trial)
             label_list.append(lbl)
         else:
-            print(f"  Warning: seg {seg_id} missing neurons, skipping.")
+            if verbose:
+                print(f"  Warning: seg {seg_id} missing neurons, skipping.")
     if len(trial_list) == 0:
         raise ValueError("No valid trials found in build_population_matrix.")
     X_3d = np.array(trial_list)
@@ -53,16 +53,24 @@ def _effective_n_splits(y, requested_splits):
     return min(int(requested_splits), max_splits)
 
 
-def decode_per_timepoint(X_3d, y, n_splits=5, method="svm"):
+def decode_per_timepoint(X_3d, y, n_splits=5, method="svm", verbose=True):
     """
     Decode bin label from population snapshot at each timepoint.
     Returns acc (T,) and chance level.
     """
 
-    min_count = np.bincount(y).min()
-    if min_count < n_splits:
-        print(f"Warning: min bin count {min_count} < n_splits {n_splits}, reducing to {min_count}")
-        n_splits = min_count
+    effective_splits = _effective_n_splits(y, n_splits)
+    if effective_splits is None:
+        if verbose:
+            print("Warning: insufficient class balance for stratified CV; returning NaNs.")
+        T = X_3d.shape[2]
+        return np.full(T, np.nan), np.full(T, np.nan)
+    if effective_splits < n_splits and verbose:
+        print(
+            f"Warning: effective n_splits reduced from {n_splits} to {effective_splits} "
+            "based on class counts."
+        )
+    n_splits = effective_splits
 
     T = X_3d.shape[2]
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=0)
@@ -88,11 +96,18 @@ def decode_per_timepoint(X_3d, y, n_splits=5, method="svm"):
     return acc, chance
 
 
-def decode_full_trajectory(X_3d, y, n_splits=5, method="svm"):
-    min_count = np.bincount(y).min()
-    if min_count < n_splits:
-        print(f"Warning: min bin count {min_count} < n_splits {n_splits}, reducing to {min_count}")
-        n_splits = min_count
+def decode_full_trajectory(X_3d, y, n_splits=5, method="svm", verbose=True):
+    effective_splits = _effective_n_splits(y, n_splits)
+    if effective_splits is None:
+        if verbose:
+            print("Warning: insufficient class balance for stratified CV; returning NaNs.")
+        return np.nan, np.nan
+    if effective_splits < n_splits and verbose:
+        print(
+            f"Warning: effective n_splits reduced from {n_splits} to {effective_splits} "
+            "based on class counts."
+        )
+    n_splits = effective_splits
 
     n_trials, N, T = X_3d.shape
     X_flat = X_3d.reshape(n_trials, N * T)
@@ -133,21 +148,28 @@ def pca_population_trajectories(X_3d, y, t_bins, n_components=3):
 
 
 def plot_population_analysis(psth, trial_rates, seg_ids, labels, t_bins,
-                              n_splits=5, method="svm"):
+                              n_splits=5, method="svm", verbose=True):
     neuron_ids = sorted(set(k[1] for k in psth))
     unique_labels_arr = sorted(np.unique(labels))
     cmap = plt.cm.viridis(np.linspace(0, 1, len(unique_labels_arr)))
 
-    X_3d, y = build_population_matrix(trial_rates, seg_ids, labels, neuron_ids, t_bins)
+    X_3d, y = build_population_matrix(
+        trial_rates, seg_ids, labels, neuron_ids, verbose=verbose
+    )
     if X_3d.size == 0 or y.size == 0:
         raise ValueError("No complete trials available for population analysis.")
 
-    print(f"Population matrix: {X_3d.shape} (trials x neurons x time)")
-    print(f"Trials per bin: { {label: int((y == label).sum()) for label in unique_labels_arr} }")
+    if verbose:
+        print(f"Population matrix: {X_3d.shape} (trials x neurons x time)")
+        print(f"Trials per bin: { {label: int((y == label).sum()) for label in unique_labels_arr} }")
 
     # compute all analyses
-    acc_t, chance_t = decode_per_timepoint(X_3d, y, n_splits=n_splits, method=method)
-    acc_full, chance_full = decode_full_trajectory(X_3d, y, n_splits=n_splits, method=method)
+    acc_t, chance_t = decode_per_timepoint(
+        X_3d, y, n_splits=n_splits, method=method, verbose=verbose
+    )
+    acc_full, chance_full = decode_full_trajectory(
+        X_3d, y, n_splits=n_splits, method=method, verbose=verbose
+    )
     X_proj, var_ratio = pca_population_trajectories(X_3d, y, t_bins)
 
     fig = plt.figure(figsize=(14, 12))
@@ -155,7 +177,8 @@ def plot_population_analysis(psth, trial_rates, seg_ids, labels, t_bins,
 
     # --- top left: per-timepoint decoding ---
     ax0 = fig.add_subplot(gs[0, 0])
-    print('acc_t', acc_t)
+    if verbose:
+        print("acc_t", acc_t)
     ax0.plot(t_bins, acc_t, color="steelblue", lw=2, label="per-timepoint")
     ax0.fill_between(t_bins, chance_t, acc_t,
                      where=acc_t > chance_t, alpha=0.15, color="steelblue")

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=agent_retry
-#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_data/logs/agent_retry_%A_%a.out
-#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_data/logs/agent_retry_%A_%a.err
+#SBATCH --output=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_data/logs/agent_retry/agent_retry_%A_%a.out
+#SBATCH --error=/user_data/cicid/Multifirefly-Project/multiff_analysis/jobs/agent_data/logs/agent_retry/agent_retry_%A_%a.err
 #SBATCH --partition=cpu,xaqq
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=30G
@@ -52,20 +52,24 @@ set -u
 # --------------------------------------------------
 # Determine agent folder from manifest
 # --------------------------------------------------
+# SLURM_ARRAY_OFFSET is set by submit_agent_retry.sh when chunking (keeps array IDs within MaxArraySize).
+SLURM_ARRAY_OFFSET="${SLURM_ARRAY_OFFSET:-0}"
+AGENT_INDEX=$((SLURM_ARRAY_OFFSET + SLURM_ARRAY_TASK_ID))
+
 # Use MANIFEST_PATH from environment if provided, otherwise use default
 MANIFEST_PATH="${MANIFEST_PATH:-$PROJECT_ROOT/RL_models/sb3_stored_models/all_agents/agent_folder_manifest.json}"
-AGENT_FOLDER=$(python -c "import json; manifest = json.load(open('$MANIFEST_PATH')); print(manifest[$SLURM_ARRAY_TASK_ID] if $SLURM_ARRAY_TASK_ID < len(manifest) else 'INDEX_OUT_OF_RANGE')")
+AGENT_FOLDER=$(python -c "import json; manifest = json.load(open('$MANIFEST_PATH')); print(manifest[$AGENT_INDEX] if $AGENT_INDEX < len(manifest) else 'INDEX_OUT_OF_RANGE')")
 
 if [[ "$AGENT_FOLDER" == "INDEX_OUT_OF_RANGE" ]]; then
-  echo "[SLURM][ERROR] SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID is out of range for manifest: $MANIFEST_PATH" >&2
+  echo "[SLURM][ERROR] AGENT_INDEX=$AGENT_INDEX (task=$SLURM_ARRAY_TASK_ID offset=$SLURM_ARRAY_OFFSET) is out of range for manifest: $MANIFEST_PATH" >&2
   exit 1
 fi
 
 echo '[SLURM] Running Agent Retry Job'
 echo "[SLURM] Host: $(hostname)"
 echo "[SLURM] Job ID: $SLURM_JOB_ID"
-echo "[SLURM] Array task ID: $SLURM_ARRAY_TASK_ID"
-echo "[SLURM] Agent index: $SLURM_ARRAY_TASK_ID"
+echo "[SLURM] Array task ID: $SLURM_ARRAY_TASK_ID (offset $SLURM_ARRAY_OFFSET)"
+echo "[SLURM] Agent index: $AGENT_INDEX"
 echo "[SLURM] Manifest path: $MANIFEST_PATH"
 echo "[SLURM] Agent path: $AGENT_FOLDER"
 echo "[SLURM] Start time: $(date)"

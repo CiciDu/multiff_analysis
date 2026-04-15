@@ -789,8 +789,8 @@ def fit_poisson_gam(
         grad_norm=grad_norm,
     )
 
-    # print message
-    print(f'fit_result.message: {fit_result.message}')
+    # # print message
+    # print(f'fit_result.message: {fit_result.message}')
 
     # ------------------------------------------------------------------
     # 6) Save results

@@ -52,7 +52,18 @@ def _add_target_df_info(target_df, monkey_information, ff_real_position_sorted, 
 
 
 def add_capture_target(target_df, ff_caught_T_new):
-    target_capture_point = np.searchsorted(target_df['time'], ff_caught_T_new)
+    # Per-sample monkey data uses 'time'; rebinned PN segments use 't_center' (see
+    # planning_and_neural/pn_aligned_by_event.rebin_data_in_new_segments).
+    if 'time' in target_df.columns:
+        t_series = target_df['time']
+    elif 't_center' in target_df.columns:
+        t_series = target_df['t_center']
+    else:
+        raise KeyError(
+            "add_capture_target needs a time axis column 'time' or 't_center'; "
+            f"columns are {list(target_df.columns)}"
+        )
+    target_capture_point = np.searchsorted(t_series, ff_caught_T_new)
     target_df.reset_index(drop=True, inplace=True)
     target_df['capture'] = 0
     # make sure target_capture_point is not out of bounds

@@ -202,6 +202,12 @@ class FurtherProcessing(base_processing_class.BaseProcessing):
             df_name='scatter_around_target_df', exists_ok=exists_ok, data_folder_name_for_retrieval=self.patterns_and_features_folder_path)
 
         if self.scatter_around_target_df is None and not retrieve_only:
+            # Earlier steps may load only cached CSVs and skip retrieve_or_make_monkey_data
+            # (e.g. SB3 agents); ensure trajectory + stop data exist before scatter stats.
+            if (getattr(self, 'monkey_information', None) is None
+                    or getattr(self, 'closest_stop_to_capture_df', None) is None
+                    or getattr(self, 'ff_real_position_sorted', None) is None):
+                self.retrieve_or_make_monkey_data(already_made_ok=True)
             self.scatter_around_target_df = monkey_landing_in_ff.make_scatter_around_target_df(self.monkey_information,
                                                                                                self.closest_stop_to_capture_df,
                                                                                                self.ff_real_position_sorted,

@@ -24,6 +24,7 @@ RunnerT = TypeVar("RunnerT")
 def run_encoding_main(
     task_class: Type[RunnerT],
     *,
+    model_class = encoding_models.PGAMModel,
     cv_mode: str = "blocked_time_buffered",
 ) -> Dict[str, Any]:
     """
@@ -72,7 +73,7 @@ def run_encoding_main(
                 bin_width=args.bin_width,
             )
             
-            model = encoding_models.RNNModel(cv_mode=cv_mode)
+            model = model_class(cv_mode=cv_mode)
             # model = encoding_models.PGAMModel(cv_mode=cv_mode)
             runner = encoding_runner.EncodingRunner(task, model)
 

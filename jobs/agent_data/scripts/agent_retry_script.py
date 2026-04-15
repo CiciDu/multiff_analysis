@@ -33,6 +33,17 @@ def main():
     try:
         agent.make_df_related_to_patterns_and_features(retrieve_only=False)
         agent.pattern_frequencies, _ = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(agent.pattern_frequencies, args.agent_path)
+        
+        # Force regeneration of ff_dataframe for this specific agent/data split(s)
+        collected_base = args.agent_path.replace('/all_agents/', '/all_collected_data/')
+        for i in range(args.num_datasets_to_collect):
+            data_name = f'data_{i}'
+            ff_dataframe_path = Path(collected_base) / 'processed_data' / data_name / 'ff_dataframe.csv'
+            if ff_dataframe_path.exists():
+                ff_dataframe_path.unlink()
+                print(f'[SCRIPT] Deleted existing ff_dataframe: {ff_dataframe_path}')
+        
+        
     except Exception as e:
         print(f'Error making df related to patterns and features for {args.agent_path}: {e}')
         raise

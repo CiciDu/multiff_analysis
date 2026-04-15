@@ -11,10 +11,6 @@ from statsmodels.stats.multitest import multipletests
 
 
 from data_wrangling import combine_info_utils
-from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
-    decoding_models,
-    decoding_runner,
-)
 from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding import cv_decoding
 
 
@@ -78,6 +74,11 @@ def collect_all_session_decoding_results(
     all_session_results_df : pd.DataFrame
         Concatenated decoding results across all sessions.
     """
+    # Local import avoids circular import: decoding_models -> plot_decoding_utils -> this module.
+    from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_pipelines import (
+        decoding_models,
+        decoding_runner,
+    )
 
     sessions_df_for_one_monkey = combine_info_utils.make_sessions_df_for_one_monkey(
         raw_data_dir_name,

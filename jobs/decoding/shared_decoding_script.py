@@ -14,7 +14,9 @@ TaskT = TypeVar("TaskT")
 def run_decoding_main(
     task_class: Type[TaskT],
     *,
+    model_class = decoding_models.CVDecodingModel,
     cv_mode: str = "group_kfold",
+    use_spike_history: bool = False,
     run_kwargs: Optional[dict[str, Any]] = None,
     task_kwargs: Optional[dict[str, Any]] = None,
     model_kwargs: Optional[dict[str, Any]] = None,
@@ -43,7 +45,7 @@ def run_decoding_main(
 
     args = parser.parse_args()
 
-    for smoothing_width in [None, 10, 20, 40]:
+    for smoothing_width in [None, 10, 40]:
         print(f"Running with smoothing_width={smoothing_width}")
     
         task_kwargs = task_kwargs or {}
@@ -53,10 +55,10 @@ def run_decoding_main(
             raw_data_folder_path=args.raw_data_folder_path,
             bin_width=args.bin_width,
             smoothing_width=smoothing_width,
-            use_spike_history=True,
+            use_spike_history=use_spike_history,
             **task_kwargs,
             ),
-            decoding_models.CVDecodingModel(
+            model_class(
                 cv_mode=cv_mode,
                 **model_kwargs,
             ),
@@ -78,10 +80,10 @@ def run_decoding_main(
             shuffle_mode='none',
         )
         
-        results_df_shuffled = runner.run(
-            **common_run,
-            shuffle_mode='timeshift_fold',
-        )
+        # results_df_shuffled = runner.run(
+        #     **common_run,
+        #     shuffle_mode='timeshift_fold',
+        # )
 
         # also get ANOVA results
         # anova = runner.run_anova_all_neurons(alpha=0.05)
