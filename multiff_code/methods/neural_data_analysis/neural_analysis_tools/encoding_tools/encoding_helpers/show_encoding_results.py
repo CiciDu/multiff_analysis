@@ -101,6 +101,51 @@ def collect_category_ecdf_from_sessions(
     elif save_path is not None:
         save_path = Path(save_path)
 
+    def _augment_unassigned_vars_if_present(session_results_list):
+        """
+        Backfill `unassigned_vars` from saved category_contributions CSV files.
+
+        This keeps older cached `category_ecdf_*.pkl` files compatible after
+        adding `unassigned_vars` support, without forcing a full recompute.
+        """
+        import csv
+
+        for _, all_results in session_results_list:
+            for res in all_results:
+                cc = res.setdefault('category_contributions', {})
+                if 'unassigned_vars' in cc:
+                    continue
+
+                contrib_csv = res.get('category_contributions_csv', None)
+                if contrib_csv is None or not Path(contrib_csv).exists():
+                    continue
+
+                try:
+                    with open(contrib_csv, 'r', newline='') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            category_name = row.get('category', None)
+                            if category_name != 'unassigned_vars':
+                                continue
+                            parsed_row = {}
+                            for key, value in row.items():
+                                if key == 'category' or value in (None, '', 'nan', 'NaN'):
+                                    continue
+                                if key == 'vars':
+                                    parsed_row[key] = value
+                                    continue
+                                try:
+                                    parsed_row[key] = float(value)
+                                except (TypeError, ValueError):
+                                    parsed_row[key] = value
+                            if parsed_row:
+                                cc['unassigned_vars'] = parsed_row
+                            break
+                except Exception:
+                    continue
+
+        return session_results_list
+
     def _filter_empty_categories(session_results_list):
         """Remove category_contributions with no valid data so empty subplots are not created."""
         default_metric = 'delta_pseudo_r2_clip_leave'
@@ -131,6 +176,7 @@ def collect_category_ecdf_from_sessions(
         with open(save_path, 'rb') as f:
             session_results_list = pickle.load(f)
         print(f'[collect_category_ecdf] Loaded from {save_path}')
+        session_results_list = _augment_unassigned_vars_if_present(session_results_list)
         return _filter_empty_categories(session_results_list)
 
     session_results_list = []
@@ -162,6 +208,7 @@ def collect_category_ecdf_from_sessions(
                 print(f'[ERROR] Failed for {raw_data_folder_path}: {e}')
                 continue
 
+    session_results_list = _augment_unassigned_vars_if_present(session_results_list)
     session_results_list = _filter_empty_categories(session_results_list)
 
     if session_results_list:

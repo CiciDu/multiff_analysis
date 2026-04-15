@@ -726,7 +726,7 @@ def plot_3d_interaction(df, var1='lam_f', var2='lam_g', var3='lam_h'):
 def analyze_penalty_tuning(tune_res):
     
     cv_results = tune_res['cv_results']
-    lam_vars = tune_res['best_lams'].keys()
+    lam_vars = list(tune_res['best_lams'].keys())
 
     df = build_penalty_dataframe(cv_results, lam_vars)
     df_sorted = rank_penalties(df)
@@ -757,7 +757,7 @@ def plot_penalty_tuning_for_one_var(runner, var_name):
             load_if_exists=True,
         )
         cv_results = tune_res['cv_results']
-        lam_vars = tune_res['best_lams'].keys()
+        lam_vars = list(tune_res['best_lams'].keys())
 
         df = build_penalty_dataframe(cv_results, lam_vars)
         df_sorted = rank_penalties(df)
