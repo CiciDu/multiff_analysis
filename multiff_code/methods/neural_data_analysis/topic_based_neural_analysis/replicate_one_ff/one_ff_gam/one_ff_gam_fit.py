@@ -9,6 +9,10 @@ from scipy import sparse
 from scipy.optimize import minimize
 from scipy.special import gammaln
 
+from neural_data_analysis.neural_analysis_tools.decoding_tools.general_decoding.cv_decoding import (
+    _build_folds,
+)
+
 
 @dataclass
 class GroupSpec:
@@ -359,26 +363,25 @@ def cross_validated_ll(
     groups,
     n_folds=10,
     random_state=0,
+    cv_mode='blocked_time_buffered',
+    buffer_samples=20,
 ):
     """
     Returns:
-        ll_per_fold : (n_folds,) array of log-likelihoods (nats/spike)
+        ll_per_fold : (n_folds,) array of model NLL (nats/spike), lower = better
     """
-    rng = np.random.default_rng(random_state)
-    T = len(y)
-    indices = np.arange(T)
-    rng.shuffle(indices)
-
-    folds = np.array_split(indices, n_folds)
+    folds = _build_folds(
+        len(y),
+        n_splits=n_folds,
+        cv_splitter=cv_mode,
+        random_state=random_state,
+        buffer_samples=buffer_samples,
+    )
     ll_folds = []
 
-    for k in range(n_folds):
-        test_idx = folds[k]
-        train_idx = np.setdiff1d(indices, test_idx)
-
+    for train_idx, test_idx in folds:
         X_train = design_df.iloc[train_idx]
         y_train = y[train_idx]
-
         X_test = design_df.iloc[test_idx]
         y_test = y[test_idx]
 
@@ -389,12 +392,60 @@ def cross_validated_ll(
             verbose=False,
         )
 
-        ll_test, _, _ = compute_likelihoods(
-            X_test, fit.coef, y_test
-        )
+        ll_test, _, _ = compute_likelihoods(X_test, fit.coef, y_test)
         ll_folds.append(ll_test)
 
     return np.array(ll_folds)
+
+
+def cross_validated_ll_and_null(
+    design_df,
+    y,
+    groups,
+    n_folds=10,
+    random_state=0,
+    cv_mode='blocked_time_buffered',
+    buffer_samples=20,
+):
+    """
+    Like cross_validated_ll, but also returns the mean-rate (null) NLL per fold.
+
+    The null NLL on each test fold uses the test-fold mean rate, matching
+    neuroGAM's FitModel: meanFR_test = nanmean(test_spikes).
+
+    Returns
+    -------
+    ll_model_per_fold : (n_folds,) array — model NLL (nats/spike), lower = better
+    ll_null_per_fold  : (n_folds,) array — mean-rate NLL (nats/spike), lower = better
+    """
+    folds = _build_folds(
+        len(y),
+        n_splits=n_folds,
+        cv_splitter=cv_mode,
+        random_state=random_state,
+        buffer_samples=buffer_samples,
+    )
+    ll_model_folds = []
+    ll_null_folds = []
+
+    for train_idx, test_idx in folds:
+        X_train = design_df.iloc[train_idx]
+        y_train = y[train_idx]
+        X_test = design_df.iloc[test_idx]
+        y_test = y[test_idx]
+
+        fit = fit_poisson_gam(
+            design_df=X_train,
+            y=y_train,
+            groups=groups,
+            verbose=False,
+        )
+
+        ll_model, ll_mean, _ = compute_likelihoods(X_test, fit.coef, y_test)
+        ll_model_folds.append(ll_model)
+        ll_null_folds.append(ll_mean)
+
+    return np.array(ll_model_folds), np.array(ll_null_folds)
 
 
 def _format_lambda(lam):

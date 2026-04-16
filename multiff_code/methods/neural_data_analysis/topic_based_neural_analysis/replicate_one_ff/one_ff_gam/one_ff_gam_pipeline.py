@@ -555,11 +555,15 @@ class OneFFGAMRunner:
         lambda_config: Optional[Dict[str, float]] = None,
         alpha: float = 0.05,
         n_folds: int = 10,
+        cv_mode: str = 'blocked_time_buffered',
+        buffer_samples: int = 20,
     ) -> Dict:
         """
         Run backward elimination for one unit.
         """
         # Fast path: load saved elimination results without preparing design.
+        # Only accept results that are marked completed — partial or stale
+        # results (e.g. from the old t-test algorithm) are recomputed.
         outdir = self._unit_outdir(unit_idx)
         (outdir / "backward_elimination").mkdir(parents=True, exist_ok=True)
         lambda_for_path = lambda_config or DEFAULT_LAMBDA_CONFIG
@@ -569,29 +573,30 @@ class OneFFGAMRunner:
         save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
         if save_path.exists():
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
-            kept = [
-                one_ff_gam_fit.GroupSpec(
-                    name=g["name"],
-                    cols=g["cols"],
-                    vartype=g["vartype"],
-                    lam=g["lam"],
-                )
-                for g in loaded.get("kept_groups", [])
-            ]
-            history = loaded.get("history", [])
-            history_csv = None
-            if history:
-                history_csv = outdir / "history.csv"
-                pd.DataFrame(history).to_csv(history_csv, index=False)
-            self.outdir = outdir
-            self.lam_suffix = lam_suffix
-            return {
-                "kept_groups": kept,
-                "history": history,
-                "history_csv": history_csv,
-                "save_path": save_path,
-                "outdir": outdir,
-            }
+            if loaded.get("completed", False):
+                kept = [
+                    one_ff_gam_fit.GroupSpec(
+                        name=g["name"],
+                        cols=g["cols"],
+                        vartype=g["vartype"],
+                        lam=g["lam"],
+                    )
+                    for g in loaded.get("kept_groups", [])
+                ]
+                history = loaded.get("history", [])
+                history_csv = None
+                if history:
+                    history_csv = outdir / "history.csv"
+                    pd.DataFrame(history).to_csv(history_csv, index=False)
+                self.outdir = outdir
+                self.lam_suffix = lam_suffix
+                return {
+                    "kept_groups": kept,
+                    "history": history,
+                    "history_csv": history_csv,
+                    "save_path": save_path,
+                    "outdir": outdir,
+                }
 
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
         outdir, lam_suffix = self._unit_context(
@@ -608,8 +613,11 @@ class OneFFGAMRunner:
             groups=self.gam_groups,
             alpha=alpha,
             n_folds=n_folds,
+            cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
             verbose=True,
             save_path=str(save_path),
+            load_if_exists=False,
             save_metadata={"structured_meta_groups": self.structured_meta_groups},
         )
 

@@ -25,8 +25,8 @@ def run_decoding_main(
     Common main logic for decoding scripts.
 
     Args:
-        task_class: The decoding task class (e.g. StopDecodingTask,
-            PNDecodingTask, VisDecodingTask).
+        task_class: The decoding task class (e.g. StopTask,
+            PNTask, VisTask).
         run_kwargs: Optional extra kwargs passed to runner.run() (e.g.
             cv_decoding_verbosity=2).
 

@@ -3,20 +3,20 @@ DecodingRunner — lightweight orchestrator (Task × Model).
 
 Usage
 -----
-    from decoding_tasks import StopDecodingTask, PNDecodingTask
+    from decoding_tasks import StopTask, PNTask
     from decoding_models import OneFFStyleModel, CVDecodingModel
     from decoding_runner import DecodingRunner
 
     # One-FF-style population decoding
-    runner = DecodingRunner(StopDecodingTask(path), OneFFStyleModel())
+    runner = DecodingRunner(StopTask(path), OneFFStyleModel())
     runner.run()
 
     # CV model-spec decoding
-    runner = DecodingRunner(StopDecodingTask(path), CVDecodingModel())
+    runner = DecodingRunner(StopTask(path), CVDecodingModel())
     runner.run()
 
     # Swap task, keep model
-    runner2 = DecodingRunner(PNDecodingTask(path), OneFFStyleModel())
+    runner2 = DecodingRunner(PNTask(path), OneFFStyleModel())
     runner2.run()
 """
 

@@ -27,7 +27,7 @@ class MultiFFParams:
     Notes
     -----
     - `bin_width` should match the binning used when assembling the stop design
-      (e.g. `bin_width` passed to `encoding_tasks.StopTask` and
+      (e.g. `bin_width` passed to `encoding_tasks.StopEncodingTask` and
       `build_stop_encoding_design`).
     - `binrange` is passed as `binrange_dict` to `build_tuning_design_for_continuous_vars`
       so that tuning boxcars for v/w/d/phi/... match one_ff.

@@ -1,17 +1,18 @@
 import pickle
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from scipy import sparse
-from scipy.optimize import minimize
-from scipy.special import gammaln
-from scipy.stats import ttest_1samp
+from scipy.stats import wilcoxon
 
-
-from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import GroupSpec, cross_validated_ll, _extract_lambda_config, _format_lambda
+from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam.one_ff_gam_fit import (
+    GroupSpec,
+    cross_validated_ll,
+    cross_validated_ll_and_null,
+    _extract_lambda_config,
+    _format_lambda,
+)
 
 
 def backward_elimination_gam(
@@ -21,71 +22,41 @@ def backward_elimination_gam(
     *,
     alpha=0.05,
     n_folds=10,
+    cv_mode='blocked_time_buffered',
+    buffer_samples=20,
     verbose=True,
     save_path: Optional[str] = None,
     load_if_exists: bool = True,
     save_metadata: Optional[Dict] = None,
 ):
     """
-    Paper-faithful backward elimination for one neuron with incremental saving.
+    Backward elimination for one neuron, matching neuroGAM's algorithm.
 
     Parameters
     ----------
     design_df : pd.DataFrame
-        Design matrix
     y : np.ndarray
-        Response variable
     groups : List[GroupSpec]
-        Initial group specifications with penalty (lambda) values
-    alpha : float, optional
-        Significance level for retention, by default 0.05
-    n_folds : int, optional
-        Number of CV folds, by default 10
-    verbose : bool, optional
-        Print progress information, by default True
-    save_path : Optional[str], optional
-        Path to save elimination results. If provided, results are saved after
-        each step, by default None
-    load_if_exists : bool, optional
-        If True and save_path exists, load and resume from saved state. 
-        Lambda values are validated against saved configuration - if they don't
-        match, cached results are ignored, by default True
-    save_metadata : Optional[Dict], optional
-        Additional metadata to save with results, by default None
+    alpha : float
+        Significance level (default 0.05).
+    n_folds : int
+        Number of CV folds (default 10).
+    cv_mode : str
+        CV strategy passed to _build_folds. Must match the mode used for all
+        other CV in the pipeline so fold splits are consistent.
+        Options: 'blocked_time_buffered' (default), 'blocked_time',
+        'group_kfold', 'kfold'.
+    buffer_samples : int
+        Buffer size for 'blocked_time_buffered' mode (default 20).
+    verbose : bool
+    save_path : str, optional
+    load_if_exists : bool
+    save_metadata : dict, optional
 
     Returns
     -------
     kept_groups : list of GroupSpec
-        Variables retained in the final model.
     history : list of dict
-        Elimination steps and statistics.
-        
-    Notes
-    -----
-    Lambda (penalty) values from the input groups are saved with the results.
-    When loading cached results, the function validates that lambda values match.
-    This ensures that elimination results are only reused when penalty settings
-    are identical.
-    
-    For convenience, use `generate_lambda_suffix(groups)` to create descriptive
-    filenames that include lambda configuration, e.g.:
-        suffix = generate_lambda_suffix(groups)
-        save_path = f'results/elimination_{suffix}.pkl'
-    
-    Examples
-    --------
-    >>> # Basic usage
-    >>> kept, history = backward_elimination_gam(
-    ...     design_df, y, groups,
-    ...     save_path='results/elim.pkl'
-    ... )
-    
-    >>> # With lambda-based filename
-    >>> suffix = generate_lambda_suffix(groups)
-    >>> kept, history = backward_elimination_gam(
-    ...     design_df, y, groups,
-    ...     save_path=f'results/elim_{suffix}.pkl'
-    ... )
     """
     import time
     start_time = time.time()
@@ -97,7 +68,6 @@ def backward_elimination_gam(
     if save_path is not None and load_if_exists:
         saved_data = _load_elimination_results(save_path, initial_groups)
         if saved_data is not None and saved_data.get('completed', False):
-            # Reconstruct GroupSpec objects
             kept = [
                 GroupSpec(
                     name=g['name'],
@@ -120,11 +90,16 @@ def backward_elimination_gam(
         save_path_obj = Path(save_path)
         save_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
-    # Compute baseline CV LL for full model
-    ll_full = cross_validated_ll(
-        design_df, y, kept, n_folds=n_folds
+    # Compute baseline CV NLL for the full model and the mean-rate null on
+    # the same folds in one pass.  cross_validated_ll_and_null returns:
+    #   ll_full : model NLL per fold (nats/spike), lower = better
+    #   ll_null : mean-rate NLL per fold (nats/spike), using train-fold mean,
+    #             matching neuroGAM's log_llh_test_mean computation in FitModel.
+    ll_full, ll_null = cross_validated_ll_and_null(
+        design_df, y, kept, n_folds=n_folds,
+        cv_mode=cv_mode, buffer_samples=buffer_samples,
     )
-    
+
     if verbose:
         _print_elimination_header(initial_groups, n_folds, alpha, ll_full.mean())
 
@@ -134,27 +109,36 @@ def backward_elimination_gam(
         step += 1
         improved = False
         candidates = []
-        
+
         if verbose:
             _print_elimination_step_header(step, len(kept))
-        
-        # Timing for candidate evaluation
+
         candidate_times = []
 
         for i, g in enumerate(kept, start=1):
             cand_start = time.time()
-            
-            reduced = [gg for gg in kept if gg.name != g.name]
 
+            reduced = [gg for gg in kept if gg.name != g.name]
             ll_reduced = cross_validated_ll(
-                design_df, y, reduced, n_folds=n_folds
+                design_df, y, reduced, n_folds=n_folds,
+                cv_mode=cv_mode, buffer_samples=buffer_samples,
             )
 
-            delta = ll_reduced - ll_full  # per fold
-            mean_delta = delta.mean()
+            # mean_delta > 0 means reduced model is WORSE (higher NLL).
+            # We want the candidate whose removal hurts least → smallest mean_delta.
+            mean_delta = (ll_reduced - ll_full).mean()
 
-            # Paired test: is removal NOT harmful?
-            t_stat, p_val = ttest_1samp(delta, 0.0)
+            # Wilcoxon signed-rank, left-tailed:
+            # H0: ll_reduced >= ll_full  (reduced is not worse)
+            # p < alpha  → reduced is significantly worse → keep variable
+            # p >= alpha → reduced is NOT significantly worse → can remove
+            # Matches neuroGAM: signrank(LLvals(:,candidate), LLvals(:,bestmodel), 'tail','left')
+            # Note: neuroGAM's LL is higher-is-better; ours is lower-is-better (NLL).
+            # Swapping argument order achieves the same directional test.
+            try:
+                _, p_val = wilcoxon(ll_full, ll_reduced, alternative='less')
+            except ValueError:
+                p_val = 1.0
 
             candidates.append({
                 'group': g,
@@ -162,7 +146,7 @@ def backward_elimination_gam(
                 'p_value': p_val,
                 'll_reduced': ll_reduced,
             })
-            
+
             cand_time = time.time() - cand_start
             candidate_times.append(cand_time)
 
@@ -172,14 +156,15 @@ def backward_elimination_gam(
                     i, len(kept), g.name, mean_delta, p_val, cand_time, avg_time
                 )
 
-        # Choose the variable whose removal hurts least
-        candidates.sort(key=lambda x: x['mean_delta'], reverse=True)
+        # Pick the candidate whose removal hurts least = smallest NLL increase.
+        # Matches neuroGAM: bestcandidate = argmax(nanmean(LLvals)) among candidates,
+        # which in NLL terms is argmin(mean NLL after removal).
+        candidates.sort(key=lambda x: x['mean_delta'])
         best = candidates[0]
 
-        # Decision rule:
-        # If removal does NOT significantly decrease LL → remove it
-        will_remove = best['p_value'] > alpha and best['mean_delta'] >= 0
-        
+        # Remove if the reduced model is NOT significantly worse (p >= alpha).
+        will_remove = best['p_value'] >= alpha
+
         if will_remove:
             removed_group = best['group']
             kept = [g for g in kept if g.name != removed_group.name]
@@ -192,20 +177,44 @@ def backward_elimination_gam(
                 'delta_ll': best['mean_delta'],
                 'p_value': best['p_value'],
             })
-        
+
         if verbose:
             kept_names = [g.name for g in kept]
             _print_elimination_decision(best, will_remove, kept_names)
-        
-        # Save incrementally after each step
+
         if save_path_obj is not None:
             _save_elimination_state(
-                save_path_obj, kept, history, 
-                completed=not improved,  # Mark complete if we're stopping
+                save_path_obj, kept, history,
+                completed=not improved,
                 current_step=step,
                 save_metadata=save_metadata,
-                initial_groups=initial_groups
+                initial_groups=initial_groups,
             )
+
+    # Null-model check (matches neuroGAM):
+    # Test whether the best model's NLL is significantly lower than the null
+    # (mean-rate) NLL.  In NLL terms: ll_null > ll_full (null is worse).
+    # Wilcoxon right-tailed on (ll_null - ll_full):
+    # H0: ll_null <= ll_full  (model no better than null)
+    # Matches neuroGAM: signrank(LLvals(:,bestmodel), 0, 'tail','right') > alpha
+    # where LLvals = LL increase over null, so > 0 ↔ model NLL < null NLL.
+    null_rejected = False
+    if kept:
+        improvement = ll_null - ll_full  # positive when model beats null
+        try:
+            _, p_null = wilcoxon(improvement, alternative='greater')
+            null_rejected = p_null < alpha
+        except ValueError:
+            null_rejected = False
+
+        if not null_rejected:
+            if verbose:
+                print('\n' + '─' * 80)
+                print('NULL CHECK: best model not significantly better than mean-rate null '
+                      f'(p={p_null:.4f} >= α={alpha})')
+                print('→ Setting kept = [] (no variable survives)')
+                print('─' * 80)
+            kept = []
 
     # Print final summary
     total_time = time.time() - start_time
@@ -296,7 +305,7 @@ def _save_elimination_state(save_path_obj, kept, history, completed, current_ste
         'history': history,
         'completed': completed,
         'current_step': current_step,
-        'lambda_config': lambda_config,  # Save lambda values for validation
+        'lambda_config': lambda_config,
     }
     
     if save_metadata is not None:

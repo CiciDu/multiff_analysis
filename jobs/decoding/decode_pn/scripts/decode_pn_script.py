@@ -20,7 +20,7 @@ from jobs.decoding.shared_decoding_script import run_decoding_main
 
 def main():
     return run_decoding_main(
-        decoding_tasks.PNDecodingTask,
+        decoding_tasks.PNTask,
         run_kwargs={'cv_decoding_verbosity': 1},
     )
 

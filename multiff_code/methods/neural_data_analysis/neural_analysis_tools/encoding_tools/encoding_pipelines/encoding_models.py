@@ -15,10 +15,10 @@ Both share the interface:
 
 Usage
 -----
-    from encoding_tasks import PNTask
+    from encoding_tasks import PNEncodingTask
     from encoding_models import PGAMModel, RNNModel
 
-    task = PNTask(raw_data_folder_path)
+    task = PNEncodingTask(raw_data_folder_path)
     runner = EncodingRunner(task, PGAMModel())
     runner.crossval(unit_idx=0)
 
@@ -490,6 +490,7 @@ class PGAMModel(BaseEncodingModel):
         retrieve_only: bool = False,
         use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
+        buffer_samples: int = 20,
     ) -> Dict:
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         return self._get_analysis_helper(task).run_backward_elimination(
@@ -501,6 +502,7 @@ class PGAMModel(BaseEncodingModel):
             retrieve_only=retrieve_only,
             use_neural_coupling=use_neural_coupling,
             cv_mode=cv_mode,
+            buffer_samples=buffer_samples,
         )
 
     def crossval_tuning_curve_coef(
@@ -606,6 +608,7 @@ class PGAMModel(BaseEncodingModel):
                 load_if_exists=load_if_exists,
                 use_neural_coupling=use_neural_coupling,
                 cv_mode=cv_mode,
+                buffer_samples=buffer_samples,
             )
         except Exception as e:
             if verbose:

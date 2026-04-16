@@ -624,6 +624,7 @@ class BaseEncodingGAMAnalysisHelper:
         retrieve_only: bool = False,
         use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
+        buffer_samples: int = 20,
     ) -> Dict:
         outdir = self._neuron_outdir(unit_idx, use_neural_coupling=use_neural_coupling)
         resolved_cv = (
@@ -682,6 +683,8 @@ class BaseEncodingGAMAnalysisHelper:
                 groups=groups,
                 alpha=alpha,
                 n_folds=n_folds,
+                cv_mode=resolved_cv,
+                buffer_samples=buffer_samples,
                 verbose=True,
                 save_path=str(save_path),
                 load_if_exists=load_if_exists,

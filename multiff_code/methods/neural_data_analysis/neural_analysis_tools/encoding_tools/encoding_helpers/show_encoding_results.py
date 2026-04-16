@@ -35,7 +35,7 @@ def collect_category_ecdf_from_sessions(
     raw_data_dir_name : str
         Base directory for raw data.
     task_class : class
-        e.g. encoding_tasks.StopTask (uses global if None)
+        e.g. encoding_tasks.StopEncodingTask (uses global if None)
     bin_width : float
     exists_ok : bool
         If True, load from save_path when available; save results after computing.
@@ -63,7 +63,7 @@ def collect_category_ecdf_from_sessions(
     if tc.__name__.endswith("EncodingRunner"):
         raise ValueError(
             "collect_category_ecdf_from_sessions now expects a task class "
-            "(e.g., encoding_tasks.StopTask), not a legacy runner class."
+            "(e.g., encoding_tasks.StopEncodingTask), not a legacy runner class."
         )
 
     effective_cv_mode = cv_mode if cv_mode is not None else _DEFAULT_CV_MODE

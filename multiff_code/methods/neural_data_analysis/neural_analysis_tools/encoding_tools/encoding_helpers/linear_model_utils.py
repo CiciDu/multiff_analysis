@@ -774,3 +774,106 @@ def plot_lm_vs_anova(
 
     plt.tight_layout()
     return fig
+
+
+
+# ---------------------------------------------------------------------------
+# Fraction tuned — neuroGAM-compatible (based on backward elimination)
+# ---------------------------------------------------------------------------
+
+def fraction_tuned_from_elimination(
+    elimination_results: Dict[int, Dict],
+    variable_names: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Compute the fraction of neurons tuned to each variable using backward
+    elimination results.  Matches neuroGAM's definition: a neuron is tuned
+    to variable X if X survives backward elimination in the joint model AND
+    the best model is significantly better than the null (neurons where
+    ``kept_groups`` is empty are counted as tuned to nothing).
+
+    Parameters
+    ----------
+    elimination_results : dict
+        Mapping ``{unit_idx: result_dict}`` where each ``result_dict`` is the
+        output of ``PGAMModel.run_backward_elimination`` or
+        ``BaseEncodingGAMAnalysisHelper.run_backward_elimination``.
+        Each dict must have a ``kept_groups`` key containing a list of
+        ``GroupSpec``-like objects (or dicts) with a ``name`` attribute/key.
+    variable_names : list of str, optional
+        Ordered list of variable names to include.  When ``None``, all names
+        found across any neuron's kept groups are used (sorted).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per variable; columns:
+        ``variable``, ``n_tuned``, ``n_neurons``, ``fraction_tuned``
+
+        Neurons where ``kept_groups`` is empty (null model not rejected) are
+        counted in ``n_neurons`` but contribute 0 to ``n_tuned`` for all
+        variables, exactly as in neuroGAM.
+    """
+    n_neurons = len(elimination_results)
+    if n_neurons == 0:
+        cols = ["variable", "n_tuned", "n_neurons", "fraction_tuned"]
+        return pd.DataFrame(columns=cols)
+
+    # Collect kept group names per neuron
+    def _kept_names(result: Dict) -> set:
+        kept = result.get("kept_groups", [])
+        names = set()
+        for g in kept:
+            # GroupSpec object (has .name) or plain dict (has 'name' key)
+            name = g.name if hasattr(g, "name") else g.get("name")
+            if name is not None:
+                names.add(name)
+        return names
+
+    kept_per_neuron = {uid: _kept_names(res) for uid, res in elimination_results.items()}
+
+    # Determine variable universe
+    if variable_names is None:
+        variable_names = sorted({v for names in kept_per_neuron.values() for v in names})
+
+    rows = []
+    for var in variable_names:
+        n_tuned = sum(1 for names in kept_per_neuron.values() if var in names)
+        rows.append({
+            "variable": var,
+            "n_tuned": n_tuned,
+            "n_neurons": n_neurons,
+            "fraction_tuned": n_tuned / n_neurons if n_neurons > 0 else float("nan"),
+        })
+
+    return pd.DataFrame(rows).sort_values("fraction_tuned", ascending=False).reset_index(drop=True)
+
+
+def print_fraction_tuned(
+    df: pd.DataFrame,
+    title: str = "Fraction tuned (backward elimination)",
+) -> None:
+    """
+    Pretty-print the output of ``fraction_tuned_from_elimination``.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Output of ``fraction_tuned_from_elimination``.
+    title : str
+        Header line.
+    """
+    bar = "─" * max(len(title) + 4, 50)
+    print(f"\n{bar}\n  {title}\n{bar}")
+    if df.empty:
+        print("  (no results)")
+        print(bar)
+        return
+    for _, row in df.iterrows():
+        n_tuned   = int(row["n_tuned"])
+        n_neurons = int(row["n_neurons"])
+        frac      = row["fraction_tuned"]
+        stars     = "█" * round(frac * 20)
+        print(f"  {row['variable']:<30}  {n_tuned:>3}/{n_neurons}  "
+              f"({100 * frac:5.1f}%)  {stars}")
+    print(bar)

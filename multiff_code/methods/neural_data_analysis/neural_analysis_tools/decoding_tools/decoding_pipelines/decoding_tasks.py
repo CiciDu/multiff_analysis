@@ -6,7 +6,7 @@ No model fitting lives here.
 
 Usage
 -----
-    task = StopDecodingTask(raw_data_folder_path)
+    task = StopTask(raw_data_folder_path)
     task.collect_data()
     # task.binned_spikes, task.feats_to_decode now available
 """
@@ -62,10 +62,10 @@ DEFAULT_FS_CANONCORR_VARS = ["speed", "ang_speed", "accel"]
 
 
 # ---------------------------------------------------------------------------
-# StopDecodingTask
+# StopTask
 # ---------------------------------------------------------------------------
 
-class StopDecodingTask(BaseDecodingTask):
+class StopTask(BaseDecodingTask):
     """Stop-event decoding task."""
 
     def __init__(self, raw_data_folder_path, bin_width=0.04, **kwargs):
@@ -97,10 +97,10 @@ class StopDecodingTask(BaseDecodingTask):
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             self.clean_var_categories()
-            print("[StopDecodingTask] Using cached design matrices")
+            print("[StopTask] Using cached design matrices")
             return
 
-        print("[StopDecodingTask] Computing design matrices from scratch")
+        print("[StopTask] Computing design matrices from scratch")
 
         self.pn, datasets, new_seg_info, events_with_stats = (
             decode_stops_design.prepare_stop_design_inputs(
@@ -160,10 +160,10 @@ class StopDecodingTask(BaseDecodingTask):
 
 
 # ---------------------------------------------------------------------------
-# VisDecodingTask
+# VisTask
 # ---------------------------------------------------------------------------
 
-class VisDecodingTask(BaseDecodingTask):
+class VisTask(BaseDecodingTask):
     """Firefly-visibility decoding task."""
 
     def __init__(self, raw_data_folder_path, bin_width=0.04, datasets=None, **kwargs):
@@ -192,7 +192,7 @@ class VisDecodingTask(BaseDecodingTask):
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             self.clean_var_categories()
-            print("[VisDecodingTask] Using cached design matrices")
+            print("[VisTask] Using cached design matrices")
             return
 
         self.pn = collect_stop_data.init_pn_to_collect_stop_data(
@@ -200,7 +200,7 @@ class VisDecodingTask(BaseDecodingTask):
         )
         self.pn.make_or_retrieve_ff_dataframe()
 
-        print("[VisDecodingTask] Computing design matrices from scratch")
+        print("[VisTask] Computing design matrices from scratch")
 
         new_seg_info, events_with_stats = decode_vis_utils.prepare_new_seg_info(
             self.pn.ff_dataframe, self.pn.bin_width
@@ -266,10 +266,10 @@ class VisDecodingTask(BaseDecodingTask):
 
 
 # ---------------------------------------------------------------------------
-# PNDecodingTask
+# PNTask
 # ---------------------------------------------------------------------------
 
-class PNDecodingTask(BaseDecodingTask):
+class PNTask(BaseDecodingTask):
     """Planning-and-neural (PN) decoding task."""
 
     def __init__(self, raw_data_folder_path, bin_width=0.04, **kwargs):
@@ -297,10 +297,10 @@ class PNDecodingTask(BaseDecodingTask):
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             self.clean_var_categories()
-            print("[PNDecodingTask] Using cached design matrices")
+            print("[PNTask] Using cached design matrices")
             return
 
-        print("[PNDecodingTask] Computing design matrices from scratch")
+        print("[PNTask] Computing design matrices from scratch")
 
         pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(
             raw_data_folder_path=self.raw_data_folder_path,
@@ -397,10 +397,10 @@ class PNDecodingTask(BaseDecodingTask):
 
 
 # ---------------------------------------------------------------------------
-# FSDecodingTask
+# FSTask
 # ---------------------------------------------------------------------------
 
-class FSDecodingTask(BaseDecodingTask):
+class FSTask(BaseDecodingTask):
     """Full-session decoding task."""
 
     def __init__(self, raw_data_folder_path, bin_width=0.04, **kwargs):
@@ -434,7 +434,7 @@ class FSDecodingTask(BaseDecodingTask):
     def collect_data(self, exists_ok=True):
         if exists_ok and self._load_design_matrices():
             self.clean_var_categories()
-            print("[FSDecodingTask] Using cached design matrices")
+            print("[FSTask] Using cached design matrices")
             return
 
         self.pn = pn_aligned_by_event.PlanningAndNeuralEventAligned(

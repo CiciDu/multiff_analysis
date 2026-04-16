@@ -3,15 +3,15 @@ EncodingRunner — lightweight orchestrator (Task × Model).
 
 Usage
 -----
-    from encoding_tasks import PNTask, FSTask, StopTask, VisTask
+    from encoding_tasks import PNEncodingTask, FSEncodingTask, StopEncodingTask, VisEncodingTask
     from encoding_models import PGAMModel, RNNModel
     from encoding_runner import EncodingRunner
 
-    runner = EncodingRunner(PNTask(path), PGAMModel())
+    runner = EncodingRunner(PNEncodingTask(path), PGAMModel())
     runner.crossval(unit_idx=0)
     runner.run_category_variance_contributions(unit_idx=0)
 
-    runner2 = EncodingRunner(PNTask(path), RNNModel())
+    runner2 = EncodingRunner(PNEncodingTask(path), RNNModel())
     runner2.crossval(unit_idx=0)
 """
 

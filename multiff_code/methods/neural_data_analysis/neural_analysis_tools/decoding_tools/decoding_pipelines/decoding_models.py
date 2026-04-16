@@ -12,14 +12,14 @@ Both share the interface:
 
 Usage
 -----
-    from decoding_tasks import StopDecodingTask
+    from decoding_tasks import StopTask
     from decoding_models import OneFFStyleModel, CVDecodingModel
     from decoding_runner import DecodingRunner
 
-    runner = DecodingRunner(StopDecodingTask(path), OneFFStyleModel())
+    runner = DecodingRunner(StopTask(path), OneFFStyleModel())
     runner.run()
 
-    runner = DecodingRunner(StopDecodingTask(path), CVDecodingModel())
+    runner = DecodingRunner(StopTask(path), CVDecodingModel())
     runner.run()
 """
 

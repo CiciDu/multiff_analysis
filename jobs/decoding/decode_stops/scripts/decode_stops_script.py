@@ -20,7 +20,7 @@ from jobs.decoding.shared_decoding_script import run_decoding_main
 
 
 def main():
-    return run_decoding_main(decoding_tasks.StopDecodingTask)
+    return run_decoding_main(decoding_tasks.StopTask)
 
 
 if __name__ == '__main__':
