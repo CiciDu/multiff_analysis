@@ -1258,15 +1258,14 @@ def plot_tuning_heatmaps(
         plt.show()
         
 
-def run_unit_ecdf(runner, log_x=False, use_neural_coupling=False):
+def run_unit_ecdf(runner, log_x=False):
     all_results = []
 
-    for u in range(runner.num_neurons):
+    for u in range(runner.get_effective_num_neurons()):
         try:
             result = runner.run_category_variance_contributions(
                 unit_idx=u,
                 retrieve_only=True,  # use cached if already computed
-                use_neural_coupling=use_neural_coupling,
             )
             all_results.append(result)
         except Exception as e:
@@ -1284,7 +1283,7 @@ def run_unit_ecdf(runner, log_x=False, use_neural_coupling=False):
     return all_results
 
 
-def run_unit_ecdf_collect(runner, use_neural_coupling=False):
+def run_unit_ecdf_collect(runner):
     """
     Same as run_unit_ecdf but returns all_results without plotting.
     Use this to gather data from multiple sessions before calling
@@ -1292,12 +1291,11 @@ def run_unit_ecdf_collect(runner, use_neural_coupling=False):
     """
     all_results = []
 
-    for u in range(runner.num_neurons):
+    for u in range(runner.get_effective_num_neurons()):
         try:
             result = runner.run_category_variance_contributions(
                 unit_idx=u,
                 retrieve_only=True,  # use cached if already computed
-                use_neural_coupling=use_neural_coupling,
             )
             all_results.append(result)
         except Exception as e:

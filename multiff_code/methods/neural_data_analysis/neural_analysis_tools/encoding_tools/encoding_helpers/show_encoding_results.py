@@ -200,9 +200,10 @@ def collect_category_ecdf_from_sessions(
                     encoder_prs=prs,
                 )
                 model = encoding_models.PGAMModel(cv_mode=effective_cv_mode)
-                runner = encoding_runner.EncodingRunner(task, model)
-                all_results = plot_gam_fit.run_unit_ecdf_collect(runner, 
-                                                                 use_neural_coupling=use_neural_coupling)
+                runner = encoding_runner.EncodingRunner(
+                    task, model, use_neural_coupling=use_neural_coupling
+                )
+                all_results = plot_gam_fit.run_unit_ecdf_collect(runner)
                 session_results_list.append((session_label, all_results))
             except Exception as e:
                 print(f'[ERROR] Failed for {raw_data_folder_path}: {e}')

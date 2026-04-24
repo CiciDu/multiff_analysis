@@ -25,7 +25,6 @@ def main():
 
     return run_encoding_main(
         encoding_tasks.FSEncodingTask,
-        cv_mode="blocked_time_buffered",
     )
 
 

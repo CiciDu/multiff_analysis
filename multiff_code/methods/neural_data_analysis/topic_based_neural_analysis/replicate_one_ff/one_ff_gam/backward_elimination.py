@@ -21,7 +21,7 @@ def backward_elimination_gam(
     groups,
     *,
     alpha=0.05,
-    n_folds=10,
+    n_folds=20,
     cv_mode='blocked_time_buffered',
     buffer_samples=20,
     verbose=True,
@@ -40,7 +40,7 @@ def backward_elimination_gam(
     alpha : float
         Significance level (default 0.05).
     n_folds : int
-        Number of CV folds (default 10).
+        Number of CV folds (default 20).
     cv_mode : str
         CV strategy passed to _build_folds. Must match the mode used for all
         other CV in the pipeline so fold splits are consistent.
@@ -126,7 +126,8 @@ def backward_elimination_gam(
 
             # mean_delta > 0 means reduced model is WORSE (higher NLL).
             # We want the candidate whose removal hurts least → smallest mean_delta.
-            mean_delta = (ll_reduced - ll_full).mean()
+            delta = ll_reduced - ll_full
+            mean_delta = np.nanmean(delta)
 
             # Wilcoxon signed-rank, left-tailed:
             # H0: ll_reduced >= ll_full  (reduced is not worse)
@@ -135,8 +136,10 @@ def backward_elimination_gam(
             # Matches neuroGAM: signrank(LLvals(:,candidate), LLvals(:,bestmodel), 'tail','left')
             # Note: neuroGAM's LL is higher-is-better; ours is lower-is-better (NLL).
             # Swapping argument order achieves the same directional test.
+            # Drop folds where either value is NaN (silent test folds).
+            valid = np.isfinite(ll_full) & np.isfinite(ll_reduced)
             try:
-                _, p_val = wilcoxon(ll_full, ll_reduced, alternative='less')
+                _, p_val = wilcoxon(ll_full[valid], ll_reduced[valid], alternative='less')
             except ValueError:
                 p_val = 1.0
 
@@ -162,8 +165,10 @@ def backward_elimination_gam(
         candidates.sort(key=lambda x: x['mean_delta'])
         best = candidates[0]
 
+        # Use the raw alpha threshold directly for elimination decisions.
+        alpha_threshold = alpha
         # Remove if the reduced model is NOT significantly worse (p >= alpha).
-        will_remove = best['p_value'] >= alpha
+        will_remove = best['p_value'] >= alpha_threshold
 
         if will_remove:
             removed_group = best['group']
@@ -176,11 +181,13 @@ def backward_elimination_gam(
                 'removed': removed_group.name,
                 'delta_ll': best['mean_delta'],
                 'p_value': best['p_value'],
+                # Keep legacy key name for downstream compatibility.
+                'alpha_step': alpha_threshold,
             })
 
         if verbose:
             kept_names = [g.name for g in kept]
-            _print_elimination_decision(best, will_remove, kept_names)
+            _print_elimination_decision(best, will_remove, kept_names, alpha_threshold)
 
         if save_path_obj is not None:
             _save_elimination_state(
@@ -198,12 +205,15 @@ def backward_elimination_gam(
     # H0: ll_null <= ll_full  (model no better than null)
     # Matches neuroGAM: signrank(LLvals(:,bestmodel), 0, 'tail','right') > alpha
     # where LLvals = LL increase over null, so > 0 ↔ model NLL < null NLL.
+    # Final check also uses the raw alpha threshold (no stepwise correction).
+    alpha_null = alpha
     null_rejected = False
     if kept:
         improvement = ll_null - ll_full  # positive when model beats null
+        valid_null = np.isfinite(improvement)
         try:
-            _, p_null = wilcoxon(improvement, alternative='greater')
-            null_rejected = p_null < alpha
+            _, p_null = wilcoxon(improvement[valid_null], alternative='greater')
+            null_rejected = p_null < alpha_null
         except ValueError:
             null_rejected = False
 
@@ -211,10 +221,17 @@ def backward_elimination_gam(
             if verbose:
                 print('\n' + '─' * 80)
                 print('NULL CHECK: best model not significantly better than mean-rate null '
-                      f'(p={p_null:.4f} >= α={alpha})')
+                      f'(p={p_null:.4f} >= α={alpha_null})')
                 print('→ Setting kept = [] (no variable survives)')
                 print('─' * 80)
             kept = []
+        else:
+            if verbose:
+                print('\n' + '─' * 80)
+                print('NULL CHECK: best model significantly better than mean-rate null '
+                      f'(p={p_null:.4f} < α={alpha_null})')
+                print('→ Variable survives')
+                print('─' * 80)
 
     # Print final summary
     total_time = time.time() - start_time
@@ -352,16 +369,16 @@ def _print_candidate_progress(idx, total, group_name, mean_delta, p_val, elapsed
     print(f'    Time: {elapsed:.1f}s (avg: {avg_time:.1f}s/candidate)')
 
 
-def _print_elimination_decision(best, removed, kept_names):
+def _print_elimination_decision(best, removed, kept_names, alpha_threshold):
     """Print decision after evaluating all candidates."""
     print('\n' + '─'*80)
     print('DECISION:')
     if removed:
         print(f'  ✓ REMOVED: {best["group"].name}')
-        print(f'    ΔLL = {best["mean_delta"]:+.6f}, p = {best["p_value"]:.4f}')
+        print(f'    ΔLL = {best["mean_delta"]:+.6f}, p = {best["p_value"]:.4f} (α = {alpha_threshold:.4f})')
         print(f'  → Remaining groups ({len(kept_names)}): {kept_names}')
     else:
-        print(f'  ✗ STOP: {best["group"].name} is significant (p = {best["p_value"]:.4f})')
+        print(f'  ✗ STOP: {best["group"].name} is significant (p = {best["p_value"]:.4f} < α = {alpha_threshold:.4f})')
         print('  → All remaining groups are necessary')
         print(f'  → Final groups ({len(kept_names)}): {kept_names}')
     print('─'*80)
@@ -385,7 +402,7 @@ def _print_elimination_summary(kept, history, total_time):
         print('\n✓ ELIMINATION HISTORY:')
         for h in history:
             print(f'    Step {h["step"]}: Removed {h["removed"]} '
-                  f'(ΔLL={h["delta_ll"]:+.4f}, p={h["p_value"]:.4f})')
+                  f'(ΔLL={h["delta_ll"]:+.4f}, p={h["p_value"]:.4f}, α={h.get("alpha_step", float("nan")):.4f})')
     
     print('='*80)
 

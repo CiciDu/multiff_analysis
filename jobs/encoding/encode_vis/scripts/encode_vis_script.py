@@ -26,7 +26,6 @@ def main():
 
     return run_encoding_main(
         encoding_tasks.VisEncodingTask,
-        cv_mode="blocked_time_buffered",
     )
 
 

@@ -607,7 +607,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             print("saved monkey_information and ff info at",
                   (self.processed_data_folder_path))
         self.make_or_retrieve_ff_dataframe_for_agent(
-            exists_ok=False, save_data=save_data)
+            exists_ok=False, save_data=False)
 
         return
 
@@ -740,7 +740,7 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.retrieve_monkey_data(
                     retrieve_ff_flash_sorted=retrieve_ff_flash_sorted)
                 self.make_or_retrieve_ff_dataframe_for_agent(
-                    exists_ok=exists_ok, save_data=save_data)
+                    exists_ok=exists_ok, save_data=False)
                 return
             except Exception as e:
                 print(

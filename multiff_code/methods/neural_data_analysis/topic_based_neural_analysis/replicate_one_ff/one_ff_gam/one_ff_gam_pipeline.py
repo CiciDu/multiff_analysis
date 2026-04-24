@@ -236,7 +236,8 @@ class OneFFGAMRunner:
                 verbose=False,
             )
             if full_cv is None:
-                raise FileNotFoundError(f"No saved full-model CV result found at: {full_path}")
+                print(f"No saved full-model CV result found at: {full_path}")
+                return None, None
         else:
             full_cv = self._run_crossval(
                 design_df=design_df,
@@ -557,6 +558,8 @@ class OneFFGAMRunner:
         n_folds: int = 10,
         cv_mode: str = 'blocked_time_buffered',
         buffer_samples: int = 20,
+        load_if_exists: bool = True,
+        retrieve_only: bool = False,
     ) -> Dict:
         """
         Run backward elimination for one unit.
@@ -571,7 +574,7 @@ class OneFFGAMRunner:
             lambda_config=lambda_for_path
         )
         save_path = outdir / "backward_elimination" / f"{lam_suffix}.pkl"
-        if save_path.exists():
+        if (load_if_exists or retrieve_only) and save_path.exists():
             loaded = one_ff_gam_fit.load_elimination_results(str(save_path))
             if loaded.get("completed", False):
                 kept = [
@@ -597,6 +600,10 @@ class OneFFGAMRunner:
                     "save_path": save_path,
                     "outdir": outdir,
                 }
+
+        if retrieve_only:
+            print(f"No completed backward elimination result found at: {save_path}")
+            return None
 
         self.prepare_unit(unit_idx=unit_idx, lambda_config=lambda_config)
         outdir, lam_suffix = self._unit_context(

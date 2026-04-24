@@ -101,12 +101,13 @@ class PNEncodingTask(BaseEncodingTask):
                "cur_ff_angle", "nxt_ff_angle"]
         )
 
-        self.binned_feats, self.temporal_meta, self.tuning_meta = (
+        self.binned_feats, self.temporal_meta, self.tuning_meta, self.raw_behavioral_feats = (
             encode_pn_utils.build_pn_encoding_design(
                 rebinned_y_var,
                 self.pn.monkey_information,
                 global_bins_2d=self.pn.global_bins_2d,
                 bin_width=self.pn.bin_width,
+                ff_caught_T_new=self.pn.ff_caught_T_new,
                 linear_vars=linear_vars,
                 **design_kwargs,
             )
@@ -139,12 +140,10 @@ class PNEncodingTask(BaseEncodingTask):
             self.pn.rebinned_x_var, self.pn.local_bin_edges
         )
         self.binned_feats = self.binned_feats.reset_index(drop=True)
+        if self.raw_behavioral_feats is not None:
+            self.raw_behavioral_feats = self.raw_behavioral_feats.reset_index(drop=True)
 
-        self.reduce_binned_feats()
-        self._prepare_spike_history_components()
-        self._make_structured_meta_groups()
-        self._save_design_matrices()
-        self.clean_var_categories()
+        self._finalize_collect_data()
 
     def _get_save_dir(self):
         return os.path.join(
@@ -191,17 +190,14 @@ class FSEncodingTask(BaseEncodingTask):
             self.meta_df_used,
             self.temporal_meta,
             self.tuning_meta,
+            self.raw_behavioral_feats,
         ) = encode_fs_utils.build_fs_encoding_design(
             self.pn, bin_width=self.bin_width, **design_kwargs
         )
 
         self.bin_df = spike_history.make_bin_df_from_meta_df(self.meta_df_used)
 
-        self.reduce_binned_feats()
-        self._prepare_spike_history_components()
-        self._make_structured_meta_groups()
-        self._save_design_matrices()
-        self.clean_var_categories()
+        self._finalize_collect_data()
 
     def _get_save_dir(self):
         return os.path.join(
@@ -249,17 +245,14 @@ class StopEncodingTask(BaseEncodingTask):
             self.meta_df_used,
             self.temporal_meta,
             self.tuning_meta,
+            self.raw_behavioral_feats,
         ) = encode_stops_utils.build_stop_encoding_design(
             self.pn, datasets, new_seg_info, events_with_stats, self.bin_width, **design_kwargs
         )
 
         self.bin_df = spike_history.make_bin_df_from_meta_df(self.meta_df_used)
 
-        self.reduce_binned_feats()
-        self._prepare_spike_history_components()
-        self._make_structured_meta_groups()
-        self._save_design_matrices()
-        self.clean_var_categories()
+        self._finalize_collect_data()
 
     def _get_save_dir(self):
         return os.path.join(
@@ -314,6 +307,7 @@ class VisEncodingTask(BaseEncodingTask):
             self.meta_df_used,
             self.temporal_meta,
             self.tuning_meta,
+            self.raw_behavioral_feats,
         ) = encoding_design_utils.build_vis_encoding_design(
             self.pn,
             datasets,
@@ -329,11 +323,7 @@ class VisEncodingTask(BaseEncodingTask):
 
         self.bin_df = spike_history.make_bin_df_from_meta_df(self.meta_df_used)
 
-        self.reduce_binned_feats()
-        self._prepare_spike_history_components()
-        self._make_structured_meta_groups()
-        self._save_design_matrices()
-        self.clean_var_categories()
+        self._finalize_collect_data()
 
     def _get_save_dir(self):
         return os.path.join(

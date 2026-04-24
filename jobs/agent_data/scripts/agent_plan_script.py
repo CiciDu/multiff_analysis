@@ -29,7 +29,7 @@ def main():
     parser.add_argument('--save-dir', type=str, default=None,
                         help='Optional: explicit save directory for outputs')
     # add the argument num_datasets_to_collect and num_steps_per_dataset
-    parser.add_argument('--num-datasets-to-collect', type=int, default=10,
+    parser.add_argument('--num-datasets-to-collect', type=int, default=20,
                         help='Number of datasets to collect')
     parser.add_argument('--num-steps-per-dataset', type=int, default=9000,
                         help='Number of steps per dataset')

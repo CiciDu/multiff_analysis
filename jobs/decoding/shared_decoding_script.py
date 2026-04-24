@@ -15,8 +15,8 @@ def run_decoding_main(
     task_class: Type[TaskT],
     *,
     model_class = decoding_models.CVDecodingModel,
-    cv_mode: str = "group_kfold",
-    use_spike_history: bool = False,
+    cv_mode: str = "blocked_time_buffered",
+    use_spike_history: bool = True,
     run_kwargs: Optional[dict[str, Any]] = None,
     task_kwargs: Optional[dict[str, Any]] = None,
     model_kwargs: Optional[dict[str, Any]] = None,
@@ -45,7 +45,7 @@ def run_decoding_main(
 
     args = parser.parse_args()
 
-    for smoothing_width in [None, 10, 40]:
+    for smoothing_width in [10, 20]:
         print(f"Running with smoothing_width={smoothing_width}")
     
         task_kwargs = task_kwargs or {}
@@ -85,11 +85,6 @@ def run_decoding_main(
         #     shuffle_mode='timeshift_fold',
         # )
 
-        # also get ANOVA results
-        # anova = runner.run_anova_all_neurons(alpha=0.05)
-        # lm = runner.run_lm_all_neurons(include_all_feats=True, alpha=0.05)
-
         # results_one_ff_style = runner.run_one_ff_style()
 
-        print(runner.results_df.head())
     return 

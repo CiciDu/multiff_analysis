@@ -95,38 +95,52 @@ def decode_per_timepoint(X_3d, y, n_splits=5, method="svm", verbose=True):
 
     return acc, chance
 
+def decode_full_trajectory(X_3d, y, n_splits=5, method="svm",
+                           n_permutations=200, verbose=True):
+    """
+    Decode using the full (flattened) population trajectory.
+    Returns (acc, chance, acc_folds, chance_folds, p_value, perm_scores).
+    """
+    from sklearn.model_selection import permutation_test_score
+    from sklearn.dummy import DummyClassifier
 
-def decode_full_trajectory(X_3d, y, n_splits=5, method="svm", verbose=True):
     effective_splits = _effective_n_splits(y, n_splits)
     if effective_splits is None:
         if verbose:
             print("Warning: insufficient class balance for stratified CV; returning NaNs.")
-        return np.nan, np.nan
+        empty = np.full(n_splits, np.nan)
+        return np.nan, np.nan, empty, empty, np.nan, empty
     if effective_splits < n_splits and verbose:
-        print(
-            f"Warning: effective n_splits reduced from {n_splits} to {effective_splits} "
-            "based on class counts."
-        )
+        print(f"Warning: effective n_splits reduced from {n_splits} to {effective_splits} "
+              "based on class counts.")
     n_splits = effective_splits
 
     n_trials, N, T = X_3d.shape
     X_flat = X_3d.reshape(n_trials, N * T)
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=0)
-    
+
     chance_clf = DummyClassifier(strategy="most_frequent")
-    fold_accs, fold_chance = [], []
+    acc_folds, chance_folds = [], []
 
     for train_idx, test_idx in cv.split(X_flat, y):
         clf = _make_clf(method)
         clf.fit(X_flat[train_idx], y[train_idx])
-        fold_accs.append(clf.score(X_flat[test_idx], y[test_idx]))
+        acc_folds.append(clf.score(X_flat[test_idx], y[test_idx]))
 
         chance_clf.fit(X_flat[train_idx], y[train_idx])
-        fold_chance.append(chance_clf.score(X_flat[test_idx], y[test_idx]))
+        chance_folds.append(chance_clf.score(X_flat[test_idx], y[test_idx]))
 
-    return np.mean(fold_accs), np.mean(fold_chance)
+    clf_perm = _make_clf(method)
+    _, perm_scores, p_value = permutation_test_score(
+        clf_perm, X_flat, y, cv=cv,
+        n_permutations=n_permutations, random_state=0, n_jobs=1
+    )
 
-
+    return (np.mean(acc_folds), np.mean(chance_folds),
+            np.array(acc_folds), np.array(chance_folds),
+            p_value, perm_scores)
+    
+    
 def pca_population_trajectories(X_3d, y, t_bins, n_components=3):
     """
     PCA fit on all individual trials (n_trials*T, N), then mean trajectory

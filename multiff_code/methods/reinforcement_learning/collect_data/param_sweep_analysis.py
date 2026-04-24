@@ -12,6 +12,7 @@ from reinforcement_learning.agents.feedforward import sb3_class
 
 from planning_analysis.agent_analysis import agent_plan_factors_x_agents_class
 from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
+from reinforcement_learning.collect_data import agent_patterns_class
 
 def _get_sweep_results_save_path(overall_folder_name, save_filename='sweep_results.pkl'):
     '''
@@ -69,7 +70,7 @@ def _build_single_agent_result(rl, agent_name):
 
 
 def collect_sweep_results_df(
-    overall_folder_name='RL_models/sb3_stored_models/all_agents/sb3_conditional/ff5_mem2p5_drop_fill_visible_only',
+    overall_folder_name='RL_models/sb3_stored_models/all_agents/sb3_conditional/ff6_mem3_drop_fill_visible_only',
     n_steps=8000,
     retrieve_data_only=False,
     save_df=True,
@@ -302,11 +303,16 @@ def collect_plan_results_df(
 
 def collect_pattern_frequencies_df(
     overall_folder_name='RL_models/sb3_stored_models/all_agents',
-    retrieve_only=True,
+    exists_ok=True,
+    retrieve_only=False,
     save_df=True,
     load_saved_overall_df=False,
     save_filename='pattern_frequencies.pkl',
     max_n_agents=None,
+    num_datasets_to_collect=2,
+    num_steps_per_dataset=9000,
+    agent_data_exists_ok=True,
+    intermediate_products_exist_ok=True,
     verbose=False,
 ):
     '''
@@ -316,16 +322,30 @@ def collect_pattern_frequencies_df(
     ----------
     overall_folder_name : str
         Folder containing all agent subfolders.
+    exists_ok : bool
+        If True, retrieve combined patterns-and-features from disk if already
+        saved for a given agent (passed to
+        AgentPatterns.combine_or_retrieve_patterns_and_features).
     retrieve_only : bool
-        Passed to agent.make_df_related_to_patterns_and_features().
+        If True, only load previously saved combined patterns-and-features for
+        each agent. Agents without cached combined data are skipped instead of
+        being recomputed.
     save_df : bool
         Whether to save the aggregated dataframe.
     load_saved_overall_df : bool
-        If True, load saved dataframe if available.
+        If True, load the already-aggregated dataframe if available.
     save_filename : str
         Filename for saving/loading.
     max_n_agents : int or None
-        Limit number of agents.
+        Limit number of agents processed.
+    num_datasets_to_collect : int
+        Number of datasets to combine per agent.
+    num_steps_per_dataset : int
+        Steps collected per dataset when running the agent.
+    agent_data_exists_ok : bool
+        If True, reuse cached per-dataset agent rollouts.
+    intermediate_products_exist_ok : bool
+        If True, reuse cached per-dataset pattern/feature CSVs.
     verbose : bool
         If False (default), suppress all output except a single progress line
         ("Processing agent X/N"). If True, print all output as usual.
@@ -334,9 +354,6 @@ def collect_pattern_frequencies_df(
     -------
     all_agents_pattern_frequencies : pd.DataFrame
     '''
-    import os
-    import pandas as pd
-
     if max_n_agents is not None:
         base_name, ext = os.path.splitext(save_filename)
         save_filename = f'{base_name}_max{max_n_agents}{ext}'
@@ -372,18 +389,24 @@ def collect_pattern_frequencies_df(
             _ctx.enter_context(contextlib.redirect_stderr(io.StringIO()))
 
         with _ctx:
-            agent = sb3_class.SB3forMultifirefly(
+            ap = agent_patterns_class.AgentPatterns(
                 model_folder_name=model_folder_name
             )
 
             try:
-                agent.make_df_related_to_patterns_and_features(
-                    retrieve_only=retrieve_only
+                ap.combine_or_retrieve_patterns_and_features(
+                    exists_ok=exists_ok,
+                    retrieve_only=retrieve_only,
+                    save_data=save_df,
+                    num_datasets_to_collect=num_datasets_to_collect,
+                    num_steps_per_dataset=num_steps_per_dataset,
+                    agent_data_exists_ok=agent_data_exists_ok,
+                    intermediate_products_exist_ok=intermediate_products_exist_ok,
                 )
 
                 df, _ = compare_monkey_and_agent_utils \
                     .add_agent_id_and_essential_agent_params_info_to_df(
-                        agent.pattern_frequencies,
+                        ap.agg_pattern_frequencies,
                         model_folder_name
                     )
 

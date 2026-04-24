@@ -152,6 +152,40 @@ class BaseDecodingTask:
         print(f"[{type(self).__name__}] PCA: {self.pca_n_components} components, "
               f"cumulative variance = {explained:.3f}")
 
+    def _ensure_pn_spikes_df_materialized(self) -> None:
+        pn = getattr(self, "pn", None)
+        if pn is None or getattr(pn, "spikes_df", None) is not None:
+            return
+        if hasattr(pn, "_make_spikes_df"):
+            # Cached decoding matrices do not persist the raw spike table.
+            pn._make_spikes_df()
+
+    def _resolve_spike_history_neuron_key(self, neuron, X_hist) -> str:
+        candidates = [neuron, str(neuron)]
+        neuron_str = str(neuron)
+        if neuron_str.startswith("cluster_"):
+            suffix = neuron_str[len("cluster_"):]
+            candidates.extend([suffix])
+            try:
+                candidates.append(int(suffix))
+            except ValueError:
+                pass
+        else:
+            candidates.append(f"cluster_{neuron_str}")
+            try:
+                candidates.append(f"cluster_{int(neuron)}")
+            except (TypeError, ValueError):
+                pass
+
+        for candidate in candidates:
+            if candidate in X_hist:
+                return candidate
+
+        raise KeyError(
+            f"Spike-history features missing for {neuron!r}. "
+            f"Available neurons include: {list(X_hist)[:5]}"
+        )
+
     def _neural_matrix_after_pca(self, *, smooth_width: int = 0,
                                   trial_idx: Optional[np.ndarray] = None) -> np.ndarray:
         raw = np.asarray(self._get_neural_matrix(), dtype=float)
@@ -168,16 +202,41 @@ class BaseDecodingTask:
         if self.bin_df is None:
             raise RuntimeError("bin_df required for spike history — set use_spike_history=True before collect_data.")
         pn = getattr(self, "pn", None)
+        self._ensure_pn_spikes_df_materialized()
         if pn is None or getattr(pn, "spikes_df", None) is None:
             raise RuntimeError("pn.spikes_df required for spike history.")
-        self.spike_history_features = spike_history_kit.compute_spike_history_designs(
+        mode = str(getattr(self, "spike_history_mode", "lags")).lower()
+        basis_type = {
+            "lags": "lagged",
+            "lagged": "lagged",
+            "basis": "raised_cosine",
+            "raised_cosine": "raised_cosine",
+        }.get(mode)
+        if basis_type is None:
+            raise ValueError(
+                f"Unknown spike_history_mode={self.spike_history_mode!r}. "
+                "Expected one of {'lags', 'lagged', 'basis', 'raised_cosine'}."
+            )
+
+        X_hist, _basis, colnames = spike_history_kit.compute_spike_history_designs(
             spikes_df=pn.spikes_df,
             bin_df=self.bin_df,
-            mode=self.spike_history_mode,
+            dt=float(self.bin_width),
             t_max=self.spike_history_t_max,
             n_basis=self.spike_history_n_basis,
             n_lags=self.spike_history_n_lags,
+            basis_type=basis_type,
         )
+        neural_cols = list(getattr(self.binned_spikes, "columns", []))
+        hist_blocks = []
+        for neuron in neural_cols:
+            neuron_key = self._resolve_spike_history_neuron_key(neuron, X_hist)
+            hist_blocks.append(X_hist[neuron_key][colnames[neuron_key]].reset_index(drop=True))
+
+        self.spike_history_features_df = (
+            pd.concat(hist_blocks, axis=1) if hist_blocks else pd.DataFrame(index=self.bin_df.index)
+        )
+        self.spike_history_features = self.spike_history_features_df.to_numpy(dtype=float, copy=False)
 
     def _get_neural_matrix_for_decoding(self, *, neural_smooth_width: int,
                                          trial_idx: Optional[np.ndarray] = None) -> np.ndarray:

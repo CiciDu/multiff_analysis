@@ -749,7 +749,7 @@ def analyze_penalty_tuning(tune_res):
 
 
 def plot_penalty_tuning_for_one_var(runner, var_name):
-    for unit_idx in range(runner.num_neurons):
+    for unit_idx in range(runner.get_effective_num_neurons()):
         tune_res = runner.run_penalty_tuning(
             unit_idx,
             n_folds=5,

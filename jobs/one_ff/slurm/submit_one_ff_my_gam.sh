@@ -36,7 +36,7 @@ EOF
 # Defaults
 # --------------------------------------------------
 N_UNITS=128
-MAX_PARALLEL=3
+MAX_CONCURRENT=3
 FORWARD_ARGS=()
 
 # --------------------------------------------------
@@ -51,7 +51,7 @@ while (( "$#" )); do
       ;;
     --max-parallel)
       [[ -z "${2:-}" ]] && { echo '[ERROR] --max-parallel requires an argument' >&2; exit 1; }
-      MAX_PARALLEL="$2"
+      MAX_CONCURRENT="$2"
       shift 2
       ;;
     -h|--help)
@@ -69,7 +69,7 @@ done
 # Validate inputs
 # --------------------------------------------------
 [[ "$N_UNITS" =~ ^[0-9]+$ ]] || { echo '[ERROR] --units must be an integer' >&2; exit 1; }
-[[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || { echo '[ERROR] --max-parallel must be an integer' >&2; exit 1; }
+[[ "$MAX_CONCURRENT" =~ ^[0-9]+$ ]] || { echo '[ERROR] --max-parallel must be an integer' >&2; exit 1; }
 
 ARRAY_MAX=$((N_UNITS - 1))
 (( ARRAY_MAX >= 0 )) || { echo '[ERROR] --units must be >= 1' >&2; exit 1; }
@@ -100,16 +100,16 @@ fi
 # --------------------------------------------------
 echo '[SUBMIT] One-FF GAM MAP Fit'
 echo "[SUBMIT] Units: $N_UNITS (0-$ARRAY_MAX)"
-echo "[SUBMIT] Max concurrent: $MAX_PARALLEL"
+echo "[SUBMIT] Max concurrent: $MAX_CONCURRENT"
 echo "[SUBMIT] Slurm script: $SLURM_SCRIPT"
 
 # --------------------------------------------------
 # Submit job (echo first so nothing is hidden)
 # --------------------------------------------------
 echo '[SUBMIT] Running sbatch:'
-echo sbatch --array=0-"$ARRAY_MAX"%"$MAX_PARALLEL" "${FORWARD_ARGS[@]}" "$SLURM_SCRIPT"
+echo sbatch --array=0-"$ARRAY_MAX"%"$MAX_CONCURRENT" "${FORWARD_ARGS[@]}" "$SLURM_SCRIPT"
 
 sbatch \
-  --array=0-"$ARRAY_MAX"%"$MAX_PARALLEL" \
+  --array=0-"$ARRAY_MAX"%"$MAX_CONCURRENT" \
   "${FORWARD_ARGS[@]}" \
   "$SLURM_SCRIPT"

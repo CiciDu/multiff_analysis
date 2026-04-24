@@ -20,30 +20,23 @@ else:
 def main():
     from reinforcement_learning.agents.feedforward import sb3_class
     from planning_analysis.agent_analysis import compare_monkey_and_agent_utils
+    from reinforcement_learning.collect_data import agent_patterns_class
 
     parser = argparse.ArgumentParser(description='Run agent retry analysis')
     parser.add_argument('--agent-path', type=str, required=True,
                         help='Agent folder path to process')
+    parser.add_argument('--num-datasets-to-collect', type=int, default=5,
+                        help='Number of datasets to collect')
     args = parser.parse_args()
 
     print(f'[SCRIPT] Agent path: {args.agent_path}')
 
-    agent = sb3_class.SB3forMultifirefly(model_folder_name=args.agent_path)
+    #agent = sb3_class.SB3forMultifirefly(model_folder_name=args.agent_path)
+    ap = agent_patterns_class.AgentPatterns(model_folder_name=args.agent_path)
 
     try:
-        agent.make_df_related_to_patterns_and_features(retrieve_only=False)
-        agent.pattern_frequencies, _ = compare_monkey_and_agent_utils.add_agent_id_and_essential_agent_params_info_to_df(agent.pattern_frequencies, args.agent_path)
-        
-        # Force regeneration of ff_dataframe for this specific agent/data split(s)
-        collected_base = args.agent_path.replace('/all_agents/', '/all_collected_data/')
-        for i in range(args.num_datasets_to_collect):
-            data_name = f'data_{i}'
-            ff_dataframe_path = Path(collected_base) / 'processed_data' / data_name / 'ff_dataframe.csv'
-            if ff_dataframe_path.exists():
-                ff_dataframe_path.unlink()
-                print(f'[SCRIPT] Deleted existing ff_dataframe: {ff_dataframe_path}')
-        
-        
+        ap.combine_or_retrieve_patterns_and_features(num_datasets_to_collect=args.num_datasets_to_collect)
+
     except Exception as e:
         print(f'Error making df related to patterns and features for {args.agent_path}: {e}')
         raise

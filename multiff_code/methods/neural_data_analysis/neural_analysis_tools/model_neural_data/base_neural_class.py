@@ -101,7 +101,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             truncate_curv_of_traj_by_time_of_capture=False
         )
 
-    def _reduce_y_var_base(self, y_var, corr_threshold_for_lags_of_a_feature=0.85,
+    def _reduce_y_var_base(self, y_var, corr_threshold_for_lags=0.85,
                            vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
                            filter_corr_by_all_columns=True,
                            filter_vif_by_subsets=True,
@@ -113,7 +113,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         # Call the function to iteratively drop lags with high correlation for each feature
         self.y_var_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var_reduced,
-                                                                                  corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
+                                                                                  corr_threshold_for_lags=corr_threshold_for_lags,
                                                                                   verbose=verbose,
                                                                                   filter_by_feature=False,
                                                                                   filter_by_subsets=False,
@@ -128,7 +128,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
                                                                            filter_by_all_columns=filter_vif_by_all_columns,
                                                                            get_column_subsets_func=self.get_subset_key_words_and_all_column_subsets_for_vif)
 
-    def _reduce_y_var_lags_base(self, corr_threshold_for_lags_of_a_feature=0.85,
+    def _reduce_y_var_lags_base(self, corr_threshold_for_lags=0.85,
                                 vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
                                 filter_corr_by_feature=True,
                                 filter_corr_by_subsets=True,
@@ -143,7 +143,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         # Call the function to iteratively drop lags with high correlation for each feature
         self.y_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(y_var_lags_reduced,
-                                                                                       corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
+                                                                                       corr_threshold_for_lags=corr_threshold_for_lags,
                                                                                        verbose=verbose,
                                                                                        filter_by_feature=filter_corr_by_feature,
                                                                                        filter_by_subsets=filter_corr_by_subsets,
@@ -164,7 +164,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
             sorted(self.y_var_lags_reduced.columns), axis=1)
 
     def _reduce_x_var_lags(self,
-                           corr_threshold_for_lags_of_a_feature=0.85,
+                           corr_threshold_for_lags=0.85,
                            vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
                            filter_corr_by_feature=False,
                            filter_corr_by_all_columns=True,
@@ -177,7 +177,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         # Call the function to iteratively drop lags with high correlation for each feature
         self.x_var_lags_reduced_corr = drop_high_corr_vars.drop_columns_with_high_corr(self.x_var_lags_reduced,
-                                                                                       corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
+                                                                                       corr_threshold_for_lags=corr_threshold_for_lags,
                                                                                        verbose=verbose,
                                                                                        filter_by_feature=filter_corr_by_feature,
                                                                                        filter_by_subsets=False,
@@ -259,7 +259,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
     def _reduce_y_var(self,
                       df_path=None,
                       save_data=True,
-                      corr_threshold_for_lags_of_a_feature=0.98,
+                      corr_threshold_for_lags=0.98,
                       vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
                       filter_corr_by_all_columns=False,
                       filter_vif_by_subsets=True,
@@ -288,7 +288,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
         self.y_var_reduced = self.y_var.drop(columns=columns_w_small_std)
         self._reduce_y_var_base(self.y_var_reduced,
                                 filter_corr_by_all_columns=filter_corr_by_all_columns,
-                                corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                                corr_threshold_for_lags=corr_threshold_for_lags,
                                 vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
                                 vif_threshold=vif_threshold,
                                 verbose=verbose,
@@ -304,7 +304,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
     def _reduce_y_var_lags(self,
                            df_path=None,
                            save_data=True,
-                           corr_threshold_for_lags_of_a_feature=0.85,
+                           corr_threshold_for_lags=0.85,
                            vif_threshold_for_initial_subset=5,
                            vif_threshold=5,
                            verbose=True,
@@ -341,7 +341,7 @@ class NeuralBaseClass(further_processing_class.FurtherProcessing):
 
         # Call parent class method to do the actual reduction
         self._reduce_y_var_lags_base(
-            corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+            corr_threshold_for_lags=corr_threshold_for_lags,
             vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
             vif_threshold=vif_threshold,
             verbose=verbose,

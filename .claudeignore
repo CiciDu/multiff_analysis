@@ -1,0 +1,41 @@
+# Python cache
+__pycache__/
+*.py[cod]
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+.conda/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+logs/
+**/logs/
+
+    
+results/
+
+# OS junk
+.DS_Store
+**/.DS_Store
+
+# Python caches
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+
+**/RL_models/ 
+**/results/
+
+**/jobs/rppo/logs/
+**/jobs/decode/logs/
+**/jobs/sb3/logs/
+
+**/logs/

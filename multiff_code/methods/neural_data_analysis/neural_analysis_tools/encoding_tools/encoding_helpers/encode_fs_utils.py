@@ -1,18 +1,13 @@
-
 from typing import Dict, List, Optional, Tuple, Union
-
 
 import numpy as np
 import pandas as pd
 
-
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
 from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decode_fs_utils
-
-
-from neural_data_analysis.design_kits.design_by_segment import (
-    other_feats
-)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import decode_stops_design
+from neural_data_analysis.design_kits.design_by_segment import other_feats
 
 
 def build_fs_encoding_design(
@@ -31,34 +26,36 @@ def build_fs_encoding_design(
     """
     Full-session encoding design builder.
 
-    Requires pn.monkey_information to already contain the time_since_* and
-    num_ff_* columns (added by decode_fs_utils.add_time_since_capture_or_stop
-    and decode_fs_utils.add_columns_related_to_ff_visibility).
+    raw_behavioral_feats mirrors FSTask.feats_to_decode exactly: it is built
+    by calling decode_fs_utils.build_fs_design_decoding (the same function
+    the decoding task uses), then applying scale_binned_feats +
+    clean_binary_and_drop_constant.
     """
-
     from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers.encoder_gam_helper import (
         FS_ENCODING_VAR_CATEGORIES,
     )
     var_categories = FS_ENCODING_VAR_CATEGORIES
 
-    binned_feats, meta_df_used, bins_2d, pos, new_seg_info = decode_fs_utils.build_fs_design_decoding(pn)
+    # ── shared decoding design ──────────────────────────────────────────
+    # This is exactly what FSTask calls; reuse it so raw_behavioral_feats
+    # is bit-for-bit identical to feats_to_decode.
+    raw_binned_feats, meta_df_used, bins_2d, pos, new_seg_info = (
+        decode_fs_utils.build_fs_design_decoding(pn)
+    )
+    raw_behavioral_feats = decode_stops_design.scale_binned_feats(raw_binned_feats)
+    raw_behavioral_feats = decoding_design_utils.clean_binary_and_drop_constant(
+        raw_behavioral_feats
+    )
 
+    # ── spike binning ───────────────────────────────────────────────────
     binned_spikes, _ = encoding_design_utils.bin_spikes_for_event_windows(
-        pn.spikes_df,
-        bins_2d,
-        pos,
-        time_col='time',
-        cluster_col='cluster',
+        pn.spikes_df, bins_2d, pos, time_col='time', cluster_col='cluster',
     )
 
-    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(
-        binned_feats
-    )
+    # ── encoding-specific design expansion ─────────────────────────────
+    binned_feats = raw_binned_feats.copy()
+    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(binned_feats)
 
-    # ==============================================================
-    # 5) Continuous tuning block
-    # ==============================================================
-    # Use a copy to avoid mutating the module-level constant.
     raw_feature_cols_to_drop = list(encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS)
     raw_feature_cols_to_drop.remove('time')
     binned_feats, tuning_meta, _ = (
@@ -74,56 +71,34 @@ def build_fs_encoding_design(
         )
     )
 
-    # Ensure 'time' (kept as raw, not splines) is in tuning_meta
     binned_feats, tuning_meta = other_feats.add_raw_feature(
-        binned_feats,
-        feature='time',
-        data=binned_feats,
-        name='time',
-        transform='linear',
-        eps=1e-6,
-        center=True,
-        scale=True,
-        meta=tuning_meta,
+        binned_feats, feature='time', data=binned_feats, name='time',
+        transform='linear', eps=1e-6, center=True, scale=True, meta=tuning_meta,
     )
-
 
     events = var_categories['event_vars']
     temporal_meta = {}
-    if len(events) > 0:
-        for event in events:
-            if event not in binned_feats.columns:
-                print(f'Missing required event column "{event}" in data')
-                print('binned_feats.columns:', binned_feats.columns.tolist())
-                continue
-
-            temporal_df, current_temporal_meta = encoding_design_utils.build_temporal_design_from_binned_events(
-                bin_t_center=meta_df_used['t_center'].to_numpy(dtype=float),
-                event_indicator=binned_feats[event].values,
-                bin_dt=bin_width,
-                n_basis=n_basis,
-                t_min=t_min,
-                t_max=t_max,
-                index=binned_feats.index,
-                event_name=event,
-            )
-
-            binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
-            binned_feats = binned_feats.drop(columns=[event])
-
-            for key, val in current_temporal_meta.items():
-                if key in temporal_meta:
-                    temporal_meta[key] = encoding_design_utils.merge_meta_vals(temporal_meta[key], val)
-                else:
-                    temporal_meta[key] = val
-    else:
-        temporal_df = None
+    for event in events:
+        if event not in binned_feats.columns:
+            print(f'Missing required event column "{event}" in data')
+            continue
+        temporal_df, current_temporal_meta = encoding_design_utils.build_temporal_design_from_binned_events(
+            bin_t_center=meta_df_used['t_center'].to_numpy(dtype=float),
+            event_indicator=binned_feats[event].values,
+            bin_dt=bin_width, n_basis=n_basis, t_min=t_min, t_max=t_max,
+            index=binned_feats.index, event_name=event,
+        )
+        binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
+        binned_feats = binned_feats.drop(columns=[event])
+        for key, val in current_temporal_meta.items():
+            if key in temporal_meta:
+                temporal_meta[key] = encoding_design_utils.merge_meta_vals(temporal_meta[key], val)
+            else:
+                temporal_meta[key] = val
+    if not events:
         temporal_meta = None
 
-
-    # for encoding_fs
     raw_features = [
-        # 'curv_of_traj',
         'num_ff_visible', 'log1p_num_ff_visible',
         'num_ff_in_memory', 'log1p_num_ff_in_memory',
         'time_since_prev_stop', 'time_since_prev_capture',
@@ -133,43 +108,18 @@ def build_fs_encoding_design(
         if k not in binned_feats.columns:
             raise KeyError(f'missing raw feature {k!r} in data')
         binned_feats, tuning_meta = other_feats.add_raw_feature(
-            binned_feats,
-            feature=k,
-            data=binned_feats,
-            name=k,
-            transform='linear',
-            eps=1e-6,
-            center=True,
-            scale=False,
-            meta=tuning_meta,
+            binned_feats, feature=k, data=binned_feats, name=k,
+            transform='linear', eps=1e-6, center=True, scale=False, meta=tuning_meta,
         )
 
-
-    # ==============================================================
-    # 9) Drop constant columns (except const)
-    # ==============================================================
-    const_cols = [
-        c for c in binned_feats.columns
-        if c != 'const' and binned_feats[c].nunique() <= 1
-    ]
+    const_cols = [c for c in binned_feats.columns if c != 'const' and binned_feats[c].nunique() <= 1]
     binned_feats = binned_feats.drop(columns=const_cols)
 
-    # ==============================================================
-    # 10) Final sorting
-    # ==============================================================
-    sort_idx = meta_df_used.sort_values(
-        ['event_id', 'k_within_seg']
-    ).index
+    sort_idx = meta_df_used.sort_values(['event_id', 'k_within_seg']).index
+    meta_df_used       = meta_df_used.loc[sort_idx].reset_index(drop=True)
+    binned_feats       = binned_feats.loc[sort_idx].reset_index(drop=True)
+    binned_spikes      = binned_spikes.loc[sort_idx].reset_index(drop=True)
+    raw_behavioral_feats = raw_behavioral_feats.loc[sort_idx].reset_index(drop=True)
 
-    meta_df_used = meta_df_used.loc[sort_idx].reset_index(drop=True)
-    binned_feats = binned_feats.loc[sort_idx].reset_index(drop=True)
-    binned_spikes = binned_spikes.loc[sort_idx].reset_index(drop=True)
-
-    return (
-        pn,
-        binned_spikes,
-        binned_feats,
-        meta_df_used,
-        temporal_meta,
-        tuning_meta,
-    )
+    return (pn, binned_spikes, binned_feats, meta_df_used,
+            temporal_meta, tuning_meta, raw_behavioral_feats)

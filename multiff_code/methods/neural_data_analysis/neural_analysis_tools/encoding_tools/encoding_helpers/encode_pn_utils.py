@@ -1,26 +1,17 @@
-
 from typing import Dict, List, Optional, Tuple, Union
-
 
 import numpy as np
 import pandas as pd
 
-
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
-
-
-
-from neural_data_analysis.design_kits.design_by_segment import (
-    other_feats
-)
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
+from neural_data_analysis.design_kits.design_by_segment import other_feats, temporal_feats
 
 
 _PN_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
-    # Kinematic (1D each)
     ('accel', ['accel'], '1D'),
     ('speed', ['speed'], '1D'),
     ('ang_speed', ['ang_speed'], '1D'),
-    # One_ff_gam-style tuning (if present in design; from agg_cols in encoding design)
     ('v', ['v'], '1D'),
     ('w', ['w'], '1D'),
     ('d', ['d'], '1D'),
@@ -30,17 +21,16 @@ _PN_BEHAVIORAL_GROUP_SPECS: List[tuple] = [
     ('eye_ver', ['eye_ver'], '1D'),
     ('eye_hor', ['eye_hor'], '1D'),
     ('time_since_target_last_seen', ['time_since_target_last_seen'], '1D'),
-    ('time_since_last_capture', ['time_since_last_capture'], '1D'), 
+    ('time_since_last_capture', ['time_since_last_capture'], '1D'),
     ('cur_ff_distance', ['cur_ff_distance'], '1D'),
     ('nxt_ff_distance', ['nxt_ff_distance'], '1D'),
     ('cur_ff_angle', ['cur_ff_angle'], '1D'),
     ('nxt_ff_angle', ['nxt_ff_angle'], '1D'),
     ('ff_visible', ['num_ff_visible', 'log1p_num_ff_visible'], '1D'),
     ('ff_in_memory', ['num_ff_in_memory', 'log1p_num_ff_in_memory'], '1D'),
-    # Event design (event = temporal basis)
-    ('cur_vis_on', None, 'event'),   # cols: rcos_* without *captured; filled below
+    ('cur_vis_on', None, 'event'),
     ('cur_vis_off', None, 'event'),
-    ]
+]
 
 
 def build_pn_encoding_design(
@@ -48,6 +38,7 @@ def build_pn_encoding_design(
     monkey_information,
     global_bins_2d,
     bin_width,
+    ff_caught_T_new=None,
     n_basis: int = 20,
     t_min: float = -0.3,
     t_max: float = 0.3,
@@ -59,24 +50,33 @@ def build_pn_encoding_design(
     angular_vars: Optional[List[str]] = None,
 ):
     """
-    Assemble stop design for encoding (GAM / temporal + tuning basis).
+    Assemble PN encoding design (GAM / temporal + tuning basis).
+
+    raw_behavioral_feats mirrors PNTask.feats_to_decode exactly: it is built
+    by applying temporal_feats.add_stop_and_capture_columns to rebinned_y_var
+    (the same call PNTask makes), then clean_binary_and_drop_constant.
+    ff_caught_T_new is required to produce the stop/capture columns; if not
+    provided the snapshot falls back to rebinned_y_var as-is after cleaning.
     """
 
-    # Optionally rename planning columns to one_ff names (target_distance -> r_targ, etc.)
-    # -------------------------------------------------------------------------
+    # ── raw behavioral feats (decoding-equivalent) ──────────────────────
+    trial_ids = rebinned_y_var['new_segment']
+    if ff_caught_T_new is not None:
+        raw_y = temporal_feats.add_stop_and_capture_columns(
+            rebinned_y_var.copy(), trial_ids, ff_caught_T_new
+        )
+    else:
+        raw_y = rebinned_y_var.copy()
+    raw_behavioral_feats = decoding_design_utils.clean_binary_and_drop_constant(raw_y)
 
-
+    # ── encoding-specific binning ────────────────────────────────────────
     kinematic_cols = []
     agg_cols = encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS
-    # -------------------------------------------------------------------------
 
-    # ------ add boxcar covariates
     binned_feats, exposure, used_bins, mask_used, pos = (
         encoding_design_utils.bin_monkey_information_feats_from_event_bins(
-            monkey_information,
-            global_bins_2d,
-            kinematic_cols=kinematic_cols,
-            agg_cols=agg_cols,
+            monkey_information, global_bins_2d,
+            kinematic_cols=kinematic_cols, agg_cols=agg_cols,
         )
     )
 
@@ -91,8 +91,11 @@ def build_pn_encoding_design(
             else:
                 print(f'Missing required variable "{var}" in binned features. Will skip it.')
 
-    rebinned_y_var['time'] = binned_feats['time'].values # pass in as raw feature later
-    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS.copy() + (linear_vars or []) + (angular_vars or [])
+    rebinned_y_var['time'] = binned_feats['time'].values
+    raw_feature_cols_to_drop = (
+        encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS.copy()
+        + (linear_vars or []) + (angular_vars or [])
+    )
     print('raw_feature_cols_to_drop:', raw_feature_cols_to_drop)
 
     binned_feats, tuning_meta, mode = encoding_design_utils.add_tuning_features_to_design(
@@ -106,77 +109,48 @@ def build_pn_encoding_design(
         raw_feature_cols_to_drop=raw_feature_cols_to_drop,
     )
 
-    # ------------------------------------------------------------------
-    # 4) Summed stop-event temporal basis
-    # ------------------------------------------------------------------
-
     events = ['cur_vis_on', 'cur_vis_off']
     temporal_meta = {}
-    if len(events) > 0:
-        for event in events:
-            if event not in rebinned_y_var.columns:
-                print(f'Missing required event column "{event}" in data')
-                print('rebinned_y_var.columns:', rebinned_y_var.columns)
-                continue
-
-            temporal_df, current_temporal_meta = encoding_design_utils.build_temporal_design_from_binned_events(
-                bin_t_center=rebinned_y_var['t_center'].to_numpy(dtype=float),
-                event_indicator=rebinned_y_var[event].values,
-                bin_dt=bin_width,
-                n_basis=n_basis,
-                t_min=t_min,
-                t_max=t_max,
-                index=rebinned_y_var.index,
-                event_name=event,
-            )
-
-            binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
-            if event in binned_feats.columns:
-                binned_feats = binned_feats.drop(columns=[event])
-
-            for key, val in current_temporal_meta.items():
-                if key in temporal_meta:
-                    temporal_meta[key] = encoding_design_utils.merge_meta_vals(temporal_meta[key], val)
-                else:
-                    temporal_meta[key] = val
-    else:
-        temporal_df = None
+    for event in events:
+        if event not in rebinned_y_var.columns:
+            print(f'Missing required event column "{event}" in data')
+            continue
+        temporal_df, current_temporal_meta = encoding_design_utils.build_temporal_design_from_binned_events(
+            bin_t_center=rebinned_y_var['t_center'].to_numpy(dtype=float),
+            event_indicator=rebinned_y_var[event].values,
+            bin_dt=bin_width, n_basis=n_basis, t_min=t_min, t_max=t_max,
+            index=rebinned_y_var.index, event_name=event,
+        )
+        binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
+        if event in binned_feats.columns:
+            binned_feats = binned_feats.drop(columns=[event])
+        for key, val in current_temporal_meta.items():
+            if key in temporal_meta:
+                temporal_meta[key] = encoding_design_utils.merge_meta_vals(temporal_meta[key], val)
+            else:
+                temporal_meta[key] = val
+    if not events:
         temporal_meta = None
 
     raw_features = [
-            # 'curv_of_traj',
-            'time',  # kept as raw, not splines
-            'num_ff_visible', 'log1p_num_ff_visible',
-            'num_ff_in_memory', 'log1p_num_ff_in_memory',
-             'cum_distance_since_target_last_seen', 
-             'time_since_last_capture',
-             'gaze_mky_view_y', 'gaze_mky_view_x', 'cur_eye_ver_l',
-        ]
+        'time',
+        'num_ff_visible', 'log1p_num_ff_visible',
+        'num_ff_in_memory', 'log1p_num_ff_in_memory',
+        'cum_distance_since_target_last_seen',
+        'time_since_last_capture',
+        'gaze_mky_view_y', 'gaze_mky_view_x', 'cur_eye_ver_l',
+    ]
     for k in raw_features:
         if k not in rebinned_y_var.columns:
             raise KeyError(f'missing raw feature {k!r} in data')
         binned_feats, tuning_meta = other_feats.add_raw_feature(
-            binned_feats,
-            feature=k,
-            data=rebinned_y_var,
-            name=k,
-            transform='linear',
-            eps=1e-6,
-            center=True,
-            scale=True,
-            meta=tuning_meta,
+            binned_feats, feature=k, data=rebinned_y_var, name=k,
+            transform='linear', eps=1e-6, center=True, scale=True, meta=tuning_meta,
         )
 
-    # Drop constant columns except 'const'
     const_cols_to_drop = [
-        c for c in binned_feats.columns
-        if c != 'const' and binned_feats[c].nunique() <= 1
+        c for c in binned_feats.columns if c != 'const' and binned_feats[c].nunique() <= 1
     ]
     binned_feats = binned_feats.drop(columns=const_cols_to_drop)
 
-
-    return (
-        binned_feats,
-        temporal_meta,
-        tuning_meta,
-    )
+    return (binned_feats, temporal_meta, tuning_meta, raw_behavioral_feats)

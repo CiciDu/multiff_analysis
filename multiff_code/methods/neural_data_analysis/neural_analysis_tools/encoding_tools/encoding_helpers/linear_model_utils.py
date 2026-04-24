@@ -547,7 +547,7 @@ def lm_spike_counts_for_columns(
 
         X_v_reduced = process_encode_design.reduce_encoding_design(
             X_v,
-            corr_threshold_for_lags_of_a_feature=0.9,
+            corr_threshold_for_lags=0.9,
             vif_threshold=5,
             verbose=False,
         )

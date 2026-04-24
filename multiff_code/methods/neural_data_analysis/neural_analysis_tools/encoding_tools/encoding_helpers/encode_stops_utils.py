@@ -1,27 +1,15 @@
-
 from typing import Dict, List, Optional, Tuple, Union
-
 
 import numpy as np
 import pandas as pd
 
-
-from neural_data_analysis.design_kits.design_around_event import (
-    stop_design,
-    cluster_design,
-)
+from neural_data_analysis.design_kits.design_around_event import stop_design, cluster_design
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import encoding_design_utils
-
-
+from neural_data_analysis.neural_analysis_tools.decoding_tools.decoding_helpers import decoding_design_utils
+from neural_data_analysis.topic_based_neural_analysis.stop_event_analysis.get_stop_events import decode_stops_design
 from neural_data_analysis.topic_based_neural_analysis.ff_visibility import vis_design
+from neural_data_analysis.design_kits.design_by_segment import other_feats
 
-from neural_data_analysis.design_kits.design_by_segment import (
-    other_feats
-)
-
-# ---------------------------------------------------------------------------
-# Stop GAM group specs (mirror one_ff_gam: lam_f tuning, lam_g event, lam_h hist, lam_p coupling)
-# ---------------------------------------------------------------------------
 
 def build_stop_encoding_design(
     pn,
@@ -44,20 +32,34 @@ def build_stop_encoding_design(
 ):
     """
     Full stop-aligned encoding design builder.
+
+    raw_behavioral_feats mirrors StopTask.feats_to_decode exactly: it is
+    produced by calling decode_stops_design.build_stop_design_decoding (the
+    same function StopTask uses), then scale_binned_feats +
+    clean_binary_and_drop_constant.
     """
 
-    # ==============================================================
-    # 3-4) Shared binning core (event windows -> binned feats/spikes)
-    # ==============================================================
+    # ── raw behavioral feats (decoding-equivalent) ──────────────────────
+    _, raw_binned_feats, _, meta_df_raw = decode_stops_design.build_stop_design_decoding(
+        new_seg_info=new_seg_info,
+        events_with_stats=events_with_stats,
+        monkey_information=pn.monkey_information,
+        ff_dataframe=pn.ff_dataframe,
+        spikes_df=pn.spikes_df,
+        bin_dt=bin_width,
+        add_ff_visible_info=True,
+        add_retries_info=add_retry_features,
+        datasets=datasets,
+        global_bins_2d=global_bins_2d,
+    )
+    raw_behavioral_feats = decode_stops_design.scale_binned_feats(raw_binned_feats)
+    raw_behavioral_feats = decoding_design_utils.clean_binary_and_drop_constant(
+        raw_behavioral_feats
+    )
+
+    # ── encoding-specific binning core ──────────────────────────────────
     (
-        bins_2d,
-        meta,
-        binned_feats,
-        exposure,
-        used_bins,
-        mask_used,
-        pos,
-        meta_df_used,
+        bins_2d, meta, binned_feats, exposure, used_bins, mask_used, pos, meta_df_used,
     ) = encoding_design_utils.bin_event_windows_core(
         new_seg_info=new_seg_info,
         monkey_information=pn.monkey_information,
@@ -68,21 +70,12 @@ def build_stop_encoding_design(
     )
 
     binned_spikes, _ = encoding_design_utils.bin_spikes_for_event_windows(
-        pn.spikes_df,
-        bins_2d,
-        pos,
-        time_col='time',
-        cluster_col='cluster',
+        pn.spikes_df, bins_2d, pos, time_col='time', cluster_col='cluster',
     )
 
-    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(
-        binned_feats
-    )
+    binned_feats = encoding_design_utils._ensure_one_ff_style_covariates(binned_feats)
 
-    # ==============================================================
-    # 5) Continuous tuning block
-    # ==============================================================
-    raw_feature_cols_to_drop=encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS.copy()
+    raw_feature_cols_to_drop = encoding_design_utils.ONE_FF_STYLE_ENCODING_COLS.copy()
     raw_feature_cols_to_drop.remove('time')
     binned_feats, tuning_meta, _ = (
         encoding_design_utils.add_tuning_features_to_design(
@@ -97,164 +90,75 @@ def build_stop_encoding_design(
         )
     )
 
-    # Ensure 'time' (kept as raw, not splines) is in tuning_meta
     binned_feats, tuning_meta = other_feats.add_raw_feature(
-        binned_feats,
-        feature='time',
-        data=binned_feats,
-        name='time',
-        transform='linear',
-        eps=1e-6,
-        center=True,
-        scale=True,
-        meta=tuning_meta,
+        binned_feats, feature='time', data=binned_feats, name='time',
+        transform='linear', eps=1e-6, center=True, scale=True, meta=tuning_meta,
     )
 
-    # ==============================================================
-    # 6) Cluster-level features
-    # ==============================================================
     if add_stop_cluster_features:
-            
         cluster_df = cluster_design.build_cluster_features_workflow(
-            meta_df_used[['event_id', 'rel_center']],
-            events_with_stats,
-            rel_time_col='rel_center',
-            winsor_p=0.5,
-            use_midbin_progress=True,
-            zscore_progress=False,
-            zscore_rel_time=True,
+            meta_df_used[['event_id', 'rel_center']], events_with_stats,
+            rel_time_col='rel_center', winsor_p=0.5, use_midbin_progress=True,
+            zscore_progress=False, zscore_rel_time=True,
         )
-
-        cluster_feats = [
-            'is_clustered',
-            'event_is_first_in_cluster',
-            'gap_since_prev_event_in_cluster_z',
-            'gap_till_next_event_in_cluster_z',
-            'cluster_duration_s_z',
-            'cluster_progress_c',
-            'bin_t_from_cluster_start_s_z',
-            'log_n_events_in_cluster_z',
-            'cluster_progress_c2',
-            'event_t_from_cluster_start_s',
-        ]
-
-        for k in cluster_feats:
+        for k in [
+            'is_clustered', 'event_is_first_in_cluster',
+            'gap_since_prev_event_in_cluster_z', 'gap_till_next_event_in_cluster_z',
+            'cluster_duration_s_z', 'cluster_progress_c', 'bin_t_from_cluster_start_s_z',
+            'log_n_events_in_cluster_z', 'cluster_progress_c2', 'event_t_from_cluster_start_s',
+        ]:
             binned_feats, tuning_meta = other_feats.add_raw_feature(
-                binned_feats,
-                feature=k,
-                data=cluster_df,
-                name=k,
-                transform='linear',
-                eps=1e-6,
-                center=True,
-                scale=False,
-                meta=tuning_meta,
+                binned_feats, feature=k, data=cluster_df, name=k,
+                transform='linear', eps=1e-6, center=True, scale=False, meta=tuning_meta,
             )
 
-    # Add relative time to event start
     meta_df_used['time_rel_to_event_start'] = meta_df_used['rel_center'].to_numpy()
-
     binned_feats, tuning_meta = other_feats.add_raw_feature(
-        binned_feats,
-        feature='time_rel_to_event_start',
-        data=meta_df_used,
-        name='time_rel_to_event_start',
-        transform='linear',
-        eps=1e-6,
-        center=True,
-        scale=False,
-        meta=tuning_meta,
+        binned_feats, feature='time_rel_to_event_start', data=meta_df_used,
+        name='time_rel_to_event_start', transform='linear', eps=1e-6,
+        center=True, scale=False, meta=tuning_meta,
     )
 
-    # ==============================================================
-    # 7) Firefly + Retry features (clean integration)
-    # ==============================================================
-    # Add raw columns directly
     binned_feats, ff_added_cols = add_ff_visible_and_in_memory_counts(
-        binned_feats,
-        bins_2d,
-        pn.ff_dataframe,
-        used_bins,
+        binned_feats, bins_2d, pn.ff_dataframe, used_bins,
     )
-
+    retry_added_cols = []
     if add_retry_features:
         binned_feats, retry_added_cols = add_retries_info_to_binned_feats(
-            binned_feats,
-            new_seg_info,
-            datasets,
-            meta_df_used,
+            binned_feats, new_seg_info, datasets, meta_df_used,
         )
-    else: 
-        retry_added_cols = []
-
-    # Register into tuning_meta
     for k in ff_added_cols + retry_added_cols:
         binned_feats, tuning_meta = other_feats.add_raw_feature(
-            binned_feats,
-            feature=k,
-            data=binned_feats,
-            name=k,
-            transform='linear',
-            eps=1e-6,
-            center=True,
-            scale=False,
-            meta=tuning_meta,
+            binned_feats, feature=k, data=binned_feats, name=k,
+            transform='linear', eps=1e-6, center=True, scale=False, meta=tuning_meta,
         )
 
-    # ==============================================================
-    # 8) Summed stop-event temporal basis
-    # ==============================================================
     if 't_center' not in meta_df_used:
         raise ValueError('meta_df_used missing required column "t_center"')
-
     if 'event_id_start_time' not in events_with_stats:
-        raise ValueError(
-            'events_with_stats missing required column "event_id_start_time"'
-        )
+        raise ValueError('events_with_stats missing required column "event_id_start_time"')
 
     temporal_df, temporal_meta = (
         encoding_design_utils.build_temporal_design_from_event_times(
             bin_t_center=meta_df_used['t_center'].to_numpy(dtype=float),
             event_times=events_with_stats['event_id_start_time'].to_numpy(dtype=float),
-            bin_dt=bin_width,
-            n_basis=n_basis,
-            t_min=t_min,
-            t_max=t_max,
-            index=binned_feats.index,
-            event_name='stop',
+            bin_dt=bin_width, n_basis=n_basis, t_min=t_min, t_max=t_max,
+            index=binned_feats.index, event_name='stop',
         )
     )
-
     binned_feats = pd.concat([binned_feats, temporal_df], axis=1)
 
-    # ==============================================================
-    # 9) Drop constant columns (except const)
-    # ==============================================================
-    const_cols = [
-        c for c in binned_feats.columns
-        if c != 'const' and binned_feats[c].nunique() <= 1
-    ]
+    const_cols = [c for c in binned_feats.columns if c != 'const' and binned_feats[c].nunique() <= 1]
     binned_feats = binned_feats.drop(columns=const_cols)
 
-    # ==============================================================
-    # 10) Final sorting
-    # ==============================================================
-    sort_idx = meta_df_used.sort_values(
-        ['event_id', 'k_within_seg']
-    ).index
+    sort_idx = meta_df_used.sort_values(['event_id', 'k_within_seg']).index
+    meta_df_used         = meta_df_used.loc[sort_idx].reset_index(drop=True)
+    binned_feats         = binned_feats.loc[sort_idx].reset_index(drop=True)
+    binned_spikes        = binned_spikes.loc[sort_idx].reset_index(drop=True)
+    raw_behavioral_feats = raw_behavioral_feats.loc[sort_idx].reset_index(drop=True)
 
-    meta_df_used = meta_df_used.loc[sort_idx].reset_index(drop=True)
-    binned_feats = binned_feats.loc[sort_idx].reset_index(drop=True)
-    binned_spikes = binned_spikes.loc[sort_idx].reset_index(drop=True)
-
-    return (
-        pn,
-        binned_spikes,
-        binned_feats,
-        meta_df_used,
-        temporal_meta,
-        tuning_meta,
-    )
+    return (pn, binned_spikes, binned_feats, meta_df_used,
+            temporal_meta, tuning_meta, raw_behavioral_feats)
 
 
 def add_ff_visible_and_in_memory_counts(

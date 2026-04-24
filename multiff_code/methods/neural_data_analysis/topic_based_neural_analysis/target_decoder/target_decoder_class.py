@@ -165,7 +165,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
 
     def reduce_y_var(self,
                      save_data=True,
-                     corr_threshold_for_lags_of_a_feature=0.98,
+                     corr_threshold_for_lags=0.98,
                      vif_threshold_for_initial_subset=5, vif_threshold=5, verbose=True,
                      filter_corr_by_all_columns=False,
                      filter_vif_by_subsets=True,
@@ -177,7 +177,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
 
         self._reduce_y_var(df_path=df_path,
                            save_data=save_data,
-                           corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                           corr_threshold_for_lags=corr_threshold_for_lags,
                            vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
                            vif_threshold=vif_threshold,
                            verbose=verbose,
@@ -189,7 +189,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
     def reduce_y_var_lags(self,
                           df_path=None,
                           save_data=True,
-                          corr_threshold_for_lags_of_a_feature=0.85,
+                          corr_threshold_for_lags=0.85,
                           vif_threshold_for_initial_subset=5,
                           vif_threshold=5,
                           verbose=True,
@@ -210,7 +210,7 @@ class TargetDecoderClass(base_neural_class.NeuralBaseClass):
 
         self._reduce_y_var_lags(df_path=df_path,
                                 save_data=save_data,
-                                corr_threshold_for_lags_of_a_feature=corr_threshold_for_lags_of_a_feature,
+                                corr_threshold_for_lags=corr_threshold_for_lags,
                                 vif_threshold_for_initial_subset=vif_threshold_for_initial_subset,
                                 vif_threshold=vif_threshold,
                                 verbose=verbose,

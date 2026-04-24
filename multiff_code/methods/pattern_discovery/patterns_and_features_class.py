@@ -180,6 +180,8 @@ class PatternsAndFeatures():
 
         # the line below is used because when the df was saved, 'percentage' column was not in it.
         self.combd_pattern_frequencies['percentage'] = self.combd_pattern_frequencies['rate']*100
+        
+        print(f'Successfully retrieved combined patterns and features from {self.combd_patterns_and_features_folder_path}')
         return
 
     def _make_agg_pattern_frequency(self):

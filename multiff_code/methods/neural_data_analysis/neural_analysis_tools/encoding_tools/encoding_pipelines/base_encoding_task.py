@@ -52,20 +52,18 @@ class BaseEncodingTask:
         self.raw_data_folder_path = raw_data_folder_path
         self.bin_width = bin_width
 
-        self.num_neurons = neural_data_processing.find_num_neurons(
-            self.raw_data_folder_path
-        )
-
         self.encoder_prs = (
             encoder_prs
             if encoder_prs is not None
             else multiff_encoding_params.default_prs()
         )
         self.binrange_dict = self.encoder_prs.binrange
+        self.use_neural_coupling = False  # set by EncodingRunner at construction
 
         # Filled by collect_data / _load_design_matrices
         self.binned_feats: Optional[pd.DataFrame] = None
         self.binned_spikes: Optional[pd.DataFrame] = None
+        self.raw_behavioral_feats: Optional[pd.DataFrame] = None
         self.temporal_meta: Optional[dict] = None
         self.tuning_meta: Optional[dict] = None
         self.structured_meta_groups: Optional[dict] = None
@@ -122,6 +120,45 @@ class BaseEncodingTask:
     def get_binned_data(self):
         """Return (binned_feats, binned_spikes) tuple."""
         return self.binned_feats, self.binned_spikes
+
+    def get_effective_num_neurons(self) -> int:
+        """Neuron count valid for both spike matrix and spike-history metadata."""
+        if self.binned_spikes is None:
+            raise RuntimeError("Call collect_data() first.")
+        n_spikes = int(self.binned_spikes.shape[1])
+        n_spk_cols = len(self.spk_colnames) if self.spk_colnames is not None else n_spikes
+        return min(n_spikes, n_spk_cols)
+
+    def get_raw_behavioral_feats(self) -> pd.DataFrame:
+        """Return raw behavioral features (no splines, no spike history).
+
+        These are the same variables that decoding tasks expose as
+        ``feats_to_decode``: kinematics and other continuous covariates
+        captured *before* spline/boxcar expansion in the encoding design
+        builder.  Use this as the RNN input when you want the model to
+        receive unparameterised behavioural signals.
+        """
+        if self.raw_behavioral_feats is None:
+            raise RuntimeError(
+                "raw_behavioral_feats is not available.  "
+                "Call collect_data() first."
+            )
+        return self.raw_behavioral_feats
+
+    def _finalize_collect_data(self) -> None:
+        """Shared tail called at the end of every subclass collect_data.
+
+        Runs feature reduction, spike-history construction, meta-group
+        assembly, persistence, and var-category cleanup — in that order.
+        Subclasses must have already populated ``binned_feats``,
+        ``binned_spikes``, and ``raw_behavioral_feats`` before calling
+        this.
+        """
+        self.reduce_binned_feats()
+        self._prepare_spike_history_components()
+        self._make_structured_meta_groups()
+        self._save_design_matrices()
+        self.clean_var_categories()
 
     # ------------------------------------------------------------------
     # CV grouping (used by models that need GroupKFold)
@@ -341,8 +378,9 @@ class BaseEncodingTask:
     def _get_design_matrix_paths(self) -> Dict[str, Path]:
         save_dir = Path(self._get_save_dir()) / "encoding_design"
         keys = [
-            "binned_feats", "binned_spikes", "binrange_dict", "bin_df",
-            "temporal_meta", "tuning_meta", "X_hist", "spk_colnames",
+            "binned_feats", "binned_spikes", "raw_behavioral_feats",
+            "binrange_dict", "bin_df",
+            "temporal_meta", "tuning_meta", "spk_colnames",
             "meta_df_used", "trial_ids",
         ]
         return {k: save_dir / f"{k}.pkl" for k in keys}
@@ -354,11 +392,11 @@ class BaseEncodingTask:
         data_to_save = {
             "binned_feats": self.binned_feats,
             "binned_spikes": self.binned_spikes,
+            "raw_behavioral_feats": getattr(self, "raw_behavioral_feats", None),
             "binrange_dict": self.binrange_dict,
             "temporal_meta": self.temporal_meta,
             "tuning_meta": self.tuning_meta,
             "bin_df": getattr(self, "bin_df", None),
-            "X_hist": getattr(self, "X_hist", None),
             "spk_colnames": getattr(self, "spk_colnames", None),
             "meta_df_used": getattr(self, "meta_df_used", None),
             "trial_ids": getattr(self, "trial_ids", None),
@@ -382,12 +420,26 @@ class BaseEncodingTask:
         required = ["binned_feats", "binned_spikes"]
         if not all(paths[k].exists() for k in required):
             return False
+        if not paths["raw_behavioral_feats"].exists():
+            print(
+                f"[{type(self).__name__}] Cached design matrices are missing "
+                "raw_behavioral_feats; recomputing from source data."
+            )
+            return False
 
         try:
             with open(paths["binned_feats"], "rb") as f:
                 self.binned_feats = pickle.load(f)
             with open(paths["binned_spikes"], "rb") as f:
                 self.binned_spikes = pickle.load(f)
+            with open(paths["raw_behavioral_feats"], "rb") as f:
+                self.raw_behavioral_feats = pickle.load(f)
+            if self.raw_behavioral_feats is None:
+                print(
+                    f"[{type(self).__name__}] Cached raw_behavioral_feats is empty; "
+                    "recomputing from source data."
+                )
+                return False
             with open(paths["binrange_dict"], "rb") as f:
                 self.binrange_dict = pickle.load(f)
             with open(paths["temporal_meta"], "rb") as f:
@@ -396,8 +448,6 @@ class BaseEncodingTask:
                 self.tuning_meta = pickle.load(f)
             with open(paths["bin_df"], "rb") as f:
                 self.bin_df = pickle.load(f)
-            with open(paths["X_hist"], "rb") as f:
-                self.X_hist = pickle.load(f)
             with open(paths["spk_colnames"], "rb") as f:
                 self.spk_colnames = pickle.load(f)
                 self.spike_cols = list(self.spk_colnames.keys())

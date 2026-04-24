@@ -107,27 +107,6 @@ class DecodingRunner:
     def plot_fold_tuning_info(self, **kwargs):
         self.model.plot_fold_tuning_info(self.task, **kwargs)
 
-    def find_categorical_vars_in_binned_feats(self, **kwargs):
-        return self.model.find_categorical_vars_in_binned_feats(self.task, **kwargs)
-
-    def run_anova_for_categorical_vars(self, unit_idx: int, **kwargs):
-        return self.model.run_anova_for_categorical_vars(self.task, unit_idx, **kwargs)
-
-    def run_anova_all_neurons(self, **kwargs):
-        return self.model.run_anova_all_neurons(self.task, **kwargs)
-
-    def plot_anova_results(self, **kwargs):
-        self.model.plot_anova_results(self.task, **kwargs)
-
-    def run_lm_for_categorical_vars(self, unit_idx: int, **kwargs):
-        return self.model.run_lm_for_categorical_vars(self.task, unit_idx, **kwargs)
-
-    def run_lm_all_neurons(self, **kwargs):
-        return self.model.run_lm_all_neurons(self.task, **kwargs)
-
-    def plot_lm_vs_anova_results(self, **kwargs):
-        return self.model.plot_lm_vs_anova_results(self.task, **kwargs)
-
     # ------------------------------------------------------------------
     # Repr
     # ------------------------------------------------------------------

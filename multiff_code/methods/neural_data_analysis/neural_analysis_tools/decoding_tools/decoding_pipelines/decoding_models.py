@@ -5,7 +5,7 @@ Provided models
 ---------------
 OneFFStyleModel     CCA + linear population readout.
 CVDecodingModel     Cross-validated model-spec decoding (CatBoost, ridge, etc.)
-                    plus ANOVA, LM, and analysis helpers.
+                    Cross-validated decoding with model selection.
 
 Both share the interface:
     model.run(task, ...)    → result
@@ -61,6 +61,26 @@ class BaseDecodingModel:
 
     def fit(self, task, **kwargs):
         return self.run(task, **kwargs)
+
+    @staticmethod
+    def _resolve_decoding_save_dir(task, save_dir=None) -> Path:
+        """
+        Resolve a decoding save_dir with a consistent spike-history component.
+        """
+        base = Path(task._get_save_dir()) if save_dir is None else Path(save_dir)
+        required_component = (
+            task._spike_history_save_subdir()
+            if bool(getattr(task, "use_spike_history", False))
+            else "no_spike_history"
+        )
+        parts = set(base.parts)
+        has_required = required_component in parts
+        has_any_spike_history_component = ("no_spike_history" in parts) or any(
+            p.startswith("sh_") for p in parts
+        )
+        if has_required or has_any_spike_history_component:
+            return base
+        return base / required_component
 
 
 # ===========================================================================
@@ -158,10 +178,7 @@ class OneFFStyleModel(BaseDecodingModel):
     ) -> Dict:
         task.collect_data(exists_ok=True)
 
-        if save_dir is None:
-            save_dir = Path(task._get_save_dir()) / "one_ff_style"
-        else:
-            save_dir = Path(save_dir)
+        save_dir = self._resolve_decoding_save_dir(task, save_dir) / "one_ff_style"
         save_dir.mkdir(parents=True, exist_ok=True)
 
         canoncorr = self.compute_canoncorr(
@@ -499,8 +516,7 @@ class CVDecodingModel(BaseDecodingModel):
         if getattr(task, "use_spike_history", False):
             task._ensure_spike_history_features_materialized()
 
-        if save_dir is None:
-            save_dir = task._get_save_dir()
+        save_dir = self._resolve_decoding_save_dir(task, save_dir)
         if shuffle_mode and shuffle_mode != "none":
             save_dir = Path(save_dir) / f"shuffle_{shuffle_mode}"
             save_dir.mkdir(parents=True, exist_ok=True)
@@ -1147,215 +1163,20 @@ class CVDecodingModel(BaseDecodingModel):
             plt.show()
 
     # ------------------------------------------------------------------
-    # Categorical variable discovery
+    # ANOVA / LM — moved to BaseEncodingModel
     # ------------------------------------------------------------------
-
-    def find_categorical_vars_in_binned_feats(
-        self, task, max_unique: int = 20, min_unique: int = 2
-    ) -> List[str]:
-        if task.feats_to_decode is None:
-            raise RuntimeError("Call collect_data() first.")
-
-        event_vars = set(getattr(task, "var_categories", {}).get("event_vars", []))
-        basis_cols: set = set()
-        for meta_attr in ("temporal_meta", "tuning_meta"):
-            meta = getattr(task, meta_attr, None) or {}
-            for col_list in (meta.get("groups") or {}).values():
-                basis_cols.update(col_list)
-
-        _basis_suffix = re.compile(r"_\d+$")
-        categorical_cols: List[str] = []
-        for col in task.feats_to_decode.columns:
-            if col in event_vars or col in basis_cols or _basis_suffix.search(col):
-                continue
-            series = task.feats_to_decode[col]
-            notnull = series.dropna()
-            if len(notnull) == 0:
-                continue
-            is_int_like = pd.api.types.is_integer_dtype(series) or (
-                pd.api.types.is_float_dtype(series)
-                and bool((notnull == notnull.round()).all())
-            )
-            if not is_int_like:
-                continue
-            if min_unique <= int(series.nunique(dropna=True)) <= max_unique:
-                categorical_cols.append(col)
-        return categorical_cols
-
-    # ------------------------------------------------------------------
-    # ANOVA
-    # ------------------------------------------------------------------
-
-    def run_anova_for_categorical_vars(
-        self, task, unit_idx: int,
-        categorical_cols: Optional[List[str]] = None,
-        alpha: float = 0.05,
-        verbose: bool = True,
-    ) -> pd.DataFrame:
-        if task.feats_to_decode is None or task.binned_spikes is None:
-            task.collect_data(exists_ok=True)
-        if categorical_cols is None:
-            categorical_cols = self.find_categorical_vars_in_binned_feats(task)
-        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
-        result_df = linear_model_utils.anova_spike_counts_for_columns(
-            y=y, binned_feats=task.feats_to_decode,
-            categorical_cols=categorical_cols, alpha=alpha,
-        )
-        if verbose:
-            linear_model_utils.print_anova_single_unit(result_df, unit_idx, alpha)
-        return result_df
-
-    def run_anova_all_neurons(
-        self, task,
-        categorical_cols: Optional[List[str]] = None,
-        alpha: float = 0.05,
-        verbose: bool = True,
-        results_cache: Optional[str] = None,
-        force_rerun: bool = False,
-    ) -> Dict[int, pd.DataFrame]:
-        cache_path = (
-            None if results_cache == ""
-            else Path(results_cache) if results_cache is not None
-            else self._results_cache_path(task, "anova")
-        )
-        if not force_rerun and cache_path is not None:
-            cached = self._load_results_cache(task, cache_path, "anova")
-            if cached is not None:
-                if verbose:
-                    linear_model_utils.print_anova_all_neurons(cached, alpha)
-                return cached
-
-        task.collect_data(exists_ok=True)
-        cols = categorical_cols or getattr(task, "categorical_vars", None) or \
-               self.find_categorical_vars_in_binned_feats(task)
-        if not cols:
-            print(f"[{self._name()}] No categorical vars — ANOVA skipped.")
-            return {}
-
-        results = {
-            unit_idx: self.run_anova_for_categorical_vars(
-                task, unit_idx=unit_idx, categorical_cols=cols, alpha=alpha, verbose=False
-            )
-            for unit_idx in range(task.binned_spikes.shape[1])
-        }
-        if cache_path is not None:
-            self._save_results_cache(task, results, cache_path, "anova")
-        if verbose:
-            linear_model_utils.print_anova_all_neurons(results, alpha)
-        return results
-
-    def plot_anova_results(
-        self, task,
-        anova_results: Dict[int, pd.DataFrame],
-        alpha: float = 0.05,
-        figsize: Optional[tuple] = None,
-        title: Optional[str] = None,
-    ):
-        if not anova_results:
-            print(f"[{self._name()}] plot_anova_results: empty results.")
-            return plt.figure()
-        if title is None:
-            title = f"ANOVA — {type(task).__name__} ({len(anova_results)} neurons, α={alpha})"
-        return linear_model_utils.plot_anova_results(
-            anova_results=anova_results, alpha=alpha, figsize=figsize, title=title
-        )
-
-    # ------------------------------------------------------------------
-    # LM (partial F-tests)
-    # ------------------------------------------------------------------
-
-    def run_lm_for_categorical_vars(
-        self, task, unit_idx: int,
-        categorical_cols: Optional[List[str]] = None,
-        continuous_cols: Optional[List[str]] = None,
-        include_all_feats: bool = True,
-        covariates_cache: Optional[str] = None,
-        alpha: float = 0.05,
-        verbose: bool = True,
-        _covariate_cols: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
-        if task.feats_to_decode is None or task.binned_spikes is None:
-            task.collect_data(exists_ok=True)
-        if categorical_cols is None:
-            categorical_cols = self.find_categorical_vars_in_binned_feats(task)
-
-        covariate_cols = _covariate_cols
-        if covariate_cols is None and include_all_feats:
-            covariate_cols = self._resolve_lm_covariate_cols(
-                task, categorical_cols=categorical_cols,
-                continuous_cols=continuous_cols, covariates_cache=covariates_cache,
-            )
-
-        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
-        result_df = linear_model_utils.lm_spike_counts_for_columns(
-            y=y, binned_feats=task.feats_to_decode,
-            categorical_cols=categorical_cols, continuous_cols=continuous_cols,
-            covariate_cols=covariate_cols, alpha=alpha,
-        )
-        if verbose:
-            linear_model_utils.print_lm_single_unit(result_df, unit_idx, alpha)
-        return result_df
-
-    def run_lm_all_neurons(
-        self, task,
-        categorical_cols: Optional[List[str]] = None,
-        continuous_cols: Optional[List[str]] = None,
-        include_all_feats: bool = True,
-        covariates_cache: Optional[str] = None,
-        alpha: float = 0.05,
-        verbose: bool = True,
-    ) -> Dict[int, pd.DataFrame]:
-        task.collect_data(exists_ok=True)
-        cols = categorical_cols or getattr(task, "categorical_vars", None) or \
-               self.find_categorical_vars_in_binned_feats(task)
-        if not cols:
-            print(f"[{self._name()}] No categorical vars — LM skipped.")
-            return {}
-
-        resolved_covariates = None
-        if include_all_feats:
-            resolved_covariates = self._resolve_lm_covariate_cols(
-                task, categorical_cols=cols, continuous_cols=continuous_cols,
-                covariates_cache=covariates_cache,
-            )
-
-        results = {
-            unit_idx: self.run_lm_for_categorical_vars(
-                task, unit_idx=unit_idx, categorical_cols=cols,
-                continuous_cols=continuous_cols, include_all_feats=False,
-                _covariate_cols=resolved_covariates, alpha=alpha, verbose=False,
-            )
-            for unit_idx in range(task.binned_spikes.shape[1])
-        }
-        if verbose:
-            linear_model_utils.print_lm_all_neurons(results, alpha)
-        return results
-
-    def plot_lm_vs_anova_results(
-        self, task,
-        anova_results: Dict[int, pd.DataFrame],
-        lm_results: Dict[int, pd.DataFrame],
-        alpha: float = 0.05,
-        figsize: Optional[tuple] = None,
-        title: Optional[str] = None,
-    ):
-        if not anova_results or not lm_results:
-            print(f"[{self._name()}] plot_lm_vs_anova_results: empty results.")
-            return plt.figure()
-        if title is None:
-            title = f"ANOVA vs LM — {type(task).__name__} ({len(anova_results)} neurons, α={alpha})"
-        return linear_model_utils.plot_lm_vs_anova(
-            anova_results=anova_results, lm_results=lm_results,
-            alpha=alpha, figsize=figsize, title=title,
-        )
-
+    # ANOVA and LM are encoding questions (behavioral variable → neural
+    # response) and now live in BaseEncodingModel / EncodingRunner.
+    # For backward compatibility, thin wrappers are provided in
+    # DecodingRunner that call linear_model_utils directly.
+    #
     # ------------------------------------------------------------------
     # Cache helpers
     # ------------------------------------------------------------------
 
     def _results_cache_path(self, task, label: str) -> Optional[Path]:
         try:
-            return Path(task._get_save_dir()) / f"{label}_results.pkl"
+            return self._resolve_decoding_save_dir(task, None) / f"{label}_results.pkl"
         except Exception:
             return None
 
@@ -1380,39 +1201,3 @@ class CVDecodingModel(BaseDecodingModel):
         except Exception as e:
             print(f"[{self._name()}] {label.upper()}: cache save failed ({e})")
 
-    def _resolve_lm_covariate_cols(
-        self, task,
-        categorical_cols: List[str],
-        continuous_cols: Optional[List[str]],
-        covariates_cache: Optional[str],
-    ) -> List[str]:
-        import json
-        cache_path = (
-            Path(covariates_cache) if covariates_cache is not None
-            else (Path(task._get_save_dir()) / "lm_covariates_cache.json"
-                  if hasattr(task, "_get_save_dir") else None)
-        )
-        if cache_path is not None and cache_path.exists():
-            try:
-                with open(cache_path) as f:
-                    return json.load(f)
-            except Exception:
-                pass
-
-        exclude = set(categorical_cols) | set(continuous_cols or [])
-        candidates = [c for c in task.feats_to_decode.columns if c not in exclude]
-        candidate_df = task.feats_to_decode[candidates]
-        reduced_df = process_encode_design.reduce_encoding_design(
-            candidate_df, corr_threshold=0.95, vif_threshold=20
-        )
-        covariate_cols = list(reduced_df.columns)
-
-        if cache_path is not None:
-            try:
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(cache_path, "w") as f:
-                    json.dump(covariate_cols, f)
-            except Exception:
-                pass
-
-        return covariate_cols

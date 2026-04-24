@@ -3,6 +3,7 @@ import argparse
 import sys
 import os
 from pathlib import Path
+import shutil
 for p in [Path.cwd()] + list(Path.cwd().parents):
     if p.name == 'Multifirefly-Project':
         os.chdir(p)
@@ -293,6 +294,13 @@ if __name__ == "__main__":
             load_replay_buffer=args.load_replay_buffer,
             use_curriculum_training=args.curriculum_training,
         )
+        
+    # to save storage space,delete the curr folder, as well as post/best/buffer.pkl
+    shutil.rmtree(rl.curr_dir, ignore_errors=True)
+    buffer_path = os.path.join(rl.best_model_postcurriculum_dir, "buffer.pkl")
+    if os.path.exists(buffer_path):
+        os.remove(buffer_path)
+        
 
     # Re-apply cost overrides after potential manifest-based env recreation
     if any(v is not None for v in (args.dv_cost_factor, args.dw_cost_factor, args.w_cost_factor, args.jerk_cost_factor, args.cost_per_stop)):
@@ -348,15 +356,15 @@ if __name__ == "__main__":
         except Exception as e:
             print('[eval] evaluation failed:', e)
 
-    # Collect model directories from this run into a per-job folder
-    try:
-        run_logger.collect_model_to_job_dir(overall_folder, getattr(
-            rl, 'model_folder_name', overall_folder), preferred_name=os.path.basename(getattr(rl, 'model_folder_name', 'agent_model')))
-        if getattr(rl, 'best_model_in_curriculum_dir', None):
-            run_logger.collect_model_to_job_dir(
-                overall_folder, rl.best_model_in_curriculum_dir, preferred_name=os.path.basename(rl.best_model_in_curriculum_dir))
-        if getattr(rl, 'best_model_postcurriculum_dir', None):
-            run_logger.collect_model_to_job_dir(
-                overall_folder, rl.best_model_postcurriculum_dir, preferred_name=os.path.basename(rl.best_model_postcurriculum_dir))
-    except Exception as e:
-        print('[logger] failed to collect models into job dir:', e)
+    # # Collect model directories from this run into a per-job folder
+    # try:
+    #     run_logger.collect_model_to_job_dir(overall_folder, getattr(
+    #         rl, 'model_folder_name', overall_folder), preferred_name=os.path.basename(getattr(rl, 'model_folder_name', 'agent_model')))
+    #     if getattr(rl, 'best_model_in_curriculum_dir', None):
+    #         run_logger.collect_model_to_job_dir(
+    #             overall_folder, rl.best_model_in_curriculum_dir, preferred_name=os.path.basename(rl.best_model_in_curriculum_dir))
+    #     if getattr(rl, 'best_model_postcurriculum_dir', None):
+    #         run_logger.collect_model_to_job_dir(
+    #             overall_folder, rl.best_model_postcurriculum_dir, preferred_name=os.path.basename(rl.best_model_postcurriculum_dir))
+    # except Exception as e:
+    #     print('[logger] failed to collect models into job dir:', e)

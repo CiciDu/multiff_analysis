@@ -28,6 +28,7 @@ Usage
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -41,6 +42,8 @@ from neural_data_analysis.design_kits.design_by_segment import spike_history
 from neural_data_analysis.neural_analysis_tools.encoding_tools.encoding_helpers import (
     encoder_gam_helper,
     encoding_design_utils,
+    linear_model_utils,
+    process_encode_design,
 )
 from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_gam import (
     gam_variance_explained,
@@ -58,10 +61,14 @@ from neural_data_analysis.topic_based_neural_analysis.replicate_one_ff.one_ff_ga
 
 class BaseEncodingModel:
     """
-    Minimal interface that every model must implement.
+    Base class for encoding models.
 
-    Parameters passed to fit / crossval are always
-    (task: BaseEncodingTask, unit_idx: int, **kwargs).
+    Subclasses must implement fit() and crossval().
+
+    Also provides ANOVA and LM analyses operating on
+    task.get_raw_behavioral_feats() — the same raw behavioral variables
+    that decoding tasks expose as feats_to_decode.  These are encoding
+    questions (behavioral variable → neural response) so they belong here.
     """
 
     def fit(self, task, unit_idx: int, **kwargs):
@@ -69,6 +76,321 @@ class BaseEncodingModel:
 
     def crossval(self, task, unit_idx: int, **kwargs):
         raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Helpers shared by ANOVA and LM
+    # ------------------------------------------------------------------
+
+    def _behavioral_feats(self, task) -> "pd.DataFrame":
+        """Return the raw behavioral feature matrix for ANOVA/LM.
+
+        Uses task.get_raw_behavioral_feats() when available (encoding
+        tasks), falling back to task.feats_to_decode (decoding tasks).
+        """
+        if hasattr(task, "get_raw_behavioral_feats"):
+            try:
+                return task.get_raw_behavioral_feats()
+            except RuntimeError:
+                pass
+        if hasattr(task, "feats_to_decode") and task.feats_to_decode is not None:
+            return task.feats_to_decode
+        raise RuntimeError("No behavioral feature matrix available. Call collect_data() first.")
+
+    def find_categorical_vars(
+        self, task, max_unique: int = 20, min_unique: int = 2
+    ) -> List[str]:
+        """Discover integer-valued low-cardinality columns suitable for ANOVA/LM.
+
+        A column is included when it is integer-like (or 0/1 float), has
+        between min_unique and max_unique distinct values, and is not a
+        spline/basis column.
+
+        Note: event_vars (e.g. ff_on, ff_off) are intentionally NOT excluded —
+        they are raw binary indicators in raw_behavioral_feats and are exactly
+        the kind of categorical variable ANOVA should test.  Only columns that
+        are already basis-expanded (identified by a trailing digit suffix like
+        _0, _1, _12 or listed in temporal_meta/tuning_meta groups) are skipped.
+        """
+        feats = self._behavioral_feats(task)
+
+        # Collect spline/basis column names from meta when available.
+        # raw_behavioral_feats never contains these, but guard for robustness.
+        basis_cols: set = set()
+        for meta_attr in ("temporal_meta", "tuning_meta"):
+            meta = getattr(task, meta_attr, None) or {}
+            for col_list in (meta.get("groups") or {}).values():
+                basis_cols.update(col_list)
+
+        _basis_suffix = re.compile(r"_\d+$")
+        categorical_cols: List[str] = []
+        for col in feats.columns:
+            if col in basis_cols or _basis_suffix.search(col):
+                continue
+            series = feats[col]
+            notnull = series.dropna()
+            if len(notnull) == 0:
+                continue
+            is_int_like = pd.api.types.is_integer_dtype(series) or (
+                pd.api.types.is_float_dtype(series)
+                and bool((notnull == notnull.round()).all())
+            )
+            if not is_int_like:
+                continue
+            if min_unique <= int(series.nunique(dropna=True)) <= max_unique:
+                categorical_cols.append(col)
+        return categorical_cols
+
+    def _results_cache_path(self, task, label: str):
+        try:
+            return Path(task._get_save_dir()) / f"{label}_results.pkl"
+        except Exception:
+            return None
+
+    def _load_results_cache(self, task, cache_path, label: str):
+        import pickle as _pkl
+        if cache_path is None or not cache_path.exists():
+            return None
+        try:
+            with open(cache_path, "rb") as f:
+                results = _pkl.load(f)
+            print(f"[{type(self).__name__}] {label.upper()}: loaded from cache ({cache_path})")
+            return results
+        except Exception as e:
+            print(f"[{type(self).__name__}] {label.upper()}: cache load failed ({e}) — re-running.")
+            return None
+
+    def _save_results_cache(self, task, results, cache_path, label: str):
+        import pickle as _pkl
+        if cache_path is None:
+            return
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(cache_path, "wb") as f:
+                _pkl.dump(results, f, protocol=_pkl.HIGHEST_PROTOCOL)
+            print(f"[{type(self).__name__}] {label.upper()}: saved to cache ({cache_path})")
+        except Exception as e:
+            print(f"[{type(self).__name__}] {label.upper()}: cache save failed ({e})")
+
+    def _resolve_lm_covariate_cols(
+        self, task,
+        categorical_cols: List[str],
+        continuous_cols: Optional[List[str]],
+        covariates_cache: Optional[str],
+    ) -> List[str]:
+        import json
+        feats = self._behavioral_feats(task)
+        cache_path = (
+            Path(covariates_cache) if covariates_cache is not None
+            else (Path(task._get_save_dir()) / "lm_covariates_cache.json"
+                  if hasattr(task, "_get_save_dir") else None)
+        )
+        if cache_path is not None and cache_path.exists():
+            try:
+                with open(cache_path) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+
+        exclude = set(categorical_cols) | set(continuous_cols or [])
+        candidates = [c for c in feats.columns if c not in exclude]
+        candidate_df = feats[candidates]
+        reduced_df = process_encode_design.reduce_encoding_design(
+            candidate_df, corr_threshold_for_lags=0.95, vif_threshold=20
+        )
+        covariate_cols = list(reduced_df.columns)
+
+        if cache_path is not None:
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(cache_path, "w") as f:
+                    json.dump(covariate_cols, f)
+            except Exception:
+                pass
+        return covariate_cols
+
+    # ------------------------------------------------------------------
+    # ANOVA
+    # ------------------------------------------------------------------
+
+    def run_anova_for_categorical_vars(
+        self, task, unit_idx: int,
+        categorical_cols: Optional[List[str]] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+    ) -> "pd.DataFrame":
+        """One-way ANOVA of spike counts across levels of each categorical variable."""
+        task.collect_data(exists_ok=True)
+        feats = self._behavioral_feats(task)
+        if categorical_cols is None:
+            categorical_cols = self.find_categorical_vars(task)
+        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        result_df = linear_model_utils.anova_spike_counts_for_columns(
+            y=y, binned_feats=feats, categorical_cols=categorical_cols, alpha=alpha,
+        )
+        if verbose:
+            linear_model_utils.print_anova_single_unit(result_df, unit_idx, alpha)
+        return result_df
+
+    def run_anova_all_neurons(
+        self, task,
+        categorical_cols: Optional[List[str]] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+        results_cache: Optional[str] = None,
+        force_rerun: bool = False,
+    ) -> Dict[int, "pd.DataFrame"]:
+        """ANOVA across all neurons; results cached to disk."""
+        cache_path = (
+            None if results_cache == ""
+            else Path(results_cache) if results_cache is not None
+            else self._results_cache_path(task, "anova")
+        )
+        if not force_rerun and cache_path is not None:
+            cached = self._load_results_cache(task, cache_path, "anova")
+            if cached is not None:
+                if verbose:
+                    linear_model_utils.print_anova_all_neurons(cached, alpha)
+                return cached
+
+        task.collect_data(exists_ok=True)
+        cols = categorical_cols or getattr(task, "categorical_vars", None) or                self.find_categorical_vars(task)
+        if not cols:
+            print(f"[{type(self).__name__}] No categorical vars — ANOVA skipped.")
+            return {}
+
+        results = {
+            unit_idx: self.run_anova_for_categorical_vars(
+                task, unit_idx=unit_idx, categorical_cols=cols, alpha=alpha, verbose=False,
+            )
+            for unit_idx in range(task.binned_spikes.shape[1])
+        }
+        self._save_results_cache(task, results, cache_path, "anova")
+        if verbose:
+            linear_model_utils.print_anova_all_neurons(results, alpha)
+        return results
+
+    def plot_anova_results(
+        self, task,
+        anova_results: Dict[int, "pd.DataFrame"],
+        alpha: float = 0.05,
+        figsize=None,
+        title: Optional[str] = None,
+    ):
+        import matplotlib.pyplot as plt
+        if not anova_results:
+            print(f"[{type(self).__name__}] plot_anova_results: empty results.")
+            return plt.figure()
+        if title is None:
+            title = f"ANOVA — {type(task).__name__} ({len(anova_results)} neurons, α={alpha})"
+        return linear_model_utils.plot_anova_results(
+            anova_results=anova_results, alpha=alpha, figsize=figsize, title=title,
+        )
+
+    # ------------------------------------------------------------------
+    # LM (partial F-tests)
+    # ------------------------------------------------------------------
+
+    def run_lm_for_categorical_vars(
+        self, task, unit_idx: int,
+        categorical_cols: Optional[List[str]] = None,
+        continuous_cols: Optional[List[str]] = None,
+        include_all_feats: bool = True,
+        covariates_cache: Optional[str] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+        _covariate_cols: Optional[List[str]] = None,
+    ) -> "pd.DataFrame":
+        """Partial F-test (LM) for each categorical variable in one neuron."""
+        task.collect_data(exists_ok=True)
+        feats = self._behavioral_feats(task)
+        if categorical_cols is None:
+            categorical_cols = self.find_categorical_vars(task)
+
+        covariate_cols = _covariate_cols
+        if covariate_cols is None and include_all_feats:
+            covariate_cols = self._resolve_lm_covariate_cols(
+                task, categorical_cols=categorical_cols,
+                continuous_cols=continuous_cols, covariates_cache=covariates_cache,
+            )
+
+        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        result_df = linear_model_utils.lm_spike_counts_for_columns(
+            y=y, binned_feats=feats,
+            categorical_cols=categorical_cols, continuous_cols=continuous_cols,
+            covariate_cols=covariate_cols, alpha=alpha,
+        )
+        if verbose:
+            linear_model_utils.print_lm_single_unit(result_df, unit_idx, alpha)
+        return result_df
+
+    def run_lm_all_neurons(
+        self, task,
+        categorical_cols: Optional[List[str]] = None,
+        continuous_cols: Optional[List[str]] = None,
+        include_all_feats: bool = True,
+        covariates_cache: Optional[str] = None,
+        alpha: float = 0.05,
+        verbose: bool = True,
+        results_cache: Optional[str] = None,
+        force_rerun: bool = False,
+    ) -> Dict[int, "pd.DataFrame"]:
+        """LM partial F-tests across all neurons."""
+        cache_path = (
+            None if results_cache == ""
+            else Path(results_cache) if results_cache is not None
+            else self._results_cache_path(task, "lm")
+        )
+        if not force_rerun and cache_path is not None:
+            cached = self._load_results_cache(task, cache_path, "lm")
+            if cached is not None:
+                if verbose:
+                    linear_model_utils.print_lm_all_neurons(cached, alpha)
+                return cached
+
+        task.collect_data(exists_ok=True)
+        cols = categorical_cols or getattr(task, "categorical_vars", None) or                self.find_categorical_vars(task)
+        if not cols:
+            print(f"[{type(self).__name__}] No categorical vars — LM skipped.")
+            return {}
+
+        resolved_covariates = None
+        if include_all_feats:
+            resolved_covariates = self._resolve_lm_covariate_cols(
+                task, categorical_cols=cols, continuous_cols=continuous_cols,
+                covariates_cache=covariates_cache,
+            )
+
+        results = {
+            unit_idx: self.run_lm_for_categorical_vars(
+                task, unit_idx=unit_idx, categorical_cols=cols,
+                continuous_cols=continuous_cols, include_all_feats=False,
+                _covariate_cols=resolved_covariates, alpha=alpha, verbose=False,
+            )
+            for unit_idx in range(task.binned_spikes.shape[1])
+        }
+        self._save_results_cache(task, results, cache_path, "lm")
+        if verbose:
+            linear_model_utils.print_lm_all_neurons(results, alpha)
+        return results
+
+    def plot_lm_vs_anova_results(
+        self, task,
+        anova_results: Dict[int, "pd.DataFrame"],
+        lm_results: Dict[int, "pd.DataFrame"],
+        alpha: float = 0.05,
+        figsize=None,
+        title: Optional[str] = None,
+    ):
+        import matplotlib.pyplot as plt
+        if not anova_results or not lm_results:
+            print(f"[{type(self).__name__}] plot_lm_vs_anova_results: empty results.")
+            return plt.figure()
+        if title is None:
+            title = f"ANOVA vs LM — {type(task).__name__} ({len(anova_results)} neurons, α={alpha})"
+        return linear_model_utils.plot_lm_vs_anova(
+            anova_results=anova_results, lm_results=lm_results,
+            alpha=alpha, figsize=figsize, title=title,
+        )
 
 
 # ===========================================================================
@@ -116,7 +438,7 @@ class PGAMModel(BaseEncodingModel):
     # Per-unit design helpers (depend on task data)
     # ------------------------------------------------------------------
 
-    def _get_design_for_unit(self, task, unit_idx: int, *, use_neural_coupling: bool = False):
+    def _get_design_for_unit(self, task, unit_idx: int):
         """Build design_df + gam_groups for one unit from task state."""
         task._prepare_spike_history_components()
 
@@ -127,7 +449,7 @@ class PGAMModel(BaseEncodingModel):
         target_col = list(task.spk_colnames.keys())[unit_idx]
         cross_neurons = (
             [c for c in task.spk_colnames.keys() if c != target_col]
-            if use_neural_coupling
+            if task.use_neural_coupling
             else None
         )
 
@@ -151,7 +473,7 @@ class PGAMModel(BaseEncodingModel):
         task.make_hist_meta_for_unit(unit_idx)
         task._make_structured_meta_groups()
 
-        if use_neural_coupling:
+        if task.use_neural_coupling:
             hist_groups = (task.hist_meta or {}).get("groups", {})
             task.var_categories["coupling_vars"] = sorted(
                 g for g in hist_groups if str(g).startswith("cpl_")
@@ -168,6 +490,15 @@ class PGAMModel(BaseEncodingModel):
 
         return design_df, gam_groups
 
+    @staticmethod
+    def _get_effective_num_neurons(task) -> int:
+        """Number of neurons valid across binned_spikes and spike-history design."""
+        if hasattr(task, "get_effective_num_neurons"):
+            return int(task.get_effective_num_neurons())
+        n_spikes = int(task.binned_spikes.shape[1])
+        n_spk_cols = len(task.spk_colnames) if getattr(task, "spk_colnames", None) else n_spikes
+        return min(n_spikes, n_spk_cols)
+
     # ------------------------------------------------------------------
     # Save paths
     # ------------------------------------------------------------------
@@ -183,11 +514,10 @@ class PGAMModel(BaseEncodingModel):
         *,
         gam_results_subdir: str,
         ensure_dirs: bool = True,
-        use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
         n_folds: Optional[int] = 10,
     ) -> dict:
-        coupling_subdir = self._coupling_subdir(use_neural_coupling)
+        coupling_subdir = self._coupling_subdir(task.use_neural_coupling)
         base = Path(task._get_save_dir()) / gam_results_subdir / coupling_subdir
 
         if ensure_dirs:
@@ -239,14 +569,11 @@ class PGAMModel(BaseEncodingModel):
         save_design: bool = False,
         save_metadata: Optional[Dict] = None,
         load_if_exists: bool = True,
-        use_neural_coupling: bool = False,
     ) -> FitResult:
         """Fit Poisson GAM for one unit."""
         task.collect_data(exists_ok=True)
 
-        design_df, gam_groups = self._get_design_for_unit(
-            task, unit_idx, use_neural_coupling=use_neural_coupling
-        )
+        design_df, gam_groups = self._get_design_for_unit(task, unit_idx)
 
         if len(design_df) != len(task.binned_spikes):
             raise ValueError(
@@ -260,7 +587,6 @@ class PGAMModel(BaseEncodingModel):
             paths = self.get_gam_save_paths(
                 task, unit_idx,
                 gam_results_subdir=gam_results_subdir,
-                use_neural_coupling=use_neural_coupling,
             )
             save_path = paths["fit_save_path"]
 
@@ -297,7 +623,6 @@ class PGAMModel(BaseEncodingModel):
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
         cv_groups=None,
-        use_neural_coupling: bool = False,
     ) -> Dict:
         """Cross-validated variance explained for one unit."""
         task.collect_data(exists_ok=True)
@@ -308,7 +633,6 @@ class PGAMModel(BaseEncodingModel):
             paths = self.get_gam_save_paths(
                 task, unit_idx,
                 gam_results_subdir=gam_results_subdir,
-                use_neural_coupling=use_neural_coupling,
                 cv_mode=effective_cv,
                 n_folds=n_folds,
             )
@@ -322,9 +646,7 @@ class PGAMModel(BaseEncodingModel):
                 print(f"[PGAMModel] Loaded cached CV results from: {save_path}")
             return maybe_loaded
 
-        design_df, gam_groups = self._get_design_for_unit(
-            task, unit_idx, use_neural_coupling=use_neural_coupling
-        )
+        design_df, gam_groups = self._get_design_for_unit(task, unit_idx)
 
         if len(design_df) != len(task.binned_spikes):
             raise ValueError(
@@ -377,14 +699,15 @@ class PGAMModel(BaseEncodingModel):
         verbose: bool = True,
         plot_cdf: bool = True,
         log_x: bool = False,
-        use_neural_coupling: bool = False,
     ) -> Optional[List[float]]:
         """Run crossval for every neuron in the session."""
         task.collect_data(exists_ok=True)
+        task._prepare_spike_history_components()
         effective_cv = cv_mode if cv_mode is not None else self.cv_mode
 
+        n_neurons = self._get_effective_num_neurons(task)
         if unit_indices is None:
-            unit_indices = list(range(task.num_neurons))
+            unit_indices = list(range(n_neurons))
 
         if fit_kwargs is None:
             fit_kwargs = dict(
@@ -396,7 +719,6 @@ class PGAMModel(BaseEncodingModel):
             paths = self.get_gam_save_paths(
                 task, unit_idx,
                 gam_results_subdir=gam_results_subdir,
-                use_neural_coupling=use_neural_coupling,
                 cv_mode=effective_cv,
                 n_folds=n_folds,
             )
@@ -410,7 +732,6 @@ class PGAMModel(BaseEncodingModel):
                 cv_mode=effective_cv,
                 buffer_samples=buffer_samples,
                 verbose=verbose,
-                use_neural_coupling=use_neural_coupling,
             )
             if verbose:
                 print(res["mean_classical_r2"], res["mean_pseudo_r2"])
@@ -439,7 +760,6 @@ class PGAMModel(BaseEncodingModel):
         category_names: Optional[List[str]] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
-        use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
     ) -> Dict:
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
@@ -451,7 +771,6 @@ class PGAMModel(BaseEncodingModel):
             category_names=category_names,
             retrieve_only=retrieve_only,
             load_if_exists=load_if_exists,
-            use_neural_coupling=use_neural_coupling,
             cv_mode=cv_mode,
         )
 
@@ -464,7 +783,6 @@ class PGAMModel(BaseEncodingModel):
         group_name_map: Optional[Dict] = None,
         retrieve_only: bool = False,
         load_if_exists: bool = True,
-        use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
     ) -> Dict:
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
@@ -475,7 +793,6 @@ class PGAMModel(BaseEncodingModel):
             group_name_map=group_name_map,
             retrieve_only=retrieve_only,
             load_if_exists=load_if_exists,
-            use_neural_coupling=use_neural_coupling,
             cv_mode=cv_mode,
         )
 
@@ -488,7 +805,6 @@ class PGAMModel(BaseEncodingModel):
         n_folds: int = 10,
         load_if_exists: bool = True,
         retrieve_only: bool = False,
-        use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
     ) -> Dict:
@@ -500,7 +816,6 @@ class PGAMModel(BaseEncodingModel):
             n_folds=n_folds,
             load_if_exists=load_if_exists,
             retrieve_only=retrieve_only,
-            use_neural_coupling=use_neural_coupling,
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
         )
@@ -520,7 +835,6 @@ class PGAMModel(BaseEncodingModel):
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
         cv_groups=None,
-        use_neural_coupling: bool = False,
     ) -> Dict:
         cv_mode = cv_mode if cv_mode is not None else self.cv_mode
         return self._get_analysis_helper(task).crossval_tuning_curve_coef(
@@ -536,7 +850,6 @@ class PGAMModel(BaseEncodingModel):
             cv_mode=cv_mode,
             buffer_samples=buffer_samples,
             cv_groups=cv_groups,
-            use_neural_coupling=use_neural_coupling,
         )
 
     def try_load_variance_explained_for_all_neurons(
@@ -546,18 +859,19 @@ class PGAMModel(BaseEncodingModel):
         n_folds: int = 5,
         load_if_exists: bool = True,
         verbose: bool = True,
-        use_neural_coupling: bool = False,
         gam_results_subdir: str = "gam_results",
     ) -> Optional[List[float]]:
         """Try to load cached CV results for every neuron without recomputing."""
         all_r2 = []
-        for unit_idx in range(task.num_neurons):
+        task.collect_data(exists_ok=True)
+        task._prepare_spike_history_components()
+        n_neurons = self._get_effective_num_neurons(task)
+        for unit_idx in range(n_neurons):
             try:
                 paths = self.get_gam_save_paths(
                     task,
                     unit_idx,
                     gam_results_subdir=gam_results_subdir,
-                    use_neural_coupling=use_neural_coupling,
                     cv_mode=self.cv_mode,
                     n_folds=n_folds,
                 )
@@ -585,7 +899,6 @@ class PGAMModel(BaseEncodingModel):
         alpha: float = 0.05,
         load_if_exists: bool = True,
         verbose: bool = True,
-        use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
     ) -> None:
@@ -598,7 +911,6 @@ class PGAMModel(BaseEncodingModel):
                 n_folds=n_folds,
                 buffer_samples=buffer_samples,
                 load_if_exists=load_if_exists,
-                use_neural_coupling=use_neural_coupling,
                 cv_mode=cv_mode,
             )
             self.run_backward_elimination(
@@ -606,7 +918,6 @@ class PGAMModel(BaseEncodingModel):
                 n_folds=backward_n_folds,
                 alpha=alpha,
                 load_if_exists=load_if_exists,
-                use_neural_coupling=use_neural_coupling,
                 cv_mode=cv_mode,
                 buffer_samples=buffer_samples,
             )
@@ -624,13 +935,14 @@ class PGAMModel(BaseEncodingModel):
         alpha: float = 0.05,
         load_if_exists: bool = True,
         verbose: bool = True,
-        use_neural_coupling: bool = False,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
     ) -> None:
         task.collect_data(exists_ok=True)
+        task._prepare_spike_history_components()
+        n_neurons = self._get_effective_num_neurons(task)
         if unit_indices is None:
-            unit_indices = list(range(task.num_neurons))
+            unit_indices = list(range(n_neurons))
         for unit_idx in unit_indices:
             self.run_full_analysis(
                 task, unit_idx,
@@ -639,7 +951,6 @@ class PGAMModel(BaseEncodingModel):
                 alpha=alpha,
                 load_if_exists=load_if_exists,
                 verbose=verbose,
-                use_neural_coupling=use_neural_coupling,
                 cv_mode=cv_mode,
                 buffer_samples=buffer_samples,
             )
@@ -698,6 +1009,7 @@ class RNNModel(BaseEncodingModel):
         rnn_results_subdir: str = "rnn_results",
         cv_mode: str = "blocked_time_buffered",
         buffer_samples: int = 20,
+        use_raw_feats: bool = True,
     ):
         self.hidden_dim = hidden_dim
         self.n_epochs = n_epochs
@@ -707,6 +1019,7 @@ class RNNModel(BaseEncodingModel):
         self.rnn_results_subdir = rnn_results_subdir
         self.cv_mode = cv_mode
         self.buffer_samples = buffer_samples
+        self.use_raw_feats = use_raw_feats
 
     # ------------------------------------------------------------------
     # Sequence construction
@@ -719,6 +1032,19 @@ class RNNModel(BaseEncodingModel):
                 "RNNModel requires per-trial grouping (e.g. new_segment column)."
             )
         return np.asarray(groups)
+
+    def _get_X(self, task) -> np.ndarray:
+        """Return the feature matrix fed to the RNN.
+
+        When ``use_raw_feats=True`` (default), uses
+        ``task.get_raw_behavioral_feats()`` — raw kinematics with no splines
+        and no spike history, matching what decoding tasks expose as
+        ``feats_to_decode``.  Set ``use_raw_feats=False`` to fall back to
+        the full spline-expanded ``task.binned_feats``.
+        """
+        if self.use_raw_feats:
+            return task.get_raw_behavioral_feats().to_numpy()
+        return task.binned_feats.to_numpy()
 
     def _make_sequences(self, X: np.ndarray, y: np.ndarray,
                         groups: np.ndarray, idx_set: np.ndarray):
@@ -815,6 +1141,32 @@ class RNNModel(BaseEncodingModel):
         base.mkdir(parents=True, exist_ok=True)
         return base / f"rnn_fit_hidden{self.hidden_dim}_epochs{self.n_epochs}.pt"
 
+    def _full_analysis_dir(self, task) -> Path:
+        subdir = getattr(self, "_gam_results_subdir", self.rnn_results_subdir)
+        outdir = Path(task._get_save_dir()) / subdir / "full_analysis"
+        outdir.mkdir(parents=True, exist_ok=True)
+        return outdir
+
+    @staticmethod
+    def _alpha_suffix(alpha: float) -> str:
+        return str(alpha).replace(".", "p")
+
+    @staticmethod
+    def _save_dataframe(df: "pd.DataFrame", path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(path, index=False)
+
+    @staticmethod
+    def _save_figure(fig, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(path, dpi=200, bbox_inches="tight")
+
+    @staticmethod
+    def _significant_variables(result_df: "pd.DataFrame") -> List[str]:
+        if result_df is None or result_df.empty or "significant" not in result_df.columns:
+            return []
+        return result_df.loc[result_df["significant"], "variable"].tolist()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -839,14 +1191,14 @@ class RNNModel(BaseEncodingModel):
         if load_if_exists and save_path.exists():
             if self.verbose:
                 print(f"[RNNModel] Loading cached model from {save_path}")
-            X = task.binned_feats.to_numpy()
+            X = self._get_X(task)
             input_dim = X.shape[1]
             model = _PoissonGRU(input_dim, self.hidden_dim).to(self.device)
             model.load_state_dict(torch.load(save_path, map_location=self.device))
             return model
 
         groups = self._get_groups(task)
-        X = task.binned_feats.to_numpy()
+        X = self._get_X(task)
         y = task.binned_spikes.iloc[:, unit_idx].to_numpy()
         all_idx = np.arange(len(X))
         X_list, y_list = self._make_sequences(X, y, groups, all_idx)
@@ -901,6 +1253,8 @@ class RNNModel(BaseEncodingModel):
             save_path = self._cv_save_path(task, unit_idx, n_folds=n_folds, cv_mode=effective_cv)
         else:
             save_path = Path(save_path)
+            
+        print(f'save_path: {save_path}')
 
         if load_if_exists and save_path.exists():
             if self.verbose:
@@ -909,7 +1263,7 @@ class RNNModel(BaseEncodingModel):
                 return _pickle.load(f)
 
         groups = self._get_groups(task)
-        X = task.binned_feats.to_numpy()
+        X = self._get_X(task)
         y = task.binned_spikes.iloc[:, unit_idx].to_numpy()
         n = len(X)
 
@@ -959,8 +1313,8 @@ class RNNModel(BaseEncodingModel):
         result = {
             "mean_pseudo_r2": float(np.nanmean(scores)),
             "mean_classical_r2": float(np.nanmean(classical_scores)),
-            "all_folds_pseudo_r2": scores,
-            "all_folds_classical_r2": classical_scores,
+            "fold_pseudo_r2": scores,
+            "fold_classical_r2": classical_scores,
             "epoch_losses": epoch_losses,
             "unit_idx": unit_idx,
             "n_folds": n_folds,
@@ -1052,3 +1406,231 @@ class RNNModel(BaseEncodingModel):
                     print(f"[RNNModel] Failed to load unit {unit_idx}: {e}")
                 return None
         return all_r2
+
+    def run_full_analysis(
+        self,
+        task,
+        unit_idx: int,
+        *,
+        n_folds: int = 5,
+        backward_n_folds: int = 10,
+        alpha: float = 0.05,
+        load_if_exists: bool = True,
+        verbose: bool = True,
+        cv_mode: Optional[str] = None,
+        buffer_samples: int = 20,
+    ) -> Dict:
+        """Run a per-neuron RNN analysis bundle.
+
+        For RNNs, "full analysis" means:
+        1. ensure cross-validated model performance is available,
+        2. run one-neuron ANOVA over categorical behavioral variables,
+        3. run one-neuron LM partial-F tests controlling for other features,
+        4. save CSV summaries under the RNN output directory.
+        """
+        import json
+
+        task.collect_data(exists_ok=True)
+
+        effective_cv = cv_mode if cv_mode is not None else self.cv_mode
+        effective_buf = buffer_samples if buffer_samples is not None else self.buffer_samples
+        alpha_suffix = self._alpha_suffix(alpha)
+        outdir = self._full_analysis_dir(task) / f"neuron_{unit_idx}"
+        outdir.mkdir(parents=True, exist_ok=True)
+
+        if verbose:
+            print(f"[RNNModel] Full analysis for unit {unit_idx}")
+
+        cv_result = self.crossval(
+            task,
+            unit_idx,
+            n_folds=n_folds,
+            cv_mode=effective_cv,
+            buffer_samples=effective_buf,
+            load_if_exists=load_if_exists,
+            verbose=verbose,
+        )
+
+        categorical_cols = self.find_categorical_vars(task)
+        if not categorical_cols:
+            if verbose:
+                print("[RNNModel] No categorical vars found; skipping ANOVA/LM.")
+            return {"crossval": cv_result, "anova": None, "lm": None, "paths": {}}
+
+        anova_df = self.run_anova_for_categorical_vars(
+            task,
+            unit_idx=unit_idx,
+            categorical_cols=categorical_cols,
+            alpha=alpha,
+            verbose=verbose,
+        )
+        lm_df = self.run_lm_for_categorical_vars(
+            task,
+            unit_idx=unit_idx,
+            categorical_cols=categorical_cols,
+            include_all_feats=True,
+            alpha=alpha,
+            verbose=verbose,
+        )
+
+        anova_path = outdir / f"anova_alpha{alpha_suffix}.csv"
+        lm_path = outdir / f"lm_alpha{alpha_suffix}.csv"
+        summary_path = outdir / f"summary_alpha{alpha_suffix}.json"
+        self._save_dataframe(anova_df, anova_path)
+        self._save_dataframe(lm_df, lm_path)
+
+        summary = {
+            "unit_idx": unit_idx,
+            "n_folds": n_folds,
+            "cv_mode": effective_cv,
+            "buffer_samples": effective_buf,
+            "mean_pseudo_r2": cv_result.get("mean_pseudo_r2"),
+            "mean_classical_r2": cv_result.get("mean_classical_r2"),
+            "categorical_vars": categorical_cols,
+            "anova_significant": self._significant_variables(anova_df),
+            "lm_significant": self._significant_variables(lm_df),
+            "anova_csv": str(anova_path),
+            "lm_csv": str(lm_path),
+        }
+        with summary_path.open("w") as f:
+            json.dump(summary, f, indent=2)
+
+        return {
+            "crossval": cv_result,
+            "anova": anova_df,
+            "lm": lm_df,
+            "paths": {
+                "anova_csv": str(anova_path),
+                "lm_csv": str(lm_path),
+                "summary_json": str(summary_path),
+            },
+        }
+
+    def run_full_analysis_all_neurons(
+        self,
+        task,
+        *,
+        unit_indices: Optional[List[int]] = None,
+        n_folds: int = 5,
+        backward_n_folds: int = 10,
+        alpha: float = 0.05,
+        load_if_exists: bool = True,
+        verbose: bool = True,
+        cv_mode: Optional[str] = None,
+        buffer_samples: int = 20,
+    ) -> Dict:
+        """Run the all-neuron RNN analysis bundle and save summary figures."""
+        import matplotlib.pyplot as plt
+
+        task.collect_data(exists_ok=True)
+
+        effective_cv = cv_mode if cv_mode is not None else self.cv_mode
+        effective_buf = buffer_samples if buffer_samples is not None else self.buffer_samples
+        alpha_suffix = self._alpha_suffix(alpha)
+        outdir = self._full_analysis_dir(task)
+
+        n_neurons = task.binned_spikes.shape[1]
+        if unit_indices is None:
+            unit_indices = list(range(n_neurons))
+
+        crossval_scores = self.crossval_all_neurons(
+            task,
+            n_folds=n_folds,
+            cv_mode=effective_cv,
+            buffer_samples=effective_buf,
+            load_if_exists=load_if_exists,
+            unit_indices=unit_indices,
+            verbose=verbose,
+            plot_cdf=False,
+        )
+
+        categorical_cols = self.find_categorical_vars(task)
+        if not categorical_cols:
+            if verbose:
+                print("[RNNModel] No categorical vars found; skipping ANOVA/LM.")
+            return {
+                "crossval_scores": crossval_scores,
+                "anova": {},
+                "lm": {},
+                "paths": {},
+            }
+
+        if unit_indices == list(range(n_neurons)):
+            anova_results = self.run_anova_all_neurons(
+                task,
+                categorical_cols=categorical_cols,
+                alpha=alpha,
+                verbose=verbose,
+                force_rerun=not load_if_exists,
+            )
+            lm_results = self.run_lm_all_neurons(
+                task,
+                categorical_cols=categorical_cols,
+                include_all_feats=True,
+                alpha=alpha,
+                verbose=verbose,
+                force_rerun=not load_if_exists,
+            )
+        else:
+            resolved_covariates = self._resolve_lm_covariate_cols(
+                task,
+                categorical_cols=categorical_cols,
+                continuous_cols=None,
+                covariates_cache=None,
+            )
+            anova_results = {
+                unit_idx: self.run_anova_for_categorical_vars(
+                    task,
+                    unit_idx=unit_idx,
+                    categorical_cols=categorical_cols,
+                    alpha=alpha,
+                    verbose=False,
+                )
+                for unit_idx in unit_indices
+            }
+            lm_results = {
+                unit_idx: self.run_lm_for_categorical_vars(
+                    task,
+                    unit_idx=unit_idx,
+                    categorical_cols=categorical_cols,
+                    include_all_feats=False,
+                    _covariate_cols=resolved_covariates,
+                    alpha=alpha,
+                    verbose=False,
+                )
+                for unit_idx in unit_indices
+            }
+            if verbose:
+                linear_model_utils.print_anova_all_neurons(anova_results, alpha)
+                linear_model_utils.print_lm_all_neurons(lm_results, alpha)
+
+        anova_fig = self.plot_anova_results(
+            task,
+            anova_results,
+            alpha=alpha,
+            title=f"RNN ANOVA - {type(task).__name__}",
+        )
+        compare_fig = self.plot_lm_vs_anova_results(
+            task,
+            anova_results,
+            lm_results,
+            alpha=alpha,
+            title=f"RNN ANOVA vs LM - {type(task).__name__}",
+        )
+
+        anova_fig_path = outdir / f"anova_alpha{alpha_suffix}.png"
+        compare_fig_path = outdir / f"lm_vs_anova_alpha{alpha_suffix}.png"
+        self._save_figure(anova_fig, anova_fig_path)
+        self._save_figure(compare_fig, compare_fig_path)
+        plt.close(anova_fig)
+        plt.close(compare_fig)
+
+        return {
+            "crossval_scores": crossval_scores,
+            "anova": anova_results,
+            "lm": lm_results,
+            "paths": {
+                "anova_plot": str(anova_fig_path),
+                "lm_vs_anova_plot": str(compare_fig_path),
+            },
+        }

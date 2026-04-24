@@ -31,7 +31,7 @@ def collect_all_session_decoding_results(
     raw_data_dir_name,
     monkey_name,
     task_class,
-    verbose=False,
+    verbose=True,
     shuffle_mode='none',
     fit_kernelwidth=True,
     detrend_spikes=False,
@@ -40,6 +40,8 @@ def collect_all_session_decoding_results(
     smoothing_width=None,
     cv_mode=None,
     model_name=None,
+    use_spike_history=False,
+    force_reconsolidate=True,
 ):
     """
     Collect existing CV decoding results across all sessions for one monkey.
@@ -103,6 +105,7 @@ def collect_all_session_decoding_results(
             raw_data_folder_path=raw_data_folder_path,
             detrend_spikes=detrend_spikes,
             smoothing_width=smoothing_width,
+            use_spike_history=use_spike_history,
         )
         model = decoding_models.CVDecodingModel(cv_mode=cv_mode or "group_kfold")
         runner = decoding_runner.DecodingRunner(task, model)
@@ -124,6 +127,7 @@ def collect_all_session_decoding_results(
             use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
             cv_mode=cv_mode,
+            force_reconsolidate=force_reconsolidate,
         )
 
         if model_name is not None:
@@ -160,6 +164,7 @@ def collect_all_session_decoding_results(
 
         session_results_df['data_name'] = row['data_name']
         session_results_df['smoothing_width'] = smoothing_width
+        session_results_df['use_spike_history'] = use_spike_history
 
         all_session_results.append(session_results_df)
 
@@ -263,7 +268,7 @@ def _add_var_category_column(df, var_categories, feature_col='behav_feature', ca
 # PLOTTING
 # ==========================================================
 
-def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_col=None, var_categories=None):
+def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_col=None, var_categories=None, sort_by_mean=False):
     """
     Plot decoding summary. Uses hue_col for grouping when provided (e.g. 'result_group'
     for multiple datasets), otherwise falls back to 'shuffle_mode'.
@@ -277,7 +282,9 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
         .mean()
     )
 
-    if var_categories is not None and 'var_category' in summary_df.columns:
+    if sort_by_mean:
+        feature_order = mean_by_feature.sort_values().index.tolist()
+    elif var_categories is not None and 'var_category' in summary_df.columns:
         feature_order = []
         present_categories = summary_df['var_category'].dropna().unique().tolist()
         ordered_categories = [
@@ -330,6 +337,7 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
     default_colors = ['#e67e22', '#2166ac', '#2ca02c', '#9467bd', '#8c564b']
     colors = [default_colors[i % len(default_colors)] for i in range(max(n_hue_levels, 2))]
 
+    dodge_spacing = 0.3
     for i, hue_val in enumerate(hue_levels):
 
         sub = summary_df.query(
@@ -343,12 +351,22 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
         sub_plot = sub.iloc[valid]
         y_positions = y_codes[valid]
 
+        if n_hue_levels > 1:
+            y_dodge = (i / (n_hue_levels - 1) - 0.5) * dodge_spacing
+        else:
+            y_dodge = 0.0
+
         color = colors[i % len(colors)] if n_hue_levels > 1 else None
-        label = f'Shuffle={hue_val}' if hue_col == 'shuffle_mode' else str(hue_val)
+        if hue_col == 'shuffle_mode':
+            label = f'Shuffle={hue_val}'
+        elif hue_col == 'use_spike_history':
+            label = 'spike history' if hue_val else 'no spike history'
+        else:
+            label = str(hue_val)
 
         ax.errorbar(
             x=sub_plot['mean_value'],
-            y=y_positions,
+            y=y_positions + y_dodge,
             xerr=sub_plot['sem_value'],
             fmt='o',
             capsize=4,
@@ -377,12 +395,11 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
     ax.set_title(title)
     
     if 'r2_cv' in value_label or 'r_cv' in value_label:
-        ax.set_xlim(-0.75, 0.75)
+        ax.set_xlim(-1, 1)
     elif 'auc_mean' in value_label:
         ax.set_xlim(0.4, 1.0)
 
-    if n_hue_levels > 1:
-        ax.legend(frameon=False)
+    ax.legend(frameon=False)
 
     plt.tight_layout()
     plt.show()
@@ -391,7 +408,7 @@ def _plot_decoding_summary(summary_df, pval_df, value_label, title, vline, hue_c
 def visualize_decoding_results(
     decoding_results_df=None,
     decoding_results_dfs=None,
-    model_name='ridge_strong',
+    model_name='ols',
     regression_metric_col='r2_cv',
     classification_metric_col='auc_mean',
     show_plots=True,
@@ -419,7 +436,7 @@ def visualize_decoding_results(
         dfs = []
         for label, d in decoding_results_dfs.items():
             prep = _prepare_decoding_df(d)
-            prep['result_group'] = label
+            prep['result_group'] = str(label)
             dfs.append(prep)
         df = pd.concat(dfs, axis=0, ignore_index=True)
         hue_col = 'result_group'
@@ -486,6 +503,7 @@ def visualize_decoding_results(
                 vline=0,
                 hue_col=hue_col,
                 var_categories=var_categories,
+                sort_by_mean=True,
             )
 
     # ======================================================

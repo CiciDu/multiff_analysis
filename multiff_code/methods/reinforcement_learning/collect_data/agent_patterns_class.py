@@ -47,18 +47,52 @@ class AgentPatterns(variations_base_class._VariationsBase, patterns_and_features
         show_planning_class.ShowPlanning.get_combd_info_folder_paths(self)
         self.default_ref_point_params_based_on_mode = monkey_plan_factors_x_sess_class.PlanAcrossSessions.default_ref_point_params_based_on_mode
 
+    def combine_or_retrieve_patterns_and_features(self,
+                                                   exists_ok=True,
+                                                   retrieve_only=False,
+                                                   save_data=True,
+                                                   num_datasets_to_collect=2,
+                                                   num_steps_per_dataset=9000,
+                                                   agent_data_exists_ok=True,
+                                                   intermediate_products_exist_ok=True,
+                                                   use_stored_data_only=False,
+                                                   model_folder_name=None,
+                                                   **env_kwargs):
+        if exists_ok:
+            try:
+                self._retrieve_combined_patterns_and_features()
+                
+                return
+            except FileNotFoundError:
+                if retrieve_only:
+                    raise FileNotFoundError(
+                        'Combined patterns and features were not found and '
+                        'retrieve_only=True, so nothing new will be created.'
+                    )
+                print('Failed to retrieve combined patterns and features. Will make them anew.')
+
+        self._combine_patterns_and_features(
+            exists_ok=intermediate_products_exist_ok,
+            save_data=save_data,
+            num_datasets_to_collect=num_datasets_to_collect,
+            num_steps_per_dataset=num_steps_per_dataset,
+            agent_data_exists_ok=agent_data_exists_ok,
+            use_stored_data_only=use_stored_data_only,
+            model_folder_name=model_folder_name,
+            **env_kwargs
+        )
+
     def _combine_patterns_and_features(self,
-                                    num_datasets_to_collect=2,
-                                    num_steps_per_dataset=9000,
-                                    save_data=True,
-                                    final_products_exist_ok=True,
-                                    intermediate_products_exist_ok=True,
-                                    agent_data_exists_ok=True,
-                                    model_folder_name=None,
-                                    use_stored_data_only=False,
-                                    **env_kwargs
-                                    ):
-      
+                                       exists_ok=True,
+                                       num_datasets_to_collect=2,
+                                       num_steps_per_dataset=9000,
+                                       save_data=True,
+                                       agent_data_exists_ok=True,
+                                       model_folder_name=None,
+                                       use_stored_data_only=False,
+                                       **env_kwargs
+                                       ):
+
         save_data = False if use_stored_data_only else save_data
 
         self.combd_pattern_frequencies = pd.DataFrame()
@@ -71,21 +105,20 @@ class AgentPatterns(variations_base_class._VariationsBase, patterns_and_features
         if model_folder_name is None:
             model_folder_name = self.model_folder_name
 
-        # make sure there's enough data from agent
         for i in range(num_datasets_to_collect):
             data_name = f'data_{i}'
             print(' ')
             print('model_folder_name:', model_folder_name)
             print('data_name:', data_name)
-            
-        
+
             self.agent = sb3_class.SB3forMultifirefly(model_folder_name=model_folder_name, data_name=data_name)
             self.agent.streamline_getting_data_from_agent(
-                n_steps=9000, exists_ok=True, save_data=True, retrieve_ff_flash_sorted=True)
-            self.agent.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(self.agent.ff_dataframe, self.agent.ff_real_position_sorted,
-                                                                        self.agent.ff_caught_T_new, self.agent.ff_life_sorted)
-            self.agent.make_df_related_to_patterns_and_features()
-
+                n_steps=num_steps_per_dataset, exists_ok=agent_data_exists_ok,
+                save_data=save_data, retrieve_ff_flash_sorted=True)
+            self.agent.ff_dataframe = make_ff_dataframe.furnish_ff_dataframe(
+                self.agent.ff_dataframe, self.agent.ff_real_position_sorted,
+                self.agent.ff_caught_T_new, self.agent.ff_life_sorted)
+            self.agent.make_df_related_to_patterns_and_features(exists_ok=exists_ok)
 
             self.agent.pattern_frequencies['data_name'] = data_name
             self.agent.feature_statistics['data_name'] = data_name

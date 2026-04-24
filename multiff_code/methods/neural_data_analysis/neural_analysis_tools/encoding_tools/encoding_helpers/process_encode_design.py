@@ -32,7 +32,7 @@ def get_strong_correlations(design_df, threshold=0.9):
     return strong_corr_df
 
 
-def reduce_encoding_design(df, corr_threshold_for_lags_of_a_feature=0.99, 
+def reduce_encoding_design(df, corr_threshold_for_lags=0.99, 
                          vif_threshold=None, 
                          verbose=True):
         
@@ -41,7 +41,7 @@ def reduce_encoding_design(df, corr_threshold_for_lags_of_a_feature=0.99,
 
     # Call the function to iteratively drop lags with high correlation for each feature
     df_reduced = drop_high_corr_vars.drop_columns_with_high_corr(df_reduced_initial,
-                                                                                corr_threshold_for_lags=corr_threshold_for_lags_of_a_feature,
+                                                                                corr_threshold_for_lags=corr_threshold_for_lags,
                                                                                 verbose=verbose,
                                                                                 filter_by_feature=False,
                                                                                 filter_by_subsets=False,

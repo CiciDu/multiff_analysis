@@ -43,12 +43,15 @@ class EncodingRunner:
         task: BaseEncodingTask,
         model: BaseEncodingModel,
         gam_results_subdir: Optional[str] = None,
+        use_neural_coupling: bool = False,
     ):
         self.task = task
         self.model = model
+        self.use_neural_coupling = use_neural_coupling
+        self.task.use_neural_coupling = use_neural_coupling
 
         if gam_results_subdir is None:
-            prefix = type(task).__name__.lower().replace("task", "")
+            prefix = type(task).__name__.lower().removesuffix("encodingtask")
             gam_results_subdir = f"{prefix}_gam_results" if prefix else "gam_results"
         self.gam_results_subdir = gam_results_subdir
 
@@ -69,6 +72,15 @@ class EncodingRunner:
 
     def collect_data(self, exists_ok: bool = True):
         self.task.collect_data(exists_ok=exists_ok)
+
+    def get_effective_num_neurons(self) -> int:
+        """Neuron count valid for both response matrix and design metadata."""
+        self.task.collect_data(exists_ok=True)
+        if hasattr(self.task, "_prepare_spike_history_components"):
+            self.task._prepare_spike_history_components()
+        if hasattr(self.task, "get_effective_num_neurons"):
+            return self.task.get_effective_num_neurons()
+        return int(self.task.binned_spikes.shape[1])
 
     # ------------------------------------------------------------------
     # Core model interface
@@ -121,6 +133,31 @@ class EncodingRunner:
 
     def run_full_analysis_all_neurons(self, **kwargs) -> None:
         return self.model.run_full_analysis_all_neurons(self.task, **kwargs)
+
+    # ------------------------------------------------------------------
+    # ANOVA / LM  (encoding questions: behavioral variable → neural response)
+    # ------------------------------------------------------------------
+
+    def find_categorical_vars(self, **kwargs):
+        return self.model.find_categorical_vars(self.task, **kwargs)
+
+    def run_anova_for_categorical_vars(self, unit_idx: int, **kwargs):
+        return self.model.run_anova_for_categorical_vars(self.task, unit_idx, **kwargs)
+
+    def run_anova_all_neurons(self, **kwargs):
+        return self.model.run_anova_all_neurons(self.task, **kwargs)
+
+    def plot_anova_results(self, anova_results, **kwargs):
+        return self.model.plot_anova_results(self.task, anova_results, **kwargs)
+
+    def run_lm_for_categorical_vars(self, unit_idx: int, **kwargs):
+        return self.model.run_lm_for_categorical_vars(self.task, unit_idx, **kwargs)
+
+    def run_lm_all_neurons(self, **kwargs):
+        return self.model.run_lm_all_neurons(self.task, **kwargs)
+
+    def plot_lm_vs_anova_results(self, anova_results, lm_results, **kwargs):
+        return self.model.plot_lm_vs_anova_results(self.task, anova_results, lm_results, **kwargs)
 
     # ------------------------------------------------------------------
     # Repr

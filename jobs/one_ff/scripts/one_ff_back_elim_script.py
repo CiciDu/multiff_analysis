@@ -76,7 +76,7 @@ def main(unit_idx: int):
     result = runner.run_backward_elimination(
         unit_idx=unit_idx,
         alpha=0.05,
-        n_folds=10,
+        n_folds=20,
     )
     kept = result['kept_groups']
     print(f"[PYTHON][DEBUG] Save path: {result['save_path']}", flush=True)

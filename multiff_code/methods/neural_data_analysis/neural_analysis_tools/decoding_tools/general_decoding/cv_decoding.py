@@ -90,6 +90,7 @@ def run_cv_decoding(
     use_detrend_inside_cv=None,
     detrend_per_block=None,
     cv_mode=None,  # 'blocked_time_buffered', 'blocked_time', 'group_kfold', 'kfold'; None -> DEFAULT_CV_MODE
+    force_reconsolidate=True,
 ):
 
     if config is None:
@@ -105,6 +106,8 @@ def run_cv_decoding(
             use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
             cv_mode=cv_mode,
+            force_reconsolidate=force_reconsolidate,
+            verbosity=verbosity,
         )
 
     if cv_mode is None:
@@ -795,6 +798,8 @@ def load_consolidated_results(
     use_detrend_inside_cv=None,
     detrend_per_block=None,
     cv_mode=None,
+    force_reconsolidate=True,
+    verbosity: int = 0,
 ):
     """
     Load the consolidated results CSV file.
@@ -822,12 +827,13 @@ def load_consolidated_results(
     out_dir = Path(out_dir)
     csv_path = out_dir / filename
 
-    if not csv_path.exists():
+    if not csv_path.exists() or force_reconsolidate:
         consolidated_df = consolidate_results_across_models(
             out_dir, filename,
             use_detrend_inside_cv=use_detrend_inside_cv,
             detrend_per_block=detrend_per_block,
             cv_mode=cv_mode,
+            verbosity=verbosity,
         )
         df = consolidated_df
     else:
@@ -839,6 +845,7 @@ def load_consolidated_results(
                 use_detrend_inside_cv=use_detrend_inside_cv,
                 detrend_per_block=detrend_per_block,
                 cv_mode=cv_mode,
+                verbosity=verbosity,
             )
         if use_detrend_inside_cv is not None and 'use_detrend_inside_cv' in df.columns:
             df = df[df['use_detrend_inside_cv'] == use_detrend_inside_cv].reset_index(drop=True)

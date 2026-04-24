@@ -1,0 +1,54 @@
+name: multiff
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+
+  # Core scientific stack
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  - numba
+  - statsmodels
+  - joblib
+
+  # Visualization
+  - matplotlib
+  - seaborn
+  - plotly
+  - colorcet
+
+  # Interactive / dashboard
+  - dash
+
+  # Deep learning (CPU; conda-forge pytorch is CPU-only on macOS)
+  - pytorch
+  - torchvision
+
+  # RL environment
+  - gymnasium
+
+  # Gradient boosting / hyperparameter tuning
+  - lightgbm
+  - xgboost
+  - optuna
+
+  # Dev environment
+  - jupyterlab
+  - ipywidgets
+  - tqdm
+  - ffmpeg
+  - pip
+
+  - pip:
+    - pyarrow           # pip wheels bundle their own libarrow — avoids conda's libabseil pin conflict
+    - catboost
+    - cebra
+    - cca-zoo
+    - pyrcca              # installs as `rcca` module
+    - elephant          # also pulls neo, quantities
+    - stable-baselines3
+    - sb3-contrib
+    - tensorboard

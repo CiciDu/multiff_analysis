@@ -45,7 +45,7 @@ EOF
 # --------------------------------------------------
 # Defaults
 # --------------------------------------------------
-MAX_PARALLEL=20
+MAX_CONCURRENT=10
 # Same idea as submit_sb3_cond.sh: at most ARRAY_MAX tasks per array job (Slurm MaxArraySize)
 ARRAY_MAX=1000
 
@@ -57,7 +57,7 @@ while (( "$#" )); do
   case "$1" in
     --max-parallel)
       [ -z "${2:-}" ] && { echo "--max-parallel requires an argument"; exit 1; }
-      MAX_PARALLEL="$2"
+      MAX_CONCURRENT="$2"
       shift 2
       ;;
     -h|--help)
@@ -121,7 +121,7 @@ if [[ "$NUM_AGENTS" -eq 0 ]]; then
 fi
 
 echo "[INFO] Total agents: $NUM_AGENTS (chunk size ≤ $ARRAY_MAX per sbatch)"
-echo "[INFO] Max concurrent jobs per array: $MAX_PARALLEL"
+echo "[INFO] Max concurrent jobs per array: $MAX_CONCURRENT"
 echo "[INFO] Each task runs: python agent_retry_script.py for manifest index = SLURM_ARRAY_OFFSET + SLURM_ARRAY_TASK_ID"
 if (( NUM_AGENTS <= 50 )); then
   echo "[INFO] Agent indices: $(seq -s ', ' 0 $((NUM_AGENTS-1)))"
@@ -144,9 +144,9 @@ while (( offset < NUM_AGENTS )); do
   # Array task IDs must stay within cluster MaxArraySize (often 0–999): use 0..chunk-1 + SLURM_ARRAY_OFFSET (see submit_sb3_cond.sh)
   last=$((chunk - 1))
 
-  echo "[SUBMIT] sbatch --array=0-${last}%${MAX_PARALLEL} SLURM_ARRAY_OFFSET=${offset} ... \"$SLURM_SCRIPT\""
+  echo "[SUBMIT] sbatch --array=0-${last}%${MAX_CONCURRENT} SLURM_ARRAY_OFFSET=${offset} ... \"$SLURM_SCRIPT\""
   sbatch \
-    --array="0-${last}%${MAX_PARALLEL}" \
+    --array="0-${last}%${MAX_CONCURRENT}" \
     --export=ALL,MANIFEST_PATH="$MANIFEST_PATH",SLURM_ARRAY_OFFSET="$offset" \
     ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
     "$SLURM_SCRIPT"

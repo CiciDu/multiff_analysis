@@ -769,6 +769,7 @@ def build_vis_encoding_design(
         meta_df_used,
         temporal_meta,
         tuning_meta,
+        raw_behavioral_feats,
     ) = encode_stops_utils.build_stop_encoding_design(
         pn,
         datasets,
@@ -799,6 +800,7 @@ def build_vis_encoding_design(
         meta_df_used,
         temporal_meta,
         tuning_meta,
+        raw_behavioral_feats,
     )
 
 

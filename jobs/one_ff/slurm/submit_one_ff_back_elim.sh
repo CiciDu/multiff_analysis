@@ -31,7 +31,7 @@ EOF
 # Defaults
 # ------------------------------
 N_UNITS=128
-MAX_PARALLEL=3
+MAX_CONCURRENT=5
 FORWARD_ARGS=()
 
 # ------------------------------
@@ -46,7 +46,7 @@ while (( "$#" )); do
       ;;
     --max-parallel)
       [ -z "${2:-}" ] && { echo "--max-parallel requires an argument"; exit 1; }
-      MAX_PARALLEL="$2"
+      MAX_CONCURRENT="$2"
       shift 2
       ;;
     -h|--help)
@@ -64,13 +64,13 @@ ARRAY_MAX=$((N_UNITS - 1))
 
 echo "[SUBMIT] One-FF Backward Elimination"
 echo "[SUBMIT] Units: $N_UNITS (0-$ARRAY_MAX)"
-echo "[SUBMIT] Max concurrent: $MAX_PARALLEL"
+echo "[SUBMIT] Max concurrent: $MAX_CONCURRENT"
 echo "[SUBMIT] Slurm script: $SLURM_SCRIPT"
 
 # ------------------------------
 # Submit job
 # ------------------------------
 sbatch \
-  --array=0-"$ARRAY_MAX"%$MAX_PARALLEL \
+  --array=0-"$ARRAY_MAX"%$MAX_CONCURRENT \
   ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"} \
   "$SLURM_SCRIPT"
