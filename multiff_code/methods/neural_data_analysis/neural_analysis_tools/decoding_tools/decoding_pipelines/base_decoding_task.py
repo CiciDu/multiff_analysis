@@ -229,9 +229,32 @@ class BaseDecodingTask:
         )
         neural_cols = list(getattr(self.binned_spikes, "columns", []))
         hist_blocks = []
+        missing_neurons = []
+        n_hist_features = int(_basis.shape[1]) if _basis is not None else 0
         for neuron in neural_cols:
-            neuron_key = self._resolve_spike_history_neuron_key(neuron, X_hist)
+            try:
+                neuron_key = self._resolve_spike_history_neuron_key(neuron, X_hist)
+            except KeyError:
+                missing_neurons.append(neuron)
+                neuron_str = str(neuron)
+                if neuron_str.startswith("cluster_"):
+                    neuron_label = neuron_str
+                else:
+                    neuron_label = f"cluster_{neuron_str}"
+                if basis_type == "raised_cosine":
+                    missing_cols = [f"{neuron_label}:b0:{k}" for k in range(n_hist_features)]
+                else:
+                    missing_cols = [f"{neuron_label}:lag:{k}" for k in range(n_hist_features)]
+                hist_blocks.append(pd.DataFrame(0.0, index=self.bin_df.index, columns=missing_cols))
+                continue
+
             hist_blocks.append(X_hist[neuron_key][colnames[neuron_key]].reset_index(drop=True))
+
+        if missing_neurons:
+            print(
+                f"[{type(self).__name__}] WARNING: spike-history features missing for "
+                f"{len(missing_neurons)} neuron(s) {missing_neurons[:10]}; filling zeros."
+            )
 
         self.spike_history_features_df = (
             pd.concat(hist_blocks, axis=1) if hist_blocks else pd.DataFrame(index=self.bin_df.index)

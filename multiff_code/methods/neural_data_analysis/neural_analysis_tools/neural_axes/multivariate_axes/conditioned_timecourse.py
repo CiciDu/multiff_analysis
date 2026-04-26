@@ -480,7 +480,7 @@ class ConditionedTimecourseMixin:
 
             for ax_i in axis_indices:
                 mask = stats_df['axis_idx'].to_numpy() == ax_i
-                p = stats_df.loc[mask, 'p_perm'].to_numpy()
+                p = stats_df.loc[mask, 'p_perm'].to_numpy(copy=True)
                 q, rej = self._fdr_bh(p, alpha=float(fdr_alpha))
                 stats_df.loc[mask, 'q_fdr'] = q
                 stats_df.loc[mask, 'reject_fdr'] = rej

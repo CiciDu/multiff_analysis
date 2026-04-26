@@ -385,6 +385,29 @@ class BaseEncodingTask:
         ]
         return {k: save_dir / f"{k}.pkl" for k in keys}
 
+    def load_cached_spk_colnames(self) -> bool:
+        """Load cached spike-history column metadata when available."""
+        if self.spk_colnames is not None:
+            return True
+
+        path = self._get_design_matrix_paths()["spk_colnames"]
+        if not path.exists():
+            return False
+
+        try:
+            with open(path, "rb") as f:
+                self.spk_colnames = pickle.load(f)
+            if self.spk_colnames is None:
+                return False
+            self.spike_cols = list(self.spk_colnames.keys())
+            return True
+        except Exception as e:
+            print(
+                f"[{type(self).__name__}] WARNING: could not load cached "
+                f"spk_colnames: {type(e).__name__}: {e}"
+            )
+            return False
+
     def _save_design_matrices(self):
         paths = self._get_design_matrix_paths()
         paths["binned_feats"].parent.mkdir(parents=True, exist_ok=True)
@@ -448,9 +471,9 @@ class BaseEncodingTask:
                 self.tuning_meta = pickle.load(f)
             with open(paths["bin_df"], "rb") as f:
                 self.bin_df = pickle.load(f)
-            with open(paths["spk_colnames"], "rb") as f:
-                self.spk_colnames = pickle.load(f)
-                self.spike_cols = list(self.spk_colnames.keys())
+            if not self.load_cached_spk_colnames():
+                self.spk_colnames = None
+                self.spike_cols = None
             if paths["meta_df_used"].exists():
                 with open(paths["meta_df_used"], "rb") as f:
                     self.meta_df_used = pickle.load(f)

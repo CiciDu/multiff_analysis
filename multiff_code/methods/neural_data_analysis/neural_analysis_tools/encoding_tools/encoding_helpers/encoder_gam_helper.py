@@ -706,7 +706,7 @@ class BaseEncodingGAMAnalysisHelper:
         self.runner.get_design_for_unit(unit_idx)
         binned_spikes = self.runner.binned_spikes
         y = np.asarray(
-            binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+            binned_spikes.iloc[:, unit_idx].to_numpy(copy=True), dtype=float).ravel()
         lam_cfg = self._resolve_lambda_config(lambda_config)
         groups = self.runner.get_gam_groups()
         return self.runner.design_df, y, groups, lam_cfg
@@ -940,7 +940,7 @@ class BaseEncodingGAMAnalysisHelper:
 
     def _extract_response_vector(self, unit_idx: int) -> np.ndarray:
         y = np.asarray(
-            self.runner.binned_spikes.iloc[:, unit_idx].to_numpy(),
+            self.runner.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True),
             dtype=float,
         ).ravel()
         return y

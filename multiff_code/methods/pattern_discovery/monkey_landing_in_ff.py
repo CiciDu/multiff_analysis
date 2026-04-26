@@ -25,18 +25,31 @@ np.set_printoptions(suppress=True)
 pd.options.display.max_rows = 101
 
 
-def iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, initial_duration_before_stop=2, reward_boundary_radius=25):
+def iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, initial_duration_before_stop=2, reward_boundary_radius=25, max_duration_counter=50):
     # This function will iteratively get monkey's info before the stop until it contains at least one point before entering the reward boundary
     duration_before_stop = initial_duration_before_stop
     duration_counter = 1
     monkey_sub = _get_subset_of_monkey_info(
         monkey_information, ff_real_position_sorted, ff_index, time, duration_before_stop, duration_counter=duration_counter)
+    prev_len = len(monkey_sub)
     # if all the points are within reward_boundary, then we might not have covered all points, in which case we will use a longer time
     while monkey_sub['distance_to_ff_center'].max() < reward_boundary_radius:
         duration_counter += 1
         print(f"duration_counter: {duration_counter}")
+        if duration_counter > max_duration_counter:
+            print(f"Warning: hit max_duration_counter={max_duration_counter} for ff_index={ff_index} at time={time}. No point found outside reward boundary.")
+            break
         monkey_sub = _get_subset_of_monkey_info(
             monkey_information, ff_real_position_sorted, ff_index, time, duration_before_stop, duration_counter=duration_counter)
+        # stop expanding if window has reached time=0 (can't go further back)
+        if time - duration_before_stop * duration_counter <= 0:
+            print(f"Warning: window reached time=0 for ff_index={ff_index} at time={time}. Stopping expansion.")
+            break
+        # stop expanding if window has hit the beginning of monkey_information (no new rows added)
+        if len(monkey_sub) == prev_len:
+            print(f"Warning: window reached beginning of data for ff_index={ff_index} at time={time}. No point found outside reward boundary.")
+            break
+        prev_len = len(monkey_sub)
     monkey_sub = monkey_sub[monkey_sub['distance_to_ff_center']
                             <= reward_boundary_radius]
     return monkey_sub
@@ -44,8 +57,9 @@ def iterate_to_get_subset_of_monkey_info(monkey_information, ff_real_position_so
 
 def _get_subset_of_monkey_info(monkey_information, ff_real_position_sorted, ff_index, time, duration_before_stop, duration_counter=1):
     # for the 2 seconds before the stop, get the monkey's trajectory and calculate the distance to the ff center
+    lower_bound = max(0, time - duration_before_stop * duration_counter)
     monkey_sub = monkey_information[monkey_information['time'].between(
-        time-duration_before_stop * duration_counter, time)].copy()
+        lower_bound, time)].copy()
     monkey_sub[['ff_x', 'ff_y']] = ff_real_position_sorted[ff_index]
     monkey_sub['distance_to_ff_center'] = np.sqrt(
         (monkey_sub['ff_x'] - monkey_sub['monkey_x'])**2 + (monkey_sub['ff_y'] - monkey_sub['monkey_y'])**2)

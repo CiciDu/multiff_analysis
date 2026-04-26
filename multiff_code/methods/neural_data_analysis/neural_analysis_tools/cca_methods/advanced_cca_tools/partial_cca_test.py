@@ -149,8 +149,8 @@ def partial_cca_incremental_cv(
 
     # Split into BASE (everything except block) and BLOCK (just the lag block)
     if X_is_df:
-        X_base  = X_full.iloc[:, ~mask_block].to_numpy()
-        X_block = X_full.iloc[:,  mask_block].to_numpy()
+        X_base  = X_full.iloc[:, ~mask_block].to_numpy(copy=True)
+        X_block = X_full.iloc[:,  mask_block].to_numpy(copy=True)
     else:
         X_base  = X_np[:, ~mask_block]
         X_block = X_np[:,  mask_block]

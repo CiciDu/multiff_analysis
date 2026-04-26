@@ -160,10 +160,10 @@ def _kernel_and_ci_for_prefix(
         raise ValueError(
             f'basis/columns mismatch for {prefix!r}: K={B.shape[1]} vs {len(cols)} cols')
 
-    beta = coef.loc[cols].to_numpy()
+    beta = coef.loc[cols].to_numpy(copy=True)
     mean = B @ beta
 
-    C = cov.loc[cols, cols].to_numpy()
+    C = cov.loc[cols, cols].to_numpy(copy=True)
     var = np.einsum('li,ij,lj->l', B, C, B)
     std = np.sqrt(np.maximum(var, 0.0))
     t = np.arange(B.shape[0]) * dt
@@ -316,8 +316,8 @@ def get_angle_tuning_with_ci(
             raise ValueError(
                 'Sin and cos angle kernels must share lag length.')
 
-        beta_s = coef.loc[sin_cols_k].to_numpy()
-        beta_c = coef.loc[cos_cols_k].to_numpy()
+        beta_s = coef.loc[sin_cols_k].to_numpy(copy=True)
+        beta_c = coef.loc[cos_cols_k].to_numpy(copy=True)
         ksin = B_sin @ beta_s
         kcos = B_cos @ beta_c
         L = ksin.shape[0]
@@ -343,7 +343,7 @@ def get_angle_tuning_with_ci(
 
         # build selector in the order [sin_cols..., cos_cols..., (const?)]
         col_order = list(sin_cols_k) + list(cos_cols_k)
-        Sigma = cov.loc[col_order, col_order].to_numpy()
+        Sigma = cov.loc[col_order, col_order].to_numpy(copy=True)
 
         # design over theta: row = [sinθ * rs | cosθ * rc | (1 if intercept)]
         S = np.sin(theta)[:, None] * rs[None, :]        # (T, K_s)
@@ -353,11 +353,11 @@ def get_angle_tuning_with_ci(
         if include_intercept and 'const' in coef.index:
             # augment Σ and D with intercept column
             col_order_int = col_order + ['const']
-            Sigma = cov.loc[col_order_int, col_order_int].to_numpy()
+            Sigma = cov.loc[col_order_int, col_order_int].to_numpy(copy=True)
             D = np.hstack([D, np.ones((D.shape[0], 1), float)])
-            beta_sub = coef.loc[col_order_int].to_numpy()
+            beta_sub = coef.loc[col_order_int].to_numpy(copy=True)
         else:
-            beta_sub = coef.loc[col_order].to_numpy()
+            beta_sub = coef.loc[col_order].to_numpy(copy=True)
 
         f = D @ beta_sub
         var = np.einsum('ti,ij,tj->t', D, Sigma, D)
@@ -389,8 +389,8 @@ def get_angle_tuning_with_ci(
     for m in range(1, int(M)+1):
         cols.extend([cos_cols_s[m-1], sin_cols_s[m-1]])
 
-    Sigma = cov.loc[cols, cols].to_numpy()
-    beta_sub = coef.loc[cols].to_numpy()
+    Sigma = cov.loc[cols, cols].to_numpy(copy=True)
+    beta_sub = coef.loc[cols].to_numpy(copy=True)
 
     # build D(theta): [cos θ, sin θ, cos 2θ, sin 2θ, ...]
     T = theta.size
@@ -401,8 +401,8 @@ def get_angle_tuning_with_ci(
 
     if include_intercept and 'const' in coef.index:
         cols_int = cols + ['const']
-        Sigma = cov.loc[cols_int, cols_int].to_numpy()
-        beta_sub = coef.loc[cols_int].to_numpy()
+        Sigma = cov.loc[cols_int, cols_int].to_numpy(copy=True)
+        beta_sub = coef.loc[cols_int].to_numpy(copy=True)
         D = np.hstack([D, np.ones((T, 1), float)])
 
     f = D @ beta_sub

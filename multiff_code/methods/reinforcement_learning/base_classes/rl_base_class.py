@@ -604,6 +604,8 @@ class _RLforMultifirefly(animation_class.AnimationClass):
             self.monkey_information_path = os.path.join(
                 self.processed_data_folder_path, 'monkey_information.csv')
             self.monkey_information.to_csv(self.monkey_information_path)
+            ff_in_obs_df_path = os.path.join(self.processed_data_folder_path, 'ff_in_obs_df.parquet')
+            self.ff_in_obs_df.to_parquet(ff_in_obs_df_path)
             print("saved monkey_information and ff info at",
                   (self.processed_data_folder_path))
         self.make_or_retrieve_ff_dataframe_for_agent(
@@ -630,6 +632,10 @@ class _RLforMultifirefly(animation_class.AnimationClass):
                 self.monkey_information_path).drop(columns=["Unnamed: 0", "Unnamed: 0.1"], errors='ignore')
             self.monkey_information = process_monkey_information._process_monkey_information_for_agent(
                 self.monkey_information)
+
+        if not hasattr(self, 'ff_in_obs_df'):
+            ff_in_obs_df_path = os.path.join(self.processed_data_folder_path, 'ff_in_obs_df.parquet')
+            self.ff_in_obs_df = pd.read_parquet(ff_in_obs_df_path)
 
         self.make_or_retrieve_closest_stop_to_capture_df(exists_ok=False)
         self.make_ff_caught_T_new()

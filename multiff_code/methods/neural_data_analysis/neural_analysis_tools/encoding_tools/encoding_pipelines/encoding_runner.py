@@ -76,7 +76,18 @@ class EncodingRunner:
     def get_effective_num_neurons(self) -> int:
         """Neuron count valid for both response matrix and design metadata."""
         self.task.collect_data(exists_ok=True)
-        if hasattr(self.task, "_prepare_spike_history_components"):
+
+        if getattr(self.task, "spk_colnames", None) is None:
+            loaded_cached_spk_colnames = False
+            if hasattr(self.task, "load_cached_spk_colnames"):
+                loaded_cached_spk_colnames = self.task.load_cached_spk_colnames()
+            if not loaded_cached_spk_colnames:
+                self.task.collect_data(exists_ok=False)
+
+        if (
+            getattr(self.task, "spk_colnames", None) is None
+            and hasattr(self.task, "_prepare_spike_history_components")
+        ):
             self.task._prepare_spike_history_components()
         if hasattr(self.task, "get_effective_num_neurons"):
             return self.task.get_effective_num_neurons()

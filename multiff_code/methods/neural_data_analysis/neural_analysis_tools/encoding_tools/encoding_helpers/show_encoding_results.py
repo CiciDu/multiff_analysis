@@ -19,11 +19,13 @@ def collect_category_ecdf_from_sessions(
     *,
     raw_data_dir_name='all_monkey_data/raw_monkey_data',
     task_class=None,
+    model='pgam',
     bin_width=0.04,
     exists_ok=True,
     save_path=None,
     use_neural_coupling=False,
     cv_mode: Optional[str] = None,
+    use_cached_session_data_only=True,
 ):
     """
     Gather category variance ECDF data from all sessions for given monkeys.
@@ -36,6 +38,9 @@ def collect_category_ecdf_from_sessions(
         Base directory for raw data.
     task_class : class
         e.g. encoding_tasks.StopEncodingTask (uses global if None)
+    model : str or class or instance
+        Encoding model selector. Supports ``'pgam'`` and ``'rnn'``, or a model
+        class / pre-instantiated model object from ``encoding_models``.
     bin_width : float
     exists_ok : bool
         If True, load from save_path when available; save results after computing.
@@ -52,8 +57,50 @@ def collect_category_ecdf_from_sessions(
     -------
     session_results_list : list of (session_label, all_results)
     """
+    import copy
     import pickle
     from pathlib import Path
+
+    def _resolve_model(model_spec, effective_cv_mode):
+        model_map = {
+            'pgam': encoding_models.PGAMModel,
+            'gam': encoding_models.PGAMModel,
+            'rnn': encoding_models.RNNModel,
+        }
+
+        model_instance = None
+        if model_spec is None:
+            model_class = encoding_models.PGAMModel
+        elif isinstance(model_spec, str):
+            model_key = model_spec.strip().lower()
+            if model_key not in model_map:
+                valid = ', '.join(sorted(model_map))
+                raise ValueError(
+                    f"Unknown model={model_spec!r}. Expected one of: {valid}, "
+                    "or a model class / instance."
+                )
+            model_class = model_map[model_key]
+        elif isinstance(model_spec, type):
+            model_class = model_spec
+        else:
+            model_instance = model_spec
+            model_class = type(model_instance)
+
+        if model_instance is None:
+            init_kwargs = {}
+            if effective_cv_mode is not None:
+                try:
+                    init_params = model_class.__init__.__code__.co_varnames
+                except AttributeError:
+                    init_params = ()
+                if 'cv_mode' in init_params:
+                    init_kwargs['cv_mode'] = effective_cv_mode
+            model_instance = model_class(**init_kwargs)
+        elif effective_cv_mode is not None and hasattr(model_instance, 'cv_mode'):
+            model_instance.cv_mode = effective_cv_mode
+
+        model_name = model_class.__name__
+        return model_instance, model_name
 
     tc = task_class
     if tc is None:
@@ -67,9 +114,18 @@ def collect_category_ecdf_from_sessions(
         )
 
     effective_cv_mode = cv_mode if cv_mode is not None else _DEFAULT_CV_MODE
+    model_instance, model_name = _resolve_model(model, effective_cv_mode)
+
+    if not hasattr(model_instance, 'run_category_variance_contributions'):
+        raise NotImplementedError(
+            f"{model_name} does not support category variance contributions, so "
+            "it cannot be used with collect_category_ecdf_from_sessions. "
+            "Use PGAMModel/'pgam' for this helper, or add an equivalent "
+            "run_category_variance_contributions implementation to the model."
+        )
 
     # Default save path when exists_ok
-    # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/{cv_mode}/category_ecdf_{monkeys}.pkl
+    # Uses: .../encoding_outputs/{stop|vis|pn}_encoder_outputs/{coupling|no_coupling}/[{model}/]{cv_mode}/category_ecdf_{monkeys}.pkl
     if save_path is None:
         # Map runner class to encoder type
         tc_name = tc.__name__
@@ -84,6 +140,7 @@ def collect_category_ecdf_from_sessions(
 
         base = raw_data_dir_name.replace('raw_monkey_data', 'planning_and_neural')
         coupling_subdir = "coupling" if use_neural_coupling else "no_coupling"
+        model_subdir = model_name.removesuffix('Model').lower()
         # Use first monkey for path; filename includes all monkeys for multi-monkey runs
         monkey_for_path = sorted(monkey_names)[0]
         monkeys_str = '_'.join(sorted(monkey_names)).replace(' ', '_')
@@ -94,8 +151,10 @@ def collect_category_ecdf_from_sessions(
             / "encoding_outputs"
             / encoder_dir
             / coupling_subdir
-            / str(effective_cv_mode)
         )
+        if model_name != 'PGAMModel':
+            cache_dir = cache_dir / model_subdir
+        cache_dir = cache_dir / str(effective_cv_mode)
         cache_dir.mkdir(parents=True, exist_ok=True)
         save_path = cache_dir / f"category_ecdf_{monkeys_str}.pkl"
     elif save_path is not None:
@@ -199,10 +258,14 @@ def collect_category_ecdf_from_sessions(
                     bin_width=bin_width,
                     encoder_prs=prs,
                 )
-                model = encoding_models.PGAMModel(cv_mode=effective_cv_mode)
+                session_model = copy.deepcopy(model_instance)
                 runner = encoding_runner.EncodingRunner(
-                    task, model, use_neural_coupling=use_neural_coupling
+                    task, session_model, use_neural_coupling=use_neural_coupling
                 )
+                if use_cached_session_data_only:
+                    if not runner.task._load_design_matrices():
+                        print(f'Failed to collect data for {raw_data_folder_path}')
+                        continue
                 all_results = plot_gam_fit.run_unit_ecdf_collect(runner)
                 session_results_list.append((session_label, all_results))
             except Exception as e:

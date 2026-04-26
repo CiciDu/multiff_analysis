@@ -33,7 +33,7 @@ def count_visible_from_time_df_fast(
         return np.zeros(B, dtype=np.int32)
 
     times = times_all[in_range]
-    ff_vis = ff_df.loc[vis_mask, ff_col].to_numpy()[in_range]
+    ff_vis = ff_df.loc[vis_mask, ff_col].to_numpy(copy=True)[in_range]
 
     # 3) map times to ORIGINAL bin rows (robust to gaps & unsorted bins)
     bin_idx = map_times_to_bin_idx_unsorted(bins_2d, times)

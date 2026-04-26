@@ -223,7 +223,7 @@ class BaseEncodingModel:
         feats = self._behavioral_feats(task)
         if categorical_cols is None:
             categorical_cols = self.find_categorical_vars(task)
-        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True), dtype=float).ravel()
         result_df = linear_model_utils.anova_spike_counts_for_columns(
             y=y, binned_feats=feats, categorical_cols=categorical_cols, alpha=alpha,
         )
@@ -313,7 +313,7 @@ class BaseEncodingModel:
                 continuous_cols=continuous_cols, covariates_cache=covariates_cache,
             )
 
-        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True), dtype=float).ravel()
         result_df = linear_model_utils.lm_spike_counts_for_columns(
             y=y, binned_feats=feats,
             categorical_cols=categorical_cols, continuous_cols=continuous_cols,
@@ -581,7 +581,7 @@ class PGAMModel(BaseEncodingModel):
                 f"{len(design_df)} vs {len(task.binned_spikes)}"
             )
 
-        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True), dtype=float).ravel()
 
         if save_path is None:
             paths = self.get_gam_save_paths(
@@ -654,7 +654,7 @@ class PGAMModel(BaseEncodingModel):
                 f"{len(design_df)} vs {len(task.binned_spikes)}"
             )
 
-        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(), dtype=float).ravel()
+        y = np.asarray(task.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True), dtype=float).ravel()
         dt = dt if dt is not None else float(task.bin_width)
         fit_kwargs = fit_kwargs or {}
 
@@ -1199,7 +1199,7 @@ class RNNModel(BaseEncodingModel):
 
         groups = self._get_groups(task)
         X = self._get_X(task)
-        y = task.binned_spikes.iloc[:, unit_idx].to_numpy()
+        y = task.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True)
         all_idx = np.arange(len(X))
         X_list, y_list = self._make_sequences(X, y, groups, all_idx)
         X_t, y_t = self._to_tensors(X_list, y_list)
@@ -1264,7 +1264,7 @@ class RNNModel(BaseEncodingModel):
 
         groups = self._get_groups(task)
         X = self._get_X(task)
-        y = task.binned_spikes.iloc[:, unit_idx].to_numpy()
+        y = task.binned_spikes.iloc[:, unit_idx].to_numpy(copy=True)
         n = len(X)
 
         groups_for_folds = groups if effective_cv == "group_kfold" else None

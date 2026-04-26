@@ -126,16 +126,16 @@ def unpack_ff_information_of_agent(ff_information, env_ff_flash, env_end_time):
     ff_caught_T_new = t_capture[sorted_captured]
     ff_believed_position_sorted = ff_information.loc[
         sorted_captured, ["agent_x_at_capture", "agent_y_at_capture"]
-    ].to_numpy()
+    ].to_numpy().copy()
 
     # --- 7. Real positions and lifetimes (for all fireflies) ---
     ff_real_position_sorted = ff_information.loc[
         sorted_indices_all, ["ffx", "ffy"]
-    ].to_numpy()
+    ].to_numpy().copy()
 
     ff_life_sorted = ff_information.loc[
         sorted_indices_all, ["t_spawn", "t_despawn"]
-    ].to_numpy()
+    ].to_numpy().copy()
 
     # Replace -9999 t_despawn with env_end_time
     missing_despawn_mask = t_despawn[sorted_indices_all] == -9999
@@ -334,9 +334,9 @@ def _extract_agent_dt_monkey_segment(monkey_df,
     )
 
     return increase_dt_for_monkey_information(
-        monkey_df.loc[mask, 'time'].to_numpy(),
-        monkey_df.loc[mask, 'monkey_x'].to_numpy(),
-        monkey_df.loc[mask, 'monkey_y'].to_numpy(),
+        monkey_df.loc[mask, 'time'].to_numpy(copy=True),
+        monkey_df.loc[mask, 'monkey_x'].to_numpy(copy=True),
+        monkey_df.loc[mask, 'monkey_y'].to_numpy(copy=True),
         agent_dt
     ), mask
 
@@ -628,9 +628,9 @@ def find_corresponding_info_of_agent(env, sac_model, info_of_monkey, start_time,
 
     A_cum_t, A_cum_mx, A_cum_my, A_cum_speed, A_cum_angle, A_cum_dw = \
         increase_dt_for_monkey_information(
-            monkey_df.loc[mask, 'time'].to_numpy(),
-            monkey_df.loc[mask, 'monkey_x'].to_numpy(),
-            monkey_df.loc[mask, 'monkey_y'].to_numpy(),
+            monkey_df.loc[mask, 'time'].to_numpy(copy=True),
+            monkey_df.loc[mask, 'monkey_x'].to_numpy(copy=True),
+            monkey_df.loc[mask, 'monkey_y'].to_numpy(copy=True),
             agent_dt
         )
 

@@ -261,7 +261,7 @@ def plot_observed_vs_predicted_event(
     pred_rate_hz = np.asarray(pred_counts, dtype=float) / exp_s
 
     # --- time axis (apply same "good" filter, then optional sort)
-    t = meta_df_used.loc[mask, time_col].to_numpy()
+    t = meta_df_used.loc[mask, time_col].to_numpy(copy=True)
     t = t[good]
 
     if sort_by_time:

@@ -7,7 +7,7 @@
 #SBATCH --mem=5G
 #SBATCH --time=48:00:00
 #SBATCH --mail-type=END,FAIL
-#SBATCH --exclude=mind-1-29
+#SBATCH --exclude=mind-1-29,mind-1-15
 
 # --------------------------------------------------
 # Shell safety

@@ -151,7 +151,7 @@ def cv_score_per_cluster(
         for train_idx, test_idx in gkf.split(df_X, groups=groups):
             Xt, Xv = df_X.iloc[train_idx], df_X.iloc[test_idx]
             yt, yv = df_Y.iloc[train_idx, j].to_numpy(
-            ), df_Y.iloc[test_idx, j].to_numpy()
+            ), df_Y.iloc[test_idx, j].to_numpy(copy=True)
             ot, ov = offset.iloc[train_idx], offset.iloc[test_idx]
 
             # Full model

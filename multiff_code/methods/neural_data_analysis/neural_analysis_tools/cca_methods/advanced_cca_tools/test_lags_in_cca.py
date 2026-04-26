@@ -139,8 +139,8 @@ def evaluate_lag_block_in_full_model(
     # BASE = all features except lag block
     # BLOCK = only the lag block
     if X_is_df:
-        X_base  = X_full.iloc[:, ~mask_block].to_numpy()
-        X_block = X_full.iloc[:,  mask_block].to_numpy()
+        X_base  = X_full.iloc[:, ~mask_block].to_numpy(copy=True)
+        X_block = X_full.iloc[:,  mask_block].to_numpy(copy=True)
     else:
         X_base  = X_np[:, ~mask_block]
         X_block = X_np[:,  mask_block]

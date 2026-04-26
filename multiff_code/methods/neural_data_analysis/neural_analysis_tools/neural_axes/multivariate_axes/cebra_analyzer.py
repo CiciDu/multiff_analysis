@@ -162,7 +162,7 @@ class CEBRAAnalyzer:
 
             for i, b in enumerate(event_bins):
                 if 0 <= b < len(y):
-                    y[b] = self.behavior_df[self.behavior_cols].iloc[i].to_numpy()
+                    y[b] = self.behavior_df[self.behavior_cols].iloc[i].to_numpy(copy=True)
 
             model = CEBRA(
                 model_architecture=model_architecture,

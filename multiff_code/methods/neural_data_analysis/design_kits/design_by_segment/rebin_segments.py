@@ -242,7 +242,7 @@ def rebin_all_segments_global_bins_pick_point(
 
         old_seg_per_sample = extras[segment_col]
         required_old_seg = new_seg_info.set_index('new_segment')[segment_col]
-        req = required_old_seg.loc[new_seg_id].to_numpy()
+        req = required_old_seg.loc[new_seg_id].to_numpy(copy=True)
 
         ok = old_seg_per_sample[sample_idx] == req
         sample_idx = sample_idx[ok]
@@ -867,7 +867,7 @@ def rebin_all_segments_global_bins(
         old_seg_per_sample = extras[segment_col]
         required_old_seg = new_seg_info.set_index('new_segment')[segment_col]
 
-        req = required_old_seg.loc[new_seg_id].to_numpy()
+        req = required_old_seg.loc[new_seg_id].to_numpy(copy=True)
         ok_old = old_seg_per_sample[sample_idx] == req
 
         sample_idx = sample_idx[ok_old]
