@@ -595,7 +595,7 @@ class PGAMclass():
                     filtwidth=2,
                     random_state=0,
                     force_recompute=False,
-                    load_only=False,
+                    retrieve_only=False,
                     cv_mode='blocked_time_buffered',
                     buffer_samples=20,
                     cv_groups=None,
@@ -625,7 +625,7 @@ class PGAMclass():
             else:
                 print(
                     f'No cached CV results found for neuron {neural_cluster_number} at {filename}, computing...')
-                if load_only:
+                if retrieve_only:
                     raise FileNotFoundError(
                         f'No cached CV results found for neuron {neural_cluster_number} at {filename}')
 

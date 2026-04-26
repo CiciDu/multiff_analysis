@@ -1258,8 +1258,13 @@ def plot_tuning_heatmaps(
         plt.show()
         
 
-def run_unit_ecdf(runner, log_x=False):
+def run_unit_ecdf(runner, log_x=False, retrieve_only=True):
     all_results = []
+
+    if retrieve_only:
+        if not runner.task.load_cached_spk_colnames():
+            print('No cached spike-history column metadata found')
+            return all_results
 
     for u in range(runner.get_effective_num_neurons()):
         try:
@@ -1272,8 +1277,13 @@ def run_unit_ecdf(runner, log_x=False):
             # print(f'Error for unit {u}: {e}. Will stop trying further units.')
             break
 
+    if len(all_results) == 0:
+        print('No results found for any units')
+        return all_results
+
     all_results = plot_gam_fit.add_clipped_leave_delta_metric(all_results)
 
+    print('plot_category_ecdf')
     plot_gam_fit.plot_category_ecdf(
         all_results,
         metric_key='delta_pseudo_r2_clip_leave',

@@ -157,7 +157,7 @@ class OneFFPGAMRunner:
         filtwidth: int = 2,
         kernel_h_length: int = 100,
         load_if_exists: bool = True,
-        load_only: bool = False,
+        retrieve_only: bool = False,
     ) -> Dict:
         """
         Run PGAM for one unit (fit if needed) and run CV.
@@ -180,7 +180,7 @@ class OneFFPGAMRunner:
                     neural_cluster_number=unit_idx,
                     n_splits=n_splits,
                     filtwidth=filtwidth,
-                    load_only=True,
+                    retrieve_only=True,
                 )
                 self.unit_idx = unit_idx
                 self.pgam_runner = quick_runner
@@ -205,7 +205,7 @@ class OneFFPGAMRunner:
             except FileNotFoundError:
                 loaded_existing = False
 
-        if (not loaded_existing) and (not load_only):
+        if (not loaded_existing) and (not retrieve_only):
             self.pgam_runner.run_pgam(neural_cluster_number=unit_idx)
             self.pgam_runner.kernel_h_length = kernel_h_length
             self.pgam_runner.post_processing_results(neural_cluster_number=unit_idx)
@@ -215,7 +215,7 @@ class OneFFPGAMRunner:
             neural_cluster_number=unit_idx,
             n_splits=n_splits,
             filtwidth=filtwidth,
-            load_only=load_only,
+            retrieve_only=retrieve_only,
         )
 
         return {

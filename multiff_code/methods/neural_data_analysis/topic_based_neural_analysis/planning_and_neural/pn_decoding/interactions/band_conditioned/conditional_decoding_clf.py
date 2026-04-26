@@ -64,7 +64,7 @@ def run_conditional_decoding_clf(
     load_if_exists=True,
     overwrite=False,
     verbosity: int = 1,
-    load_only=False,
+    retrieve_only=False,
 ):
     """
     Pairwise interaction decoding with paired, trial-level bootstrap
@@ -191,7 +191,7 @@ def run_conditional_decoding_clf(
         else:
             _log('Computing new results...', level=1)
 
-    if load_only:
+    if retrieve_only:
         print('Failed to load cached results. Returning empty results.')
         return None
 
@@ -561,7 +561,7 @@ def run_band_conditioned_clf_decoding(
     DISCRETE_INTERACTIONS,
     max_pairs=100,
     save_path=None,
-    load_only=False,
+    retrieve_only=False,
     verbosity=1,
     make_plots=True,
 ):
@@ -595,7 +595,7 @@ def run_band_conditioned_clf_decoding(
             interaction_col=new_col,
             save_path=save_path,
             verbosity=verbosity,
-            load_only=load_only,
+            retrieve_only=retrieve_only,
         )
 
         outs[f'{var_a}_vs_{var_b}'] = out

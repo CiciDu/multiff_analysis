@@ -292,7 +292,7 @@ def run_conditional_decoding_reg(
     load_if_exists=True,
     overwrite=False,
     verbosity: int = 1,
-    load_only=False,
+    retrieve_only=False,
 ):
     """
     Decode a continuous variable conditioned on a categorical variable.
@@ -409,7 +409,7 @@ def run_conditional_decoding_reg(
 
     
     
-    if load_only:
+    if retrieve_only:
         print('Failed to load cached results. Returning empty results.')
         return None
 
@@ -595,7 +595,7 @@ def run_band_conditioned_reg_decoding(
     CONTINUOUS_INTERACTIONS,
     max_pairs=100,
     save_path=None,
-    load_only=False,
+    retrieve_only=False,
     verbosity=1,
     make_plots=True,
 ):
@@ -628,7 +628,7 @@ def run_band_conditioned_reg_decoding(
             condition_col=var_b,
             model_types=('ridge', 'elasticnet'),
             save_path=save_path,
-            load_only=load_only,
+            retrieve_only=retrieve_only,
             verbosity=verbosity,
         )
         

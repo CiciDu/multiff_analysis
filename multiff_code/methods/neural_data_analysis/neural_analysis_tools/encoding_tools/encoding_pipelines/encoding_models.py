@@ -691,7 +691,7 @@ class PGAMModel(BaseEncodingModel):
         gam_results_subdir: str = "gam_results",
         n_folds: int = 5,
         load_if_exists: bool = True,
-        load_only: bool = False,
+        retrieve_only: bool = False,
         fit_kwargs: Optional[Dict] = None,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
@@ -704,6 +704,11 @@ class PGAMModel(BaseEncodingModel):
         task.collect_data(exists_ok=True)
         task._prepare_spike_history_components()
         effective_cv = cv_mode if cv_mode is not None else self.cv_mode
+
+        if retrieve_only:
+            if not task._load_design_matrices():
+                print('No cached data found')
+                return None
 
         n_neurons = self._get_effective_num_neurons(task)
         if unit_indices is None:
@@ -729,6 +734,7 @@ class PGAMModel(BaseEncodingModel):
                 fit_kwargs=fit_kwargs,
                 save_path=paths["cv_save_path"],
                 load_if_exists=load_if_exists,
+                retrieve_only=retrieve_only,
                 cv_mode=effective_cv,
                 buffer_samples=buffer_samples,
                 verbose=verbose,
@@ -1224,6 +1230,7 @@ class RNNModel(BaseEncodingModel):
         buffer_samples: Optional[int] = None,
         save_path: Optional[str] = None,
         load_if_exists: bool = True,
+        retrieve_only: bool = False,
         **kwargs,
     ) -> Dict:
         """
@@ -1256,11 +1263,14 @@ class RNNModel(BaseEncodingModel):
             
         print(f'save_path: {save_path}')
 
-        if load_if_exists and save_path.exists():
+        can_load = (load_if_exists or retrieve_only) and save_path.exists()
+        if can_load:
             if self.verbose:
                 print(f"[RNNModel] Loading cached CV results from {save_path}")
             with save_path.open("rb") as f:
                 return _pickle.load(f)
+        if retrieve_only:
+            raise FileNotFoundError(f"No cached CV result found at: {save_path}")
 
         groups = self._get_groups(task)
         X = self._get_X(task)
@@ -1339,6 +1349,7 @@ class RNNModel(BaseEncodingModel):
         cv_mode: Optional[str] = None,
         buffer_samples: Optional[int] = None,
         load_if_exists: bool = True,
+        retrieve_only: bool = False,
         unit_indices: Optional[List[int]] = None,
         verbose: bool = True,
         plot_cdf: bool = True,
@@ -1365,6 +1376,7 @@ class RNNModel(BaseEncodingModel):
                 cv_mode=effective_cv,
                 buffer_samples=effective_buf,
                 load_if_exists=load_if_exists,
+                retrieve_only=retrieve_only,
             )
             all_r2.append(res["mean_pseudo_r2"])
             if verbose:
@@ -1416,6 +1428,7 @@ class RNNModel(BaseEncodingModel):
         backward_n_folds: int = 10,
         alpha: float = 0.05,
         load_if_exists: bool = True,
+        retrieve_only: bool = False,
         verbose: bool = True,
         cv_mode: Optional[str] = None,
         buffer_samples: int = 20,
@@ -1448,6 +1461,7 @@ class RNNModel(BaseEncodingModel):
             cv_mode=effective_cv,
             buffer_samples=effective_buf,
             load_if_exists=load_if_exists,
+            retrieve_only=retrieve_only,
             verbose=verbose,
         )
 

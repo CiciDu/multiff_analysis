@@ -49,7 +49,7 @@ def main(args):
         filtwidth=2,
         kernel_h_length=100,
         load_if_exists=True,
-        load_only=False,
+        retrieve_only=False,
     )
 
     if result["loaded_existing"]:
